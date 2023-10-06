@@ -520,7 +520,7 @@ class pyOptSparseDriver(Driver):
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
-                jac_prom = self._prom_names_jac(jac)
+                jac_prom = self._prom_names_dict(jac)
                 opt_prob.addConGroup(prom_name, size,
                                      lower=lower - _y_intercepts[name],
                                      upper=upper - _y_intercepts[name],
@@ -902,9 +902,9 @@ class pyOptSparseDriver(Driver):
         # convert sens_dict to use promoted names
         sens_dict = self._prom_names_jac(sens_dict)
 
-        print("Derivatives calculated")
+        # print("Derivatives calculated")
         # print(dv_dict)
-        print(sens_dict, flush=True)
+        # print(sens_dict, flush=True)
         self._in_user_function = False
         return sens_dict, fail
 
