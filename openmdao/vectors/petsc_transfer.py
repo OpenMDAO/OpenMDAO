@@ -313,6 +313,10 @@ else:
                                 rev_xfer_in_nocolor[sub_out].append(input_inds)
                                 rev_xfer_out_nocolor[sub_out].append(output_inds)
                         else:
+                            if inp_is_dup and out_is_dup and src_indices is not None and src_indices.size > 0:
+                                offset = offsets_out[myrank, idx_out]
+                                output_inds = np.asarray(src_indices + offset, dtype=INT_DTYPE)
+
                             rev_xfer_in[sub_out].append(input_inds)
                             rev_xfer_out[sub_out].append(output_inds)
                 else:
