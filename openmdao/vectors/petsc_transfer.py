@@ -333,23 +333,33 @@ else:
                             rev_xfer_in_nocolor[sub_out]
                             rev_xfer_out_nocolor[sub_out]
 
+            total_fwd = 0
             for sname, inds in fwd_xfer_in.items():
-                fwd_xfer_in[sname] = _merge(inds)
+                inds = _merge(inds)
+                fwd_xfer_in[sname] = inds
                 fwd_xfer_out[sname] = _merge(fwd_xfer_out[sname])
+                total_fwd += len(inds)
 
             if rev:
+                total_rev = 0
                 for sname, inds in rev_xfer_out.items():
+                    inds = _merge(inds)
                     rev_xfer_in[sname] = _merge(rev_xfer_in[sname])
-                    rev_xfer_out[sname] = _merge(inds)
+                    rev_xfer_out[sname] = inds
+                    total_rev += len(inds)
+
+                total_rev_nocolor = 0
                 for sname, inds in rev_xfer_out_nocolor.items():
+                    inds = _merge(inds)
                     rev_xfer_in_nocolor[sname] = _merge(rev_xfer_in_nocolor[sname])
-                    rev_xfer_out_nocolor[sname] = _merge(inds)
+                    rev_xfer_out_nocolor[sname] = inds
+                    total_rev_nocolor += len(inds)
+
+            xfer_in = np.empty(total_fwd, dtype=INT_DTYPE)
+            xfer_out = np.empty(total_fwd, dtype=INT_DTYPE)
 
             if fwd_xfer_in:
-                xfer_in = np.concatenate(list(fwd_xfer_in.values()))
-                xfer_out = np.concatenate(list(fwd_xfer_out.values()))
-            else:
-                xfer_in = xfer_out = np.zeros(0, dtype=INT_DTYPE)
+                xfer_in, xfer_out = _merge_indices(total_fwd, fwd_xfer_in, fwd_xfer_out)
 
             out_vec = vectors['output']['nonlinear']
 
@@ -365,11 +375,7 @@ else:
                     inds, fwd_xfer_out[sname], group.comm)
 
             if rev:
-                if rev_xfer_in:
-                    xfer_in = np.concatenate(list(rev_xfer_in.values()))
-                    xfer_out = np.concatenate(list(rev_xfer_out.values()))
-                else:
-                    xfer_in = xfer_out = np.zeros(0, dtype=INT_DTYPE)
+                xfer_in, xfer_out = _merge_indices(total_rev, rev_xfer_in, rev_xfer_out)
 
                 xfer_all = PETScTransfer(vectors['input']['nonlinear'], out_vec,
                                          xfer_in, xfer_out, group.comm)
@@ -383,8 +389,8 @@ else:
                         rev_xfer_in[sname], inds, group.comm)
 
                 if has_rev_par_coloring and rev_xfer_in_nocolor:
-                    xfer_in = np.concatenate(list(rev_xfer_in_nocolor.values()))
-                    xfer_out = np.concatenate(list(rev_xfer_out_nocolor.values()))
+                    xfer_in, xfer_out = _merge_indices(total_rev_nocolor, rev_xfer_in_nocolor,
+                                                       rev_xfer_out_nocolor)
 
                     xrev[(None, 'nocolor')] = PETScTransfer(vectors['input']['nonlinear'], out_vec,
                                                             xfer_in, xfer_out, group.comm)
@@ -449,3 +455,39 @@ else:
                 if in_vec._alloc_complex:
                     data = in_vec._get_data()
                     data[:] = in_petsc.array
+
+
+def _merge_indices(total_size, in_inds, out_inds):
+    """
+    Merge indices into contiguous arrays and update index dicts to use subviews of the same array.
+
+    Parameters
+    ----------
+    total_size : int
+        Total size of the merged indices.
+    in_inds : dict
+        Input indices.
+    out_inds : dict
+        Output indices.
+
+    Returns
+    -------
+    int ndarray
+        Merged input indices.
+    int ndarray
+        Merged output indices.
+    """
+    xfer_in = np.empty(total_size, dtype=INT_DTYPE)
+    xfer_out = np.empty(total_size, dtype=INT_DTYPE)
+    start = end = 0
+    for idata, odata in zip(in_inds.items(), out_inds.items()):
+        sname, inp = idata
+        _, out = odata
+        end += len(inp)
+        xfer_in[start:end] = inp
+        xfer_out[start:end] = out
+        in_inds[sname] = xfer_in[start:end]
+        out_inds[sname] = xfer_out[start:end]
+        start = end
+
+    return xfer_in, xfer_out
