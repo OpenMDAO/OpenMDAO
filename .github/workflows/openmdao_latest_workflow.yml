@@ -143,8 +143,9 @@ jobs:
           python -m pip install --pre testflo
           python -m pip install --pre websockets
           python -m pip install --pre aiounittest
-          echo "greenlet is a playwright dependency that doesn't currently build properly for python 3.12"
-          python -m pip install --pre greenlet
+          echo "greenlet is a playwright dependency that doesn't currently build"
+          echo "properly for python 3.12 for versions less than 3.0"
+          python -m pip install --pre 'greenlet>=3'
           python -m pip install --pre playwright
           python -m pip install --pre num2words
 
