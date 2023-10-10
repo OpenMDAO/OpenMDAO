@@ -96,11 +96,6 @@ jobs:
           python -m pip install --upgrade pip
 
           echo "============================================================="
-          echo "Upgrade to latest setuptools"
-          echo "============================================================="
-          python -m pip install --upgrade setuptools
-
-          echo "============================================================="
           echo "Install latest versions of NumPy/SciPy"
           echo "============================================================="
           python -m pip install --pre numpy
@@ -148,10 +143,10 @@ jobs:
           python -m pip install --pre testflo
           python -m pip install --pre websockets
           python -m pip install --pre aiounittest
-          echo "the current latest version of playwright (1.38.0) is pinned to"
+          echo "the latest version of playwright (1.38.0) is pinned to"
           echo "greenlet 2.0.2 which does not build properly for python 3.12"
           echo "https://github.com/microsoft/playwright-python/issues/2096"
-          python -m pip install --pre playwright  || echo "Skipping playwright..."
+          python -m pip install --pre playwright  || echo "Skipping playwright, no GUI testing!"
           python -m pip install --pre num2words
 
           echo "============================================================="
@@ -174,6 +169,11 @@ jobs:
               echo "SNOPT source is not available"
           fi
           build_pyoptsparse $BRANCH $SNOPT
+
+          echo "============================================================="
+          echo "Ensure we have the latest setuptools"
+          echo "============================================================="
+          python -m pip install --upgrade setuptools
 
           echo "============================================================="
           echo "Install OpenMDAO"
