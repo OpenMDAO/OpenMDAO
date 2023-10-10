@@ -96,6 +96,11 @@ jobs:
           python -m pip install --upgrade pip
 
           echo "============================================================="
+          echo "Upgrade to latest setuptools"
+          echo "============================================================="
+          python -m pip install --upgrade setuptools
+
+          echo "============================================================="
           echo "Install latest versions of NumPy/SciPy"
           echo "============================================================="
           python -m pip install --pre numpy
