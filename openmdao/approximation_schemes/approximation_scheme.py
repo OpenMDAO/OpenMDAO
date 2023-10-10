@@ -534,10 +534,10 @@ class ApproximationScheme(object):
                         end_time = time.perf_counter()
                         prom_name = _convert_auto_ivc_to_conn_name(
                             system._conn_global_abs_in2out, wrt)
-                        self._progress_out.write(f"{fd_count+1}/{len(result)}: Checking "
+                        self._progress_out.write(f"{fd_count + 1}/{len(result)}: Checking "
                                                  f"derivatives with respect to: "
                                                  f"'{prom_name} [{vecidxs}]' ... "
-                                                 f"{round(end_time-start_time, 4)} seconds\n")
+                                                 f"{round(end_time - start_time, 4)} seconds\n")
                 elif use_parallel_fd:
                     next(jidx_iter)  # skip this column index
 

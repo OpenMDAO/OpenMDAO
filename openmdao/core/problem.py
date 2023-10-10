@@ -2399,7 +2399,7 @@ class Problem(object):
         for c in checks:
             if c not in _all_checks:
                 print(f"WARNING: '{c}' is not a recognized check.  Available checks are: "
-                      f"{ sorted(_all_checks)}")
+                      f"{sorted(_all_checks)}")
                 continue
             logger.info(f'checking {c}')
             _all_checks[c](self, logger)
