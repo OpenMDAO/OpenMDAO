@@ -355,9 +355,6 @@ else:
                     rev_xfer_out_nocolor[sname] = inds
                     total_rev_nocolor += len(inds)
 
-            xfer_in = np.empty(total_fwd, dtype=INT_DTYPE)
-            xfer_out = np.empty(total_fwd, dtype=INT_DTYPE)
-
             if fwd_xfer_in:
                 xfer_in, xfer_out = _merge_indices(total_fwd, fwd_xfer_in, fwd_xfer_out)
 

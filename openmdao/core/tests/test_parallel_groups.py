@@ -24,8 +24,9 @@ except ImportError:
 from openmdao.test_suite.groups.parallel_groups import \
     FanOutGrouped, FanInGrouped2, Diamond, ConvergeDiverge
 
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
 from openmdao.utils.logger_utils import TestLogger
+from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.error_checking.check_config import _default_checks
 
 
@@ -644,6 +645,80 @@ class TestDesvarResponseOrdering(unittest.TestCase):
 
         self.assertEqual(dv_names, ['phases.climb.comp.x', 'phases.cruise.comp.x', 'phases.descent.comp.x'])
         self.assertEqual(con_names, ['phases.climb.comp.y', 'phases.cruise.comp.y', 'phases.descent.comp.y'])
+
+
+
+class SimpleDistComp(om.ExplicitComponent):
+
+    def setup(self):
+        comm = self.comm
+        rank = comm.rank
+
+        sizes, _ = evenly_distrib_idxs(comm.size, 3)
+        io_size = sizes[rank]
+
+        # src_indices will be computed automatically
+        self.add_input('x', val=np.ones(io_size), distributed=True)
+        self.add_input('a', val=-3.0 * np.ones(io_size), distributed=True)
+
+        self.add_output('y', val=np.ones(io_size), distributed=True)
+
+        self.declare_partials('y', ['x', 'a'])
+
+    def compute(self, inputs, outputs):
+        x = inputs['x']
+        a = inputs['a']
+
+        outputs['y'] = 2*x*a + x + a
+
+    def compute_partials(self, inputs, partials):
+        x = inputs['x']
+        a = inputs['a']
+
+        partials['y', 'x'] = np.diag(2.0 * a + 1.0)
+        partials['y', 'a'] = np.diag(2.0 * x + 1.0)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestFD(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_fd_rev_mode(self):
+        size = 3
+
+        p = om.Problem()
+        model = p.model
+
+        model.add_subsystem('p', om.IndepVarComp('x', np.ones(size)), promotes=['*'])
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
+
+        sub.add_subsystem('p2', om.IndepVarComp('a', -3.0 + 0.6 * np.arange(size)), promotes=['*'])
+
+        sub.add_subsystem('C1', om.ExecComp(['xd = x'],
+                                               x=np.ones(size), xd=np.ones(size)),
+                          promotes_inputs=['*'])
+
+        sub.add_subsystem("D1", SimpleDistComp(), promotes_outputs=['*'], promotes_inputs=['a'])
+
+        sub.connect('C1.xd', 'D1.x')
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_constraint('y', lower=0.0)
+
+        sub.approx_totals(method='fd')
+
+        p.setup(mode='rev', force_alloc_complex=True)
+
+        p.run_model()
+
+        data =  p.check_totals(method='fd', out_stream=None)
+        
+        print("sub jacobian:")
+        import pprint
+        pprint.pprint(sub._jacobian._subjacs_info)
+
+        assert_check_totals(data, atol=1e-5)
 
 
 if __name__ == "__main__":

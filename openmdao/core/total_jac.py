@@ -364,6 +364,16 @@ class _TotalJacInfo(object):
                 if self.simul_coloring is not None:  # when simul coloring, need two scratch arrays
                     self.jac_scratch['fwd'].append(scratch[1][:J.shape[0]])
             if 'rev' in modes:
+                from openmdao.core.group import Group
+
+                # find all groups doing FD
+                fdgroups = [s.pathname for s in model.system_iter(recurse=True, typ=Group)
+                            if s._owns_approx_jac]
+                allfdgroups = set()
+                for grps in model.comm.allgather(fdgroups):
+                    allfdgroups.update(grps)
+                fdprefixes = [n + '.' for n in allfdgroups]
+
                 self.jac_scratch['rev'] = [scratch[0][:J.shape[1]]]
                 if self.simul_coloring is not None:  # when simul coloring, need two scratch arrays
                     self.jac_scratch['rev'].append(scratch[1][:J.shape[1]])
@@ -378,6 +388,7 @@ class _TotalJacInfo(object):
 
                 voimeta = self.output_meta['rev']
                 start = end = 0
+                has_dist = False
                 for name, pname in zip(wrt, prom_wrt):
                     vmeta = all_abs2meta_out[name]
                     if pname in voimeta:
@@ -385,13 +396,22 @@ class _TotalJacInfo(object):
                         end += meta['size']
                     else:
                         end += vmeta['global_size']
-                    if not vmeta['distributed'] and model._owning_rank[name] != model.comm.rank:
+
+                    is_fdvar = False
+                    for prefix in fdprefixes:
+                        if name.startswith(prefix):
+                            is_fdvar = True
+                            break
+
+                    dist = vmeta['distributed']
+                    has_dist |= dist
+                    if not is_fdvar and not dist and model._owning_rank[name] != model.comm.rank:
                         self.rev_allreduce_mask[start:end] = False
                     start = end
 
                 # if rev_allreduce_mask isn't all True on all procs, then we need to do an Allreduce
                 need_allreduce = not np.all(self.rev_allreduce_mask)
-                if not any(model.comm.allgather(need_allreduce)):
+                if not (has_dist or any(model.comm.allgather(need_allreduce))):
                     self.rev_allreduce_mask = None
 
         if not approx:
