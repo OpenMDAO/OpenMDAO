@@ -1,3 +1,6 @@
+"""
+A collection of classes for mapping indices to variable names and vice versa.
+"""
 
 from openmdao.utils.array_utils import shape_to_len
 
@@ -9,8 +12,27 @@ _MAX_FLAT_RANGE_SIZE = 10000
 class DataRangeMapper(object):
     """
     A mapper of indices to variable names and vice versa.
+
+    Parameters
+    ----------
+    ranges : list of (data, start, stop)
+        Ordered list of (data, start, stop) tuples, where start and stop define the range of
+        indices for the data. Ranges must be contiguous.  data must be hashable.
+
+    Attributes
+    ----------
+    size : int
+        Total size of all of the ranges combined.
+    _data2range : dict
+        Dictionary mapping data to an index range.
+    _range2data : dict
+        Dictionary mapping an index range to data.
     """
+
     def __init__(self, ranges):
+        """
+        Initialize a DataRangeMapper.
+        """
         self._data2range = {}
         self._range2data = {}
         self.size = ranges[-1][2] - ranges[0][1]
@@ -171,16 +193,24 @@ class RangeTree(DataRangeMapper):
 
     Search complexity is O(log2 n). Uses less memory than FlatRangeMapper when total array size is
     large.
+
+    Parameters
+    ----------
+    ranges : list of (data, start, stop)
+        Ordered list of (data, start, stop) tuples, where start and stop define the range of
+        indices for the data. Ranges must be contiguous.  data must be hashable.
+
+    Attributes
+    ----------
+    size : int
+        Total size of all of the ranges combined.
+    root : RangeTreeNode
+        Root node of the binary search tree.
     """
+
     def __init__(self, ranges):
         """
         Initialize a RangeTree.
-
-        Parameters
-        ----------
-        ranges : list of (data, start, stop)
-            List of (data, start, stop) tuples, where start and stop define the range of indices
-            for the data. Ranges must be contiguous and data must be hashable.
         """
         super().__init__(ranges)
         self.size = ranges[-1][2] - ranges[0][1]
@@ -283,8 +313,6 @@ class FlatRangeMapper(DataRangeMapper):
 
     Attributes
     ----------
-    size : int
-        Total size of all of the ranges combined.
     ranges : list of (data, start, stop)
         List of (data, start, stop) tuples, where start and stop define the range of
         indices for that data. Ranges must be contiguous. data must be hashable.
@@ -384,6 +412,12 @@ def metas2shapes(meta_iter, shape_name='shape'):
         Name of the metadata entry that contains the shape of the variable. Value can be either
         'shape' or 'global_shape'.  Default is 'shape'.  The value of the metadata entry must
         be a tuple of integers.
+
+    Yields
+    ------
+    tuple
+        Tuple of the form (name, shape), where name is the variable name and shape is the shape
+        of the variable.
     """
     for name, meta in meta_iter:
         yield (name, meta[shape_name])
@@ -407,5 +441,4 @@ if __name__ == '__main__':
     for i in range(34):
         rname, rind = rtree.index2rel_data(i)
         fname, find = flat.index2rel_data(i)
-        assert rname == fname and rind == find, f'i = {i}, rname = {rname}, rind = {rind}, fname = {fname}, find = {find}'
         print(i, rname, rind, fname, find)

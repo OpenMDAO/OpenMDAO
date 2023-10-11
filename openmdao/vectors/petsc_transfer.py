@@ -49,9 +49,9 @@ else:
             """
             Initialize all attributes.
             """
-            super().__init__(in_vec, out_vec, in_inds, out_inds, comm)
-            in_indexset = PETSc.IS().createGeneral(self._in_inds, comm=self._comm)
-            out_indexset = PETSc.IS().createGeneral(self._out_inds, comm=self._comm)
+            super().__init__(in_vec, out_vec, in_inds, out_inds)
+            in_indexset = PETSc.IS().createGeneral(self._in_inds, comm=comm)
+            out_indexset = PETSc.IS().createGeneral(self._out_inds, comm=comm)
 
             self._scatter = PETSc.Scatter().create(out_vec._petsc, out_indexset, in_vec._petsc,
                                                    in_indexset).scatter
@@ -218,28 +218,28 @@ else:
                             iidxlist = []
                             oidxlist_nc = []
                             iidxlist_nc = []
-                            oidxlist.append(output_inds)
-                            iidxlist.append(input_inds)
                             for rnk, osize, isize in zip(range(group.comm.size),
                                                          sizes_out[:, idx_out],
                                                          sizes_in[:, idx_in]):
-                                if osize > 0 and isize == 0:
+                                if rnk == myrank:
+                                    oidxlist.append(output_inds)
+                                    iidxlist.append(input_inds)
+                                elif osize > 0 and isize == 0:
                                     offset = offsets_out[rnk, idx_out]
                                     if src_indices is None:
                                         oarr = np.arange(offset, offset + meta_in['size'],
                                                          dtype=INT_DTYPE)
-                                        iarr = input_inds
                                     elif src_indices.size > 0:
                                         oarr = np.asarray(src_indices + offset, dtype=INT_DTYPE)
-                                        iarr = input_inds
                                     else:
                                         continue
-                                    if rnk == myrank or not has_rev_par_coloring:
-                                        oidxlist.append(oarr)
-                                        iidxlist.append(iarr)
-                                    else:
+
+                                    if has_rev_par_coloring:
                                         oidxlist_nc.append(oarr)
-                                        iidxlist_nc.append(iarr)
+                                        iidxlist_nc.append(input_inds)
+                                    else:
+                                        oidxlist.append(oarr)
+                                        iidxlist.append(input_inds)
 
                             if len(iidxlist) > 1:
                                 input_inds = np.concatenate(iidxlist)
@@ -263,6 +263,7 @@ else:
 
                                 rev_xfer_in_nocolor[sub_out].append(input_inds)
                                 rev_xfer_out_nocolor[sub_out].append(output_inds)
+
                         elif out_is_dup and (not inp_is_dup or inp_missing > 0) and (iowninput or
                                                                                      distrib_in):
                             oidxlist = []
@@ -274,21 +275,19 @@ else:
                                 if src_indices is None:
                                     oarr = np.arange(offset, offset + meta_in['size'],
                                                      dtype=INT_DTYPE)
-                                    iarr = input_inds
                                 elif src_indices.size > 0:
                                     if (distrib_in and not distrib_out and len(on_iprocs) == 1 and
                                             on_iprocs[0] == rnk):
                                         offset -= np.sum(sizes_out[:rnk, idx_out])
                                     oarr = np.asarray(src_indices + offset, dtype=INT_DTYPE)
-                                    iarr = input_inds
                                 else:
                                     continue
                                 if rnk == myrank or not has_rev_par_coloring:
                                     oidxlist.append(oarr)
-                                    iidxlist.append(iarr)
+                                    iidxlist.append(input_inds)
                                 else:
                                     oidxlist_nc.append(oarr)
-                                    iidxlist_nc.append(iarr)
+                                    iidxlist_nc.append(input_inds)
 
                             if len(iidxlist) > 1:
                                 input_inds = np.concatenate(iidxlist)
@@ -313,7 +312,8 @@ else:
                                 rev_xfer_in_nocolor[sub_out].append(input_inds)
                                 rev_xfer_out_nocolor[sub_out].append(output_inds)
                         else:
-                            if inp_is_dup and out_is_dup and src_indices is not None and src_indices.size > 0:
+                            if (inp_is_dup and out_is_dup and src_indices is not None and
+                                    src_indices.size > 0):
                                 offset = offsets_out[myrank, idx_out]
                                 output_inds = np.asarray(src_indices + offset, dtype=INT_DTYPE)
 

@@ -2299,6 +2299,36 @@ class TestDistribBugs(unittest.TestCase):
         totals = prob.check_totals(method='cs', out_stream=None)
         self._compare_totals(totals)
 
+    def test_dist_desvar_dist_input(self):
+        class SimpleSum(om.ExplicitComponent):
+            """Simple component to sum distributed vector"""
+
+            def setup(self):
+                # Inputs
+                self.add_input('x', 1.0, shape=[2], distributed=True)
+
+                # Outputs
+                self.add_output('sum', 0.0)
+
+            def compute(self, inputs, outputs):
+                outputs['sum'] = self.comm.allreduce(np.sum(inputs["x"]))
+
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                if mode == "fwd":
+                    d_outputs['sum'] += self.comm.allreduce(np.sum(d_inputs["x"]))
+                if mode == "rev":
+                    d_inputs["x"] += d_outputs['sum'] * np.ones(2)
+
+        prob = om.Problem()
+        prob.model.add_subsystem("ivc", om.IndepVarComp("x", 1.0, shape=[2], distributed=True))
+        prob.model.connect("ivc.x", "ParallelSum.x")
+        prob.model.add_subsystem("ParallelSum", SimpleSum())
+
+        prob.setup(mode='rev')
+
+        prob.run_model()
+        # This check totals fails, some of the derivative terms from proc 2 are missing
+        assert_check_totals(prob.check_totals("ParallelSum.sum", "ivc.x"))
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests

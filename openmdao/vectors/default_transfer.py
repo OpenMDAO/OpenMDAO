@@ -19,6 +19,58 @@ def _merge(indices_list):
         return _empty_idx_array
 
 
+def _fill(arr, indices_list):
+    start = end = 0
+    for inds in indices_list:
+        end += len(inds)
+        arr[start:end] = inds
+        start = end
+
+    return end
+
+
+def _setup_index_arrays(tot_size, in_xfers, out_xfers, vectors):
+    if tot_size > 0:
+        xfer_in = np.empty(tot_size, dtype=INT_DTYPE)
+        xfer_out = np.empty(tot_size, dtype=INT_DTYPE)
+    else:
+        xfer_in = xfer_out = np.zeros(0, dtype=INT_DTYPE)
+
+    start = end = 0
+    for sname, lst in in_xfers.items():
+        # lst is a list of range objects
+        rstart = rend = start
+        for rng in lst:
+            rend += len(rng)
+            xfer_in[rstart:rend] = rng
+            rstart = rend
+
+        end += rend - start
+        _fill(xfer_out[start:end], out_xfers[sname])
+        in_xfers[sname] = xfer_in[start:end]
+        out_xfers[sname] = xfer_out[start:end]
+        start = end
+
+    if tot_size > 0:
+        xfer_all = DefaultTransfer(vectors['input']['nonlinear'],
+                                   vectors['output']['nonlinear'], xfer_in, xfer_out)
+    else:
+        xfer_all = None
+
+    xfer_dict = {}
+    xfer_dict[None] = xfer_all
+
+    for sname, inds in in_xfers.items():
+        if inds.size > 0:
+            xfer_dict[sname] = DefaultTransfer(vectors['input']['nonlinear'],
+                                               vectors['output']['nonlinear'],
+                                               inds, out_xfers[sname])
+        else:
+            xfer_dict[sname] = None
+
+    return xfer_dict
+
+
 class DefaultTransfer(Transfer):
     """
     Default NumPy transfer.
@@ -33,8 +85,6 @@ class DefaultTransfer(Transfer):
         Input indices for the transfer.
     out_inds : int ndarray
         Output indices for the transfer.
-    comm : MPI.Comm or <FakeComm>
-        Communicator of the system that owns this transfer.
     """
 
     @staticmethod
@@ -65,8 +115,6 @@ class DefaultTransfer(Transfer):
         mypathlen = len(group.pathname + '.' if group.pathname else '')
 
         # Initialize empty lists for the transfer indices
-        xfer_in = []
-        xfer_out = []
         fwd_xfer_in = defaultdict(list)
         fwd_xfer_out = defaultdict(list)
         if rev:
@@ -83,12 +131,13 @@ class DefaultTransfer(Transfer):
         if offsets_out.size > 0:
             offsets_out = offsets_out[iproc]
 
+        start = end = 0
+
         # Loop through all connections owned by this group
         for abs_in, abs_out in group._conn_abs_in2out.items():
             # This weeds out discrete vars (all vars are local if using this Transfer)
             if abs_in in abs2meta['input']:
 
-                indices = None
                 # Get meta
                 meta_in = abs2meta['input'][abs_in]
 
@@ -108,10 +157,9 @@ class DefaultTransfer(Transfer):
                     output_inds = src_indices + offset
 
                 # 2. Compute the input indices
-                input_inds = np.arange(offsets_in[idx_in],
-                                       offsets_in[idx_in] + sizes_in[idx_in], dtype=INT_DTYPE)
-                if indices is not None:
-                    input_inds = input_inds.reshape(indices.shape)
+                # all input indices can be simple ranges during this part in order to save memory
+                input_inds = range(offsets_in[idx_in], offsets_in[idx_in] + sizes_in[idx_in])
+                end += sizes_in[idx_in]
 
                 # Now the indices are ready - input_inds, output_inds
                 sub_in = abs_in[mypathlen:].split('.', 1)[0]
@@ -121,55 +169,14 @@ class DefaultTransfer(Transfer):
                     sub_out = abs_out[mypathlen:].split('.', 1)[0]
                     rev_xfer_in[sub_out].append(input_inds)
                     rev_xfer_out[sub_out].append(output_inds)
-                else:
-                    continue
 
-        tot_size = 0
-        for sname, inds in fwd_xfer_in.items():
-            fwd_xfer_in[sname] = arr = _merge(inds)
-            fwd_xfer_out[sname] = _merge(fwd_xfer_out[sname])
-            tot_size += arr.size
+                start = end
 
+        tot_size = end
+
+        transfers['fwd'] = _setup_index_arrays(tot_size, fwd_xfer_in, fwd_xfer_out, vectors)
         if rev:
-            for sname, inds in rev_xfer_in.items():
-                rev_xfer_in[sname] = _merge(inds)
-                rev_xfer_out[sname] = _merge(rev_xfer_out[sname])
-
-        if tot_size > 0:
-            try:
-                xfer_in = np.concatenate(list(fwd_xfer_in.values()))
-                xfer_out = np.concatenate(list(fwd_xfer_out.values()))
-            except ValueError:
-                xfer_in = xfer_out = np.zeros(0, dtype=INT_DTYPE)
-
-            xfer_all = DefaultTransfer(vectors['input']['nonlinear'],
-                                       vectors['output']['nonlinear'], xfer_in, xfer_out,
-                                       group.comm)
-        else:
-            xfer_all = None
-
-        transfers['fwd'] = xfwd = {}
-        xfwd[None] = xfer_all
-        if rev:
-            transfers['rev'] = xrev = {}
-            xrev[None] = xfer_all
-
-        for sname, inds in fwd_xfer_in.items():
-            if inds.size > 0:
-                xfwd[sname] = DefaultTransfer(vectors['input']['nonlinear'],
-                                              vectors['output']['nonlinear'],
-                                              inds, fwd_xfer_out[sname], group.comm)
-            else:
-                xfwd[sname] = None
-
-        if rev:
-            for sname, inds in rev_xfer_out.items():
-                if inds.size > 0:
-                    xrev[sname] = DefaultTransfer(vectors['input']['nonlinear'],
-                                                  vectors['output']['nonlinear'],
-                                                  rev_xfer_in[sname], inds, group.comm)
-                else:
-                    xrev[sname] = None
+            transfers['rev'] = _setup_index_arrays(tot_size, rev_xfer_in, rev_xfer_out, vectors)
 
     @staticmethod
     def _setup_discrete_transfers(group):
