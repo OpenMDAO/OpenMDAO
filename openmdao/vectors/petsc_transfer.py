@@ -1,7 +1,11 @@
 """Define the PETSc Transfer class."""
+import numpy as np
 from openmdao.utils.mpi import check_mpi_env
+from openmdao.core.constants import INT_DTYPE
 
 use_mpi = check_mpi_env()
+_empty_idx_array = np.array([], dtype=INT_DTYPE)
+
 
 if use_mpi is False:
     PETScTransfer = None
@@ -14,12 +18,10 @@ else:
         if use_mpi is True:
             raise ImportError("Importing petsc4py failed and OPENMDAO_USE_MPI is true.")
 
-    import numpy as np
     from petsc4py import PETSc
     from collections import defaultdict
 
-    from openmdao.vectors.default_transfer import DefaultTransfer, _merge
-    from openmdao.core.constants import INT_DTYPE
+    from openmdao.vectors.default_transfer import DefaultTransfer, _fill, _setup_index_views
     from openmdao.utils.array_utils import shape_to_len
 
     class PETScTransfer(DefaultTransfer):
@@ -119,6 +121,8 @@ else:
                     return []
                 return np.nonzero(group._var_sizes[io][:, allprocs_abs2idx[name]])[0]
 
+            total_fwd = total_rev = total_rev_nocolor = 0
+
             # Loop through all connections owned by this system
             for abs_in, abs_out in group._conn_abs_in2out.items():
                 # Only continue if the input exists on this processor
@@ -162,8 +166,7 @@ else:
                         else:
                             rank = myrank if local_out else owner
                             offset = offsets_out[rank, idx_out]
-                            output_inds = np.arange(offset, offset + meta_in['size'],
-                                                    dtype=INT_DTYPE)
+                            output_inds = range(offset, offset + meta_in['size'])
                     else:
                         output_inds = np.zeros(src_indices.size, INT_DTYPE)
                         start = end = 0
@@ -191,9 +194,10 @@ else:
                             start = end
 
                     # 2. Compute the input indices
-                    input_inds = np.arange(offsets_in[myrank, idx_in],
-                                           offsets_in[myrank, idx_in] +
-                                           sizes_in[myrank, idx_in], dtype=INT_DTYPE)
+                    input_inds = range(offsets_in[myrank, idx_in],
+                                       offsets_in[myrank, idx_in] + sizes_in[myrank, idx_in])
+
+                    total_fwd += len(input_inds)
 
                     # Now the indices are ready - input_inds, output_inds
                     sub_in = abs_in[mypathlen:].partition('.')[0]
@@ -218,6 +222,7 @@ else:
                             iidxlist = []
                             oidxlist_nc = []
                             iidxlist_nc = []
+                            size = size_nc = 0
                             for rnk, osize, isize in zip(range(group.comm.size),
                                                          sizes_out[:, idx_out],
                                                          sizes_in[:, idx_in]):
@@ -227,8 +232,7 @@ else:
                                 elif osize > 0 and isize == 0:
                                     offset = offsets_out[rnk, idx_out]
                                     if src_indices is None:
-                                        oarr = np.arange(offset, offset + meta_in['size'],
-                                                         dtype=INT_DTYPE)
+                                        oarr = range(offset, offset + meta_in['size'])
                                     elif src_indices.size > 0:
                                         oarr = np.asarray(src_indices + offset, dtype=INT_DTYPE)
                                     else:
@@ -237,16 +241,20 @@ else:
                                     if has_rev_par_coloring:
                                         oidxlist_nc.append(oarr)
                                         iidxlist_nc.append(input_inds)
+                                        size_nc += len(input_inds)
                                     else:
                                         oidxlist.append(oarr)
                                         iidxlist.append(input_inds)
+                                        size += len(input_inds)
 
                             if len(iidxlist) > 1:
-                                input_inds = np.concatenate(iidxlist)
-                                output_inds = np.concatenate(oidxlist)
+                                input_inds = _merge(iidxlist, size)
+                                output_inds = _merge(oidxlist, size)
                             else:
                                 input_inds = iidxlist[0]
                                 output_inds = oidxlist[0]
+
+                            total_rev += len(input_inds)
 
                             rev_xfer_in[sub_out].append(input_inds)
                             rev_xfer_out[sub_out].append(output_inds)
@@ -255,11 +263,13 @@ else:
                                 # keep transfers separate that shouldn't happen when partial
                                 # coloring is active
                                 if len(iidxlist_nc) > 1:
-                                    input_inds = np.concatenate(iidxlist_nc)
-                                    output_inds = np.concatenate(oidxlist_nc)
+                                    input_inds = _merge(iidxlist_nc, size_nc)
+                                    output_inds = _merge(oidxlist_nc, size_nc)
                                 else:
                                     input_inds = iidxlist_nc[0]
                                     output_inds = oidxlist_nc[0]
+
+                                total_rev_nocolor += len(input_inds)
 
                                 rev_xfer_in_nocolor[sub_out].append(input_inds)
                                 rev_xfer_out_nocolor[sub_out].append(output_inds)
@@ -270,11 +280,11 @@ else:
                             iidxlist = []
                             oidxlist_nc = []
                             iidxlist_nc = []
+                            size = size_nc = 0
                             for rnk in get_xfer_ranks(abs_out, 'output'):
                                 offset = offsets_out[rnk, idx_out]
                                 if src_indices is None:
-                                    oarr = np.arange(offset, offset + meta_in['size'],
-                                                     dtype=INT_DTYPE)
+                                    oarr = range(offset, offset + meta_in['size'])
                                 elif src_indices.size > 0:
                                     if (distrib_in and not distrib_out and len(on_iprocs) == 1 and
                                             on_iprocs[0] == rnk):
@@ -285,29 +295,35 @@ else:
                                 if rnk == myrank or not has_rev_par_coloring:
                                     oidxlist.append(oarr)
                                     iidxlist.append(input_inds)
+                                    size += len(input_inds)
                                 else:
                                     oidxlist_nc.append(oarr)
                                     iidxlist_nc.append(input_inds)
+                                    size_nc += len(input_inds)
 
                             if len(iidxlist) > 1:
-                                input_inds = np.concatenate(iidxlist)
-                                output_inds = np.concatenate(oidxlist)
+                                input_inds = _merge(iidxlist, size)
+                                output_inds = _merge(oidxlist, size)
                             elif len(iidxlist) == 1:
                                 input_inds = iidxlist[0]
                                 output_inds = oidxlist[0]
                             else:
-                                input_inds = output_inds = np.zeros(0, dtype=INT_DTYPE)
+                                input_inds = output_inds = _empty_idx_array
+
+                            total_rev += len(input_inds)
 
                             rev_xfer_in[sub_out].append(input_inds)
                             rev_xfer_out[sub_out].append(output_inds)
 
                             if has_rev_par_coloring and iidxlist_nc:
                                 if len(iidxlist_nc) > 1:
-                                    input_inds = np.concatenate(iidxlist_nc)
-                                    output_inds = np.concatenate(oidxlist_nc)
+                                    input_inds = _merge(iidxlist_nc, size_nc)
+                                    output_inds = _merge(oidxlist_nc, size_nc)
                                 else:
                                     input_inds = iidxlist_nc[0]
                                     output_inds = oidxlist_nc[0]
+
+                                total_rev_nocolor += len(input_inds)
 
                                 rev_xfer_in_nocolor[sub_out].append(input_inds)
                                 rev_xfer_out_nocolor[sub_out].append(output_inds)
@@ -316,6 +332,8 @@ else:
                                     src_indices.size > 0):
                                 offset = offsets_out[myrank, idx_out]
                                 output_inds = np.asarray(src_indices + offset, dtype=INT_DTYPE)
+
+                            total_rev += len(input_inds)
 
                             rev_xfer_in[sub_out].append(input_inds)
                             rev_xfer_out[sub_out].append(output_inds)
@@ -333,30 +351,8 @@ else:
                             rev_xfer_in_nocolor[sub_out]
                             rev_xfer_out_nocolor[sub_out]
 
-            total_fwd = 0
-            for sname, inds in fwd_xfer_in.items():
-                inds = _merge(inds)
-                fwd_xfer_in[sname] = inds
-                fwd_xfer_out[sname] = _merge(fwd_xfer_out[sname])
-                total_fwd += len(inds)
-
-            if rev:
-                total_rev = 0
-                for sname, inds in rev_xfer_out.items():
-                    inds = _merge(inds)
-                    rev_xfer_in[sname] = _merge(rev_xfer_in[sname])
-                    rev_xfer_out[sname] = inds
-                    total_rev += len(inds)
-
-                total_rev_nocolor = 0
-                for sname, inds in rev_xfer_out_nocolor.items():
-                    inds = _merge(inds)
-                    rev_xfer_in_nocolor[sname] = _merge(rev_xfer_in_nocolor[sname])
-                    rev_xfer_out_nocolor[sname] = inds
-                    total_rev_nocolor += len(inds)
-
             if fwd_xfer_in:
-                xfer_in, xfer_out = _merge_indices(total_fwd, fwd_xfer_in, fwd_xfer_out)
+                xfer_in, xfer_out = _setup_index_views(total_fwd, fwd_xfer_in, fwd_xfer_out)
 
             out_vec = vectors['output']['nonlinear']
 
@@ -372,7 +368,7 @@ else:
                     inds, fwd_xfer_out[sname], group.comm)
 
             if rev:
-                xfer_in, xfer_out = _merge_indices(total_rev, rev_xfer_in, rev_xfer_out)
+                xfer_in, xfer_out = _setup_index_views(total_rev, rev_xfer_in, rev_xfer_out)
 
                 xfer_all = PETScTransfer(vectors['input']['nonlinear'], out_vec,
                                          xfer_in, xfer_out, group.comm)
@@ -385,9 +381,9 @@ else:
                         vectors['input']['nonlinear'], vectors['output']['nonlinear'],
                         rev_xfer_in[sname], inds, group.comm)
 
-                if has_rev_par_coloring and rev_xfer_in_nocolor:
-                    xfer_in, xfer_out = _merge_indices(total_rev_nocolor, rev_xfer_in_nocolor,
-                                                       rev_xfer_out_nocolor)
+                if rev_xfer_in_nocolor:
+                    xfer_in, xfer_out = _setup_index_views(total_rev_nocolor, rev_xfer_in_nocolor,
+                                                           rev_xfer_out_nocolor)
 
                     xrev[(None, 'nocolor')] = PETScTransfer(vectors['input']['nonlinear'], out_vec,
                                                             xfer_in, xfer_out, group.comm)
@@ -454,37 +450,30 @@ else:
                     data[:] = in_petsc.array
 
 
-def _merge_indices(total_size, in_inds, out_inds):
+def _merge(inds_list, tot_size):
     """
-    Merge indices into contiguous arrays and update index dicts to use subviews of the same array.
+    Convert a list of indices and/or ranges into an array.
 
     Parameters
     ----------
-    total_size : int
-        Total size of the merged indices.
-    in_inds : dict
-        Input indices.
-    out_inds : dict
-        Output indices.
+    inds_list : list of ranges or ndarrays
+        List of indices.
+    tot_size : int
+        Total size of the indices in the list.
 
     Returns
     -------
-    int ndarray
-        Merged input indices.
-    int ndarray
-        Merged output indices.
+    ndarray
+        Array of indices.
     """
-    xfer_in = np.empty(total_size, dtype=INT_DTYPE)
-    xfer_out = np.empty(total_size, dtype=INT_DTYPE)
-    start = end = 0
-    for idata, odata in zip(in_inds.items(), out_inds.items()):
-        sname, inp = idata
-        _, out = odata
-        end += len(inp)
-        xfer_in[start:end] = inp
-        xfer_out[start:end] = out
-        in_inds[sname] = xfer_in[start:end]
-        out_inds[sname] = xfer_out[start:end]
-        start = end
+    if inds_list:
+        arr = np.empty(tot_size, dtype=INT_DTYPE)
+        start = end = 0
+        for inds in inds_list:
+            end += len(inds)
+            arr[start:end] = inds
+            start = end
 
-    return xfer_in, xfer_out
+        return arr
+
+    return _empty_idx_array
