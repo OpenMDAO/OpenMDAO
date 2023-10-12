@@ -96,6 +96,11 @@ jobs:
           python -m pip install --upgrade pip
 
           echo "============================================================="
+          echo "Install latest setuptools"
+          echo "============================================================="
+          python -m pip install --upgrade --pre setuptools
+
+          echo "============================================================="
           echo "Install latest versions of NumPy/SciPy"
           echo "============================================================="
           python -m pip install --upgrade --pre numpy
@@ -169,11 +174,6 @@ jobs:
               echo "SNOPT source is not available"
           fi
           build_pyoptsparse $BRANCH $SNOPT
-
-          echo "============================================================="
-          echo "Install latest setuptools"
-          echo "============================================================="
-          python -m pip install --upgrade --pre setuptools
 
           echo "============================================================="
           echo "Install OpenMDAO"
