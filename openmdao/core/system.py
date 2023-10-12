@@ -1960,14 +1960,14 @@ class System(object):
             # includes and excludes for inputs are specified using _absolute_ names
             # vectors are keyed on absolute name, discretes on relative/promoted name
             if options['record_inputs']:
-                match_names = match_names | set(abs2prom_inputs.keys())
+                match_names.update(abs2prom_inputs.keys())
                 myinputs = sorted([n for n in abs2prom_inputs
                                    if check_path(n, incl, excl)])
 
             # includes and excludes for outputs are specified using _promoted_ names
             # vectors are keyed on absolute name, discretes on relative/promoted name
             if options['record_outputs']:
-                match_names = match_names | set(abs2prom_output.values())
+                match_names.update(abs2prom_output.values())
                 myoutputs = sorted([n for n, prom in abs2prom_output.items()
                                     if check_path(prom, incl, excl)])
 
@@ -1980,7 +1980,7 @@ class System(object):
                     myresiduals = myoutputs
 
             elif options['record_residuals']:
-                match_names = match_names | set(self._residuals.keys())
+                match_names.update(self._residuals.keys())
                 myresiduals = [n for n in self._residuals._abs_iter()
                                if check_path(abs2prom_output[n], incl, excl)]
 
