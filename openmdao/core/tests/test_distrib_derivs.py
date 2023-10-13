@@ -717,7 +717,7 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        #assert_check_totals(prob.check_totals(method='fd', out_stream=None))
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None))
 
         # rev mode
 
@@ -733,8 +733,6 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        # from openmdao.devtools.debug import trace_mpi
-        # trace_mpi()
         assert_check_totals(prob.check_totals(method='fd', out_stream=None))
 
     def test_simple_distrib_voi_group_fd(self):
