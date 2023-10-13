@@ -128,6 +128,7 @@ else:
                 inp_boundary_set = inp_boundary_set.difference(group._conn_global_abs_in2out)
                 model = group._problem_meta['model_ref']()
                 relgraph = model._relevance_graph
+                prefix = group.pathname + '.'
 
                 # inp_dep_dist is the set of input variables that are upstream of distributed
                 # variables.
@@ -136,11 +137,12 @@ else:
                     found = False
                     for _, succs in nx.bfs_successors(relgraph, inp):
                         for successor in succs:
-                            ndata = relgraph.nodes[successor]
-                            if 'dist' in ndata and ndata['dist']:
-                                inp_dep_dist.add(inp)
-                                found = True
-                                break
+                            if successor.startswith(prefix):
+                                ndata = relgraph.nodes[successor]
+                                if 'dist' in ndata and ndata['dist']:
+                                    inp_dep_dist.add(inp)
+                                    found = True
+                                    break
                         if found:
                             break
 

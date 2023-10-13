@@ -735,6 +735,60 @@ class MPITests2(unittest.TestCase):
 
         assert_check_totals(prob.check_totals(method='fd', out_stream=None))
 
+    def test_distrib_voi_group_fd2(self):
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+        ivc.add_output('y', np.ones((size, )))
+
+        model.add_subsystem('p', ivc, promotes=['*'])
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
+
+        ivc2 = om.IndepVarComp()
+        ivc2.add_output('a', -3.0 + 0.6 * np.arange(size))
+
+        sub.add_subsystem('p2', ivc2, promotes=['*'])
+        sub.add_subsystem('dummy', om.ExecComp(['xd = x', "yd = y"],
+                                               x=np.ones(size), xd=np.ones(size),
+                                               y=np.ones(size), yd=np.ones(size)),
+                          promotes_inputs=['*'])
+
+        sub.add_subsystem("parab", DistParab(arr_size=size), promotes_outputs=['*'], promotes_inputs=['a'])
+        model.add_subsystem('sum', om.ExecComp('f_sum = sum(xd)',
+                                             f_sum=np.ones((size, )),
+                                             xd=np.ones((size, ))),
+                          promotes_outputs=['*'])
+
+        model.promotes('sum', inputs=['xd'])
+
+        sub.connect('dummy.xd', 'parab.x')
+        sub.connect('dummy.yd', 'parab.y')
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_constraint('f_xy', lower=0.0)
+        model.add_objective('f_sum', index=-1)
+
+        sub.approx_totals(method='fd')
+
+        prob.setup(mode='fwd', force_alloc_complex=True)
+
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None))
+
+        # rev mode
+
+        prob.setup(mode='rev', force_alloc_complex=True)
+
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None))
+
     def test_simple_distrib_voi_group_fd(self):
         size = 3
 
@@ -774,6 +828,52 @@ class MPITests2(unittest.TestCase):
         prob.run_model()
 
         assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=1e-5)
+
+    def test_nondistrib_voi_group_fd(self):
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+        ivc.add_output('y', np.ones((size, )))
+
+        model.add_subsystem('p', ivc, promotes=['*'])
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
+
+        ivc2 = om.IndepVarComp()
+        ivc2.add_output('a', -3.0 + 0.6 * np.arange(size))
+
+        sub.add_subsystem('p2', ivc2, promotes=['*'])
+        sub.add_subsystem('dummy', om.ExecComp(['xd = x', "yd = y"],
+                                               x=np.ones(size), xd=np.ones(size),
+                                               y=np.ones(size), yd=np.ones(size)),
+                          promotes_inputs=['*'])
+
+        sub.add_subsystem("parab", om.ExecComp('f_xy = x**2 + 3.*xy - y*y + a', shape=size), promotes_outputs=['*'], promotes_inputs=['a'])
+        model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
+                                             f_sum=np.ones((size, )),
+                                             f_xy=np.ones((size, ))),
+                          promotes_outputs=['*'])
+
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
+
+        sub.connect('dummy.xd', 'parab.x')
+        sub.connect('dummy.yd', 'parab.y')
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_constraint('f_xy', lower=0.0)
+        model.add_objective('f_sum', index=-1)
+
+        sub.approx_totals(method='fd')
+
+        prob.setup(mode='rev', force_alloc_complex=True)
+
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None))
 
     def test_distrib_group_fd_unsupported_config(self):
         size = 7

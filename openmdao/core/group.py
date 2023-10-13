@@ -3187,35 +3187,33 @@ class Group(System):
                         xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
 
                 if self._fd_subgroup_inputs and self.comm.size > 1:
-                    seed_info = self._problem_meta['seed_var_info']
-                    if seed_info is not None:
-                        seed_vars, has_distrib_seed = seed_info
-                        if True:  # has_distrib_seed:
-                            if len(seed_vars) > 1:
-                                raise RuntimeError("Multiple seed variables not supported "
-                                                   "under MPI if they are distributed and in "
-                                                   "a group doing finite difference.")
-                            pre = '' if sub is None else sub + '.'
-                            slices = self._doutputs.get_slice_dict()
-                            outarr = self._doutputs.asarray()
-                            data = {}
-                            for inp in self._fd_subgroup_inputs:
-                                src = self._conn_global_abs_in2out[inp]
-                                if src.startswith(pre) and src in slices:
-                                    arr = outarr[slices[src]]
-                                    if np.any(arr):
-                                        data[src] = arr
-                                    else:
-                                        data[src] = None
+                    seed_vars = self._problem_meta['seed_vars']
+                    if seed_vars is not None:
+                        if len(seed_vars) > 1:
+                            raise RuntimeError("Multiple seed variables not supported "
+                                               "under MPI if they are distributed and in "
+                                               "a group doing finite difference.")
+                        pre = '' if sub is None else sub + '.'
+                        slices = self._doutputs.get_slice_dict()
+                        outarr = self._doutputs.asarray()
+                        data = {}
+                        for inp in self._fd_subgroup_inputs:
+                            src = self._conn_global_abs_in2out[inp]
+                            if src.startswith(pre) and src in slices:
+                                arr = outarr[slices[src]]
+                                if np.any(arr):
+                                    data[src] = arr
+                                else:
+                                    data[src] = None
 
-                            if data:
-                                comm = self.comm
-                                myrank = comm.rank
-                                for rank, d in enumerate(comm.allgather(data)):
-                                    if rank != myrank:
-                                        for n, val in d.items():
-                                            if val is not None and n in slices:
-                                                outarr[slices[n]] += val
+                        if data:
+                            comm = self.comm
+                            myrank = comm.rank
+                            for rank, d in enumerate(comm.allgather(data)):
+                                if rank != myrank:
+                                    for n, val in d.items():
+                                        if val is not None and n in slices:
+                                            outarr[slices[n]] += val
 
                 if self._has_input_scaling:
                     vec_inputs.scale_to_phys(mode='rev')

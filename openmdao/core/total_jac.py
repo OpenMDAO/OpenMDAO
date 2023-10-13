@@ -796,22 +796,21 @@ class _TotalJacInfo(object):
                     imeta = defaultdict(bool)
                     imeta['par_deriv_color'] = parallel_deriv_color
                     imeta['idx_list'] = [(start, end)]
-                    imeta['seed_info'] = [[name], dist]
+                    imeta['seed_vars'] = [name]
                     idx_iter_dict[parallel_deriv_color] = (imeta, it)
                 else:
                     imeta = idx_iter_dict[parallel_deriv_color][0]
                     imeta['idx_list'].append((start, end))
-                    imeta['seed_info'][0].append(name)
-                    imeta['seed_info'][1] |= dist
+                    imeta['seed_vars'].append(name)
             elif self.directional:
                 imeta = defaultdict(bool)
                 imeta['idx_list'] = range(start, end)
-                imeta['seed_info'] = [(name,), dist]
+                imeta['seed_vars'] = (name,)
                 idx_iter_dict[name] = (imeta, self.directional_iter)
             elif not simul_coloring:  # plain old single index iteration
                 imeta = defaultdict(bool)
                 imeta['idx_list'] = range(start, end)
-                imeta['seed_info'] = [(name,), dist]
+                imeta['seed_vars'] = (name,)
                 idx_iter_dict[name] = (imeta, self.single_index_iter)
 
             if path in relevant and not non_rel_outs:
@@ -861,7 +860,7 @@ class _TotalJacInfo(object):
 
                 iterdict['relevant'] = all_rel_systems
                 iterdict['cache_lin_solve'] = cache
-                iterdict['seed_info'] = all_vois
+                iterdict['seed_vars'] = all_vois
                 itermeta.append(iterdict)
 
             idx_iter_dict['@simul_coloring'] = (imeta, self.simul_coloring_iter)
@@ -1541,7 +1540,7 @@ class _TotalJacInfo(object):
             for key, idx_info in self.idx_iter_dict[mode].items():
                 imeta, idx_iter = idx_info
                 for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
-                    self.model._problem_meta['seed_var_info'] = itermeta['seed_info']
+                    self.model._problem_meta['seed_vars'] = itermeta['seed_vars']
                     rel_systems, _, cache_key = input_setter(inds, itermeta, mode)
 
                     if debug_print:
@@ -1581,7 +1580,7 @@ class _TotalJacInfo(object):
 
                     # reset any Problem level data for the current iteration
                     self.model._problem_meta['parallel_deriv_color'] = None
-                    self.model._problem_meta['seed_var_info'] = None
+                    self.model._problem_meta['seed_vars'] = None
 
         # Driver scaling.
         if self.has_scaling:
