@@ -1,6 +1,8 @@
 """Define the PETSc Transfer class."""
 import numpy as np
+import networkx as nx
 from openmdao.utils.mpi import check_mpi_env
+from openmdao.utils.general_utils import common_subpath
 from openmdao.core.constants import INT_DTYPE
 
 use_mpi = check_mpi_env()
@@ -116,10 +118,38 @@ else:
                 nz = np.count_nonzero(group._var_sizes[io][:, allprocs_abs2idx[name]])
                 return nz > 1, group._var_sizes[io].shape[0] - nz, False
 
-            def get_xfer_ranks(name, io):
-                if group._var_allprocs_abs2meta[io][name]['distributed']:
-                    return []
+            def get_nonzero_ranks(name, io):
                 return np.nonzero(group._var_sizes[io][:, allprocs_abs2idx[name]])[0]
+
+            if rev and group._owns_approx_jac and group._has_distrib_vars and group.pathname != '':
+                # inp_boundary_set is the set of input variables that are connected to sources
+                # outside of this group.
+                inp_boundary_set = set(group._var_allprocs_abs2meta['input'])
+                inp_boundary_set = inp_boundary_set.difference(group._conn_global_abs_in2out)
+                model = group._problem_meta['model_ref']()
+                relgraph = model._relevance_graph
+
+                # inp_dep_dist is the set of input variables that are upstream of distributed
+                # variables.
+                inp_dep_dist = set()
+                for inp in inp_boundary_set:
+                    found = False
+                    for _, succs in nx.bfs_successors(relgraph, inp):
+                        for successor in succs:
+                            ndata = relgraph.nodes[successor]
+                            if 'dist' in ndata and ndata['dist']:
+                                inp_dep_dist.add(inp)
+                                found = True
+                                break
+                        if found:
+                            break
+
+                # look in model for the connections to the inp_dep_dist inputs
+                for inp in inp_dep_dist:
+                    src = model._conn_global_abs_in2out[inp]
+                    gname = common_subpath((src, inp))
+                    owning_group = model._get_subsystem(gname)
+                    owning_group._fd_subgroup_inputs.add(inp)
 
             total_fwd = total_rev = total_rev_nocolor = 0
 
@@ -180,7 +210,7 @@ else:
 
                             if np.any(on_iproc):
                                 # This converts from iproc-then-ivar to ivar-then-iproc ordering
-                                # Subtract off part of previous procs
+                                # Subtract off part of this variable from previous procs
                                 # Then add all variables on previous procs
                                 # Then all previous variables on this proc
                                 # - np.sum(out_sizes[:iproc, idx_out])
@@ -203,7 +233,9 @@ else:
                     sub_in = abs_in[mypathlen:].partition('.')[0]
                     fwd_xfer_in[sub_in].append(input_inds)
                     fwd_xfer_out[sub_in].append(output_inds)
-                    if rev:
+                    if rev and group._owns_approx_jac:
+                        pass  # no rev transfers needed for FD group
+                    elif rev:
                         inp_is_dup, inp_missing, distrib_in = is_dup(abs_in, 'input')
                         out_is_dup, _, distrib_out = is_dup(abs_out, 'output')
 
@@ -281,7 +313,7 @@ else:
                             oidxlist_nc = []
                             iidxlist_nc = []
                             size = size_nc = 0
-                            for rnk in get_xfer_ranks(abs_out, 'output'):
+                            for rnk in get_nonzero_ranks(abs_out, 'output'):
                                 offset = offsets_out[rnk, idx_out]
                                 if src_indices is None:
                                     oarr = range(offset, offset + meta_in['size'])
@@ -343,7 +375,7 @@ else:
                     sub_in = abs_in[mypathlen:].partition('.')[0]
                     fwd_xfer_in[sub_in]  # defaultdict will create an empty list there
                     fwd_xfer_out[sub_in]
-                    if rev:
+                    if rev and not group._owns_approx_jac:
                         sub_out = abs_out[mypathlen:].partition('.')[0]
                         rev_xfer_in[sub_out]
                         rev_xfer_out[sub_out]
@@ -367,7 +399,7 @@ else:
                     vectors['input']['nonlinear'], vectors['output']['nonlinear'],
                     inds, fwd_xfer_out[sname], group.comm)
 
-            if rev:
+            if rev and not group._owns_approx_jac:
                 xfer_in, xfer_out = _setup_index_views(total_rev, rev_xfer_in, rev_xfer_out)
 
                 xfer_all = PETScTransfer(vectors['input']['nonlinear'], out_vec,

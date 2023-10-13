@@ -1005,6 +1005,9 @@ class Problem(object):
             'singular_jac_behavior': 'warn',  # How to handle singular jac conditions
             'parallel_deriv_color': None,  # None unless derivatives involving a parallel deriv
                                            # colored dv/response are currently being computed
+            'seed_var_info': None,  # list of tuples of the form (seed var names, any_are_distrib).
+                                    # The seed variables are those that are active in the current
+                                    # derivative solve.
         }
 
         if _prob_setup_stack:

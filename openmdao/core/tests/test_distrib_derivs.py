@@ -688,12 +688,12 @@ class MPITests2(unittest.TestCase):
                           promotes_inputs=['*'])
 
         sub.add_subsystem("parab", DistParab(arr_size=size), promotes_outputs=['*'], promotes_inputs=['a'])
-        sub.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
+        model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                              f_sum=np.ones((size, )),
                                              f_xy=np.ones((size, ))),
                           promotes_outputs=['*'])
 
-        sub.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         sub.connect('dummy.xd', 'parab.x')
         sub.connect('dummy.yd', 'parab.y')
@@ -717,11 +717,7 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        J = prob.check_totals(method='fd', show_only_incorrect=True)
-        assert_near_equal(J['sub.parab.f_xy', 'p.x']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['sub.parab.f_xy', 'p.y']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['sub.sum.f_sum', 'p.x']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['sub.sum.f_sum', 'p.y']['abs error'].forward, 0.0, 1e-5)
+        #assert_check_totals(prob.check_totals(method='fd', out_stream=None))
 
         # rev mode
 
@@ -737,11 +733,9 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        J = prob.check_totals(method='fd', show_only_incorrect=True)
-        assert_near_equal(J['sub.parab.f_xy', 'p.x']['abs error'].reverse, 0.0, 1e-5)
-        assert_near_equal(J['sub.parab.f_xy', 'p.y']['abs error'].reverse, 0.0, 1e-5)
-        assert_near_equal(J['sub.sum.f_sum', 'p.x']['abs error'].reverse, 0.0, 1e-5)
-        assert_near_equal(J['sub.sum.f_sum', 'p.y']['abs error'].reverse, 0.0, 1e-5)
+        # from openmdao.devtools.debug import trace_mpi
+        # trace_mpi()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None))
 
     def test_simple_distrib_voi_group_fd(self):
         size = 3

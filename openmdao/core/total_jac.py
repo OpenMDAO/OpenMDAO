@@ -91,7 +91,7 @@ class _TotalJacInfo(object):
         (local indices, local sizes).
     in_idx_map : dict
         Mapping of jacobian row/col index to a tuple of the form
-        (dist, relevant_systems, cache_linear_solutions_flag)
+        (relevant_systems, cache_linear_solutions_flag, voi name)
     total_relevant_systems : set
         The set of names of all systems relevant to the computation of the total derivatives.
     directional : bool
@@ -372,7 +372,6 @@ class _TotalJacInfo(object):
                 allfdgroups = set()
                 for grps in model.comm.allgather(fdgroups):
                     allfdgroups.update(grps)
-                fdprefixes = [n + '.' for n in allfdgroups]
 
                 self.jac_scratch['rev'] = [scratch[0][:J.shape[1]]]
                 if self.simul_coloring is not None:  # when simul coloring, need two scratch arrays
@@ -397,15 +396,9 @@ class _TotalJacInfo(object):
                     else:
                         end += vmeta['global_size']
 
-                    is_fdvar = False
-                    for prefix in fdprefixes:
-                        if name.startswith(prefix):
-                            is_fdvar = True
-                            break
-
                     dist = vmeta['distributed']
                     has_dist |= dist
-                    if not is_fdvar and not dist and model._owning_rank[name] != model.comm.rank:
+                    if not dist and model._owning_rank[name] != model.comm.rank:
                         self.rev_allreduce_mask[start:end] = False
                     start = end
 
@@ -710,12 +703,13 @@ class _TotalJacInfo(object):
                 path = model._conn_global_abs_in2out[abs_in]
 
             in_var_meta = all_abs2meta_out[path]
+            dist = in_var_meta['distributed']
 
             if name in vois:
                 # if name is in vois, then it has been declared as either a design var or
                 # a constraint or an objective.
                 meta = vois[name]
-                if meta['distributed']:
+                if dist:
                     end += meta['global_size']
                 else:
                     end += meta['size']
@@ -753,7 +747,6 @@ class _TotalJacInfo(object):
             offsets = var_offsets['output']
             gstart = np.sum(sizes[:iproc, in_var_idx])
             gend = gstart + sizes[iproc, in_var_idx]
-            has_rank_zeros = np.count_nonzero(sizes[:, in_var_idx]) < sizes.shape[0]
 
             # if we're doing parallel deriv coloring, we only want to set the seed on one proc
             # for each var in a given color
@@ -765,7 +758,6 @@ class _TotalJacInfo(object):
             else:
                 relev = None
 
-            dist = in_var_meta['distributed']
             if not dist:
                 # if the var is not distributed, convert the indices to global.
                 # We don't iterate over the full distributed size in this case.
@@ -780,7 +772,7 @@ class _TotalJacInfo(object):
             if gend > gstart and (relev is None or relev):
                 loc = np.nonzero(np.logical_and(irange >= gstart, irange < gend))[0]
                 if in_idxs is None:
-                    if in_var_meta['distributed']:
+                    if dist:
                         loc_i[loc] = np.arange(0, gend - gstart, dtype=INT_DTYPE)
                     else:
                         loc_i[loc] = irange[loc] - gstart
@@ -804,17 +796,22 @@ class _TotalJacInfo(object):
                     imeta = defaultdict(bool)
                     imeta['par_deriv_color'] = parallel_deriv_color
                     imeta['idx_list'] = [(start, end)]
+                    imeta['seed_info'] = [[name], dist]
                     idx_iter_dict[parallel_deriv_color] = (imeta, it)
                 else:
                     imeta = idx_iter_dict[parallel_deriv_color][0]
                     imeta['idx_list'].append((start, end))
+                    imeta['seed_info'][0].append(name)
+                    imeta['seed_info'][1] |= dist
             elif self.directional:
                 imeta = defaultdict(bool)
                 imeta['idx_list'] = range(start, end)
+                imeta['seed_info'] = [(name,), dist]
                 idx_iter_dict[name] = (imeta, self.directional_iter)
             elif not simul_coloring:  # plain old single index iteration
                 imeta = defaultdict(bool)
                 imeta['idx_list'] = range(start, end)
+                imeta['seed_info'] = [(name,), dist]
                 idx_iter_dict[name] = (imeta, self.single_index_iter)
 
             if path in relevant and not non_rel_outs:
@@ -843,14 +840,16 @@ class _TotalJacInfo(object):
             imeta = defaultdict(bool)
             imeta['coloring'] = simul_coloring
             all_rel_systems = set()
+            all_vois = set()
             cache = False
             imeta['itermeta'] = itermeta = []
             locs = None
             for ilist in simul_coloring.color_iter(mode):
                 for i in ilist:
-                    rel_systems, cache_lin_sol, _ = idx_map[i]
+                    rel_systems, cache_lin_sol, voiname = idx_map[i]
                     _update_rel_systems(all_rel_systems, rel_systems)
                     cache |= cache_lin_sol
+                    all_vois.add(voiname)
 
                 iterdict = defaultdict(bool)
 
@@ -862,6 +861,7 @@ class _TotalJacInfo(object):
 
                 iterdict['relevant'] = all_rel_systems
                 iterdict['cache_lin_solve'] = cache
+                iterdict['seed_info'] = all_vois
                 itermeta.append(iterdict)
 
             idx_iter_dict['@simul_coloring'] = (imeta, self.simul_coloring_iter)
@@ -1067,7 +1067,7 @@ class _TotalJacInfo(object):
             Iteration metadata.
         """
         for i in imeta['idx_list']:
-            yield i, self.single_input_setter, self.single_jac_setter, None
+            yield i, self.single_input_setter, self.single_jac_setter, imeta
 
     def simul_coloring_iter(self, imeta, mode):
         """
@@ -1096,11 +1096,7 @@ class _TotalJacInfo(object):
         jac_setter = self.simul_coloring_jac_setter
 
         for color, ilist in enumerate(coloring.color_iter(mode)):
-            if len(ilist) == 1:
-                yield ilist, input_setter, jac_setter, None
-            else:
-                # yield all indices for a color at once
-                yield ilist, input_setter, jac_setter, imeta['itermeta'][color]
+            yield ilist, input_setter, jac_setter, imeta['itermeta'][color]
 
     def par_deriv_iter(self, imeta, mode):
         """
@@ -1216,7 +1212,7 @@ class _TotalJacInfo(object):
         int or None
             key used for storage of cached linear solve (if active, else None).
         """
-        if itermeta is None:
+        if len(inds) == 1:
             return self.single_input_setter(inds[0], None, mode)
 
         self._zero_vecs(mode)
@@ -1255,14 +1251,14 @@ class _TotalJacInfo(object):
 
         dist = self.comm.size > 1
 
-        self.model._problem_meta['parallel_deriv_color'] = imeta['par_deriv_color']
-
         for i in inds:
             if not dist or self.in_loc_idxs[mode][i] >= 0:
                 rel_systems, vnames, _ = self.single_input_setter(i, imeta, mode)
                 _update_rel_systems(all_rel_systems, rel_systems)
                 if vnames is not None:
                     vec_names.add(vnames[0])
+
+        self.model._problem_meta['parallel_deriv_color'] = imeta['par_deriv_color']
 
         if vec_names:
             return all_rel_systems, sorted(vec_names), (inds[0], mode)
@@ -1419,8 +1415,6 @@ class _TotalJacInfo(object):
             for i in inds:
                 self.simple_single_jac_scatter(i, mode)
 
-        self.model._problem_meta['parallel_deriv_color'] = None
-
     def simul_coloring_jac_setter(self, inds, mode, meta):
         """
         Set the appropriate part of the total jacobian for simul coloring input indices.
@@ -1547,7 +1541,8 @@ class _TotalJacInfo(object):
             for key, idx_info in self.idx_iter_dict[mode].items():
                 imeta, idx_iter = idx_info
                 for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
-                    rel_systems, vec_names, cache_key = input_setter(inds, itermeta, mode)
+                    self.model._problem_meta['seed_var_info'] = itermeta['seed_info']
+                    rel_systems, _, cache_key = input_setter(inds, itermeta, mode)
 
                     if debug_print:
                         if par_print and key in par_print:
@@ -1583,6 +1578,10 @@ class _TotalJacInfo(object):
                         print(f'Elapsed Time: {time.perf_counter() - t0} secs\n', flush=True)
 
                     jac_setter(inds, mode, imeta)
+
+                    # reset any Problem level data for the current iteration
+                    self.model._problem_meta['parallel_deriv_color'] = None
+                    self.model._problem_meta['seed_var_info'] = None
 
         # Driver scaling.
         if self.has_scaling:
