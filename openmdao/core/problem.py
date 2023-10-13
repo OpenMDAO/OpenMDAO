@@ -812,8 +812,9 @@ class Problem(object):
         """
         Set up case recording.
         """
-        self._filtered_vars_to_record = self.driver._get_vars_to_record(self.recording_options)
-        self._rec_mgr.startup(self, self.comm)
+        if self._rec_mgr.has_recorders():
+            self._filtered_vars_to_record = self.driver._get_vars_to_record(self)
+            self._rec_mgr.startup(self, self.comm)
 
     def add_recorder(self, recorder):
         """
