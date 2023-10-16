@@ -207,7 +207,7 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
                 errmsg = (f"{self.msginfo}: Error interpolating output '{out_name}' "
                           f"because input '{varname_causing_error}' required extrapolation while "
                           f"interpolating dimension {err.idx + 1}, where its value '{err.value}'"
-                          f" exceeded the range ('{ err.lower}', '{err.upper}')")
+                          f" exceeded the range ('{err.lower}', '{err.upper}')")
                 raise AnalysisError(errmsg, inspect.getframeinfo(inspect.currentframe()),
                                     self.msginfo)
 
