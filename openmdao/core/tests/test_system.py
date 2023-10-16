@@ -5,7 +5,8 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_warnings
+from openmdao.utils.testing_utils import use_tempdirs
 
 
 class TestSystem(unittest.TestCase):
@@ -220,7 +221,6 @@ class TestSystem(unittest.TestCase):
 
         self.assertEqual(str(cm.exception), msg)
 
-
     def test_list_inputs_output_with_includes_excludes(self):
         from openmdao.test_suite.scripts.circuit_analysis import Circuit
 
@@ -235,6 +235,7 @@ class TestSystem(unittest.TestCase):
         model.connect('ground.V', 'circuit.Vg')
 
         p.setup()
+        p.set_solver_print(-1)
         p.run_model()
 
         # Inputs with no includes or excludes
@@ -409,7 +410,7 @@ class TestSystem(unittest.TestCase):
               "any `set_val` calls.")
 
         with assert_warning(UserWarning, msg):
-            prob.model.list_inputs(units=True, prom_name=True)
+            prob.model.list_inputs(units=True, prom_name=True, out_stream=None)
 
     def test_get_io_metadata(self):
         from openmdao.test_suite.components.sellar_feature import SellarMDA
@@ -601,6 +602,71 @@ class TestSystem(unittest.TestCase):
         c3y = p.get_val('my_group.g1.c3.y')
         expected = ((4 * 3 + 5) * 3 + 5) * 3 + 5.
         assert_near_equal(expected, c3y)
+
+    @use_tempdirs
+    def test_recording_options_includes_excludes(self):
+        import openmdao.api as om
+
+        prob = om.Problem()
+
+        mag = prob.model.add_subsystem('mag', om.ExecComp('y=x**2'),
+                                       promotes_inputs=['*'], promotes_outputs=['*'])
+
+        sum = prob.model.add_subsystem('sum', om.ExecComp('z=sum(y)'),
+                                       promotes_inputs=['*'], promotes_outputs=['*'])
+
+        recorder = om.SqliteRecorder("rec_options.sql")
+        mag.add_recorder(recorder)
+        sum.add_recorder(recorder)
+
+        mag.recording_options['record_inputs'] = True
+        mag.recording_options['excludes'] = ['*x*', '*aa*']
+        mag.recording_options['includes'] = ['*y*', '*bb*']
+
+        sum.recording_options['record_inputs'] = True
+        sum.recording_options['excludes'] = ['*y*', '*cc*']
+        sum.recording_options['includes'] = ['*z*', '*dd*']
+
+        prob.setup()
+
+        expected_warnings = (
+            (om.OpenMDAOWarning, "'mag' <class ExecComp>: No matches for pattern '*aa*' in recording_options['excludes']."),
+            (om.OpenMDAOWarning, "'mag' <class ExecComp>: No matches for pattern '*bb*' in recording_options['includes']."),
+            (om.OpenMDAOWarning, "'sum' <class ExecComp>: No matches for pattern '*cc*' in recording_options['excludes']."),
+            (om.OpenMDAOWarning, "'sum' <class ExecComp>: No matches for pattern '*dd*' in recording_options['includes'].")
+        )
+
+        with assert_warnings(expected_warnings):
+            prob.final_setup()
+
+    @use_tempdirs
+    def test_record_residuals_includes_excludes(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.sellar import SellarProblem
+
+        prob = SellarProblem()
+
+        model = prob.model
+
+        recorder = om.SqliteRecorder("rec_resids.sql")
+        model.add_recorder(recorder)
+
+        # just want record residuals
+        model.recording_options['record_inputs'] = False
+        model.recording_options['record_outputs'] = False
+        model.recording_options['record_residuals'] = True
+        model.recording_options['excludes'] = ['*y1*', '*x']   # x is an input, which we are not recording
+        model.recording_options['includes'] = ['*con*', '*z']  # z is an input, which we are not recording
+
+        prob.setup()
+
+        expected_warnings = (
+            (om.OpenMDAOWarning, "<model> <class SellarDerivatives>: No matches for pattern '*x' in recording_options['excludes']."),
+            (om.OpenMDAOWarning, "<model> <class SellarDerivatives>: No matches for pattern '*z' in recording_options['includes']."),
+        )
+
+        with assert_warnings(expected_warnings):
+            prob.final_setup()
 
 
 if __name__ == "__main__":
