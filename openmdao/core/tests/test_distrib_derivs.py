@@ -789,6 +789,214 @@ class MPITests2(unittest.TestCase):
 
         assert_check_totals(prob.check_totals(method='fd', out_stream=None))
 
+    def test_distrib_voi_group_fd4(self):
+        # distrib comp is inside of fd group but not a response, and 2 nondistrib
+        # constraints connect to it downstream, both inside and outside of the fd group.
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+        ivc.add_output('y', np.ones((size, )))
+
+        model.add_subsystem('p', ivc)
+        sub = model.add_subsystem('sub', om.Group())
+
+        sub.add_subsystem('p2', om.IndepVarComp('a', -3.0 + 0.6 * np.arange(size)))
+        sub.add_subsystem('dummy', om.ExecComp(['xd = x', "yd = y"],
+                                               x=np.ones(size), xd=np.ones(size),
+                                               y=np.ones(size), yd=np.ones(size)))
+
+        sub.add_subsystem("parab", DistParab(arr_size=size))
+        sub.add_subsystem("cons", om.ExecComp("c = x*3. + 7.", x=np.ones(size), c=np.ones(size)))
+        # model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)', f_sum=np.ones((size, )), f_xy=np.ones((size, ))))
+
+        model.connect('p.x', 'sub.dummy.x')
+        model.connect('p.y', 'sub.dummy.y')
+        model.connect('sub.p2.a', 'sub.parab.a')
+        model.connect('sub.dummy.xd', 'sub.parab.x')
+        model.connect('sub.dummy.yd', 'sub.parab.y')
+        # model.connect('sub.parab.f_xy', 'sum.f_xy', src_indices=om.slicer[:])
+        model.connect('sub.parab.f_xy', 'sub.cons.x', src_indices=om.slicer[:])
+
+        model.add_design_var('p.x', lower=-50.0, upper=50.0)
+        model.add_design_var('p.y', lower=-50.0, upper=50.0)
+        model.add_constraint('sub.cons.c', lower=0.0)
+        # model.add_objective('sum.f_sum', index=-1)
+
+        sub.approx_totals(method='fd')
+
+        prob.setup(mode='fwd', force_alloc_complex=True)
+
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+        # rev mode
+
+        prob.setup(mode='rev', force_alloc_complex=True)
+
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_distrib_voi_group_fd5(self):
+        # distrib comp is inside of fd group but not a response, and 2 nondistrib
+        # constraints connect to it downstream, both inside of the fd group.
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+        ivc.add_output('y', np.ones((size, )))
+
+        model.add_subsystem('p', ivc)
+        sub = model.add_subsystem('sub', om.Group())
+
+        sub.add_subsystem('p2', om.IndepVarComp('a', -3.0 + 0.6 * np.arange(size)))
+        sub.add_subsystem('dummy', om.ExecComp(['xd = x', "yd = y"],
+                                               x=np.ones(size), xd=np.ones(size),
+                                               y=np.ones(size), yd=np.ones(size)))
+
+        sub.add_subsystem("parab", DistParab(arr_size=size))
+        sub.add_subsystem("cons", om.ExecComp("c = x*3. + 7.", x=np.ones(size), c=np.ones(size)))
+        # sub.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)', f_sum=np.ones((size, )), f_xy=np.ones((size, ))))
+
+        model.connect('p.x', 'sub.dummy.x')
+        model.connect('p.y', 'sub.dummy.y')
+        model.connect('sub.p2.a', 'sub.parab.a')
+        model.connect('sub.dummy.xd', 'sub.parab.x')
+        model.connect('sub.dummy.yd', 'sub.parab.y')
+        # model.connect('sub.parab.f_xy', 'sub.sum.f_xy', src_indices=om.slicer[:])
+        model.connect('sub.parab.f_xy', 'sub.cons.x', src_indices=om.slicer[:])
+
+        model.add_design_var('p.x', lower=-50.0, upper=50.0)
+        model.add_design_var('p.y', lower=-50.0, upper=50.0)
+        model.add_constraint('sub.cons.c', lower=0.0)
+        # model.add_objective('sub.sum.f_sum', index=-1)
+
+        sub.approx_totals(method='fd')
+
+        prob.setup(mode='fwd', force_alloc_complex=True)
+
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+        # rev mode
+
+        prob.setup(mode='rev', force_alloc_complex=True)
+
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_distrib_voi_group_nofd(self):
+        # distrib comp output feeds two nondist inputs
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+        ivc.add_output('y', np.ones((size, )))
+
+        model.add_subsystem('p', ivc)
+
+        model.add_subsystem('p2', om.IndepVarComp('a', -3.0 + 0.6 * np.arange(size)))
+        model.add_subsystem('dummy', om.ExecComp(['xd = x', "yd = y"],
+                                               x=np.ones(size), xd=np.ones(size),
+                                               y=np.ones(size), yd=np.ones(size)))
+
+        model.add_subsystem("parab", DistParab(arr_size=size))
+        model.add_subsystem("cons", om.ExecComp("c = x*3. + 7.", x=np.ones(size), c=np.ones(size)))
+        model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)', f_sum=np.ones((size, )), f_xy=np.ones((size, ))))
+
+        model.connect('p.x', 'dummy.x')
+        model.connect('p.y', 'dummy.y')
+        model.connect('p2.a', 'parab.a')
+        model.connect('dummy.xd', 'parab.x')
+        model.connect('dummy.yd', 'parab.y')
+        model.connect('parab.f_xy', 'sum.f_xy', src_indices=om.slicer[:])
+        model.connect('parab.f_xy', 'cons.x', src_indices=om.slicer[:])
+
+        model.add_design_var('p.x', lower=-50.0, upper=50.0)
+        model.add_design_var('p.y', lower=-50.0, upper=50.0)
+        model.add_constraint('cons.c', lower=0.0)
+        model.add_objective('sum.f_sum', index=-1)
+
+        prob.setup(mode='fwd', force_alloc_complex=True)
+
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None), atol=3e-6)
+
+        # rev mode
+
+        prob.setup(mode='rev', force_alloc_complex=True)
+
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None), atol=3e-6)
+
+    def test_nondistrib_voi_group_fd2(self):
+        # nondistrib comp is inside of fd group but not a response, and 2 nondistrib
+        # constraints connect to it downstream, both inside of the fd group.
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+        ivc.add_output('y', np.ones((size, )))
+
+        model.add_subsystem('p', ivc)
+        sub = model.add_subsystem('sub', om.Group())
+
+        sub.add_subsystem('p2', om.IndepVarComp('a', -3.0 + 0.6 * np.arange(size)))
+        sub.add_subsystem('dummy', om.ExecComp(['xd = x', "yd = y"],
+                                               x=np.ones(size), xd=np.ones(size),
+                                               y=np.ones(size), yd=np.ones(size)))
+
+        sub.add_subsystem("parab", om.ExecComp('f_xy = x**2 + 3.*xy - y*y + a', shape=size))
+        sub.add_subsystem("cons", om.ExecComp("c = x*3. + 7.", x=np.ones(size), c=np.ones(size)))
+        sub.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)', f_sum=np.ones((size, )), f_xy=np.ones((size, ))))
+
+        model.connect('p.x', 'sub.dummy.x')
+        model.connect('p.y', 'sub.dummy.y')
+        model.connect('sub.p2.a', 'sub.parab.a')
+        model.connect('sub.dummy.xd', 'sub.parab.x')
+        model.connect('sub.dummy.yd', 'sub.parab.y')
+        model.connect('sub.parab.f_xy', 'sub.sum.f_xy', src_indices=om.slicer[:])
+        model.connect('sub.parab.f_xy', 'sub.cons.x', src_indices=om.slicer[:])
+
+        model.add_design_var('p.x', lower=-50.0, upper=50.0)
+        model.add_design_var('p.y', lower=-50.0, upper=50.0)
+        model.add_constraint('sub.cons.c', lower=0.0)
+        model.add_objective('sub.sum.f_sum', index=-1)
+
+        sub.approx_totals(method='fd')
+
+        prob.setup(mode='fwd', force_alloc_complex=True)
+
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+        # rev mode
+
+        prob.setup(mode='rev', force_alloc_complex=True)
+
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
     def test_simple_distrib_voi_group_fd(self):
         size = 3
 

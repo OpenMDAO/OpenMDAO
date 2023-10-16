@@ -835,12 +835,14 @@ class Group(System):
                 graph.add_node(dv, type_='out',
                                dist=outmeta[dv]['distributed'] if dv in outmeta else None)
                 graph.add_edge(dv.rpartition('.')[0], dv)
+            graph.nodes[dv]['isdv'] = True
 
         for res in resps:
             if res not in graph:
                 graph.add_node(res, type_='out',
                                dist=outmeta[res]['distributed'] if res in outmeta else None)
-                graph.add_edge(res.rpartition('.')[0], res)
+                graph.add_edge(res.rpartition('.')[0], res, isresponse=True)
+            graph.nodes[res]['isresponse'] = True
 
         # figure out if we can remove any edges based on zero partials we find
         # in components.  By default all component connected outputs
@@ -904,10 +906,12 @@ class Group(System):
         for tgt, src in connections.items():
             if src not in graph:
                 dist = srcmeta[src]['distributed'] if src in srcmeta else None
-                graph.add_node(src, type_='out', dist=dist)
+                graph.add_node(src, type_='out', dist=dist,
+                               isdv=False, isresponse=False)
 
             dist = tgtmeta[tgt]['distributed'] if tgt in tgtmeta else None
-            graph.add_node(tgt, type_='in', dist=dist)
+            graph.add_node(tgt, type_='in', dist=dist,
+                           isdv=False, isresponse=False)
 
             graph.add_edge(src.rpartition('.')[0], src)
             graph.add_edge(tgt, tgt.rpartition('.')[0])

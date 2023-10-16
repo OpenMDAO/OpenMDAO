@@ -121,37 +121,57 @@ else:
             def get_nonzero_ranks(name, io):
                 return np.nonzero(group._var_sizes[io][:, allprocs_abs2idx[name]])[0]
 
+            # for an FD group, we use the relevance graph to determine which inputs on the
+            # boundary of the group are upstream of distributed variables within the group so
+            # that we can perform any necessary allreduce operations on the outputs that
+            # are connected to those inputs.
             if rev and group._owns_approx_jac and group._has_distrib_vars and group.pathname != '':
-                # inp_boundary_set is the set of input variables that are connected to sources
-                # outside of this group.
-                inp_boundary_set = set(group._var_allprocs_abs2meta['input'])
-                inp_boundary_set = inp_boundary_set.difference(group._conn_global_abs_in2out)
                 model = group._problem_meta['model_ref']()
                 relgraph = model._relevance_graph
-                prefix = group.pathname + '.'
+                group_path = group.pathname + '.'
 
-                # inp_dep_dist is the set of input variables that are upstream of distributed
-                # variables.
-                inp_dep_dist = set()
-                for inp in inp_boundary_set:
-                    found = False
-                    for _, succs in nx.bfs_successors(relgraph, inp):
-                        for successor in succs:
-                            if successor.startswith(prefix):
-                                ndata = relgraph.nodes[successor]
-                                if 'dist' in ndata and ndata['dist']:
-                                    inp_dep_dist.add(inp)
-                                    found = True
-                                    break
-                        if found:
-                            break
+                inner_resps = []
+                outer_dvs = []
+                inner_dists = set()
+                for n, data in relgraph.nodes(data=True):
+                    inside = n.startswith(group_path)
+                    if inside:
+                        if 'isresponse' in data and data['isresponse']:
+                            inner_resps.append(n)
+                        if 'dist' in data and data['dist']:
+                            inner_dists.add(n)
+                    else:  # not inside
+                        if 'isdv' in data and data['isdv']:
+                            outer_dvs.append(n)
 
-                # look in model for the connections to the inp_dep_dist inputs
-                for inp in inp_dep_dist:
-                    src = model._conn_global_abs_in2out[inp]
-                    gname = common_subpath((src, inp))
-                    owning_group = model._get_subsystem(gname)
-                    owning_group._fd_subgroup_inputs.add(inp)
+                if inner_resps and outer_dvs and inner_dists:
+                    # inp_boundary_set is the set of input variables that are connected to sources
+                    # outside of this group. (all group inputs minus group inputs that are connected
+                    # internal to the group)
+                    inp_boundary_set = set(group._var_allprocs_abs2meta['input'])
+                    inp_boundary_set = inp_boundary_set.difference(group._conn_global_abs_in2out)
+
+                    # inp_dep_dist is the set of group boundary inputs that are upstream of
+                    # distributed variables and between an external design var and an internal
+                    # response.
+                    inp_dep_dist = set()
+
+                    relevant = group._relevant
+                    for resp in inner_resps:
+                        for dv in outer_dvs:
+                            rel = relevant[resp][dv][0]
+                            if inner_dists.intersection(rel['input']) or \
+                               inner_dists.intersection(rel['output']):
+                                # dist var is in between the dv and response
+                                if resp in inner_dists:
+                                    inp_dep_dist.update(inp_boundary_set.intersection(rel['input']))
+
+                    # look in model for the connections to the group boundary inputs from outside
+                    for inp in inp_dep_dist:
+                        src = model._conn_global_abs_in2out[inp]
+                        gname = common_subpath((src, inp))
+                        owning_group = model._get_subsystem(gname)
+                        owning_group._fd_subgroup_inputs.add(inp)
 
             total_fwd = total_rev = total_rev_nocolor = 0
 
