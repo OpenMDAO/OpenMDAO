@@ -234,8 +234,9 @@ class TestN2Viewer(unittest.TestCase):
         ivc_0_val = vals[0]['val']
         ivc_1_val = vals[1]['val']
 
-        self.assertEqual(ivc_0_val, [5., 2])
-        self.assertEqual(ivc_1_val, np.array([1.]))
+        self.assertEqual(ivc_0_val[0], 5.)
+        self.assertEqual(ivc_0_val[1], 2.)
+        self.assertEqual(ivc_1_val, 1.)
 
     def test_problem_case(self):
         prob = om.Problem()

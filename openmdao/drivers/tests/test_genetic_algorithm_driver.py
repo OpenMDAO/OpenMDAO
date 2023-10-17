@@ -164,7 +164,7 @@ class TestSimpleGA(unittest.TestCase):
 
         # Optimal solution
         assert_near_equal(prob['comp.f'], 0.49399549, 1e-4)
-        self.assertTrue(int(prob['xI']) in [3, -3])
+        self.assertTrue(int(prob['xI'].item()) in [3, -3])
 
     def test_mixed_integer_branin_discrete(self):
         prob = om.Problem(reports=('optimizer',))
@@ -1382,7 +1382,7 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
                 self.add_subsystem('p3', om.IndepVarComp('z', 1.0))
 
                 self.add_subsystem('comp', om.ExecComp(['f = x + y + z']))
-                
+
                 self.connect('p1.x', 'comp.x')
                 self.connect('p2.y', 'comp.y')
                 self.connect('p3.z', 'comp.z')

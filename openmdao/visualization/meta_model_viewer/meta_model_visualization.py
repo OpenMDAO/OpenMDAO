@@ -398,7 +398,7 @@ class MetaModelVisualization(object):
                 self.prob.run_model()
                 for title in self.output_names:
                     outputs[title].append(
-                        float(self.prob[self.meta_model.name + '.' + title]))
+                        self.prob[self.meta_model.name + '.' + title].item())
 
         return stack_outputs(outputs)
 

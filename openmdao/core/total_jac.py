@@ -1724,7 +1724,7 @@ class _TotalJacInfo(object):
         vslice = jac_arr[tup[0]]
 
         if inds is None:
-            zero_idxs = np.nonzero(vslice.reshape(shape))
+            zero_idxs = np.atleast_1d(vslice.reshape(shape)).nonzero()
         else:
             zero_idxs = np.nonzero(vslice)
             if zero_idxs[0].size == 0:

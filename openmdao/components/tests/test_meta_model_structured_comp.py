@@ -1201,7 +1201,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         p = om.Problem(model)
         p.setup(force_alloc_complex=True)
 
-        p.set_val('InterpSubsystem.mach', 7.0)
+        p.set_val('InterpSubsystem.mach', 7.001)  # off the table point
         p.run_model()
 
         cpd = force_check_partials(p, compact_print=False, out_stream=None, method='cs')
@@ -1347,7 +1347,7 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
         f = np.sqrt(P1) + P2 * P3
 
         # verify the shape matches the order and size of the input params
-        print(f.shape)
+        self.assertEqual(f.shape, (25, 5, 10))
 
         # Create regular grid interpolator instance
         interp = om.MetaModelStructuredComp(method='scipy_cubic')
