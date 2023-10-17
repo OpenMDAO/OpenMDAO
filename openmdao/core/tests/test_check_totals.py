@@ -1857,9 +1857,9 @@ class TestProblemCheckTotals(unittest.TestCase):
         data = p.check_totals(method='cs', directional=True)
         assert_check_totals(data, atol=1e-6, rtol=1e-6)
 
-    def _build_sparse_model(self):
+    def _build_sparse_model(self, driver, coloring=False):
         prob = om.Problem()
-        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver = driver
 
         prob.model.add_subsystem('comp1', Simple(size=5))
         prob.model.add_subsystem('comp2', Simple(size=5))
@@ -1883,20 +1883,23 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.model.connect('comp.out3', 'comp7.x')
         prob.model.connect('comp.out4', 'comp8.x')
 
-        prob.model.add_design_var('comp1.x')
-        prob.model.add_design_var('comp2.x')
-        prob.model.add_design_var('comp3.x')
-        prob.model.add_design_var('comp4.x')
+        prob.model.add_design_var('comp1.x', lower=-.5)
+        prob.model.add_design_var('comp2.x', lower=0)
+        prob.model.add_design_var('comp3.x', lower=-1.)
+        prob.model.add_design_var('comp4.x', lower=-5.)
 
         prob.model.add_constraint('comp5.y', lower=-999., upper=999.)
         prob.model.add_constraint('comp6.y', lower=-999., upper=999.)
         prob.model.add_constraint('comp7.y', lower=-999., upper=999.)
         prob.model.add_objective('comp8.y', index=0)
 
+        if coloring:
+            prob.driver.declare_coloring()
+
         return prob
 
     def test_sparse_matfree_fwd(self):
-        prob = self._build_sparse_model()
+        prob = self._build_sparse_model(driver=om.ScipyOptimizeDriver())
         m = prob.model
         prob.setup(force_alloc_complex=True, mode='fwd')
         prob.run_model()
@@ -1911,18 +1914,39 @@ class TestProblemCheckTotals(unittest.TestCase):
         for slv, ex in zip(nsolves, expected):
             self.assertEqual(slv, ex)
 
-    def test_sparse_matfree_fwd_coloring(self):
-        prob = self._build_sparse_model()
+    def test_sparse_matfree_fwd_coloring_scipy(self):
+        prob = self._build_sparse_model(driver=om.ScipyOptimizeDriver(), coloring=True)
         m = prob.model
         prob.setup(force_alloc_complex=True, mode='fwd')
         prob.run_model()
 
-        from openmdao.utils.coloring import dynamic_total_coloring
-        dynamic_total_coloring(prob.driver, run_model=False)
-        prob.driver._coloring_info['dynamic'] = True
-        # prob.driver._coloring_info['coloring'].display()
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+
+        prob.run_driver()
+
+        # reset lin solve counts
+        for c in  [m.comp5, m.comp6, m.comp7, m.comp8]:
+            c.nsolve_linear = 0
+
+        J = prob.compute_totals()
+
+        nsolves = [c.nsolve_linear for c in [m.comp5, m.comp6, m.comp7, m.comp8]]
+        # Coloring requires 2 linear solves, mixing all dependencies, so each comp gets
+        # 2 linear solves.
+        expected = [2, 2, 2, 2]
+
+        for slv, ex in zip(nsolves, expected):
+            self.assertEqual(slv, ex)
+
+    def test_sparse_matfree_fwd_coloring_pyoptsparse(self):
+        prob = self._build_sparse_model(coloring=True, driver=om.pyOptSparseDriver())
+        m = prob.model
+        prob.setup(force_alloc_complex=True, mode='fwd')
+        prob.run_model()
 
         assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+
+        prob.run_driver()
 
         # reset lin solve counts
         for c in  [m.comp5, m.comp6, m.comp7, m.comp8]:
@@ -1939,7 +1963,7 @@ class TestProblemCheckTotals(unittest.TestCase):
             self.assertEqual(slv, ex)
 
     def test_sparse_matfree_rev(self):
-        prob = self._build_sparse_model()
+        prob = self._build_sparse_model(driver=om.ScipyOptimizeDriver())
         m = prob.model
         prob.setup(force_alloc_complex=True, mode='rev')
         prob.run_model()
@@ -1956,17 +1980,36 @@ class TestProblemCheckTotals(unittest.TestCase):
         for slv, ex in zip(nsolves, expected):
             self.assertEqual(slv, ex)
 
-    def test_sparse_matfree_rev_coloring(self):
-        prob = self._build_sparse_model()
+    def test_sparse_matfree_rev_coloring_scipy(self):
+        prob = self._build_sparse_model(driver=om.ScipyOptimizeDriver(), coloring=True)
         m = prob.model
         prob.setup(force_alloc_complex=True, mode='rev')
         prob.run_model()
 
-        from openmdao.utils.coloring import dynamic_total_coloring
-        dynamic_total_coloring(prob.driver, run_model=False)
-        prob.driver._coloring_info['dynamic'] = True
-        # prob.driver._coloring_info['coloring'].display()
+        prob.run_driver()  # activates coloring
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
 
+        # reset lin solve counts
+        for c in  [m.comp1, m.comp2, m.comp3, m.comp4]:
+            c.nsolve_linear = 0
+
+        J = prob.compute_totals()
+
+        nsolves = [c.nsolve_linear for c in [m.comp1, m.comp2, m.comp3, m.comp4]]
+        # coloring requires 2 rev solves, which combine all dependencies, so each
+        # comp gets 2 linear solves
+        expected = [2, 2, 2, 2]
+
+        for slv, ex in zip(nsolves, expected):
+            self.assertEqual(slv, ex)
+
+    def test_sparse_matfree_rev_coloring_pyoptsparse(self):
+        prob = self._build_sparse_model(driver=om.pyOptSparseDriver(), coloring=True)
+        m = prob.model
+        prob.setup(force_alloc_complex=True, mode='rev')
+        prob.run_model()
+
+        prob.run_driver()  # activates coloring
         assert_check_totals(prob.check_totals(method='cs', out_stream=None))
 
         # reset lin solve counts
