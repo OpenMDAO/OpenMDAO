@@ -11,7 +11,7 @@ import numpy as np
 import openmdao.api as om
 from openmdao.core.driver import Driver
 from openmdao.utils.units import convert_units
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
+from openmdao.utils.assert_utils import assert_near_equal, assert_warnings, assert_check_totals
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.components.paraboloid import Paraboloid
