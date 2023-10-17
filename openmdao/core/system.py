@@ -23,7 +23,7 @@ from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import _full_slice
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.record_util import create_local_meta, check_path
+from openmdao.utils.record_util import create_local_meta, check_path, has_match
 from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len
@@ -1948,16 +1948,27 @@ class System(object):
             incl = options['includes']
             excl = options['excludes']
 
+            # includes and excludes for outputs are specified using promoted names
+            # includes and excludes for inputs are specified using _absolute_ names
+            abs2prom_output = self._var_allprocs_abs2prom['output']
+            abs2prom_inputs = self._var_allprocs_abs2prom['input']
+
+            # set of promoted output names and absolute input and residual names
+            # used for matching includes/excludes
+            match_names = set()
+
             # includes and excludes for inputs are specified using _absolute_ names
             # vectors are keyed on absolute name, discretes on relative/promoted name
             if options['record_inputs']:
-                myinputs = sorted([n for n in self._var_abs2prom['input']
+                match_names.update(abs2prom_inputs.keys())
+                myinputs = sorted([n for n in abs2prom_inputs
                                    if check_path(n, incl, excl)])
 
             # includes and excludes for outputs are specified using _promoted_ names
             # vectors are keyed on absolute name, discretes on relative/promoted name
             if options['record_outputs']:
-                myoutputs = sorted([n for n, prom in self._var_abs2prom['output'].items()
+                match_names.update(abs2prom_output.values())
+                myoutputs = sorted([n for n, prom in abs2prom_output.items()
                                     if check_path(prom, incl, excl)])
 
                 if self._var_discrete['output']:
@@ -1969,9 +1980,19 @@ class System(object):
                     myresiduals = myoutputs
 
             elif options['record_residuals']:
-                abs2prom = self._var_abs2prom['output']
+                match_names.update(self._residuals.keys())
                 myresiduals = [n for n in self._residuals._abs_iter()
-                               if check_path(abs2prom[n], incl, excl)]
+                               if check_path(abs2prom_output[n], incl, excl)]
+
+            # check that all exclude/include globs have at least one matching output or input name
+            for pattern in excl:
+                if not has_match(pattern, match_names):
+                    issue_warning(f"{self.msginfo}: No matches for pattern '{pattern}' in "
+                                  "recording_options['excludes'].")
+            for pattern in incl:
+                if not has_match(pattern, match_names):
+                    issue_warning(f"{self.msginfo}: No matches for pattern '{pattern}' in "
+                                  "recording_options['includes'].")
 
             self._filtered_vars_to_record = {
                 'input': myinputs,
@@ -4839,27 +4860,29 @@ class System(object):
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
-        for sub in self.system_iter(include_self=True, recurse=True):
-            sub.under_complex_step = active
-            sub._inputs.set_complex_step_mode(active)
-            sub._outputs.set_complex_step_mode(active)
-            sub._residuals.set_complex_step_mode(active)
+        self.under_complex_step = active
+        self._inputs.set_complex_step_mode(active)
+        self._outputs.set_complex_step_mode(active)
+        self._residuals.set_complex_step_mode(active)
 
-            if sub._doutputs._alloc_complex:
-                sub._doutputs.set_complex_step_mode(active)
-                sub._dinputs.set_complex_step_mode(active)
-                sub._dresiduals.set_complex_step_mode(active)
-                if sub.nonlinear_solver:
-                    sub.nonlinear_solver._set_complex_step_mode(active)
+        if self._doutputs._alloc_complex:
+            self._doutputs.set_complex_step_mode(active)
+            self._dinputs.set_complex_step_mode(active)
+            self._dresiduals.set_complex_step_mode(active)
+            if self.nonlinear_solver:
+                self.nonlinear_solver._set_complex_step_mode(active)
 
-                if sub.linear_solver:
-                    sub.linear_solver._set_complex_step_mode(active)
+            if self.linear_solver:
+                self.linear_solver._set_complex_step_mode(active)
 
-                if sub._owns_approx_jac:
-                    sub._jacobian.set_complex_step_mode(active)
+            if self._owns_approx_jac:
+                self._jacobian.set_complex_step_mode(active)
 
-                if sub._assembled_jac:
-                    sub._assembled_jac.set_complex_step_mode(active)
+            if self._assembled_jac:
+                self._assembled_jac.set_complex_step_mode(active)
+
+        for sub in self.system_iter(include_self=False, recurse=True):
+            sub._set_complex_step_mode(active)
 
     def cleanup(self):
         """

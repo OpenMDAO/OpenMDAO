@@ -17,7 +17,7 @@ from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
-from openmdao.utils.om_warnings import OMDeprecationWarning
+from openmdao.utils.om_warnings import OpenMDAOWarning
 
 from openmdao.utils.mpi import MPI
 
@@ -650,11 +650,11 @@ class TestDriver(unittest.TestCase):
 
         totals = prob.check_totals(out_stream=None, driver_scaling=True)
 
-        for key, val in totals.items():
+        for val in totals.values():
             assert_near_equal(val['rel error'][0], 0.0, 1e-6)
 
         cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
+        cases = cr.list_cases('driver', out_stream=None)
         case = cr.get_case(cases[0])
 
         dv = case.get_design_vars()
@@ -814,6 +814,68 @@ class TestDriver(unittest.TestCase):
         assert_near_equal(totals['sub.comp.f_xy', 'sub.x']['J_fd'], [[1.44e2]], 1e-5)
         assert_near_equal(totals['sub.comp.f_xy', 'sub.y']['J_fd'], [[1.58e2]], 1e-5)
 
+    def test_get_vars_to_record(self):
+        recorder = om.SqliteRecorder("cases.sql")
+
+        prob = om.Problem(name='ABCD')
+        prob.add_recorder(recorder)
+
+        prob.model.add_subsystem('mag', om.ExecComp('y=x**2'),
+                                 promotes_inputs=['*'], promotes_outputs=['*'])
+
+        prob.model.add_subsystem('sum', om.ExecComp('z=sum(y)'),
+                                 promotes_inputs=['*'], promotes_outputs=['*'])
+
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.add_recorder(recorder)
+
+
+        prob.recording_options['record_inputs'] = True
+        prob.recording_options['excludes'] = ['*x*', '*aa*']
+        prob.recording_options['includes'] = ['*z*', '*bb*']
+
+        prob.driver.recording_options['record_inputs'] = True
+        prob.driver.recording_options['excludes'] = ['*y*', '*cc*']
+        prob.driver.recording_options['includes'] = ['*x*', '*dd*']
+
+        prob.setup()
+
+        expected_warnings = (
+            (OpenMDAOWarning, "Problem ABCD: No matches for pattern '*aa*' in recording_options['excludes']."),
+            (OpenMDAOWarning, "Problem ABCD: No matches for pattern '*bb*' in recording_options['includes']."),
+            (OpenMDAOWarning, "ScipyOptimizeDriver: No matches for pattern '*cc*' in recording_options['excludes']."),
+            (OpenMDAOWarning, "ScipyOptimizeDriver: No matches for pattern '*dd*' in recording_options['includes'].")
+        )
+
+        with assert_warnings(expected_warnings):
+            prob.final_setup()
+
+    def test_record_residuals_includes_excludes(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.sellar import SellarProblem
+
+        prob = SellarProblem()
+
+        recorder = om.SqliteRecorder("rec_resids.sql")
+        prob.driver.add_recorder(recorder)
+
+        # just want record residuals
+        prob.driver.recording_options['record_inputs'] = False
+        prob.driver.recording_options['record_outputs'] = False
+        prob.driver.recording_options['record_residuals'] = True
+        prob.driver.recording_options['excludes'] = ['*y1*', '*x']   # x is an input, which we are not recording
+        prob.driver.recording_options['includes'] = ['*con*', '*z']  # z is an input, which we are not recording
+
+        prob.setup()
+
+        expected_warnings = (
+            (om.OpenMDAOWarning, "Driver: No matches for pattern '*x' in recording_options['excludes']."),
+            (om.OpenMDAOWarning, "Driver: No matches for pattern '*z' in recording_options['includes']."),
+        )
+
+        with assert_warnings(expected_warnings):
+            prob.final_setup()
 
 @use_tempdirs
 class TestCheckRelevance(unittest.TestCase):

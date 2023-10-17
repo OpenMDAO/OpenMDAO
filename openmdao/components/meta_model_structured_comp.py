@@ -212,7 +212,7 @@ class MetaModelStructuredComp(ExplicitComponent):
                 varname_causing_error = '.'.join((self.pathname, self.pnames[err.idx]))
                 errmsg = (f"{self.msginfo}: Error interpolating output '{out_name}' "
                           f"because input '{varname_causing_error}' was out of bounds "
-                          f"('{ err.lower}', '{err.upper}') with value '{err.value}'")
+                          f"('{err.lower}', '{err.upper}') with value '{err.value}'")
                 raise AnalysisError(errmsg, inspect.getframeinfo(inspect.currentframe()),
                                     self.msginfo)
 
