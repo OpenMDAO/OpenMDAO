@@ -220,7 +220,7 @@ else:
                             offset = offsets_out[rank, idx_out]
                             output_inds = range(offset, offset + meta_in['size'])
                     else:
-                        output_inds = np.zeros(src_indices.size, INT_DTYPE)
+                        output_inds = np.empty(src_indices.size, INT_DTYPE)
                         start = end = 0
                         for iproc in range(group.comm.size):
                             end += sizes_out[iproc, idx_out]

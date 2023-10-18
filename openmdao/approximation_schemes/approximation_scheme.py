@@ -155,9 +155,9 @@ class ApproximationScheme(object):
             if is_total:
                 ccol2vcol = np.empty(coloring._shape[1], dtype=INT_DTYPE)
 
-            ordered_wrt_iter = list(system._jac_wrt_iter())
+            # ordered_wrt_iter = list(system._jac_wrt_iter())
             colored_start = colored_end = 0
-            for abs_wrt, cstart, cend, _, cinds, _ in ordered_wrt_iter:
+            for abs_wrt, cstart, cend, _, cinds, _ in system._jac_wrt_iter():
                 if wrt_matches is None or abs_wrt in wrt_matches:
                     colored_end += cend - cstart
                     ccol2jcol[colored_start:colored_end] = np.arange(cstart, cend, dtype=INT_DTYPE)
@@ -479,9 +479,10 @@ class ApproximationScheme(object):
             solution array corresponding to the jacobian column at the given column index
         """
         total = system.pathname == ''
-        ordered_of_iter = list(system._jac_of_iter())
         if total:
-            tot_result = np.zeros(ordered_of_iter[-1][2])
+            for _, _, end, _, _ in system._jac_of_iter():
+                pass
+            tot_result = np.zeros(end)
 
         total_or_semi = total or _is_group(system)
 

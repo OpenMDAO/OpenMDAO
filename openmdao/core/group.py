@@ -1215,10 +1215,12 @@ class Group(System):
 
     def _get_jac_col_scatter(self):
         """
-        Return source and target indices for a scatter from the output vector to a jacobian column.
+        Return source and target indices for a scatter from output vector to total jacobian column.
 
         If the transfer involves remote or distributed variables, the indices will be global.
         Otherwise they will be converted to local.
+
+        This is only called on the top level system.
 
         Returns
         -------
@@ -3194,9 +3196,10 @@ class Group(System):
                     seed_vars = self._problem_meta['seed_vars']
                     if seed_vars is not None:
                         if len(seed_vars) > 1:
-                            raise RuntimeError("Multiple seed variables not supported "
-                                               "under MPI if they are distributed and in "
-                                               "a group doing finite difference.")
+                            raise RuntimeError(f"Multiple seed variables {sorted(seed_vars)} are "
+                                               "not supported under MPI in reverse mode if they "
+                                               "depend on an group doing finite difference and "
+                                               "containing distributed variables.")
                         pre = '' if sub is None else sub + '.'
                         slices = self._doutputs.get_slice_dict()
                         outarr = self._doutputs.asarray()

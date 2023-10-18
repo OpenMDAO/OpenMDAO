@@ -1758,7 +1758,7 @@ class Component(System):
         """
         nzresids = []
         dresids = self._dresiduals.asarray()
-        for of, start, end, _full_slice, dist_sizes in self._jac_of_iter():
+        for of, start, end, _, dist_sizes in self._jac_of_iter():
             if dist_sizes is not None:
                 if np.any(dresids[start:end]):
                     nzresids.append(of)
