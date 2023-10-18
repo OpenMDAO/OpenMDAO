@@ -3877,6 +3877,7 @@ class Group(System):
                 # ExplicitComponent jacobian defined with -1 on diagonal.
                 d_residuals *= -1.0
 
+                print("after solve_linear:", d_outputs.asarray())
         else:
             self._linear_solver._set_matvec_scope(scope_out, scope_in)
             self._linear_solver.solve(mode, rel_systems)

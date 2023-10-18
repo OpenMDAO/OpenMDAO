@@ -80,12 +80,20 @@ else:
             for subsys in group._subgroups_myproc:
                 subsys._setup_transfers(desvars, responses)
 
+            group._transfers = {}
+
+            PETScTransfer._setup_transfers_fwd(group, desvars, responses)
+            if rev:
+                PETScTransfer._setup_transfers_rev(group, desvars, responses)
+
+        @staticmethod
+        def _setup_transfers_fwd(group, desvars, responses):
             abs2meta_in = group._var_abs2meta['input']
             abs2meta_out = group._var_abs2meta['output']
             allprocs_abs2meta_out = group._var_allprocs_abs2meta['output']
             myrank = group.comm.rank
 
-            transfers = group._transfers = {}
+            transfers = group._transfers
             vectors = group._vectors
             offsets = group._get_var_offsets()
             mypathlen = len(group.pathname) + 1 if group.pathname else 0
@@ -95,15 +103,142 @@ else:
             xfer_out = []
             fwd_xfer_in = defaultdict(list)
             fwd_xfer_out = defaultdict(list)
-            if rev:
-                has_rev_par_coloring = any([m['parallel_deriv_color'] is not None
-                                            for m in responses.values()])
-                rev_xfer_in = defaultdict(list)
-                rev_xfer_out = defaultdict(list)
 
-                # xfers that are only active when parallel coloring is not
-                rev_xfer_in_nocolor = defaultdict(list)
-                rev_xfer_out_nocolor = defaultdict(list)
+            allprocs_abs2idx = group._var_allprocs_abs2idx
+            sizes_in = group._var_sizes['input']
+            sizes_out = group._var_sizes['output']
+            offsets_in = offsets['input']
+            offsets_out = offsets['output']
+
+            total_fwd = total_rev = total_rev_nocolor = 0
+
+            # Loop through all connections owned by this system
+            for abs_in, abs_out in group._conn_abs_in2out.items():
+                # Only continue if the input exists on this processor
+                if abs_in in abs2meta_in:
+                    # Get meta
+                    meta_in = abs2meta_in[abs_in]
+                    meta_out = allprocs_abs2meta_out[abs_out]
+
+                    idx_in = allprocs_abs2idx[abs_in]
+                    idx_out = allprocs_abs2idx[abs_out]
+
+                    local_out = abs_out in abs2meta_out
+
+                    # Read in and process src_indices
+                    src_indices = meta_in['src_indices']
+                    if src_indices is None:
+                        owner = group._owning_rank[abs_out]
+                        # if the input is larger than the output on a single proc, we have
+                        # to just loop over the procs in the same way we do when src_indices
+                        # is defined.
+                        if meta_in['size'] > sizes_out[owner, idx_out]:
+                            src_indices = np.arange(meta_in['size'], dtype=INT_DTYPE)
+                    else:
+                        src_indices = src_indices.shaped_array()
+
+                    on_iprocs = []
+
+                    # 1. Compute the output indices
+                    # NOTE: src_indices are relative to a single, possibly distributed variable,
+                    # while the output_inds that we compute are relative to the full distributed
+                    # array that contains all local variables from each rank stacked in rank order.
+                    if src_indices is None:
+                        if meta_out['distributed']:
+                            # input in this case is non-distributed (else src_indices would be
+                            # defined by now).  dist output to non-distributed input conns w/o
+                            # src_indices are not allowed.
+                            raise RuntimeError(f"{group.msginfo}: Can't connect distributed output "
+                                               f"'{abs_out}' to non-distributed input '{abs_in}' "
+                                               "without declaring src_indices.",
+                                               ident=(abs_out, abs_in))
+                        else:
+                            rank = myrank if local_out else owner
+                            offset = offsets_out[rank, idx_out]
+                            output_inds = range(offset, offset + meta_in['size'])
+                    else:
+                        output_inds = np.empty(src_indices.size, INT_DTYPE)
+                        start = end = 0
+                        for iproc in range(group.comm.size):
+                            end += sizes_out[iproc, idx_out]
+                            if start == end:
+                                continue
+
+                            # The part of src on iproc
+                            on_iproc = np.logical_and(start <= src_indices, src_indices < end)
+
+                            if np.any(on_iproc):
+                                # This converts from iproc-then-ivar to ivar-then-iproc ordering
+                                # Subtract off part of this variable from previous procs
+                                # Then add all variables on previous procs
+                                # Then all previous variables on this proc
+                                # - np.sum(out_sizes[:iproc, idx_out])
+                                # + np.sum(out_sizes[:iproc, :])
+                                # + np.sum(out_sizes[iproc, :idx_out])
+                                # + inds
+                                offset = offsets_out[iproc, idx_out] - start
+                                output_inds[on_iproc] = src_indices[on_iproc] + offset
+                                on_iprocs.append(iproc)
+
+                            start = end
+
+                    # 2. Compute the input indices
+                    input_inds = range(offsets_in[myrank, idx_in],
+                                       offsets_in[myrank, idx_in] + sizes_in[myrank, idx_in])
+
+                    total_fwd += len(input_inds)
+
+                    # Now the indices are ready - input_inds, output_inds
+                    sub_in = abs_in[mypathlen:].partition('.')[0]
+                    fwd_xfer_in[sub_in].append(input_inds)
+                    fwd_xfer_out[sub_in].append(output_inds)
+                else:
+                    # not a local input but still need entries in the transfer dicts to
+                    # avoid hangs
+                    sub_in = abs_in[mypathlen:].partition('.')[0]
+                    fwd_xfer_in[sub_in]  # defaultdict will create an empty list there
+                    fwd_xfer_out[sub_in]
+
+            if fwd_xfer_in:
+                xfer_in, xfer_out = _setup_index_views(total_fwd, fwd_xfer_in, fwd_xfer_out)
+
+            out_vec = vectors['output']['nonlinear']
+
+            xfer_all = PETScTransfer(vectors['input']['nonlinear'], out_vec,
+                                     xfer_in, xfer_out, group.comm)
+
+            transfers['fwd'] = xfwd = {}
+            xfwd[None] = xfer_all
+
+            for sname, inds in fwd_xfer_in.items():
+                transfers['fwd'][sname] = PETScTransfer(
+                    vectors['input']['nonlinear'], vectors['output']['nonlinear'],
+                    inds, fwd_xfer_out[sname], group.comm)
+
+        @staticmethod
+        def _setup_transfers_rev(group, desvars, responses):
+            abs2meta_in = group._var_abs2meta['input']
+            abs2meta_out = group._var_abs2meta['output']
+            allprocs_abs2meta_out = group._var_allprocs_abs2meta['output']
+            myrank = group.comm.rank
+
+            transfers = group._transfers
+            vectors = group._vectors
+            offsets = group._get_var_offsets()
+            mypathlen = len(group.pathname) + 1 if group.pathname else 0
+
+            # Initialize empty lists for the transfer indices
+            xfer_in = []
+            xfer_out = []
+
+            has_rev_par_coloring = any([m['parallel_deriv_color'] is not None
+                                        for m in responses.values()])
+            rev_xfer_in = defaultdict(list)
+            rev_xfer_out = defaultdict(list)
+
+            # xfers that are only active when parallel coloring is not
+            rev_xfer_in_nocolor = defaultdict(list)
+            rev_xfer_out_nocolor = defaultdict(list)
 
             allprocs_abs2idx = group._var_allprocs_abs2idx
             sizes_in = group._var_sizes['input']
@@ -115,7 +250,7 @@ else:
             # boundary of the group are upstream of distributed variables within the group so
             # that we can perform any necessary allreduce operations on the outputs that
             # are connected to those inputs.
-            if rev and group._owns_approx_jac and group._has_distrib_vars and group.pathname != '':
+            if group._owns_approx_jac and group._has_distrib_vars and group.pathname != '':
                 model = group._problem_meta['model_ref']()
                 relgraph = model._relevance_graph
                 group_path = group.pathname + '.'
@@ -242,12 +377,9 @@ else:
                     total_fwd += len(input_inds)
 
                     # Now the indices are ready - input_inds, output_inds
-                    sub_in = abs_in[mypathlen:].partition('.')[0]
-                    fwd_xfer_in[sub_in].append(input_inds)
-                    fwd_xfer_out[sub_in].append(output_inds)
-                    if rev and group._owns_approx_jac:
+                    if group._owns_approx_jac:
                         pass  # no rev transfers needed for FD group
-                    elif rev:
+                    else:
                         inp_is_dup, inp_missing, distrib_in = group.get_var_dup_info(abs_in, 'input')
                         out_is_dup, _, distrib_out = group.get_var_dup_info(abs_out, 'output')
 
@@ -386,10 +518,7 @@ else:
                 else:
                     # not a local input but still need entries in the transfer dicts to
                     # avoid hangs
-                    sub_in = abs_in[mypathlen:].partition('.')[0]
-                    fwd_xfer_in[sub_in]  # defaultdict will create an empty list there
-                    fwd_xfer_out[sub_in]
-                    if rev and not group._owns_approx_jac:
+                    if not group._owns_approx_jac:
                         sub_out = abs_out[mypathlen:].partition('.')[0]
                         rev_xfer_in[sub_out]
                         rev_xfer_out[sub_out]
@@ -397,24 +526,10 @@ else:
                             rev_xfer_in_nocolor[sub_out]
                             rev_xfer_out_nocolor[sub_out]
 
-            if fwd_xfer_in:
-                xfer_in, xfer_out = _setup_index_views(total_fwd, fwd_xfer_in, fwd_xfer_out)
-
-            out_vec = vectors['output']['nonlinear']
-
-            xfer_all = PETScTransfer(vectors['input']['nonlinear'], out_vec,
-                                     xfer_in, xfer_out, group.comm)
-
-            transfers['fwd'] = xfwd = {}
-            xfwd[None] = xfer_all
-
-            for sname, inds in fwd_xfer_in.items():
-                transfers['fwd'][sname] = PETScTransfer(
-                    vectors['input']['nonlinear'], vectors['output']['nonlinear'],
-                    inds, fwd_xfer_out[sname], group.comm)
-
-            if rev and not group._owns_approx_jac:
+            if not group._owns_approx_jac:
                 xfer_in, xfer_out = _setup_index_views(total_rev, rev_xfer_in, rev_xfer_out)
+
+                out_vec = vectors['output']['nonlinear']
 
                 xfer_all = PETScTransfer(vectors['input']['nonlinear'], out_vec,
                                          xfer_in, xfer_out, group.comm)

@@ -895,8 +895,8 @@ class MPITests2(unittest.TestCase):
 
         assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
 
-    def test_group_fd_inner_par(self):
-        size = 7
+    def _setup_inner_par(self, size=7):
+        # one IVC feeds two parallel comps, which feed a third comp
 
         prob = om.Problem()
         model = prob.model
@@ -923,23 +923,22 @@ class MPITests2(unittest.TestCase):
 
         sub.approx_totals(method='fd')
 
+        return prob
+
+    def test_group_fd_inner_par_fwd(self):
+        prob = self._setup_inner_par(size=7)
         prob.setup(mode='fwd', force_alloc_complex=True)
-
         prob.run_model()
-
         assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
 
-        # rev mode
-
+    def test_group_fd_inner_par_rev(self):
+        prob = self._setup_inner_par(size=7)
         prob.setup(mode='rev', force_alloc_complex=True)
-
         prob.run_model()
-
         assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
 
-    def test_group_fd_inner_par2(self):
-        size = 7
-
+    def _setup_inner_par2(self, size=7):
+        # 2 IVCs feed two parallel comps, which feed two duplicated comps
         prob = om.Problem()
         model = prob.model
 
@@ -966,18 +965,18 @@ class MPITests2(unittest.TestCase):
 
         sub.approx_totals(method='fd')
 
+        return prob
+
+    def test_group_fd_inner_par2_fwd(self):
+        prob = self._setup_inner_par2(size=7)
         prob.setup(mode='fwd', force_alloc_complex=True)
-
         prob.run_model()
-
         assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
 
-        # rev mode
-
+    def test_group_fd_inner_par2_rev(self):
+        prob = self._setup_inner_par2(size=7)
         prob.setup(mode='rev', force_alloc_complex=True)
-
         prob.run_model()
-
         assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
 
     def test_distrib_voi_group_fd_loop(self):

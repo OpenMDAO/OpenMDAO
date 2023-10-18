@@ -454,7 +454,7 @@ class ApproximationScheme(object):
 
     def _uncolored_column_iter(self, system, approx_groups):
         """
-        Perform approximations and yields (column_index, column) for each jac column.
+        Perform approximations and yield (column_index, column) for each jac column.
 
         Parameters
         ----------
@@ -592,6 +592,7 @@ class ApproximationScheme(object):
         for ic, col in self.compute_approx_col_iter(system,
                                                     under_cs=system._outputs._under_complex_step):
             if system._tot_jac is None:
+                print(ic, col)
                 jac.set_col(system, ic, col)
             else:
                 system._tot_jac.set_col(ic, col)
