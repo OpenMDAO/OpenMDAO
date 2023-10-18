@@ -8,7 +8,7 @@ from openmdao.test_suite.components.sellar_feature import SellarMDA
 
 # Compare memory usage after running setup 10 times to
 # running setup 100 times
-ITERS = [ 10, 1000 ]
+ITERS = [ 10, 100 ]
 
 # The code with the leak problem would report a difference of memory
 # used between 10 and 100 iter runs of 36.9MiB. After fixing, it was
@@ -43,18 +43,18 @@ class TestSetupMemLeak(unittest.TestCase):
                 gc.collect()
                 if i == 0:
                     snapshot0 = tracemalloc.take_snapshot()
-                else:
-                    snapshot = tracemalloc.take_snapshot()
-                    top_stats = snapshot.compare_to(snapshot0, 'lineno')
 
-                    total_mem = 0
-                    for stat in top_stats:
-                        tb_str = str(stat.traceback)
-                        # Ignore memory allocations by tracemalloc itself, which throw things off:
-                        if f"{os.path.sep}tracemalloc.py:" not in tb_str:
-                            total_mem += stat.size
+            snapshot = tracemalloc.take_snapshot()
+            top_stats = snapshot.compare_to(snapshot0, 'lineno')
 
-                    mem_used.append(total_mem)
+            total_mem = 0
+            for stat in top_stats:
+                tb_str = str(stat.traceback)
+                # Ignore memory allocations by tracemalloc itself, which throw things off:
+                if f"{os.path.sep}tracemalloc.py:" not in tb_str:
+                    total_mem += stat.size
+
+            mem_used.append(total_mem)
 
         tracemalloc.stop()
         mem_diff = (mem_used[1] - mem_used[0])/1024
