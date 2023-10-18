@@ -111,16 +111,6 @@ else:
             offsets_in = offsets['input']
             offsets_out = offsets['output']
 
-            def is_dup(name, io):
-                # return if given var is duplicated and number of procs where var doesn't exist
-                if group._var_allprocs_abs2meta[io][name]['distributed']:
-                    return False, 0, True  # distributed vars are never dups
-                nz = np.count_nonzero(group._var_sizes[io][:, allprocs_abs2idx[name]])
-                return nz > 1, group._var_sizes[io].shape[0] - nz, False
-
-            def get_nonzero_ranks(name, io):
-                return np.nonzero(group._var_sizes[io][:, allprocs_abs2idx[name]])[0]
-
             # for an FD group, we use the relevance graph to determine which inputs on the
             # boundary of the group are upstream of distributed variables within the group so
             # that we can perform any necessary allreduce operations on the outputs that
@@ -258,8 +248,8 @@ else:
                     if rev and group._owns_approx_jac:
                         pass  # no rev transfers needed for FD group
                     elif rev:
-                        inp_is_dup, inp_missing, distrib_in = is_dup(abs_in, 'input')
-                        out_is_dup, _, distrib_out = is_dup(abs_out, 'output')
+                        inp_is_dup, inp_missing, distrib_in = group.get_var_dup_info(abs_in, 'input')
+                        out_is_dup, _, distrib_out = group.get_var_dup_info(abs_out, 'output')
 
                         iowninput = myrank == group._owning_rank[abs_in]
                         sub_out = abs_out[mypathlen:].partition('.')[0]
@@ -335,7 +325,9 @@ else:
                             oidxlist_nc = []
                             iidxlist_nc = []
                             size = size_nc = 0
-                            for rnk in get_nonzero_ranks(abs_out, 'output'):
+                            for rnk, sz in enumerate(group.get_var_sizes(abs_out, 'output')):
+                                if sz == 0:
+                                    continue
                                 offset = offsets_out[rnk, idx_out]
                                 if src_indices is None:
                                     oarr = range(offset, offset + meta_in['size'])

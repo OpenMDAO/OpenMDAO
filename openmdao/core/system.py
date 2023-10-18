@@ -6355,3 +6355,44 @@ class System(object):
             if size > 0:
                 yield vname, offset, offset + size
             offset += size
+
+    def get_var_dup_info(self, name, io):
+        """
+        Return information about how the given variable is duplicated across MPI processes.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
+        io : str
+            Either 'input' or 'output'.
+
+        Returns
+        -------
+        tuple
+            A tuple of the form (is_duplicated, num_zeros, is_distributed).
+        """
+        nz = np.count_nonzero(self._var_sizes[io][:, self._var_allprocs_abs2idx[name]])
+
+        if self._var_allprocs_abs2meta[io][name]['distributed']:
+            return False, self._var_sizes[io].shape[0] - nz, True  # distributed vars are never dups
+
+        return nz > 1, self._var_sizes[io].shape[0] - nz, False
+
+    def get_var_sizes(self, name, io):
+        """
+        Return the sizes of the given variable on all procs.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
+        io : str
+            Either 'input' or 'output'.
+
+        Returns
+        -------
+        ndarray
+            Array of sizes of the variable on all procs.
+        """
+        return self._var_sizes[io][:, self._var_allprocs_abs2idx[name]]
