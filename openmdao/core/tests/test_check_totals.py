@@ -18,7 +18,6 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
 from openmdao.core.tests.test_check_partials import ParaboloidTricky, MyCompGoodPartials, \
     MyCompBadPartials, DirectionalVectorizedMatFreeComp
 from openmdao.test_suite.scripts.circle_opt import CircleOpt
-from openmdao.test_suite.components.exec_comp_for_test import ExecComp4Test
 from openmdao.core.constants import _UNDEFINED
 
 from openmdao.utils.mpi import MPI
@@ -27,6 +26,11 @@ try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
     PETScVector = None
+
+try:
+    from pyoptsparse import Optimization as pyoptsparse_opt
+except ImportError:
+    pyoptsparse_opt = None
 
 
 class DistribParaboloid(om.ExplicitComponent):
@@ -1938,6 +1942,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         for slv, ex in zip(nsolves, expected):
             self.assertEqual(slv, ex)
 
+    @unittest.skipIf(pyoptsparse_opt is None, "pyOptSparseDriver is required.")
     def test_sparse_matfree_fwd_coloring_pyoptsparse(self):
         prob = self._build_sparse_model(coloring=True, driver=om.pyOptSparseDriver())
         m = prob.model
@@ -2003,6 +2008,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         for slv, ex in zip(nsolves, expected):
             self.assertEqual(slv, ex)
 
+    @unittest.skipIf(pyoptsparse_opt is None, "pyOptSparseDriver is required.")
     def test_sparse_matfree_rev_coloring_pyoptsparse(self):
         prob = self._build_sparse_model(driver=om.pyOptSparseDriver(), coloring=True)
         m = prob.model
