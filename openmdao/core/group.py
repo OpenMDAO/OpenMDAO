@@ -4140,6 +4140,9 @@ class Group(System):
                 else:
                     path = of
 
+                if not total and path not in self._var_abs2meta['output']:
+                    continue
+
                 meta = abs2meta[path]
                 if meta['distributed']:
                     dist_sizes = sizes[:, abs2idx[path]]
@@ -4214,6 +4217,8 @@ class Group(System):
                     elif wrt in local_outs:
                         vec = self._outputs
                     else:
+                        if not total:
+                            continue
                         vec = None
                     if wrt in approx_wrt_idx:
                         sub_wrt_idx = approx_wrt_idx[wrt]

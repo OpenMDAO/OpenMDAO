@@ -864,20 +864,155 @@ class MPITests2(unittest.TestCase):
 
         sub.add_subsystem("parab", DistParab(arr_size=size))
         sub.add_subsystem("cons", om.ExecComp("c = x*3. + 7.", x=np.ones(size), c=np.ones(size)))
-        # sub.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)', f_sum=np.ones((size, )), f_xy=np.ones((size, ))))
+        sub.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)', f_sum=np.ones((size, )), f_xy=np.ones((size, ))))
 
         model.connect('p.x', 'sub.dummy.x')
         model.connect('p.y', 'sub.dummy.y')
         model.connect('sub.p2.a', 'sub.parab.a')
         model.connect('sub.dummy.xd', 'sub.parab.x')
         model.connect('sub.dummy.yd', 'sub.parab.y')
-        # model.connect('sub.parab.f_xy', 'sub.sum.f_xy', src_indices=om.slicer[:])
+        model.connect('sub.parab.f_xy', 'sub.sum.f_xy', src_indices=om.slicer[:])
         model.connect('sub.parab.f_xy', 'sub.cons.x', src_indices=om.slicer[:])
 
         model.add_design_var('p.x', lower=-50.0, upper=50.0)
         model.add_design_var('p.y', lower=-50.0, upper=50.0)
         model.add_constraint('sub.cons.c', lower=0.0)
-        # model.add_objective('sub.sum.f_sum', index=-1)
+        model.add_objective('sub.sum.f_sum', index=-1)
+
+        sub.approx_totals(method='fd')
+
+        prob.setup(mode='fwd', force_alloc_complex=True)
+
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+        # rev mode
+
+        prob.setup(mode='rev', force_alloc_complex=True)
+
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_group_fd_inner_par(self):
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+
+        model.add_subsystem('p', ivc)
+        sub = model.add_subsystem('sub', om.Group())
+        par = sub.add_subsystem('par', om.ParallelGroup())
+        par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+        par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+        sub.add_subsystem('C3', om.ExecComp('y = x1*.5 - x2*3.', shape=size))
+
+        model.connect('p.x', 'sub.par.C1.x')
+        model.connect('p.x', 'sub.par.C2.x')
+        model.connect('sub.par.C1.y', 'sub.C3.x1')
+        model.connect('sub.par.C2.y', 'sub.C3.x2')
+
+        model.add_design_var('p.x', lower=-50.0, upper=50.0)
+        model.add_constraint('sub.par.C1.y', lower=0.0)
+        model.add_constraint('sub.par.C2.y', lower=0.0)
+        model.add_objective('sub.C3.y', index=-1)
+
+        sub.approx_totals(method='fd')
+
+        prob.setup(mode='fwd', force_alloc_complex=True)
+
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+        # rev mode
+
+        prob.setup(mode='rev', force_alloc_complex=True)
+
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_group_fd_inner_par2(self):
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p', om.IndepVarComp('x', np.ones((size, ))))
+        model.add_subsystem('p2', om.IndepVarComp('x', np.ones((size, ))))
+        sub = model.add_subsystem('sub', om.Group())
+        par = sub.add_subsystem('par', om.ParallelGroup())
+        par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+        par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+        sub.add_subsystem('C3', om.ExecComp('y = x*.5', shape=size))
+        sub.add_subsystem('C4', om.ExecComp('y = x*3.', shape=size))
+
+        model.connect('p.x', 'sub.par.C1.x')
+        model.connect('p2.x', 'sub.par.C2.x')
+        model.connect('sub.par.C1.y', 'sub.C3.x')
+        model.connect('sub.par.C2.y', 'sub.C4.x')
+
+        model.add_design_var('p.x', lower=-50.0, upper=50.0)
+        model.add_design_var('p2.x', lower=-50.0, upper=50.0)
+        model.add_constraint('sub.par.C1.y', lower=0.0)
+        model.add_constraint('sub.par.C2.y', lower=0.0)
+        model.add_constraint('sub.C4.y', lower=0.0)
+        model.add_objective('sub.C3.y', index=-1)
+
+        sub.approx_totals(method='fd')
+
+        prob.setup(mode='fwd', force_alloc_complex=True)
+
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+        # rev mode
+
+        prob.setup(mode='rev', force_alloc_complex=True)
+
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_distrib_voi_group_fd_loop(self):
+        # distrib comp is inside of fd group and part of a loop.
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+
+        model.add_subsystem('p', ivc)
+        sub = model.add_subsystem('sub', om.Group())
+
+        sub.add_subsystem('p2', om.IndepVarComp('a', -3.0 + 0.6 * np.arange(size)))
+        sub.add_subsystem('dummy', om.ExecComp(['xd = x', "yd = y"],
+                                               x=np.ones(size), xd=np.ones(size),
+                                               y=np.ones(size), yd=np.ones(size)))
+
+        sub.add_subsystem("parab", DistParab(arr_size=size))
+        sub.add_subsystem("cons", om.ExecComp("c = x*3. + 7.", x=np.ones(size), c=np.ones(size)))
+        sub.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)', f_sum=np.ones((size, )), f_xy=np.ones((size, ))))
+
+        model.connect('p.x', 'sub.dummy.x')
+        model.connect('sub.p2.a', 'sub.parab.a')
+        model.connect('sub.dummy.xd', 'sub.parab.x')
+        model.connect('sub.dummy.yd', 'sub.parab.y')
+        model.connect('sub.parab.f_xy', 'sub.sum.f_xy', src_indices=om.slicer[:])
+        model.connect('sub.parab.f_xy', 'sub.cons.x', src_indices=om.slicer[:])
+        model.connect('sub.cons.c', 'sub.dummy.y')
+
+        model.add_design_var('p.x', lower=-50.0, upper=50.0)
+        model.add_constraint('sub.cons.c', lower=0.0)
+        model.add_objective('sub.sum.f_sum', index=-1)
 
         sub.approx_totals(method='fd')
 
