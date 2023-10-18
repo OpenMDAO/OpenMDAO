@@ -1,4 +1,9 @@
 # .coveragerc to control coverage.py
+
+[run]
+omit =
+    */core/tests/test_setup_memleak.py
+
 [report]
 omit =
     */tests/*
