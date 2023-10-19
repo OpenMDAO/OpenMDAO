@@ -249,6 +249,10 @@ else:
                         owning_group = model._get_subsystem(gname)
                         owning_group._fd_subgroup_inputs.add(inp)
 
+            if group._owns_approx_jac:
+                # FD groups don't need to do anything here
+                return
+
             total_rev = total_rev_nocolor = 0
 
             # Loop through all connections owned by this system
@@ -326,182 +330,177 @@ else:
                                        offsets_in[myrank, idx_in] + sizes_in[myrank, idx_in])
 
                     # Now the indices are ready - input_inds, output_inds
-                    if group._owns_approx_jac:
-                        pass  # no rev transfers needed for FD group
-                    else:
-                        inp_is_dup, inp_missing, distrib_in = group.get_var_dup_info(abs_in, 'input')
-                        out_is_dup, _, distrib_out = group.get_var_dup_info(abs_out, 'output')
+                    inp_is_dup, inp_missing, distrib_in = group.get_var_dup_info(abs_in, 'input')
+                    out_is_dup, _, distrib_out = group.get_var_dup_info(abs_out, 'output')
 
-                        iowninput = myrank == group._owning_rank[abs_in]
-                        sub_out = abs_out[mypathlen:].partition('.')[0]
+                    iowninput = myrank == group._owning_rank[abs_in]
+                    sub_out = abs_out[mypathlen:].partition('.')[0]
 
-                        if inp_is_dup and (abs_out not in abs2meta_out or
-                                           (distrib_out and not iowninput)):
-                            rev_xfer_in[sub_out]
-                            rev_xfer_out[sub_out]
-                        elif out_is_dup and inp_is_dup and inp_missing > 0 and iowninput:
-                            # if this proc owns the input and both the output and input have
-                            # duplicates, then we send the owning input to each duplicated output
-                            # that doesn't have a corresponding connected input on the same proc.
-                            oidxlist = []
-                            iidxlist = []
-                            oidxlist_nc = []
-                            iidxlist_nc = []
-                            size = size_nc = 0
-                            for rnk, osize, isize in zip(range(group.comm.size),
-                                                         sizes_out[:, idx_out],
-                                                         sizes_in[:, idx_in]):
-                                if rnk == myrank:
-                                    oidxlist.append(output_inds)
-                                    iidxlist.append(input_inds)
-                                elif osize > 0 and isize == 0:
-                                    offset = offsets_out[rnk, idx_out]
-                                    if src_indices is None:
-                                        oarr = range(offset, offset + meta_in['size'])
-                                    elif src_indices.size > 0:
-                                        oarr = np.asarray(src_indices + offset, dtype=INT_DTYPE)
-                                    else:
-                                        continue
-
-                                    if has_rev_par_coloring:
-                                        oidxlist_nc.append(oarr)
-                                        iidxlist_nc.append(input_inds)
-                                        size_nc += len(input_inds)
-                                    else:
-                                        oidxlist.append(oarr)
-                                        iidxlist.append(input_inds)
-                                        size += len(input_inds)
-
-                            if len(iidxlist) > 1:
-                                input_inds = _merge(iidxlist, size)
-                                output_inds = _merge(oidxlist, size)
-                            else:
-                                input_inds = iidxlist[0]
-                                output_inds = oidxlist[0]
-
-                            total_rev += len(input_inds)
-
-                            rev_xfer_in[sub_out].append(input_inds)
-                            rev_xfer_out[sub_out].append(output_inds)
-
-                            if has_rev_par_coloring and iidxlist_nc:
-                                # keep transfers separate that shouldn't happen when partial
-                                # coloring is active
-                                if len(iidxlist_nc) > 1:
-                                    input_inds = _merge(iidxlist_nc, size_nc)
-                                    output_inds = _merge(oidxlist_nc, size_nc)
-                                else:
-                                    input_inds = iidxlist_nc[0]
-                                    output_inds = oidxlist_nc[0]
-
-                                total_rev_nocolor += len(input_inds)
-
-                                rev_xfer_in_nocolor[sub_out].append(input_inds)
-                                rev_xfer_out_nocolor[sub_out].append(output_inds)
-
-                        elif out_is_dup and (not inp_is_dup or inp_missing > 0) and (iowninput or
-                                                                                     distrib_in):
-                            oidxlist = []
-                            iidxlist = []
-                            oidxlist_nc = []
-                            iidxlist_nc = []
-                            size = size_nc = 0
-                            for rnk, sz in enumerate(group.get_var_sizes(abs_out, 'output')):
-                                if sz == 0:
-                                    continue
+                    if inp_is_dup and (abs_out not in abs2meta_out or
+                                        (distrib_out and not iowninput)):
+                        rev_xfer_in[sub_out]
+                        rev_xfer_out[sub_out]
+                    elif out_is_dup and inp_is_dup and inp_missing > 0 and iowninput:
+                        # if this proc owns the input and both the output and input have
+                        # duplicates, then we send the owning input to each duplicated output
+                        # that doesn't have a corresponding connected input on the same proc.
+                        oidxlist = []
+                        iidxlist = []
+                        oidxlist_nc = []
+                        iidxlist_nc = []
+                        size = size_nc = 0
+                        for rnk, osize, isize in zip(range(group.comm.size),
+                                                        sizes_out[:, idx_out],
+                                                        sizes_in[:, idx_in]):
+                            if rnk == myrank:
+                                oidxlist.append(output_inds)
+                                iidxlist.append(input_inds)
+                            elif osize > 0 and isize == 0:
                                 offset = offsets_out[rnk, idx_out]
                                 if src_indices is None:
                                     oarr = range(offset, offset + meta_in['size'])
                                 elif src_indices.size > 0:
-                                    if (distrib_in and not distrib_out and len(on_iprocs) == 1 and
-                                            on_iprocs[0] == rnk):
-                                        offset -= np.sum(sizes_out[:rnk, idx_out])
                                     oarr = np.asarray(src_indices + offset, dtype=INT_DTYPE)
                                 else:
                                     continue
-                                if rnk == myrank or not has_rev_par_coloring:
-                                    oidxlist.append(oarr)
-                                    iidxlist.append(input_inds)
-                                    size += len(input_inds)
-                                else:
+
+                                if has_rev_par_coloring:
                                     oidxlist_nc.append(oarr)
                                     iidxlist_nc.append(input_inds)
                                     size_nc += len(input_inds)
-
-                            if len(iidxlist) > 1:
-                                input_inds = _merge(iidxlist, size)
-                                output_inds = _merge(oidxlist, size)
-                            elif len(iidxlist) == 1:
-                                input_inds = iidxlist[0]
-                                output_inds = oidxlist[0]
-                            else:
-                                input_inds = output_inds = _empty_idx_array
-
-                            total_rev += len(input_inds)
-
-                            rev_xfer_in[sub_out].append(input_inds)
-                            rev_xfer_out[sub_out].append(output_inds)
-
-                            if has_rev_par_coloring and iidxlist_nc:
-                                if len(iidxlist_nc) > 1:
-                                    input_inds = _merge(iidxlist_nc, size_nc)
-                                    output_inds = _merge(oidxlist_nc, size_nc)
                                 else:
-                                    input_inds = iidxlist_nc[0]
-                                    output_inds = oidxlist_nc[0]
+                                    oidxlist.append(oarr)
+                                    iidxlist.append(input_inds)
+                                    size += len(input_inds)
 
-                                total_rev_nocolor += len(input_inds)
-
-                                rev_xfer_in_nocolor[sub_out].append(input_inds)
-                                rev_xfer_out_nocolor[sub_out].append(output_inds)
+                        if len(iidxlist) > 1:
+                            input_inds = _merge(iidxlist, size)
+                            output_inds = _merge(oidxlist, size)
                         else:
-                            if (inp_is_dup and out_is_dup and src_indices is not None and
-                                    src_indices.size > 0):
-                                offset = offsets_out[myrank, idx_out]
-                                output_inds = np.asarray(src_indices + offset, dtype=INT_DTYPE)
+                            input_inds = iidxlist[0]
+                            output_inds = oidxlist[0]
 
-                            total_rev += len(input_inds)
+                        total_rev += len(input_inds)
 
-                            rev_xfer_in[sub_out].append(input_inds)
-                            rev_xfer_out[sub_out].append(output_inds)
+                        rev_xfer_in[sub_out].append(input_inds)
+                        rev_xfer_out[sub_out].append(output_inds)
+
+                        if has_rev_par_coloring and iidxlist_nc:
+                            # keep transfers separate that shouldn't happen when partial
+                            # coloring is active
+                            if len(iidxlist_nc) > 1:
+                                input_inds = _merge(iidxlist_nc, size_nc)
+                                output_inds = _merge(oidxlist_nc, size_nc)
+                            else:
+                                input_inds = iidxlist_nc[0]
+                                output_inds = oidxlist_nc[0]
+
+                            total_rev_nocolor += len(input_inds)
+
+                            rev_xfer_in_nocolor[sub_out].append(input_inds)
+                            rev_xfer_out_nocolor[sub_out].append(output_inds)
+
+                    elif out_is_dup and (not inp_is_dup or inp_missing > 0) and (iowninput or
+                                                                                    distrib_in):
+                        oidxlist = []
+                        iidxlist = []
+                        oidxlist_nc = []
+                        iidxlist_nc = []
+                        size = size_nc = 0
+                        for rnk, sz in enumerate(group.get_var_sizes(abs_out, 'output')):
+                            if sz == 0:
+                                continue
+                            offset = offsets_out[rnk, idx_out]
+                            if src_indices is None:
+                                oarr = range(offset, offset + meta_in['size'])
+                            elif src_indices.size > 0:
+                                if (distrib_in and not distrib_out and len(on_iprocs) == 1 and
+                                        on_iprocs[0] == rnk):
+                                    offset -= np.sum(sizes_out[:rnk, idx_out])
+                                oarr = np.asarray(src_indices + offset, dtype=INT_DTYPE)
+                            else:
+                                continue
+                            if rnk == myrank or not has_rev_par_coloring:
+                                oidxlist.append(oarr)
+                                iidxlist.append(input_inds)
+                                size += len(input_inds)
+                            else:
+                                oidxlist_nc.append(oarr)
+                                iidxlist_nc.append(input_inds)
+                                size_nc += len(input_inds)
+
+                        if len(iidxlist) > 1:
+                            input_inds = _merge(iidxlist, size)
+                            output_inds = _merge(oidxlist, size)
+                        elif len(iidxlist) == 1:
+                            input_inds = iidxlist[0]
+                            output_inds = oidxlist[0]
+                        else:
+                            input_inds = output_inds = _empty_idx_array
+
+                        total_rev += len(input_inds)
+
+                        rev_xfer_in[sub_out].append(input_inds)
+                        rev_xfer_out[sub_out].append(output_inds)
+
+                        if has_rev_par_coloring and iidxlist_nc:
+                            if len(iidxlist_nc) > 1:
+                                input_inds = _merge(iidxlist_nc, size_nc)
+                                output_inds = _merge(oidxlist_nc, size_nc)
+                            else:
+                                input_inds = iidxlist_nc[0]
+                                output_inds = oidxlist_nc[0]
+
+                            total_rev_nocolor += len(input_inds)
+
+                            rev_xfer_in_nocolor[sub_out].append(input_inds)
+                            rev_xfer_out_nocolor[sub_out].append(output_inds)
+                    else:
+                        if (inp_is_dup and out_is_dup and src_indices is not None and
+                                src_indices.size > 0):
+                            offset = offsets_out[myrank, idx_out]
+                            output_inds = np.asarray(src_indices + offset, dtype=INT_DTYPE)
+
+                        total_rev += len(input_inds)
+
+                        rev_xfer_in[sub_out].append(input_inds)
+                        rev_xfer_out[sub_out].append(output_inds)
                 else:
                     # not a local input but still need entries in the transfer dicts to
                     # avoid hangs
-                    if not group._owns_approx_jac:
-                        sub_out = abs_out[mypathlen:].partition('.')[0]
-                        rev_xfer_in[sub_out]
-                        rev_xfer_out[sub_out]
-                        if has_rev_par_coloring:
-                            rev_xfer_in_nocolor[sub_out]
-                            rev_xfer_out_nocolor[sub_out]
+                    sub_out = abs_out[mypathlen:].partition('.')[0]
+                    rev_xfer_in[sub_out]
+                    rev_xfer_out[sub_out]
+                    if has_rev_par_coloring:
+                        rev_xfer_in_nocolor[sub_out]
+                        rev_xfer_out_nocolor[sub_out]
 
-            if not group._owns_approx_jac:
-                xfer_in, xfer_out = _setup_index_views(total_rev, rev_xfer_in, rev_xfer_out)
+            xfer_in, xfer_out = _setup_index_views(total_rev, rev_xfer_in, rev_xfer_out)
 
-                out_vec = vectors['output']['nonlinear']
+            out_vec = vectors['output']['nonlinear']
 
-                xfer_all = PETScTransfer(vectors['input']['nonlinear'], out_vec,
-                                         xfer_in, xfer_out, group.comm)
+            xfer_all = PETScTransfer(vectors['input']['nonlinear'], out_vec,
+                                        xfer_in, xfer_out, group.comm)
 
-                transfers['rev'] = xrev = {}
-                xrev[None] = xfer_all
+            transfers['rev'] = xrev = {}
+            xrev[None] = xfer_all
 
-                for sname, inds in rev_xfer_out.items():
-                    transfers['rev'][sname] = PETScTransfer(
+            for sname, inds in rev_xfer_out.items():
+                transfers['rev'][sname] = PETScTransfer(
+                    vectors['input']['nonlinear'], vectors['output']['nonlinear'],
+                    rev_xfer_in[sname], inds, group.comm)
+
+            if rev_xfer_in_nocolor:
+                xfer_in, xfer_out = _setup_index_views(total_rev_nocolor, rev_xfer_in_nocolor,
+                                                        rev_xfer_out_nocolor)
+
+                xrev[(None, 'nocolor')] = PETScTransfer(vectors['input']['nonlinear'], out_vec,
+                                                        xfer_in, xfer_out, group.comm)
+
+                for sname, inds in rev_xfer_out_nocolor.items():
+                    transfers['rev'][(sname, 'nocolor')] = PETScTransfer(
                         vectors['input']['nonlinear'], vectors['output']['nonlinear'],
-                        rev_xfer_in[sname], inds, group.comm)
-
-                if rev_xfer_in_nocolor:
-                    xfer_in, xfer_out = _setup_index_views(total_rev_nocolor, rev_xfer_in_nocolor,
-                                                           rev_xfer_out_nocolor)
-
-                    xrev[(None, 'nocolor')] = PETScTransfer(vectors['input']['nonlinear'], out_vec,
-                                                            xfer_in, xfer_out, group.comm)
-
-                    for sname, inds in rev_xfer_out_nocolor.items():
-                        transfers['rev'][(sname, 'nocolor')] = PETScTransfer(
-                            vectors['input']['nonlinear'], vectors['output']['nonlinear'],
-                            rev_xfer_in_nocolor[sname], inds, group.comm)
+                        rev_xfer_in_nocolor[sname], inds, group.comm)
 
         def _transfer(self, in_vec, out_vec, mode='fwd'):
             """
