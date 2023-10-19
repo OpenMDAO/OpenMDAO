@@ -1160,7 +1160,8 @@ class Component(System):
         if dependent:
             meta['val'] = val
 
-            if np.all(val == 0):
+            _val = val.data if issparse(val) else val
+            if np.all(_val == 0):
                 warn_deprecation(f'{self.msginfo}: d({of})/d({wrt}): Partial was declared to be '
                                  f'exactly zero. This is inefficient and the declaration should '
                                  f'be removed. In a future version of OpenMDAO this behavior '
