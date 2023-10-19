@@ -1,4 +1,55 @@
 ***********************************
+# Release Notes for OpenMDAO 3.29.0
+
+October 20, 2023
+
+Key improvements in this release include the Implementation of POEM 092, which allows users to define
+a pre-processor function for options. This can be used to facilitate more easily passing options
+from parent systems to child systems.
+
+The coloring report has been reimplemented in bokeh and is more interactive. Users with problems
+whose systems exhibit significant sparsity may find this useful.
+
+Key bug fixes include a fix for a problem where Submodel components weren't working properly in complex-step mode.
+Also, the relatively new `add_residual` feature wasn't able to be called during configure. This has been fixed.
+
+## New Deprecations
+
+- None
+
+## Backwards Incompatible API Changes
+
+- None
+
+## Backwards Incompatible Non-API Changes
+
+- None
+
+## New Features
+
+- Updated the coloring report to use bokeh for visualization. [#3013](https://github.com/OpenMDAO/OpenMDAO/pull/3013)
+- Allow users to define a preprocessor function for option sets. [POEM 092 Implementation] [#3040](https://github.com/OpenMDAO/OpenMDAO/pull/3040)
+- Added a warning when an excludes or includes recording option has no matches [#3039](https://github.com/OpenMDAO/OpenMDAO/pull/3039)
+- Added the option to not include values in the N2 diagram [#3022](https://github.com/OpenMDAO/OpenMDAO/pull/3022)
+
+## Bug Fixes
+
+- Fixed a bug where the SubModel was never set to complex step mode. [#3042](https://github.com/OpenMDAO/OpenMDAO/pull/3042)
+- Fixed issue that was preventing `add_residual` from being called during configure. [#3031](https://github.com/OpenMDAO/OpenMDAO/pull/3031)
+- Fixed the `openmdao n2` command to work properly with subproblems [#3029](https://github.com/OpenMDAO/OpenMDAO/pull/3029)
+- Fixed an issue where the desvars and responses are sorted in a different order if the number of procs is less than the number of subsystems in a par group. [#3028](https://github.com/OpenMDAO/OpenMDAO/pull/3028)
+- Fixed doc error describing 'openmdao timing' [#3015](https://github.com/OpenMDAO/OpenMDAO/pull/3015)
+- Fixed an uncaught TypeError in the Dymos Linkage report [#3011](https://github.com/OpenMDAO/OpenMDAO/pull/3011)
+
+## Miscellaneous
+
+- Updated 'latest' workflow for Python 3.12 compatibility [#3044](https://github.com/OpenMDAO/OpenMDAO/pull/3044)
+- Fixed a broken link in the documentation [#3036](https://github.com/OpenMDAO/OpenMDAO/pull/3036)
+- Cleaned up some deprecations in the OpenMDAO code base [#3035](https://github.com/OpenMDAO/OpenMDAO/pull/3035)
+- networkx version update. [#3025](https://github.com/OpenMDAO/OpenMDAO/pull/3025)
+- Changed bug report template so that entire example section isn't rendered as python. [#3021](https://github.com/OpenMDAO/OpenMDAO/pull/3021)
+
+***********************************
 # Release Notes for OpenMDAO 3.28.0
 
 August 30, 2023
