@@ -283,7 +283,7 @@ class I2O2JacVec(om.ExplicitComponent):
 
 class Simple(om.ExplicitComponent):
     """
-    Simple matrix free component where some of/wrt partials are zero.
+    Simple component that counts compute/compute_partials/_solve_linear.
     """
 
     def __init__(self, size, **kwargs):
