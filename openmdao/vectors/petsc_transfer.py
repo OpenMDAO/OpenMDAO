@@ -98,8 +98,8 @@ else:
             offsets = group._get_var_offsets()
             mypathlen = len(group.pathname) + 1 if group.pathname else 0
 
-            fwd_xfer_in = defaultdict(list)
-            fwd_xfer_out = defaultdict(list)
+            xfer_in = defaultdict(list)
+            xfer_out = defaultdict(list)
 
             allprocs_abs2idx = group._var_allprocs_abs2idx
             sizes_in = group._var_sizes['input']
@@ -144,28 +144,28 @@ else:
 
                     # Now the indices are ready - input_inds, output_inds
                     sub_in = abs_in[mypathlen:].partition('.')[0]
-                    fwd_xfer_in[sub_in].append(input_inds)
-                    fwd_xfer_out[sub_in].append(output_inds)
+                    xfer_in[sub_in].append(input_inds)
+                    xfer_out[sub_in].append(output_inds)
                 else:
                     # not a local input but still need entries in the transfer dicts to
                     # avoid hangs
                     sub_in = abs_in[mypathlen:].partition('.')[0]
-                    fwd_xfer_in[sub_in]  # defaultdict will create an empty list there
-                    fwd_xfer_out[sub_in]
+                    xfer_in[sub_in]  # defaultdict will create an empty list there
+                    xfer_out[sub_in]
 
             transfers = {}
-            if fwd_xfer_in:
-                xfer_in, xfer_out = _setup_index_views(total_len, fwd_xfer_in, fwd_xfer_out)
+            if xfer_in:
+                full_xfer_in, full_xfer_out = _setup_index_views(total_len, xfer_in, xfer_out)
                 # full transfer (transfer to all subsystems at once)
                 transfers[None] = PETScTransfer(vectors['input']['nonlinear'],
                                                 vectors['output']['nonlinear'],
-                                                xfer_in, xfer_out, group.comm)
+                                                full_xfer_in, full_xfer_out, group.comm)
 
                 # transfers to individual subsystems
-                for sname, inds in fwd_xfer_in.items():
+                for sname, inds in xfer_in.items():
                     transfers[sname] = PETScTransfer(vectors['input']['nonlinear'],
                                                      vectors['output']['nonlinear'],
-                                                     inds, fwd_xfer_out[sname], group.comm)
+                                                     inds, xfer_out[sname], group.comm)
 
             return transfers
 
@@ -182,12 +182,12 @@ else:
 
             has_rev_par_coloring = any([m['parallel_deriv_color'] is not None
                                         for m in responses.values()])
-            rev_xfer_in = defaultdict(list)
-            rev_xfer_out = defaultdict(list)
+            xfer_in = defaultdict(list)
+            xfer_out = defaultdict(list)
 
             # xfers that are only active when parallel coloring is not
-            rev_xfer_in_nocolor = defaultdict(list)
-            rev_xfer_out_nocolor = defaultdict(list)
+            xfer_in_nocolor = defaultdict(list)
+            xfer_out_nocolor = defaultdict(list)
 
             allprocs_abs2idx = group._var_allprocs_abs2idx
             sizes_in = group._var_sizes['input']
@@ -276,9 +276,9 @@ else:
                         src_indices = src_indices.shaped_array()
 
                     rank = myrank if abs_out in abs2meta_out else owner
-                    output_inds, on_iprocs = _get_output_inds(group, abs_out, abs_in, src_indices,
-                                                              rank, sizes_out[:, idx_out],
-                                                              offsets_out[:, idx_out])
+                    output_inds, _ = _get_output_inds(group, abs_out, abs_in, src_indices,
+                                                      rank, sizes_out[:, idx_out],
+                                                      offsets_out[:, idx_out])
 
                     # 2. Compute the input indices
                     input_inds = range(offsets_in[myrank, idx_in],
@@ -292,8 +292,8 @@ else:
 
                     if inp_is_dup and (abs_out not in abs2meta_out or
                                        (distrib_out and not iowninput)):
-                        rev_xfer_in[sub_out]
-                        rev_xfer_out[sub_out]
+                        xfer_in[sub_out]
+                        xfer_out[sub_out]
                     elif out_is_dup and inp_missing > 0 and (iowninput or distrib_in):
                         # if this proc owns the input or the input is distributyed,
                         # and the output is duplicated, then we send the owning/distrib input
@@ -313,7 +313,7 @@ else:
                                 size += len(input_inds)
                             elif osize > 0 and isize == 0:
                                 # dup output exists on this rank but there is no corresponding
-                                # input, so we send the owning input to the dup output
+                                # input, so we send the owning/distrib input to the dup output
                                 offset = offsets_out[rnk, idx_out]
                                 if src_indices is None:
                                     oarr = range(offset, offset + meta_in['size'])
@@ -340,8 +340,8 @@ else:
 
                         total_size += len(input_inds)
 
-                        rev_xfer_in[sub_out].append(input_inds)
-                        rev_xfer_out[sub_out].append(output_inds)
+                        xfer_in[sub_out].append(input_inds)
+                        xfer_out[sub_out].append(output_inds)
 
                         if has_rev_par_coloring and iidxlist_nc:
                             # keep transfers separate that shouldn't happen when partial
@@ -355,8 +355,8 @@ else:
 
                             total_size_nocolor += len(input_inds)
 
-                            rev_xfer_in_nocolor[sub_out].append(input_inds)
-                            rev_xfer_out_nocolor[sub_out].append(output_inds)
+                            xfer_in_nocolor[sub_out].append(input_inds)
+                            xfer_out_nocolor[sub_out].append(output_inds)
                     else:
                         if (inp_is_dup and out_is_dup and src_indices is not None and
                                 src_indices.size > 0):
@@ -365,18 +365,18 @@ else:
 
                         total_size += len(input_inds)
 
-                        rev_xfer_in[sub_out].append(input_inds)
-                        rev_xfer_out[sub_out].append(output_inds)
+                        xfer_in[sub_out].append(input_inds)
+                        xfer_out[sub_out].append(output_inds)
                 else:
                     # not a local input but still need entries in the transfer dicts to
                     # avoid hangs
-                    rev_xfer_in[sub_out]
-                    rev_xfer_out[sub_out]
+                    xfer_in[sub_out]
+                    xfer_out[sub_out]
                     if has_rev_par_coloring:
-                        rev_xfer_in_nocolor[sub_out]
-                        rev_xfer_out_nocolor[sub_out]
+                        xfer_in_nocolor[sub_out]
+                        xfer_out_nocolor[sub_out]
 
-            full_xfer_in, full_xfer_out = _setup_index_views(total_size, rev_xfer_in, rev_xfer_out)
+            full_xfer_in, full_xfer_out = _setup_index_views(total_size, xfer_in, xfer_out)
 
             transfers = {
                 None: PETScTransfer(vectors['input']['nonlinear'],
@@ -384,25 +384,25 @@ else:
                                     full_xfer_in, full_xfer_out, group.comm)
             }
 
-            for sname, inds in rev_xfer_out.items():
+            for sname, inds in xfer_out.items():
                 transfers[sname] = PETScTransfer(vectors['input']['nonlinear'],
                                                  vectors['output']['nonlinear'],
-                                                 rev_xfer_in[sname], inds, group.comm)
+                                                 xfer_in[sname], inds, group.comm)
 
-            if rev_xfer_in_nocolor:
+            if xfer_in_nocolor:
                 full_xfer_in, full_xfer_out = _setup_index_views(total_size_nocolor,
-                                                                 rev_xfer_in_nocolor,
-                                                                 rev_xfer_out_nocolor)
+                                                                 xfer_in_nocolor,
+                                                                 xfer_out_nocolor)
 
                 transfers[(None, 'nocolor')] = PETScTransfer(vectors['input']['nonlinear'],
                                                              vectors['output']['nonlinear'],
                                                              full_xfer_in, full_xfer_out,
                                                              group.comm)
 
-                for sname, inds in rev_xfer_out_nocolor.items():
+                for sname, inds in xfer_out_nocolor.items():
                     transfers[(sname, 'nocolor')] = PETScTransfer(vectors['input']['nonlinear'],
                                                                   vectors['output']['nonlinear'],
-                                                                  rev_xfer_in_nocolor[sname], inds,
+                                                                  xfer_in_nocolor[sname], inds,
                                                                   group.comm)
 
             return transfers
@@ -523,17 +523,10 @@ def _get_output_inds(group, abs_out, abs_in, src_indices, rank, sizes, offsets):
             on_iproc = np.logical_and(start <= src_indices, src_indices < end)
 
             if np.any(on_iproc):
-                # This converts from iproc-then-ivar to ivar-then-iproc ordering
-                # Subtract off part of this variable from previous procs
-                # Then add all variables on previous procs
-                # Then all previous variables on this proc
-                # - np.sum(out_sizes[:iproc, idx_out])
-                # + np.sum(out_sizes[:iproc, :])
-                # + np.sum(out_sizes[iproc, :idx_out])
-                # + inds
-                offset = offsets[iproc] - start
-                output_inds[on_iproc] = src_indices[on_iproc] + offset
                 on_iprocs.append(iproc)
+
+                # This converts from global to variable specific ordering
+                output_inds[on_iproc] = src_indices[on_iproc] + (offsets[iproc] - start)
 
             start = end
 
