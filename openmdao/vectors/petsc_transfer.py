@@ -90,7 +90,6 @@ else:
         def _setup_transfers_fwd(group, desvars, responses):
             abs2meta_in = group._var_abs2meta['input']
             abs2meta_out = group._var_abs2meta['output']
-            allprocs_abs2meta_out = group._var_allprocs_abs2meta['output']
             myrank = group.comm.rank
 
             transfers = group._transfers
@@ -110,7 +109,7 @@ else:
             offsets_in = offsets['input']
             offsets_out = offsets['output']
 
-            total_fwd = total_rev = total_rev_nocolor = 0
+            total_len = 0
 
             # Loop through all connections owned by this system
             for abs_in, abs_out in group._conn_abs_in2out.items():
@@ -118,17 +117,14 @@ else:
                 if abs_in in abs2meta_in:
                     # Get meta
                     meta_in = abs2meta_in[abs_in]
-                    meta_out = allprocs_abs2meta_out[abs_out]
 
                     idx_in = allprocs_abs2idx[abs_in]
                     idx_out = allprocs_abs2idx[abs_out]
-
-                    local_out = abs_out in abs2meta_out
+                    owner = group._owning_rank[abs_out]
 
                     # Read in and process src_indices
                     src_indices = meta_in['src_indices']
                     if src_indices is None:
-                        owner = group._owning_rank[abs_out]
                         # if the input is larger than the output on a single proc, we have
                         # to just loop over the procs in the same way we do when src_indices
                         # is defined.
@@ -137,56 +133,15 @@ else:
                     else:
                         src_indices = src_indices.shaped_array()
 
-                    on_iprocs = []
-
-                    # 1. Compute the output indices
-                    # NOTE: src_indices are relative to a single, possibly distributed variable,
-                    # while the output_inds that we compute are relative to the full distributed
-                    # array that contains all local variables from each rank stacked in rank order.
-                    if src_indices is None:
-                        if meta_out['distributed']:
-                            # input in this case is non-distributed (else src_indices would be
-                            # defined by now).  dist output to non-distributed input conns w/o
-                            # src_indices are not allowed.
-                            raise RuntimeError(f"{group.msginfo}: Can't connect distributed output "
-                                               f"'{abs_out}' to non-distributed input '{abs_in}' "
-                                               "without declaring src_indices.",
-                                               ident=(abs_out, abs_in))
-                        else:
-                            rank = myrank if local_out else owner
-                            offset = offsets_out[rank, idx_out]
-                            output_inds = range(offset, offset + meta_in['size'])
-                    else:
-                        output_inds = np.empty(src_indices.size, INT_DTYPE)
-                        start = end = 0
-                        for iproc in range(group.comm.size):
-                            end += sizes_out[iproc, idx_out]
-                            if start == end:
-                                continue
-
-                            # The part of src on iproc
-                            on_iproc = np.logical_and(start <= src_indices, src_indices < end)
-
-                            if np.any(on_iproc):
-                                # This converts from iproc-then-ivar to ivar-then-iproc ordering
-                                # Subtract off part of this variable from previous procs
-                                # Then add all variables on previous procs
-                                # Then all previous variables on this proc
-                                # - np.sum(out_sizes[:iproc, idx_out])
-                                # + np.sum(out_sizes[:iproc, :])
-                                # + np.sum(out_sizes[iproc, :idx_out])
-                                # + inds
-                                offset = offsets_out[iproc, idx_out] - start
-                                output_inds[on_iproc] = src_indices[on_iproc] + offset
-                                on_iprocs.append(iproc)
-
-                            start = end
+                    rank = myrank if abs_out in abs2meta_out else owner
+                    output_inds = _get_output_inds(group, abs_out, abs_in, src_indices, rank,
+                                                   sizes_out[:, idx_out], offsets_out[:, idx_out])
 
                     # 2. Compute the input indices
                     input_inds = range(offsets_in[myrank, idx_in],
                                        offsets_in[myrank, idx_in] + sizes_in[myrank, idx_in])
 
-                    total_fwd += len(input_inds)
+                    total_len += len(input_inds)
 
                     # Now the indices are ready - input_inds, output_inds
                     sub_in = abs_in[mypathlen:].partition('.')[0]
@@ -200,7 +155,7 @@ else:
                     fwd_xfer_out[sub_in]
 
             if fwd_xfer_in:
-                xfer_in, xfer_out = _setup_index_views(total_fwd, fwd_xfer_in, fwd_xfer_out)
+                xfer_in, xfer_out = _setup_index_views(total_len, fwd_xfer_in, fwd_xfer_out)
 
             out_vec = vectors['output']['nonlinear']
 
@@ -226,10 +181,6 @@ else:
             vectors = group._vectors
             offsets = group._get_var_offsets()
             mypathlen = len(group.pathname) + 1 if group.pathname else 0
-
-            # Initialize empty lists for the transfer indices
-            xfer_in = []
-            xfer_out = []
 
             has_rev_par_coloring = any([m['parallel_deriv_color'] is not None
                                         for m in responses.values()])
@@ -298,7 +249,7 @@ else:
                         owning_group = model._get_subsystem(gname)
                         owning_group._fd_subgroup_inputs.add(inp)
 
-            total_fwd = total_rev = total_rev_nocolor = 0
+            total_rev = total_rev_nocolor = 0
 
             # Loop through all connections owned by this system
             for abs_in, abs_out in group._conn_abs_in2out.items():
@@ -373,8 +324,6 @@ else:
                     # 2. Compute the input indices
                     input_inds = range(offsets_in[myrank, idx_in],
                                        offsets_in[myrank, idx_in] + sizes_in[myrank, idx_in])
-
-                    total_fwd += len(input_inds)
 
                     # Now the indices are ready - input_inds, output_inds
                     if group._owns_approx_jac:
@@ -638,3 +587,49 @@ def _merge(inds_list, tot_size):
         return arr
 
     return _empty_idx_array
+
+
+def _get_output_inds(group, abs_out, abs_in, src_indices, rank, sizes, offsets):
+    meta_out = group._var_allprocs_abs2meta['output'][abs_out]
+
+    # NOTE: src_indices are relative to a single, possibly distributed variable,
+    # while the output_inds that we compute are relative to the full distributed
+    # array that contains all local variables from each rank stacked in rank order.
+    if src_indices is None:
+        if meta_out['distributed']:
+            # input in this case is non-distributed (else src_indices would be
+            # defined by now).  dist output to non-distributed input conns w/o
+            # src_indices are not allowed.
+            raise RuntimeError(f"{group.msginfo}: Can't connect distributed output "
+                                f"'{abs_out}' to non-distributed input '{abs_in}' "
+                                "without declaring src_indices.",
+                                ident=(abs_out, abs_in))
+        else:
+            offset = offsets[rank]
+            output_inds = range(offset, offset + sizes[rank])
+    else:
+        output_inds = np.empty(src_indices.size, INT_DTYPE)
+        start = end = 0
+        for iproc in range(group.comm.size):
+            end += sizes[iproc]
+            if start == end:
+                continue
+
+            # The part of src on iproc
+            on_iproc = np.logical_and(start <= src_indices, src_indices < end)
+
+            if np.any(on_iproc):
+                # This converts from iproc-then-ivar to ivar-then-iproc ordering
+                # Subtract off part of this variable from previous procs
+                # Then add all variables on previous procs
+                # Then all previous variables on this proc
+                # - np.sum(out_sizes[:iproc, idx_out])
+                # + np.sum(out_sizes[:iproc, :])
+                # + np.sum(out_sizes[iproc, :idx_out])
+                # + inds
+                offset = offsets[iproc] - start
+                output_inds[on_iproc] = src_indices[on_iproc] + offset
+
+            start = end
+
+    return output_inds
