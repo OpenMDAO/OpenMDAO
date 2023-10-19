@@ -90,81 +90,58 @@ else:
 
         @staticmethod
         def _setup_transfers_fwd(group, desvars, responses):
+            transfers = {}
+
+            if not group._conn_abs_in2out:
+                return transfers
+
             abs2meta_in = group._var_abs2meta['input']
-            abs2meta_out = group._var_abs2meta['output']
             myrank = group.comm.rank
 
-            vectors = group._vectors
-            offsets = group._get_var_offsets()
+            offsets_in = group._get_var_offsets()['input'][myrank, :]
             mypathlen = len(group.pathname) + 1 if group.pathname else 0
 
             xfer_in = defaultdict(list)
             xfer_out = defaultdict(list)
 
             allprocs_abs2idx = group._var_allprocs_abs2idx
-            sizes_in = group._var_sizes['input']
-            sizes_out = group._var_sizes['output']
-            offsets_in = offsets['input']
-            offsets_out = offsets['output']
+            sizes_in = group._var_sizes['input'][myrank, :]
 
             total_len = 0
 
             # Loop through all connections owned by this system
             for abs_in, abs_out in group._conn_abs_in2out.items():
+                sub_in = abs_in[mypathlen:].partition('.')[0]
+
                 # Only continue if the input exists on this processor
                 if abs_in in abs2meta_in:
-                    # Get meta
-                    meta_in = abs2meta_in[abs_in]
+
+                    output_inds, _ = _get_output_inds(group, abs_out, abs_in)
 
                     idx_in = allprocs_abs2idx[abs_in]
-                    idx_out = allprocs_abs2idx[abs_out]
-                    owner = group._owning_rank[abs_out]
-
-                    # Read in and process src_indices
-                    src_indices = meta_in['src_indices']
-                    if src_indices is None:
-                        # if the input is larger than the output on a single proc, we have
-                        # to just loop over the procs in the same way we do when src_indices
-                        # is defined.
-                        if meta_in['size'] > sizes_out[owner, idx_out]:
-                            src_indices = np.arange(meta_in['size'], dtype=INT_DTYPE)
-                    else:
-                        src_indices = src_indices.shaped_array()
-
-                    rank = myrank if abs_out in abs2meta_out else owner
-                    output_inds, _ = _get_output_inds(group, abs_out, abs_in, src_indices, rank,
-                                                      sizes_out[:, idx_out],
-                                                      offsets_out[:, idx_out])
-
-                    # 2. Compute the input indices
-                    input_inds = range(offsets_in[myrank, idx_in],
-                                       offsets_in[myrank, idx_in] + sizes_in[myrank, idx_in])
+                    input_inds = range(offsets_in[idx_in], offsets_in[idx_in] + sizes_in[idx_in])
 
                     total_len += len(input_inds)
 
-                    # Now the indices are ready - input_inds, output_inds
-                    sub_in = abs_in[mypathlen:].partition('.')[0]
                     xfer_in[sub_in].append(input_inds)
                     xfer_out[sub_in].append(output_inds)
                 else:
                     # not a local input but still need entries in the transfer dicts to
                     # avoid hangs
-                    sub_in = abs_in[mypathlen:].partition('.')[0]
                     xfer_in[sub_in]  # defaultdict will create an empty list there
                     xfer_out[sub_in]
 
-            transfers = {}
             if xfer_in:
                 full_xfer_in, full_xfer_out = _setup_index_views(total_len, xfer_in, xfer_out)
                 # full transfer (transfer to all subsystems at once)
-                transfers[None] = PETScTransfer(vectors['input']['nonlinear'],
-                                                vectors['output']['nonlinear'],
+                transfers[None] = PETScTransfer(group._vectors['input']['nonlinear'],
+                                                group._vectors['output']['nonlinear'],
                                                 full_xfer_in, full_xfer_out, group.comm)
 
                 # transfers to individual subsystems
                 for sname, inds in xfer_in.items():
-                    transfers[sname] = PETScTransfer(vectors['input']['nonlinear'],
-                                                     vectors['output']['nonlinear'],
+                    transfers[sname] = PETScTransfer(group._vectors['input']['nonlinear'],
+                                                     group._vectors['output']['nonlinear'],
                                                      inds, xfer_out[sname], group.comm)
 
             return transfers
@@ -262,23 +239,8 @@ else:
                     meta_in = abs2meta_in[abs_in]
                     idx_in = allprocs_abs2idx[abs_in]
                     idx_out = allprocs_abs2idx[abs_out]
-                    owner = group._owning_rank[abs_out]
 
-                    # Read in and process src_indices
-                    src_indices = meta_in['src_indices']
-                    if src_indices is None:
-                        # if the input is larger than the output on a single proc, we have
-                        # to just loop over the procs in the same way we do when src_indices
-                        # is defined.
-                        if meta_in['size'] > sizes_out[owner, idx_out]:
-                            src_indices = np.arange(meta_in['size'], dtype=INT_DTYPE)
-                    else:
-                        src_indices = src_indices.shaped_array()
-
-                    rank = myrank if abs_out in abs2meta_out else owner
-                    output_inds, _ = _get_output_inds(group, abs_out, abs_in, src_indices,
-                                                      rank, sizes_out[:, idx_out],
-                                                      offsets_out[:, idx_out])
+                    output_inds, src_indices = _get_output_inds(group, abs_out, abs_in)
 
                     # 2. Compute the input indices
                     input_inds = range(offsets_in[myrank, idx_in],
@@ -493,15 +455,22 @@ def _merge(inds_list, tot_size):
     return _empty_idx_array
 
 
-def _get_output_inds(group, abs_out, abs_in, src_indices, rank, sizes, offsets):
-    meta_out = group._var_allprocs_abs2meta['output'][abs_out]
-    on_iprocs = []
+def _get_output_inds(group, abs_out, abs_in):
+    owner = group._owning_rank[abs_out]
+    src_indices = group._var_abs2meta['input'][abs_in]['src_indices']
+    if src_indices is not None:
+        src_indices = src_indices.shaped_array()
+
+    rank = group.comm.rank if abs_out in group._var_abs2meta['output'] else owner
+    out_idx = group._var_allprocs_abs2idx[abs_out]
+    offsets = group._get_var_offsets()['output'][:, out_idx]
+    sizes = group._var_sizes['output'][:, out_idx]
 
     # NOTE: src_indices are relative to a single, possibly distributed variable,
     # while the output_inds that we compute are relative to the full distributed
     # array that contains all local variables from each rank stacked in rank order.
     if src_indices is None:
-        if meta_out['distributed']:
+        if group._var_allprocs_abs2meta['output'][abs_out]['distributed']:
             # input in this case is non-distributed (else src_indices would be
             # defined by now).  dist output to non-distributed input conns w/o
             # src_indices are not allowed.
@@ -523,11 +492,9 @@ def _get_output_inds(group, abs_out, abs_in, src_indices, rank, sizes, offsets):
             on_iproc = np.logical_and(start <= src_indices, src_indices < end)
 
             if np.any(on_iproc):
-                on_iprocs.append(iproc)
-
                 # This converts from global to variable specific ordering
                 output_inds[on_iproc] = src_indices[on_iproc] + (offsets[iproc] - start)
 
             start = end
 
-    return output_inds, on_iprocs
+    return output_inds, src_indices
