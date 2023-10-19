@@ -42,7 +42,6 @@ class TestSetupMemLeak(unittest.TestCase):
 
         for memtest in ITERS:
             prob.model = SellarMDA()
-            snapshots = []
 
             for i in range(memtest):
                 prob.setup(check=False) # called here causes memory leak
