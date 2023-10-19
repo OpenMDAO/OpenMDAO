@@ -1905,26 +1905,12 @@ def _compute_total_coloring_context(top):
     top : System
         Top of the system hierarchy where coloring will be done.
     """
-    for system in top.system_iter(recurse=True, include_self=True):
-        if system.matrix_free:
-            raise RuntimeError("%s: simultaneous coloring does not currently work with matrix free "
-                               "components." % system.pathname)
-
-        jac = system._assembled_jac
-        if jac is None:
-            jac = system._jacobian
-        if jac is not None:
-            jac._randgen = np.random.default_rng(41)  # set seed for consistency
+    top._problem_meta['coloring_randgen'] = np.random.default_rng(41)  # set seed for consistency
 
     try:
         yield
     finally:
-        for system in top.system_iter(recurse=True, include_self=True):
-            jac = system._assembled_jac
-            if jac is None:
-                jac = system._jacobian
-            if jac is not None:
-                jac._randgen = None
+        top._problem_meta['coloring_randgen'] = None
 
 
 def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'],

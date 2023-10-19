@@ -25,7 +25,6 @@ except Exception as err:
 from openmdao.core.constants import INT_DTYPE
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
-import openmdao.utils.coloring as c_mod
 from openmdao.utils.class_util import WeakMethodWrapper
 from openmdao.utils.mpi import FakeComm, MPI
 from openmdao.utils.om_warnings import issue_warning, warn_deprecation
