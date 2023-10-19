@@ -164,8 +164,8 @@ else:
                 # transfers to individual subsystems
                 for sname, inds in fwd_xfer_in.items():
                     transfers[sname] = PETScTransfer(vectors['input']['nonlinear'],
-                                                    vectors['output']['nonlinear'],
-                                                    inds, fwd_xfer_out[sname], group.comm)
+                                                     vectors['output']['nonlinear'],
+                                                     inds, fwd_xfer_out[sname], group.comm)
 
             return transfers
 
@@ -291,13 +291,14 @@ else:
                     iowninput = myrank == group._owning_rank[abs_in]
 
                     if inp_is_dup and (abs_out not in abs2meta_out or
-                                        (distrib_out and not iowninput)):
+                                       (distrib_out and not iowninput)):
                         rev_xfer_in[sub_out]
                         rev_xfer_out[sub_out]
-                    elif out_is_dup and inp_is_dup and inp_missing > 0 and iowninput:
-                        # if this proc owns the input and both the output and input have
-                        # duplicates, then we send the owning input to each duplicated output
-                        # that doesn't have a corresponding connected input on the same proc.
+                    elif out_is_dup and inp_missing > 0 and (iowninput or distrib_in):
+                        # if this proc owns the input or the input is distributyed,
+                        # and the output is duplicated, then we send the owning/distrib input
+                        # to each duplicated output that doesn't have a corresponding connected
+                        # input on the same proc.
                         oidxlist = []
                         iidxlist = []
                         oidxlist_nc = []
@@ -309,6 +310,7 @@ else:
                             if rnk == myrank:
                                 oidxlist.append(output_inds)
                                 iidxlist.append(input_inds)
+                                size += len(input_inds)
                             elif osize > 0 and isize == 0:
                                 # dup output exists on this rank but there is no corresponding
                                 # input, so we send the owning input to the dup output
@@ -344,62 +346,6 @@ else:
                         if has_rev_par_coloring and iidxlist_nc:
                             # keep transfers separate that shouldn't happen when partial
                             # coloring is active
-                            if len(iidxlist_nc) > 1:
-                                input_inds = _merge(iidxlist_nc, size_nc)
-                                output_inds = _merge(oidxlist_nc, size_nc)
-                            else:
-                                input_inds = iidxlist_nc[0]
-                                output_inds = oidxlist_nc[0]
-
-                            total_size_nocolor += len(input_inds)
-
-                            rev_xfer_in_nocolor[sub_out].append(input_inds)
-                            rev_xfer_out_nocolor[sub_out].append(output_inds)
-
-                    elif out_is_dup and (not inp_is_dup or inp_missing > 0) and (iowninput or
-                                                                                    distrib_in):
-                        oidxlist = []
-                        iidxlist = []
-                        oidxlist_nc = []
-                        iidxlist_nc = []
-                        size = size_nc = 0
-                        for rnk, sz in enumerate(group.get_var_sizes(abs_out, 'output')):
-                            if sz == 0:
-                                continue
-                            offset = offsets_out[rnk, idx_out]
-                            if src_indices is None:
-                                oarr = range(offset, offset + meta_in['size'])
-                            elif src_indices.size > 0:
-                                if (distrib_in and not distrib_out and len(on_iprocs) == 1 and
-                                        on_iprocs[0] == rnk):
-                                    offset -= np.sum(sizes_out[:rnk, idx_out])
-                                oarr = np.asarray(src_indices + offset, dtype=INT_DTYPE)
-                            else:
-                                continue
-                            if rnk == myrank or not has_rev_par_coloring:
-                                oidxlist.append(oarr)
-                                iidxlist.append(input_inds)
-                                size += len(input_inds)
-                            else:
-                                oidxlist_nc.append(oarr)
-                                iidxlist_nc.append(input_inds)
-                                size_nc += len(input_inds)
-
-                        if len(iidxlist) > 1:
-                            input_inds = _merge(iidxlist, size)
-                            output_inds = _merge(oidxlist, size)
-                        elif len(iidxlist) == 1:
-                            input_inds = iidxlist[0]
-                            output_inds = oidxlist[0]
-                        else:
-                            input_inds = output_inds = _empty_idx_array
-
-                        total_size += len(input_inds)
-
-                        rev_xfer_in[sub_out].append(input_inds)
-                        rev_xfer_out[sub_out].append(output_inds)
-
-                        if has_rev_par_coloring and iidxlist_nc:
                             if len(iidxlist_nc) > 1:
                                 input_inds = _merge(iidxlist_nc, size_nc)
                                 output_inds = _merge(oidxlist_nc, size_nc)
@@ -560,9 +506,8 @@ def _get_output_inds(group, abs_out, abs_in, src_indices, rank, sizes, offsets):
             # defined by now).  dist output to non-distributed input conns w/o
             # src_indices are not allowed.
             raise RuntimeError(f"{group.msginfo}: Can't connect distributed output "
-                                f"'{abs_out}' to non-distributed input '{abs_in}' "
-                                "without declaring src_indices.",
-                                ident=(abs_out, abs_in))
+                               f"'{abs_out}' to non-distributed input '{abs_in}' "
+                               "without declaring src_indices.", ident=(abs_out, abs_in))
         else:
             offset = offsets[rank]
             output_inds = range(offset, offset + sizes[rank])
