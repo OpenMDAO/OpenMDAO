@@ -3,9 +3,16 @@
 
 October 20, 2023
 
-Key improvements in this release include the Implementation of POEM 092, which allows users to define
-a pre-processor function for options. This can be used to facilitate more easily passing options
-from parent systems to child systems.
+Key improvements in this release include the implementation of POEM 092, which allows users to define
+a pre-processor function for options. This can be used to facilitate processing of options, such as
+handling unit conversions.
+
+POEM 091 forces a component to use _either_ jacobian-based partials or the matrix-free API. Using both
+is no longer allowed.
+
+Finally, POEM 038 is implemented which currently raises a deprecation error if a user
+declares a partial whose value is exactly zero. In the future this will be an error,
+since the "correct" behavior is to not declare such partials at all.
 
 The coloring report has been reimplemented in bokeh and is more interactive. Users with problems
 whose systems exhibit significant sparsity may find this useful.
@@ -31,6 +38,8 @@ Also, the relatively new `add_residual` feature wasn't able to be called during 
 - Allow users to define a preprocessor function for option sets. [POEM 092 Implementation] [#3040](https://github.com/OpenMDAO/OpenMDAO/pull/3040)
 - Added a warning when an excludes or includes recording option has no matches [#3039](https://github.com/OpenMDAO/OpenMDAO/pull/3039)
 - Added the option to not include values in the N2 diagram [#3022](https://github.com/OpenMDAO/OpenMDAO/pull/3022)
+- Implementation of POEM 038. declare_partials now warns if val == 0. [#3050](https://github.com/OpenMDAO/OpenMDAO/pull/3050)
+- POEM 91 Implementation - Each Component must now be either matrix free or jacobian based. [#3020](https://github.com/OpenMDAO/OpenMDAO/pull/3020)
 
 ## Bug Fixes
 
