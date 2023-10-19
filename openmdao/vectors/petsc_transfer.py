@@ -98,9 +98,6 @@ else:
             offsets = group._get_var_offsets()
             mypathlen = len(group.pathname) + 1 if group.pathname else 0
 
-            # Initialize empty lists for the transfer indices
-            xfer_in = []
-            xfer_out = []
             fwd_xfer_in = defaultdict(list)
             fwd_xfer_out = defaultdict(list)
 
@@ -156,21 +153,19 @@ else:
                     fwd_xfer_in[sub_in]  # defaultdict will create an empty list there
                     fwd_xfer_out[sub_in]
 
+            transfers = {}
             if fwd_xfer_in:
                 xfer_in, xfer_out = _setup_index_views(total_len, fwd_xfer_in, fwd_xfer_out)
-
-            transfers = {
                 # full transfer (transfer to all subsystems at once)
-                None: PETScTransfer(vectors['input']['nonlinear'],
-                                    vectors['output']['nonlinear'],
-                                    xfer_in, xfer_out, group.comm)
-            }
+                transfers[None] = PETScTransfer(vectors['input']['nonlinear'],
+                                                vectors['output']['nonlinear'],
+                                                xfer_in, xfer_out, group.comm)
 
-            # transfers to individual subsystems
-            for sname, inds in fwd_xfer_in.items():
-                transfers[sname] = PETScTransfer(vectors['input']['nonlinear'],
-                                                 vectors['output']['nonlinear'],
-                                                 inds, fwd_xfer_out[sname], group.comm)
+                # transfers to individual subsystems
+                for sname, inds in fwd_xfer_in.items():
+                    transfers[sname] = PETScTransfer(vectors['input']['nonlinear'],
+                                                    vectors['output']['nonlinear'],
+                                                    inds, fwd_xfer_out[sname], group.comm)
 
             return transfers
 
@@ -178,7 +173,6 @@ else:
         def _setup_transfers_rev(group, desvars, responses):
             abs2meta_in = group._var_abs2meta['input']
             abs2meta_out = group._var_abs2meta['output']
-            allprocs_abs2meta_out = group._var_allprocs_abs2meta['output']
             myrank = group.comm.rank
 
             transfers = group._transfers
@@ -254,18 +248,17 @@ else:
                         owning_group._fd_subgroup_inputs.add(inp)
 
             if group._owns_approx_jac:
-                # FD groups don't need to do anything here
+                # FD groups don't need reverse transfers
                 return {}
 
-            total_rev = total_rev_nocolor = 0
+            total_size = total_size_nocolor = 0
 
             # Loop through all connections owned by this system
             for abs_in, abs_out in group._conn_abs_in2out.items():
                 sub_out = abs_out[mypathlen:].partition('.')[0]
-                
+
                 # Only continue if the input exists on this processor
                 if abs_in in abs2meta_in:
-                    # Get meta
                     meta_in = abs2meta_in[abs_in]
                     idx_in = allprocs_abs2idx[abs_in]
                     idx_out = allprocs_abs2idx[abs_out]
@@ -311,12 +304,14 @@ else:
                         iidxlist_nc = []
                         size = size_nc = 0
                         for rnk, osize, isize in zip(range(group.comm.size),
-                                                        sizes_out[:, idx_out],
-                                                        sizes_in[:, idx_in]):
+                                                     group.get_var_sizes(abs_out, 'output'),
+                                                     group.get_var_sizes(abs_in, 'input')):
                             if rnk == myrank:
                                 oidxlist.append(output_inds)
                                 iidxlist.append(input_inds)
                             elif osize > 0 and isize == 0:
+                                # dup output exists on this rank but there is no corresponding
+                                # input, so we send the owning input to the dup output
                                 offset = offsets_out[rnk, idx_out]
                                 if src_indices is None:
                                     oarr = range(offset, offset + meta_in['size'])
@@ -341,7 +336,7 @@ else:
                             input_inds = iidxlist[0]
                             output_inds = oidxlist[0]
 
-                        total_rev += len(input_inds)
+                        total_size += len(input_inds)
 
                         rev_xfer_in[sub_out].append(input_inds)
                         rev_xfer_out[sub_out].append(output_inds)
@@ -356,7 +351,7 @@ else:
                                 input_inds = iidxlist_nc[0]
                                 output_inds = oidxlist_nc[0]
 
-                            total_rev_nocolor += len(input_inds)
+                            total_size_nocolor += len(input_inds)
 
                             rev_xfer_in_nocolor[sub_out].append(input_inds)
                             rev_xfer_out_nocolor[sub_out].append(output_inds)
@@ -399,7 +394,7 @@ else:
                         else:
                             input_inds = output_inds = _empty_idx_array
 
-                        total_rev += len(input_inds)
+                        total_size += len(input_inds)
 
                         rev_xfer_in[sub_out].append(input_inds)
                         rev_xfer_out[sub_out].append(output_inds)
@@ -412,7 +407,7 @@ else:
                                 input_inds = iidxlist_nc[0]
                                 output_inds = oidxlist_nc[0]
 
-                            total_rev_nocolor += len(input_inds)
+                            total_size_nocolor += len(input_inds)
 
                             rev_xfer_in_nocolor[sub_out].append(input_inds)
                             rev_xfer_out_nocolor[sub_out].append(output_inds)
@@ -422,7 +417,7 @@ else:
                             offset = offsets_out[myrank, idx_out]
                             output_inds = np.asarray(src_indices + offset, dtype=INT_DTYPE)
 
-                        total_rev += len(input_inds)
+                        total_size += len(input_inds)
 
                         rev_xfer_in[sub_out].append(input_inds)
                         rev_xfer_out[sub_out].append(output_inds)
@@ -435,7 +430,7 @@ else:
                         rev_xfer_in_nocolor[sub_out]
                         rev_xfer_out_nocolor[sub_out]
 
-            full_xfer_in, full_xfer_out = _setup_index_views(total_rev, rev_xfer_in, rev_xfer_out)
+            full_xfer_in, full_xfer_out = _setup_index_views(total_size, rev_xfer_in, rev_xfer_out)
 
             transfers = {
                 None: PETScTransfer(vectors['input']['nonlinear'],
@@ -449,7 +444,7 @@ else:
                                                  rev_xfer_in[sname], inds, group.comm)
 
             if rev_xfer_in_nocolor:
-                full_xfer_in, full_xfer_out = _setup_index_views(total_rev_nocolor,
+                full_xfer_in, full_xfer_out = _setup_index_views(total_size_nocolor,
                                                                  rev_xfer_in_nocolor,
                                                                  rev_xfer_out_nocolor)
 
