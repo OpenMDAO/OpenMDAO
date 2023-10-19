@@ -2,7 +2,7 @@
 
 [run]
 omit =
-    */core/tests/test_setup_memleak.py
+    */tests/test_setup_memleak*
 
 [report]
 omit =

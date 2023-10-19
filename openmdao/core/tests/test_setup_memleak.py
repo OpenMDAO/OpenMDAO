@@ -15,6 +15,19 @@ ITERS = [ 10, 100 ]
 # 0.2 KiB.
 MAX_MEM_DIFF_KB = 200
 
+
+def nocoverage():
+    """
+    Disable coverage for a test case.
+    """
+    def decorator(testcase):
+        testcase.__no_coverage__ = True
+        return testcase
+
+    return decorator
+
+
+@nocoverage()
 class TestSetupMemLeak(unittest.TestCase):
     """ Test for memory leaks when calling setup() multiple times """
 
