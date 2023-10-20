@@ -8,7 +8,8 @@ from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.impl_comp_simple import TestImplCompSimple
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.om_warnings import OMDeprecationWarning
 
 
 class TestExplicitComponent(unittest.TestCase):
@@ -283,6 +284,24 @@ class TestExplicitComponent(unittest.TestCase):
 
         # pretend we reconfigured
         prob.setup()
+
+    def test_zero_partial(self):
+        class Comp(ExplicitComponent):
+            def setup(self):
+                self.add_input('x', val=3.0)
+                self.add_output('y', val=3.0)
+
+                self.declare_partials(of='y', wrt='x', val=0.0)
+
+        prob = Problem()
+        prob.model.add_subsystem('comp', Comp())
+
+        msg = "'comp' <class Comp>: d(y)/d(x): Partial was declared to be exactly zero. " \
+              "This is inefficient and the declaration should be removed. In a future " \
+              "version of OpenMDAO this behavior will raise an error."
+
+        with assert_warning(OMDeprecationWarning, msg):
+            prob.setup()
 
 
 class TestImplicitComponent(unittest.TestCase):
