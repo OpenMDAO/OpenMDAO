@@ -35,11 +35,11 @@ Also, the relatively new `add_residual` feature wasn't able to be called during 
 ## New Features
 
 - Updated the coloring report to use bokeh for visualization. [#3013](https://github.com/OpenMDAO/OpenMDAO/pull/3013)
-- Allow users to define a preprocessor function for option sets. [POEM 092 Implementation] [#3040](https://github.com/OpenMDAO/OpenMDAO/pull/3040)
+- Implemented POEM 092: Allow users to define a preprocessor function for option sets. [#3040](https://github.com/OpenMDAO/OpenMDAO/pull/3040)
 - Added a warning when an excludes or includes recording option has no matches [#3039](https://github.com/OpenMDAO/OpenMDAO/pull/3039)
 - Added the option to not include values in the N2 diagram [#3022](https://github.com/OpenMDAO/OpenMDAO/pull/3022)
-- Implementation of POEM 038. declare_partials now warns if val == 0. [#3050](https://github.com/OpenMDAO/OpenMDAO/pull/3050)
-- POEM 91 Implementation - Each Component must now be either matrix free or jacobian based. [#3020](https://github.com/OpenMDAO/OpenMDAO/pull/3020)
+- Implemented POEM 038: `declare_partials` now warns if val == 0. [#3050](https://github.com/OpenMDAO/OpenMDAO/pull/3050)
+- Implemented POEM 091: Each Component must now be either matrix free or jacobian based. [#3020](https://github.com/OpenMDAO/OpenMDAO/pull/3020)
 
 ## Bug Fixes
 
@@ -52,10 +52,10 @@ Also, the relatively new `add_residual` feature wasn't able to be called during 
 
 ## Miscellaneous
 
+- Updated baseline dependency versions for Windows testing [#3051](https://github.com/OpenMDAO/OpenMDAO/pull/3051)
 - Updated 'latest' workflow for Python 3.12 compatibility [#3044](https://github.com/OpenMDAO/OpenMDAO/pull/3044)
 - Fixed a broken link in the documentation [#3036](https://github.com/OpenMDAO/OpenMDAO/pull/3036)
 - Cleaned up some deprecations in the OpenMDAO code base [#3035](https://github.com/OpenMDAO/OpenMDAO/pull/3035)
-- networkx version update. [#3025](https://github.com/OpenMDAO/OpenMDAO/pull/3025)
 - Changed bug report template so that entire example section isn't rendered as python. [#3021](https://github.com/OpenMDAO/OpenMDAO/pull/3021)
 
 ***********************************
@@ -90,6 +90,7 @@ involved in cycles to eliminate unnecessary feedback.
 - Implemented POEM 87: Expand Functionality of Dynamic Shaping [#3000](https://github.com/OpenMDAO/OpenMDAO/pull/3000)
 - Disabled guess_nonlinear when the solver option restart_from_successful is activated [#3003](https://github.com/OpenMDAO/OpenMDAO/pull/3003)
 - Implemented POEM 090: Added 'auto_order' option to Group. [#2963](https://github.com/OpenMDAO/OpenMDAO/pull/2963)
+- Implemented POEM 088: Enabled custom load_case methods for System. [#2937](https://github.com/OpenMDAO/OpenMDAO/pull/2937)
 
 ## Bug Fixes
 
