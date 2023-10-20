@@ -22,7 +22,7 @@ Also, the relatively new `add_residual` feature wasn't able to be called during 
 
 ## New Deprecations
 
-- None
+- Declaring partials with values equal to exactly zero will now result in a deprecation warning, and in the future will result in an error. [#3050](https://github.com/OpenMDAO/OpenMDAO/pull/3050)
 
 ## Backwards Incompatible API Changes
 
@@ -46,7 +46,7 @@ Also, the relatively new `add_residual` feature wasn't able to be called during 
 - Fixed a bug where the SubModel was never set to complex step mode. [#3042](https://github.com/OpenMDAO/OpenMDAO/pull/3042)
 - Fixed issue that was preventing `add_residual` from being called during configure. [#3031](https://github.com/OpenMDAO/OpenMDAO/pull/3031)
 - Fixed the `openmdao n2` command to work properly with subproblems [#3029](https://github.com/OpenMDAO/OpenMDAO/pull/3029)
-- Fixed an issue where the desvars and responses are sorted in a different order if the number of procs is less than the number of subsystems in a par group. [#3028](https://github.com/OpenMDAO/OpenMDAO/pull/3028)
+- Fixed an issue where the desvars and responses are sorted in a different order if the number of procs is less than the number of subsystems in a parallel group. [#3028](https://github.com/OpenMDAO/OpenMDAO/pull/3028)
 - Fixed doc error describing 'openmdao timing' [#3015](https://github.com/OpenMDAO/OpenMDAO/pull/3015)
 - Fixed an uncaught TypeError in the Dymos Linkage report [#3011](https://github.com/OpenMDAO/OpenMDAO/pull/3011)
 
