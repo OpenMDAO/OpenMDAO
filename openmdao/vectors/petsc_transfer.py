@@ -168,7 +168,6 @@ else:
 
             allprocs_abs2idx = group._var_allprocs_abs2idx
             sizes_in = group._var_sizes['input']
-            sizes_out = group._var_sizes['output']
             offsets_in = offsets['input']
             offsets_out = offsets['output']
 
@@ -218,6 +217,8 @@ else:
                                     inp_dep_dist.update(inp_boundary_set.intersection(rel['input']))
 
                     # look in model for the connections to the group boundary inputs from outside
+                    # and update the _fd_subgroup_inputs in the group that owns connections to
+                    # those inputs.
                     for inp in inp_dep_dist:
                         src = model._conn_global_abs_in2out[inp]
                         gname = common_subpath((src, inp))
