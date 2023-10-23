@@ -1004,6 +1004,8 @@ class Problem(object):
             'model_options': self.model_options,  # A dict of options passed to all systems in tree
             'allow_post_setup_reorder': self.options['allow_post_setup_reorder'],  # see option
             'singular_jac_behavior': 'warn',  # How to handle singular jac conditions
+            'coloring_randgen': None,  # If total coloring is being computed, will contain a random
+                                       # number generator, else None.
         }
 
         if _prob_setup_stack:
