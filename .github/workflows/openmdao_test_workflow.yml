@@ -299,7 +299,6 @@ jobs:
           echo "###################################################"
           cp .coveragerc $HOME
           cd $HOME
-          pip install git+https://github.com/swryan/testflo@new_coverage
           testflo -n 2 openmdao --timeout=240 --show_skipped --coverage --coverpkg openmdao --durations=20
 
       - name: Submit coverage
