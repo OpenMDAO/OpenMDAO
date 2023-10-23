@@ -1,8 +1,7 @@
 # .coveragerc to control coverage.py
 
 [run]
-omit =
-    */tests/test_setup_memleak*
+disable_warnings = module-not-measured
 
 [report]
 omit =
