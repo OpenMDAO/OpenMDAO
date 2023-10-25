@@ -19,7 +19,7 @@ import copy
 import numpy as np
 
 try:
-    from pyDOE2 import lhs
+    from pyDOE3 import lhs
 except ModuleNotFoundError:
     lhs = None
 
@@ -65,10 +65,10 @@ class DifferentialEvolutionDriver(Driver):
         Initialize the DifferentialEvolutionDriver driver.
         """
         if lhs is None:
-            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE2' package, "
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
-                               "    pip install pyDOE2")
+                               "    pip install pyDOE3")
 
         super().__init__(**kwargs)
 
@@ -536,10 +536,10 @@ class DifferentialEvolution(object):
         Initialize genetic algorithm object.
         """
         if lhs is None:
-            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE2' package, "
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
-                               "    pip install pyDOE2")
+                               "    pip install pyDOE3")
 
         self.objfun = objfun
         self.comm = comm
