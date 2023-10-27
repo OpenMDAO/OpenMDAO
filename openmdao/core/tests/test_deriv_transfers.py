@@ -242,9 +242,6 @@ class TestParallelGroups(unittest.TestCase):
 
         J = prob.compute_totals(of=of, wrt=wrt)
 
-        import pprint
-        pprint.pprint(J)
-
         assert_near_equal(J['C1.y', 'par.indep1.x'][0][0], 2.5, 1e-6)
         assert_near_equal(J['C1.y', 'par.indep2.x'][0][0], 3.5, 1e-6)
         assert_near_equal(prob['C1.y'], 6., 1e-6)

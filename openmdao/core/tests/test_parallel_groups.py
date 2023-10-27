@@ -713,10 +713,6 @@ class TestFD(unittest.TestCase):
         p.run_model()
 
         data =  p.check_totals(method='fd', out_stream=None)
-        
-        print("sub jacobian:")
-        import pprint
-        pprint.pprint(sub._jacobian._subjacs_info)
 
         assert_check_totals(data, atol=1e-5)
 

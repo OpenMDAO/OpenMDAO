@@ -35,7 +35,7 @@ from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, \
     DerivativesWarning, PromotionWarning, UnusedOptionWarning, UnitsWarning
 from openmdao.utils.general_utils import determine_adder_scaler, \
-    format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, \
+    format_as_float_or_array, _contains_all, all_ancestors, make_set, match_prom_or_abs, \
     ensure_compatible, env_truthy, make_traceback, _is_slicer_op
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -672,8 +672,8 @@ class System(object):
             Starting index.
         int
             Ending index.
-        Vector
-            Either the _outputs or _inputs vector.
+        Vector or None
+            Either the _outputs or _inputs vector if var is local else None.
         slice
             A full slice.
         ndarray or None
@@ -2592,9 +2592,8 @@ class System(object):
         """
         Context manager for vectors.
 
-        For the given vec_name, return vectors that use a set of
-        internal variables that are relevant to the current matrix-vector
-        product.  This is called only from _apply_linear.
+        Return vectors that use a set of internal variables that are relevant to the current
+        matrix-vector product.  This is called only from _apply_linear.
 
         Parameters
         ----------
@@ -4576,7 +4575,7 @@ class System(object):
             If None, all are in the scope.
         """
         with self._scaled_context_all():
-            self._apply_linear(None, ContainsAll(), mode, scope_out, scope_in)
+            self._apply_linear(None, _contains_all, mode, scope_out, scope_in)
 
     def run_solve_linear(self, mode):
         """
@@ -4590,7 +4589,7 @@ class System(object):
             'fwd' or 'rev'.
         """
         with self._scaled_context_all():
-            self._solve_linear(mode, ContainsAll())
+            self._solve_linear(mode, _contains_all)
 
     def run_linearize(self, sub_do_ln=True):
         """

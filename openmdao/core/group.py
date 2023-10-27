@@ -3,7 +3,7 @@ import sys
 from collections import Counter, defaultdict
 from collections.abc import Iterable
 
-from itertools import product, chain
+from itertools import product, chain, repeat
 from numbers import Number
 import inspect
 from fnmatch import fnmatchcase
@@ -26,7 +26,7 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len
 from openmdao.utils.general_utils import common_subpath, all_ancestors, \
-    convert_src_inds, ContainsAll, shape2tuple, get_connection_owner, ensure_compatible, \
+    convert_src_inds, _contains_all, shape2tuple, get_connection_owner, ensure_compatible, \
     _src_name_iter, meta2src_iter, get_rev_conns
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
@@ -192,11 +192,15 @@ class Group(System):
         Dict of absolute response metadata.
     _relevance_graph : nx.DiGraph
         Graph of relevance connections.  Always None except in the top level Group.
-    _fd_subgroup_inputs : set
+    _fd_rev_xfer_correction_dist : set
         If one or more subgroups of this group is using finite difference to compute derivatives,
-        this is the set of inputs to those subgroups that are upstream of a distributed variable
+        this is the set of inputs to those subgroups that are upstream of a distributed response
         within the same subgroup.  These determine if an allreduce is necessary when transferring
         data to a connected output in reverse mode.
+    _fd_rev_xfer_correction_dup : dict
+        If one or more subgroups of this group is using finite difference to compute derivatives,
+        this is the set of inputs to those subgroups that are upstream of a duplicated response
+        within the same subgroup.
     """
 
     def __init__(self, **kwargs):
@@ -227,7 +231,8 @@ class Group(System):
         self._abs_desvars = None
         self._abs_responses = None
         self._relevance_graph = None
-        self._fd_subgroup_inputs = set()
+        self._fd_rev_xfer_correction_dist = set()
+        self._fd_rev_xfer_correction_dup = {}
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -801,7 +806,7 @@ class Group(System):
             return self.get_relevant_vars(self._abs_desvars,
                                           self._check_alias_overlaps(self._abs_responses), mode)
 
-        return {'@all': ({'input': ContainsAll(), 'output': ContainsAll()}, ContainsAll())}
+        return {'@all': ({'input': _contains_all, 'output': _contains_all}, _contains_all)}
 
     def get_relevance_graph(self, desvars, responses):
         """
@@ -956,20 +961,19 @@ class Group(System):
         for dvmeta in desvars.values():
             desvar = dvmeta['source']
             dvset = set(self.all_connected_nodes(graph, desvar))
-            parallel_deriv_color = dvmeta['parallel_deriv_color']
-            if parallel_deriv_color:
+            if dvmeta['parallel_deriv_color']:
                 pd_dv_locs[desvar] = set(self.all_connected_nodes(graph, desvar, local=True))
-                pd_err_chk[parallel_deriv_color][desvar] = pd_dv_locs[desvar]
+                pd_err_chk[dvmeta['parallel_deriv_color']][desvar] = pd_dv_locs[desvar]
 
             for resmeta in responses.values():
                 response = resmeta['source']
                 if response not in rescache:
                     rescache[response] = set(self.all_connected_nodes(grev, response))
-                    parallel_deriv_color = resmeta['parallel_deriv_color']
-                    if parallel_deriv_color:
+                    if resmeta['parallel_deriv_color']:
                         pd_res_locs[response] = set(self.all_connected_nodes(grev, response,
                                                                              local=True))
-                        pd_err_chk[parallel_deriv_color][response] = pd_res_locs[response]
+                        pd_err_chk[resmeta['parallel_deriv_color']][response] = \
+                            pd_res_locs[response]
 
                 common = dvset.intersection(rescache[response])
 
@@ -1321,7 +1325,8 @@ class Group(System):
             # must call this before vector setup because it determines if we need to alloc commplex
             self._setup_partials()
 
-        self._fd_subgroup_inputs = set()
+        self._fd_rev_xfer_correction_dist = set()
+        self._fd_rev_xfer_correction_dup = {}
 
         self._problem_meta['relevant'] = self._init_relevance(mode)
 
@@ -3192,36 +3197,6 @@ class Group(System):
                         xfer = self._transfers['rev'][key]
                         xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
 
-                if self._fd_subgroup_inputs and self.comm.size > 1:
-                    seed_vars = self._problem_meta['seed_vars']
-                    if seed_vars is not None:
-                        if len(seed_vars) > 1:
-                            raise RuntimeError(f"Multiple seed variables {sorted(seed_vars)} are "
-                                               "not supported under MPI in reverse mode if they "
-                                               "depend on an group doing finite difference and "
-                                               "containing distributed variables.")
-                        pre = '' if sub is None else sub + '.'
-                        slices = self._doutputs.get_slice_dict()
-                        outarr = self._doutputs.asarray()
-                        data = {}
-                        for inp in self._fd_subgroup_inputs:
-                            src = self._conn_global_abs_in2out[inp]
-                            if src.startswith(pre) and src in slices:
-                                arr = outarr[slices[src]]
-                                if np.any(arr):
-                                    data[src] = arr
-                                else:
-                                    data[src] = None
-
-                        if data:
-                            comm = self.comm
-                            myrank = comm.rank
-                            for rank, d in enumerate(comm.allgather(data)):
-                                if rank != myrank:
-                                    for n, val in d.items():
-                                        if val is not None and n in slices:
-                                            outarr[slices[n]] += val
-
                 if self._has_input_scaling:
                     vec_inputs.scale_to_phys(mode='rev')
 
@@ -3813,12 +3788,55 @@ class Group(System):
         if jac is not None:
             with self._matvec_context(scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
+
                 jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
+
+                # _fd_rev_xfer_correction_dist is used to correct for the fact that we don't
+                # do reverse transfers internal to an FD group.  Reverse transfers
+                # are constructed such that derivative values are correct when transferred into
+                # system output variables, taking into account distributed inputs.
+                # Since the transfers are not correcting for those issues, we need to do it here.
+
+                # If we have a distributed constraint/obj within the FD group,
+                # we perform essentially an allreduce on the d_inputs vars that connect to
+                # outside systems so they'll include the contribution from all procs.
+                if self._fd_rev_xfer_correction_dist:
+                    seed_vars = self._problem_meta['seed_vars']
+                    if seed_vars is not None:
+                        if len(seed_vars) > 1:
+                            prefix = self.pathname + '.'
+                            seed_vars = [n for n in seed_vars if n.startswith(prefix)]
+                            if len(seed_vars) > 1:
+                                raise RuntimeError("Multiple simultaneous seed variables "
+                                                   f"{sorted(seed_vars)} within an FD group are not"
+                                                   " supported under MPI in reverse mode if they "
+                                                   "depend on an group doing finite difference and "
+                                                   "containing distributed constraints/objectives.")
+                        slices = self._dinputs.get_slice_dict()
+                        inarr = self._dinputs.asarray()
+                        data = {}
+                        for inp in self._fd_rev_xfer_correction_dist:
+                            if inp in slices:
+                                arr = inarr[slices[inp]]
+                                if np.any(arr):
+                                    data[inp] = arr
+                                else:
+                                    data[inp] = None
+
+                        if data:
+                            comm = self.comm
+                            myrank = comm.rank
+                            for rank, d in enumerate(comm.allgather(data)):
+                                if rank != myrank:
+                                    for n, val in d.items():
+                                        if val is not None and n in slices:
+                                            inarr[slices[n]] += val
+
         # Apply recursion
         else:
             if mode == 'fwd':
                 self._transfer('linear', mode)
-                if rel_systems is not None:
+                if rel_systems is not None and rel_systems is not _contains_all:
                     for s in self._solver_subsystem_iter(local_only=True):
                         if s.pathname not in rel_systems:
                             # zero out dvecs of irrelevant subsystems
@@ -3830,7 +3848,7 @@ class Group(System):
 
             if mode == 'rev':
                 self._transfer('linear', mode)
-                if rel_systems is not None:
+                if rel_systems is not None and rel_systems is not _contains_all:
                     for s in self._solver_subsystem_iter(local_only=True):
                         if s.pathname not in rel_systems:
                             # zero out dvecs of irrelevant subsystems
@@ -3880,7 +3898,7 @@ class Group(System):
             self._linear_solver._set_matvec_scope(scope_out, scope_in)
             self._linear_solver.solve(mode, rel_systems)
 
-    def _linearize(self, jac, sub_do_ln=True, rel_systems=ContainsAll()):
+    def _linearize(self, jac, sub_do_ln=True, rel_systems=_contains_all):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
@@ -4219,9 +4237,10 @@ class Group(System):
                     elif wrt in local_outs:
                         vec = self._outputs
                     else:
-                        if not total:
-                            continue
-                        vec = None
+                        # ???
+                        # if not total:
+                        #     continue
+                        vec = None  # remote wrt
                     if wrt in approx_wrt_idx:
                         sub_wrt_idx = approx_wrt_idx[wrt]
                         size = sub_wrt_idx.indexed_src_size
@@ -4229,6 +4248,8 @@ class Group(System):
                     else:
                         sub_wrt_idx = _full_slice
                         size = abs2meta[io][wrt][szname]
+                    if vec is None:
+                        sub_wrt_idx = repeat(None, size)
                     end += size
                     dist_sizes = sizes[io][:, toidx[wrt]] if meta['distributed'] else None
                     yield wrt, start, end, vec, sub_wrt_idx, dist_sizes

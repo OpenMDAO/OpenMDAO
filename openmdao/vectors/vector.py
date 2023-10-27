@@ -226,18 +226,23 @@ class Vector(object):
         Yields
         ------
         str
-            Name of each variable.
+            Relative name of each variable.
         ndarray or float
             Value of each variable.
         """
+        if self._system().pathname:
+            plen = len(self._system().pathname) + 1
+        else:
+            plen = 0
+
         if self._under_complex_step:
             for n, v in self._views.items():
                 if n in self._names:
-                    yield n, v
+                    yield n[plen:], v
         else:
             for n, v in self._views.items():
                 if n in self._names:
-                    yield n, v.real
+                    yield n[plen:], v.real
 
     def _name2abs_name(self, name):
         """
@@ -396,6 +401,24 @@ class Vector(object):
             return self._views[name]
         else:
             return self._views[name].real
+
+    def _abs_set_val(self, name, val):
+        """
+        Get the variable value using the absolute name.
+
+        No error checking is performed on the name.
+
+        Parameters
+        ----------
+        name : str
+            Absolute name in the owning system's namespace.
+        val : float or ndarray
+            Value to set.
+        """
+        if self._under_complex_step:
+            self._views[name][:] = val
+        else:
+            self._views[name].real[:] = val
 
     def __setitem__(self, name, value):
         """

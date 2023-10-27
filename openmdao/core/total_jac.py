@@ -11,7 +11,7 @@ import time
 import numpy as np
 
 from openmdao.core.constants import INT_DTYPE
-from openmdao.utils.general_utils import ContainsAll, _src_or_alias_dict, _src_or_alias_name
+from openmdao.utils.general_utils import _contains_all, _src_or_alias_dict, _src_or_alias_name
 
 from openmdao.utils.mpi import MPI, check_mpi_env
 from openmdao.utils.coloring import _initialize_model_approx, Coloring
@@ -29,7 +29,6 @@ if use_mpi is not False:
 elif use_mpi is False:
     PETSc = None
 
-_contains_all = ContainsAll()
 _directional_rng = np.random.default_rng(99)
 
 
@@ -366,12 +365,12 @@ class _TotalJacInfo(object):
             if 'rev' in modes:
                 from openmdao.core.group import Group
 
-                # find all groups doing FD
-                fdgroups = [s.pathname for s in model.system_iter(recurse=True, typ=Group)
-                            if s._owns_approx_jac]
-                allfdgroups = set()
-                for grps in model.comm.allgather(fdgroups):
-                    allfdgroups.update(grps)
+                # # find all groups doing FD
+                # fdgroups = [s.pathname for s in model.system_iter(recurse=True, typ=Group)
+                #             if s._owns_approx_jac]
+                # allfdgroups = set()
+                # for grps in model.comm.allgather(fdgroups):
+                #     allfdgroups.update(grps)
 
                 self.jac_scratch['rev'] = [scratch[0][:J.shape[1]]]
                 if self.simul_coloring is not None:  # when simul coloring, need two scratch arrays
@@ -652,7 +651,6 @@ class _TotalJacInfo(object):
         """
         iproc = self.comm.rank
         model = self.model
-        owning_rank = model._owning_rank
         relevant = model._relevant
         has_par_deriv_color = False
         all_abs2meta_out = model._var_allprocs_abs2meta['output']
@@ -796,21 +794,21 @@ class _TotalJacInfo(object):
                     imeta = defaultdict(bool)
                     imeta['par_deriv_color'] = parallel_deriv_color
                     imeta['idx_list'] = [(start, end)]
-                    imeta['seed_vars'] = [name]
+                    imeta['seed_vars'] = {name}
                     idx_iter_dict[parallel_deriv_color] = (imeta, it)
                 else:
                     imeta = idx_iter_dict[parallel_deriv_color][0]
                     imeta['idx_list'].append((start, end))
-                    imeta['seed_vars'].append(name)
+                    imeta['seed_vars'].add(name)
             elif self.directional:
                 imeta = defaultdict(bool)
                 imeta['idx_list'] = range(start, end)
-                imeta['seed_vars'] = (name,)
+                imeta['seed_vars'] = {name}
                 idx_iter_dict[name] = (imeta, self.directional_iter)
             elif not simul_coloring:  # plain old single index iteration
                 imeta = defaultdict(bool)
                 imeta['idx_list'] = range(start, end)
-                imeta['seed_vars'] = (name,)
+                imeta['seed_vars'] = {name}
                 idx_iter_dict[name] = (imeta, self.single_index_iter)
 
             if path in relevant and not non_rel_outs:
@@ -937,6 +935,7 @@ class _TotalJacInfo(object):
             if (path in abs2idx and path in slices and path not in self.remote_vois):
                 var_idx = abs2idx[path]
                 slc = slices[path]
+                slcsize = slc.stop - slc.start
 
                 if MPI and meta['distributed'] and self.get_remote:
                     if indices is not None:
@@ -950,16 +949,20 @@ class _TotalJacInfo(object):
                         name2jinds.append((path, jac_inds[-1]))
                     else:
                         dist_offset = np.sum(sizes[:myproc, var_idx])
-                        inds.append(np.arange(slc.start, slc.stop, dtype=INT_DTYPE))
+                        inds.append(range(slc.start, slc.stop) if slcsize > 0
+                                    else np.zeros(0, dtype=INT_DTYPE))
                         jac_inds.append(np.arange(jstart + dist_offset,
                                         jstart + dist_offset + sizes[myproc, var_idx],
                                         dtype=INT_DTYPE))
                         name2jinds.append((path, jac_inds[-1]))
                 else:
-                    idx_array = np.arange(slc.start, slc.stop, dtype=INT_DTYPE)
-                    if indices is not None:
-                        idx_array = idx_array[indices.flat()]
-                    inds.append(idx_array)
+                    if indices is None:
+                        sol_inds = range(slc.start, slc.stop) if slcsize > 0 \
+                            else np.zeros(0, dtype=INT_DTYPE)
+                    else:
+                        sol_inds = np.arange(slc.start, slc.stop, dtype=INT_DTYPE)
+                        sol_inds = sol_inds[indices.flat()]
+                    inds.append(sol_inds)
                     jac_inds.append(np.arange(jstart, jstart + sz, dtype=INT_DTYPE))
                     if fwd or not self.get_remote:
                         name2jinds.append((path, jac_inds[-1]))
@@ -1344,9 +1347,11 @@ class _TotalJacInfo(object):
                 if self.jac_scatters[mode] is not None:
                     self.src_petsc[mode].array = self.J[:, i]
                     self.tgt_petsc[mode].array[:] = self.J[:, i]
+                    # print(f"J[:, {i}] before:", self.J[:, i])
                     self.jac_scatters[mode].scatter(self.src_petsc[mode], self.tgt_petsc[mode],
                                                     addv=False, mode=False)
                     self.J[:, i] = self.tgt_petsc[mode].array
+                    # print(f"J[:, {i}] after:", self.J[:, i])
 
         else:  # rev
             if self.get_remote:

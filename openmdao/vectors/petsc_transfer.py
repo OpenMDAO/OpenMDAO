@@ -150,7 +150,72 @@ else:
         def _setup_transfers_rev(group, desvars, responses):
             abs2meta_in = group._var_abs2meta['input']
             abs2meta_out = group._var_abs2meta['output']
+            allprocs_abs2idx = group._var_allprocs_abs2idx
+            allprocs_abs2prom = group._var_allprocs_abs2prom
             myrank = group.comm.rank
+            commsize = group.comm.size
+
+            # for an FD group, we use the relevance graph to determine which inputs on the
+            # boundary of the group are upstream of responses within the group so
+            # that we can perform any necessary corrections to the derivative inputs.
+            if commsize > 1 and group._owns_approx_jac and group.pathname != '':
+                all_abs2meta_out = group._var_allprocs_abs2meta['output']
+                all_abs2meta_in = group._var_allprocs_abs2meta['input']
+                model = group._problem_meta['model_ref']()
+                all_conns = model._conn_global_abs_in2out
+
+                # connections internal to this group
+                conns = group._conn_global_abs_in2out
+                relevant = group._relevant
+
+                inner_srcs = {src for _, src in conns.items() if src in all_abs2meta_out}
+                out_boundary_set = {n for n, m in all_abs2meta_out.items() if not m['distributed']}
+                out_boundary_set = out_boundary_set.difference(inner_srcs)
+                inp_boundary_set = set(all_abs2meta_in).difference(conns)
+
+                boundary_relevance = {}
+                for resp, dvdct in relevant.items():
+                    for dv, tup in dvdct.items():
+                        rel = tup[0]
+                        rel_boundary_ins = inp_boundary_set.intersection(rel['input'])
+                        for out in out_boundary_set.intersection(rel['output']):
+                            if out not in boundary_relevance:
+                                boundary_relevance[out] = set()
+                            boundary_relevance[out].update(rel_boundary_ins)
+
+                external_srcs = {all_conns[inp] for inp in inp_boundary_set}
+
+                dup_dep_inputs = defaultdict(dict)
+
+                for resp, dvdct in relevant.items():
+                    if resp in all_abs2meta_out:  # resp is continuous and inside this group
+                        is_dist_resp = all_abs2meta_out[resp]['distributed']
+                        is_dup_resp = False
+                        if not is_dist_resp and resp in allprocs_abs2idx:
+                            ndups = _get_output_dups(group, resp)
+                            is_dup_resp = ndups > 1
+
+                        for dv, tup in dvdct.items():
+                            # use only dvs outside of this group.
+                            if dv not in allprocs_abs2prom:
+                                rel = tup[0]
+                                if is_dist_resp:
+                                    for inp in inp_boundary_set.intersection(rel['input']):
+                                        if inp in abs2meta_in:
+                                            group._fd_rev_xfer_correction_dist.add(inp)
+                                # elif is_dup_resp:
+                                    # rel_boundary_ins = inp_boundary_set.intersection(rel['input'])
+                                    # for resinp, nnz in dup_ins.items():
+                                    #     if resinp in rel['input']:
+                                    #         for inp in rel_boundary_ins:
+                                    #             if inp in abs2meta_in:
+                                    #                 dup_dep_inputs[inp][resp] = nnz
+
+                group._fd_rev_xfer_correction_dup = dup_dep_inputs
+
+            if group._owns_approx_jac:
+                # FD groups don't need reverse transfers
+                return {}
 
             transfers = group._transfers
             vectors = group._vectors
@@ -166,68 +231,9 @@ else:
             xfer_in_nocolor = defaultdict(list)
             xfer_out_nocolor = defaultdict(list)
 
-            allprocs_abs2idx = group._var_allprocs_abs2idx
             sizes_in = group._var_sizes['input']
             offsets_in = offsets['input']
             offsets_out = offsets['output']
-
-            # for an FD group, we use the relevance graph to determine which inputs on the
-            # boundary of the group are upstream of distributed variables within the group so
-            # that we can perform any necessary allreduce operations on the outputs that
-            # are connected to those inputs.
-            if group._owns_approx_jac and group._has_distrib_vars and group.pathname != '':
-                model = group._problem_meta['model_ref']()
-                relgraph = model._relevance_graph
-                group_path = group.pathname + '.'
-
-                inner_resps = []
-                outer_dvs = []
-                inner_dists = set()
-                for n, data in relgraph.nodes(data=True):
-                    inside = n.startswith(group_path)
-                    if inside:
-                        if 'isresponse' in data and data['isresponse']:
-                            inner_resps.append(n)
-                        if 'dist' in data and data['dist']:
-                            inner_dists.add(n)
-                    else:  # not inside
-                        if 'isdv' in data and data['isdv']:
-                            outer_dvs.append(n)
-
-                if inner_resps and outer_dvs and inner_dists:
-                    # inp_boundary_set is the set of input variables that are connected to sources
-                    # outside of this group. (all group inputs minus group inputs that are connected
-                    # internal to the group)
-                    inp_boundary_set = set(group._var_allprocs_abs2meta['input'])
-                    inp_boundary_set = inp_boundary_set.difference(group._conn_global_abs_in2out)
-
-                    # inp_dep_dist is the set of group boundary inputs that are upstream of
-                    # distributed variables and between an external design var and an internal
-                    # response.
-                    inp_dep_dist = set()
-
-                    relevant = group._relevant
-                    for resp in inner_resps:
-                        for dv in outer_dvs:
-                            rel = relevant[resp][dv][0]
-                            if inner_dists.intersection(rel['input']) or \
-                               inner_dists.intersection(rel['output']):
-                                # dist var is in between the dv and response
-                                if resp in inner_dists:
-                                    inp_dep_dist.update(inp_boundary_set.intersection(rel['input']))
-
-                    # look in model for the connections to the group boundary inputs from outside
-                    # and update the _fd_subgroup_inputs in the group that owns connections to
-                    # those inputs.
-                    for inp in inp_dep_dist:
-                        src = model._conn_global_abs_in2out[inp]
-                        gname = common_subpath((src, inp))
-                        owning_group = model._get_subsystem(gname)
-                        owning_group._fd_subgroup_inputs.add(inp)
-
-            if group._owns_approx_jac:
-                # FD groups don't need reverse transfers
-                return {}
 
             total_size = total_size_nocolor = 0
 
@@ -499,3 +505,15 @@ def _get_output_inds(group, abs_out, abs_in):
             start = end
 
     return output_inds, src_indices
+
+
+def _get_output_dups(group, output):
+    return np.count_nonzero(group._var_sizes['output'][:, group._var_allprocs_abs2idx[output]])
+
+
+def _get_comp_inputs(graph, output):
+    compname = output.rpartition('.')[0]
+    if compname in graph:
+        return list(graph.predecessors(compname))
+    else:  # response will be connected directly to resp component inputs
+        return list(graph.predecessors(output))

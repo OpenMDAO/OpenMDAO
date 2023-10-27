@@ -903,7 +903,7 @@ class TestAutoIVCParDerivBug(unittest.TestCase):
         # from om_devtools.dist_idxs import dump_dist_idxs
         # dump_dist_idxs(prob, full=True)
 
-        assert_check_totals(prob.check_totals(method='cs', show_only_incorrect=True, out_stream=None))
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
 
 
 if __name__ == "__main__":

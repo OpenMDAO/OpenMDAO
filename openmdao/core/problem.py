@@ -24,7 +24,7 @@ from openmdao.core.driver import Driver, record_iteration, SaveOptResult
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.system import System, _OptStatus
 from openmdao.core.group import Group
-from openmdao.core.total_jac import _TotalJacInfo
+from openmdao.core.total_jac import _TotalJacInfo, _contains_all
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.approximation_schemes.complex_step import ComplexStep
@@ -48,7 +48,7 @@ from openmdao.utils.array_utils import scatter_dist_to_local
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
     clear_reports, get_reports_dir, _load_report_plugins
-from openmdao.utils.general_utils import ContainsAll, pad_name, LocalRangeIterable, \
+from openmdao.utils.general_utils import _contains_all, pad_name, LocalRangeIterable, \
     _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
@@ -62,7 +62,6 @@ except ImportError:
 
 from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
-_contains_all = ContainsAll()
 
 CITATION = """@article{openmdao_2019,
     Author={Justin S. Gray and John T. Hwang and Joaquim R. R. A.
@@ -1006,9 +1005,9 @@ class Problem(object):
             'singular_jac_behavior': 'warn',  # How to handle singular jac conditions
             'parallel_deriv_color': None,  # None unless derivatives involving a parallel deriv
                                            # colored dv/response are currently being computed
-            'seed_vars': None,  # list of tuples of the form (seed var names, any_are_distrib).
-                                    # The seed variables are those that are active in the current
-                                    # derivative solve.
+            'seed_vars': None,  # set of names of seed variables. Seed variables are those that
+                                # have their derivative value set to 1.0 at the beginning of the
+                                # current derivative solve.
         }
 
         if _prob_setup_stack:
