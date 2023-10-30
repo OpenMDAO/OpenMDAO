@@ -1008,6 +1008,8 @@ class Problem(object):
             'seed_vars': None,  # set of names of seed variables. Seed variables are those that
                                 # have their derivative value set to 1.0 at the beginning of the
                                 # current derivative solve.
+            'coloring_randgen': None,  # If total coloring is being computed, will contain a random
+                                       # number generator, else None.
         }
 
         if _prob_setup_stack:

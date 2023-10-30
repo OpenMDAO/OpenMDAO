@@ -844,7 +844,7 @@ class _TotalJacInfo(object):
             for ilist in simul_coloring.color_iter(mode):
                 for i in ilist:
                     rel_systems, cache_lin_sol, voiname = idx_map[i]
-                    _update_rel_systems(all_rel_systems, rel_systems)
+                    all_rel_systems = _update_rel_systems(all_rel_systems, rel_systems)
                     cache |= cache_lin_sol
                     all_vois.add(voiname)
 
@@ -1256,7 +1256,7 @@ class _TotalJacInfo(object):
         for i in inds:
             if not dist or self.in_loc_idxs[mode][i] >= 0:
                 rel_systems, vnames, _ = self.single_input_setter(i, imeta, mode)
-                _update_rel_systems(all_rel_systems, rel_systems)
+                all_rel_systems = _update_rel_systems(all_rel_systems, rel_systems)
                 if vnames is not None:
                     vec_names.add(vnames[0])
 
@@ -2064,8 +2064,15 @@ def _update_rel_systems(all_rel_systems, rel_systems):
         Current set of all relevant system names.
     rel_systems : set
         Set of relevant system names for the latest iteration.
+
+    Returns
+    -------
+    set or ContainsAll
+        Updated set of all relevant system names.
     """
     if all_rel_systems is _contains_all or rel_systems is _contains_all:
-        all_rel_systems = _contains_all
-    else:
-        all_rel_systems.update(rel_systems)
+        return _contains_all
+
+    all_rel_systems.update(rel_systems)
+
+    return all_rel_systems

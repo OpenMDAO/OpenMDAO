@@ -9,9 +9,9 @@ from collections import OrderedDict
 import numpy as np
 
 try:
-    import pyDOE2
+    import pyDOE3
 except ImportError:
-    pyDOE2 = None
+    pyDOE3 = None
 
 from openmdao.utils.name_maps import prom_name2abs_name
 
@@ -277,7 +277,7 @@ class UniformGenerator(DOEGenerator):
 
 class _pyDOE_Generator(DOEGenerator):
     """
-    Base class for DOE case generators implementing methods from pyDOE2.
+    Base class for DOE case generators implementing methods from pyDOE3.
 
     Parameters
     ----------
@@ -299,11 +299,11 @@ class _pyDOE_Generator(DOEGenerator):
         """
         Initialize the _pyDOE_Generator.
         """
-        if pyDOE2 is None:
-            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE2' package, "
+        if pyDOE3 is None:
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
-                               "    pip install pyDOE2")
+                               "    pip install pyDOE3")
 
         super().__init__()
         self._levels = levels
@@ -452,7 +452,7 @@ class FullFactorialGenerator(_pyDOE_Generator):
         ndarray
             The design matrix as a size x levels array of indices.
         """
-        return pyDOE2.fullfact(self._get_all_levels())
+        return pyDOE3.fullfact(self._get_all_levels())
 
 
 class GeneralizedSubsetGenerator(_pyDOE_Generator):
@@ -507,7 +507,7 @@ class GeneralizedSubsetGenerator(_pyDOE_Generator):
         ndarray
             The design matrix as a size x levels array of indices.
         """
-        return pyDOE2.gsd(levels=self._get_all_levels(), reduction=self._reduction, n=self._n)
+        return pyDOE3.gsd(levels=self._get_all_levels(), reduction=self._reduction, n=self._n)
 
 
 class PlackettBurmanGenerator(_pyDOE_Generator):
@@ -535,7 +535,7 @@ class PlackettBurmanGenerator(_pyDOE_Generator):
         ndarray
             The design matrix as a size x levels array of indices.
         """
-        doe = pyDOE2.pbdesign(size)
+        doe = pyDOE3.pbdesign(size)
 
         doe[doe < 0] = 0  # replace -1 with zero
 
@@ -583,14 +583,14 @@ class BoxBehnkenGenerator(_pyDOE_Generator):
                                "but must be at least 3 when using %s. " %
                                (size, self.__class__.__name__))
 
-        doe = pyDOE2.bbdesign(size, center=self._center)
+        doe = pyDOE3.bbdesign(size, center=self._center)
 
         return doe + 1  # replace [-1, 0, 1] with [0, 1, 2]
 
 
 class LatinHypercubeGenerator(DOEGenerator):
     """
-    DOE case generator implementing Latin hypercube method via pyDOE2.
+    DOE case generator implementing Latin hypercube method via pyDOE3.
 
     Parameters
     ----------
@@ -673,7 +673,7 @@ class LatinHypercubeGenerator(DOEGenerator):
             self._samples = size
 
         # generate design
-        doe = pyDOE2.lhs(size, samples=self._samples,
+        doe = pyDOE3.lhs(size, samples=self._samples,
                          criterion=self._criterion,
                          iterations=self._iterations,
                          random_state=self._seed)

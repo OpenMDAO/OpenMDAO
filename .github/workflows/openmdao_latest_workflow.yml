@@ -124,7 +124,7 @@ jobs:
           echo "============================================================="
           echo "Install latest versions of 'doe' dependencies"
           echo "============================================================="
-          python -m pip install --upgrade --pre pyDOE2
+          python -m pip install --upgrade --pre pyDOE3
 
           echo "============================================================="
           echo "Install latest versions of 'notebooks' dependencies"

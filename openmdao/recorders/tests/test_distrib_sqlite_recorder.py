@@ -23,9 +23,9 @@ else:
     PETScVector = None
 
 try:
-    import pyDOE2
+    import pyDOE3
 except ImportError:
-    pyDOE2 = None
+    pyDOE3 = None
 
 from openmdao.test_suite.components.paraboloid import Paraboloid
 
@@ -307,7 +307,7 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.run_model()
         prob.record('final')
 
-    @unittest.skipUnless(pyDOE2, "This test uses full factorial from pyDOE2.")
+    @unittest.skipUnless(pyDOE3, "This test uses full factorial from pyDOE3.")
     def test_sql_meta_file_exists(self):
         # Check that an existing sql_meta file will be deleted/overwritten
         # if it already exists before a run. (see Issue #2062)
@@ -364,7 +364,7 @@ class DistributedRecorderTest(unittest.TestCase):
 
         prob.cleanup()
 
-    @unittest.skipUnless(pyDOE2, "This test uses full factorial from pyDOE2.")
+    @unittest.skipUnless(pyDOE3, "This test uses full factorial from pyDOE3.")
     def test_record_on_one_proc(self):
         # This test verifies that cases can be recorded on a single process in an MPI environment
         # with more than one process, and the recorded cases can then be processed in parallel

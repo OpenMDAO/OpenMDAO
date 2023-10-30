@@ -136,6 +136,7 @@ class DictionaryJacobian(Jacobian):
         iflat = d_inputs._abs_get_val
         subjacs_info = self._subjacs_info
         is_explicit = system.is_explicit()
+        randgen = self._randgen
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             for abs_key in self._iter_abs_keys(system):
@@ -162,7 +163,7 @@ class DictionaryJacobian(Jacobian):
 
                 if left_vec is not None and right_vec is not None:
                     subjac_info = subjacs_info[abs_key]
-                    if self._randgen:
+                    if randgen:
                         subjac = self._randomize_subjac(subjac_info['val'], abs_key)
                     else:
                         subjac = subjac_info['val']
