@@ -14,10 +14,10 @@ from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.unit_conv import SrcComp, TgtCompC, TgtCompF, TgtCompK
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
 from openmdao.test_suite.parametric_suite import parametric_suite
-from openmdao.utils.assert_utils import assert_near_equal, assert_warnings, assert_check_partials, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, \
+    assert_check_totals, assert_warnings
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.mpi import MPI
-from openmdao.utils.om_warnings import OMDeprecationWarning
 from openmdao.utils.testing_utils import use_tempdirs
 
 try:
@@ -2607,6 +2607,275 @@ class CheckTotalsIndices(unittest.TestCase):
 
         prob.run_model()
         check = prob.check_totals(compact_print=True)
+
+
+def _setup_inner_par_ivc_direct_conn(size=7):
+    # one IVC feeds two parallel comps, which feed a third comp.  All but the IVC are
+    # in an FD subgroup.
+
+    prob = om.Problem()
+    model = prob.model
+
+    model.add_subsystem('p', om.IndepVarComp('x', np.ones((size, ))))
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+    sub.add_subsystem('C3', om.ExecComp('y = x1 + x2', shape=size))
+
+    model.connect('p.x', 'sub.par.C1.x')
+    model.connect('p.x', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.C3.x1')
+    model.connect('sub.par.C2.y', 'sub.C3.x2')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_objective('sub.C3.y', index=-1)
+
+    sub.approx_totals(method='fd')
+
+    return prob
+
+def _setup_inner_par_2ivcs(size=7):
+    prob = om.Problem()
+    model = prob.model
+
+    model.add_subsystem('p', om.IndepVarComp('x', np.ones((size, ))))
+    model.add_subsystem('p2', om.IndepVarComp('x', np.ones((size, ))))
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+    sub.add_subsystem('C3', om.ExecComp('y = x1 + x2', shape=size))
+
+    model.connect('p.x', 'sub.par.C1.x')
+    model.connect('p2.x', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.C3.x1')
+    model.connect('sub.par.C2.y', 'sub.C3.x2')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_design_var('p2.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_objective('sub.C3.y', index=-1)
+
+    sub.approx_totals(method='cs')
+
+    return prob
+
+def _setup_inner_par_ivc_indirect_conn(size=7):
+    # one IVC feeds an intermediate dup comp, which feeds two parallel comps, which feed a third comp
+    # inside the FD group.
+
+    prob = om.Problem()
+    model = prob.model
+
+    ivc = om.IndepVarComp()
+    ivc.add_output('x', np.ones((size, )))
+
+    model.add_subsystem('p', ivc)
+    model.add_subsystem('dum', om.ExecComp('y = x', shape=size))
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+    sub.add_subsystem('C3', om.ExecComp('y = x1 + x2', shape=size))
+
+    model.connect('p.x', 'dum.x')
+    model.connect('dum.y', 'sub.par.C1.x')
+    model.connect('dum.y', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.C3.x1')
+    model.connect('sub.par.C2.y', 'sub.C3.x2')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_objective('sub.C3.y', index=-1)
+
+    sub.approx_totals(method='fd')
+
+    return prob
+
+def _setup_inner_par_ivc_indirect2_conn(size=7):
+    # one IVC feeds an intermediate dup comp, which feeds two parallel comps, which feed a third comp
+    # inside the FD group.
+
+    prob = om.Problem()
+    model = prob.model
+
+    ivc = om.IndepVarComp()
+    ivc.add_output('x', np.ones((size, )))
+
+    model.add_subsystem('p', ivc)
+    model.add_subsystem('dum', om.ExecComp('y = x', shape=size))
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+    sub.add_subsystem('C3', om.ExecComp('y = x1 + x2', shape=size))
+    model.add_subsystem('C4', om.ExecComp('y = x', shape=size))
+
+    model.connect('p.x', 'dum.x')
+    model.connect('dum.y', 'sub.par.C1.x')
+    model.connect('dum.y', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.C3.x1')
+    model.connect('sub.par.C2.y', 'sub.C3.x2')
+    model.connect('sub.C3.y', 'C4.x')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_objective('C4.y', index=-1)
+
+    sub.approx_totals(method='fd')
+
+    return prob
+
+def _setup_inner_par_2ivc_conn(size=7):
+    # one IVC feeds an intermediate dup comp, which feeds two parallel comps, which feed a third comp
+    # inside the FD group, which feeds another comp outside the FD group.
+
+    prob = om.Problem()
+    model = prob.model
+
+    model.add_subsystem('p', om.IndepVarComp('x', np.ones((size, ))))
+    model.add_subsystem('p2', om.IndepVarComp('x', np.ones((size, ))))
+
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+    sub.add_subsystem('C3', om.ExecComp('y = x1 + x2', shape=size))
+
+    model.connect('p.x', 'sub.par.C1.x')
+    model.connect('p2.x', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.C3.x1')
+    model.connect('sub.par.C2.y', 'sub.C3.x2')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_design_var('p2.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_objective('sub.C3.y', index=-1)
+
+    sub.approx_totals(method='fd')
+
+    return prob
+
+
+def _setup2ivc2par2dup(size=7):
+    # 2 IVCs feed two parallel comps, which feed two duplicated comps
+    prob = om.Problem()
+    model = prob.model
+
+    model.add_subsystem('p', om.IndepVarComp('x', np.ones((size, ))))
+    model.add_subsystem('p2', om.IndepVarComp('x', np.ones((size, ))))
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+    sub.add_subsystem('C3', om.ExecComp('y = x*.5', shape=size))
+    sub.add_subsystem('C4', om.ExecComp('y = x*3.', shape=size))
+
+    model.connect('p.x', 'sub.par.C1.x')
+    model.connect('p2.x', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.C3.x')
+    model.connect('sub.par.C2.y', 'sub.C4.x')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_design_var('p2.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_constraint('sub.C4.y', lower=0.0)
+    model.add_objective('sub.C3.y', index=-1)
+
+    sub.approx_totals(method='fd')
+
+    return prob
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestFDWithParallelSubGroups(unittest.TestCase):
+
+    N_PROCS = 2
+
+
+    def test_group_fd_inner_par_fwd(self):
+        prob = _setup_inner_par_ivc_direct_conn(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd'), atol=3e-6)
+
+    def test_group_fd_inner_par_rev(self):
+        prob = _setup_inner_par_ivc_direct_conn(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        # assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+        assert_check_totals(prob.check_totals(method='fd', show_only_incorrect=True), atol=3e-6)
+
+    def test_group_fd_inner_par2_fwd(self):
+        prob = _setup2ivc2par2dup(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_group_fd_inner_par2_rev(self):
+        prob = _setup2ivc2par2dup(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_group_fd_inner_par2ivcs_fwd(self):
+        prob = _setup_inner_par_2ivcs(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_group_fd_inner_par2ivcs_rev(self):
+        prob = _setup_inner_par_2ivcs(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd'), atol=3e-6)
+
+    def test_group_fd_inner_par_indirect_fwd(self):
+        prob = _setup_inner_par_ivc_indirect_conn(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_group_fd_inner_par_indirect_rev(self):
+        prob = _setup_inner_par_ivc_indirect_conn(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        # assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+        assert_check_totals(prob.check_totals(method='fd', show_only_incorrect=True), atol=3e-6)
+
+    def test_group_inner_par_2ivc_conn_fwd(self):
+        prob = _setup_inner_par_2ivc_conn(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_group_inner_par_2ivc_conn_rev(self):
+        prob = _setup_inner_par_2ivc_conn(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_group_fd_inner_par_indirect2_fwd(self):
+        prob = _setup_inner_par_ivc_indirect2_conn(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_group_fd_inner_par_indirect2_rev(self):
+        prob = _setup_inner_par_ivc_indirect2_conn(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        # assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+        assert_check_totals(prob.check_totals(method='fd', show_only_incorrect=True), atol=3e-6)
+
 
 
 if __name__ == "__main__":
