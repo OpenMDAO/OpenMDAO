@@ -1,4 +1,8 @@
 # .coveragerc to control coverage.py
+
+[run]
+disable_warnings = module-not-measured
+
 [report]
 omit =
     */tests/*

@@ -31,9 +31,9 @@ except ImportError:
     PETScVector = None
 
 try:
-    import pyDOE2
+    import pyDOE3
 except ImportError:
-    pyDOE2 = None
+    pyDOE3 = None
 
 extra_prints = False  # enable printing results
 
@@ -52,28 +52,28 @@ def _test_func_name(func, num, param):
 
 class TestErrors(unittest.TestCase):
 
-    @unittest.skipIf(pyDOE2, "only runs if 'pyDOE2' is not installed")
-    def test_no_pyDOE2(self):
+    @unittest.skipIf(pyDOE3, "only runs if 'pyDOE3' is not installed")
+    def test_no_pyDOE3(self):
         with self.assertRaises(RuntimeError) as err:
             DifferentialEvolution(lambda: 0)
 
         self.assertEqual(str(err.exception),
-                         "DifferentialEvolution requires the 'pyDOE2' package, "
+                         "DifferentialEvolution requires the 'pyDOE3' package, "
                          "which can be installed with one of the following commands:\n"
                          "    pip install openmdao[doe]\n"
-                         "    pip install pyDOE2")
+                         "    pip install pyDOE3")
 
         with self.assertRaises(RuntimeError) as err:
             om.DifferentialEvolutionDriver()
 
         self.assertEqual(str(err.exception),
-                         "DifferentialEvolutionDriver requires the 'pyDOE2' package, "
+                         "DifferentialEvolutionDriver requires the 'pyDOE3' package, "
                          "which can be installed with one of the following commands:\n"
                          "    pip install openmdao[doe]\n"
-                         "    pip install pyDOE2")
+                         "    pip install pyDOE3")
 
 
-@unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
 class TestDifferentialEvolution(unittest.TestCase):
 
     def setUp(self):
@@ -433,7 +433,7 @@ class TestDifferentialEvolution(unittest.TestCase):
             self.assertLessEqual(1.0 - 1e-6, prob["x"][i])
 
 
-@unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
 class TestDriverOptionsDifferentialEvolution(unittest.TestCase):
 
     def setUp(self):
@@ -466,7 +466,7 @@ class TestDriverOptionsDifferentialEvolution(unittest.TestCase):
         self.assertEqual(prob.driver.options['Pc'], 0.0123)
 
 
-@unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
 class TestMultiObjectiveDifferentialEvolution(unittest.TestCase):
 
     def setUp(self):
@@ -579,7 +579,7 @@ class TestMultiObjectiveDifferentialEvolution(unittest.TestCase):
         self.assertGreater(h2, h1)  # top area does not depend on height
 
 
-@unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
 class TestConstrainedDifferentialEvolution(unittest.TestCase):
 
     def setUp(self):
@@ -864,7 +864,7 @@ class TestConstrainedDifferentialEvolution(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-@unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
 class MPITestDifferentialEvolution(unittest.TestCase):
     N_PROCS = 2
 
@@ -914,7 +914,7 @@ class MPITestDifferentialEvolution(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-@unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
 class MPITestDifferentialEvolutionNoSetSeed(unittest.TestCase):
     N_PROCS = 2
 
@@ -1001,7 +1001,7 @@ class Summer(om.ExplicitComponent):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-@unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
 @use_tempdirs
 class MPITestDifferentialEvolution4Procs(unittest.TestCase):
     N_PROCS = 4

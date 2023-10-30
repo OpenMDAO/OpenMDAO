@@ -18,6 +18,7 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
 from openmdao.core.tests.test_check_partials import ParaboloidTricky, MyCompGoodPartials, \
     MyCompBadPartials, DirectionalVectorizedMatFreeComp
 from openmdao.test_suite.scripts.circle_opt import CircleOpt
+from openmdao.core.constants import _UNDEFINED
 
 from openmdao.utils.mpi import MPI
 
@@ -25,6 +26,11 @@ try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
     PETScVector = None
+
+try:
+    from pyoptsparse import Optimization as pyoptsparse_opt
+except ImportError:
+    pyoptsparse_opt = None
 
 
 class DistribParaboloid(om.ExplicitComponent):
@@ -255,9 +261,12 @@ class I2O2JacVec(om.ExplicitComponent):
             if 'out1' in d_outputs:
                 if 'in1' in d_inputs:
                     d_outputs['out1'] += inputs['in2'] * d_inputs['in1']
-                    d_outputs['out2'] += 3. * d_inputs['in1']
                 if 'in2' in d_inputs:
                     d_outputs['out1'] += inputs['in1'] * d_inputs['in2']
+            if 'out2' in d_outputs:
+                if 'in1' in d_inputs:
+                    d_outputs['out2'] += 3. * d_inputs['in1']
+                if 'in2' in d_inputs:
                     d_outputs['out2'] += 5. * d_inputs['in2']
         else:  # rev
             if 'out1' in d_outputs:
@@ -271,6 +280,111 @@ class I2O2JacVec(om.ExplicitComponent):
                 if 'in2' in d_inputs:
                     d_inputs['in2'] += 5. * d_outputs['out2']
 
+
+class Simple(om.ExplicitComponent):
+    """
+    Simple component that counts compute/compute_partials/_solve_linear.
+    """
+
+    def __init__(self, size, **kwargs):
+        super().__init__(**kwargs)
+        self.size = size
+        self.ncomputes = 0
+        self.ncompute_partials = 0
+        self.nsolve_linear = 0
+
+    def setup(self):
+        self.add_input('x', val=np.ones(self.size))
+        self.add_output('y', val=np.ones(self.size))
+
+        rows = np.arange(self.size)
+        self.declare_partials(of=['y'], wrt=['x'], rows=rows, cols=rows)
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = inputs['x'] * 2.0
+        self.ncomputes += 1
+
+    def compute_partials(self, inputs, partials):
+        partials['y', 'x'] = np.ones(self.size) * 2.0
+        self.ncompute_partials += 1
+
+    def _solve_linear(self, mode, rel_systems, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
+        super()._solve_linear(mode, rel_systems, scope_out, scope_in)
+        self.nsolve_linear += 1
+
+
+class SparseJacVec(om.ExplicitComponent):
+    """
+    Simple matrix free component where some of/wrt partials are zero.
+    """
+
+    def __init__(self, size, **kwargs):
+        super().__init__(**kwargs)
+        self.size = size
+
+    def setup(self):
+        self.add_input('in1', val=np.ones(self.size))
+        self.add_input('in2', val=np.ones(self.size))
+        self.add_input('in3', val=np.ones(self.size))
+        self.add_input('in4', val=np.ones(self.size))
+        self.add_output('out1', val=np.ones(self.size))
+        self.add_output('out2', val=np.ones(self.size))
+        self.add_output('out3', val=np.ones(self.size))
+        self.add_output('out4', val=np.ones(self.size))
+
+        # declare partials to improve var sparsity in the full model
+        self.declare_partials(of=['out1', 'out2'], wrt=['in1', 'in2'])
+        self.declare_partials(of=['out3', 'out4'], wrt=['in3', 'in4'])
+
+    def compute(self, inputs, outputs):
+        outputs['out1'] = inputs['in1'] * inputs['in2']
+        outputs['out2'] = 3. * inputs['in1'] + 5. * inputs['in2']
+        outputs['out3'] = inputs['in3'] * inputs['in4']
+        outputs['out4'] = 7. * inputs['in3'] + 9. * inputs['in4']
+
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        if mode == 'fwd':
+            if 'out1' in d_outputs:
+                if 'in1' in d_inputs:
+                    d_outputs['out1'] += inputs['in2'] * d_inputs['in1']
+                if 'in2' in d_inputs:
+                    d_outputs['out1'] += inputs['in1'] * d_inputs['in2']
+            if 'out2' in d_outputs:
+                if 'in1' in d_inputs:
+                    d_outputs['out2'] += 3. * d_inputs['in1']
+                if 'in2' in d_inputs:
+                    d_outputs['out2'] += 5. * d_inputs['in2']
+            if 'out3' in d_outputs:
+                if 'in3' in d_inputs:
+                    d_outputs['out3'] += inputs['in4'] * d_inputs['in3']
+                if 'in4' in d_inputs:
+                    d_outputs['out3'] += inputs['in3'] * d_inputs['in4']
+            if 'out4' in d_outputs:
+                if 'in3' in d_inputs:
+                    d_outputs['out4'] += 7. * d_inputs['in3']
+                if 'in4' in d_inputs:
+                    d_outputs['out4'] += 9. * d_inputs['in4']
+        else:  # rev
+            if 'out1' in d_outputs:
+                if 'in1' in d_inputs:
+                    d_inputs['in1'] += inputs['in2'] * d_outputs['out1']
+                if 'in2' in d_inputs:
+                    d_inputs['in2'] += inputs['in1'] * d_outputs['out1']
+            if 'out2' in d_outputs:
+                if 'in1' in d_inputs:
+                    d_inputs['in1'] += 3. * d_outputs['out2']
+                if 'in2' in d_inputs:
+                    d_inputs['in2'] += 5. * d_outputs['out2']
+            if 'out3' in d_outputs:
+                if 'in3' in d_inputs:
+                    d_inputs['in3'] += inputs['in4'] * d_outputs['out3']
+                if 'in4' in d_inputs:
+                    d_inputs['in4'] += inputs['in3'] * d_outputs['out3']
+            if 'out4' in d_outputs:
+                if 'in3' in d_inputs:
+                    d_inputs['in3'] += 7. * d_outputs['out4']
+                if 'in4' in d_inputs:
+                    d_inputs['in4'] += 9. * d_outputs['out4']
 
 
 class TestProblemCheckTotals(unittest.TestCase):
@@ -1747,6 +1861,177 @@ class TestProblemCheckTotals(unittest.TestCase):
         data = p.check_totals(method='cs', directional=True)
         assert_check_totals(data, atol=1e-6, rtol=1e-6)
 
+    def _build_sparse_model(self, driver, coloring=False):
+        prob = om.Problem()
+        prob.driver = driver
+
+        prob.model.add_subsystem('comp1', Simple(size=5))
+        prob.model.add_subsystem('comp2', Simple(size=5))
+        prob.model.add_subsystem('comp3', Simple(size=5))
+        prob.model.add_subsystem('comp4', Simple(size=5))
+
+        prob.model.add_subsystem('comp', SparseJacVec(size=5))
+
+        prob.model.add_subsystem('comp5', Simple(size=5))
+        prob.model.add_subsystem('comp6', Simple(size=5))
+        prob.model.add_subsystem('comp7', Simple(size=5))
+        prob.model.add_subsystem('comp8', Simple(size=5))
+
+        prob.model.connect('comp1.y', 'comp.in1')
+        prob.model.connect('comp2.y', 'comp.in2')
+        prob.model.connect('comp3.y', 'comp.in3')
+        prob.model.connect('comp4.y', 'comp.in4')
+
+        prob.model.connect('comp.out1', 'comp5.x')
+        prob.model.connect('comp.out2', 'comp6.x')
+        prob.model.connect('comp.out3', 'comp7.x')
+        prob.model.connect('comp.out4', 'comp8.x')
+
+        prob.model.add_design_var('comp1.x', lower=-.5)
+        prob.model.add_design_var('comp2.x', lower=0)
+        prob.model.add_design_var('comp3.x', lower=-1.)
+        prob.model.add_design_var('comp4.x', lower=-5.)
+
+        prob.model.add_constraint('comp5.y', lower=-999., upper=999.)
+        prob.model.add_constraint('comp6.y', lower=-999., upper=999.)
+        prob.model.add_constraint('comp7.y', lower=-999., upper=999.)
+        prob.model.add_objective('comp8.y', index=0)
+
+        if coloring:
+            prob.driver.declare_coloring()
+
+        return prob
+
+    def test_sparse_matfree_fwd(self):
+        prob = self._build_sparse_model(driver=om.ScipyOptimizeDriver())
+        m = prob.model
+        prob.setup(force_alloc_complex=True, mode='fwd')
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+
+        nsolves = [c.nsolve_linear for c in [m.comp5, m.comp6, m.comp7, m.comp8]]
+        # each DV is size 5. each output depends on 2 inputs, so 10 linear solves each.
+        # A 'dense' matfree comp would have resulted in 20 (5 x 4) linear solves each.
+        expected = [10, 10, 10, 10]
+
+        for slv, ex in zip(nsolves, expected):
+            self.assertEqual(slv, ex)
+
+    def test_sparse_matfree_fwd_coloring_scipy(self):
+        prob = self._build_sparse_model(driver=om.ScipyOptimizeDriver(), coloring=True)
+        m = prob.model
+        prob.setup(force_alloc_complex=True, mode='fwd')
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+
+        prob.run_driver()
+
+        # reset lin solve counts
+        for c in  [m.comp5, m.comp6, m.comp7, m.comp8]:
+            c.nsolve_linear = 0
+
+        J = prob.compute_totals()
+
+        nsolves = [c.nsolve_linear for c in [m.comp5, m.comp6, m.comp7, m.comp8]]
+        # Coloring requires 2 linear solves, mixing all dependencies, so each comp gets
+        # 2 linear solves.
+        expected = [2, 2, 2, 2]
+
+        for slv, ex in zip(nsolves, expected):
+            self.assertEqual(slv, ex)
+
+    @unittest.skipIf(pyoptsparse_opt is None, "pyOptSparseDriver is required.")
+    def test_sparse_matfree_fwd_coloring_pyoptsparse(self):
+        prob = self._build_sparse_model(coloring=True, driver=om.pyOptSparseDriver())
+        m = prob.model
+        prob.setup(force_alloc_complex=True, mode='fwd')
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+
+        prob.run_driver()
+
+        # reset lin solve counts
+        for c in  [m.comp5, m.comp6, m.comp7, m.comp8]:
+            c.nsolve_linear = 0
+
+        J = prob.compute_totals()
+
+        nsolves = [c.nsolve_linear for c in [m.comp5, m.comp6, m.comp7, m.comp8]]
+        # Coloring requires 2 linear solves, mixing all dependencies, so each comp gets
+        # 2 linear solves.
+        expected = [2, 2, 2, 2]
+
+        for slv, ex in zip(nsolves, expected):
+            self.assertEqual(slv, ex)
+
+    def test_sparse_matfree_rev(self):
+        prob = self._build_sparse_model(driver=om.ScipyOptimizeDriver())
+        m = prob.model
+        prob.setup(force_alloc_complex=True, mode='rev')
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+
+        nsolves = [c.nsolve_linear for c in [m.comp1, m.comp2, m.comp3, m.comp4]]
+        # 3 constraints of size 5 plus size 1 objective.  First 2 DVs depend on first 2
+        # constraints, so 10 linear solves.  Last 2 DVs depend on 3rd constraint (size 5)
+        # plus objective, so 6 linear solves.
+        # A 'dense' matfree comp would have resulted in 16 ((5 x 3) + 1) linear solves each.
+        expected = [10, 10, 6, 6]
+
+        for slv, ex in zip(nsolves, expected):
+            self.assertEqual(slv, ex)
+
+    def test_sparse_matfree_rev_coloring_scipy(self):
+        prob = self._build_sparse_model(driver=om.ScipyOptimizeDriver(), coloring=True)
+        m = prob.model
+        prob.setup(force_alloc_complex=True, mode='rev')
+        prob.run_model()
+
+        prob.run_driver()  # activates coloring
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+
+        # reset lin solve counts
+        for c in  [m.comp1, m.comp2, m.comp3, m.comp4]:
+            c.nsolve_linear = 0
+
+        J = prob.compute_totals()
+
+        nsolves = [c.nsolve_linear for c in [m.comp1, m.comp2, m.comp3, m.comp4]]
+        # coloring requires 2 rev solves, which combine all dependencies, so each
+        # comp gets 2 linear solves
+        expected = [2, 2, 2, 2]
+
+        for slv, ex in zip(nsolves, expected):
+            self.assertEqual(slv, ex)
+
+    @unittest.skipIf(pyoptsparse_opt is None, "pyOptSparseDriver is required.")
+    def test_sparse_matfree_rev_coloring_pyoptsparse(self):
+        prob = self._build_sparse_model(driver=om.pyOptSparseDriver(), coloring=True)
+        m = prob.model
+        prob.setup(force_alloc_complex=True, mode='rev')
+        prob.run_model()
+
+        prob.run_driver()  # activates coloring
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+
+        # reset lin solve counts
+        for c in  [m.comp1, m.comp2, m.comp3, m.comp4]:
+            c.nsolve_linear = 0
+
+        J = prob.compute_totals()
+
+        nsolves = [c.nsolve_linear for c in [m.comp1, m.comp2, m.comp3, m.comp4]]
+        # coloring requires 2 rev solves, which combine all dependencies, so each
+        # comp gets 2 linear solves
+        expected = [2, 2, 2, 2]
+
+        for slv, ex in zip(nsolves, expected):
+            self.assertEqual(slv, ex)
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestProblemCheckTotalsMPI(unittest.TestCase):
@@ -1815,7 +2100,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 self.assertEqual(contents.count("step"), 0)
                 # check number of rows/cols
                 self.assertEqual(contents.count("+-------------------------------+------------------+-------------+-------------+-------------+-------------+--------------------+"), nsubjacs + 1)
-            
+
     def test_single_cs_step_compact(self):
         for mode in ('fwd', 'rev'):
             with self.subTest(f"{mode} derivatives"):
@@ -1829,7 +2114,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 self.assertEqual(contents.count("step"), 0)
                 # check number of rows/cols
                 self.assertEqual(contents.count("+-------------------------------+------------------+-------------+-------------+-------------+-------------+------------+"), nsubjacs + 1)
-            
+
     def test_multi_fd_steps_fwd(self):
         p = om.Problem(model=CircleOpt(), driver=om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False))
         p.setup(mode='fwd')
@@ -1897,7 +2182,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 self.assertEqual(contents.count("step"), 1)
                 # check number of rows/cols
                 self.assertEqual(contents.count("+-------------------------------+------------------+-------------+-------------+-------------+-------------+-------------+--------------------+"), (nsubjacs*2) + 1)
-            
+
     def test_multi_cs_steps_compact(self):
         for mode in ('fwd', 'rev'):
             with self.subTest(f"{mode} derivatives"):
@@ -1915,7 +2200,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
     def test_multi_fd_steps_compact_directional(self):
         expected_divs = {
             'fwd': ('+----------------------------------------------------------------------------------------+------------------+-------------+-------------+-------------+-------------+-------------+------------+', 7),
-            'rev': ('+-------------------------------+-----------------------------------------+-------------+-------------+-------------+-------------+-------------+------------+', 13), 
+            'rev': ('+-------------------------------+-----------------------------------------+-------------+-------------+-------------+-------------+-------------+------------+', 13),
         }
         for mode in ('fwd', 'rev'):
             with self.subTest(f"{mode} derivatives"):
@@ -1929,7 +2214,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 # check number of rows/cols
                 s, times = expected_divs[mode]
                 self.assertEqual(contents.count(s), times)
-            
+
 
 
 if __name__ == "__main__":

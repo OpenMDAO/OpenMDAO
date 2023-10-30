@@ -242,12 +242,11 @@ class ImplicitComponent(Component):
             d_inputs, d_outputs, d_residuals = vecs
             d_residuals = self._dresiduals_wrapper
 
-            # Jacobian and vectors are all scaled, unitless
-            jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
-
             # if we're not matrix free, we can skip the bottom of
             # this loop because apply_linear does nothing.
             if not self.matrix_free:
+                # Jacobian and vectors are all scaled, unitless
+                jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
                 return
 
             # Jacobian and vectors are all unscaled, dimensional
@@ -322,8 +321,9 @@ class ImplicitComponent(Component):
                                        self._discrete_inputs, self._discrete_outputs)
                     else:
                         self.linearize(self._inputs, self._outputs, self._jac_wrapper)
-                    self.comm.bcast(list(self._jacobian.items()), root=0)
-                else:
+                    if self._jacobian is not None:
+                        self.comm.bcast(list(self._jacobian.items()), root=0)
+                elif self._jacobian is not None:
                     for key, val in self.comm.bcast(None, root=0):
                         self._jac_wrapper[key] = val
             else:
@@ -462,26 +462,6 @@ class ImplicitComponent(Component):
         super()._reset_setup_vars()
         self._declared_residuals = {}
         self._resid2out_subjac_map = {}
-
-    def _setup_procs(self, pathname, comm, mode, prob_meta):
-        """
-        Execute first phase of the setup process.
-
-        Distribute processors, assign pathnames, and call setup on the component.
-
-        Parameters
-        ----------
-        pathname : str
-            Global name of the system, including the path.
-        comm : MPI.Comm or <FakeComm>
-            MPI communicator object.
-        mode : str
-            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
-            reverse (adjoint). Default is 'rev'.
-        prob_meta : dict
-            Problem level metadata.
-        """
-        super()._setup_procs(pathname, comm, mode, prob_meta)
 
     def _resid_name_shape_iter(self):
         for name, meta in self._declared_residuals.items():
