@@ -324,7 +324,7 @@ jobs:
           status: 'warning'
           message: |
             Environment change detected on `Latest` build.
-            Python, NumPy or SciPy was not the requested version, probably due to Conda/PETSc.
+            Python, NumPy or SciPy was not the requested version:
             ```${{steps.env_info.outputs.errors}}```
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
