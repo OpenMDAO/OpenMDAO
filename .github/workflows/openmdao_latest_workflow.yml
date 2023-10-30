@@ -3,9 +3,9 @@ name: OpenMDAO Latest
 
 on:
 
-  # Run the workflow daily at 0400 UTC
+  # Run the workflow Monday, Wednesday and Friday at 0400 UTC
   schedule:
-    - cron: '0 4 * * *'
+    - cron: '0 4 * * 1,3,5'
 
   # Allow running the workflow manually from the Actions tab
   workflow_dispatch:
