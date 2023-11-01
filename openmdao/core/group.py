@@ -197,10 +197,6 @@ class Group(System):
         this is the set of inputs to those subgroups that are upstream of a distributed response
         within the same subgroup.  These determine if an allreduce is necessary when transferring
         data to a connected output in reverse mode.
-    _fd_rev_xfer_correction_dup : dict
-        If one or more subgroups of this group is using finite difference to compute derivatives,
-        this is the set of inputs to those subgroups that are upstream of a duplicated response
-        within the same subgroup.
     """
 
     def __init__(self, **kwargs):
@@ -232,7 +228,6 @@ class Group(System):
         self._abs_responses = None
         self._relevance_graph = None
         self._fd_rev_xfer_correction_dist = set()
-        self._fd_rev_xfer_correction_dup = {}
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -1326,7 +1321,6 @@ class Group(System):
             self._setup_partials()
 
         self._fd_rev_xfer_correction_dist = set()
-        self._fd_rev_xfer_correction_dup = {}
 
         self._problem_meta['relevant'] = self._init_relevance(mode)
 
@@ -3794,7 +3788,7 @@ class Group(System):
                 # _fd_rev_xfer_correction_dist is used to correct for the fact that we don't
                 # do reverse transfers internal to an FD group.  Reverse transfers
                 # are constructed such that derivative values are correct when transferred into
-                # system output variables, taking into account distributed inputs.
+                # system doutput variables, taking into account distributed inputs.
                 # Since the transfers are not correcting for those issues, we need to do it here.
 
                 # If we have a distributed constraint/obj within the FD group,
@@ -4104,12 +4098,13 @@ class Group(System):
             of -= ivc
 
         for key in product(of, wrt.union(of)):
+            _of, _wrt = key
+
             # Create approximations for the ones we need.
             if self._tot_jac is not None:
                 yield key  # get all combos if we're doing total derivs
                 continue
 
-            _of, _wrt = key
             # Skip explicit res wrt outputs
             if _wrt in of and _wrt not in ivc:
 
@@ -4306,6 +4301,9 @@ class Group(System):
 
         abs2meta = self._var_allprocs_abs2meta
         info = self._coloring_info
+        total = self.pathname == ''
+        nprocs = self.comm.size
+
         responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
 
         if info['coloring'] is not None and (self._owns_approx_of is None or
@@ -4321,13 +4319,32 @@ class Group(System):
         approx._wrt_meta = {}
         approx._reset()
 
+        sizes_out = self._var_sizes['output']
+        sizes_in = self._var_sizes['input']
+        abs2idx = self._var_allprocs_abs2idx
+
+        self._cross_keys = set()
         approx_keys = self._get_approx_subjac_keys()
         for key in approx_keys:
             left, right = key
-            if left in responses and responses[left]['alias'] is not None:
-                left = responses[left]['source']
-            if right in responses and responses[right]['alias'] is not None:
-                right = responses[right]['source']
+            if total:
+                if left in responses and responses[left]['alias'] is not None:
+                    left = responses[left]['source']
+                if right in responses and responses[right]['alias'] is not None:
+                    right = responses[right]['source']
+            elif nprocs > 1:
+                sout = sizes_out[:, abs2idx[left]]
+                sin = sizes_in[:, abs2idx[right]]
+                if np.count_nonzero(sout[sin == 0]) > 0 and np.count_nonzero(sin[sout == 0]) > 0:
+                    # we have of and wrt that exist on different procs. Now see if they're relevant
+                    # to each other
+                    for rel in self._relevant.values():
+                        relins = rel['@all'][0]['input']
+                        relouts = rel['@all'][0]['output']
+                        if left in relouts:
+                            if right in relins or right in relouts:
+                                self._cross_keys.add(key)
+                                break
 
             if key in self._subjacs_info:
                 meta = self._subjacs_info[key]
@@ -4363,7 +4380,7 @@ class Group(System):
 
             approx.add_approximation(key, self, meta)
 
-        if self.pathname:
+        if not total:
             abs_outs = self._var_allprocs_abs2meta['output']
             abs_ins = self._var_allprocs_abs2meta['input']
             # we're taking semi-total derivs for this group. Update _owns_approx_of

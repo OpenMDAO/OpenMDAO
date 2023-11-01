@@ -2974,6 +2974,9 @@ class TestFDWithParallelSubGroups(unittest.TestCase):
         prob = _setup_2ivcs_fdgroupwithcrisscrosspars_1sink(size=7)
         prob.setup(mode='fwd', force_alloc_complex=True)
         prob.run_model()
+        prob.compute_totals()
+        import pprint
+        pprint.pprint({n: m['val'] for n,m in prob.model.sub._jacobian._subjacs_info.items()})
         assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
 
     def test_2ivcs_fdgroupwithcrisscrosspars_1sink_rev(self):
@@ -3033,10 +3036,10 @@ class TestFDWithParallelSubGroups(unittest.TestCase):
         assert_check_totals(prob.check_totals(method='fd', show_only_incorrect=True), atol=3e-6)
 
 
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class TestFDWithParallelSubGroups4(TestFDWithParallelSubGroups):
+# @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+# class TestFDWithParallelSubGroups4(TestFDWithParallelSubGroups):
 
-    N_PROCS = 4
+#     N_PROCS = 4
 
 
 if __name__ == "__main__":

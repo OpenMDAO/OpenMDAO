@@ -97,8 +97,8 @@ class DictionaryJacobian(Jacobian):
                                 if ofsz and wrtsz:
                                     owner_dict[key] = rank
                                     break
-                            else:  # no rank was found where both were local...
-                                owner_dict[key] = None
+                            else:  # no rank was found where both were local. Use 'of' local rank
+                                owner_dict[key] = np.min(np.nonzero(ofsizes)[0])
 
                 self._key_owner = owner_dict
             else:
@@ -161,6 +161,13 @@ class DictionaryJacobian(Jacobian):
                     left_vec = wrtvec
                     right_vec = ofvec
 
+                if abs_key in self._key_owner and abs_key in system._cross_keys:
+                    wrtowner = system._owning_rank[other_name]
+                    if system.comm.rank == wrtowner:
+                        system.comm.bcast(right_vec, root=wrtowner)
+                    else:
+                        right_vec = system.comm.bcast(None, root=wrtowner)
+
                 if left_vec is not None and right_vec is not None:
                     subjac_info = subjacs_info[abs_key]
                     if randgen:
@@ -195,17 +202,23 @@ class DictionaryJacobian(Jacobian):
                             left_vec += subjac.dot(right_vec)
                             # print("dinputs AFTER:", left_vec)
 
-                hasremote = fwd and abs_key in self._key_owner
+                hasremote = abs_key in self._key_owner
                 if hasremote:
-                    if fwd:
+                    if True:  # fwd:
                         owner = self._key_owner[abs_key]
                         if owner == system.comm.rank:
                             # print("SENDING", left_vec, "from", owner, abs_key)
                             system.comm.bcast(left_vec, root=owner)
                         elif owner is not None:
                             left_vec = system.comm.bcast(None, root=owner)
-                            if res_name in d_res_names:
-                                d_residuals._abs_set_val(res_name, left_vec)
+                            if fwd:
+                                if res_name in d_res_names:
+                                    d_residuals._abs_set_val(res_name, left_vec)
+                            else:  # rev
+                                if other_name in d_out_names:
+                                    d_outputs._abs_set_val(other_name, left_vec)
+                                elif other_name in d_inp_names:
+                                    d_inputs._abs_set_val(other_name, left_vec)
                             # print("RECEIVED", left_vec, "from", owner, abs_key)
 
 

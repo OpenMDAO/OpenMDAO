@@ -161,39 +161,16 @@ else:
             if commsize > 1 and group._owns_approx_jac and group.pathname != '':
                 all_abs2meta_out = group._var_allprocs_abs2meta['output']
                 all_abs2meta_in = group._var_allprocs_abs2meta['input']
-                model = group._problem_meta['model_ref']()
-                all_conns = model._conn_global_abs_in2out
 
                 # connections internal to this group
                 conns = group._conn_global_abs_in2out
                 relevant = group._relevant
 
-                inner_srcs = {src for _, src in conns.items() if src in all_abs2meta_out}
-                out_boundary_set = {n for n, m in all_abs2meta_out.items() if not m['distributed']}
-                out_boundary_set = out_boundary_set.difference(inner_srcs)
                 inp_boundary_set = set(all_abs2meta_in).difference(conns)
-
-                boundary_relevance = {}
-                for resp, dvdct in relevant.items():
-                    for dv, tup in dvdct.items():
-                        rel = tup[0]
-                        rel_boundary_ins = inp_boundary_set.intersection(rel['input'])
-                        for out in out_boundary_set.intersection(rel['output']):
-                            if out not in boundary_relevance:
-                                boundary_relevance[out] = set()
-                            boundary_relevance[out].update(rel_boundary_ins)
-
-                external_srcs = {all_conns[inp] for inp in inp_boundary_set}
-
-                dup_dep_inputs = defaultdict(dict)
 
                 for resp, dvdct in relevant.items():
                     if resp in all_abs2meta_out:  # resp is continuous and inside this group
                         is_dist_resp = all_abs2meta_out[resp]['distributed']
-                        is_dup_resp = False
-                        if not is_dist_resp and resp in allprocs_abs2idx:
-                            ndups = _get_output_dups(group, resp)
-                            is_dup_resp = ndups > 1
 
                         for dv, tup in dvdct.items():
                             # use only dvs outside of this group.
@@ -203,15 +180,6 @@ else:
                                     for inp in inp_boundary_set.intersection(rel['input']):
                                         if inp in abs2meta_in:
                                             group._fd_rev_xfer_correction_dist.add(inp)
-                                # elif is_dup_resp:
-                                    # rel_boundary_ins = inp_boundary_set.intersection(rel['input'])
-                                    # for resinp, nnz in dup_ins.items():
-                                    #     if resinp in rel['input']:
-                                    #         for inp in rel_boundary_ins:
-                                    #             if inp in abs2meta_in:
-                                    #                 dup_dep_inputs[inp][resp] = nnz
-
-                group._fd_rev_xfer_correction_dup = dup_dep_inputs
 
             if group._owns_approx_jac:
                 # FD groups don't need reverse transfers
