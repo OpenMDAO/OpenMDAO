@@ -150,41 +150,40 @@ else:
         def _setup_transfers_rev(group, desvars, responses):
             abs2meta_in = group._var_abs2meta['input']
             abs2meta_out = group._var_abs2meta['output']
-            allprocs_abs2idx = group._var_allprocs_abs2idx
             allprocs_abs2prom = group._var_allprocs_abs2prom
-            myrank = group.comm.rank
-            commsize = group.comm.size
 
             # for an FD group, we use the relevance graph to determine which inputs on the
             # boundary of the group are upstream of responses within the group so
             # that we can perform any necessary corrections to the derivative inputs.
-            if commsize > 1 and group._owns_approx_jac and group.pathname != '':
-                all_abs2meta_out = group._var_allprocs_abs2meta['output']
-                all_abs2meta_in = group._var_allprocs_abs2meta['input']
-
-                # connections internal to this group
-                conns = group._conn_global_abs_in2out
-                relevant = group._relevant
-
-                inp_boundary_set = set(all_abs2meta_in).difference(conns)
-
-                for resp, dvdct in relevant.items():
-                    if resp in all_abs2meta_out:  # resp is continuous and inside this group
-                        is_dist_resp = all_abs2meta_out[resp]['distributed']
-
-                        for dv, tup in dvdct.items():
-                            # use only dvs outside of this group.
-                            if dv not in allprocs_abs2prom:
-                                rel = tup[0]
-                                if is_dist_resp:
-                                    for inp in inp_boundary_set.intersection(rel['input']):
-                                        if inp in abs2meta_in:
-                                            group._fd_rev_xfer_correction_dist.add(inp)
-
             if group._owns_approx_jac:
+                if group.comm.size > 1 and group.pathname != '':
+                    all_abs2meta_out = group._var_allprocs_abs2meta['output']
+                    all_abs2meta_in = group._var_allprocs_abs2meta['input']
+
+                    # connections internal to this group
+                    conns = group._conn_global_abs_in2out
+                    relevant = group._relevant
+
+                    inp_boundary_set = set(all_abs2meta_in).difference(conns)
+
+                    for resp, dvdct in relevant.items():
+                        if resp in all_abs2meta_out:  # resp is continuous and inside this group
+                            is_dist_resp = all_abs2meta_out[resp]['distributed']
+
+                            for dv, tup in dvdct.items():
+                                # use only dvs outside of this group.
+                                if dv not in allprocs_abs2prom:
+                                    rel = tup[0]
+                                    if is_dist_resp:
+                                        for inp in inp_boundary_set.intersection(rel['input']):
+                                            if inp in abs2meta_in:
+                                                group._fd_rev_xfer_correction_dist.add(inp)
+
                 # FD groups don't need reverse transfers
                 return {}
 
+            myrank = group.comm.rank
+            allprocs_abs2idx = group._var_allprocs_abs2idx
             transfers = group._transfers
             vectors = group._vectors
             offsets = group._get_var_offsets()
