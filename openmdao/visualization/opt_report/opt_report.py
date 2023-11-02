@@ -130,7 +130,7 @@ def opt_report(prob, outfile=None):
 
     driver_scaling = True
 
-    get_prom_name = prob.model.get_prom_name
+    get_prom_name = prob.model._get_prom_name
 
     # Collect the entire array of array valued desvars and constraints (ignore indices)
     objs_vals = {}
