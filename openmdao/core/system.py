@@ -5597,8 +5597,7 @@ class System(object):
                                            "`get_val(<name>, get_remote=True)`.")
                 else:
                     if src_indices._flat_src:
-                        sinds = src_indices.flat()
-                        val = val.ravel()[sinds]
+                        val = val.ravel()[src_indices.flat()]
                         # if at component level, just keep shape of the target and don't flatten
                         if not flat and not is_prom:
                             shp = vmeta['shape']

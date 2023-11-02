@@ -993,11 +993,6 @@ class TestDriverMPI(unittest.TestCase):
 
                 outputs['y'] = np.sum(y_g) + (inputs['w']-10)**2
                 outputs['z'] = x**2
-                print('-------------')
-                print(self.comm.rank, 'x', x)
-                print(self.comm.rank, 'w', inputs['w'])
-                print(self.comm.rank, 'y', outputs['y'])
-                print(self.comm.rank, 'z', outputs['z'])
 
             def compute_partials(self, inputs, J):
                 x = inputs['x']
@@ -1014,10 +1009,12 @@ class TestDriverMPI(unittest.TestCase):
                                     promotes=['*'])
         d_ivc.add_output('x', 2*np.ones(size))
 
-        # distributed indep var, 'w'
+        # non-distributed indep var, 'w'
         ivc = model.add_subsystem('ivc', om.IndepVarComp(distributed=False),
                                   promotes=['*'])
-        ivc.add_output('w')
+        # previous version of this test set w to 2 different values depending on rank, which
+        # is not valid for a non-distributed variable.  Changed to be the same on all procs.
+        ivc.add_output('w', 3.0)
 
         # distributed component, 'dc'
         model.add_subsystem('dc', DistribComp(), promotes=['*'])
@@ -1030,7 +1027,6 @@ class TestDriverMPI(unittest.TestCase):
         driver.supports._read_only = False
         driver.supports['distributed_design_vars'] = True
 
-        # run model
         p.setup()
         p.run_model()
 
@@ -1058,10 +1054,9 @@ class TestDriverMPI(unittest.TestCase):
         assert_near_equal(driver.get_design_var_values(get_remote=True)['d_ivc.x'],
                           [5, 5, 5, 9, 9])
 
-        # run driver
         p.run_driver()
 
-        assert_near_equal(p.get_val('dc.y', get_remote=True), [113, 113])
+        assert_near_equal(p.get_val('dc.y', get_remote=True), [81, 81])
         assert_near_equal(p.get_val('dc.z', get_remote=True), [25, 25, 25, 81, 81])
 
     def test_distrib_desvar_bug(self):

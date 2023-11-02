@@ -815,12 +815,12 @@ class MPITests2(unittest.TestCase):
                           promotes_inputs=['*'])
 
         sub.add_subsystem("parab", DistParab(arr_size=size), promotes_outputs=['*'], promotes_inputs=['a'])
-        model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
+        sub.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                              f_sum=np.ones((size, )),
                                              f_xy=np.ones((size, ))),
                           promotes_outputs=['*'])
 
-        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
+        sub.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         sub.connect('dummy.xd', 'parab.x')
         sub.connect('dummy.yd', 'parab.y')
@@ -1240,35 +1240,13 @@ class MPITests2(unittest.TestCase):
         model.add_constraint('ndp2.g', lower=0.0)
         model.add_objective('f_sum', index=-1)
 
-        mode_idx = {'fwd': 0, 'rev': 1}
         for mode in ['fwd', 'rev']:
             prob.setup(mode=mode, force_alloc_complex=True)
 
             prob.run_model()
 
-            J = prob.check_totals(method='cs', show_only_incorrect=True)
-            assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][mode_idx[mode]], 0.0, 1e-5)
-            assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][mode_idx[mode]], 0.0, 1e-5)
-            assert_near_equal(J['ndp.g', 'p.x']['abs error'][mode_idx[mode]], 0.0, 2e-5)
-            assert_near_equal(J['ndp.g', 'p.y']['abs error'][mode_idx[mode]], 0.0, 2e-5)
-            assert_near_equal(J['parab2.f_xy', 'p.x2']['abs error'][mode_idx[mode]], 0.0, 1e-5)
-            assert_near_equal(J['parab2.f_xy', 'p.y2']['abs error'][mode_idx[mode]], 0.0, 1e-5)
-            assert_near_equal(J['ndp2.g', 'p.x2']['abs error'][mode_idx[mode]], 0.0, 2e-5)
-            assert_near_equal(J['ndp2.g', 'p.y2']['abs error'][mode_idx[mode]], 0.0, 2e-5)
-            assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][mode_idx[mode]], 0.0, 1e-5)
-            assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][mode_idx[mode]], 0.0, 1e-5)
-
-            J = prob.check_totals(method='cs', show_only_incorrect=True)
-            assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][mode_idx[mode]], 0.0, 1e-14)
-            assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][mode_idx[mode]], 0.0, 1e-14)
-            assert_near_equal(J['ndp.g', 'p.x']['abs error'][mode_idx[mode]], 0.0, 1e-13)
-            assert_near_equal(J['ndp.g', 'p.y']['abs error'][mode_idx[mode]], 0.0, 1e-13)
-            assert_near_equal(J['parab2.f_xy', 'p.x2']['abs error'][mode_idx[mode]], 0.0, 1e-14)
-            assert_near_equal(J['parab2.f_xy', 'p.y2']['abs error'][mode_idx[mode]], 0.0, 1e-14)
-            assert_near_equal(J['ndp2.g', 'p.x2']['abs error'][mode_idx[mode]], 0.0, 1e-13)
-            assert_near_equal(J['ndp2.g', 'p.y2']['abs error'][mode_idx[mode]], 0.0, 1e-13)
-            assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][mode_idx[mode]], 0.0, 1e-14)
-            assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][mode_idx[mode]], 0.0, 1e-14)
+            assert_check_totals(prob.check_totals(method='fd', out_stream=None))
+            assert_check_totals(prob.check_totals(method='cs', out_stream=None), rtol=1e-14)
 
     def run_mixed_distrib2_prob(self, mode, klass=MixedDistrib2):
         size = 5
@@ -2680,7 +2658,6 @@ class TestDistribBugs(unittest.TestCase):
         prob.setup(mode='rev')
 
         prob.run_model()
-        # This check totals fails, some of the derivative terms from proc 2 are missing
         assert_check_totals(prob.check_totals("ParallelSum.sum", "ivc.x"))
 
 if __name__ == "__main__":

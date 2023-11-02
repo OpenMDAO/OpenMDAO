@@ -3036,10 +3036,10 @@ class TestFDWithParallelSubGroups(unittest.TestCase):
         assert_check_totals(prob.check_totals(method='fd', show_only_incorrect=True), atol=3e-6)
 
 
-# @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-# class TestFDWithParallelSubGroups4(TestFDWithParallelSubGroups):
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestFDWithParallelSubGroups4(TestFDWithParallelSubGroups):
 
-#     N_PROCS = 4
+    N_PROCS = 4
 
 
 if __name__ == "__main__":

@@ -8,7 +8,6 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE, _UNDEFINED
-from openmdao.utils.mpi import MPI
 
 
 class ExplicitComponent(Component):

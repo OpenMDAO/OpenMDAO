@@ -222,9 +222,9 @@ class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
         assert_near_equal(prob['c4.y1'], 46.0, 1e-6)
         assert_near_equal(prob['c4.y2'], -93.0, 1e-6)
 
-        #J = prob.compute_totals(of=unknown_list, wrt=indep_list)
-        #for key, val in full_expected.items():
-            #assert_near_equal(J[key], val, 1e-6)
+        J = prob.compute_totals(of=unknown_list, wrt=indep_list)
+        for key, val in full_expected.items():
+            assert_near_equal(J[key], val, 1e-6)
 
         reduced_expected = {key: v for key, v in full_expected.items() if key[0] in prob.model._var_abs2meta['output']}
 

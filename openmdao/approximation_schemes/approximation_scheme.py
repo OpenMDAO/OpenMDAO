@@ -272,15 +272,6 @@ class ApproximationScheme(object):
                             in_idx = [list(in_idx)]
                             vec_idx = [vec_idx]
                 else:
-                    # if vec is None:  # remote wrt
-                    #     if wrt in abs2meta['input']:
-                    #         vec_idx = range(abs2meta['input'][wrt]['global_size'])
-                    #     else:
-                    #         vec_idx = range(abs2meta['output'][wrt]['global_size'])
-                    # else:
-                    #     vec_idx = LocalRangeIterable(system, wrt)
-                    #     if directional:
-                    #         vec_idx = [v for v in vec_idx if v is not None]
                     vec_idx = LocalRangeIterable(system, wrt)
                     if directional and vec is not None:
                         vec_idx = [v for v in vec_idx if v is not None]

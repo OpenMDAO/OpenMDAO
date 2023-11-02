@@ -885,6 +885,10 @@ class Group(System):
         those variables are connected to other variables based on the connections
         in the model.
 
+        This results in a smaller graph (fewer edges) than would be the case for a pure variable
+        graph where all inputs to a particular component would have to be connected to all outputs
+        from that component.
+
         Parameters
         ----------
         connections : dict
@@ -895,10 +899,6 @@ class Group(System):
         networkx.DiGraph
             Graph of all variables and components in the model.
         """
-        # Create a hybrid graph with components and all connected vars.  If a var is connected,
-        # also connect it to its corresponding component.  This results in a smaller graph
-        # (fewer edges) than would be the case for a pure variable graph where all inputs
-        # to a particular component would have to be connected to all outputs from that component.
         graph = nx.DiGraph()
         tgtmeta = self._var_allprocs_abs2meta['input']
         srcmeta = self._var_allprocs_abs2meta['output']
@@ -913,9 +913,11 @@ class Group(System):
             graph.add_node(tgt, type_='in', dist=dist,
                            isdv=False, isresponse=False)
 
+            # create edges to/from the component
             graph.add_edge(src.rpartition('.')[0], src)
             graph.add_edge(tgt, tgt.rpartition('.')[0])
 
+            # connect the variables src and tgt
             graph.add_edge(src, tgt)
 
         return graph
@@ -1584,12 +1586,12 @@ class Group(System):
 
     def _check_nondist_sizes(self):
         # verify that nondistributed variables have same size across all procs
+        abs2idx = self._var_allprocs_abs2idx
         for io in ('input', 'output'):
             sizes = self._var_sizes[io]
-            idxs = self._var_allprocs_abs2idx
             for abs_name, meta in self._var_allprocs_abs2meta[io].items():
                 if not meta['distributed']:
-                    vsizes = sizes[:, idxs[abs_name]]
+                    vsizes = sizes[:, abs2idx[abs_name]]
                     unique = set(vsizes)
                     unique.discard(0)
                     if len(unique) > 1:
@@ -3037,8 +3039,6 @@ class Group(System):
         # either owned by (implicit) or declared by (explicit) this Group.
         # This way, we don't repeat the error checking in multiple groups.
 
-        self._dist_in_sources = defaultdict(list)
-
         for abs_in, abs_out in abs_in2out.items():
             all_meta_out = allprocs_abs2meta_out[abs_out]
             all_meta_in = allprocs_abs2meta_in[abs_in]
@@ -3076,8 +3076,6 @@ class Group(System):
                 # get input shape and src_indices from the local meta dict
                 # (input is always local)
                 if meta_in['distributed']:
-                    self._dist_in_sources[abs_out].append(abs_in)
-
                     # if output is non-distributed and input is distributed, make output shape the
                     # full distributed shape, i.e., treat it in this regard as a distributed output
                     out_shape = self._get_full_dist_shape(abs_out, all_meta_out['shape'])
@@ -4098,13 +4096,12 @@ class Group(System):
             of -= ivc
 
         for key in product(of, wrt.union(of)):
-            _of, _wrt = key
-
             # Create approximations for the ones we need.
             if self._tot_jac is not None:
                 yield key  # get all combos if we're doing total derivs
                 continue
 
+            _of, _wrt = key
             # Skip explicit res wrt outputs
             if _wrt in of and _wrt not in ivc:
 
@@ -4232,9 +4229,6 @@ class Group(System):
                     elif wrt in local_outs:
                         vec = self._outputs
                     else:
-                        # ???
-                        # if not total:
-                        #     continue
                         vec = None  # remote wrt
                     if wrt in approx_wrt_idx:
                         sub_wrt_idx = approx_wrt_idx[wrt]
@@ -4332,7 +4326,7 @@ class Group(System):
                     left = responses[left]['source']
                 if right in responses and responses[right]['alias'] is not None:
                     right = responses[right]['source']
-            elif nprocs > 1:
+            elif nprocs > 1 and self._has_fd_group:
                 sout = sizes_out[:, abs2idx[left]]
                 sin = sizes_in[:, abs2idx[right]]
                 if np.count_nonzero(sout[sin == 0]) > 0 and np.count_nonzero(sin[sout == 0]) > 0:
