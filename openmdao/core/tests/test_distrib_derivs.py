@@ -787,11 +787,9 @@ class MPITests2(unittest.TestCase):
         assert_near_equal(J['sum.f_sum', 'p.x']['abs error'].reverse, 0.0, 1e-5)
         assert_near_equal(J['sum.f_sum', 'p.y']['abs error'].reverse, 0.0, 1e-5)
 
-    def test_distrib_voi_group_fd(self):
+    def _setup_distrib_voi_group_fd(self, mode, size=7):
         # Only supports groups where the inputs to the distributed component whose inputs are
         # distributed to procs via src_indices don't cross the boundary.
-        size = 7
-
         prob = om.Problem()
         model = prob.model
 
@@ -829,10 +827,15 @@ class MPITests2(unittest.TestCase):
 
         sub.approx_totals(method='fd')
 
-        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.setup(mode=mode, force_alloc_complex=True)
 
         prob.run_model()
 
+        return prob
+
+    def test_distrib_voi_group_fd_fwd(self):
+        size = 7
+        prob = self._setup_distrib_voi_group_fd('fwd', size)
         desvar = prob.driver.get_design_var_values()
         con = prob.driver.get_constraint_values()
 
@@ -843,12 +846,9 @@ class MPITests2(unittest.TestCase):
 
         assert_check_totals(prob.check_totals(method='fd', out_stream=None), rtol=1e-5)
 
-        # rev mode
-
-        prob.setup(mode='rev', force_alloc_complex=True)
-
-        prob.run_model()
-
+    def test_distrib_voi_group_fd_rev(self):
+        size = 7
+        prob = self._setup_distrib_voi_group_fd('rev', size)
         desvar = prob.driver.get_design_var_values()
         con = prob.driver.get_constraint_values()
 
