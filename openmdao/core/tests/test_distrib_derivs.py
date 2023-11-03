@@ -793,11 +793,10 @@ class MPITests2(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        ivc = om.IndepVarComp()
+        ivc = model.add_subsystem('p', om.IndepVarComp(), promotes=['*'])
         ivc.add_output('x', np.ones((size, )))
         ivc.add_output('y', np.ones((size, )))
 
-        model.add_subsystem('p', ivc, promotes=['*'])
         sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
 
         ivc2 = om.IndepVarComp()

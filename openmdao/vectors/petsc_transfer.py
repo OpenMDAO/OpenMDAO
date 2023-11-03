@@ -166,16 +166,16 @@ else:
 
                     for resp, dvdct in group._relevant.items():
                         if resp in all_abs2meta_out:  # resp is continuous and inside this group
-                            is_dist_resp = all_abs2meta_out[resp]['distributed']
-
-                            for dv, tup in dvdct.items():
-                                # use only dvs outside of this group.
-                                if dv not in allprocs_abs2prom:
-                                    rel = tup[0]
-                                    if is_dist_resp:
+                            if all_abs2meta_out[resp]['distributed']:  # distributed response
+                                for dv, tup in dvdct.items():
+                                    # use only dvs outside of this group.
+                                    if dv not in allprocs_abs2prom:
+                                        rel = tup[0]
                                         for inp in inp_boundary_set.intersection(rel['input']):
                                             if inp in abs2meta_in:
-                                                group._fd_rev_xfer_correction_dist.add(inp)
+                                                if resp not in group._fd_rev_xfer_correction_dist:
+                                                    group._fd_rev_xfer_correction_dist[resp] = set()
+                                                group._fd_rev_xfer_correction_dist[resp].add(inp)
 
                 # FD groups don't need reverse transfers
                 return {}

@@ -192,11 +192,11 @@ class Group(System):
         Dict of absolute response metadata.
     _relevance_graph : nx.DiGraph
         Graph of relevance connections.  Always None except in the top level Group.
-    _fd_rev_xfer_correction_dist : set
+    _fd_rev_xfer_correction_dist : dict
         If one or more subgroups of this group is using finite difference to compute derivatives,
         this is the set of inputs to those subgroups that are upstream of a distributed response
-        within the same subgroup.  These determine if an allreduce is necessary when transferring
-        data to a connected output in reverse mode.
+        within the same subgroup, keyed by active response.  These determine if an allreduce is
+        necessary when transferring data to a connected output in reverse mode.
     """
 
     def __init__(self, **kwargs):
@@ -227,7 +227,7 @@ class Group(System):
         self._abs_desvars = None
         self._abs_responses = None
         self._relevance_graph = None
-        self._fd_rev_xfer_correction_dist = set()
+        self._fd_rev_xfer_correction_dist = {}
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -1322,7 +1322,7 @@ class Group(System):
             # must call this before vector setup because it determines if we need to alloc commplex
             self._setup_partials()
 
-        self._fd_rev_xfer_correction_dist = set()
+        self._fd_rev_xfer_correction_dist = {}
 
         self._problem_meta['relevant'] = self._init_relevance(mode)
 
@@ -3789,8 +3789,8 @@ class Group(System):
                 # system doutput variables, taking into account distributed inputs.
                 # Since the transfers are not correcting for those issues, we need to do it here.
 
-                # If we have a distributed constraint/obj within the FD group,
-                # we perform essentially an allreduce on the d_inputs vars that connect to
+                # If we have a distributed constraint/obj within the FD group and that con/obj is,
+                # active, we perform essentially an allreduce on the d_inputs vars that connect to
                 # outside systems so they'll include the contribution from all procs.
                 if self._fd_rev_xfer_correction_dist:
                     seed_vars = self._problem_meta['seed_vars']
@@ -3804,25 +3804,27 @@ class Group(System):
                                                    " supported under MPI in reverse mode if they "
                                                    "depend on an group doing finite difference and "
                                                    "containing distributed constraints/objectives.")
-                        slices = self._dinputs.get_slice_dict()
-                        inarr = self._dinputs.asarray()
-                        data = {}
-                        for inp in self._fd_rev_xfer_correction_dist:
-                            if inp in slices:
-                                arr = inarr[slices[inp]]
-                                if np.any(arr):
-                                    data[inp] = arr
-                                else:
-                                    data[inp] = None
+                        seed_var = list(seed_vars)[0]
+                        if seed_var in self._fd_rev_xfer_correction_dist:
+                            slices = self._dinputs.get_slice_dict()
+                            inarr = self._dinputs.asarray()
+                            data = {}
+                            for inp in self._fd_rev_xfer_correction_dist[seed_var]:
+                                if inp in slices:
+                                    arr = inarr[slices[inp]]
+                                    if np.any(arr):
+                                        data[inp] = arr
+                                    else:
+                                        data[inp] = None
 
-                        if data:
-                            comm = self.comm
-                            myrank = comm.rank
-                            for rank, d in enumerate(comm.allgather(data)):
-                                if rank != myrank:
-                                    for n, val in d.items():
-                                        if val is not None and n in slices:
-                                            inarr[slices[n]] += val
+                            if data:
+                                comm = self.comm
+                                myrank = comm.rank
+                                for rank, d in enumerate(comm.allgather(data)):
+                                    if rank != myrank:
+                                        for n, val in d.items():
+                                            if val is not None and n in slices:
+                                                inarr[slices[n]] += val
 
         # Apply recursion
         else:
