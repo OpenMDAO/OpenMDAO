@@ -2,7 +2,7 @@
 import numpy as np
 import scipy.sparse as sp
 
-from openmdao.jacobians.jacobian import Jacobian, _get_remote_vars
+from openmdao.jacobians.jacobian import Jacobian
 from openmdao.core.constants import INT_DTYPE
 
 

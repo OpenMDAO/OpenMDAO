@@ -23,8 +23,7 @@ else:
     from petsc4py import PETSc
     from collections import defaultdict
 
-    from openmdao.vectors.default_transfer import DefaultTransfer, _fill, _setup_index_views
-    from openmdao.utils.array_utils import shape_to_len
+    from openmdao.vectors.default_transfer import DefaultTransfer, _setup_index_views
 
     class PETScTransfer(DefaultTransfer):
         """
@@ -160,13 +159,12 @@ else:
                     all_abs2meta_out = group._var_allprocs_abs2meta['output']
                     all_abs2meta_in = group._var_allprocs_abs2meta['input']
 
-                    # connections internal to this group
+                    # connections internal to this group and all direct/indirect subsystems
                     conns = group._conn_global_abs_in2out
-                    relevant = group._relevant
 
                     inp_boundary_set = set(all_abs2meta_in).difference(conns)
 
-                    for resp, dvdct in relevant.items():
+                    for resp, dvdct in group._relevant.items():
                         if resp in all_abs2meta_out:  # resp is continuous and inside this group
                             is_dist_resp = all_abs2meta_out[resp]['distributed']
 
@@ -472,15 +470,3 @@ def _get_output_inds(group, abs_out, abs_in):
             start = end
 
     return output_inds, src_indices
-
-
-def _get_output_dups(group, output):
-    return np.count_nonzero(group._var_sizes['output'][:, group._var_allprocs_abs2idx[output]])
-
-
-def _get_comp_inputs(graph, output):
-    compname = output.rpartition('.')[0]
-    if compname in graph:
-        return list(graph.predecessors(compname))
-    else:  # response will be connected directly to resp component inputs
-        return list(graph.predecessors(output))

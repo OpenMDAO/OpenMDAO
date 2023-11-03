@@ -368,28 +368,6 @@ def _global2local_offsets(global_offsets):
     return offsets
 
 
-def dist2local_src_inds(src_indices, sizes, rank):
-    """
-    Given existing distributed src_indices, return a localized index array.
-
-    Parameters
-    ----------
-    src_indices : ndarray
-        Array of global src_indices.
-    sizes : ndarray
-        Array of sizes for a variable across procs.
-    rank : int
-        MPI rank of the current process.
-
-    Returns
-    -------
-    ndarray
-        Array of local src_indices.
-    """
-    start = np.sum(sizes[:rank])
-    return src_indices - start
-
-
 def get_input_idx_split(full_idxs, inputs, outputs, use_full_cols, is_total):
     """
     Split an array of indices into vec outs + ins into two arrays of indices into outs and ins.

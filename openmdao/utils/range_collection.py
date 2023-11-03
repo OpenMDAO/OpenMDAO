@@ -399,38 +399,12 @@ def metas2ranges(meta_iter, shape_name='shape'):
         start = stop
 
 
-def metas2shapes(meta_iter, shape_name='shape'):
-    """
-    Convert an iterator of metadata to an iterator of (name, shape) tuples.
-
-    Parameters
-    ----------
-    meta_iter : iterator of (name, meta)
-        Iterator of (name, meta) tuples, where name is the variable name and meta is the
-        corresponding metadata dictionary.
-    shape_name : str
-        Name of the metadata entry that contains the shape of the variable. Value can be either
-        'shape' or 'global_shape'.  Default is 'shape'.  The value of the metadata entry must
-        be a tuple of integers.
-
-    Yields
-    ------
-    tuple
-        Tuple of the form (name, shape), where name is the variable name and shape is the shape
-        of the variable.
-    """
-    for name, meta in meta_iter:
-        yield (name, meta[shape_name])
-
-
 if __name__ == '__main__':
     meta = {
         'x': {'shape': (2, 3)},
         'y': {'shape': (4, 5)},
         'z': {'shape': (6,)},
     }
-
-    print(list(metas2shapes(meta.items())))
 
     ranges = list(metas2ranges(meta.items()))
     print(ranges)

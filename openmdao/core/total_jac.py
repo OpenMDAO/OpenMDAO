@@ -255,8 +255,6 @@ class _TotalJacInfo(object):
 
         self.has_lin_cons = has_lin_cons
         self.dist_input_range_map = {}
-        self.has_input_dist = {}
-        self.has_output_dist = {}
 
         self.total_relevant_systems = set()
         self.simul_coloring = None
@@ -306,12 +304,10 @@ class _TotalJacInfo(object):
             self.dist_idx_map = {m: None for m in modes}
             self.modes = modes
 
-        self.of_meta, self.of_size, has_of_dist = \
+        self.of_meta, self.of_size, _ = \
             self._get_tuple_map(of, responses, all_abs2meta_out)
-        self.has_input_dist['rev'] = self.has_output_dist['fwd'] = has_of_dist
-        self.wrt_meta, self.wrt_size, has_wrt_dist = \
+        self.wrt_meta, self.wrt_size, self.has_wrt_dist = \
             self._get_tuple_map(wrt, design_vars, all_abs2meta_out)
-        self.has_input_dist['fwd'] = self.has_output_dist['rev'] = has_wrt_dist
 
         # always allocate a 2D dense array and we can assign views to dict keys later if
         # return format is 'dict' or 'flat_dict'.
@@ -319,7 +315,7 @@ class _TotalJacInfo(object):
 
         # if we have distributed 'wrt' variables in fwd mode we have to broadcast the jac
         # columns from the owner of a given range of dist indices to everyone else.
-        if self.get_remote and has_wrt_dist and self.comm.size > 1:
+        if self.get_remote and self.has_wrt_dist and self.comm.size > 1:
             abs2idx = model._var_allprocs_abs2idx
             sizes = model._var_sizes['output']
             meta = self.wrt_meta
@@ -343,7 +339,6 @@ class _TotalJacInfo(object):
 
         # create scratch array for jac scatters
         self.jac_scratch = None
-        self.jac_dist_col_mask = None
 
         if self.comm.size > 1 and self.get_remote:
             # need 2 scratch vectors of the same size here
@@ -365,20 +360,9 @@ class _TotalJacInfo(object):
             if 'rev' in modes:
                 from openmdao.core.group import Group
 
-                # # find all groups doing FD
-                # fdgroups = [s.pathname for s in model.system_iter(recurse=True, typ=Group)
-                #             if s._owns_approx_jac]
-                # allfdgroups = set()
-                # for grps in model.comm.allgather(fdgroups):
-                #     allfdgroups.update(grps)
-
                 self.jac_scratch['rev'] = [scratch[0][:J.shape[1]]]
                 if self.simul_coloring is not None:  # when simul coloring, need two scratch arrays
                     self.jac_scratch['rev'].append(scratch[1][:J.shape[1]])
-                has_out_dist = self.has_output_dist['rev']
-
-                if has_out_dist:
-                    self.jac_dist_col_mask = np.zeros(J.shape[1], dtype=bool)
 
                 # create a column mask to zero out contributions to the Allreduce from
                 # duplicated vars
@@ -1347,19 +1331,16 @@ class _TotalJacInfo(object):
                 if self.jac_scatters[mode] is not None:
                     self.src_petsc[mode].array = self.J[:, i]
                     self.tgt_petsc[mode].array[:] = self.J[:, i]
-                    # print(f"J[:, {i}] before:", self.J[:, i])
                     self.jac_scatters[mode].scatter(self.src_petsc[mode], self.tgt_petsc[mode],
                                                     addv=False, mode=False)
                     self.J[:, i] = self.tgt_petsc[mode].array
-                    # print(f"J[:, {i}] after:", self.J[:, i])
 
         else:  # rev
-            if self.get_remote:
-                if self.rev_allreduce_mask is not None:
-                    scratch = self.jac_scratch['rev'][0]
-                    scratch[:] = 0.0
-                    scratch[self.rev_allreduce_mask] = self.J[i][self.rev_allreduce_mask]
-                    self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
+            if self.get_remote and self.rev_allreduce_mask is not None:
+                scratch = self.jac_scratch['rev'][0]
+                scratch[:] = 0.0
+                scratch[self.rev_allreduce_mask] = self.J[i][self.rev_allreduce_mask]
+                self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
 
     def single_jac_setter(self, i, mode, meta):
         """
@@ -1593,7 +1574,7 @@ class _TotalJacInfo(object):
 
         # if some of the wrt vars are distributed in fwd mode, we have to bcast from the rank
         # where each part of the distrib var exists
-        if self.get_remote and mode == 'fwd' and self.has_input_dist[mode]:
+        if self.get_remote and mode == 'fwd' and self.has_wrt_dist:
             for start, stop, rank in self.dist_input_range_map[mode]:
                 contig = self.J[:, start:stop].copy()
                 model.comm.Bcast(contig, root=rank)

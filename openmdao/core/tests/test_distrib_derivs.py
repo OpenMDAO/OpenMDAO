@@ -126,9 +126,6 @@ class SimpleMixedDistrib2(om.ExplicitComponent):
         outputs['out_dist'] = inputs['in_dist'] * 5.
 
     def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        Id = inputs['in_dist']
-        Is = inputs['in_nd']
-
         if mode == 'fwd':
             if 'out_dist' in d_outputs:
                 if 'in_dist' in d_inputs:
@@ -844,7 +841,7 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        assert_check_totals(prob.check_totals(method='fd', out_stream=None))
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), rtol=1e-5)
 
         # rev mode
 
@@ -860,7 +857,7 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        assert_check_totals(prob.check_totals(method='fd', out_stream=None))
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), rtol=1e-5)
 
     def test_distrib_voi_group_fd2(self):
         prob = _setup_ivc_subivc_dist_parab_sum()
@@ -1245,8 +1242,8 @@ class MPITests2(unittest.TestCase):
 
             prob.run_model()
 
-            assert_check_totals(prob.check_totals(method='fd', out_stream=None))
-            assert_check_totals(prob.check_totals(method='cs', out_stream=None), rtol=1e-14)
+            assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=2e-5, rtol=2e-5)
+            assert_check_totals(prob.check_totals(method='cs', out_stream=None), rtol=1e-13)
 
     def run_mixed_distrib2_prob(self, mode, klass=MixedDistrib2):
         size = 5

@@ -418,10 +418,7 @@ class Jacobian(object):
             if key in self._subjacs_info:
                 subjac = self._subjacs_info[key]
                 if subjac['cols'] is None:  # dense
-                    try:
-                        subjac['val'][:, loc_idx] = column[start:end]
-                    except Exception as ex:
-                        print(ex)
+                    subjac['val'][:, loc_idx] = column[start:end]
                 else:  # our COO format
                     match_inds = np.nonzero(subjac['cols'] == loc_idx)[0]
                     if match_inds.size > 0:
@@ -462,65 +459,3 @@ class Jacobian(object):
         """
         self._subjacs_info = self._system()._subjacs_info
         self._col_varnames = None  # force recompute of internal index maps on next set_col
-
-    def get_wrt_names(self):
-        """
-        Get the list of all wrt names.
-
-        Returns
-        -------
-        list
-            List of all wrt names.
-        """
-        return self._col_varnames
-
-    def get_of_names(self):
-        """
-        Get the list of all of names.
-
-        Returns
-        -------
-        list
-            List of all of names.
-        """
-        seen = set()
-        ofs = []
-        for of, _ in self._subjacs_info.keys():
-            if of not in seen:
-                seen.add(of)
-                ofs.append(of)
-
-        return ofs
-
-
-def _get_remote_vars(system, varnames):
-    # vnames must be absolute names (no aliases)
-
-    nprocs = system.comm.size
-    remote_vars = set()
-
-    if nprocs > 1:
-        # If we have remote vars, pick an owning rank for each and use that
-        # to bcast to others later
-        all_abs2meta_out = system._var_allprocs_abs2meta['output']
-        all_abs2meta_in = system._var_allprocs_abs2meta['input']
-        abs2meta_out = system._var_abs2meta['output']
-        abs2meta_in = system._var_abs2meta['input']
-
-        remote_lst = [n for n in varnames if n not in abs2meta_in and n not in abs2meta_out]
-
-        seen = set()
-
-        for vnames in system.comm.allgather(remote_lst):
-            for vname in vnames:
-                if vname not in seen:
-                    seen.add(vname)
-                    if vname in all_abs2meta_out:
-                        dist = all_abs2meta_out[vname]['distributed']
-                    else:
-                        dist = all_abs2meta_in[vname]['distributed']
-
-                    if not dist:
-                        remote_vars.add(vname)
-
-    return remote_vars
