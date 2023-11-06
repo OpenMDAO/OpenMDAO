@@ -1,6 +1,7 @@
 """ Unit tests for the Pyoptsparse Driver."""
 
 import copy
+import pathlib
 import unittest
 import os.path
 
@@ -16,6 +17,7 @@ from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
 from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
+from openmdao.utils.reports_system import get_reports_dir
 from openmdao.utils.testing_utils import use_tempdirs, require_pyoptsparse
 from openmdao.utils.om_warnings import OMDeprecationWarning
 from openmdao.utils.mpi import MPI
@@ -3254,6 +3256,58 @@ class TestResizingTestCase(unittest.TestCase):
         p.setup()
         p.run_driver()
         p.compute_totals()
+
+@unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
+@use_tempdirs
+class TestPyoptSparseOutputFiles(unittest.TestCase):
+
+    def run_and_test(self, optimizer, output_file_names):
+        prob = self.createParaboloidProblem()
+        prob.driver = pyOptSparseDriver(optimizer=optimizer, print_results=False)
+
+        if optimizer == 'ALPSO':
+            prob.driver.opt_settings['fileout'] = 3
+
+        prob.run_driver()
+        default_output_dir = pathlib.Path(get_reports_dir()).joinpath(prob._name)
+        for opt_setting_name, output_file_name in output_file_names:
+            output_file = default_output_dir.joinpath(output_file_name)
+            self.assertTrue(output_file.is_file(),
+                        f"{output_file_name} output file not found at {str(output_file)}")
+
+    def test_default_output_dir_default(self):
+        optimizers_and_output_files = {
+            'ALPSO': [('filename','ALPSO_print.out'), ('filename','ALPSO_summary.out')],
+            'CONMIN': [('IFILE', 'CONMIN.out')],
+            'IPOPT': [('output_file', 'IPOPT.out')],
+            'NLPQLP': [('iFile', 'NLPQLP.out')],
+            'PSQP': [('IFILE', 'PSQP.out')],
+            'PAROPT': [('tr_output_file', 'paropt.tr'), ('output_file', 'paropt.out')],
+            'SLSQP': [('IFILE', 'SLSQP.out')],
+            'SNOPT': [('Print file', 'SNOPT_print.out'), ('Summary file', 'SNOPT_summary.out')]
+        }
+        for optimizer, output_files in optimizers_and_output_files.items():
+            _, loc_opt = set_pyoptsparse_opt(optimizer)
+            if loc_opt == optimizer: # Only do optimizers that are installed
+                self.run_and_test(optimizer, output_files)
+        # self.run_and_test('CONMIN', ['CONMIN.out'])
+
+    def createParaboloidProblem(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+        prob.set_solver_print(level=0)
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+        prob.setup()
+        return prob
+
 
 
 if __name__ == "__main__":
