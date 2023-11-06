@@ -214,6 +214,33 @@ class TestParallelGroups(unittest.TestCase):
         J = prob.compute_totals(of=unknown_list, wrt=indep_list)
         assert_near_equal(J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
 
+    @parameterized.expand(itertools.product([om.LinearRunOnce],
+                                            [om.NonlinearBlockGS, om.NonlinearRunOnce],
+                                            ['fwd', 'rev']),
+                          name_func=_test_func_name)
+    def test_par_with_only_1_subsystem(self, solver, nlsolver, mode):
+        p = om.Problem()
+        model = p.model
+        p.model.linear_solver = solver()
+        p.model.nonlinear_solver = nlsolver()
+
+        # model.add_subsystem('p1', om.IndepVarComp('x', 1.0))
+        par = model.add_subsystem('par', om.ParallelGroup())
+        par.add_subsystem('c1', om.ExecComp('y=2.0*x'))
+        model.add_subsystem('c2', om.ExecComp('y=3.0*x'))
+
+        # model.connect('p1.x', 'par.c1.x')
+        model.connect('par.c1.y', 'c2.x')
+
+        model.add_design_var('par.c1.x', lower=-50.0, upper=50.0)
+        model.add_constraint('par.c1.y', lower=-15.0, upper=15.0)
+        model.add_objective('c2.y')
+
+        p.setup(check=False, mode=mode)
+        p.run_model()
+
+        assert_check_totals(p.check_totals(out_stream=None), atol=1e-6)
+
     def test_zero_shape(self):
         raise unittest.SkipTest("zero shapes not fully supported yet")
         class MultComp(ExplicitComponent):

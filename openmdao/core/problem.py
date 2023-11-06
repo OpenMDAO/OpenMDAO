@@ -3262,7 +3262,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         out_buffer.write('    Directional Derivative (Jfor)')
                     else:
                         out_buffer.write('    Raw Forward Derivative (Jfor)')
-                    out_buffer.write(f"\n    {Jfor}\n\n")
+                    Jstr = textwrap.indent(str(Jfor), '    ')
+                    out_buffer.write(f"\n{Jstr}\n\n")
 
                 fdtype = fd_opts['method'].upper()
 
@@ -3274,7 +3275,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                             out_buffer.write('    Directional Derivative (Jrev)')
                     else:
                         out_buffer.write('    Raw Reverse Derivative (Jrev)')
-                    out_buffer.write(f"\n    {Jrev}\n\n")
+                    Jstr = textwrap.indent(str(Jrev), '    ')
+                    out_buffer.write(f"\n{Jstr}\n\n")
 
                 try:
                     fds = derivative_info['J_fd']
@@ -3292,8 +3294,9 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                             out_buffer.write(f"    Directional {fdtype} Derivative (Jfd)"
                                              f"{stepstrs[i]}\n    {fd}\n\n")
                     else:
+                        Jstr = textwrap.indent(str(fd), '    ')
                         out_buffer.write(f"    Raw {fdtype} Derivative (Jfd){stepstrs[i]}"
-                                         f"\n    {fd}\n\n")
+                                         f"\n{Jstr}\n\n")
 
                 out_buffer.write(' -' * 30 + '\n')
 
