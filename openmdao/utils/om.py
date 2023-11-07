@@ -433,7 +433,7 @@ def _list_pre_post_cmd(options, user_args):
         prob.list_pre_post(outfile=options.outfile)
 
     # register the hook
-    hooks._register_hook('setup', class_name='Problem', inst_id=options.problem,
+    hooks._register_hook('final_setup', class_name='Problem', inst_id=options.problem,
                          post=_list_pre_post, exit=True)
 
     _load_and_exec(options.file[0], user_args)
