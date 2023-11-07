@@ -24,6 +24,8 @@ except ImportError:
 from openmdao.test_suite.groups.parallel_groups import \
     FanOutGrouped, FanInGrouped2, Diamond, ConvergeDiverge
 
+from openmdao.core.tests.test_distrib_derivs import DistribExecComp
+
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.utils.array_utils import evenly_distrib_idxs
@@ -214,32 +216,31 @@ class TestParallelGroups(unittest.TestCase):
         J = prob.compute_totals(of=unknown_list, wrt=indep_list)
         assert_near_equal(J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
 
-    @parameterized.expand(itertools.product([om.LinearRunOnce],
-                                            [om.NonlinearBlockGS, om.NonlinearRunOnce],
-                                            ['fwd', 'rev']),
-                          name_func=_test_func_name)
-    def test_par_with_only_1_subsystem(self, solver, nlsolver, mode):
+    @parameterized.expand(['fwd', 'rev'], name_func=_test_func_name)
+    def test_par_with_only_1_subsystem(self, mode):
         p = om.Problem()
         model = p.model
-        p.model.linear_solver = solver()
-        p.model.nonlinear_solver = nlsolver()
 
-        # model.add_subsystem('p1', om.IndepVarComp('x', 1.0))
+        model.add_subsystem('p1', om.IndepVarComp('x', np.ones(3)))
         par = model.add_subsystem('par', om.ParallelGroup())
-        par.add_subsystem('c1', om.ExecComp('y=2.0*x'))
-        model.add_subsystem('c2', om.ExecComp('y=3.0*x'))
+        G = par.add_subsystem('G', om.Group())
+        G.add_subsystem('c1', om.ExecComp('y=2.0*x', shape=3))
+        G.add_subsystem('c2', DistribExecComp(['y=5.0*x', 'y=7.0*x'], arr_size=3))
+        model.add_subsystem('c2', om.ExecComp('y=3.0*x', shape=3))
 
-        # model.connect('p1.x', 'par.c1.x')
-        model.connect('par.c1.y', 'c2.x')
+        model.connect('p1.x', 'par.G.c1.x')
+        model.connect('par.G.c1.y', 'par.G.c2.x')
+        model.connect('par.G.c2.y', 'c2.x', src_indices=om.slicer[:])
 
-        model.add_design_var('par.c1.x', lower=-50.0, upper=50.0)
-        model.add_constraint('par.c1.y', lower=-15.0, upper=15.0)
-        model.add_objective('c2.y')
+        model.add_design_var('p1.x', lower=-50.0, upper=50.0)
+        model.add_constraint('par.G.c1.y', lower=-15.0, upper=15.0)
+        model.add_constraint('par.G.c2.y', lower=-15.0, upper=15.0)
+        model.add_objective('c2.y', index=0)
 
         p.setup(check=False, mode=mode)
         p.run_model()
 
-        assert_check_totals(p.check_totals(out_stream=None), atol=1e-6)
+        assert_check_totals(p.check_totals(out_stream=None), rtol=2e-5, atol=2e-5)
 
     def test_zero_shape(self):
         raise unittest.SkipTest("zero shapes not fully supported yet")

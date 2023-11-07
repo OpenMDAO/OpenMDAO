@@ -330,11 +330,15 @@ class _CheckingJacobian(DictionaryJacobian):
             if key in self._subjacs_info:
                 subjac = self._subjacs_info[key]
                 if subjac['cols'] is None:
+                    if subjac['val'] is None:  # can happen for matrix free comp
+                        subjac['val'] = np.zeros(subjac['shape'])
                     subjac['val'][:, loc_idx] = column[start:end]
                 else:
                     match_inds = np.nonzero(subjac['cols'] == loc_idx)[0]
                     if match_inds.size > 0:
                         row_inds = subjac['rows'][match_inds]
+                        if subjac['val'] is None:
+                            subjac['val'] = np.zeros(len(subjac['rows']))
                         subjac['val'][match_inds] = column[start:end][row_inds]
                     else:
                         row_inds = np.zeros(0, dtype=INT_DTYPE)

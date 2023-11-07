@@ -3256,47 +3256,48 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     out_buffer.write(f'\n    MPI Rank {MPI.COMM_WORLD.rank}\n')
                 out_buffer.write('\n')
 
-                # Raw Derivatives
-                if magnitudes[0].forward is not None:
-                    if directional:
-                        out_buffer.write('    Directional Derivative (Jfor)')
-                    else:
-                        out_buffer.write('    Raw Forward Derivative (Jfor)')
-                    Jstr = textwrap.indent(str(Jfor), '    ')
-                    out_buffer.write(f"\n{Jstr}\n\n")
-
-                fdtype = fd_opts['method'].upper()
-
-                if magnitudes[0].reverse is not None:
-                    if directional:
-                        if totals:
-                            out_buffer.write('    Directional Derivative (Jrev) Dot Product')
+                with np.printoptions(linewidth=240):
+                    # Raw Derivatives
+                    if magnitudes[0].forward is not None:
+                        if directional:
+                            out_buffer.write('    Directional Derivative (Jfor)')
                         else:
-                            out_buffer.write('    Directional Derivative (Jrev)')
-                    else:
-                        out_buffer.write('    Raw Reverse Derivative (Jrev)')
-                    Jstr = textwrap.indent(str(Jrev), '    ')
-                    out_buffer.write(f"\n{Jstr}\n\n")
+                            out_buffer.write('    Raw Forward Derivative (Jfor)')
+                        Jstr = textwrap.indent(str(Jfor), '    ')
+                        out_buffer.write(f"\n{Jstr}\n\n")
 
-                try:
-                    fds = derivative_info['J_fd']
-                except KeyError:
-                    fds = [0.]
+                    fdtype = fd_opts['method'].upper()
 
-                for i in range(len(magnitudes)):
-                    fd = fds[i]
-
-                    if directional:
-                        if totals and magnitudes[i].reverse is not None:
-                            out_buffer.write(f'    Directional {fdtype} Derivative (Jfd) '
-                                             f'Dot Product{stepstrs[i]}\n    {fd}\n\n')
+                    if magnitudes[0].reverse is not None:
+                        if directional:
+                            if totals:
+                                out_buffer.write('    Directional Derivative (Jrev) Dot Product')
+                            else:
+                                out_buffer.write('    Directional Derivative (Jrev)')
                         else:
-                            out_buffer.write(f"    Directional {fdtype} Derivative (Jfd)"
-                                             f"{stepstrs[i]}\n    {fd}\n\n")
-                    else:
-                        Jstr = textwrap.indent(str(fd), '    ')
-                        out_buffer.write(f"    Raw {fdtype} Derivative (Jfd){stepstrs[i]}"
-                                         f"\n{Jstr}\n\n")
+                            out_buffer.write('    Raw Reverse Derivative (Jrev)')
+                        Jstr = textwrap.indent(str(Jrev), '    ')
+                        out_buffer.write(f"\n{Jstr}\n\n")
+
+                    try:
+                        fds = derivative_info['J_fd']
+                    except KeyError:
+                        fds = [0.]
+
+                    for i in range(len(magnitudes)):
+                        fd = fds[i]
+
+                        if directional:
+                            if totals and magnitudes[i].reverse is not None:
+                                out_buffer.write(f'    Directional {fdtype} Derivative (Jfd) '
+                                                 f'Dot Product{stepstrs[i]}\n    {fd}\n\n')
+                            else:
+                                out_buffer.write(f"    Directional {fdtype} Derivative (Jfd)"
+                                                 f"{stepstrs[i]}\n    {fd}\n\n")
+                        else:
+                            Jstr = textwrap.indent(str(fd), '    ')
+                            out_buffer.write(f"    Raw {fdtype} Derivative (Jfd){stepstrs[i]}"
+                                             f"\n{Jstr}\n\n")
 
                 out_buffer.write(' -' * 30 + '\n')
 
@@ -3354,7 +3355,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                   f"{ders}.\nThis can happen if a component 'compute_jacvec_product' "
                   "or 'apply_linear'\nmethod does not properly reduce the value of a distributed "
                   "output when computing the\nderivative of that output with respect to a serial "
-                  "input.\nOpenMDAO 3.25 changed the convention used"
+                  "input.\nOpenMDAO 3.25 changed the convention used "
                   "when transferring data between distributed and non-distributed \nvariables "
                   "within a matrix free component. See POEM 75 for details.")
 
