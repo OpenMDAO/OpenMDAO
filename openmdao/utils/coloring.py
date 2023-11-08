@@ -22,7 +22,7 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM
 from openmdao.utils.general_utils import _src_or_alias_dict, \
-    _src_name_iter, _src_or_alias_item_iter
+    _src_name_iter, _src_or_alias_item_iter, _convert_auto_ivc_to_conn_name
 import openmdao.utils.hooks as hooks
 from openmdao.utils.mpi import MPI
 from openmdao.utils.file_utils import _load_and_exec, image2html
@@ -2287,14 +2287,21 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
 
             system = problem.model
 
-            # save a copy of the abs2prom dict on the coloring object
-            # so promoted names can be used when displaying coloring data
-            coloring._abs2prom = system._var_allprocs_abs2prom.copy()
-
             if fname is not None:
                 if ((system._full_comm is not None and system._full_comm.rank == 0) or
                         (system._full_comm is None and system.comm.rank == 0)):
                     coloring.save(fname)
+
+    # save a copy of the abs2prom dict on the coloring object
+    # so promoted names can be used when displaying coloring data
+    # (also map auto_ivc names to the prom name of their connected input)
+    if coloring is not None:
+        coloring._abs2prom = abs2prom = system._var_allprocs_abs2prom.copy()
+        conns = model._conn_global_abs_in2out
+        for abs_out in abs2prom['output']:
+            if abs_out.startswith('_auto_ivc.'):
+                abs_in = _convert_auto_ivc_to_conn_name(conns, abs_out)
+                abs2prom['output'][abs_out] = abs2prom['input'][abs_in]
 
     driver._total_jac = None
 
