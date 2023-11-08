@@ -484,18 +484,11 @@ class TestDOEDriver(unittest.TestCase):
             for case in cases:
                 writer.writerow([np.ones((2, 2)) * val for _, val in case])
 
-        from packaging.version import Version
-        if Version(np.__version__) >= Version("1.14"):
-            opts = {'legacy': '1.13'}
-        else:
-            opts = {}
-
-        with printoptions(**opts):
-            # have to use regex to handle differences in numpy print formats for shape
-            msg = f"Error assigning p1.x = \[ 0.  0.  0.  0.\]: could not broadcast " \
-                  f"input array from shape \(4.*\) into shape \(1.*\)"
-            with self.assertRaisesRegex(ValueError, msg):
-                prob.run_driver()
+        with self.assertRaises(ValueError) as err:
+            prob.run_driver()
+        self.assertEqual(str(err.exception),
+                         "Error assigning p1.x = [0. 0. 0. 0.]: could not broadcast "
+                         "input array from shape (4,) into shape (1,)")
 
     def test_uniform(self):
         prob = om.Problem()

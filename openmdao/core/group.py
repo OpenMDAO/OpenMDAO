@@ -5104,7 +5104,7 @@ class Group(System):
         """
         Get promoted name for specified variable.
         """
-        abs2prom = self._var_abs2prom
+        abs2prom = self._var_allprocs_abs2prom
         if abs_name in abs2prom['input']:
             return abs2prom['input'][abs_name]
         elif abs_name in abs2prom['output']:
