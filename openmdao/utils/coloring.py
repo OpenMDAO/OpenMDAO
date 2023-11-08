@@ -2285,18 +2285,16 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
             # save metadata we used to create the coloring
             coloring._meta.update(sparsity_info)
 
-            system = problem.model
-
             if fname is not None:
-                if ((system._full_comm is not None and system._full_comm.rank == 0) or
-                        (system._full_comm is None and system.comm.rank == 0)):
+                if ((model._full_comm is not None and model._full_comm.rank == 0) or
+                        (model._full_comm is None and model.comm.rank == 0)):
                     coloring.save(fname)
 
     # save a copy of the abs2prom dict on the coloring object
     # so promoted names can be used when displaying coloring data
     # (also map auto_ivc names to the prom name of their connected input)
     if coloring is not None:
-        coloring._abs2prom = abs2prom = system._var_allprocs_abs2prom.copy()
+        coloring._abs2prom = abs2prom = model._var_allprocs_abs2prom.copy()
         conns = model._conn_global_abs_in2out
         for abs_out in abs2prom['output']:
             if abs_out.startswith('_auto_ivc.'):
