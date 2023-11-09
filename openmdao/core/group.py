@@ -5056,7 +5056,7 @@ class Group(System):
         graph = self.get_relevance_graph(dvs, responses)
 
         dvs = set([meta['source'] for meta in dvs.values()])
-        responses = set([meta['source'] for meta in responses.values()])
+        responses = list(set([meta['source'] for meta in responses.values()]))
 
         # we don't want _auto_ivc dependency to force all subsystems to be iterated, so split
         # the _auto_ivc node into two nodes, one for design vars and one for everything else.

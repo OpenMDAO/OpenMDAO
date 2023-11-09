@@ -272,10 +272,9 @@ class ApproximationScheme(object):
                             in_idx = [list(in_idx)]
                             vec_idx = [vec_idx]
                 else:
+                    vec_idx = LocalRangeIterable(system, wrt)
                     if directional and vec is not None:
                         vec_idx = [v for v in vec_idx if v is not None]
-                    else:
-                        vec_idx = LocalRangeIterable(system, wrt)
 
                     # Directional derivatives for quick deriv checking.
                     # Place the indices in a list so that they are all stepped at the same time.

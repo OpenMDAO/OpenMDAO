@@ -189,8 +189,6 @@ class RangeTree(RangeMapper):
 
     Attributes
     ----------
-    size : int
-        Total size of all of the sizes combined.
     root : RangeTreeNode
         Root node of the binary search tree.
     """
