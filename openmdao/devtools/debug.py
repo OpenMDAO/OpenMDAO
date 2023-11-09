@@ -14,7 +14,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.om_warnings import issue_warning, MPIWarning
 from openmdao.utils.reports_system import register_report
 from openmdao.utils.file_utils import text2html, _load_and_exec
-from openmdao.utils.range_collection import DataRangeMapper
+from openmdao.utils.rangemapper import RangeMapper
 from openmdao.visualization.tables.table_builder import generate_table
 
 
@@ -689,11 +689,11 @@ def show_dist_var_conns(group, rev=False, out_stream=_DEFAULT_OUT_STREAM):
 
     for g in group.system_iter(typ=Group, include_self=True):
         if g._transfers[direction]:
-            in_ranges = list(g.dist_range_iter('input', group.comm))
-            out_ranges = list(g.dist_range_iter('output', group.comm))
+            in_ranges = list(g.dist_size_iter('input', group.comm))
+            out_ranges = list(g.dist_size_iter('output', group.comm))
 
-            inmapper = DataRangeMapper.create(in_ranges)
-            outmapper = DataRangeMapper.create(out_ranges)
+            inmapper = RangeMapper.create(in_ranges)
+            outmapper = RangeMapper.create(out_ranges)
 
             gprint = False
 
@@ -708,9 +708,9 @@ def show_dist_var_conns(group, rev=False, out_stream=_DEFAULT_OUT_STREAM):
 
                     conns = {}
                     for iidx, oidx in zip(transfer._in_inds, transfer._out_inds):
-                        idata, irind = inmapper.index2rel_data(iidx)
+                        idata, irind = inmapper.index2key_rel(iidx)
                         ivar, irank = idata
-                        odata, orind = outmapper.index2rel_data(oidx)
+                        odata, orind = outmapper.index2key_rel(oidx)
                         ovar, orank = odata
 
                         if odata not in conns:
@@ -733,18 +733,15 @@ def show_dist_var_conns(group, rev=False, out_stream=_DEFAULT_OUT_STREAM):
                             oinds = [d[0] for d in dlist]
                             iinds = [d[1] for d in dlist]
 
-                            orange = outmapper.data2range(odata)
-                            irange = inmapper.data2range(idata)
+                            orange = outmapper.key2range(odata)
+                            irange = inmapper.key2range(idata)
 
-                            oslc = is_full_slice(orange, oinds)
-                            if oslc:
-                                islc = is_full_slice(irange, iinds)
-                                if islc:
-                                    s = f"{ovar}[:] {arrow} {ivar}[:]"
-                                    if s not in strs:
-                                        strs[s] = set()
-                                    strs[s].add(ranktup)
-                                    continue
+                            if is_full_slice(orange, oinds) and is_full_slice(irange, iinds):
+                                s = f"{ovar} {arrow} {ivar}"
+                                if s not in strs:
+                                    strs[s] = set()
+                                strs[s].add(ranktup)
+                                continue
 
                             for oidx, iidx in zip(oinds, iinds):
                                 s = f"{ovar}[{oidx}] {arrow} {ivar}[{iidx}]"
@@ -802,12 +799,30 @@ def show_dist_var_conns(group, rev=False, out_stream=_DEFAULT_OUT_STREAM):
                         if np.all(oranks == oranks[0]):
                             orstr = str(oranks[0])
                         else:
-                            orstr = str(sorted(oranks))
+                            sorted_ranks = sorted(oranks)
+                            orstr = str(sorted_ranks)
+                            if len(sorted_ranks) > 3:
+                                for j, r in enumerate(sorted_ranks):
+                                    if j == 0 or r - val == 1:
+                                        val = r
+                                    else:
+                                        break
+                                else:
+                                    orstr = f"[{sorted_ranks[0]} to {sorted_ranks[-1]}]"
 
                         if np.all(iranks == iranks[0]):
                             irstr = str(iranks[0])
                         else:
+                            sorted_ranks = sorted(iranks)
                             irstr = str(sorted(iranks))
+                            if len(sorted_ranks) > 3:
+                                for j, r in enumerate(sorted_ranks):
+                                    if j == 0 or r - val == 1:
+                                        val = r
+                                    else:
+                                        break
+                                else:
+                                    irstr = f"[{sorted_ranks[0]} to {sorted_ranks[-1]}]"
 
                         if orstr == irstr and '[' not in orstr:
                             printer(f"{pad}      {s}    rank {orstr}", file=out_stream)

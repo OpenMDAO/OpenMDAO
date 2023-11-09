@@ -229,7 +229,7 @@ else:
                         xfer_in[sub_out]
                         xfer_out[sub_out]
                     elif out_is_dup and inp_missing > 0 and (iowninput or distrib_in):
-                        # if this proc owns the input or the input is distributyed,
+                        # if this proc owns the input or the input is distributed,
                         # and the output is duplicated, then we send the owning/distrib input
                         # to each duplicated output that doesn't have a corresponding connected
                         # input on the same proc.
@@ -278,8 +278,8 @@ else:
                         xfer_out[sub_out].append(output_inds)
 
                         if has_rev_par_coloring and iidxlist_nc:
-                            # keep transfers separate that shouldn't happen when partial
-                            # coloring is active
+                            # keep transfers separate that shouldn't happen when parallel
+                            # deriv coloring is active
                             if len(iidxlist_nc) > 1:
                                 input_inds = _merge(iidxlist_nc, size_nc)
                                 output_inds = _merge(oidxlist_nc, size_nc)

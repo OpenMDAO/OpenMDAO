@@ -27,7 +27,7 @@ from openmdao.utils.array_utils import array_connection_compatible, _flatten_src
     shape_to_len
 from openmdao.utils.general_utils import common_subpath, all_ancestors, \
     convert_src_inds, _contains_all, shape2tuple, get_connection_owner, ensure_compatible, \
-    _src_name_iter, meta2src_iter, get_rev_conns
+    meta2src_iter, get_rev_conns
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
 from openmdao.utils.graph_utils import get_sccs_topo, get_out_of_order_nodes
@@ -193,10 +193,11 @@ class Group(System):
     _relevance_graph : nx.DiGraph
         Graph of relevance connections.  Always None except in the top level Group.
     _fd_rev_xfer_correction_dist : dict
-        If one or more subgroups of this group is using finite difference to compute derivatives,
-        this is the set of inputs to those subgroups that are upstream of a distributed response
-        within the same subgroup, keyed by active response.  These determine if an allreduce is
-        necessary when transferring data to a connected output in reverse mode.
+        If this group is using finite difference to compute derivatives,
+        this is the set of inputs that are upstream of a distributed response
+        within this group, keyed by active response.  These determine if contributions
+        from all ranks will be added together to get the correct input values when derivatives
+        in the larger model are being solved using reverse mode.
     """
 
     def __init__(self, **kwargs):
@@ -3799,32 +3800,34 @@ class Group(System):
                             prefix = self.pathname + '.'
                             seed_vars = [n for n in seed_vars if n.startswith(prefix)]
                             if len(seed_vars) > 1:
+                                # TODO: get this working with coloring
                                 raise RuntimeError("Multiple simultaneous seed variables "
                                                    f"{sorted(seed_vars)} within an FD group are not"
                                                    " supported under MPI in reverse mode if they "
-                                                   "depend on an group doing finite difference and "
+                                                   "depend on a group doing finite difference and "
                                                    "containing distributed constraints/objectives.")
-                        seed_var = list(seed_vars)[0]
-                        if seed_var in self._fd_rev_xfer_correction_dist:
-                            slices = self._dinputs.get_slice_dict()
-                            inarr = self._dinputs.asarray()
-                            data = {}
-                            for inp in self._fd_rev_xfer_correction_dist[seed_var]:
-                                if inp in slices:
-                                    arr = inarr[slices[inp]]
-                                    if np.any(arr):
-                                        data[inp] = arr
-                                    else:
-                                        data[inp] = None
+                        for seed_var in seed_vars:
+                            if seed_var in self._fd_rev_xfer_correction_dist:
+                                slices = self._dinputs.get_slice_dict()
+                                inarr = self._dinputs.asarray()
+                                data = {}
+                                for inp in self._fd_rev_xfer_correction_dist[seed_var]:
+                                    if inp in slices:
+                                        arr = inarr[slices[inp]]
+                                        if np.any(arr):
+                                            data[inp] = arr
+                                        else:
+                                            data[inp] = None
 
-                            if data:
-                                comm = self.comm
-                                myrank = comm.rank
-                                for rank, d in enumerate(comm.allgather(data)):
-                                    if rank != myrank:
-                                        for n, val in d.items():
-                                            if val is not None and n in slices:
-                                                inarr[slices[n]] += val
+                                if data:
+                                    comm = self.comm
+                                    myrank = comm.rank
+                                    for rank, d in enumerate(comm.allgather(data)):
+                                        if rank != myrank:
+                                            for n, val in d.items():
+                                                if val is not None and n in slices:
+                                                    inarr[slices[n]] += val
+                            break  # there's only 1 in the seed_vars set
 
         # Apply recursion
         else:
@@ -5053,7 +5056,7 @@ class Group(System):
         graph = self.get_relevance_graph(dvs, responses)
 
         dvs = set([meta['source'] for meta in dvs.values()])
-        responses = [meta['source'] for meta in responses.values()]
+        responses = set([meta['source'] for meta in responses.values()])
 
         # we don't want _auto_ivc dependency to force all subsystems to be iterated, so split
         # the _auto_ivc node into two nodes, one for design vars and one for everything else.

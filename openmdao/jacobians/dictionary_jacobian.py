@@ -50,6 +50,9 @@ class DictionaryJacobian(Jacobian):
             List of keys matching this jacobian for the current system.
         """
         if self._iter_keys is None:
+            # determine the set of remote keys (keys where either of or wrt is remote somewhere)
+            # only if we're under MPI with comm size > 1 and the given system is a Group that
+            # computes its derivatives using finite difference or complex step.
             include_remotes = system.pathname and \
                 system.comm.size > 1 and system._owns_approx_jac and system._subsystems_allprocs
             subjacs = self._subjacs_info

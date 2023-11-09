@@ -358,8 +358,6 @@ class _TotalJacInfo(object):
                 if self.simul_coloring is not None:  # when simul coloring, need two scratch arrays
                     self.jac_scratch['fwd'].append(scratch[1][:J.shape[0]])
             if 'rev' in modes:
-                from openmdao.core.group import Group
-
                 self.jac_scratch['rev'] = [scratch[0][:J.shape[1]]]
                 if self.simul_coloring is not None:  # when simul coloring, need two scratch arrays
                     self.jac_scratch['rev'].append(scratch[1][:J.shape[1]])
@@ -374,8 +372,7 @@ class _TotalJacInfo(object):
                 for name, pname in zip(wrt, prom_wrt):
                     vmeta = all_abs2meta_out[name]
                     if pname in voimeta:
-                        meta = voimeta[pname]
-                        end += meta['size']
+                        end += voimeta[pname]['size']
                     else:
                         end += vmeta['global_size']
 
