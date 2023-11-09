@@ -40,7 +40,7 @@ class RangeMapper(object):
 
         Parameters
         ----------
-        sizes : list of (key, size)
+        sizes : iterable of (key, size)
             Iterable of (key, size) tuples.
         max_flat_range_size : int
             If the total array size is less than this, a FlatRangeMapper will be returned instead
