@@ -4900,6 +4900,8 @@ class Group(System):
 
         dvs = set([meta['source'] for meta in dvs.values()])
         responses = [meta['source'] for meta in responses.values()]
+        response0 = responses[0]
+        responses = set(responses)  # get rid of dups
 
         # we don't want _auto_ivc dependency to force all subsystems to be iterated, so split
         # the _auto_ivc node into two nodes, one for design vars and one for everything else.
@@ -4968,8 +4970,8 @@ class Group(System):
             # into a response to force them to be in the opt SCC.
             for tgts in always_opt.values():
                 for tgt in tgts:
-                    graph.add_edge(tgt, responses[0])
-                    graph.add_edge(responses[0], tgt)
+                    graph.add_edge(tgt, response0)
+                    graph.add_edge(response0, tgt)
 
         if grad_groups:
             if self.comm.size > 1:
@@ -5046,7 +5048,8 @@ class Group(System):
 
         groups = set()
         for s in self.system_iter(recurse=True):
-            if isinstance(s, Group):
+            isgroup = isinstance(s, Group)
+            if isgroup:
                 groups.add(s.pathname)
             if s.pathname in iterated:
                 s._run_on_opt[_OptStatus.OPTIMIZING] = True
@@ -5054,9 +5057,11 @@ class Group(System):
                 # set OPTIMIZING to False because its default value is True
                 s._run_on_opt[_OptStatus.OPTIMIZING] = False
 
-            if s.pathname in pre:
+            # groups can be in multiple iteration lists, but components can
+            # only be in one, so we have to check for that here.
+            if s.pathname in pre and (isgroup or not s.pathname in iterated):
                 s._run_on_opt[_OptStatus.PRE] = True
-            if s.pathname in post:
+            if s.pathname in post and (isgroup or not s.pathname in iterated):
                 s._run_on_opt[_OptStatus.POST] = True
 
         self._relevance_graph = None  # reset graph since we've modified it
