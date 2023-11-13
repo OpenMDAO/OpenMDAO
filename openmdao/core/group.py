@@ -3793,41 +3793,32 @@ class Group(System):
                 # If we have a distributed constraint/obj within the FD group and that con/obj is,
                 # active, we perform essentially an allreduce on the d_inputs vars that connect to
                 # outside systems so they'll include the contribution from all procs.
-                if self._fd_rev_xfer_correction_dist:
+                if self._fd_rev_xfer_correction_dist and mode == 'rev':
                     seed_vars = self._problem_meta['seed_vars']
                     if seed_vars is not None:
-                        if len(seed_vars) > 1:
-                            prefix = self.pathname + '.'
-                            seed_vars = [n for n in seed_vars if n.startswith(prefix)]
-                            if len(seed_vars) > 1:
-                                # TODO: get this working with coloring
-                                raise RuntimeError("Multiple simultaneous seed variables "
-                                                   f"{sorted(seed_vars)} within an FD group are not"
-                                                   " supported under MPI in reverse mode if they "
-                                                   "depend on a group doing finite difference and "
-                                                   "containing distributed constraints/objectives.")
+                        seed_vars = [n for n in seed_vars if n in self._fd_rev_xfer_correction_dist]
+                        slices = self._dinputs.get_slice_dict()
+                        inarr = self._dinputs.asarray()
+                        data = {}
                         for seed_var in seed_vars:
-                            if seed_var in self._fd_rev_xfer_correction_dist:
-                                slices = self._dinputs.get_slice_dict()
-                                inarr = self._dinputs.asarray()
-                                data = {}
-                                for inp in self._fd_rev_xfer_correction_dist[seed_var]:
-                                    if inp in slices:
+                            for inp in self._fd_rev_xfer_correction_dist[seed_var]:
+                                if inp not in data:
+                                    if inp in slices:  # inp is a local input
                                         arr = inarr[slices[inp]]
                                         if np.any(arr):
                                             data[inp] = arr
                                         else:
-                                            data[inp] = None
+                                            data[inp] = None  # don't send an array of zeros
+                                    else:
+                                        data[inp] = None  # prevent possible MPI hangs
 
-                                if data:
-                                    comm = self.comm
-                                    myrank = comm.rank
-                                    for rank, d in enumerate(comm.allgather(data)):
-                                        if rank != myrank:
-                                            for n, val in d.items():
-                                                if val is not None and n in slices:
-                                                    inarr[slices[n]] += val
-                            break  # there's only 1 in the seed_vars set
+                        if data:
+                            myrank = self.comm.rank
+                            for rank, d in enumerate(self.comm.allgather(data)):
+                                if rank != myrank:
+                                    for n, val in d.items():
+                                        if val is not None and n in slices:
+                                            inarr[slices[n]] += val
 
         # Apply recursion
         else:
