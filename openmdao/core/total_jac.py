@@ -818,11 +818,12 @@ class _TotalJacInfo(object):
             imeta = defaultdict(bool)
             imeta['coloring'] = simul_coloring
             all_rel_systems = set()
-            all_vois = set()
             cache = False
             imeta['itermeta'] = itermeta = []
             locs = None
             for ilist in simul_coloring.color_iter(mode):
+                all_vois = set()
+
                 for i in ilist:
                     rel_systems, cache_lin_sol, voiname = idx_map[i]
                     all_rel_systems = _update_rel_systems(all_rel_systems, rel_systems)
