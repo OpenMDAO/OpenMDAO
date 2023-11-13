@@ -4922,7 +4922,7 @@ class Group(System):
         # the _auto_ivc node into two nodes, one for design vars and one for everything else.
         if '_auto_ivc' in graph:
             graph.add_node('_auto_ivc_other')
-            # we're modifying the graph, so have to save edges before iterating
+            # we're modifying the graph, so have to save existing auto_ivc edges before iterating
             edges = list(graph.edges('_auto_ivc'))
             for _, autoivc_var in edges:
                 if autoivc_var not in dvs:
@@ -4942,24 +4942,8 @@ class Group(System):
             vartgt = 'type_' in graph.nodes[tgt]
             if varsrc and not vartgt:  # tgt is a system
                 edges_to_add.append((tgt, src))  # connect from system back to var
-                # if tgt in always_opt and always_opt[tgt] is None:
-                #     always_opt[tgt] = [tgt]
             elif vartgt and not varsrc:  # src is a system
                 edges_to_add.append((tgt, src))  # connect from var back to system
-                # if src in always_opt and always_opt[src] is None:
-                #     always_opt[src] = [src]
-            # elif vartgt and varsrc:  # both are var nodes
-            #     srcsys = src.rpartition('.')[0]
-            #     tgtsys = tgt.rpartition('.')[0]
-            #     if srcsys == tgtsys:
-            #         # edges_to_add.append((tgt, src))  # connect from tgt back to src
-            #         if tgtsys in always_opt:
-            #             always_opt[tgtsys].append(tgt)
-            #         else:
-            #             always_opt[tgtsys] = [tgt]
-            # else:
-            #     # this should never happen
-            #     raise RuntimeError(f"Unexpected graph connection between {src} and {tgt}.")
 
         graph.add_edges_from(edges_to_add)
 
@@ -5022,12 +5006,13 @@ class Group(System):
         post = set()
         iterated = set()
         for strong_con in sccs:
-            # because the sccs are in topological order, we know that until we
+            # because the sccs are in topological order and all design vars and
+            # responses are in the iteration set, we know that until we
             # see a design var (or response), we're in the pre-opt set.  Once we
             # see a design var (or response), we're in the iterated set.  Once
             # we see an scc without a design var (or response), we're in the
             # post-opt set.
-            if dv0 in strong_con:  # dvs.intersection(strong_con):
+            if dv0 in strong_con:
                 for s in strong_con:
                     if 'type_' in graph.nodes[s]:
                         s = s.rpartition('.')[0]
@@ -5042,7 +5027,6 @@ class Group(System):
                         addto.update(all_ancestors(s))
 
         # change _auto_ivc_other back to _auto_ivc.
-        # Note that this could cause _auto_ivc to be in multiple places, but that's ok.
         for iterset in (pre, iterated, post):
             if '_auto_ivc_other' in iterset:
                 iterset.discard('_auto_ivc_other')
@@ -5081,8 +5065,6 @@ class Group(System):
             if s.pathname in post and (isgroup or s.pathname not in iterated or
                                        s.pathname == '_auto_ivc'):
                 s._run_on_opt[_OptStatus.POST] = True
-
-        self._relevance_graph = None  # reset graph since we've modified it
 
         self._pre_components = sorted(pre - groups)
         self._post_components = sorted(post - groups)
