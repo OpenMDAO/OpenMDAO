@@ -679,8 +679,7 @@ def _constraint_plot(kind, meta, val, width=300):
 
     # If lower and upper bounds are None, return an HTML snippet indicating the issue
     if kind == 'constraint' and meta['upper'] == INF_BOUND and meta['lower'] == -INF_BOUND:
-        return '<span class="bounds-unavailable">Both lower and upper bounds are None, ' \
-                   'which is not allowed for a constraint.</span>'
+        return '<span class="bounds-unavailable">Both lower and upper bounds are None.</span>'
 
     if kind == 'desvar' and meta['upper'] == INF_BOUND and meta['lower'] == -INF_BOUND:
         return   # nothing to plot
