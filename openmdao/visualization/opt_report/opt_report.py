@@ -677,6 +677,11 @@ def _constraint_plot(kind, meta, val, width=300):
     else:
         val = val.item()
 
+    # If lower and upper bounds are None, return an HTML snippet indicating the issue
+    if meta['lower'] == -INF_BOUND and meta['upper'] == INF_BOUND:
+        return '<span class="bounds-unavailable">Both lower and upper bounds are None, ' \
+                   'which is not allowed for a constraint.</span>'
+
     if kind == 'desvar' and meta['upper'] == INF_BOUND and meta['lower'] == -INF_BOUND:
         return   # nothing to plot
 
@@ -812,8 +817,6 @@ def var_bounds_plot(kind, ax, value, lower, upper):
     #  - value much greater than upper
 
     # also need to handle one-sided constraints where only one of lower and upper is given
-    if kind == 'constraint' and upper == INF_BOUND and lower == -INF_BOUND:
-        raise ValueError("Upper and lower bounds cannot all be None for a constraint")
 
     # Basic plot setup
     plt.rcParams['hatch.linewidth'] = _out_of_bounds_hatch_width  # can't seem to do this any other
