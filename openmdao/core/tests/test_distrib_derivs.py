@@ -2656,6 +2656,76 @@ class TestDistribBugs(unittest.TestCase):
         prob.run_model()
         assert_check_totals(prob.check_totals("ParallelSum.sum", "ivc.x"))
 
+
+class DummyComp(om.ExplicitComponent):
+    def initialize(self):
+        self.options.declare('a',default=0.)
+        self.options.declare('b',default=0.)
+
+    def setup(self):
+        self.add_input('x')
+        self.add_output('y', 0.)
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = self.options['a']*inputs['x'] + self.options['b']
+
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        if mode=='rev':
+            if 'y' in d_outputs:
+                if 'x' in d_inputs:
+                    d_inputs['x'] += self.options['a'] * d_outputs['y']
+                    print(self.pathname, 'compute_jvp: dinputs[x]', d_inputs['x'])
+        else:
+            raise RuntimeError("fwd mode not supported")
+
+class DummyGroup(om.ParallelGroup):
+    def setup(self):
+        self.add_subsystem('C1',DummyComp(a=1,b=2.))
+        self.add_subsystem('C2',DummyComp(a=3.,b=4.))
+
+
+class TestLocalSrcIndsParColoring2(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_local_src_inds(self):
+        # this uses parallel coloring with src_indices indexing into a local array
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('dvs',om.IndepVarComp('x',[1.,2.]), promotes=['*'])
+        model.add_subsystem('par',DummyGroup())
+        model.connect('x','par.C1.x',src_indices=[0])
+        model.connect('x','par.C2.x',src_indices=[1])
+
+        prob.model.add_design_var('x',lower=0.,upper=1.)
+
+        # None or string
+        deriv_color = 'deriv_color'
+
+        # compute derivatives for made-up y constraints in parallel
+        prob.model.add_constraint('par.C1.y',
+                                  lower=1.0,
+                                  parallel_deriv_color=deriv_color)
+        prob.model.add_constraint('par.C2.y',
+                                  lower=1.0,
+                                  parallel_deriv_color=deriv_color)
+
+        prob.setup(mode='rev')
+        prob.run_model()
+        prob.check_totals(compact_print=False,
+                          show_progress=False,
+                          directional=False,
+                          show_only_incorrect=True)
+
+
+class TestLocalSrcIndsParColoring3(TestLocalSrcIndsParColoring2):
+    N_PROCS = 3
+
+
+class TestLocalSrcIndsParColoring4(TestLocalSrcIndsParColoring2):
+    N_PROCS = 4
+
+
+
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests
     mpirun_tests()

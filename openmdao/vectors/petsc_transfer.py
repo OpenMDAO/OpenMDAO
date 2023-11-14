@@ -229,10 +229,10 @@ else:
                         xfer_in[sub_out]
                         xfer_out[sub_out]
                     elif out_is_dup and inp_missing > 0 and (iowninput or distrib_in):
-                        # if this proc owns the input or the input is distributed,
+                        # if this rank owns the input or the input is distributed,
                         # and the output is duplicated, then we send the owning/distrib input
                         # to each duplicated output that doesn't have a corresponding connected
-                        # input on the same proc.
+                        # input on the same rank.
                         oidxlist = []
                         iidxlist = []
                         oidxlist_nc = []
@@ -241,7 +241,7 @@ else:
                         for rnk, osize, isize in zip(range(group.comm.size),
                                                      group.get_var_sizes(abs_out, 'output'),
                                                      group.get_var_sizes(abs_in, 'input')):
-                            if rnk == myrank:
+                            if rnk == myrank:  # transfer to output on same rank
                                 oidxlist.append(output_inds)
                                 iidxlist.append(input_inds)
                                 size += len(input_inds)
@@ -257,6 +257,8 @@ else:
                                     continue
 
                                 if has_rev_par_coloring:
+                                    # these transfers will only happen if parallel coloring is
+                                    # not active for the current seed response
                                     oidxlist_nc.append(oarr)
                                     iidxlist_nc.append(input_inds)
                                     size_nc += len(input_inds)
@@ -302,8 +304,7 @@ else:
                         xfer_in[sub_out].append(input_inds)
                         xfer_out[sub_out].append(output_inds)
                 else:
-                    # not a local input but still need entries in the transfer dicts to
-                    # avoid hangs
+                    # remote input but still need entries in the transfer dicts to avoid hangs
                     xfer_in[sub_out]
                     xfer_out[sub_out]
                     if has_rev_par_coloring:
@@ -429,20 +430,33 @@ def _merge(inds_list, tot_size):
 
 def _get_output_inds(group, abs_out, abs_in):
     owner = group._owning_rank[abs_out]
-    src_indices = group._var_abs2meta['input'][abs_in]['src_indices']
-    if src_indices is not None:
-        src_indices = src_indices.shaped_array()
+    meta_in = group._var_abs2meta['input'][abs_in]
+    out_dist = group._var_allprocs_abs2meta['output'][abs_out]['distributed']
+    in_dist = meta_in['distributed']
+    src_indices = meta_in['src_indices']
 
     rank = group.comm.rank if abs_out in group._var_abs2meta['output'] else owner
     out_idx = group._var_allprocs_abs2idx[abs_out]
     offsets = group._get_var_offsets()['output'][:, out_idx]
     sizes = group._var_sizes['output'][:, out_idx]
 
+
+    if src_indices is None:
+        orig_src_inds = src_indices
+    else:
+        src_indices = src_indices.shaped_array()
+        orig_src_inds = src_indices
+        if not out_dist and not in_dist:  # convert from local to distributed src_indices
+            off = np.sum(sizes[:rank])
+            if off > 0.:  # adjust for local offsets
+                # don't do += to avoid modifying stored value
+                src_indices = src_indices + off
+
     # NOTE: src_indices are relative to a single, possibly distributed variable,
     # while the output_inds that we compute are relative to the full distributed
     # array that contains all local variables from each rank stacked in rank order.
     if src_indices is None:
-        if group._var_allprocs_abs2meta['output'][abs_out]['distributed']:
+        if out_dist:
             # input in this case is non-distributed (else src_indices would be
             # defined by now).  dist output to non-distributed input conns w/o
             # src_indices are not allowed.
@@ -469,4 +483,4 @@ def _get_output_inds(group, abs_out, abs_in):
 
             start = end
 
-    return output_inds, src_indices
+    return output_inds, orig_src_inds

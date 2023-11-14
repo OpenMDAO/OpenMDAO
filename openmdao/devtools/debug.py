@@ -701,7 +701,7 @@ def show_dist_var_conns(group, rev=False, out_stream=_DEFAULT_OUT_STREAM):
             skip = len(gprefix)
 
             for sub, transfer in g._transfers[direction].items():
-                if sub is not None:
+                if sub is not None and (not isinstance(sub, tuple) or sub[0] is not None):
                     if not gprint:
                         gdict[g.pathname] = {}
                         gprint = True
@@ -749,7 +749,7 @@ def show_dist_var_conns(group, rev=False, out_stream=_DEFAULT_OUT_STREAM):
                                     strs[s] = set()
                                 strs[s].add(ranktup)
 
-                    gdict[g.pathname][sub] = strs
+                    gdict[g.pathname][str(sub)] = strs
 
     do_ranks = False
 
