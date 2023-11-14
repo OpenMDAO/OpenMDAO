@@ -440,7 +440,6 @@ def _get_output_inds(group, abs_out, abs_in):
     offsets = group._get_var_offsets()['output'][:, out_idx]
     sizes = group._var_sizes['output'][:, out_idx]
 
-
     if src_indices is None:
         orig_src_inds = src_indices
     else:

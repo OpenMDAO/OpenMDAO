@@ -18,7 +18,7 @@ def _fill(arr, indices_list):
     ----------
     arr : ndarray
         Array to be filled.
-    indices_list : list of int ndarrays
+    indices_list : list of int ndarrays or ranges
         List of ranges/indices to be placed into arr.
     """
     start = end = 0
