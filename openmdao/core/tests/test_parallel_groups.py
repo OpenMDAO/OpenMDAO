@@ -745,6 +745,110 @@ class TestFD(unittest.TestCase):
         assert_check_totals(data, atol=1e-5)
 
 
+
+class DoubleComp(om.ExplicitComponent):
+    # dummy component to use outputs of parallel group
+    def setup(self):
+        self.add_input('x')
+        self.add_output('y', 0.)
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = 2. * inputs['x']
+
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        if mode=='rev':
+            if 'y' in d_outputs:
+                if 'x' in d_inputs:
+                    d_inputs['x'] += 2. * d_outputs['y']
+        else:
+            if 'y' in d_outputs:
+                if 'x' in d_inputs:
+                    d_outputs['y'] += 2. * d_inputs['x']
+
+
+class BcastComp(om.ExplicitComponent):
+    # dummy component to be evaluated in pararallel by om.ParallelGroup
+    def setup(self):
+        self.add_input('x', shape_by_conn=True)
+        self.add_output('y', 0.0)
+
+    def compute(self,inputs,outputs):
+        y = None
+        if self.comm.rank==0: # pretend that this must be computed on one or a subset of procs...
+                            # which may be necessary for various solvers/analyses
+            y = np.sum(inputs['x'])
+
+        # bcast to all procs
+        outputs['y'] = self.comm.bcast(y, root=0)
+
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        if mode == 'rev':
+            if 'y' in d_outputs:
+                # this used to give bad derivatives in parallel group due to non-uniform d_outputs['y'] across procs...
+                if self.comm.rank==0: # compute on first proc
+                    d_inputs['x'] += d_outputs['y']
+
+                # bcast to all procs
+                d_inputs['x'] = self.comm.bcast(d_inputs['x'], root=0)
+        else:
+            if 'y' in d_outputs:
+                if self.comm.rank==0: # compute on first proc
+                    d_outputs['y'] += np.sum(d_inputs['x'])
+
+                # bcast to all procs
+                d_outputs['y'] = self.comm.bcast(d_outputs['y'], root=0)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestSingleRankRunWithBcast(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def setup_model(self, mode):
+        prob = om.Problem()
+        model = prob.model
+
+        # dummy structural design variables
+        model.add_subsystem('indep', om.IndepVarComp('x', 0.01*np.ones(20)))
+        par = model.add_subsystem('par', om.ParallelGroup())
+
+        par.add_subsystem('C1', BcastComp())
+        par.add_subsystem('C2', BcastComp())
+
+        model.connect('indep.x', f'par.C1.x')
+        model.connect('indep.x', f'par.C2.x')
+
+        # add component that uses outputs from parallel components
+        model.add_subsystem('dummy_comp', DoubleComp())
+        model.connect('par.C1.y','dummy_comp.x')
+
+
+        prob.setup(mode=mode)
+        prob.run_model()
+
+        return prob
+
+    def test_bcast_fwd(self):
+        prob = self.setup_model(mode='fwd')
+
+        for i in range(1,3):
+            y = prob.get_val(f'par.C{i}.y',get_remote=True)
+            assert_near_equal(y, 0.2, 1e-6)
+
+        assert_check_totals(prob.check_totals(of=['dummy_comp.y','par.C1.y'],
+                                              wrt=['indep.x'], out_stream=None))
+
+    def test_bcast_rev(self):
+        prob = self.setup_model(mode='rev')
+
+        for i in range(1,3):
+            y = prob.get_val(f'par.C{i}.y',get_remote=True)
+            assert_near_equal(y, 0.2, 1e-6)
+
+        assert_check_totals(prob.check_totals(of=['dummy_comp.y','par.C1.y'],
+                                              wrt=['indep.x'], out_stream=None))
+
+
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests
     mpirun_tests()

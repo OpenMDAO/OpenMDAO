@@ -2685,6 +2685,7 @@ class DummyGroup(om.ParallelGroup):
         self.add_subsystem('C2',DummyComp(a=3.,b=4.))
 
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestLocalSrcIndsParColoring2(unittest.TestCase):
     N_PROCS = 2
 
@@ -2714,10 +2715,12 @@ class TestLocalSrcIndsParColoring2(unittest.TestCase):
         self.check_model(mode='rev')
 
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestLocalSrcIndsParColoring3(TestLocalSrcIndsParColoring2):
     N_PROCS = 3
 
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestLocalSrcIndsParColoring4(TestLocalSrcIndsParColoring2):
     N_PROCS = 4
 
