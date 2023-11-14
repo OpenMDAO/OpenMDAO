@@ -54,10 +54,7 @@ def _test_func_name(func, num, param):
     return func.__name__ + '_' + '_'.join(args)
 
 
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestParallelGroups(unittest.TestCase):
-
-    N_PROCS = 2
 
     @parameterized.expand(itertools.product([(om.LinearRunOnce, None)],
                                             [om.NonlinearBlockGS, om.NonlinearRunOnce]),
@@ -216,6 +213,12 @@ class TestParallelGroups(unittest.TestCase):
         J = prob.compute_totals(of=unknown_list, wrt=indep_list)
         assert_near_equal(J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
 
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestParallelGroupsMPI2(TestParallelGroups):
+
+    N_PROCS = 2
+
     @parameterized.expand(['fwd', 'rev'], name_func=_test_func_name)
     def test_par_with_only_1_subsystem(self, mode):
         p = om.Problem()
@@ -348,6 +351,7 @@ class TestParallelGroups(unittest.TestCase):
                     break
             else:
                 self.fail("Didn't find '%s' in info messages." % msg)
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestDistDriverVars(unittest.TestCase):
