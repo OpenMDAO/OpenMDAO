@@ -2674,9 +2674,10 @@ class DummyComp(om.ExplicitComponent):
             if 'y' in d_outputs:
                 if 'x' in d_inputs:
                     d_inputs['x'] += self.options['a'] * d_outputs['y']
-                    print(self.pathname, 'compute_jvp: dinputs[x]', d_inputs['x'])
         else:
-            raise RuntimeError("fwd mode not supported")
+            if 'y' in d_outputs:
+                if 'x' in d_inputs:
+                    d_outputs['y'] += self.options['a'] * d_inputs['x']
 
 class DummyGroup(om.ParallelGroup):
     def setup(self):
@@ -2687,7 +2688,7 @@ class DummyGroup(om.ParallelGroup):
 class TestLocalSrcIndsParColoring2(unittest.TestCase):
     N_PROCS = 2
 
-    def test_local_src_inds(self):
+    def check_model(self, mode):
         # this uses parallel coloring with src_indices indexing into a local array
         prob = om.Problem()
         model = prob.model
@@ -2696,25 +2697,21 @@ class TestLocalSrcIndsParColoring2(unittest.TestCase):
         model.connect('x','par.C1.x',src_indices=[0])
         model.connect('x','par.C2.x',src_indices=[1])
 
-        prob.model.add_design_var('x',lower=0.,upper=1.)
-
-        # None or string
-        deriv_color = 'deriv_color'
+        model.add_design_var('x',lower=0.,upper=1.)
 
         # compute derivatives for made-up y constraints in parallel
-        prob.model.add_constraint('par.C1.y',
-                                  lower=1.0,
-                                  parallel_deriv_color=deriv_color)
-        prob.model.add_constraint('par.C2.y',
-                                  lower=1.0,
-                                  parallel_deriv_color=deriv_color)
+        model.add_constraint('par.C1.y', lower=1.0, parallel_deriv_color='deriv_color')
+        model.add_constraint('par.C2.y', lower=1.0, parallel_deriv_color='deriv_color')
 
-        prob.setup(mode='rev')
+        prob.setup(mode=mode)
         prob.run_model()
-        prob.check_totals(compact_print=False,
-                          show_progress=False,
-                          directional=False,
-                          show_only_incorrect=True)
+        assert_check_totals(prob.check_totals(out_stream=None))
+
+    def test_local_src_inds_fwd(self):
+        self.check_model(mode='fwd')
+
+    def test_local_src_inds_rev(self):
+        self.check_model(mode='rev')
 
 
 class TestLocalSrcIndsParColoring3(TestLocalSrcIndsParColoring2):
