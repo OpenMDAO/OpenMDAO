@@ -330,14 +330,13 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         self.assertEqual(color_txt[24].strip(), '|_auto_ivc.v2')
 
         stream = StringIO()
-        coloring.display_txt(out_stream=stream, use_prom_names=True)  # the default
+        coloring.display_txt(out_stream=stream)           # use_prom_names=True is the default
         color_txt = stream.getvalue().split('\n')
 
         self.assertTrue(color_txt[0].endswith('  area'))  # promoted name
         self.assertEqual(color_txt[22].strip(), '|x')     # connected input rather than _auto_ivc.v0
         self.assertEqual(color_txt[23].strip(), '|y')     # connected input rather than _auto_ivc.v1
         self.assertEqual(color_txt[24].strip(), '|r')     # connected input rather than _auto_ivc.v2
-
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_total_coloring_snopt_auto_dyn_partials(self):
