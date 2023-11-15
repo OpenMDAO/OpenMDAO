@@ -119,9 +119,8 @@ jobs:
           python -m pip_audit -s osv --ignore-vuln GHSA-hcpj-qp55-gfph
 
       - name: Notify slack
-        uses: act10ns/slack@v1.6.0
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        uses: act10ns/slack@v2.0.0
         with:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           status: ${{ job.status }}
         if: failure()
