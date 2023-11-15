@@ -129,9 +129,9 @@ _UNDEFINED = _ReprClass("UNDEFINED")
 # out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
 _DEFAULT_OUT_STREAM = _ReprClass("DEFAULT_OUT_STREAM")
 
-# Use in pyOptSparseDriver. The default is the reports directory which includes the directory
+# Used in pyOptSparseDriver and Problem for coloring dir. The default is the reports directory which includes the directory
 #  named after the Problem name. But when the declare method in that class is called, the driver
 #  does not have a reference to the Problem so can't get the name. This serves as a flag that
 #  the default directory in the reports directory is what is wanted. Then in the run method,
 #  the actual default directory is used
-_DEFAULT_PYOPT_SPARSE_OUTPUT_DIR = _ReprClass("DEFAULT_PYOPT_SPARSE_OUTPUT_DIR")
+_DEFAULT_REPORTS_DIR = _ReprClass("DEFAULT_PYOPT_SPARSE_OUTPUT_DIR")
