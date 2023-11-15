@@ -22,7 +22,7 @@ except ImportError:
 except Exception as err:
     pyoptsparse = err
 
-from openmdao.core.constants import INT_DTYPE, _DEFAULT_PYOPT_SPARSE_OUTPUT_DIR, _ReprClass
+from openmdao.core.constants import INT_DTYPE, _DEFAULT_REPORTS_DIR, _ReprClass
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.class_util import WeakMethodWrapper
@@ -269,7 +269,7 @@ class pyOptSparseDriver(Driver):
         self.options.declare('hotstart_file', types=str, default=None, allow_none=True,
                              desc='File location of a pyopt_sparse optimization history to use '
                                   'to hot start the optimization. Default is None.')
-        self.options.declare('output_dir', types=(str,_ReprClass), default=_DEFAULT_PYOPT_SPARSE_OUTPUT_DIR, allow_none=True,
+        self.options.declare('output_dir', types=(str,_ReprClass), default=_DEFAULT_REPORTS_DIR, allow_none=True,
                              desc='Directory location of pyopt_sparse output files.'
                                 'Default is ./reports_directory/problem_name.')
 
@@ -382,7 +382,7 @@ class pyOptSparseDriver(Driver):
         # Need to tell optimizer where to put its .out files
         if self.options['output_dir'] is None:
             self.options['output_dir'] = "."
-        elif self.options['output_dir'] == _DEFAULT_PYOPT_SPARSE_OUTPUT_DIR:
+        elif self.options['output_dir'] == _DEFAULT_REPORTS_DIR:
             problem = self._problem()
             default_output_dir = pathlib.Path(get_reports_dir()).joinpath(problem._name)
             pathlib.Path(default_output_dir).mkdir(parents=True, exist_ok=True)
