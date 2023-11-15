@@ -266,6 +266,8 @@ jobs:
           python -m pip install pyparsing psutil objgraph pyxdsm
 
       - name: Display environment info
+        id: env_info
+        continue-on-error: true
         run: |
           conda info
           conda list
@@ -273,14 +275,26 @@ jobs:
           echo "============================================================="
           echo "Check installed versions of Python, Numpy and Scipy"
           echo "============================================================="
-          python -c "import platform; assert  platform.python_version().startswith(str(${{ matrix.PY }})), \
-                    f'Python version {platform.python_version()} is not the requested version (${{ matrix.PY }})'"
+          echo 'errors<<EOF' >> $GITHUB_OUTPUT
 
-          python -c "import numpy; assert str(numpy.__version__).startswith(str(${{ matrix.NUMPY }})), \
-                    f'Numpy version {numpy.__version__} is not the requested version (${{ matrix.NUMPY }})'"
+          FINAL_VER=`python -c "import platform; print(platform.python_version())"`
+          if [[ ! "$FINAL_VER" == "${{ matrix.PY }}"* ]]; then
+            echo "Python version was changed from ${{ matrix.PY }} to $FINAL_VER" >> $GITHUB_OUTPUT
+          fi
 
-          python -c "import scipy; assert str(scipy.__version__).startswith(str(${{ matrix.SCIPY }})), \
-                    f'Scipy version {scipy.__version__} is not the requested version (${{ matrix.SCIPY }})'"
+          FINAL_VER=`python -c "import numpy; print(numpy.__version__)"`
+          if [[ ! "$FINAL_VER" == "${{ matrix.NUMPY }}"* ]]; then
+            echo "NumPy version was changed from ${{ matrix.NUMPY }} to $FINAL_VER" >> $GITHUB_OUTPUT
+          fi
+
+          FINAL_VER=`python -c "import scipy; print(scipy.__version__)"`
+          if [[ ! "$FINAL_VER" == "${{ matrix.SCIPY }}"* ]]; then
+            echo "SciPy version was changed from ${{ matrix.SCIPY }} to $FINAL_VER" >> $GITHUB_OUTPUT
+          fi
+
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+          grep changed $GITHUB_OUTPUT || echo ""
 
       - name: Setup tmate session
         if: matrix.DEBUG
@@ -387,11 +401,22 @@ jobs:
           cd $GITHUB_WORKSPACE
           python -m bandit -c bandit.yml -ll -r openmdao
 
-      - name: Notify slack
-        uses: act10ns/slack@v1.6.0
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      - name: Slack env change
+        if: steps.env_info.outputs.errors != ''
+        uses: act10ns/slack@v2.0.0
         with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: 'warning'
+          message: |
+            Environment change detected on `${{ matrix.NAME }}` build.
+            Python, NumPy or SciPy was not the requested version:
+            ```${{steps.env_info.outputs.errors}}```
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Notify slack
+        uses: act10ns/slack@v2.0.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
           status: ${{ job.status }}
         if: always()
 

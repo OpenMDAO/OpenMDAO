@@ -3,9 +3,9 @@ name: OpenMDAO Latest
 
 on:
 
-  # Run the workflow daily at 0400 UTC
+  # Run the workflow Monday, Wednesday and Friday at 0400 UTC
   schedule:
-    - cron: '0 4 * * *'
+    - cron: '0 4 * * 1,3,5'
 
   # Allow running the workflow manually from the Actions tab
   workflow_dispatch:
@@ -220,14 +220,27 @@ jobs:
           echo "============================================================="
           echo "Check installed versions of Python, Numpy and Scipy"
           echo "============================================================="
-          python -c "import platform; assert platform.python_version().startswith(str(${{ matrix.PY }})), \
-                    f'Python was changed from version ${{ matrix.PY }} to {platform.python_version()}'"
+          echo 'errors<<EOF' >> $GITHUB_OUTPUT
 
-          python -c "import numpy; assert str(numpy.__version__).startswith('$NUMPY_VER'), \
-                    f'NumPy was changed from version $NUMPY_VER to {numpy.__version__}'"
+          FINAL_VER=`python -c "import platform; print(platform.python_version())"`
+          if [[ ! "$FINAL_VER" == "${{ matrix.PY }}"* ]]; then
+            echo "Python version was changed from ${{ matrix.PY }} to $FINAL_VER" >> $GITHUB_OUTPUT
+          fi
 
-          python -c "import scipy; assert str(scipy.__version__).startswith('$SCIPY_VER'), \
-                    f'SciPy was changed from version $SCIPY_VER to {scipy.__version__}'"
+          FINAL_VER=`python -c "import numpy; print(numpy.__version__)"`
+          if [[ ! "$FINAL_VER" == "$NUMPY_VER"* ]]; then
+            echo "NumPy version was changed from $NUMPY_VER to $FINAL_VER" >> $GITHUB_OUTPUT
+          fi
+
+          FINAL_VER=`python -c "import scipy; print(scipy.__version__)"`
+          if [[ ! "$FINAL_VER" == "$SCIPY_VER"* ]]; then
+            echo "SciPy version was changed from $SCIPY_VER to $FINAL_VER" >> $GITHUB_OUTPUT
+          fi
+
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+          grep changed $GITHUB_OUTPUT || echo ""
+
         if: always()
 
       - name: Run tests
@@ -303,15 +316,16 @@ jobs:
 
           grep '^0 unique deprecation warnings' $RPT_FILE
 
-      - name: Slack env failure
-        if: steps.env_info.outcome == 'failure'
+      - name: Slack env change
+        if: steps.env_info.outputs.errors != ''
         uses: act10ns/slack@v2.0.0
         with:
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
           status: 'warning'
           message: |
             Environment change detected on `Latest` build.
-            Python, NumPy or SciPy was not the requested version, probably due to Conda/PETSc.
+            Python, NumPy or SciPy was not the requested version:
+            ```${{steps.env_info.outputs.errors}}```
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Slack unit test failure
