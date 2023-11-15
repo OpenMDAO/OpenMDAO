@@ -3260,7 +3260,9 @@ class TestResizingTestCase(unittest.TestCase):
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 @use_tempdirs
 class TestPyoptSparseOutputFiles(unittest.TestCase):
+    # dict of optimizers with the values being a list of tuples of ( option_name, output_file_name )
     optimizers_and_output_files = {
+        # ALPSO uses a single option `filename` to determine name of both output files
         'ALPSO': [('filename', 'ALPSO_print.out'), ('filename', 'ALPSO_summary.out')],
         'CONMIN': [('IFILE', 'CONMIN.out')],
         'IPOPT': [('output_file', 'IPOPT.out')],
@@ -3286,7 +3288,9 @@ class TestPyoptSparseOutputFiles(unittest.TestCase):
         prob.setup()
         return prob
 
-    def run_and_test(self, optimizer, output_file_names):
+    def run_and_test_default_output_dir(self, optimizer, output_file_names):
+        # default is to put the files in the reports directory under the problem name folder
+        # output_file_names is a list of tuples of setting name and output file name
         prob = self.createParaboloidProblem()
         prob.driver = pyOptSparseDriver(optimizer=optimizer, print_results=False)
 
@@ -3300,8 +3304,9 @@ class TestPyoptSparseOutputFiles(unittest.TestCase):
             self.assertTrue(output_file.is_file(),
                         f"{output_file_name} output file not found at {str(output_file)}")
 
-    def run_and_test_previous_behavior(self, optimizer, output_file_names):
-        # output_file_names is a list of tuples
+    def run_and_test_previous_behavior_output_dir(self, optimizer, output_file_names):
+        # Previous behavior is to put files in current working directory. Indicated with None
+        # output_file_names is a list of tuples of setting name and output file name
         prob = self.createParaboloidProblem()
         prob.driver = pyOptSparseDriver(optimizer=optimizer, print_results=False)
 
@@ -3316,7 +3321,7 @@ class TestPyoptSparseOutputFiles(unittest.TestCase):
             self.assertTrue(output_file.is_file(),
                         f"{output_file_name} output file not found at {str(output_file)}")
 
-    def run_and_test_user_set(self, optimizer, output_file_names):
+    def run_and_test_user_set_output_dir(self, optimizer, output_file_names):
         # output_file_names is a list of tuples of setting name and output file name
 
         user_directory_name = 'user_reports_dir'
@@ -3329,10 +3334,11 @@ class TestPyoptSparseOutputFiles(unittest.TestCase):
             prob.driver.opt_settings['fileout'] = 3
 
         for opt_setting_name, output_file_name in output_file_names:
-            output_file_path = pathlib.Path(user_directory_name).joinpath(output_file_name)
             if optimizer == 'ALPSO': # Since ALPSO only has the one setting that affects both
                                      #   output files
                 output_file_path = pathlib.Path(user_directory_name).joinpath('ALPSO.out')
+            else:
+                output_file_path = pathlib.Path(user_directory_name).joinpath(output_file_name)
             prob.driver.opt_settings[opt_setting_name] =  str(output_file_path)
 
         prob.run_driver()
@@ -3346,19 +3352,19 @@ class TestPyoptSparseOutputFiles(unittest.TestCase):
         for optimizer, output_files in self.optimizers_and_output_files.items():
             _, loc_opt = set_pyoptsparse_opt(optimizer)
             if loc_opt == optimizer: # Only do optimizers that are installed
-                self.run_and_test(optimizer, output_files)
+                self.run_and_test_default_output_dir(optimizer, output_files)
 
     def test_previous_behavior_output_dir(self):
         for optimizer, output_files in self.optimizers_and_output_files.items():
             _, loc_opt = set_pyoptsparse_opt(optimizer)
             if loc_opt == optimizer: # Only do optimizers that are installed
-                self.run_and_test(optimizer, output_files)
+                self.run_and_test_previous_behavior_output_dir(optimizer, output_files)
 
     def test_user_set_output_dir(self):
         for optimizer, output_files in self.optimizers_and_output_files.items():
             _, loc_opt = set_pyoptsparse_opt(optimizer)
             if loc_opt == optimizer: # Only do optimizers that are installed
-                self.run_and_test_user_set(optimizer, output_files)
+                self.run_and_test_user_set_output_dir(optimizer, output_files)
 
 
 
