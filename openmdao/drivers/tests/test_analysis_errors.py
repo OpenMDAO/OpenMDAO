@@ -111,6 +111,8 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
         if optimizer in self.opt_settings:
             driver.opt_settings = self.opt_settings[optimizer]
         driver.options['print_results'] = False
+        driver.options['output_dir'] = None  # So output goes in current working directory
+                                             # that was the location when this test was written
 
         # setup problem & initialize values
         prob = om.Problem(model, driver)
