@@ -1,5 +1,6 @@
 
 import os
+import pathlib
 import sys
 import itertools
 import pickle
@@ -10,6 +11,9 @@ import numpy as np
 from io import StringIO
 
 from numpy.testing import assert_almost_equal
+
+from openmdao.utils.reports_system import get_reports_dir
+
 try:
     from scipy.sparse import load_npz
 except ImportError:
@@ -89,7 +93,9 @@ class DynPartialsComp(om.ExplicitComponent):
 
 def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True,
             recorder=None, has_lin_constraint=True, has_diag_partials=True, partial_coloring=False,
-            use_vois=True, auto_ivc=False, con_alias=False, check=False, **options):
+            use_vois=True, auto_ivc=False, con_alias=False, check=False,
+            problem_options=None,
+            **options):
 
     p = om.Problem(model=CounterGroup())
 
@@ -251,6 +257,9 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
 
     if recorder:
         p.driver.add_recorder(recorder)
+
+    if 'coloring_dir' in problem_options:
+        p.options['coloring_dir'] = problem_options['coloring_dir']
 
     p.setup(mode=mode, derivatives=derivs, check=check)
     if use_vois:
@@ -1527,6 +1536,44 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
             c = Coloring.load('_bad_pickle_')
 
         self.assertEqual(ctx.exception.args[0], "File '_bad_pickle_' is not a valid coloring file.")
+
+
+
+@use_tempdirs
+class TestSettingColoringDir(unittest.TestCase):
+
+    def test_coloring_dir_is_None(self):
+        problem_options = {
+            'coloring_dir': None,
+        }
+        p = run_opt(pyOptSparseDriver, 'auto', assemble_type='csc', optimizer='SLSQP',
+                    dynamic_total_coloring=True, print_results=False,
+                    problem_options=problem_options)
+
+        coloring_dir = pathlib.Path('./coloring_files')
+        self.assertTrue(coloring_dir.is_dir(), 'Coloring dir not found')
+
+    def test_coloring_dir_is_custom(self):
+        problem_options = {
+            'coloring_dir': 'custom_coloring_dir',
+        }
+        p = run_opt(pyOptSparseDriver, 'auto', assemble_type='csc', optimizer='SLSQP',
+                    dynamic_total_coloring=True, print_results=False, problem_options=problem_options)
+
+        coloring_dir = pathlib.Path('custom_coloring_dir')
+        self.assertTrue(coloring_dir.is_dir(), 'Coloring dir not found')
+
+    def test_coloring_dir_is_default(self):
+        problem_options = {
+        }
+        p = run_opt(pyOptSparseDriver, 'auto', assemble_type='csc', optimizer='SLSQP',
+                    dynamic_total_coloring=True, print_results=False,
+                    problem_options=problem_options)
+
+        coloring_dir = pathlib.Path(get_reports_dir()).joinpath(p._name).joinpath(
+            'coloring_files')
+        self.assertTrue(coloring_dir.is_dir(), 'Coloring dir not found')
+
 
 
 if __name__ == '__main__':
