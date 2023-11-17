@@ -1,3 +1,5 @@
+name: Update status of associated POEM
+
 on:
   pull_request_target:
     types:
@@ -55,7 +57,6 @@ jobs:
 
       - name: Update POEM
         id: update_poem
-        if: github.event_name == 'push'
         env:
           BODY: ${{ github.event.pull_request.body }}
         run: |
