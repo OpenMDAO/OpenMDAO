@@ -59,6 +59,7 @@ jobs:
         id: update_poem
         env:
           BODY: ${{ github.event.pull_request.body }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           echo "BODY:\n$BODY"
           echo "----------------------"
