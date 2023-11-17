@@ -1244,8 +1244,6 @@ class _TotalJacInfo(object):
 
         self.model._problem_meta['parallel_deriv_color'] = imeta['par_deriv_color']
 
-        # print("par_deriv_input_setter: all_rel_systems =", sorted(all_rel_systems), "par_deriv_color =", self.model._problem_meta['parallel_deriv_color'])
-
         if vec_names:
             return all_rel_systems, sorted(vec_names), (inds[0], mode)
         else:
@@ -1340,7 +1338,6 @@ class _TotalJacInfo(object):
                 scratch = self.jac_scratch['rev'][0]
                 scratch[:] = 0.0
                 scratch[self.rev_allreduce_mask] = self.J[i][self.rev_allreduce_mask]
-                # print("_jac_setter_dist: Allreduce in jac_setter_dist on rank", self.comm.rank, "par_deriv_color =", self.model._problem_meta['parallel_deriv_color'])
                 self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
 
     def single_jac_setter(self, i, mode, meta):
@@ -1391,10 +1388,8 @@ class _TotalJacInfo(object):
             else:  # rev
                 if i < 0:
                     byrank = self.comm.allgather((i, None))
-                    # print("rank=", self.comm.rank, "par_deriv_jac_setter: allgather None inds=", inds, "par_deriv_color =", self.model._problem_meta['parallel_deriv_color'])
                 else:
                     byrank = self.comm.allgather((i, self.J[i]))
-                    # print("rank=", self.comm.rank, f"par_deriv_jac_setter: allgather {self.J[i]} inds=", inds, "par_deriv_color =", self.model._problem_meta['parallel_deriv_color'])
                 for ind, row in byrank:
                     if row is not None:
                         self.J[ind, :] = row
