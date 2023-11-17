@@ -1233,16 +1233,18 @@ class _TotalJacInfo(object):
         all_rel_systems = set()
         vec_names = set()
 
-        dist = self.comm.size > 1
-
         for i in inds:
-            if not dist or self.in_loc_idxs[mode][i] >= 0:
+            if self.in_loc_idxs[mode][i] >= 0:
                 rel_systems, vnames, _ = self.single_input_setter(i, imeta, mode)
-                all_rel_systems = _update_rel_systems(all_rel_systems, rel_systems)
                 if vnames is not None:
                     vec_names.add(vnames[0])
+            else:
+                rel_systems, _, _ = self.in_idx_map[mode][i]
+            all_rel_systems = _update_rel_systems(all_rel_systems, rel_systems)
 
         self.model._problem_meta['parallel_deriv_color'] = imeta['par_deriv_color']
+
+        # print("par_deriv_input_setter: all_rel_systems =", sorted(all_rel_systems), "par_deriv_color =", self.model._problem_meta['parallel_deriv_color'])
 
         if vec_names:
             return all_rel_systems, sorted(vec_names), (inds[0], mode)
@@ -1338,6 +1340,7 @@ class _TotalJacInfo(object):
                 scratch = self.jac_scratch['rev'][0]
                 scratch[:] = 0.0
                 scratch[self.rev_allreduce_mask] = self.J[i][self.rev_allreduce_mask]
+                # print("_jac_setter_dist: Allreduce in jac_setter_dist on rank", self.comm.rank, "par_deriv_color =", self.model._problem_meta['parallel_deriv_color'])
                 self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
 
     def single_jac_setter(self, i, mode, meta):
@@ -1370,8 +1373,7 @@ class _TotalJacInfo(object):
         meta : dict
             Metadata dict.
         """
-        dist = self.comm.size > 1
-        if dist:
+        if self.comm.size > 1:
             for i in inds:
                 if self.in_loc_idxs[mode][i] >= 0:
                     self.simple_single_jac_scatter(i, mode)
@@ -1389,8 +1391,10 @@ class _TotalJacInfo(object):
             else:  # rev
                 if i < 0:
                     byrank = self.comm.allgather((i, None))
+                    # print("rank=", self.comm.rank, "par_deriv_jac_setter: allgather None inds=", inds, "par_deriv_color =", self.model._problem_meta['parallel_deriv_color'])
                 else:
                     byrank = self.comm.allgather((i, self.J[i]))
+                    # print("rank=", self.comm.rank, f"par_deriv_jac_setter: allgather {self.J[i]} inds=", inds, "par_deriv_color =", self.model._problem_meta['parallel_deriv_color'])
                 for ind, row in byrank:
                     if row is not None:
                         self.J[ind, :] = row
