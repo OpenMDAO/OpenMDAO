@@ -62,11 +62,10 @@ jobs:
           echo "POEM_ID=$POEM_ID" >> $GITHUB_OUTPUT
 
       - name: Update POEM status to Integrated
-        if: github.event_name == 'push' && steps.update_poem.outputs.POEM_ID != ''
+        if: steps.update_poem.outputs.POEM_ID != ''
         uses: benc-uk/workflow-dispatch@v1
         with:
           repo: ${{ github.repository_owner }}/POEMs
           workflow: Update POEM status to Integrated
           inputs: '{ "poem_integrated": "${{ steps.update_poem.outputs.POEM_ID }}" }'
           token: ${{ secrets.ACCESS_TOKEN }}
-        if: github.event_name == 'push'
