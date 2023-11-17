@@ -1,0 +1,72 @@
+on:
+  pull_request_target:
+    types:
+      - closed
+
+jobs:
+  if_merged:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+      - name: Update POEM
+        id: update_poem
+        if: github.event_name == 'push'
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          echo "BODY:\n$BODY"
+          echo "----------------------"
+
+          while IFS= read -r line; do
+            ISSUE_ID=$(echo $line | grep "Resolves #" -)
+            if [[ "$ISSUE_ID" ]]; then
+              ISSUE_ID=$(echo $ISSUE_ID | cut -d '#' -f 2)
+              break
+            fi
+          done <<< "$BODY"
+
+          echo "ISSUE: $ISSUE_ID"
+
+          echo "----------------------"
+
+          ISSUE_TEXT=`gh --repo OpenMDAO/OpenMDAO issue view $ISSUE_ID`
+
+          echo "ISSUE TEXT:"
+          echo $ISSUE_TEXT
+
+          echo "----------------------"
+
+          ASSOCIATED_POEM=""
+          POEM_ID=""
+
+          while IFS= read -r line; do
+            if [[ "$ASSOCIATED_POEM" ]]; then
+              POEM_ID=$(echo $line)
+              if [[ "$POEM_ID" ]]; then
+                break
+              fi
+            else
+              ASSOCIATED_POEM=$(echo $line | grep "Associated POEM" -)
+            fi
+          done <<< "$ISSUE_TEXT"
+
+          echo "POEM_ID: $POEM_ID"
+
+          echo "----------------------"
+
+          echo "POEM_ID=$POEM_ID" >> $GITHUB_OUTPUT
+
+      - name: Update POEM status to Integrated
+        if: github.event_name == 'push' && steps.update_poem.outputs.POEM_ID != ''
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          repo: ${{ github.repository_owner }}/POEMs
+          workflow: Update POEM status to Integrated
+          inputs: '{ "poem_integrated": "${{ steps.update_poem.outputs.POEM_ID }}" }'
+          token: ${{ secrets.ACCESS_TOKEN }}
+        if: github.event_name == 'push'
