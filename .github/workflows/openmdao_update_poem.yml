@@ -7,36 +7,7 @@ on:
 
 jobs:
 
-  dump_contexts_to_log:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Dump GitHub context
-        env:
-          GITHUB_CONTEXT: ${{ toJson(github) }}
-        run: echo "$GITHUB_CONTEXT"
-      - name: Dump job context
-        env:
-          JOB_CONTEXT: ${{ toJson(job) }}
-        run: echo "$JOB_CONTEXT"
-      - name: Dump steps context
-        env:
-          STEPS_CONTEXT: ${{ toJson(steps) }}
-        run: echo "$STEPS_CONTEXT"
-      - name: Dump runner context
-        env:
-          RUNNER_CONTEXT: ${{ toJson(runner) }}
-        run: echo "$RUNNER_CONTEXT"
-      - name: Dump strategy context
-        env:
-          STRATEGY_CONTEXT: ${{ toJson(strategy) }}
-        run: echo "$STRATEGY_CONTEXT"
-      - name: Dump matrix context
-        env:
-          MATRIX_CONTEXT: ${{ toJson(matrix) }}
-        run: echo "$MATRIX_CONTEXT"
-
-  if_merged:
-    if: github.event.pull_request.merged == true
+  check_for_poem:
     runs-on: ubuntu-latest
 
     defaults:
@@ -54,9 +25,8 @@ jobs:
           echo "Initiated by: ${GITHUB_ACTOR}"
           echo "============================================================="
 
-
-      - name: Update POEM
-        id: update_poem
+      - name: Check for POEM
+        id: check_poem
         env:
           BODY: ${{ github.event.pull_request.body }}
           GH_TOKEN: ${{ github.token }}
@@ -71,6 +41,8 @@ jobs:
               break
             fi
           done <<< "$BODY"
+
+          ISSUE_ID=$(echo $ISSUE_ID|tr -d '\n\t\r ')
 
           echo "ISSUE: $ISSUE_ID"
 
@@ -97,14 +69,16 @@ jobs:
             fi
           done <<< "$ISSUE_TEXT"
 
+          POEM_ID=$(echo $POEM_ID|tr -d '\n\t\r ')
+
           echo "POEM_ID: $POEM_ID"
 
           echo "----------------------"
 
           echo "POEM_ID=$POEM_ID" >> $GITHUB_OUTPUT
 
-      - name: Update POEM status to Integrated
-        if: steps.update_poem.outputs.POEM_ID != ''
+      - name: Update POEM status
+        if: github.event.pull_request.merged == true && steps.update_poem.outputs.POEM_ID != ''
         uses: benc-uk/workflow-dispatch@v1
         with:
           repo: ${{ github.repository_owner }}/POEMs
