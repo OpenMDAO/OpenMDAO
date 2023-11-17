@@ -25,13 +25,15 @@ jobs:
           echo "Initiated by: ${GITHUB_ACTOR}"
           echo "============================================================="
 
-      - name: Check for POEM
+      - name: Check for Associated POEM
         id: check_poem
         env:
           BODY: ${{ github.event.pull_request.body }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "BODY:\n$BODY"
+          echo "PULL REQUEST:"
+          echo $BODY
+
           echo "----------------------"
 
           while IFS= read -r line; do
@@ -44,21 +46,19 @@ jobs:
 
           ISSUE_ID=$(echo $ISSUE_ID|tr -d '\n\t\r ')
 
-          echo "ISSUE: $ISSUE_ID"
+          echo "ISSUE ID: $ISSUE_ID"
 
           echo "----------------------"
 
           ISSUE_TEXT=`gh --repo OpenMDAO/OpenMDAO issue view $ISSUE_ID`
 
-          echo "ISSUE TEXT:"
-          echo $ISSUE_TEXT
-
-          echo "----------------------"
-
           ASSOCIATED_POEM=""
           POEM_ID=""
 
+          echo "ISSUE:"
+
           while IFS= read -r line; do
+            echo $line
             if [[ "$ASSOCIATED_POEM" ]]; then
               POEM_ID=$(echo $line)
               if [[ "$POEM_ID" ]]; then
@@ -69,9 +69,11 @@ jobs:
             fi
           done <<< "$ISSUE_TEXT"
 
-          POEM_ID=$(echo $POEM_ID|tr -d '\n\t\r ')
+          echo "----------------------"
 
-          echo "POEM_ID: $POEM_ID"
+          POEM_ID=$(echo $POEM_ID | tr -d '\n\t\r ')
+
+          echo "POEM ID: $POEM_ID"
 
           echo "----------------------"
 
