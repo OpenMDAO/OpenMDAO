@@ -387,6 +387,8 @@ class NonlinearSchurSolver(NonlinearSolver):
         # print("My    Jacobian:\n", custom_jac, flush=True)
         # system.comm.barrier()
         # quit()
+        iD_schur = np.eye(n_vars, dtype=system._vectors["residual"]["linear"].asarray(copy=True).dtype) * 1e-16
+        schur_jac = schur_jac + iD_schur
         d_subsys2 = scipy.linalg.solve(schur_jac, subsys2._vectors["residual"]["linear"].asarray())
 
         # if system.comm.rank == 0:
