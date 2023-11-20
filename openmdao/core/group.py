@@ -5099,3 +5099,39 @@ class Group(System):
                     self._subsystems_myproc[0]._full_comm.rank == 0
 
         return False
+
+    def _get_prom_name(self, abs_name):
+        """
+        Get promoted name for specified variable.
+        """
+        abs2prom = self._var_allprocs_abs2prom
+        if abs_name in abs2prom['input']:
+            return abs2prom['input'][abs_name]
+        elif abs_name in abs2prom['output']:
+            return abs2prom['output'][abs_name]
+        else:
+            return abs_name
+
+    def _prom_names_list(self, lst):
+        """
+        Convert a list of variable names to promoted names.
+        """
+        return [self._get_prom_name(n) for n in lst]
+
+    def _prom_names_dict(self, dct):
+        """
+        Convert a dictionary keyed on variable names to be keyed on promoted names.
+        """
+        return {self._get_prom_name(k): v for k, v in dct.items()}
+
+    def _prom_names_jac(self, jac):
+        """
+        Convert a nested dict jacobian keyed on variable names to be keyed on promoted names.
+        """
+        new_jac = {}
+        for of in jac:
+            new_jac[self._get_prom_name(of)] = of_dict = {}
+            for wrt in jac[of]:
+                of_dict[self._get_prom_name(wrt)] = jac[of][wrt]
+
+        return new_jac
