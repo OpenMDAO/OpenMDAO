@@ -135,6 +135,7 @@ class TestReportsSystem(unittest.TestCase):
 
                 return super().solve()
 
+
         prob = om.Problem(reports=prob1_reports)
         prob.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
         G = prob.model.add_subsystem('G', om.Group())

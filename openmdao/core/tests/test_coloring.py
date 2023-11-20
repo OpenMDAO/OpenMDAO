@@ -258,7 +258,7 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
     if recorder:
         p.driver.add_recorder(recorder)
 
-    if 'coloring_dir' in problem_options:
+    if problem_options and 'coloring_dir' in problem_options:
         p.options['coloring_dir'] = problem_options['coloring_dir']
 
     p.setup(mode=mode, derivatives=derivs, check=check)

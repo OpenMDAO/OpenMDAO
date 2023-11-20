@@ -354,8 +354,10 @@ class Problem(object):
 
         # Start a run by deleting any existing reports so that the files
         #   that are in that directory are all from this run and not a previous run
-        if os.path.isdir(get_reports_dir()):
-            shutil.rmtree(get_reports_dir())
+        reports_dirpath = pathlib.Path(get_reports_dir()).joinpath(f'{self._name}')
+        if self.comm.rank == 0:
+            if os.path.isdir(reports_dirpath):
+                shutil.rmtree(reports_dirpath)
 
         # register hooks for any reports
         activate_reports(self._reports, self)
@@ -978,8 +980,9 @@ class Problem(object):
             self.options['coloring_dir'] = "./coloring_files"
         elif self.options['coloring_dir'] == _DEFAULT_REPORTS_DIR:
             default_coloring_dir = pathlib.Path(get_reports_dir()).joinpath(self._name).joinpath('coloring_files')
-            pathlib.Path(default_coloring_dir).mkdir(parents=True, exist_ok=True)
             self.options['coloring_dir'] = str(default_coloring_dir)
+        if 'total_coloring' in self._reports:
+            pathlib.Path(self.options['coloring_dir']).mkdir(parents=True, exist_ok=True)
 
         # this metadata will be shared by all Systems/Solvers in the system tree
         self._metadata = {
