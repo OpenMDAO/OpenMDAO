@@ -19,8 +19,7 @@ from io import StringIO, TextIOBase
 import numpy as np
 import scipy.sparse as sparse
 
-from openmdao.core.constants import _SetupStatus, _DEFAULT_REPORTS_DIR, _ReprClass
-
+from openmdao.core.constants import _SetupStatus
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver, record_iteration, SaveOptResult
 from openmdao.core.explicitcomponent import ExplicitComponent
