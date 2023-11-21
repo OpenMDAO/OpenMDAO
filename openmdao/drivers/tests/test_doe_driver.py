@@ -120,7 +120,7 @@ class TestErrors(unittest.TestCase):
                          "    pip install openmdao[doe]\n"
                          "    pip install pyDOE3")
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_lhc_criterion(self):
         with self.assertRaises(ValueError) as err:
             om.LatinHypercubeGenerator(criterion='foo')
@@ -348,7 +348,7 @@ class TestDOEDriver(unittest.TestCase):
             for name in ('x', 'y', 'f_xy'):
                 self.assertEqual(outputs[name], expected_case[name])
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_csv_array(self):
         prob = om.Problem()
         model = prob.model
@@ -484,18 +484,11 @@ class TestDOEDriver(unittest.TestCase):
             for case in cases:
                 writer.writerow([np.ones((2, 2)) * val for _, val in case])
 
-        from packaging.version import Version
-        if Version(np.__version__) >= Version("1.14"):
-            opts = {'legacy': '1.13'}
-        else:
-            opts = {}
-
-        with printoptions(**opts):
-            # have to use regex to handle differences in numpy print formats for shape
-            msg = f"Error assigning p1.x = \[ 0.  0.  0.  0.\]: could not broadcast " \
-                  f"input array from shape \(4.*\) into shape \(1.*\)"
-            with self.assertRaisesRegex(ValueError, msg):
-                prob.run_driver()
+        with self.assertRaises(ValueError) as err:
+            prob.run_driver()
+        self.assertEqual(str(err.exception),
+                         "Error assigning p1.x = [0. 0. 0. 0.]: could not broadcast "
+                         "input array from shape (4,) into shape (1,)")
 
     def test_uniform(self):
         prob = om.Problem()
@@ -535,7 +528,7 @@ class TestDOEDriver(unittest.TestCase):
             for name in ('x', 'y'):
                 assert_near_equal(outputs[name], expected_case[name], 1e-4)
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_full_factorial(self):
         prob = om.Problem()
         model = prob.model
@@ -566,7 +559,7 @@ class TestDOEDriver(unittest.TestCase):
             for name in ('x', 'y', 'f_xy'):
                 self.assertEqual(outputs[name], expected_case[name])
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_full_factorial_factoring(self):
 
         class Digits2Num(om.ExplicitComponent):
@@ -613,7 +606,7 @@ class TestDOEDriver(unittest.TestCase):
         # number of cases
         self.assertEqual(len(set(objs)), 16)
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_full_factorial_array(self):
         prob = om.Problem()
         model = prob.model
@@ -655,7 +648,7 @@ class TestDOEDriver(unittest.TestCase):
             self.assertEqual(outputs['xy'][0], expected_case['xy'][0])
             self.assertEqual(outputs['xy'][1], expected_case['xy'][1])
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_full_fact_dict_levels(self):
         # Specifying levels only for one DV, the other is defaulted
         prob = om.Problem()
@@ -697,7 +690,7 @@ class TestDOEDriver(unittest.TestCase):
             self.assertEqual(outputs['y'], expected_case['y'])
             self.assertEqual(outputs['f_xy'], expected_case['f_xy'])
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_generalized_subset(self):
         # All DVs have the same number of levels
         prob = om.Problem()
@@ -733,7 +726,7 @@ class TestDOEDriver(unittest.TestCase):
             for name in ('x', 'y', 'f_xy'):
                 self.assertEqual(outputs[name], expected_case[name])
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_generalized_subset_dict_levels(self):
         # Number of variables specified individually for all DVs (scalars).
         prob = om.Problem()
@@ -776,7 +769,7 @@ class TestDOEDriver(unittest.TestCase):
             for name in ('x', 'y', 'f_xy'):
                 self.assertAlmostEqual(outputs[name][0], expected_case[name][0])
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_generalized_subset_array(self):
         # Number of levels specified individually for all DVs (arrays).
 
@@ -823,7 +816,7 @@ class TestDOEDriver(unittest.TestCase):
         # Testing uniqueness. If all elements are unique, it should be the same length as the number of cases
         self.assertEqual(len(set(objs)), 104)
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_plackett_burman(self):
         prob = om.Problem()
         model = prob.model
@@ -860,7 +853,7 @@ class TestDOEDriver(unittest.TestCase):
             for name in ('x', 'y', 'f_xy'):
                 self.assertEqual(outputs[name], expected_case[name])
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_box_behnken(self):
         upper = 10.
         center = 1
@@ -921,7 +914,7 @@ class TestDOEDriver(unittest.TestCase):
             for name in ('x', 'y', 'z'):
                 self.assertEqual(outputs[name], expected_case[name])
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_latin_hypercube(self):
         samples = 4
 
@@ -994,7 +987,7 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(x_buckets_filled, all_buckets)
         self.assertEqual(y_buckets_filled, all_buckets)
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_latin_hypercube_array(self):
         samples = 4
 
@@ -1063,7 +1056,7 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(x_buckets_filled, all_buckets)
         self.assertEqual(y_buckets_filled, all_buckets)
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_latin_hypercube_center(self):
         samples = 4
         upper = 10.
@@ -1122,7 +1115,7 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(x_buckets_filled, all_buckets)
         self.assertEqual(y_buckets_filled, all_buckets)
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_record_bug(self):
         # There was a bug that caused values to be recorded in driver_scaled form.
 
@@ -1382,7 +1375,7 @@ class TestDOEDriver(unittest.TestCase):
                 self.assertEqual(outputs[name], expected_case[name])
                 self.assertTrue(isinstance(outputs[name], int))
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_desvar_indices(self):
         prob = om.Problem()
         prob.model.add_subsystem('comp', om.ExecComp('y=x**2',
@@ -1438,7 +1431,7 @@ class TestDOEDriver(unittest.TestCase):
         for name in ('x', 'y', 'z'):
             assert_near_equal(outputs[name], prob[name])
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_multi_constraint_doe(self):
         prob = om.Problem()
         prob.model.add_subsystem('comp', om.ExecComp('y=x**2 + b',
@@ -1500,7 +1493,7 @@ class TestDOEDriver(unittest.TestCase):
             for dv in ('x', 'y'):
                 self.assertEqual(derivs['f_xy', dv], expected_deriv['f_xy', dv])
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_derivative_scaled_recording(self):
         prob = om.Problem()
         model = prob.model
@@ -2192,7 +2185,7 @@ class TestParallelDOE2proc(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
 @use_tempdirs
 class TestParallelDistribDOE(unittest.TestCase):
 

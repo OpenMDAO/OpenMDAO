@@ -34,9 +34,9 @@ class DOEDriver(Driver):
     _color : int or None
         In MPI, the cached color is used to determine which cases to run on this proc.
     _indep_list : list
-        List of design variables.
+        List of design variables, used to compute derivatives.
     _quantities : list
-        Contains the objectives plus nonlinear constraints.
+        Contains the objectives plus nonlinear constraints, used to compute derivatives.
     """
 
     def __init__(self, generator=None, **kwargs):
@@ -232,8 +232,7 @@ class DOEDriver(Driver):
             # save reference to metadata for use in record_iteration
             self._metadata = metadata
 
-        opts = self.recording_options
-        if opts['record_derivatives']:
+        if self.recording_options['record_derivatives']:
             self._compute_totals(of=self._quantities,
                                  wrt=self._indep_list,
                                  return_format=self._total_jac_format,
