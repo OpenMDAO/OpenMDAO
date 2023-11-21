@@ -3266,9 +3266,7 @@ class TestPyoptSparseOutputFiles(unittest.TestCase):
         'ALPSO': [('filename', 'ALPSO_print.out'), ('filename', 'ALPSO_summary.out')],
         'CONMIN': [('IFILE', 'CONMIN.out')],
         'IPOPT': [('output_file', 'IPOPT.out')],
-        'NLPQLP': [('iFile', 'NLPQLP.out')],
         'PSQP': [('IFILE', 'PSQP.out')],
-        'PAROPT': [('tr_output_file', 'paropt.tr'), ('output_file', 'paropt.out')],
         'SLSQP': [('IFILE', 'SLSQP.out')],
         'SNOPT': [('Print file', 'SNOPT_print.out'), ('Summary file', 'SNOPT_summary.out')]
     }
@@ -3333,13 +3331,8 @@ class TestPyoptSparseOutputFiles(unittest.TestCase):
         if optimizer == 'ALPSO':
             prob.driver.opt_settings['fileout'] = 3
 
-        for opt_setting_name, output_file_name in output_file_names:
-            if optimizer == 'ALPSO': # Since ALPSO only has the one setting that affects both
-                                     #   output files
-                output_file_path = pathlib.Path(user_directory_name).joinpath('ALPSO.out')
-            else:
-                output_file_path = pathlib.Path(user_directory_name).joinpath(output_file_name)
-            prob.driver.opt_settings[opt_setting_name] =  str(output_file_path)
+
+        prob.driver.options['output_dir'] = user_directory_name
 
         prob.run_driver()
 

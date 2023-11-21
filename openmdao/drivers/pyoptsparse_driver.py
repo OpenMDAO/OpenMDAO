@@ -269,10 +269,10 @@ class pyOptSparseDriver(Driver):
         self.options.declare('hotstart_file', types=str, default=None, allow_none=True,
                              desc='File location of a pyopt_sparse optimization history to use '
                                   'to hot start the optimization. Default is None.')
-        self.options.declare('output_dir', types=(str,_ReprClass), default=_DEFAULT_REPORTS_DIR, allow_none=True,
+        self.options.declare('output_dir', types=(str, _ReprClass), default=_DEFAULT_REPORTS_DIR,
+                             allow_none=True,
                              desc='Directory location of pyopt_sparse output files.'
-                                'Default is ./reports_directory/problem_name.')
-
+                             'Default is ./reports_directory/problem_name.')
 
     @property
     def hist_file(self):
@@ -389,7 +389,7 @@ class pyOptSparseDriver(Driver):
             self.options['output_dir'] = str(default_output_dir)
         output_dir = self.options['output_dir']
 
-        if optimizer == 'ALPSO': # Actually, this is the root of two files generated
+        if optimizer == 'ALPSO':  # Actually, this is the root of two files generated
             if problem.driver.opt_settings.get('filename') is None:
                 problem.driver.opt_settings['filename'] = f'{output_dir}/ALPSO.out'
         elif optimizer == 'CONMIN':
@@ -398,18 +398,10 @@ class pyOptSparseDriver(Driver):
         elif optimizer == 'IPOPT':
             if problem.driver.opt_settings.get('output_file') is None:
                 problem.driver.opt_settings['output_file'] = f'{output_dir}/IPOPT.out'
-        elif optimizer == 'NLPQLP':
-            if problem.driver.opt_settings.get('iFile') is None:
-                problem.driver.opt_settings['iFile'] = f'{output_dir}/NLPQLP.out'
         # Nothing for NSGA2
         elif optimizer == 'PSQP':
             if problem.driver.opt_settings.get('IFILE') is None:
                 problem.driver.opt_settings['IFILE'] = f'{output_dir}/PSQP.out'
-        elif optimizer == 'PAROPT':
-            if problem.driver.opt_settings.get('tr_output_file') is None:
-                problem.driver.opt_settings['tr_output_file'] = f'{output_dir}/paropt.tr'
-            if problem.driver.opt_settings.get('output_file') is None:
-                problem.driver.opt_settings['output_file'] = f'{output_dir}/paropt.out'
         elif optimizer == 'SLSQP':
             if problem.driver.opt_settings.get('IFILE') is None:
                 problem.driver.opt_settings['IFILE'] = f'{output_dir}/SLSQP.out'
