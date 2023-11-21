@@ -1537,44 +1537,5 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
 
         self.assertEqual(ctx.exception.args[0], "File '_bad_pickle_' is not a valid coloring file.")
 
-
-
-@use_tempdirs
-class TestSettingColoringDir(unittest.TestCase):
-
-    def test_coloring_dir_is_None(self):
-        problem_options = {
-            'coloring_dir': None,
-        }
-        p = run_opt(pyOptSparseDriver, 'auto', assemble_type='csc', optimizer='SLSQP',
-                    dynamic_total_coloring=True, print_results=False,
-                    problem_options=problem_options)
-
-        coloring_dir = pathlib.Path('./coloring_files')
-        self.assertTrue(coloring_dir.is_dir(), 'Coloring dir not found')
-
-    def test_coloring_dir_is_custom(self):
-        problem_options = {
-            'coloring_dir': 'custom_coloring_dir',
-        }
-        p = run_opt(pyOptSparseDriver, 'auto', assemble_type='csc', optimizer='SLSQP',
-                    dynamic_total_coloring=True, print_results=False, problem_options=problem_options)
-
-        coloring_dir = pathlib.Path('custom_coloring_dir')
-        self.assertTrue(coloring_dir.is_dir(), 'Coloring dir not found')
-
-    def test_coloring_dir_is_default(self):
-        problem_options = {
-        }
-        p = run_opt(pyOptSparseDriver, 'auto', assemble_type='csc', optimizer='SLSQP',
-                    dynamic_total_coloring=True, print_results=False,
-                    problem_options=problem_options)
-
-        coloring_dir = pathlib.Path(get_reports_dir()).joinpath(p._name).joinpath(
-            'coloring_files')
-        self.assertTrue(coloring_dir.is_dir(), 'Coloring dir not found')
-
-
-
 if __name__ == '__main__':
     unittest.main()

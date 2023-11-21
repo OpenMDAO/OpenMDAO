@@ -288,10 +288,9 @@ class Problem(object):
 
         # General options
         self.options = OptionsDictionary(parent_name=type(self).__name__)
-        self.options.declare('coloring_dir', types=(str,_ReprClass), default=_DEFAULT_REPORTS_DIR,
-                             allow_none=True,
-                             desc='Directory containing coloring files (if any) for this Problem.'
-                                'Default is ./reports_directory/problem_name/coloring_dir.')
+        self.options.declare('coloring_dir', types=str,
+                             default=os.path.join(os.getcwd(), 'coloring_files'),
+                             desc='Directory containing coloring files (if any) for this Problem.')
         self.options.declare('group_by_pre_opt_post', types=bool,
                              default=False,
                              desc="If True, group subsystems of the top level model into "
@@ -971,18 +970,6 @@ class Problem(object):
         self._mode = self._orig_mode = mode
 
         model_comm = self.driver._setup_comm(comm)
-
-        # set the coloring_dir option based on user settings.
-        # By default, put it in the reports dir
-        # If set to None, put it in the current directory (the previous behavior)
-        # Otherwise, use what ever the user set the directory to
-        if self.options['coloring_dir'] is None:
-            self.options['coloring_dir'] = "./coloring_files"
-        elif self.options['coloring_dir'] == _DEFAULT_REPORTS_DIR:
-            default_coloring_dir = pathlib.Path(get_reports_dir()).joinpath(self._name).joinpath('coloring_files')
-            self.options['coloring_dir'] = str(default_coloring_dir)
-        if 'total_coloring' in self._reports:
-            pathlib.Path(self.options['coloring_dir']).mkdir(parents=True, exist_ok=True)
 
         # this metadata will be shared by all Systems/Solvers in the system tree
         self._metadata = {
