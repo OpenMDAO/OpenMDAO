@@ -3,7 +3,6 @@ Routines to compute coloring for use with simultaneous derivatives.
 """
 import datetime
 import io
-import itertools
 import os
 import time
 import pickle
@@ -23,7 +22,7 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM
 from openmdao.utils.general_utils import _src_or_alias_dict, \
-    _src_name_iter, _src_or_alias_item_iter
+    _src_name_iter, _src_or_alias_item_iter, _convert_auto_ivc_to_conn_name
 import openmdao.utils.hooks as hooks
 from openmdao.utils.mpi import MPI
 from openmdao.utils.file_utils import _load_and_exec, image2html
@@ -154,6 +153,8 @@ class Coloring(object):
         Names of total jacobian rows or columns.
     _local_array : ndarray or None:
         Indices of total jacobian rows or columns.
+    _abs2prom : {'input': dict, 'output': dict}
+        Dictionary mapping absolute names to promoted names.
     """
 
     def __init__(self, sparsity, row_vars=None, row_var_sizes=None, col_vars=None,
@@ -186,6 +187,8 @@ class Coloring(object):
 
         self._names_array = {'fwd': None, 'rev': None}
         self._local_array = {'fwd': None, 'rev': None}
+
+        self._abs2prom = None
 
     def color_iter(self, direction):
         """
@@ -596,7 +599,7 @@ class Coloring(object):
 
         return (
             f"Coloring (direction: {direction}, ncolors: {self.total_solves()}, shape: {shape}"
-            f", pct nonzero: {self._pct_nonzero:.2f}, tol: {self._meta.get('good_tol')}"
+            f", pct nonzero: {self._pct_nonzero:.2f}, tol: {self._meta.get('good_tol')})"
         )
 
     def summary(self, out_stream=_DEFAULT_OUT_STREAM):
@@ -657,7 +660,8 @@ class Coloring(object):
         if coloring_timestamp is not None:
             print(f"Coloring created on: {coloring_timestamp}", file=out_stream)
 
-    def display_txt(self, out_stream=_DEFAULT_OUT_STREAM, html=False, summary=True):
+    def display_txt(self, out_stream=_DEFAULT_OUT_STREAM, html=False, summary=True,
+                    use_prom_names=True):
         """
         Print the structure of a boolean array with coloring info for each nonzero value.
 
@@ -679,6 +683,8 @@ class Coloring(object):
             be plain text.
         summary : bool
             If True, include the coloring summary.
+        use_prom_names : bool
+            If True, display promoted names rather than absolute path names for variables.
         """
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
@@ -753,7 +759,12 @@ class Coloring(object):
                         for c in range(colstart, colend):
                             print(charr[r, c], end='', file=out_stream)
                         colstart = colend
-                    print(' %d  %s' % (r, rv), file=out_stream)  # include row variable with row
+                    if use_prom_names and self._abs2prom:
+                        row_var_name = self._get_prom_name(rv)
+                    else:
+                        row_var_name = rv
+                    # include row variable with row
+                    print(' %d  %s' % (r, row_var_name), file=out_stream)
                 rowstart = rowend
 
             # now print the column vars below the matrix, with each one spaced over to line up
@@ -762,7 +773,10 @@ class Coloring(object):
 
             for name, size in zip(self._col_vars, self._col_var_sizes):
                 tab = ' ' * start
-                col_var_name = name
+                if use_prom_names and self._abs2prom:
+                    col_var_name = self._get_prom_name(name)
+                else:
+                    col_var_name = name
                 print('%s|%s' % (tab, col_var_name), file=out_stream)
                 start += size
 
@@ -965,7 +979,8 @@ class Coloring(object):
 
         pyplot.close(fig)
 
-    def display_bokeh(source, output_file='total_coloring.html', show=False, max_colors=200):
+    def display_bokeh(source, output_file='total_coloring.html', show=False, max_colors=200,
+                      use_prom_names=True):
         """
         Display a plot of the sparsity pattern, showing grouping by color.
 
@@ -985,6 +1000,8 @@ class Coloring(object):
             to some default length, otherwise both forward and reverse displays may share shades
             very near white and be difficult to distinguish. Once the number of forward or reverse
             solves exceeds this threshold, the color pattern restarts.
+        use_prom_names : bool
+            If True, display promoted names rather than absolute path names for variables.
         """
         if bokeh_resources is None:
             print("bokeh is not installed so this coloring viewer is not available. The ascii "
@@ -1131,10 +1148,18 @@ class Coloring(object):
                     desvar_name = coloring._col_vars[np.digitize(col_idx, desvar_idx_bins)]
                     desvar_col_map[desvar_name].add(col_idx)
 
+                if use_prom_names and coloring._abs2prom:
+                    desvar_col_map = {coloring._get_prom_name(k): v
+                                      for k, v in desvar_col_map.items()}
+
                 resvar_col_map = {varname: set() for varname in coloring._row_vars}
                 for row_idx in range(nrows):
                     resvar_name = coloring._row_vars[np.digitize(row_idx, response_idx_bins)]
                     resvar_col_map[resvar_name].add(row_idx)
+
+                if use_prom_names and coloring._abs2prom:
+                    resvar_col_map = {coloring._get_prom_name(k): v
+                                      for k, v in resvar_col_map.items()}
 
                 design_var_js = CustomJSHover(code="""
                 for (var name in varnames_map) {
@@ -1444,6 +1469,24 @@ class Coloring(object):
             tangent = tangent.T
 
         return tangent
+
+    def _get_prom_name(self, abs_name):
+        """
+        Get promoted name for specified variable.
+        """
+        abs2prom = self._abs2prom
+
+        # if we don't have prom names, just return abs name
+        if not abs2prom:
+            return abs_name
+
+        # if we can't find a prom name, just return abs name
+        if abs_name in abs2prom['input']:
+            return abs2prom['input'][abs_name]
+        elif abs_name in abs2prom['output']:
+            return abs2prom['output'][abs_name]
+        else:
+            return abs_name
 
 
 def _order_by_ID(col_adj_matrix):
@@ -2242,11 +2285,21 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
             # save metadata we used to create the coloring
             coloring._meta.update(sparsity_info)
 
-            system = problem.model
             if fname is not None:
-                if ((system._full_comm is not None and system._full_comm.rank == 0) or
-                        (system._full_comm is None and system.comm.rank == 0)):
+                if ((model._full_comm is not None and model._full_comm.rank == 0) or
+                        (model._full_comm is None and model.comm.rank == 0)):
                     coloring.save(fname)
+
+    # save a copy of the abs2prom dict on the coloring object
+    # so promoted names can be used when displaying coloring data
+    # (also map auto_ivc names to the prom name of their connected input)
+    if coloring is not None:
+        coloring._abs2prom = abs2prom = model._var_allprocs_abs2prom.copy()
+        conns = model._conn_global_abs_in2out
+        for abs_out in abs2prom['output']:
+            if abs_out.startswith('_auto_ivc.'):
+                abs_in = _convert_auto_ivc_to_conn_name(conns, abs_out)
+                abs2prom['output'][abs_out] = abs2prom['input'][abs_in]
 
     driver._total_jac = None
 

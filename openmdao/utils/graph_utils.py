@@ -56,7 +56,7 @@ def get_out_of_order_nodes(graph, orders):
     return strongcomps, out_of_order
 
 
-def get_hybrid_graph(connections):
+def get_hybrid_graph(connections, model=None):
     """
     Return a graph of all variables and components in the model.
 
@@ -68,6 +68,9 @@ def get_hybrid_graph(connections):
     ----------
     connections : dict
         Dictionary of connections in the model, of the form {tgt: src}.
+    model : <Group>
+        The model that contains the connections, or None.  If not None, all
+        outputs, even unconnected ones, will be included in the graph.
 
     Returns
     -------
@@ -79,6 +82,7 @@ def get_hybrid_graph(connections):
     # (fewer edges) than would be the case for a pure variable graph where all inputs
     # to a particular component would have to be connected to all outputs from that component.
     graph = nx.DiGraph()
+
     for tgt, src in connections.items():
         if src not in graph:
             graph.add_node(src, type_='out')
@@ -92,5 +96,21 @@ def get_hybrid_graph(connections):
         graph.add_edge(tgt, tgt_sys)
 
         graph.add_edge(src, tgt)
+
+    if model is None:
+        return graph
+
+    # it's possible to have outputs that are unconnected, so we need to add them to the graph
+    # and connect them to their component.  All inputs are connected so we don't need to do the
+    # same for them.
+    for n in model._var_allprocs_abs2meta['output']:
+        if n not in graph:
+            graph.add_node(n, type_='out')
+            graph.add_edge(n.rpartition('.')[0], n)
+
+    for n in model._discrete_outputs:
+        if n not in graph:
+            graph.add_node(n, type_='out')
+            graph.add_edge(n.rpartition('.')[0], n)
 
     return graph
