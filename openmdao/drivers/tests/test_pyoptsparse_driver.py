@@ -2747,6 +2747,39 @@ class TestPyoptSparse(unittest.TestCase):
         assert_near_equal(p.get_val('exec.z')[0], 25, tolerance=1e-4)
         assert_near_equal(p.get_val('exec.z')[50], -75, tolerance=1e-4)
 
+    def test_prom_names(self):
+
+        p = om.Problem()
+
+        exec = om.ExecComp(['y = a*x**2',
+                            'z = a + x**2'],
+                            a={'shape': (1,)},
+                            y={'shape': (101,)},
+                            x={'shape': (101,)},
+                            z={'shape': (101,)})
+
+        p.model.add_subsystem('exec', exec,
+                              promotes_inputs=['a', 'x'],
+                              promotes_outputs=['y', 'z'])
+
+        p.model.add_design_var('a', lower=-1000, upper=1000)
+        p.model.add_objective('y', index=50)
+        p.model.add_constraint('z', indices=[0], equals=25)
+        p.model.add_constraint('z', indices=[-1], lower=20, alias="ALIAS_TEST")
+
+        p.driver = om.pyOptSparseDriver(optimizer=OPTIMIZER)
+
+        p.setup(mode='rev')
+        p.set_val('x', np.linspace(-10, 10, 101))
+        p.run_driver()
+
+        # check that the pyoptsparse solution uses promoted names
+        sol = p.driver.pyopt_solution
+
+        self.assertEqual(set(sol.variables.keys()), {'a'})
+        self.assertEqual(set(sol.objectives.keys()), {'y'})
+        self.assertEqual(set(sol.constraints.keys()), {'z', 'ALIAS_TEST'})
+
     def test_hist_file_hotstart(self):
         filename = "hist_file"
 

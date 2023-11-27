@@ -739,17 +739,23 @@ class TestProblem(unittest.TestCase):
         prob.model.add_subsystem('comp', Paraboloid())
         prob.setup()
         prob.run_model()
-        msg = "Problem .*: To enable complex step, specify 'force_alloc_complex=True' when calling " + \
-            "setup on the problem, e\.g\. 'problem\.setup\(force_alloc_complex=True\)'"
-        with self.assertRaisesRegex(RuntimeError, msg):
+
+        msg = f"Problem {prob._get_inst_id()}: To enable complex step, specify 'force_alloc_complex=True' when calling " + \
+              "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
+
+        with self.assertRaises(RuntimeError) as err:
             prob.set_complex_step_mode(True)
+        self.assertEqual(str(err.exception), msg)
 
         prob = om.Problem()
         prob.model.add_subsystem('comp', Paraboloid())
-        msg = "Problem .*: set_complex_step_mode cannot be called before `Problem\.run_model\(\)`, " + \
-            "`Problem\.run_driver\(\)`, or `Problem\.final_setup\(\)`."
-        with self.assertRaisesRegex(RuntimeError, msg) :
+
+        msg = f"Problem {prob._get_inst_id()}: set_complex_step_mode cannot be called before `Problem.run_model()`, " + \
+              "`Problem.run_driver()`, or `Problem.final_setup()`."
+
+        with self.assertRaises(RuntimeError) as err:
             prob.set_complex_step_mode(True)
+        self.assertEqual(str(err.exception), msg)
 
     def test_feature_run_driver(self):
 
@@ -1818,19 +1824,23 @@ class TestProblem(unittest.TestCase):
         prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
         prob.model.set_input_defaults('x', 3.0)
         prob.model.set_input_defaults('y', -4.0)
+
         prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'COBYLA'
+
         prob.model.add_design_var('x', lower=-50, upper=50)
         prob.model.add_design_var('y', lower=-50, upper=50)
         prob.model.add_objective('parab.f_xy')
         prob.model.add_constraint('const.g', lower=0, upper=10.)
+
         prob.setup()
 
-        msg = "Problem .*: Problem.list_problem_vars\(\) cannot be called before " \
-                         "`Problem\.run_model\(\)`, `Problem\.run_driver\(\)`, or " \
-                         "`Problem\.final_setup\(\)`\."
-        with self.assertRaisesRegex(RuntimeError, msg):
+        msg = f"Problem {prob._get_inst_id()}: Problem.list_problem_vars() cannot be called " \
+              "before `Problem.run_model()`, `Problem.run_driver()`, or `Problem.final_setup()`."
+
+        with self.assertRaises(RuntimeError) as err:
             prob.list_problem_vars()
+        self.assertEqual(str(err.exception), msg)
 
     def test_list_problem_w_multi_constraints(self):
         p = om.Problem()
