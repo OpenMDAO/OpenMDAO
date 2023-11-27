@@ -2697,12 +2697,10 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
     """
     Set up internal data structures needed for computing approx totals.
     """
-    design_vars = driver._designvars
-
     if of is None:
         of = driver._get_ordered_nl_responses()
     if wrt is None:
-        wrt = list(design_vars)
+        wrt = list(driver._designvars)
 
     # Initialization based on driver (or user) -requested "of" and "wrt".
     if (not model._owns_approx_jac or model._owns_approx_of is None or
@@ -2712,19 +2710,12 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
         model._owns_approx_wrt = wrt
 
         # Support for indices defined on driver vars.
-        if MPI and model.comm.size > 1:
-            of_idx = model._owns_approx_of_idx
-            for key, meta in driver._responses.items():
-                if meta['indices'] is not None:
-                    of_idx[key] = meta['indices']
-        else:
-            model._owns_approx_of_idx = {
-                key: meta['indices']
-                    for key, meta in _src_or_alias_item_iter(driver._responses)
-                if meta['indices'] is not None
-            }
+        model._owns_approx_of_idx = {
+            key: meta['indices'] for key, meta in _src_or_alias_item_iter(driver._responses)
+            if meta['indices'] is not None
+        }
         model._owns_approx_wrt_idx = {
-            key: meta['indices'] for key, meta in _src_or_alias_item_iter(design_vars)
+            key: meta['indices'] for key, meta in _src_or_alias_item_iter(driver._designvars)
             if meta['indices'] is not None
         }
 
