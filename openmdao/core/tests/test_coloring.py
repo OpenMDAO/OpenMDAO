@@ -10,9 +10,6 @@ import numpy as np
 from io import StringIO
 
 from numpy.testing import assert_almost_equal
-
-from openmdao.utils.reports_system import get_reports_dir
-
 try:
     from scipy.sparse import load_npz
 except ImportError:
@@ -92,9 +89,7 @@ class DynPartialsComp(om.ExplicitComponent):
 
 def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True,
             recorder=None, has_lin_constraint=True, has_diag_partials=True, partial_coloring=False,
-            use_vois=True, auto_ivc=False, con_alias=False, check=False,
-            problem_options=None,
-            **options):
+            use_vois=True, auto_ivc=False, con_alias=False, check=False, **options):
 
     p = om.Problem(model=CounterGroup())
 
@@ -256,9 +251,6 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
 
     if recorder:
         p.driver.add_recorder(recorder)
-
-    if problem_options and 'coloring_dir' in problem_options:
-        p.options['coloring_dir'] = problem_options['coloring_dir']
 
     p.setup(mode=mode, derivatives=derivs, check=check)
     if use_vois:
@@ -1561,6 +1553,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
             c = Coloring.load('_bad_pickle_')
 
         self.assertEqual(ctx.exception.args[0], "File '_bad_pickle_' is not a valid coloring file.")
+
 
 if __name__ == '__main__':
     unittest.main()
