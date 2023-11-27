@@ -130,16 +130,7 @@ def opt_report(prob, outfile=None):
 
     driver_scaling = True
 
-    # Collect data from the problem
-    abs2prom = prob.model._var_abs2prom
-
-    def get_prom_name(abs_name):
-        if abs_name in abs2prom['input']:
-            return abs2prom['input'][abs_name]
-        elif abs_name in abs2prom['output']:
-            return abs2prom['output'][abs_name]
-        else:
-            return abs_name
+    get_prom_name = prob.model._get_prom_name
 
     # Collect the entire array of array valued desvars and constraints (ignore indices)
     objs_vals = {}
