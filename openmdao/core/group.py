@@ -186,10 +186,6 @@ class Group(System):
         Sorted list of pathnames of components that are executed prior to the optimization loop.
     _post_components : list of str or None
         Sorted list of pathnames of components that are executed after the optimization loop.
-    _abs_desvars : set
-        Set of absolute design variable names.
-    _abs_responses : set
-        Set of absolute response names.
     _relevance_graph : nx.DiGraph
         Graph of relevance connections.  Always None except in the top level Group.
     """
@@ -219,8 +215,6 @@ class Group(System):
         self._shapes_graph = None
         self._pre_components = None
         self._post_components = None
-        self._abs_desvars = None
-        self._abs_responses = None
         self._relevance_graph = None
 
         # TODO: we cannot set the solvers with property setters at the moment
@@ -771,7 +765,7 @@ class Group(System):
         # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
 
-    def _init_relevance(self, mode):
+    def _init_relevance(self, mode, abs_desvars=None, abs_responses=None):
         """
         Create the relevance dictionary.
 
@@ -781,19 +775,23 @@ class Group(System):
         ----------
         mode : str
             Derivative direction, either 'fwd' or 'rev'.
+        abs_desvars : dict or None
+            Dictionary of design variable metadata, keyed using absolute names.
+        abs_responses : dict or None
+            Dictionary of response variable metadata, keyed using absolute names.
 
         Returns
         -------
         dict
             The relevance dictionary.
         """
-        abs_desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
-        abs_responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
-        self._abs_desvars = set(_src_name_iter(abs_desvars))
-        self._abs_responses = set(_src_name_iter(abs_responses))
         assert self.pathname == '', "Relevance can only be initialized on the top level System."
 
         if self._use_derivatives:
+            if abs_desvars is None:
+                abs_desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
+            if abs_responses is None:
+                abs_responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
             return self.get_relevant_vars(abs_desvars,
                                           self._check_alias_overlaps(abs_responses), mode)
 
