@@ -823,21 +823,18 @@ class Group(System):
         if self._relevance_graph is not None:
             return self._relevance_graph
 
-        conns = self._conn_global_abs_in2out
-        graph = self.get_hybrid_graph(conns)
+        graph = self.get_hybrid_graph()
         outmeta = self._var_allprocs_abs2meta['output']
 
-        dvs = set(meta2src_iter(desvars.values()))
-        resps = set(meta2src_iter(responses.values()))
-
         # now add design vars and responses to the graph
-        for dv in dvs:
+        for dv in meta2src_iter(desvars.values()):
             if dv not in graph:
                 graph.add_node(dv, type_='out',
                                dist=outmeta[dv]['distributed'] if dv in outmeta else None)
                 graph.add_edge(dv.rpartition('.')[0], dv)
             graph.nodes[dv]['isdv'] = True
 
+        resps = set(meta2src_iter(responses.values()))
         for res in resps:
             if res not in graph:
                 graph.add_node(res, type_='out',
@@ -878,7 +875,7 @@ class Group(System):
         self._relevance_graph = graph
         return graph
 
-    def get_hybrid_graph(self, connections):
+    def get_hybrid_graph(self):
         """
         Return a graph of all variables and components in the model.
 
@@ -890,11 +887,6 @@ class Group(System):
         graph where all inputs to a particular component would have to be connected to all outputs
         from that component.
 
-        Parameters
-        ----------
-        connections : dict
-            Dictionary of connections in the model, of the form {tgt: src}.
-
         Returns
         -------
         networkx.DiGraph
@@ -904,7 +896,7 @@ class Group(System):
         tgtmeta = self._var_allprocs_abs2meta['input']
         srcmeta = self._var_allprocs_abs2meta['output']
 
-        for tgt, src in connections.items():
+        for tgt, src in self._conn_global_abs_in2out.items():
             if src not in graph:
                 dist = srcmeta[src]['distributed'] if src in srcmeta else None
                 graph.add_node(src, type_='out', dist=dist,
@@ -5014,7 +5006,7 @@ class Group(System):
 
     def _setup_iteration_lists(self):
         """
-        Set up the lists containing the pre, iterated, and post subsets of systems.
+        Set up the iteration lists containing the pre, iterated, and post subsets of systems.
 
         This should only be called on the top level Group.
         """
@@ -5029,72 +5021,70 @@ class Group(System):
                           "the entire model will be included in the optimization iteration.")
             return
 
+        # keep track of Groups with nonlinear solvers that use gradients (like Newton). These groups
+        # and all systems they contain must be grouped together into the same iteration list.
         grad_groups = []
-        always_opt = {}
+        always_opt = set()
         for s in self.system_iter(recurse=True, include_self=True):
             if isinstance(s, Group):
                 if s.nonlinear_solver is not None and s.nonlinear_solver.supports['gradients']:
                     grad_groups.append(s.pathname)
             elif s.options['always_opt']:
-                always_opt[s.pathname] = None
+                always_opt.add(s.pathname)
 
-        dvs = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
+        designvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
         responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
 
-        if not dvs or not responses:
+        if not designvars or not responses:
             return
 
-        graph = self.get_relevance_graph(dvs, responses)
+        graph = self.get_hybrid_graph()
 
-        dvs = set([meta['source'] for meta in dvs.values()])
-        responses = list(set([meta['source'] for meta in responses.values()]))
+        # now add design vars and responses to the graph
+        for dv in meta2src_iter(designvars.values()):
+            if dv not in graph:
+                graph.add_node(dv, type_='out')
+                graph.add_edge(dv.rpartition('.')[0], dv)
+
+        resps = set(meta2src_iter(responses.values()))
+        for res in resps:
+            if res not in graph:
+                graph.add_node(res, type_='out')
+                graph.add_edge(res.rpartition('.')[0], res)
+
+        dvs = [meta['source'] for meta in designvars.values()]
+        dv0 = dvs[0]
+        dvs = set(dvs)
+        responses = [meta['source'] for meta in responses.values()]
+        response0 = responses[0]
+        responses = set(responses)  # get rid of dups due to aliases
 
         # we don't want _auto_ivc dependency to force all subsystems to be iterated, so split
         # the _auto_ivc node into two nodes, one for design vars and one for everything else.
         if '_auto_ivc' in graph:
-            edges = list(graph.edges('_auto_ivc'))
             graph.add_node('_auto_ivc_other')
+            # we're modifying the graph, so have to save existing auto_ivc edges before iterating
+            edges = list(graph.edges('_auto_ivc'))
+            for _, autoivc_var in edges:
+                if autoivc_var not in dvs:
+                    new_autoivc_var = autoivc_var.replace('_auto_ivc', '_auto_ivc_other')
+                    graph.add_node(new_autoivc_var, type_='out')
+                    graph.add_edge('_auto_ivc_other', new_autoivc_var)
+                    for _, inp in graph.edges(autoivc_var):
+                        graph.add_edge(new_autoivc_var, inp)
+                    graph.remove_node(autoivc_var)
 
-            for src, tgt in edges:
-                if tgt not in dvs:
-                    newtgt = tgt.replace('_auto_ivc', '_auto_ivc_other')
-                    graph.add_node(newtgt, type_='out')
-                    graph.add_edge('_auto_ivc_other', newtgt)
-                    for u, v in graph.edges(tgt):
-                        graph.add_edge(newtgt, v)
-                    graph.remove_node(tgt)
-
-        # add 'reverse' connections from inputs and outputs to their component
-        # if it exists in order to keep component and its vars in the same SCC.
-        # Also add 'reverse' connections between connected inputs and outputs
-        # belonging to the same component if the component is not in the graph so
-        # that they will be in the same SCC.
-        # Also, for any 'always_opt' components, loop them into a response to
-        # force them to be in the opt SCC.
+        # add 'reverse' connections from inputs and outputs to their component if it exists in order
+        # to keep component and its vars in the same SCC. Also, for any 'always_opt' components,
+        # loop them into a response to force them to be in the opt SCC.
         edges_to_add = []
         for src, tgt in graph.edges():
             varsrc = 'type_' in graph.nodes[src]
             vartgt = 'type_' in graph.nodes[tgt]
             if varsrc and not vartgt:  # tgt is a system
                 edges_to_add.append((tgt, src))  # connect from system back to var
-                if tgt in always_opt and always_opt[tgt] is None:
-                    always_opt[tgt] = [tgt]
             elif vartgt and not varsrc:  # src is a system
                 edges_to_add.append((tgt, src))  # connect from var back to system
-                if src in always_opt and always_opt[src] is None:
-                    always_opt[src] = [src]
-            elif vartgt and varsrc:  # both are var nodes
-                srcsys = src.rpartition('.')[0]
-                tgtsys = tgt.rpartition('.')[0]
-                if srcsys == tgtsys:
-                    edges_to_add.append((tgt, src))  # connect from tgt back to src
-                    if tgtsys in always_opt:
-                        always_opt[tgtsys].append(tgt)
-                    else:
-                        always_opt[tgtsys] = [tgt]
-            else:
-                # this should never happen
-                raise RuntimeError(f"Unexpected graph connection between {src} and {tgt}.")
 
         graph.add_edges_from(edges_to_add)
 
@@ -5111,13 +5101,10 @@ class Group(System):
             for dv in dvs:
                 graph.add_edge(res, dv)
 
-        if always_opt:
-            # loop 'always_opt' components (or their outputs if the component is not in the graph)
-            # into a response to force them to be in the opt SCC.
-            for tgts in always_opt.values():
-                for tgt in tgts:
-                    graph.add_edge(tgt, responses[0])
-                    graph.add_edge(responses[0], tgt)
+        # loop 'always_opt' components into a response to force them to be in the opt SCC.
+        for opt_sys in always_opt:
+            graph.add_edge(opt_sys, response0)
+            graph.add_edge(response0, opt_sys)
 
         if grad_groups:
             if self.comm.size > 1:
@@ -5153,13 +5140,20 @@ class Group(System):
 
             graph.add_edges_from(toadd)
 
+        # this gives us the strongly connected components in topological order
         sccs = get_sccs_topo(graph)
 
         pre = addto = set()
         post = set()
         iterated = set()
         for strong_con in sccs:
-            if dvs.intersection(strong_con):
+            # because the sccs are in topological order and all design vars and
+            # responses are in the iteration set, we know that until we
+            # see a design var (or response), we're in the pre-opt set.  Once we
+            # see a design var (or response), we're in the iterated set.  Once
+            # we see an scc without a design var (or response), we're in the
+            # post-opt set.
+            if dv0 in strong_con:
                 for s in strong_con:
                     if 'type_' in graph.nodes[s]:
                         s = s.rpartition('.')[0]
@@ -5174,11 +5168,11 @@ class Group(System):
                         addto.update(all_ancestors(s))
 
         # change _auto_ivc_other back to _auto_ivc.
-        # Note that this could cause _auto_ivc to be in multiple places, but that's ok.
         for iterset in (pre, iterated, post):
-            iterset.discard('_auto_ivc_other')
-            if iterset:
-                iterset.add('_auto_ivc')
+            if '_auto_ivc_other' in iterset:
+                iterset.discard('_auto_ivc_other')
+                if iterset:
+                    iterset.add('_auto_ivc')
 
         # remove _auto_ivc from pre and post if it's in iterated
         if '_auto_ivc' in iterated:
@@ -5194,7 +5188,8 @@ class Group(System):
 
         groups = set()
         for s in self.system_iter(recurse=True):
-            if isinstance(s, Group):
+            isgroup = isinstance(s, Group)
+            if isgroup:
                 groups.add(s.pathname)
             if s.pathname in iterated:
                 s._run_on_opt[_OptStatus.OPTIMIZING] = True
@@ -5202,12 +5197,15 @@ class Group(System):
                 # set OPTIMIZING to False because its default value is True
                 s._run_on_opt[_OptStatus.OPTIMIZING] = False
 
-            if s.pathname in pre:
+            # groups can be in multiple iteration lists, but components can
+            # only be in one (with _auto_ivc being the exception), so we have to
+            # check for that here.
+            if s.pathname in pre and (isgroup or s.pathname not in iterated or
+                                      s.pathname == '_auto_ivc'):
                 s._run_on_opt[_OptStatus.PRE] = True
-            if s.pathname in post:
+            if s.pathname in post and (isgroup or s.pathname not in iterated or
+                                       s.pathname == '_auto_ivc'):
                 s._run_on_opt[_OptStatus.POST] = True
-
-        self._relevance_graph = None  # reset graph since we've modified it
 
         self._pre_components = sorted(pre - groups)
         self._post_components = sorted(post - groups)
@@ -5247,3 +5245,39 @@ class Group(System):
                     self._subsystems_myproc[0]._full_comm.rank == 0
 
         return False
+
+    def _get_prom_name(self, abs_name):
+        """
+        Get promoted name for specified variable.
+        """
+        abs2prom = self._var_allprocs_abs2prom
+        if abs_name in abs2prom['input']:
+            return abs2prom['input'][abs_name]
+        elif abs_name in abs2prom['output']:
+            return abs2prom['output'][abs_name]
+        else:
+            return abs_name
+
+    def _prom_names_list(self, lst):
+        """
+        Convert a list of variable names to promoted names.
+        """
+        return [self._get_prom_name(n) for n in lst]
+
+    def _prom_names_dict(self, dct):
+        """
+        Convert a dictionary keyed on variable names to be keyed on promoted names.
+        """
+        return {self._get_prom_name(k): v for k, v in dct.items()}
+
+    def _prom_names_jac(self, jac):
+        """
+        Convert a nested dict jacobian keyed on variable names to be keyed on promoted names.
+        """
+        new_jac = {}
+        for of in jac:
+            new_jac[self._get_prom_name(of)] = of_dict = {}
+            for wrt in jac[of]:
+                of_dict[self._get_prom_name(wrt)] = jac[of][wrt]
+
+        return new_jac

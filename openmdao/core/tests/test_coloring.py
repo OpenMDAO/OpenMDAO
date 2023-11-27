@@ -125,7 +125,7 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
 
     p.model.add_subsystem('arctan_yox', arctan_yox)
 
-    p.model.add_subsystem('circle', om.ExecComp('area=pi*r**2'))
+    p.model.add_subsystem('circle', om.ExecComp('area=pi*r**2'), promotes_outputs=['area'])
 
     p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', has_diag_partials=has_diag_partials,
                                                g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
@@ -243,7 +243,7 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
             # linear constraint (if has_lin_constraint is set)
             p.model.add_constraint('y', equals=0, indices=[0,], linear=has_lin_constraint)
 
-        p.model.add_objective('circle.area', ref=-1)
+        p.model.add_objective('area', ref=-1)
 
     # setup coloring
     if color_info is not None:
@@ -311,6 +311,32 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         # coloring saves 16 solves per driver iter  (5 vs 21)
         self.assertEqual(p.model._solve_count, 21)
         self.assertEqual(p_color.model._solve_count, 5)
+
+    @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
+    def test_dynamic_total_coloring_display_txt(self):
+        p_color = run_opt(pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False,
+                          dynamic_total_coloring=True, auto_ivc=True)
+
+        # check text visualizion of coloring
+        coloring = compute_total_coloring(p_color)
+
+        stream = StringIO()
+        coloring.display_txt(out_stream=stream, use_prom_names=False)
+        color_txt = stream.getvalue().split('\n')
+
+        self.assertTrue(color_txt[0].endswith('  circle.area'))
+        self.assertEqual(color_txt[22].strip(), '|_auto_ivc.v0')
+        self.assertEqual(color_txt[23].strip(), '|_auto_ivc.v1')
+        self.assertEqual(color_txt[24].strip(), '|_auto_ivc.v2')
+
+        stream = StringIO()
+        coloring.display_txt(out_stream=stream)           # use_prom_names=True is the default
+        color_txt = stream.getvalue().split('\n')
+
+        self.assertTrue(color_txt[0].endswith('  area'))  # promoted name
+        self.assertEqual(color_txt[22].strip(), '|x')     # connected input rather than _auto_ivc.v0
+        self.assertEqual(color_txt[23].strip(), '|y')     # connected input rather than _auto_ivc.v1
+        self.assertEqual(color_txt[24].strip(), '|r')     # connected input rather than _auto_ivc.v2
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_total_coloring_snopt_auto_dyn_partials(self):
@@ -540,7 +566,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
         # test __repr__
         rep = repr(p_color.driver._coloring_info['coloring'])
-        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21), pct nonzero: 13.42, tol: 1e-15')
+        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21), pct nonzero: 13.42, tol: 1e-15)')
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_print_options_total_with_coloring_fwd(self):
@@ -821,7 +847,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         p = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, use_vois=False)
         coloring = compute_total_coloring(p,
                                           of=['r_con.g', 'theta_con.g', 'delta_theta_con.g',
-                                              'l_conx.g', 'y', 'circle.area'],
+                                              'l_conx.g', 'y', 'area'],
                                           wrt=['x', 'y', 'r'])
         self.assertEqual(coloring.total_solves(), 5)
 
@@ -1068,12 +1094,12 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
         p_color = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
         coloring = p_color.driver._coloring_info['coloring']
         rep = repr(coloring)
-        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21), pct nonzero: 13.42, tol: 1e-15')
+        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21), pct nonzero: 13.42, tol: 1e-15)')
 
         dense_J = np.ones((50, 50), dtype=bool)
         coloring = _compute_coloring(dense_J, 'auto')
         rep = repr(coloring)
-        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 50, shape: (50, 50), pct nonzero: 100.00, tol: None')
+        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 50, shape: (50, 50), pct nonzero: 100.00, tol: None)')
 
     def test_bad_mode(self):
         p_color_rev = run_opt(om.ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
