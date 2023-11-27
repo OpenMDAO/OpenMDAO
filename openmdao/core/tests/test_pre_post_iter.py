@@ -8,6 +8,26 @@ from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, Sel
 from openmdao.utils.testing_utils import use_tempdirs
 
 
+class MissingPartialsComp(om.ExplicitComponent):
+
+    def setup(self):
+        self.add_input('a', 1.0)
+        self.add_input('b', 1.0)
+        self.add_output('y', 1.0)
+        self.add_output('z', 1.0)
+
+        self.declare_partials(of=['y'], wrt=['a'])
+        self.declare_partials(of=['z'], wrt=['b'])
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = 2.0 * inputs['a']
+        outputs['z'] = 3.0 * inputs['b']
+
+    def compute_partials(self, inputs, partials, discrete_inputs=None):
+        partials['y', 'a'] = 2.0
+        partials['z', 'b'] = 3.0
+
+
 @use_tempdirs
 class TestPrePostIter(unittest.TestCase):
 
@@ -590,6 +610,41 @@ class TestPrePostIter(unittest.TestCase):
 
         data = p.check_totals(method='cs', out_stream=None)
         assert_check_totals(data)
+
+    def test_comp_multiple_iter_lists(self):
+        # Groups can be in multiple iteration lists, but not components.
+        p = om.Problem()
+        model = p.model
+        G1 = model.add_subsystem('G1', om.Group(), promotes=['*'])
+        G2 = model.add_subsystem('G2', om.Group(), promotes=['*'])
+        G3 = model.add_subsystem('G3', om.Group(), promotes=['*'])
+
+        C1 = G1.add_subsystem('C1', MissingPartialsComp())
+        C2 = G1.add_subsystem('C2', MissingPartialsComp())
+        C3 = G1.add_subsystem('C3', MissingPartialsComp())
+        C4 = G2.add_subsystem('C4', MissingPartialsComp())
+        C5 = G3.add_subsystem('C5', MissingPartialsComp())
+
+        model.connect('C1.y', 'C2.a')
+        model.connect('C1.z', 'C4.a')
+        model.connect('C2.y', 'C3.a')
+        model.connect('C3.z', 'C4.b')
+        model.connect('C4.y', 'C5.a')
+
+        model.add_design_var('C3.b')
+        model.add_objective('C4.z')
+
+        p.driver = om.ScipyOptimizeDriver()
+        p.options["group_by_pre_opt_post"] = True
+
+        p.setup()
+        p.final_setup()
+
+        self.assertEqual(C1._run_on_opt, [True, False, False])
+        self.assertEqual(C2._run_on_opt, [True, False, False])
+        self.assertEqual(C3._run_on_opt, [False, True, False])
+        self.assertEqual(C4._run_on_opt, [False, True, False])
+        self.assertEqual(C5._run_on_opt, [False, False, True])
 
 if __name__ == "__main__":
     unittest.main()
