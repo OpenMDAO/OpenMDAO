@@ -135,4 +135,4 @@ _DEFAULT_OUT_STREAM = _ReprClass("DEFAULT_OUT_STREAM")
 #  does not have a reference to the Problem so can't get the name. This serves as a flag that
 #  the default directory in the reports directory is what is wanted. Then in the run method,
 #  the actual default directory is used
-_DEFAULT_REPORTS_DIR = _ReprClass("DEFAULT_PYOPT_SPARSE_OUTPUT_DIR")
+_DEFAULT_REPORTS_DIR = _ReprClass("DEFAULT_REPORTS_DIR")
