@@ -404,7 +404,7 @@ class Vector(object):
 
     def _abs_set_val(self, name, val):
         """
-        Get the variable value using the absolute name.
+        Set the variable value using the absolute name.
 
         No error checking is performed on the name.
 

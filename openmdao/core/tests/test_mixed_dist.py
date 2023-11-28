@@ -117,7 +117,10 @@ def create_problem():
     return prob
 
 
-class TestMixedDist(unittest.TestCase):
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestMixedDist2(unittest.TestCase):
+    N_PROCS = 2
+
     def test_mixed_dist(self):
         prob = create_problem()
         prob.setup(mode='rev')
@@ -125,14 +128,8 @@ class TestMixedDist(unittest.TestCase):
         assert_check_totals(prob.check_totals())
 
 
-
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class TestMixedDist2(TestMixedDist):
-    N_PROCS = 2
-
-
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class TestMixedDist3(TestMixedDist):
+class TestMixedDist3(TestMixedDist2):
     N_PROCS = 3
 
 
