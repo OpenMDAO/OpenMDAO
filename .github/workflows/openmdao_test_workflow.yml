@@ -11,6 +11,8 @@ on:
   # Allow running the workflow manually from the Actions tab
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
 
   tests:
@@ -25,10 +27,10 @@ jobs:
           - NAME: Ubuntu Baseline
             OS: ubuntu-latest
             PY: '3.11'
-            NUMPY: '1.24'
+            NUMPY: '1.26'
             SCIPY: '1.11'
             PETSc: '3.18'
-            PYOPTSPARSE: 'v2.9.2'
+            PYOPTSPARSE: 'v2.10.1'
             # PAROPT: true
             SNOPT: '7.7'
             OPTIONAL: '[all]'
@@ -51,10 +53,10 @@ jobs:
           - NAME: MacOS Baseline
             OS: macos-latest
             PY: '3.11'
-            NUMPY: '1.24'
+            NUMPY: '1.26'
             SCIPY: '1.11'
             PETSc: '3.18'
-            # PYOPTSPARSE: 'v2.9.2'
+            # PYOPTSPARSE: 'v2.10.1'
             # PAROPT: true
             # SNOPT: '7.7'
             OPTIONAL: '[all]'
@@ -65,8 +67,8 @@ jobs:
           - NAME: Ubuntu Minimal
             OS: ubuntu-latest
             PY: '3'
-            NUMPY: '1.24'
-            SCIPY: '1.10'
+            NUMPY: '1'
+            SCIPY: '1'
             OPTIONAL: '[test]'
             TESTS: true
 
@@ -88,10 +90,10 @@ jobs:
           - NAME: Build Docs
             OS: ubuntu-latest
             PY: '3.11'
-            NUMPY: '1.24'
-            SCIPY: '1.10'
+            NUMPY: '1.26'
+            SCIPY: '1.11'
             PETSc: '3.18'
-            PYOPTSPARSE: 'v2.9.2'
+            PYOPTSPARSE: 'v2.10.1'
             SNOPT: '7.7'
             OPTIONAL: '[all]'
             JAX: '0.4.14'
@@ -363,7 +365,7 @@ jobs:
       - name: Display doc build reports
         if: failure() && matrix.BUILD_DOCS && steps.build_docs.outcome == 'failure'
         run: |
-          for f in /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports/*; do
+          for f in $(find /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports -name '*.log'); do
             echo "============================================================="
             echo $f
             echo "============================================================="
