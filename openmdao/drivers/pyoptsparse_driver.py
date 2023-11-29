@@ -380,10 +380,12 @@ class pyOptSparseDriver(Driver):
         self._check_for_invalid_desvar_values()
         self._check_jac = self.options['singular_jac_behavior'] in ['error', 'warn']
 
+        linear_constraints = [key for (key, con) in self._cons.items() if con['linear']]
+
         # Only need initial run if we have linear constraints or if we are using an optimizer that
         # doesn't perform one initially.
         model_ran = False
-        if optimizer in run_required or np.any([con['linear'] for con in self._cons.values()]):
+        if optimizer in run_required or linear_constraints:
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 # Initial Run
                 model.run_solve_nonlinear()
@@ -434,9 +436,8 @@ class pyOptSparseDriver(Driver):
         cons_to_remove = set()
 
         # Calculate and save derivatives for any linear constraints.
-        lcons = [key for (key, con) in self._cons.items() if con['linear']]
-        if len(lcons) > 0:
-            _lin_jacs = self._compute_totals(of=lcons, wrt=indep_list,
+        if len(linear_constraints) > 0:
+            _lin_jacs = self._compute_totals(of=linear_constraints, wrt=indep_list,
                                              return_format=self._total_jac_format)
             _con_vals = self.get_constraint_values(lintype='linear')
             # convert all of our linear constraint jacs to COO format. Otherwise pyoptsparse will

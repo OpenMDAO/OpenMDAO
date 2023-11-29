@@ -250,7 +250,6 @@ class _TotalJacInfo(object):
         for name in prom_of:
             if name in constraints and constraints[name]['linear']:
                 has_lin_cons = True
-                self.simul_coloring = None
                 break
         else:
             has_lin_cons = False

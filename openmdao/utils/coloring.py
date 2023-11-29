@@ -1956,7 +1956,7 @@ def _compute_total_coloring_context(top):
         top._problem_meta['coloring_randgen'] = None
 
 
-def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
+def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
                         tol=_DEF_COMP_SPARSITY_ARGS['tol'],
                         orders=_DEF_COMP_SPARSITY_ARGS['orders'], setup=False, run_model=False,
                         of=None, wrt=None, use_abs_names=True):
@@ -2238,9 +2238,8 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
     """
     driver = problem.driver
 
-    # if of and wrt are None, which is True in the case of dynamic coloring, ofs will be the
-    # 'driver' names of the responses (promoted or alias), and wrts will be the abs names of
-    # the wrt sources.  In this case, use_abs_names is not used.
+    # if of and wrt are None, ofs will be the 'driver' names of the responses (promoted or alias),
+    # and wrts will be the abs names of the wrt sources.  In this case, use_abs_names is not used.
     ofs, of_sizes = _get_response_info(driver, of)
     wrts, wrt_sizes = _get_desvar_info(driver, wrt)
 
@@ -2271,7 +2270,7 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
         coloring = model._compute_coloring(wrt_patterns='*', method=list(model._approx_schemes)[0],
                                            num_full_jacs=num_full_jacs, tol=tol, orders=orders)[0]
     else:
-        J, sparsity_info = _get_bool_total_jac(problem, num_full_jacs=num_full_jacs, tol=tol,
+        J, sparsity_info = _get_total_jac_sparsity(problem, num_full_jacs=num_full_jacs, tol=tol,
                                                orders=orders, setup=setup,
                                                run_model=run_model, of=ofs, wrt=wrts,
                                                use_abs_names=True)
