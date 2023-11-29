@@ -789,9 +789,11 @@ class Group(System):
 
         if self._use_derivatives:
             if abs_desvars is None:
-                abs_desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
+                abs_desvars = self.get_design_vars(recurse=True, get_sizes=False,
+                                                   use_prom_ivc=False)
             if abs_responses is None:
-                abs_responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
+                abs_responses = self.get_responses(recurse=True, get_sizes=False,
+                                                   use_prom_ivc=False)
             return self.get_relevant_vars(abs_desvars,
                                           self._check_alias_overlaps(abs_responses), mode)
 

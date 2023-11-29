@@ -1957,9 +1957,9 @@ def _compute_total_coloring_context(top):
 
 
 def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
-                        tol=_DEF_COMP_SPARSITY_ARGS['tol'],
-                        orders=_DEF_COMP_SPARSITY_ARGS['orders'], setup=False, run_model=False,
-                        of=None, wrt=None, use_abs_names=True):
+                            tol=_DEF_COMP_SPARSITY_ARGS['tol'],
+                            orders=_DEF_COMP_SPARSITY_ARGS['orders'], setup=False, run_model=False,
+                            of=None, wrt=None, use_abs_names=True):
     """
     Return a boolean version of the total jacobian.
 
@@ -2271,9 +2271,9 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
                                            num_full_jacs=num_full_jacs, tol=tol, orders=orders)[0]
     else:
         J, sparsity_info = _get_total_jac_sparsity(problem, num_full_jacs=num_full_jacs, tol=tol,
-                                               orders=orders, setup=setup,
-                                               run_model=run_model, of=ofs, wrt=wrts,
-                                               use_abs_names=True)
+                                                   orders=orders, setup=setup,
+                                                   run_model=run_model, of=ofs, wrt=wrts,
+                                                   use_abs_names=True)
         coloring = _compute_coloring(J, mode)
         if coloring is not None:
             coloring._row_vars = ofs
@@ -2759,18 +2759,19 @@ class _ColSparsityJac(object):
         # record only the nonzero part of the column.
         # Depending on user specified tolerance, the number of nonzeros may be further reduced later
         nzs = np.nonzero(column)[0]
-        if self._col_list[i] is None:
-            self._col_list[i] = [nzs, np.abs(column[nzs])]
-        else:
-            oldnzs, olddata = self._col_list[i]
-            if oldnzs.size == nzs.size and np.all(nzs == oldnzs):
-                olddata += np.abs(column[nzs])
-            else:  # nonzeros don't match
-                scratch = np.zeros(column.size)
-                scratch[oldnzs] = olddata
-                scratch[nzs] += np.abs(column[nzs])
-                newnzs = np.nonzero(scratch)[0]
-                self._col_list[i] = [newnzs, scratch[newnzs]]
+        if nzs.size > 0:
+            if self._col_list[i] is None:
+                self._col_list[i] = [nzs, np.abs(column[nzs])]
+            else:
+                oldnzs, olddata = self._col_list[i]
+                if oldnzs.size == nzs.size and np.all(nzs == oldnzs):
+                    olddata += np.abs(column[nzs])
+                else:  # nonzeros don't match
+                    scratch = np.zeros(column.size)
+                    scratch[oldnzs] = olddata
+                    scratch[nzs] += np.abs(column[nzs])
+                    newnzs = np.nonzero(scratch)[0]
+                    self._col_list[i] = [newnzs, scratch[newnzs]]
 
     def set_dense_jac(self, system, jac):
         """
@@ -2783,8 +2784,8 @@ class _ColSparsityJac(object):
         jac : ndarray
             Dense jacobian.
         """
-        for i, col in enumerate(jac.T):
-            self.set_col(system, i, col)
+        for i in range(jac.shape[1]):
+            self.set_col(system, i, jac[:, i])
 
     def __setitem__(self, key, value):
         # ignore any setting of subjacs based on analytic derivs
@@ -2814,10 +2815,10 @@ class _ColSparsityJac(object):
             if tup is None:
                 continue
             rowinds, d = tup
-            if rowinds.size > 0:
-                rows.append(rowinds)
-                cols.append(np.full(rowinds.size, icol))
-                data.append(d)
+            rows.append(rowinds)
+            cols.append(np.full(rowinds.size, icol))
+            data.append(d)
+
         if rows:
             rows = np.hstack(rows)
             cols = np.hstack(cols)

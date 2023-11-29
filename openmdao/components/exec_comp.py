@@ -1039,10 +1039,10 @@ class ExecComp(ExplicitComponent):
 
             for icol, rows in zip(icols, nzrowlists):
                 scratch[rows] = imag_oar[rows]
-                inp = idx2name[icol]
-                loc_i = icol - in_slices[inp].start
+                input_name = idx2name[icol]
+                loc_i = icol - in_slices[input_name].start
                 for u in out_names:
-                    key = (u, inp)
+                    key = (u, input_name)
                     if key in self._declared_partials:
                         # set the column in the Jacobian entry
                         part = scratch[out_slices[u]]
