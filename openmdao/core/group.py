@@ -778,7 +778,8 @@ class Group(System):
         abs_desvars : dict or None
             Dictionary of design variable metadata, keyed using absolute names.
         abs_responses : dict or None
-            Dictionary of response variable metadata, keyed using absolute names.
+            Dictionary of response variable metadata, keyed using absolute names.  Aliases are
+            not allowed.
 
         Returns
         -------
@@ -1089,7 +1090,7 @@ class Group(System):
         # group all aliases by source so we can compute overlaps for each source individually
         for name, meta in responses.items():
             if meta['alias'] and not (name in discrete['input'] or name in discrete['output']):
-                aliases.add(name)  # name is the same as meta['alias'] here
+                aliases.add(meta['alias'])
                 src = meta['source']
                 if src in aliased_srcs:
                     aliased_srcs[src].append(meta)
@@ -4162,12 +4163,11 @@ class Group(System):
         self._jacobian = DictionaryJacobian(system=self)
 
         abs2meta = self._var_allprocs_abs2meta
-        info = self._coloring_info
         responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
 
-        if info['coloring'] is not None and (self._owns_approx_of is None or
-                                             self._owns_approx_wrt is None):
-            method = info['method']
+        if self._coloring_info['coloring'] is not None and (self._owns_approx_of is None or
+                                                            self._owns_approx_wrt is None):
+            method = self._coloring_info['method']
         else:
             method = list(self._approx_schemes)[0]
 
@@ -4237,8 +4237,9 @@ class Group(System):
         Ensure that if coloring is declared, approximations will be set up.
         """
         if self._coloring_info['coloring'] is not None:
-            meta = self._coloring_info
-            self.approx_totals(meta['method'], meta.get('step'), meta.get('form'))
+            self.approx_totals(self._coloring_info['method'],
+                               self._coloring_info.get('step'),
+                               self._coloring_info.get('form'))
         self._setup_approx_partials()
 
     def _setup_check(self):

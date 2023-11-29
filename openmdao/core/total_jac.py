@@ -143,6 +143,8 @@ class _TotalJacInfo(object):
         self.get_remote = get_remote
         self.directional = directional
 
+        has_custom_derivs = of is not None or wrt is not None
+
         if isinstance(wrt, str):
             wrt = [wrt]
 
@@ -231,14 +233,8 @@ class _TotalJacInfo(object):
         self.output_list = {'fwd': of, 'rev': wrt}
         self.input_meta = {'fwd': design_vars, 'rev': responses}
         self.output_meta = {'fwd': responses, 'rev': design_vars}
-        self.input_vec = {
-            'fwd': model._dresiduals,
-            'rev': model._doutputs
-        }
-        self.output_vec = {
-            'fwd': model._doutputs,
-            'rev': model._dresiduals
-        }
+        self.input_vec = {'fwd': model._dresiduals, 'rev': model._doutputs}
+        self.output_vec = {'fwd': model._doutputs, 'rev': model._dresiduals}
         self._dist_driver_vars = driver._dist_driver_vars
 
         abs2meta_out = model._var_allprocs_abs2meta['output']
@@ -635,8 +631,6 @@ class _TotalJacInfo(object):
         idx_iter_dict = {}  # a dict of index iterators
 
         simul_coloring = self.simul_coloring
-        if simul_coloring:
-            simul_color_modes = {'fwd': simul_coloring._fwd, 'rev': simul_coloring._rev}
 
         vois = self.input_meta[mode]
         input_list = self.input_list[mode]
@@ -814,11 +808,14 @@ class _TotalJacInfo(object):
         loc_idxs = np.hstack(loc_idxs)
         seed = np.hstack(seed)
 
+        if simul_coloring:
+            simul_color_mode = simul_coloring._fwd if mode == 'fwd' else simul_coloring._rev
+
         if self.directional:
             seed[:] = _directional_rng.random(seed.size)
             seed *= 2.0
             seed -= 1.0
-        elif simul_coloring and simul_color_modes[mode] is not None:
+        elif simul_coloring and simul_color_mode is not None:
             imeta = defaultdict(bool)
             imeta['coloring'] = simul_coloring
             all_rel_systems = set()
@@ -1589,7 +1586,7 @@ class _TotalJacInfo(object):
         if self.has_scaling:
             self._do_driver_scaling(self.J_dict)
 
-        # if some of the wrt vars are distributed in fwd mode, we have to bcast from the rank
+        # if some of the wrt vars are distributed in fwd mode, we bcast from the rank
         # where each part of the distrib var exists
         if self.get_remote and mode == 'fwd' and self.has_input_dist[mode]:
             for start, stop, rank in self.dist_input_range_map[mode]:
@@ -1931,12 +1928,14 @@ class _TotalJacInfo(object):
         finally:
             self.model._recording_iter.pop()
 
-    def set_col(self, icol, column):
+    def set_col(self, system, icol, column):
         """
         Set the given column of the total jacobian.
 
         Parameters
         ----------
+        system : System
+            System that is setting the column. (not used)
         icol : int
             Index of the column.
         column : ndarray

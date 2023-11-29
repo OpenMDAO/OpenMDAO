@@ -384,13 +384,13 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
         jac = False
 
     if jac:
-        # save old totals
         coloring = driver._get_coloring()
 
         # assemble data for jacobian visualization
         data['oflabels'] = driver._get_ordered_nl_responses()
         data['wrtlabels'] = list(dv_vals)
 
+        # save old totals
         if driver._total_jac is None:
             # this call updates driver._total_jac
             driver._compute_totals(of=data['oflabels'], wrt=data['wrtlabels'],

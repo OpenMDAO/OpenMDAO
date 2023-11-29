@@ -2326,7 +2326,7 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
 
     Returns
     -------
-    Coloring
+    Coloring or None
         The computed coloring.
     """
     problem = driver._problem()

@@ -582,15 +582,14 @@ class ApproximationScheme(object):
         if not self._wrt_meta:
             return
 
-        if jac is None:
+        if system._tot_jac is not None:
+            jac = system._tot_jac
+        elif jac is None:
             jac = system._jacobian
 
         for ic, col in self.compute_approx_col_iter(system,
                                                     under_cs=system._outputs._under_complex_step):
-            if system._tot_jac is None:
-                jac.set_col(system, ic, col)
-            else:
-                system._tot_jac.set_col(ic, col)
+            jac.set_col(system, ic, col)
 
     def _compute_approx_col_iter(self, system, under_cs):
         # This will either generate new approx groups or use cached ones
