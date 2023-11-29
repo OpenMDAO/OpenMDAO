@@ -66,9 +66,9 @@ jobs:
           # test minimal install
           - NAME: Ubuntu Minimal
             OS: ubuntu-latest
-            PY: '3'
-            NUMPY: '1'
-            SCIPY: '1'
+            PY: '3.11'
+            NUMPY: '1.26'
+            SCIPY: '1.11'
             OPTIONAL: '[test]'
             TESTS: true
 
