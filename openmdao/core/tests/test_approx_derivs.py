@@ -152,7 +152,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        prob.driver._compute_totals(of=['parab.f_xy'], wrt=['px.x'], use_abs_names=True)
+        prob.driver._compute_totals(of=['parab.f_xy'], wrt=['px.x'])
 
         # 1. run_model; 2. step x
         self.assertEqual(model.parab.count, 2)

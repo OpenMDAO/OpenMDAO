@@ -436,7 +436,7 @@ class pyOptSparseDriver(Driver):
         cons_to_remove = set()
 
         # Calculate and save derivatives for any linear constraints.
-        if len(linear_constraints) > 0:
+        if linear_constraints:
             _lin_jacs = self._compute_totals(of=linear_constraints, wrt=indep_list,
                                              return_format=self._total_jac_format)
             _con_vals = self.get_constraint_values(lintype='linear')

@@ -98,7 +98,7 @@ class _TotalJacInfo(object):
         If True, perform a single directional derivative.
     """
 
-    def __init__(self, problem, of, wrt, use_abs_names, return_format, approx=False,
+    def __init__(self, problem, of, wrt, return_format, approx=False,
                  debug_print=False, driver_scaling=True, get_remote=True, directional=False):
         """
         Initialize object.
@@ -111,8 +111,6 @@ class _TotalJacInfo(object):
             Response names.
         wrt : iter of str
             Design variable names.
-        use_abs_names : bool
-            If True, names in of and wrt are absolute names.
         return_format : str
             Indicates the desired return format of the total jacobian. Can have value of
             'array', 'dict', or 'flat_dict'.

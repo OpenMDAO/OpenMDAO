@@ -1777,13 +1777,13 @@ class Problem(object):
         # Calculate Total Derivatives
         if model._owns_approx_jac:
             # Support this, even though it is a bit silly (though you could compare fd with cs.)
-            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
+            total_info = _TotalJacInfo(self, of, wrt, return_format='flat_dict',
                                        approx=True, driver_scaling=driver_scaling,
                                        directional=directional)
             Jcalc = total_info.compute_totals_approx(initialize=True)
             Jcalc_name = 'J_fwd'
         else:
-            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
+            total_info = _TotalJacInfo(self, of, wrt, return_format='flat_dict',
                                        driver_scaling=driver_scaling, directional=directional)
             self._metadata['checking'] = True
             try:
@@ -1829,7 +1829,7 @@ class Problem(object):
 
             model.approx_totals(method=method, step=step, form=form,
                                 step_calc=step_calc if method == 'fd' else None)
-            fd_tot_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
+            fd_tot_info = _TotalJacInfo(self, of, wrt, return_format='flat_dict',
                                         approx=True, driver_scaling=driver_scaling,
                                         directional=directional)
             if directional:
@@ -1946,7 +1946,7 @@ class Problem(object):
             or the ref and ref0 values that were specified when add_design_var, add_objective, and
             add_constraint were called on the model. Default is False, which is unscaled.
         use_abs_names : bool
-            Set to True when passing in absolute names to skip some translation steps.
+            This is deprecated and has no effect.
         get_remote : bool
             If True, the default, the full distributed total jacobian will be retrieved.
 
@@ -1955,6 +1955,10 @@ class Problem(object):
         object
             Derivatives in form requested by 'return_format'.
         """
+        if use_abs_names:
+            warn_deprecation("The use_abs_names argument to compute_totals is deprecated and has "
+                             "no effect.")
+
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             with multi_proc_exception_check(self.comm):
                 self.final_setup()
@@ -1973,11 +1977,11 @@ class Problem(object):
                                    "for compute_totals.")
 
         if self.model._owns_approx_jac:
-            total_info = _TotalJacInfo(self, of, wrt, use_abs_names, return_format,
+            total_info = _TotalJacInfo(self, of, wrt, return_format,
                                        approx=True, driver_scaling=driver_scaling)
             return total_info.compute_totals_approx(initialize=True)
         else:
-            total_info = _TotalJacInfo(self, of, wrt, use_abs_names, return_format,
+            total_info = _TotalJacInfo(self, of, wrt, return_format,
                                        debug_print=debug_print, driver_scaling=driver_scaling,
                                        get_remote=get_remote)
             return total_info.compute_totals()

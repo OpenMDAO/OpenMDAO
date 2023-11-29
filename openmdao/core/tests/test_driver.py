@@ -156,8 +156,7 @@ class TestDriver(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        derivs = prob.driver._compute_totals(of=['comp.y1'], wrt=['px.x'], use_abs_names=True,
-                                             return_format='dict')
+        derivs = prob.driver._compute_totals(of=['comp.y1'], wrt=['px.x'], return_format='dict')
 
         oscale = np.array([1.0/(7.0-5.2), 1.0/(11.0-6.3)])
         iscale = np.array([2.0-0.5, 3.0-1.5])

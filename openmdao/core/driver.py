@@ -997,8 +997,7 @@ class Driver(object):
     def _recording_iter(self):
         return self._problem()._metadata['recording_iter']
 
-    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict',
-                        use_abs_names=True, driver_scaling=True):
+    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', driver_scaling=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1016,8 +1015,6 @@ class Driver(object):
             Format to return the derivatives. Default is a 'flat_dict', which
             returns them in a dictionary whose keys are tuples of form (of, wrt). For
             the scipy optimizer, 'array' is also supported.
-        use_abs_names : bool
-            Set to True when passing in absolute names to skip some translation steps.
         driver_scaling : bool
             If True (default), scale derivative values by the quantities specified when the desvars
             and responses were added. If False, leave them unscaled.
@@ -1042,8 +1039,8 @@ class Driver(object):
 
             try:
                 if total_jac is None:
-                    total_jac = _TotalJacInfo(problem, of, wrt, use_abs_names,
-                                              return_format, approx=True, debug_print=debug_print,
+                    total_jac = _TotalJacInfo(problem, of, wrt, return_format, approx=True,
+                                              debug_print=debug_print,
                                               driver_scaling=driver_scaling)
 
                     if total_jac.has_lin_cons:
@@ -1062,7 +1059,7 @@ class Driver(object):
 
         else:
             if total_jac is None:
-                total_jac = _TotalJacInfo(problem, of, wrt, use_abs_names, return_format,
+                total_jac = _TotalJacInfo(problem, of, wrt, return_format,
                                           debug_print=debug_print, driver_scaling=driver_scaling)
 
                 if total_jac.has_lin_cons:

@@ -492,9 +492,7 @@ class SubmodelComp(ExplicitComponent):
         wrt = list(self.submodel_inputs.keys())
         of = list(self.submodel_outputs.keys())
 
-        tots = p.driver._compute_totals(wrt=wrt,
-                                        of=of,
-                                        use_abs_names=False, driver_scaling=False)
+        tots = p.driver._compute_totals(wrt=wrt, of=of, driver_scaling=False)
 
         if self.coloring is None:
             for (tot_output, tot_input), tot in tots.items():

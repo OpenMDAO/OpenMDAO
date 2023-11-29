@@ -21,11 +21,10 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM
-from openmdao.utils.general_utils import _src_or_alias_dict, \
-    _src_name_iter, _src_or_alias_item_iter, _convert_auto_ivc_to_conn_name
+from openmdao.utils.general_utils import _src_name_iter, _src_or_alias_item_iter, \
+    _convert_auto_ivc_to_conn_name
 import openmdao.utils.hooks as hooks
-from openmdao.utils.mpi import MPI
-from openmdao.utils.file_utils import _load_and_exec, image2html
+from openmdao.utils.file_utils import _load_and_exec
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, OMDeprecationWarning
 from openmdao.utils.reports_system import register_report
 from openmdao.devtools.memory import mem_usage
@@ -41,12 +40,12 @@ except ImportError:
 
 try:
     from bokeh.models import CategoricalColorMapper, ColumnDataSource, CustomJSHover, \
-        Div, FixedTicker, HoverTool, LinearColorMapper, PreText
-    from bokeh.layouts import column, grid, gridplot
+        Div, HoverTool, PreText
+    from bokeh.layouts import column
     from bokeh.palettes import Blues256, Reds256, gray, interp_palette
     from bokeh.plotting import figure
     import bokeh.resources as bokeh_resources
-    from bokeh.transform import linear_cmap, transform
+    from bokeh.transform import transform
     import bokeh.io
 except ImportError:
     bokeh_resources = None
@@ -1959,7 +1958,7 @@ def _compute_total_coloring_context(top):
 def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
                             tol=_DEF_COMP_SPARSITY_ARGS['tol'],
                             orders=_DEF_COMP_SPARSITY_ARGS['orders'], setup=False, run_model=False,
-                            of=None, wrt=None, use_abs_names=True):
+                            of=None, wrt=None):
     """
     Return a boolean version of the total jacobian.
 
@@ -1990,8 +1989,6 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
         Names of response variables.
     wrt : iter of str or None
         Names of design variables.
-    use_abs_names : bool
-        Set to True when passing in absolute names to skip some translation steps.
 
     Returns
     -------
@@ -2026,11 +2023,9 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
         fullJ = None
         for i in range(num_full_jacs):
             if use_driver:
-                Jabs = prob.driver._compute_totals(of=of, wrt=wrt, return_format='array',
-                                                   use_abs_names=use_abs_names)
+                Jabs = prob.driver._compute_totals(of=of, wrt=wrt, return_format='array')
             else:
-                Jabs = prob.compute_totals(of=of, wrt=wrt, return_format='array',
-                                           use_abs_names=use_abs_names)
+                Jabs = prob.compute_totals(of=of, wrt=wrt, return_format='array')
             if fullJ is None:
                 fullJ = np.abs(Jabs)
             else:
@@ -2239,7 +2234,7 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
     driver = problem.driver
 
     # if of and wrt are None, ofs will be the 'driver' names of the responses (promoted or alias),
-    # and wrts will be the abs names of the wrt sources.  In this case, use_abs_names is not used.
+    # and wrts will be the abs names of the wrt sources.
     ofs, of_sizes = _get_response_info(driver, of)
     wrts, wrt_sizes = _get_desvar_info(driver, wrt)
 
@@ -2272,8 +2267,7 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
     else:
         J, sparsity_info = _get_total_jac_sparsity(problem, num_full_jacs=num_full_jacs, tol=tol,
                                                    orders=orders, setup=setup,
-                                                   run_model=run_model, of=ofs, wrt=wrts,
-                                                   use_abs_names=True)
+                                                   run_model=run_model, of=ofs, wrt=wrts)
         coloring = _compute_coloring(J, mode)
         if coloring is not None:
             coloring._row_vars = ofs
@@ -2696,12 +2690,10 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
     """
     Set up internal data structures needed for computing approx totals.
     """
-    design_vars = driver._designvars
-
     if of is None:
         of = driver._get_ordered_nl_responses()
     if wrt is None:
-        wrt = list(design_vars)
+        wrt = list(driver._designvars)
 
     # Initialization based on driver (or user) -requested "of" and "wrt".
     if (not model._owns_approx_jac or model._owns_approx_of is None or
@@ -2711,19 +2703,13 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
         model._owns_approx_wrt = wrt
 
         # Support for indices defined on driver vars.
-        if MPI and model.comm.size > 1:
-            of_idx = model._owns_approx_of_idx
-            for key, meta in driver._responses.items():
-                if meta['indices'] is not None:
-                    of_idx[key] = meta['indices']
-        else:
-            model._owns_approx_of_idx = {
-                key: meta['indices']
-                    for key, meta in _src_or_alias_item_iter(driver._responses)
-                if meta['indices'] is not None
-            }
+        model._owns_approx_of_idx = {
+            key: meta['indices']
+                for key, meta in _src_or_alias_item_iter(driver._responses)
+            if meta['indices'] is not None
+        }
         model._owns_approx_wrt_idx = {
-            key: meta['indices'] for key, meta in _src_or_alias_item_iter(design_vars)
+            key: meta['indices'] for key, meta in _src_or_alias_item_iter(driver._designvars)
             if meta['indices'] is not None
         }
 
