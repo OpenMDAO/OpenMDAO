@@ -82,7 +82,7 @@ class MultiN2ParallelTestCase(unittest.TestCase):
 
     def test_n2_parallel(self):
         """
-        Verify that both comms create an N2 file.
+        Verify that an N2 file is generated for the problems on both comms
         """
         om.n2(self.p, show_browser=False, outfile=self.outFile)
         self.assertTrue(os.path.exists(self.outFile), msg=f"{self.outFile} not found")
