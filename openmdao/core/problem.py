@@ -1986,6 +1986,42 @@ class Problem(object):
                                        get_remote=get_remote)
             return total_info.compute_totals()
 
+    def _active_desvar_iter(self, names=None):
+        """
+        Yield the active design variables and their metadata.
+
+        Parameters
+        ----------
+        names : iter of str or None
+            Iterator of design variable names.
+
+        Yields
+        ------
+        str
+            Name of the design variable.
+        dict
+            Metadata for the design variable.
+        """
+        pass
+
+    def _active_response_iter(self, names=None):
+        """
+        Yield the active responses and their metadata.
+
+        Parameters
+        ----------
+        names : iter of str or None
+            Iterator of response names.
+
+        Yields
+        ------
+        str
+            Name of the response.
+        dict
+            Metadata for the response.
+        """
+        pass
+
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
         Control printing for solvers and subsolvers in the model.

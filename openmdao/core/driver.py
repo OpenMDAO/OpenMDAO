@@ -910,14 +910,14 @@ class Driver(object):
         self._cons = cons = {}
 
         # driver _responses are keyed by either the alias or the promoted name
+        response_size = 0
         self._responses = resps = model.get_responses(recurse=True, use_prom_ivc=True)
         for name, data in resps.items():
             if data['type'] == 'con':
                 cons[name] = data
             else:
                 objs[name] = data
-
-        response_size = sum(resps[n]['global_size'] for n in self._get_ordered_nl_responses())
+            response_size += data['global_size']
 
         # Gather up the information for design vars. _designvars are keyed by the promoted name
         self._designvars = designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)

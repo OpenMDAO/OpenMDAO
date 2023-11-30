@@ -3456,7 +3456,7 @@ class System(object):
         get_sizes : bool, optional
             If True, compute the size of each design variable.
         use_prom_ivc : bool
-            Translate auto_ivc_names to their promoted input names.
+            Use promoted names for inputs, else convert to absolute source names.
 
         Returns
         -------
@@ -3470,35 +3470,32 @@ class System(object):
         conns = model._conn_global_abs_in2out
         abs2meta_out = model._var_allprocs_abs2meta['output']
 
-        # Human readable error message during Driver setup.
         out = {}
         try:
             for prom_name, data in self._design_vars.items():
                 if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
                     self._problem_meta['using_par_deriv_color'] = True
 
-                if prom_name in pro2abs_out:
+                if prom_name in pro2abs_out:  # promoted output
 
                     # This is an output name, most likely a manual indepvarcomp.
-                    abs_name = pro2abs_out[prom_name][0]
-                    out[abs_name] = data
-                    data['source'] = abs_name
+                    abs_out = pro2abs_out[prom_name][0]
                     data['orig'] = (prom_name, None)
-                    dist = abs_name in abs2meta_out and abs2meta_out[abs_name]['distributed']
+                    out[abs_out] = data
 
-                else:  # assume an input name else KeyError
+                else:  # promoted input
 
-                    # Design variable on an input connected to an ivc, so use abs ivc name.
-                    in_abs = pro2abs_in[prom_name][0]
-                    data['source'] = source = conns[in_abs]
+                    # Design variable on an input connected to an ivc.
+                    abs_out = conns[pro2abs_in[prom_name][0]]
                     data['orig'] = (None, prom_name)
-                    dist = source in abs2meta_out and abs2meta_out[source]['distributed']
                     if use_prom_ivc:
                         out[prom_name] = data
                     else:
-                        out[source] = data
+                        out[abs_out] = data
 
-                data['distributed'] = dist
+                data['source'] = abs_out
+                data['distributed'] = \
+                    abs_out in abs2meta_out and abs2meta_out[abs_out]['distributed']
 
         except KeyError as err:
             msg = "{}: Output not found for design variable {}."
@@ -3542,10 +3539,9 @@ class System(object):
                 else:
                     meta['global_size'] = 0  # discrete var
 
-        if recurse:
+        if recurse and self._subsystems_allprocs:
             abs2prom_in = self._var_allprocs_abs2prom['input']
-            if (self.comm.size > 1 and self._subsystems_allprocs and
-                    self._mpi_proc_allocator.parallel):
+            if (self.comm.size > 1 and self._mpi_proc_allocator.parallel):
 
                 # For parallel groups, we need to make sure that the design variable dictionary is
                 # assembled in the same order under mpi as for serial runs.
@@ -3598,7 +3594,7 @@ class System(object):
                     else:
                         out.update(dvs)
 
-        if out and self is model:
+        if self is model:
             for var, outmeta in out.items():
                 if var in abs2meta_out and "openmdao:allow_desvar" not in abs2meta_out[var]['tags']:
                     src, tgt = outmeta['orig']
@@ -3643,11 +3639,10 @@ class System(object):
         conns = model._conn_global_abs_in2out
         abs2meta_out = model._var_allprocs_abs2meta['output']
 
-        # Human readable error message during Driver setup.
+        out = {}
         try:
-            out = {}
             # keys of self._responses are the alias or the promoted name
-            for prom_or_alias, data in self._responses.items():
+            for data in self._responses.values():
                 if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
                     self._problem_meta['using_par_deriv_color'] = True
 
@@ -3662,31 +3657,21 @@ class System(object):
                                            " is the same name as an existing variable.")
                     data['alias_path'] = self.pathname
 
-                if prom_or_alias in prom2abs_out:
-                    abs_out = prom2abs_out[prom_or_alias][0]
-                    # for outputs, the dict key is always the absolute name of the output
+                if prom in prom2abs_out:  # promoted output
+                    abs_out = prom2abs_out[prom][0]
+                else:  # promoted input
+                    abs_out = conns[prom2abs_in[prom][0]]
+
+                if alias:
+                    out[alias] = data
+                elif prom in prom2abs_out or not use_prom_ivc:
                     out[abs_out] = data
-                    data['source'] = abs_out
-                    data['distributed'] = \
-                        abs_out in abs2meta_out and abs2meta_out[abs_out]['distributed']
-
                 else:
-                    if prom in prom2abs_out:
-                        src_path = prom2abs_out[prom][0]
-                    else:
-                        src_path = conns[prom2abs_in[prom][0]]
+                    out[prom] = data
 
-                    distrib = src_path in abs2meta_out and abs2meta_out[src_path]['distributed']
-                    data['source'] = src_path
-                    data['distributed'] = distrib
-
-                    if use_prom_ivc:
-                        # dict key is either an alias or the promoted input name
-                        out[prom_or_alias] = data
-                    else:
-                        # dict key is either an alias or the absolute src name since constraints
-                        # can be specified on inputs.
-                        out[src_path if alias is None else alias] = data
+                data['source'] = abs_out
+                data['distributed'] = \
+                    abs_out in abs2meta_out and abs2meta_out[abs_out]['distributed']
 
         except KeyError as err:
             msg = "{}: Output not found for response {}."
@@ -3720,11 +3705,9 @@ class System(object):
                 self._check_voi_meta_sizes(resp_types[response['type']], response,
                                            resp_size_checks[response['type']])
 
-        if recurse:
+        if recurse and self._subsystems_allprocs:
             abs2prom_in = self._var_allprocs_abs2prom['input']
-            if (self.comm.size > 1 and self._subsystems_allprocs and
-                    self._mpi_proc_allocator.parallel):
-
+            if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
                 # For parallel groups, we need to make sure that the design variable dictionary is
                 # assembled in the same order under mpi as for serial runs.
                 out_by_sys = {}
