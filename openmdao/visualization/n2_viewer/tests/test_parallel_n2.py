@@ -60,6 +60,7 @@ class N2ParallelTestCase(unittest.TestCase):
         Verify that allgather() is called from all ranks and doesn't sit there blocking.
         """
         om.n2(self.p, show_browser=False, outfile=OUTFILE)
+        self.assertTrue(os.path.exists(OUTFILE), msg=f"{OUTFILE} not found")
 
     def tearDown(self):
         clean_outfile(OUTFILE)
