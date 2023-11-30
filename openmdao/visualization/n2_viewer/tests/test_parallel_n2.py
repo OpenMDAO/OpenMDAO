@@ -61,7 +61,8 @@ class N2ParallelTestCase(unittest.TestCase):
         """
         om.n2(self.p, show_browser=False, outfile=OUTFILE)
         MPI.COMM_WORLD.barrier()
-        self.assertTrue(os.path.exists(OUTFILE), msg=f"{OUTFILE} not found")
+        if MPI.COMM_WORLD.rank == 0:
+            self.assertTrue(os.path.exists(OUTFILE), msg=f"{OUTFILE} not found")
 
     def tearDown(self):
         clean_outfile(OUTFILE)
@@ -88,7 +89,8 @@ class MultiN2ParallelTestCase(unittest.TestCase):
         """
         om.n2(self.p, show_browser=False, outfile=self.outFile)
         MPI.COMM_WORLD.barrier()
-        self.assertTrue(os.path.exists(self.outFile), msg=f"{self.outFile} not found")
+        if self.localComm.rank == 0:
+            self.assertTrue(os.path.exists(self.outFile), msg=f"{self.outFile} not found")
 
     def tearDown(self):
         clean_outfile(self.outFile)
