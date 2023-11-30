@@ -13,7 +13,16 @@ except ImportError:
 
 # set DEBUG to True if you want to view the generated HTML file
 DEBUG = False
-OUTFILE = 'n2test.html'
+OUTFILE = "n2test.html"
+
+
+def clean_outfile(outFile):
+    if not DEBUG:
+        try:
+            os.remove(outFile)
+        except OSError:
+            # Don't want the test to fail if the test file is already removed
+            pass
 
 
 # Test model derived from one contributed by Anil Yildirim at U-Mich MDO lab
@@ -53,12 +62,34 @@ class N2ParallelTestCase(unittest.TestCase):
         om.n2(self.p, show_browser=False, outfile=OUTFILE)
 
     def tearDown(self):
-        if not DEBUG:
-            try:
-                os.remove(OUTFILE)
-            except OSError:
-                # Don't want the test to fail if the test file is already removed
-                pass
+        clean_outfile(OUTFILE)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class MultiN2ParallelTestCase(unittest.TestCase):
+    N_PROCS = 2
+
+    def setUp(self):
+        # Create 2 communicators and make a problem on each one
+        self.globalComm = MPI.COMM_WORLD
+        self.localComm = self.globalComm.Split(MPI.COMM_WORLD.rank)
+
+        self.p = om.Problem(comm=self.localComm)
+        self.p.model = Top()
+        self.p.setup()
+
+        self.outFile = f"n2test_{self.globalComm.rank}.html"
+
+    def test_n2_parallel(self):
+        """
+        Verify that both comms create an N2 file.
+        """
+        om.n2(self.p, show_browser=False, outfile=self.outFile)
+        self.assertTrue(os.path.exists(self.outFile), msg=f"{self.outFile} not found")
+
+    def tearDown(self):
+        clean_outfile(self.outFile)
+
 
 if __name__ == "__main__":
     unittest.main()
