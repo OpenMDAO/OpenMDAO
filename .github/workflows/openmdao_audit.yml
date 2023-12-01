@@ -10,6 +10,8 @@ on:
   # Allow running the workflow manually from the Actions tab
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
 
   audit:
@@ -45,7 +47,7 @@ jobs:
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
         with:
-          python-version: 3
+          python-version: 3.11
           conda-version: "*"
           channels: conda-forge,defaults
           channel-priority: true
