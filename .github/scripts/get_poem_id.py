@@ -24,7 +24,7 @@ def get_poem_id(repository, pull_id):
     Returns
     -------
     int
-        The ID of the associated POEM, or 0 if an associated POEM ID was found
+        0 if an associated POEM was identified, 1 if not and -1 if an error occurred.
     """
     print("-------------------------------------------------------------------------------")
     print(f"Checking Pull Request #{pull_id} for associated issue...")
@@ -85,10 +85,10 @@ def get_poem_id(repository, pull_id):
     print(f"{poem_id=}")
     print("----------------")
 
-    if 'POEM_' in poem_id:
-        poem_id = poem_id[5:]
-    elif 'POEM' in poem_id:
-        poem_id = poem_id[4:]
+    for prefix in ['POEM_', 'POEM #', 'POEM#', 'POEM']:
+        pos = poem_id.find(prefix)
+        if pos >=0:
+            poem_id = poem_id[pos+len(prefix):].strip()
 
     if not poem_id.isnumeric():
         # valid poem ID not found, could be blank or "_No response_"
