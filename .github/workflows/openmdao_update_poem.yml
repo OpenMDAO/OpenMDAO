@@ -4,7 +4,7 @@
 name: Update Associated POEM
 
 on:
-  pull_request_target:
+  pull_request:
     types: [ opened, reopened, closed ]
     branches: [ master ]
 
@@ -18,9 +18,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write
       pull-requests: write
-      repository-projects: write
 
     defaults:
       run:
@@ -49,7 +47,7 @@ jobs:
           if python .github/scripts/get_poem_id.py ${GITHUB_REPOSITORY} $PR_NUMBER; then
             cat POEM_ID.txt >> $GITHUB_OUTPUT
           else
-            echo "POEM_ID=''" >> $GITHUB_OUTPUT
+            echo "POEM_ID=" >> $GITHUB_OUTPUT
           fi
 
       - name: Comment on PR
