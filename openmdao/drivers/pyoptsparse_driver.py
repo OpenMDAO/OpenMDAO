@@ -380,38 +380,6 @@ class pyOptSparseDriver(Driver):
 
         optimizer = self.options['optimizer']
 
-        # Need to tell optimizer where to put its .out files
-        if self.options['output_dir'] is None:
-            self.options['output_dir'] = "."
-        elif self.options['output_dir'] == _DEFAULT_REPORTS_DIR:
-            problem = self._problem()
-            default_output_dir = pathlib.Path(get_reports_dir()).joinpath(problem._name)
-            pathlib.Path(default_output_dir).mkdir(parents=True, exist_ok=True)
-            self.options['output_dir'] = str(default_output_dir)
-        output_dir = self.options['output_dir']
-
-        if optimizer == 'ALPSO':  # Actually, this is the root of two files generated
-            if problem.driver.opt_settings.get('filename') is None:
-                problem.driver.opt_settings['filename'] = f'{output_dir}/ALPSO.out'
-        elif optimizer == 'CONMIN':
-            if problem.driver.opt_settings.get('IFILE') is None:
-                problem.driver.opt_settings['IFILE'] = f'{output_dir}/CONMIN.out'
-        elif optimizer == 'IPOPT':
-            if problem.driver.opt_settings.get('output_file') is None:
-                problem.driver.opt_settings['output_file'] = f'{output_dir}/IPOPT.out'
-        # Nothing for NSGA2
-        elif optimizer == 'PSQP':
-            if problem.driver.opt_settings.get('IFILE') is None:
-                problem.driver.opt_settings['IFILE'] = f'{output_dir}/PSQP.out'
-        elif optimizer == 'SLSQP':
-            if problem.driver.opt_settings.get('IFILE') is None:
-                problem.driver.opt_settings['IFILE'] = f'{output_dir}/SLSQP.out'
-        elif optimizer == 'SNOPT':
-            if problem.driver.opt_settings.get('Print file') is None:
-                problem.driver.opt_settings['Print file'] = f'{output_dir}/SNOPT_print.out'
-            if problem.driver.opt_settings.get('Summary file') is None:
-                problem.driver.opt_settings['Summary file'] = f'{output_dir}/SNOPT_summary.out'
-
         self._fill_NANs = not respects_fail_flag[self.options['optimizer']]
 
         self._check_for_missing_objective()
@@ -602,6 +570,32 @@ class pyOptSparseDriver(Driver):
             msg = "Optimizer %s is not available in this installation." % optimizer
             raise ImportError(msg)
 
+        # Need to tell optimizer where to put its .out files
+        if self.options['output_dir'] is None:
+            output_dir = "."
+        elif self.options['output_dir'] == _DEFAULT_REPORTS_DIR:
+            problem = self._problem()
+            default_output_dir = pathlib.Path(get_reports_dir()).joinpath(problem._name)
+            pathlib.Path(default_output_dir).mkdir(parents=True, exist_ok=True)
+            output_dir = str(default_output_dir)
+        else:
+            output_dir = self.options['output_dir']
+
+
+        optimizers_and_output_files = {
+            # ALPSO uses a single option `filename` to determine name of both output files
+            'ALPSO': [('filename', 'ALPSO.out')],
+            'CONMIN': [('IFILE', 'CONMIN.out')],
+            'IPOPT': [('output_file', 'IPOPT.out')],
+            'PSQP': [('IFILE', 'PSQP.out')],
+            'SLSQP': [('IFILE', 'SLSQP.out')],
+            'SNOPT': [('Print file', 'SNOPT_print.out'), ('Summary file', 'SNOPT_summary.out')]
+        }
+
+        for opt_setting_name, output_file_name in optimizers_and_output_files[optimizer]:
+            if self.opt_settings.get(opt_setting_name) is None:
+                self.opt_settings[opt_setting_name] = f'{output_dir}/{output_file_name}'
+            
         # Process any default optimizer-specific settings.
         if optimizer in DEFAULT_OPT_SETTINGS:
             for name, value in DEFAULT_OPT_SETTINGS[optimizer].items():
