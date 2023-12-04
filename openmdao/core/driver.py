@@ -447,8 +447,8 @@ class Driver(object):
                 val = np.array([_val]) if np.ndim(_val) == 0 else _val  # Handle discrete desvars
                 idxs = meta['indices']() if meta['indices'] else None
                 flat_idxs = meta['flat_indices']
-                scaler = meta['scaler'] or 1.
-                adder = meta['adder'] or 0.
+                scaler = meta['scaler'] if meta['scaler'] is not None else 1.
+                adder = meta['adder'] if meta['adder'] is not None else 0.
                 lower = meta['lower'] / scaler - adder
                 upper = meta['upper'] / scaler - adder
                 flat_val = val.ravel()[idxs] if flat_idxs else val[idxs].ravel()

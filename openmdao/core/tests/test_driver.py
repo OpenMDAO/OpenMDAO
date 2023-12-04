@@ -1095,5 +1095,36 @@ class TestDriverMPI(unittest.TestCase):
         assert_near_equal(dvs['par_group.g0.dv.x'], 2)
         assert_near_equal(dvs['par_group.g1.dv.x'], 2)
 
+    def test_scalar_scaler_and_adder(self):
+        # build the model
+        prob = om.Problem()
+        dvs = prob.model.add_subsystem('dv', om.IndepVarComp())
+        dvs.add_output("x_vec", [3.0, -4.0])
+        prob.model.add_subsystem('paraboloid', om.ExecComp('f = (x-3)**2 + x*y + (y+4)**2 - 3'))
+
+        # setup the optimization
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.model.connect("dv.x_vec", 'paraboloid.x', src_indices=0)
+        prob.model.connect("dv.x_vec", 'paraboloid.y', src_indices=1)
+
+        # Passing scaler as a vector here causes the problem
+        prob.model.dv.add_design_var('x_vec', lower=-50, upper=50,
+                                     scaler=[0.5, 0.5], adder=[0.0, 0.0])
+        prob.model.add_objective('paraboloid.f')
+
+        prob.setup()
+
+        # run the optimization
+        prob.run_driver()
+
+        # location of the minimum
+        x_star = prob.get_val('paraboloid.x')
+        y_star = prob.get_val('paraboloid.y')
+
+        assert_near_equal(x_star, 6.6666, tolerance=1.0E-3)
+        assert_near_equal(y_star, -7.3333, tolerance=1.0E-3)
+
+
 if __name__ == "__main__":
     unittest.main()
