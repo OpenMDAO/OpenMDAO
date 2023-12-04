@@ -12,7 +12,7 @@ ERROR = -1
 
 def get_poem_id(repository, pull_id):
     """
-    Read the body of a pull request from stdin, write ID of any associated POEM to FILENAME.
+    Read the body of the specified pull request, write the ID of any associated POEM to FILENAME.
 
     Parameters
     ----------
