@@ -778,8 +778,7 @@ class Group(System):
         abs_desvars : dict or None
             Dictionary of design variable metadata, keyed using absolute names.
         abs_responses : dict or None
-            Dictionary of response variable metadata, keyed using absolute names.  Aliases are
-            not allowed.
+            Dictionary of response variable metadata, keyed using absolute names.
 
         Returns
         -------
@@ -795,6 +794,9 @@ class Group(System):
             if abs_responses is None:
                 abs_responses = self.get_responses(recurse=True, get_sizes=False,
                                                    use_prom_ivc=False)
+
+            # the responses passed into get_relevant vars have had any alias keys removed by
+            # check_aias_overlaps.
             return self.get_relevant_vars(abs_desvars,
                                           self._check_alias_overlaps(abs_responses), mode)
 
@@ -880,7 +882,7 @@ class Group(System):
         responses : dict
             Dictionary of response variable metadata.
         mode : str
-            Direction of derivatives, either 'fwd' or 'rev'.
+            Direction of derivatives, either 'fwd', 'rev', or 'auto'.
 
         Returns
         -------
@@ -1082,6 +1084,7 @@ class Group(System):
     def _check_alias_overlaps(self, responses):
         # If you have response aliases, check for overlapping indices.  Also adds aliased
         # sources to responses if they're not already there so relevance will work properly.
+        # the returns responses dict does not contain any alias keys.
         aliases = set()
         aliased_srcs = {}
         to_add = {}
@@ -1107,6 +1110,7 @@ class Group(System):
                         # the relevance calculation.
                         to_add[src] = meta
 
+        # loop over any sources having multiple aliases to ensure no overlap of indices
         for src, metalist in aliased_srcs.items():
             if len(metalist) == 1:
                 continue
@@ -5141,3 +5145,204 @@ class Group(System):
                 of_dict[self._get_prom_name(wrt)] = jac[of][wrt]
 
         return new_jac
+
+    def get_design_vars(self, recurse=True, get_sizes=True, use_prom_ivc=True):
+        """
+        Get the DesignVariable settings from this system.
+
+        Retrieve all design variable settings from the system and, if recurse
+        is True, all of its subsystems.
+
+        Parameters
+        ----------
+        recurse : bool
+            If True, recurse through the subsystems and return the path of
+            all design vars relative to the this Group.
+        get_sizes : bool, optional
+            If True, compute the size of each design variable.
+        use_prom_ivc : bool
+            Use promoted names for inputs, else convert to absolute source names.
+
+        Returns
+        -------
+        dict
+            The design variables defined in the current system and, if
+            recurse=True, its subsystems.
+        """
+        out = super().get_design_vars(recurse=recurse, get_sizes=get_sizes,
+                                      use_prom_ivc=use_prom_ivc)
+        if recurse:
+            abs2prom_in = self._var_allprocs_abs2prom['input']
+            if (self.comm.size > 1 and self._mpi_proc_allocator.parallel):
+
+                # For parallel groups, we need to make sure that the design variable dictionary is
+                # assembled in the same order under mpi as for serial runs.
+                out_by_sys = {}
+
+                for subsys in self._sorted_sys_iter():
+                    sub_out = {}
+                    name = subsys.name
+                    dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
+                                                 use_prom_ivc=use_prom_ivc)
+                    if use_prom_ivc:
+                        # have to promote subsystem prom name to this level
+                        sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
+                        for dv, meta in dvs.items():
+                            if dv in sub_pro2abs_in:
+                                abs_dv = sub_pro2abs_in[dv][0]
+                                sub_out[abs2prom_in[abs_dv]] = meta
+                            else:
+                                sub_out[dv] = meta
+                    else:
+                        sub_out.update(dvs)
+
+                    out_by_sys[name] = sub_out
+
+                out_by_sys_by_rank = self.comm.allgather(out_by_sys)
+                all_outs_by_sys = {}
+                for outs in out_by_sys_by_rank:
+                    for name, meta in outs.items():
+                        all_outs_by_sys[name] = meta
+
+                for subsys_name in self._sorted_sys_iter_all_procs():
+                    for name, meta in all_outs_by_sys[subsys_name].items():
+                        if name not in out:
+                            out[name] = meta
+
+            else:
+
+                for subsys in self._sorted_sys_iter():
+                    dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
+                                                 use_prom_ivc=use_prom_ivc)
+                    if use_prom_ivc:
+                        # have to promote subsystem prom name to this level
+                        sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
+                        for dv, meta in dvs.items():
+                            if dv in sub_pro2abs_in:
+                                abs_dv = sub_pro2abs_in[dv][0]
+                                out[abs2prom_in[abs_dv]] = meta
+                            else:
+                                out[dv] = meta
+                    else:
+                        out.update(dvs)
+
+        model = self._problem_meta['model_ref']()
+        if self is model:
+            abs2meta_out = model._var_allprocs_abs2meta['output']
+            for var, outmeta in out.items():
+                if var in abs2meta_out and "openmdao:allow_desvar" not in abs2meta_out[var]['tags']:
+                    prom_src, prom_tgt = outmeta['orig']
+                    if prom_src is None:
+                        self._collect_error(f"Design variable '{prom_tgt}' is connected to '{var}',"
+                                            f" but '{var}' is not an IndepVarComp or ImplicitComp "
+                                            "output.")
+                    else:
+                        self._collect_error(f"Design variable '{prom_src}' is not an IndepVarComp "
+                                            "or ImplicitComp output.")
+
+        return out
+
+    def get_responses(self, recurse=True, get_sizes=True, use_prom_ivc=False):
+        """
+        Get the response variable settings from this system.
+
+        Retrieve all response variable settings from the system as a dict,
+        keyed by either absolute variable name, promoted name, or alias name,
+        depending on the value of use_prom_ivc and whether the original key was
+        a promoted output, promoted input, or an alias.
+
+        Parameters
+        ----------
+        recurse : bool, optional
+            If True, recurse through the subsystems and return the path of
+            all responses relative to the this system.
+        get_sizes : bool, optional
+            If True, compute the size of each response.
+        use_prom_ivc : bool
+            Translate ivc names to their promoted input names.
+
+        Returns
+        -------
+        dict
+            The responses defined in the current system and, if
+            recurse=True, its subsystems.
+        """
+        out = super().get_responses(recurse=recurse, get_sizes=get_sizes, use_prom_ivc=use_prom_ivc)
+        if recurse:
+            abs2prom_in = self._var_allprocs_abs2prom['input']
+            if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
+                # For parallel groups, we need to make sure that the design variable dictionary is
+                # assembled in the same order under mpi as for serial runs.
+                out_by_sys = {}
+
+                for subsys in self._sorted_sys_iter():
+                    name = subsys.name
+                    sub_out = {}
+
+                    resps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
+                                                 use_prom_ivc=use_prom_ivc)
+                    if use_prom_ivc:
+                        # have to promote subsystem prom name to this level
+                        sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
+                        for dv, meta in resps.items():
+                            if dv in sub_pro2abs_in:
+                                abs_resp = sub_pro2abs_in[dv][0]
+                                sub_out[abs2prom_in[abs_resp]] = meta
+                            else:
+                                sub_out[dv] = meta
+                    else:
+                        for rkey, rmeta in resps.items():
+                            if rkey in out:
+                                tdict = {'con': 'constraint', 'obj': 'objective'}
+                                rpath = rmeta['alias_path']
+                                rname = '.'.join((rpath, rmeta['name'])) if rpath else rkey
+                                rtype = tdict[rmeta['type']]
+                                ometa = sub_out[rkey]
+                                opath = ometa['alias_path']
+                                oname = '.'.join((opath, ometa['name'])) if opath else ometa['name']
+                                otype = tdict[ometa['type']]
+                                raise NameError(f"The same response alias, '{rkey}' was declared"
+                                                f" for {rtype} '{rname}' and {otype} '{oname}'.")
+                            sub_out[rkey] = rmeta
+
+                    out_by_sys[name] = sub_out
+
+                out_by_sys_by_rank = self.comm.allgather(out_by_sys)
+                all_outs_by_sys = {}
+                for outs in out_by_sys_by_rank:
+                    for name, meta in outs.items():
+                        all_outs_by_sys[name] = meta
+
+                for subsys_name in self._sorted_sys_iter_all_procs():
+                    for name, meta in all_outs_by_sys[subsys_name].items():
+                        out[name] = meta
+
+            else:
+                for subsys in self._sorted_sys_iter():
+                    resps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
+                                                 use_prom_ivc=use_prom_ivc)
+                    if use_prom_ivc:
+                        # have to promote subsystem prom name to this level
+                        sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
+                        for dv, meta in resps.items():
+                            if dv in sub_pro2abs_in:
+                                abs_resp = sub_pro2abs_in[dv][0]
+                                out[abs2prom_in[abs_resp]] = meta
+                            else:
+                                out[dv] = meta
+                    else:
+                        for rkey, rmeta in resps.items():
+                            if rkey in out:
+                                tdict = {'con': 'constraint', 'obj': 'objective'}
+                                rpath = rmeta['alias_path']
+                                rname = '.'.join((rpath, rmeta['name'])) if rpath else rkey
+                                rtype = tdict[rmeta['type']]
+                                ometa = out[rkey]
+                                opath = ometa['alias_path']
+                                oname = '.'.join((opath, ometa['name'])) if opath else ometa['name']
+                                otype = tdict[ometa['type']]
+                                raise NameError(f"The same response alias, '{rkey}' was declared"
+                                                f" for {rtype} '{rname}' and {otype} '{oname}'.")
+                            out[rkey] = rmeta
+
+        return out

@@ -1285,7 +1285,7 @@ class MatMultMultipointTestCase(unittest.TestCase):
             with multi_proc_exception_check(p.comm):
                 self.assertLess(norm, 1.e-7)
 
-        print("final obj:", p['obj.y'])
+        # print("final obj:", p['obj.y'])
 
 
 @use_tempdirs
@@ -1450,7 +1450,10 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
                                 sizes=[3, 4, 5, 6], color='total', fixed=True)
 
         self.assertEqual(str(ctx.exception),
-                         "ScipyOptimizeDriver: Current coloring configuration does not match the configuration of the current model.\n   The following row vars were added: ['comp.z'].\n   The following column vars were added: ['indeps.d'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
+                         "ScipyOptimizeDriver: Current coloring configuration does not match the configuration of the current model.\n"
+                         "   The following row vars were added: ['comp.z'].\n   The following column vars were added: ['indeps.d'].\n"
+                         "Make sure you don't have different problems that have the same coloring directory. Set the coloring directory "
+                         "by setting the value of problem.options['coloring_dir'].")
 
     def test_added_name_partial(self):
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
@@ -1463,7 +1466,10 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             p.run_driver()
 
-        self.assertEqual(str(ctx.exception), "'comp' <class DumbComp>: Current coloring configuration does not match the configuration of the current model.\n   The following row vars were added: ['z'].\n   The following column vars were added: ['z_in'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
+        self.assertEqual(str(ctx.exception), "'comp' <class DumbComp>: Current coloring configuration does not match the configuration of "
+                                             "the current model.\n   The following row vars were added: ['z'].\n   The following column vars "
+                                             "were added: ['z_in'].\nMake sure you don't have different problems that have the same coloring "
+                                             "directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
 
     def test_removed_name_total(self):
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
@@ -1474,7 +1480,12 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             p = self._build_model(ofnames=['w', 'y'], wrtnames=['a', 'c'],
                                   sizes=[3, 5], color='total', fixed=True)
-        self.assertEqual(str(ctx.exception), "ScipyOptimizeDriver: Current coloring configuration does not match the configuration of the current model.\n   The following row vars were removed: ['comp.x'].\n   The following column vars were removed: ['indeps.b'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
+        self.assertEqual(str(ctx.exception),
+                         "ScipyOptimizeDriver: Current coloring configuration does not match the "
+                         "configuration of the current model.\n   The following row vars were removed: "
+                         "['comp.x'].\n   The following column vars were removed: ['indeps.b'].\nMake "
+                         "sure you don't have different problems that have the same coloring directory. "
+                         "Set the coloring directory by setting the value of problem.options['coloring_dir'].")
 
     def test_removed_name_partial(self):
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
@@ -1488,7 +1499,11 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
             p.run_driver()
 
         self.assertEqual(str(ctx.exception),
-                         "'comp' <class DumbComp>: Current coloring configuration does not match the configuration of the current model.\n   The following row vars were removed: ['x'].\n   The following column vars were removed: ['x_in'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
+                         "'comp' <class DumbComp>: Current coloring configuration does not match the "
+                         "configuration of the current model.\n   The following row vars were removed: "
+                         "['x'].\n   The following column vars were removed: ['x_in'].\nMake sure you "
+                         "don't have different problems that have the same coloring directory. Set the "
+                         "coloring directory by setting the value of problem.options['coloring_dir'].")
 
     def test_reordered_name_total(self):
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
@@ -1498,7 +1513,12 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             p = self._build_model(ofnames=['w', 'y', 'x'], wrtnames=['a', 'c', 'b'],
                                   sizes=[3, 5, 4], color='total', fixed=True)
-        self.assertEqual(str(ctx.exception), "ScipyOptimizeDriver: Current coloring configuration does not match the configuration of the current model.\n   The row vars have changed order.\n   The column vars have changed order.\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
+        self.assertEqual(str(ctx.exception),
+                         "ScipyOptimizeDriver: Current coloring configuration does not match the "
+                         "configuration of the current model.\n   The row vars have changed order.\n   "
+                         "The column vars have changed order.\nMake sure you don't have different "
+                         "problems that have the same coloring directory. Set the coloring directory "
+                         "by setting the value of problem.options['coloring_dir'].")
 
     def test_reordered_name_partial(self):
         p = self._build_model(ofnames=['x', 'y', 'z'], wrtnames=['a', 'b', 'c'],
@@ -1511,7 +1531,12 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             p.run_driver()
 
-        self.assertEqual(str(ctx.exception), "'comp' <class DumbComp>: Current coloring configuration does not match the configuration of the current model.\n   The row vars have changed order.\n   The column vars have changed order.\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
+        self.assertEqual(str(ctx.exception),
+                         "'comp' <class DumbComp>: Current coloring configuration does not match the "
+                         "configuration of the current model.\n   The row vars have changed order.\n   "
+                         "The column vars have changed order.\nMake sure you don't have different problems "
+                         "that have the same coloring directory. Set the coloring directory by setting "
+                         "the value of problem.options['coloring_dir'].")
 
     def test_size_change_total(self):
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
@@ -1521,7 +1546,12 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
                                   sizes=[3, 7, 5], color='total', fixed=True)
-        self.assertEqual(str(ctx.exception), "ScipyOptimizeDriver: Current coloring configuration does not match the configuration of the current model.\n   The following variables have changed sizes: ['comp.x', 'indeps.b'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
+        self.assertEqual(str(ctx.exception),
+                         "ScipyOptimizeDriver: Current coloring configuration does not match the "
+                         "configuration of the current model.\n   The following variables have "
+                         "changed sizes: ['comp.x', 'indeps.b'].\nMake sure you don't have different "
+                         "problems that have the same coloring directory. Set the coloring directory "
+                         "by setting the value of problem.options['coloring_dir'].")
 
     def test_size_change_partial(self):
         p = self._build_model(ofnames=['x', 'y', 'z'], wrtnames=['a', 'b', 'c'],
@@ -1534,7 +1564,12 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             p.run_driver()
 
-        self.assertEqual(str(ctx.exception), "'comp' <class DumbComp>: Current coloring configuration does not match the configuration of the current model.\n   The following variables have changed sizes: ['y', 'y_in'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
+        self.assertEqual(str(ctx.exception),
+                         "'comp' <class DumbComp>: Current coloring configuration "
+                         "does not match the configuration of the current model.\n   The following "
+                         "variables have changed sizes: ['y', 'y_in'].\nMake sure you don't have "
+                         "different problems that have the same coloring directory. Set the coloring "
+                         "directory by setting the value of problem.options['coloring_dir'].")
 
     def test_bad_format(self):
         with open('_bad_format_', 'w') as f:

@@ -1938,21 +1938,23 @@ def _tol_sweep(arr, tol=_DEF_COMP_SPARSITY_ARGS['tol'], orders=_DEF_COMP_SPARSIT
 
 
 @contextmanager
-def _compute_total_coloring_context(top):
+def _compute_total_coloring_context(problem):
     """
     Context manager for computing total jac sparsity for simultaneous coloring.
 
     Parameters
     ----------
-    top : System
-        Top of the system hierarchy where coloring will be done.
+    problem : Problem
+        The problem where coloring will be done.
     """
-    top._problem_meta['coloring_randgen'] = np.random.default_rng(41)  # set seed for consistency
+    problem._metadata['coloring_randgen'] = np.random.default_rng(41)  # set seed for consistency
+    problem._computing_coloring = True
 
     try:
         yield
     finally:
-        top._problem_meta['coloring_randgen'] = None
+        problem._metadata['coloring_randgen'] = None
+        problem._computing_coloring = False
 
 
 def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
@@ -1999,10 +2001,10 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
     driver = prob.driver
     driver._res_subjacs = {}
 
-    if setup:
+    if setup and not prob._computing_coloring:
         prob.setup(mode=prob._mode)
 
-    if run_model:
+    if run_model and not prob._computing_coloring:
         prob.run_model(reset_iter_counts=False)
 
     if of is None or wrt is None:
@@ -2018,7 +2020,7 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
     else:
         use_driver = False
 
-    with _compute_total_coloring_context(prob.model):
+    with _compute_total_coloring_context(prob):
         start_time = time.perf_counter()
         fullJ = None
         for i in range(num_full_jacs):
@@ -2311,7 +2313,7 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
     return coloring
 
 
-def dynamic_total_coloring(driver, run_model=True, fname=None):
+def dynamic_total_coloring(driver, run_model=True, fname=None, of=None, wrt=None):
     """
     Compute simultaneous deriv coloring during runtime.
 
@@ -2323,6 +2325,10 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
         If True, call run_model before computing coloring.
     fname : str or None
         Name of file where coloring will be saved.
+    of : iter of str or None
+        Names of the 'response' variables.
+    wrt : iter of str or None
+        Names of the 'design' variables.
 
     Returns
     -------
@@ -2344,8 +2350,8 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
     tol = driver._coloring_info.get('tol', _DEF_COMP_SPARSITY_ARGS['tol'])
     orders = driver._coloring_info.get('orders', _DEF_COMP_SPARSITY_ARGS['orders'])
 
-    coloring = compute_total_coloring(problem, num_full_jacs=num_full_jacs, tol=tol, orders=orders,
-                                      setup=False, run_model=run_model, fname=fname)
+    coloring = compute_total_coloring(problem, of=of, wrt=wrt, num_full_jacs=num_full_jacs, tol=tol,
+                                      orders=orders, setup=False, run_model=run_model, fname=fname)
 
     if coloring is not None:
         if not problem.model._approx_schemes:  # avoid double display

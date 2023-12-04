@@ -365,7 +365,7 @@ class TestProblem(unittest.TestCase):
             p.compute_totals()
 
         self.assertEqual(str(cm.exception),
-                         "Driver is not providing any design variables for compute_totals.")
+                         "No design variables were passed to compute_totals and the driver is not providing any.")
 
     def test_compute_totals_no_args_no_response(self):
         p = om.Problem()
@@ -386,7 +386,7 @@ class TestProblem(unittest.TestCase):
             p.compute_totals()
 
         self.assertEqual(str(cm.exception),
-                         "Driver is not providing any response variables for compute_totals.")
+                         "No response variables were passed to compute_totals and the driver is not providing any.")
 
     def test_compute_totals_no_args(self):
         p = om.Problem()

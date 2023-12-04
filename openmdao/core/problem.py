@@ -52,7 +52,7 @@ from openmdao.utils.general_utils import ContainsAll, pad_name, LocalRangeIterab
     _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
-import openmdao.utils.coloring as coloring_mod
+import openmdao.utils.coloring as cmod
 from openmdao.visualization.tables.table_builder import generate_table
 
 try:
@@ -139,7 +139,8 @@ class Problem(object):
     driver : <Driver> or None
         The driver for the problem. If not specified, a simple "Run Once" driver will be used.
     comm : MPI.Comm or <FakeComm> or None
-        The global communicator.
+        The MPI communicator for this Problem. If not specified, comm will be MPI.COMM_WORLD if
+        MPI is active, else it will be None.
     name : str
         Problem name. Can be used to specify a Problem instance when multiple Problems
         exist.
@@ -202,6 +203,8 @@ class Problem(object):
         The number of times run_driver or run_model has been called.
     _warned : bool
         Bool to check if `value` deprecation warning has occured yet
+    _computing_coloring : bool
+        When True, we are computing coloring.
     """
 
     def __init__(self, model=None, driver=None, comm=None, name=None, reports=_UNDEFINED,
@@ -219,6 +222,7 @@ class Problem(object):
 
         self.cite = CITATION
         self._warned = False
+        self._computing_coloring = False
 
         # Set the Problem name so that it can be referenced from command line tools (e.g. check)
         # that accept a Problem argument, and to name the corresponding reports subdirectory.
@@ -1078,7 +1082,7 @@ class Problem(object):
         if coloring is None and info['static'] is not None:
             coloring = driver._get_static_coloring()
 
-        if coloring and coloring_mod._use_total_sparsity:
+        if coloring and cmod._use_total_sparsity:
             # if we're using simultaneous total derivatives then our effective size is less
             # than the full size
             if coloring._fwd and coloring._rev:
@@ -1910,9 +1914,6 @@ class Problem(object):
                 if of in resp and resp[of]['indices'] is not None:
                     data[''][key]['indices'] = resp[of]['indices'].indexed_src_size
 
-        if out_stream == _DEFAULT_OUT_STREAM:
-            out_stream = sys.stdout
-
         _assemble_derivative_data(data, rel_err_tol, abs_err_tol, out_stream, compact_print,
                                   [model], {'': fd_args}, totals=total_info, lcons=lcons,
                                   show_only_incorrect=show_only_incorrect)
@@ -1923,7 +1924,8 @@ class Problem(object):
         return data['']
 
     def compute_totals(self, of=None, wrt=None, return_format='flat_dict', debug_print=False,
-                       driver_scaling=False, use_abs_names=False, get_remote=True):
+                       driver_scaling=False, use_abs_names=False, get_remote=True,
+                       use_coloring=None):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1949,6 +1951,10 @@ class Problem(object):
             This is deprecated and has no effect.
         get_remote : bool
             If True, the default, the full distributed total jacobian will be retrieved.
+        use_coloring : bool or None
+            If True, use coloring to compute total derivatives.  If False, do not.  If None, only
+            compute coloring if the Driver has declared coloring. This is only used if user supplies
+            of and wrt args.  Otherwise, coloring is completely determined by the driver.
 
         Returns
         -------
@@ -1963,64 +1969,98 @@ class Problem(object):
             with multi_proc_exception_check(self.comm):
                 self.final_setup()
 
-        if wrt is None:
-            wrt = list(self.driver._designvars)
-            if not wrt:
-                raise RuntimeError("Driver is not providing any design variables "
-                                   "for compute_totals.")
-
-        if of is None:
-            of = list(self.driver._objs)
-            of.extend(self.driver._cons)
-            if not of:
-                raise RuntimeError("Driver is not providing any response variables "
-                                   "for compute_totals.")
-
         if self.model._owns_approx_jac:
             total_info = _TotalJacInfo(self, of, wrt, return_format,
                                        approx=True, driver_scaling=driver_scaling)
             return total_info.compute_totals_approx(initialize=True)
         else:
+            if (of is None and wrt is None) or _vois_match_driver(self.driver, of, wrt):
+                if use_coloring is False:
+                    coloring_meta = None
+                else:
+                    # just use coloring and desvars/responses from driver
+                    coloring_meta = self.driver._coloring_info
+            else:
+                if use_coloring:
+                    coloring_meta = self.driver._coloring_info.copy()
+                    coloring_meta['coloring'] = None
+                    coloring_meta['dynamic'] = True
+                else:
+                    coloring_meta = None
+
+            do_coloring = coloring_meta is not None and coloring_meta['coloring'] is None
+
+            if do_coloring and not self._computing_coloring:
+                coloring_meta['coloring'] = self._get_total_coloring(coloring_meta, of=of, wrt=wrt)
+
             total_info = _TotalJacInfo(self, of, wrt, return_format,
                                        debug_print=debug_print, driver_scaling=driver_scaling,
-                                       get_remote=get_remote)
+                                       get_remote=get_remote,
+                                       coloring_info=coloring_meta)
             return total_info.compute_totals()
 
-    def _active_desvar_iter(self, names=None):
+    def _active_desvar_iter(self, prom_names=None):
         """
-        Yield the active design variables and their metadata.
+        Yield (name, metadata) for each active design variable.
 
         Parameters
         ----------
-        names : iter of str or None
-            Iterator of design variable names.
+        prom_names : iter of str or None
+            Iterator of design variable promoted names.
 
         Yields
         ------
         str
-            Name of the design variable.
+            Promoted name of the design variable.
         dict
             Metadata for the design variable.
         """
-        pass
+        if prom_names:
+            desvars = self.model.get_design_vars(recurse=True, get_sizes=True)
+            for name in prom_names:
+                if name in desvars:
+                    yield name, desvars[name]
+                else:
+                    meta = {
+                        'parallel_deriv_color': None,
+                        'indices': None
+                    }
+                    self.model._update_dv_meta(name, meta, get_size=True)
+                    yield name, meta
+        else:  # use driver desvars
+            yield from self.driver._designvars.items()
 
-    def _active_response_iter(self, names=None):
+    def _active_response_iter(self, prom_names_or_aliases=None):
         """
-        Yield the active responses and their metadata.
+        Yield (name, metadata) for each active response.
 
         Parameters
         ----------
-        names : iter of str or None
-            Iterator of response names.
+        prom_names_or_aliases : iter of str or None
+            Iterator of response promoted names or aliases.
 
         Yields
         ------
         str
-            Name of the response.
+            Promoted name or alias of the response.
         dict
             Metadata for the response.
         """
-        pass
+        if prom_names_or_aliases:
+            resps = self.model.get_responses(recurse=True, get_sizes=True)
+            for name in prom_names_or_aliases:
+                if name in resps:
+                    yield name, resps[name]
+                else:
+                    meta = {
+                        'parallel_deriv_color': None,
+                        'indices': None,
+                        'alias': None,
+                    }
+                    self.model._update_response_meta(name, meta, get_size=True)
+                    yield name, meta
+        else:  # use driver responses
+            yield from self.driver._responses.values()
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
@@ -2710,6 +2750,51 @@ class Problem(object):
                             seen.add(msg)
 
         return unique_errors
+
+    def _get_total_coloring(self, coloring_info, of=None, wrt=None, run_model=None):
+        """
+        Get the total coloring given the coloring info.
+
+        If necessary, dynamically generate it.
+
+        Parameters
+        ----------
+        coloring_info : dict
+            Coloring metadata dict.
+        of : list of str or None
+            List of response names.
+        wrt : list of str or None
+            List of design variable names.
+        run_model : bool or None
+            If False, don't run model.  If None, use problem._run_counter to determine if model
+            should be run.
+
+        Returns
+        -------
+        Coloring or None
+            Coloring object, possible loaded from a file or dynamically generated, or None
+        """
+        if cmod._use_total_sparsity:
+            coloring = None
+            if coloring_info['coloring'] is None and coloring_info['dynamic']:
+                do_run = run_model if run_model is not None else self._run_counter < 0
+                coloring = \
+                    cmod.dynamic_total_coloring(self.driver, run_model=do_run,
+                                                fname=self.driver._get_total_coloring_fname(),
+                                                of=of, wrt=wrt)
+
+            if coloring is not None:
+                # if the improvement wasn't large enough, don't use coloring
+                pct = coloring._solves_info()[-1]
+                info = coloring_info
+                if info['min_improve_pct'] > pct:
+                    info['coloring'] = info['static'] = None
+                    msg = f"Coloring was deactivated.  Improvement of {pct:.1f}% was less " \
+                          f"than min allowed ({info['min_improve_pct']:.1f}%)."
+                    issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
+                    info['coloring'] = coloring = None
+
+            return coloring
 
 
 _ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
@@ -3477,3 +3562,28 @@ def _get_fd_options(var, global_method, local_opts, global_step, global_form, gl
                 fd_options[name] = value
 
     return fd_options, could_not_cs
+
+
+def _vois_match_driver(driver, ofs, wrts):
+    """
+    Return True if the given of/wrt pair matches the driver's voi lists.
+
+    Parameters
+    ----------
+    driver : <Driver>
+        The driver.
+    ofs : list of str
+        List of response names.
+    wrts : list of str
+        List of design variable names.
+
+    Returns
+    -------
+    bool
+        True if the given of/wrt pair matches the driver's voi lists.
+    """
+    driver_ofs = driver._get_ordered_nl_responses()
+    if ofs != driver_ofs:
+        return False
+    driver_wrts = list(driver._designvars)
+    return wrts == driver_wrts

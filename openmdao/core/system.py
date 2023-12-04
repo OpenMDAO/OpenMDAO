@@ -3188,11 +3188,6 @@ class System(object):
             msg = "{}: Constraint '{}' cannot be both equality and inequality."
             raise ValueError(msg.format(self.msginfo, name))
 
-        if self._static_mode:
-            responses = self._static_responses
-        else:
-            responses = self._responses
-
         if type_ == 'con':
 
             # Convert lower to ndarray/float as necessary
@@ -3272,6 +3267,11 @@ class System(object):
         resp['cache_linear_solution'] = cache_linear_solution
         resp['parallel_deriv_color'] = parallel_deriv_color
         resp['flat_indices'] = flat_indices
+
+        if self._static_mode:
+            responses = self._static_responses
+        else:
+            responses = self._responses
 
         if alias in responses:
             raise TypeError(f"{self.msginfo}: Constraint alias '{alias}' is a duplicate of an "
@@ -3419,6 +3419,76 @@ class System(object):
                           cache_linear_solution=cache_linear_solution,
                           flat_indices=flat_indices, alias=alias)
 
+    def _update_dv_meta(self, prom_name, meta, get_size=False, use_prom_ivc=False):
+        """
+        Update the design variable metadata.
+
+        Parameters
+        ----------
+        prom_name : str
+            Promoted name of the design variable in the system.
+        meta : dict
+            Metadata dictionary that is populated by this method.
+        get_size : bool
+            If True, compute the size and store it in the metadata.
+        use_prom_ivc : bool
+            Determines whether return key is promoted name or source name.
+        """
+        pro2abs_out = self._var_allprocs_prom2abs_list['output']
+        pro2abs_in = self._var_allprocs_prom2abs_list['input']
+        model = self._problem_meta['model_ref']()
+        conns = model._conn_global_abs_in2out
+        abs2meta_out = model._var_allprocs_abs2meta['output']
+
+        if prom_name in pro2abs_out:  # promoted output
+            abs_out = pro2abs_out[prom_name][0]
+            key = abs_out
+            meta['orig'] = (prom_name, None)
+
+        else:  # Design variable on an input connected to an ivc.
+            abs_out = conns[pro2abs_in[prom_name][0]]
+            key = prom_name if use_prom_ivc else abs_out
+            meta['orig'] = (None, prom_name)
+
+        meta['source'] = abs_out
+        meta['distributed'] = \
+            abs_out in abs2meta_out and abs2meta_out[abs_out]['distributed']
+
+        if get_size:
+            if 'indices' not in meta:
+                meta['indices'] = None
+            sizes = model._var_sizes['output']
+            abs2idx = model._var_allprocs_abs2idx
+            src_name = meta['source']
+
+            if 'size' in meta:
+                meta['size'] = int(meta['size'])  # make default int so will be json serializable
+            else:
+                if src_name in abs2idx:
+                    if meta['distributed']:
+                        meta['size'] = sizes[model.comm.rank, abs2idx[src_name]]
+                    else:
+                        meta['size'] = sizes[model._owning_rank[src_name], abs2idx[src_name]]
+                else:
+                    meta['size'] = 0  # discrete var, don't know size
+
+            if src_name in abs2idx:  # var is continuous
+                indices = meta['indices']
+                vmeta = abs2meta_out[src_name]
+                meta['distributed'] = vmeta['distributed']
+                if indices is not None:
+                    # Index defined in this design var.
+                    # update src shapes for Indexer objects
+                    indices.set_src_shape(vmeta['global_shape'])
+                    indices = indices.shaped_instance()
+                    meta['size'] = meta['global_size'] = indices.indexed_src_size
+                else:
+                    meta['global_size'] = vmeta['global_size']
+            else:
+                meta['global_size'] = 0  # discrete var
+
+        return key
+
     def _check_voi_meta_sizes(self, typename, meta, names):
         """
         Check that sizes of named metadata agree with meta['size'].
@@ -3464,149 +3534,98 @@ class System(object):
             The design variables defined in the current system and, if
             recurse=True, its subsystems.
         """
-        pro2abs_out = self._var_allprocs_prom2abs_list['output']
-        pro2abs_in = self._var_allprocs_prom2abs_list['input']
-        model = self._problem_meta['model_ref']()
-        conns = model._conn_global_abs_in2out
-        abs2meta_out = model._var_allprocs_abs2meta['output']
-
         out = {}
         try:
             for prom_name, data in self._design_vars.items():
                 if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
                     self._problem_meta['using_par_deriv_color'] = True
 
-                if prom_name in pro2abs_out:  # promoted output
+                key = self._update_dv_meta(prom_name, data, get_size=get_sizes,
+                                           use_prom_ivc=use_prom_ivc)
+                if get_sizes and data['source'] in self._var_allprocs_abs2idx:
+                    self._check_voi_meta_sizes(
+                        'design var', data, ['ref', 'ref0', 'scaler', 'adder', 'upper', 'lower'])
 
-                    # This is an output name, most likely a manual indepvarcomp.
-                    abs_out = pro2abs_out[prom_name][0]
-                    data['orig'] = (prom_name, None)
-                    out[abs_out] = data
-
-                else:  # promoted input
-
-                    # Design variable on an input connected to an ivc.
-                    abs_out = conns[pro2abs_in[prom_name][0]]
-                    data['orig'] = (None, prom_name)
-                    if use_prom_ivc:
-                        out[prom_name] = data
-                    else:
-                        out[abs_out] = data
-
-                data['source'] = abs_out
-                data['distributed'] = \
-                    abs_out in abs2meta_out and abs2meta_out[abs_out]['distributed']
+                out[key] = data
 
         except KeyError as err:
-            msg = "{}: Output not found for design variable {}."
-            raise RuntimeError(msg.format(self.msginfo, str(err)))
+            raise RuntimeError(f"{self.msginfo}: Output not found for design variable {err}.")
 
-        if get_sizes:
+        return out
+
+    def _update_response_meta(self, prom_name, meta, get_size=False, use_prom_ivc=False):
+        """
+        Update the design variable metadata.
+
+        Parameters
+        ----------
+        prom_name : str
+            Promoted name of the design variable in the system.
+        meta : dict
+            Metadata dictionary.
+        get_size : bool
+            If True, compute the size of each design variable.
+        use_prom_ivc : bool
+            Use promoted names for inputs, else convert to absolute source names.
+        """
+        prom2abs_out = self._var_allprocs_prom2abs_list['output']
+        prom2abs_in = self._var_allprocs_prom2abs_list['input']
+        model = self._problem_meta['model_ref']()
+        conns = model._conn_global_abs_in2out
+        abs2meta_out = model._var_allprocs_abs2meta['output']
+
+        alias = meta['alias']
+        try:
+            prom = meta['name']  # always a promoted var name
+        except KeyError:
+            meta['name'] = prom = prom_name
+
+        if alias is not None:
+            if alias in prom2abs_out or alias in prom2abs_in:
+                # Constraint alias should never be the same as any openmdao variable.
+                path = prom2abs_out[prom][0] if prom in prom2abs_out else prom
+                raise RuntimeError(f"{self.msginfo}: Constraint alias '{alias}' on '{path}'"
+                                   " is the same name as an existing variable.")
+            meta['alias_path'] = self.pathname
+
+        if prom in prom2abs_out:  # promoted output
+            abs_out = prom2abs_out[prom][0]
+        else:  # promoted input
+            abs_out = conns[prom2abs_in[prom][0]]
+
+        if alias:
+            key = alias
+        elif prom in prom2abs_out or not use_prom_ivc:
+            key = abs_out
+        else:
+            key = prom
+
+        meta['source'] = abs_out
+        meta['distributed'] = \
+            abs_out in abs2meta_out and abs2meta_out[abs_out]['distributed']
+
+        if get_size:
             # Size them all
             sizes = model._var_sizes['output']
             abs2idx = model._var_allprocs_abs2idx
             owning_rank = model._owning_rank
 
-            for name, meta in out.items():
-
-                src_name = meta['source']
-
-                if 'size' not in meta:
-                    if src_name in abs2idx:
-                        if meta['distributed']:
-                            meta['size'] = sizes[model.comm.rank, abs2idx[src_name]]
-                        else:
-                            meta['size'] = sizes[owning_rank[src_name], abs2idx[src_name]]
-                    else:
-                        meta['size'] = 0  # discrete var, don't know size
-                meta['size'] = int(meta['size'])  # make default int so will be json serializable
-
-                if src_name in abs2idx:  # var is continuous
-                    indices = meta['indices']
-                    vmeta = abs2meta_out[src_name]
-                    meta['distributed'] = vmeta['distributed']
-                    if indices is not None:
-                        # Index defined in this design var.
-                        # update src shapes for Indexer objects
-                        indices.set_src_shape(vmeta['global_shape'])
-                        indices = indices.shaped_instance()
-                        meta['size'] = meta['global_size'] = indices.indexed_src_size
-                    else:
-                        meta['global_size'] = vmeta['global_size']
-
-                    self._check_voi_meta_sizes('design var', meta,
-                                               ['ref', 'ref0', 'scaler', 'adder', 'upper', 'lower'])
-                else:
-                    meta['global_size'] = 0  # discrete var
-
-        if recurse and self._subsystems_allprocs:
-            abs2prom_in = self._var_allprocs_abs2prom['input']
-            if (self.comm.size > 1 and self._mpi_proc_allocator.parallel):
-
-                # For parallel groups, we need to make sure that the design variable dictionary is
-                # assembled in the same order under mpi as for serial runs.
-                out_by_sys = {}
-
-                for subsys in self._sorted_sys_iter():
-                    sub_out = {}
-                    name = subsys.name
-                    dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
-                                                 use_prom_ivc=use_prom_ivc)
-                    if use_prom_ivc:
-                        # have to promote subsystem prom name to this level
-                        sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
-                        for dv, meta in dvs.items():
-                            if dv in sub_pro2abs_in:
-                                abs_dv = sub_pro2abs_in[dv][0]
-                                sub_out[abs2prom_in[abs_dv]] = meta
-                            else:
-                                sub_out[dv] = meta
-                    else:
-                        sub_out.update(dvs)
-
-                    out_by_sys[name] = sub_out
-
-                out_by_sys_by_rank = self.comm.allgather(out_by_sys)
-                all_outs_by_sys = {}
-                for outs in out_by_sys_by_rank:
-                    for name, meta in outs.items():
-                        all_outs_by_sys[name] = meta
-
-                for subsys_name in self._sorted_sys_iter_all_procs():
-                    for name, meta in all_outs_by_sys[subsys_name].items():
-                        if name not in out:
-                            out[name] = meta
-
+            # Discrete vars
+            if abs_out not in abs2idx:
+                meta['size'] = meta['global_size'] = 0  # discrete var, don't know size
             else:
+                out_meta = abs2meta_out[abs_out]
 
-                for subsys in self._sorted_sys_iter():
-                    dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
-                                                 use_prom_ivc=use_prom_ivc)
-                    if use_prom_ivc:
-                        # have to promote subsystem prom name to this level
-                        sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
-                        for dv, meta in dvs.items():
-                            if dv in sub_pro2abs_in:
-                                abs_dv = sub_pro2abs_in[dv][0]
-                                out[abs2prom_in[abs_dv]] = meta
-                            else:
-                                out[dv] = meta
-                    else:
-                        out.update(dvs)
+                if 'indices' in meta and meta['indices'] is not None:
+                    indices = meta['indices']
+                    indices.set_src_shape(out_meta['global_shape'])
+                    indices = indices.shaped_instance()
+                    meta['size'] = meta['global_size'] = indices.indexed_src_size
+                else:
+                    meta['size'] = sizes[owning_rank[abs_out], abs2idx[abs_out]]
+                    meta['global_size'] = out_meta['global_size']
 
-        if self is model:
-            for var, outmeta in out.items():
-                if var in abs2meta_out and "openmdao:allow_desvar" not in abs2meta_out[var]['tags']:
-                    src, tgt = outmeta['orig']
-                    if src is None:
-                        self._collect_error(f"Design variable '{tgt}' is connected to '{var}', but "
-                                            f"'{var}' is not an IndepVarComp or ImplicitComp "
-                                            "output.")
-                    else:
-                        self._collect_error(f"Design variable '{src}' is not an IndepVarComp or "
-                                            "ImplicitComp output.")
-
-        return out
+        return key
 
     def get_responses(self, recurse=True, get_sizes=True, use_prom_ivc=False):
         """
@@ -3633,154 +3652,23 @@ class System(object):
             The responses defined in the current system and, if
             recurse=True, its subsystems.
         """
-        prom2abs_out = self._var_allprocs_prom2abs_list['output']
-        prom2abs_in = self._var_allprocs_prom2abs_list['input']
-        model = self._problem_meta['model_ref']()
-        conns = model._conn_global_abs_in2out
-        abs2meta_out = model._var_allprocs_abs2meta['output']
-
         out = {}
         try:
             # keys of self._responses are the alias or the promoted name
-            for data in self._responses.values():
+            for prom_or_alias, data in self._responses.items():
                 if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
                     self._problem_meta['using_par_deriv_color'] = True
 
-                alias = data['alias']  # may be None
-                prom = data['name']  # always a promoted var name
+                key = self._update_response_meta(prom_or_alias, data, get_size=get_sizes,
+                                                 use_prom_ivc=use_prom_ivc)
+                if get_sizes:
+                    self._check_voi_meta_sizes(
+                        resp_types[data['type']], data, resp_size_checks[data['type']])
 
-                if alias is not None:
-                    if alias in prom2abs_out or alias in prom2abs_in:
-                        # Constraint alias should never be the same as any openmdao variable.
-                        path = prom2abs_out[prom][0] if prom in prom2abs_out else prom
-                        raise RuntimeError(f"{self.msginfo}: Constraint alias '{alias}' on '{path}'"
-                                           " is the same name as an existing variable.")
-                    data['alias_path'] = self.pathname
-
-                if prom in prom2abs_out:  # promoted output
-                    abs_out = prom2abs_out[prom][0]
-                else:  # promoted input
-                    abs_out = conns[prom2abs_in[prom][0]]
-
-                if alias:
-                    out[alias] = data
-                elif prom in prom2abs_out or not use_prom_ivc:
-                    out[abs_out] = data
-                else:
-                    out[prom] = data
-
-                data['source'] = abs_out
-                data['distributed'] = \
-                    abs_out in abs2meta_out and abs2meta_out[abs_out]['distributed']
+                out[key] = data
 
         except KeyError as err:
-            msg = "{}: Output not found for response {}."
-            raise RuntimeError(msg.format(self.msginfo, str(err)))
-
-        if get_sizes:
-            # Size them all
-            sizes = model._var_sizes['output']
-            abs2idx = model._var_allprocs_abs2idx
-            owning_rank = model._owning_rank
-            for response in out.values():
-                name = response['source']
-
-                # Discrete vars
-                if name not in abs2idx:
-                    response['size'] = response['global_size'] = 0  # discrete var, don't know size
-                    continue
-
-                meta = abs2meta_out[name]
-                response['distributed'] = meta['distributed']
-
-                if response['indices'] is not None:
-                    indices = response['indices']
-                    indices.set_src_shape(meta['global_shape'])
-                    indices = indices.shaped_instance()
-                    response['size'] = response['global_size'] = indices.indexed_src_size
-                else:
-                    response['size'] = sizes[owning_rank[name], abs2idx[name]]
-                    response['global_size'] = meta['global_size']
-
-                self._check_voi_meta_sizes(resp_types[response['type']], response,
-                                           resp_size_checks[response['type']])
-
-        if recurse and self._subsystems_allprocs:
-            abs2prom_in = self._var_allprocs_abs2prom['input']
-            if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
-                # For parallel groups, we need to make sure that the design variable dictionary is
-                # assembled in the same order under mpi as for serial runs.
-                out_by_sys = {}
-
-                for subsys in self._sorted_sys_iter():
-                    name = subsys.name
-                    sub_out = {}
-
-                    resps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
-                                                 use_prom_ivc=use_prom_ivc)
-                    if use_prom_ivc:
-                        # have to promote subsystem prom name to this level
-                        sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
-                        for dv, meta in resps.items():
-                            if dv in sub_pro2abs_in:
-                                abs_resp = sub_pro2abs_in[dv][0]
-                                sub_out[abs2prom_in[abs_resp]] = meta
-                            else:
-                                sub_out[dv] = meta
-                    else:
-                        for rkey, rmeta in resps.items():
-                            if rkey in out:
-                                tdict = {'con': 'constraint', 'obj': 'objective'}
-                                rpath = rmeta['alias_path']
-                                rname = '.'.join((rpath, rmeta['name'])) if rpath else rkey
-                                rtype = tdict[rmeta['type']]
-                                ometa = sub_out[rkey]
-                                opath = ometa['alias_path']
-                                oname = '.'.join((opath, ometa['name'])) if opath else ometa['name']
-                                otype = tdict[ometa['type']]
-                                raise NameError(f"The same response alias, '{rkey}' was declared"
-                                                f" for {rtype} '{rname}' and {otype} '{oname}'.")
-                            sub_out[rkey] = rmeta
-
-                    out_by_sys[name] = sub_out
-
-                out_by_sys_by_rank = self.comm.allgather(out_by_sys)
-                all_outs_by_sys = {}
-                for outs in out_by_sys_by_rank:
-                    for name, meta in outs.items():
-                        all_outs_by_sys[name] = meta
-
-                for subsys_name in self._sorted_sys_iter_all_procs():
-                    for name, meta in all_outs_by_sys[subsys_name].items():
-                        out[name] = meta
-
-            else:
-                for subsys in self._sorted_sys_iter():
-                    resps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
-                                                 use_prom_ivc=use_prom_ivc)
-                    if use_prom_ivc:
-                        # have to promote subsystem prom name to this level
-                        sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
-                        for dv, meta in resps.items():
-                            if dv in sub_pro2abs_in:
-                                abs_resp = sub_pro2abs_in[dv][0]
-                                out[abs2prom_in[abs_resp]] = meta
-                            else:
-                                out[dv] = meta
-                    else:
-                        for rkey, rmeta in resps.items():
-                            if rkey in out:
-                                tdict = {'con': 'constraint', 'obj': 'objective'}
-                                rpath = rmeta['alias_path']
-                                rname = '.'.join((rpath, rmeta['name'])) if rpath else rkey
-                                rtype = tdict[rmeta['type']]
-                                ometa = out[rkey]
-                                opath = ometa['alias_path']
-                                oname = '.'.join((opath, ometa['name'])) if opath else ometa['name']
-                                otype = tdict[ometa['type']]
-                                raise NameError(f"The same response alias, '{rkey}' was declared"
-                                                f" for {rtype} '{rname}' and {otype} '{oname}'.")
-                            out[rkey] = rmeta
+            raise RuntimeError(f"{self.msginfo}: Output not found for response {err}.")
 
         return out
 

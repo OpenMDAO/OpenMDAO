@@ -1,21 +1,21 @@
 """
 Helper class for total jacobian computation.
 """
+import sys
+import time
+import pprint
+from contextlib import contextmanager
 from collections import defaultdict
 from itertools import chain, repeat
 from copy import deepcopy
-import pprint
-import sys
-import time
 
 import numpy as np
 
 from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.general_utils import ContainsAll, _src_or_alias_dict, _src_or_alias_name
-
 from openmdao.utils.mpi import MPI, check_mpi_env
-from openmdao.utils.coloring import _initialize_model_approx, Coloring
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
+import openmdao.utils.coloring as coloring
 
 
 use_mpi = check_mpi_env()
@@ -96,10 +96,13 @@ class _TotalJacInfo(object):
         The set of names of all systems relevant to the computation of the total derivatives.
     directional : bool
         If True, perform a single directional derivative.
+    relevance : dict
+        Dict of relevance dictionaries for each var of interest.
     """
 
     def __init__(self, problem, of, wrt, return_format, approx=False,
-                 debug_print=False, driver_scaling=True, get_remote=True, directional=False):
+                 debug_print=False, driver_scaling=True, get_remote=True, directional=False,
+                 coloring_info=None):
         """
         Initialize object.
 
@@ -125,16 +128,18 @@ class _TotalJacInfo(object):
             Whether to get remote variables if using MPI.
         directional : bool
             If True, perform a single directional derivative.
+        coloring_info : dict
+            Metadata pertaining to coloring.  If None, the driver's coloring_info is used.
         """
         driver = problem.driver
-        prom2abs = problem.model._var_allprocs_prom2abs_list['output']
-        prom2abs_in = problem.model._var_allprocs_prom2abs_list['input']
-        conns = problem.model._conn_global_abs_in2out
-
         self.model = model = problem.model
+
+        prom2abs = model._var_allprocs_prom2abs_list['output']
+        prom2abs_in = model._var_allprocs_prom2abs_list['input']
+        conns = model._conn_global_abs_in2out
+
         self.comm = problem.comm
         self.mode = problem._mode
-        self.owning_ranks = problem.model._owning_rank
         self.has_scaling = driver._has_scaling and driver_scaling
         self.return_format = return_format
         self.lin_sol_cache = {}
@@ -142,8 +147,6 @@ class _TotalJacInfo(object):
         self.par_deriv_printnames = {}
         self.get_remote = get_remote
         self.directional = directional
-
-        has_custom_derivs = of is not None or wrt is not None
 
         if isinstance(wrt, str):
             wrt = [wrt]
@@ -163,12 +166,21 @@ class _TotalJacInfo(object):
         driver_wrt = list(driver._designvars)
         driver_of = driver._get_ordered_nl_responses()
 
+        has_custom_derivs = ((of is not None and list(of) != driver_of) or
+                             (wrt is not None and list(wrt) != driver_wrt))
+
         # In normal use, of and wrt always contain variable names. However, there are unit tests
         # that don't specify them, so we need these here.
         if wrt is None:
             wrt = driver_wrt
+            if not wrt:
+                raise RuntimeError("No design variables were passed to compute_totals and "
+                                   "the driver is not providing any.")
         if of is None:
             of = driver_of
+            if not of:
+                raise RuntimeError("No response variables were passed to compute_totals and "
+                                   "the driver is not providing any.")
 
         # Convert 'wrt' names from promoted to absolute
         prom_wrt = wrt
@@ -256,35 +268,31 @@ class _TotalJacInfo(object):
         self.total_relevant_systems = set()
         self.simul_coloring = None
 
+        if has_custom_derivs:
+            # have to compute new relevance
+            abs_desvars = {n: m for n, m in problem._active_desvar_iter(prom_wrt)}
+            abs_responses = {n: m for n, m in problem._active_response_iter(prom_of)}
+            old_rel = model._relevance_graph
+            model._relevance_graph = None
+            try:
+                self.relevance = model._init_relevance(problem._orig_mode,
+                                                       abs_desvars, abs_responses)
+            finally:
+                model._relevance_graph = old_rel
+        else:
+            self.relevance = problem._metadata['relevant']
+
         if approx:
-            _initialize_model_approx(model, driver, self.of, self.wrt)
+            coloring._initialize_model_approx(model, driver, self.of, self.wrt)
             modes = ['fwd']
         else:
             if not has_lin_cons:
-                self.simul_coloring = driver._coloring_info['coloring']
+                if coloring_info is None:
+                    self.simul_coloring = driver._coloring_info['coloring']
+                else:
+                    self.simul_coloring = coloring_info['coloring']
 
-                # if we don't get wrt and of from driver, turn off coloring
-                if self.simul_coloring is not None:
-                    ok = True
-                    if prom_wrt != driver_wrt:
-                        ok = False
-                    else:
-                        # TODO: there's some weirdness here where sometimes the
-                        # of vars are absolute and sometimes they're not...
-                        for pof, aof, dof in zip(prom_of, of, driver_of):
-                            if pof != dof and aof != dof:
-                                ok = False
-                                break
-                    if not ok:
-                        msg = ("compute_totals called using a different list of design vars and/or "
-                               "responses than those used to define coloring, so coloring will "
-                               "be turned off.\ncoloring design vars: %s, current design vars: "
-                               "%s\ncoloring responses: %s, current responses: %s." %
-                               (driver_wrt, wrt, driver_of, of))
-                        issue_warning(msg, category=DerivativesWarning)
-                        self.simul_coloring = None
-
-            if not isinstance(self.simul_coloring, Coloring):
+            if not isinstance(self.simul_coloring, coloring.Coloring):
                 self.simul_coloring = None
 
             if self.simul_coloring is None:
@@ -684,7 +692,10 @@ class _TotalJacInfo(object):
                 parallel_deriv_color = meta['parallel_deriv_color']
                 cache_lin_sol = meta['cache_linear_solution']
 
-                _check_voi_meta(name, parallel_deriv_color, simul_coloring)
+                if simul_coloring and parallel_deriv_color:
+                    raise RuntimeError("Using both simul_coloring and parallel_deriv_color with "
+                                       f"variable '{name}' is not supported.")
+
                 if parallel_deriv_color:
                     if parallel_deriv_color not in self.par_deriv_printnames:
                         self.par_deriv_printnames[parallel_deriv_color] = []
@@ -836,7 +847,7 @@ class _TotalJacInfo(object):
                     iterdict['local_in_idxs'] = locs[active]
                     iterdict['seeds'] = seed[ilist][active]
 
-                iterdict['relevant'] = all_rel_systems
+                iterdict['relevant_systems'] = all_rel_systems
                 iterdict['cache_lin_solve'] = cache
                 itermeta.append(iterdict)
 
@@ -1198,9 +1209,9 @@ class _TotalJacInfo(object):
         self.input_vec[mode].set_val(itermeta['seeds'], itermeta['local_in_idxs'])
 
         if itermeta['cache_lin_solve']:
-            return itermeta['relevant'], ('linear',), (inds[0], mode)
+            return itermeta['relevant_systems'], ('linear',), (inds[0], mode)
         else:
-            return itermeta['relevant'], None, None
+            return itermeta['relevant_systems'], None, None
 
     def par_deriv_input_setter(self, inds, imeta, mode):
         """
@@ -1525,78 +1536,80 @@ class _TotalJacInfo(object):
         # Linearize Model
         model._tot_jac = self
 
-        try:
-            ln_solver = model._linear_solver
-            with model._scaled_context_all():
-                model._linearize(model._assembled_jac,
-                                 sub_do_ln=ln_solver._linearize_children(),
-                                 rel_systems=self.total_relevant_systems)
-            if ln_solver._assembled_jac is not None and \
-                    ln_solver._assembled_jac._under_complex_step:
-                model.linear_solver._assembled_jac._update(model)
-            ln_solver._linearize()
-        finally:
-            model._tot_jac = None
+        with self._relevance_context():
+            try:
+                ln_solver = model._linear_solver
+                with model._scaled_context_all():
+                    model._linearize(model._assembled_jac,
+                                     sub_do_ln=ln_solver._linearize_children(),
+                                     rel_systems=self.total_relevant_systems)
+                if ln_solver._assembled_jac is not None and \
+                        ln_solver._assembled_jac._under_complex_step:
+                    model.linear_solver._assembled_jac._update(model)
+                ln_solver._linearize()
+            finally:
+                model._tot_jac = None
 
-        self.J[:] = 0.0
+            self.J[:] = 0.0
 
-        # Main loop over columns (fwd) or rows (rev) of the jacobian
-        for mode in self.modes:
-            for key, idx_info in self.idx_iter_dict[mode].items():
-                imeta, idx_iter = idx_info
-                for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
-                    rel_systems, vec_names, cache_key = input_setter(inds, itermeta, mode)
+            # Main loop over columns (fwd) or rows (rev) of the jacobian
+            for mode in self.modes:
+                for key, idx_info in self.idx_iter_dict[mode].items():
+                    imeta, idx_iter = idx_info
+                    for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
+                        rel_systems, vec_names, cache_key = input_setter(inds, itermeta, mode)
 
-                    if debug_print:
-                        if par_print and key in par_print:
-                            varlist = '(' + ', '.join([name for name in par_print[key]]) + ')'
-                            print('Solving color:', key, varlist, flush=True)
-                        else:
-                            if key == '@simul_coloring':
-                                print(f'In mode: {mode}, Solving variable(s) using simul '
-                                      'coloring:')
-                                for local_ind in imeta['coloring']._local_indices(inds=inds,
-                                                                                  mode=mode):
-                                    print(f"   {local_ind}", flush=True)
-                            elif self.directional:
-                                print(f"In mode: {mode}.\n, Solving for directional derivative "
-                                      f"wrt '{self.ivc_print_names.get(key, key)}'",)
+                        if debug_print:
+                            if par_print and key in par_print:
+                                varlist = '(' + ', '.join([name for name in par_print[key]]) + ')'
+                                print('Solving color:', key, varlist, flush=True)
                             else:
-                                print(f"In mode: {mode}.\n('{self.ivc_print_names.get(key, key)}'"
-                                      f", [{inds}])", flush=True)
+                                if key == '@simul_coloring':
+                                    print(f'In mode: {mode}, Solving variable(s) using simul '
+                                          'coloring:')
+                                    for local_ind in imeta['coloring']._local_indices(inds=inds,
+                                                                                      mode=mode):
+                                        print(f"   {local_ind}", flush=True)
+                                elif self.directional:
+                                    print(f"In mode: {mode}.\n, Solving for directional derivative "
+                                          f"wrt '{self.ivc_print_names.get(key, key)}'",)
+                                else:
+                                    print(f"In mode: {mode}.\n"
+                                          f"('{self.ivc_print_names.get(key, key)}', [{inds}])",
+                                          flush=True)
 
-                        t0 = time.perf_counter()
+                            t0 = time.perf_counter()
 
-                    # restore old linear solution if cache_linear_solution was set by the user for
-                    # any input variables involved in this linear solution.
-                    with model._scaled_context_all():
-                        if cache_key is not None and not has_lin_cons and self.mode == mode:
-                            self._restore_linear_solution(cache_key, mode)
-                            model._solve_linear(mode, rel_systems)
-                            self._save_linear_solution(cache_key, mode)
-                        else:
-                            model._solve_linear(mode, rel_systems)
+                        # restore old linear solution if cache_linear_solution was set by the user
+                        # for any input variables involved in this linear solution.
+                        with model._scaled_context_all():
+                            if cache_key is not None and not has_lin_cons and self.mode == mode:
+                                self._restore_linear_solution(cache_key, mode)
+                                model._solve_linear(mode, rel_systems)
+                                self._save_linear_solution(cache_key, mode)
+                            else:
+                                model._solve_linear(mode, rel_systems)
 
-                    if debug_print:
-                        print(f'Elapsed Time: {time.perf_counter() - t0} secs\n', flush=True)
+                        if debug_print:
+                            print(f'Elapsed Time: {time.perf_counter() - t0} secs\n', flush=True)
 
-                    jac_setter(inds, mode, imeta)
+                        jac_setter(inds, mode, imeta)
 
-        # Driver scaling.
-        if self.has_scaling:
-            self._do_driver_scaling(self.J_dict)
+            # Driver scaling.
+            if self.has_scaling:
+                self._do_driver_scaling(self.J_dict)
 
-        # if some of the wrt vars are distributed in fwd mode, we bcast from the rank
-        # where each part of the distrib var exists
-        if self.get_remote and mode == 'fwd' and self.has_input_dist[mode]:
-            for start, stop, rank in self.dist_input_range_map[mode]:
-                contig = self.J[:, start:stop].copy()
-                model.comm.Bcast(contig, root=rank)
-                self.J[:, start:stop] = contig
+            # if some of the wrt vars are distributed in fwd mode, we bcast from the rank
+            # where each part of the distrib var exists
+            if self.get_remote and mode == 'fwd' and self.has_input_dist[mode]:
+                for start, stop, rank in self.dist_input_range_map[mode]:
+                    contig = self.J[:, start:stop].copy()
+                    model.comm.Bcast(contig, root=rank)
+                    self.J[:, start:stop] = contig
 
-        if debug_print:
-            # Debug outputs scaled derivatives.
-            self._print_derivatives()
+            if debug_print:
+                # Debug outputs scaled derivatives.
+                self._print_derivatives()
 
         return self.J_final
 
@@ -1633,64 +1646,66 @@ class _TotalJacInfo(object):
 
         t0 = time.perf_counter()
 
-        model._tot_jac = self
-        try:
-            # Re-initialize so that it is clean.
-            if initialize:
+        with self._relevance_context():
+            model._tot_jac = self
+            try:
+                # Re-initialize so that it is clean.
+                if initialize:
 
-                # Need this cache cleared because we re-initialize after linear constraints.
-                model._approx_subjac_keys = None
+                    # Need this cache cleared because we re-initialize after linear constraints.
+                    model._approx_subjac_keys = None
 
-                if model._approx_schemes:
+                    if model._approx_schemes:
+                        for scheme in model._approx_schemes.values():
+                            scheme._reset()
+                        method = list(model._approx_schemes)[0]
+                        kwargs = model._owns_approx_jac_meta
+                        model.approx_totals(method=method, **kwargs)
+                        if progress_out_stream is not None:
+                            model._approx_schemes[method]._progress_out = progress_out_stream
+                    else:
+                        model.approx_totals(method='fd')
+                        if progress_out_stream is not None:
+                            model._approx_schemes['fd']._progress_out = progress_out_stream
+
+                    model._setup_jacobians(recurse=False)
+                    model._setup_approx_partials()
+                    if model._coloring_info['coloring'] is not None:
+                        model._update_wrt_matches(model._coloring_info)
+
+                if self.directional:
                     for scheme in model._approx_schemes.values():
-                        scheme._reset()
-                    method = list(model._approx_schemes)[0]
-                    kwargs = model._owns_approx_jac_meta
-                    model.approx_totals(method=method, **kwargs)
-                    if progress_out_stream is not None:
-                        model._approx_schemes[method]._progress_out = progress_out_stream
+                        seeds = {k: -s for k, s in self.seeds.items()}
+                        scheme._totals_directions = seeds
+                        scheme._totals_directional_mode = self.mode
                 else:
-                    model.approx_totals(method='fd')
-                    if progress_out_stream is not None:
-                        model._approx_schemes['fd']._progress_out = progress_out_stream
+                    for scheme in model._approx_schemes.values():
+                        scheme._totals_directions = {}
+                        scheme._totals_directional_mode = None
 
-                model._setup_jacobians(recurse=False)
-                model._setup_approx_partials()
-                if model._coloring_info['coloring'] is not None:
-                    model._update_wrt_matches(model._coloring_info)
+                # Linearize Model
+                model._linearize(model._assembled_jac,
+                                 sub_do_ln=model._linear_solver._linearize_children(),
+                                 rel_systems=self.total_relevant_systems)
 
-            if self.directional:
-                for scheme in model._approx_schemes.values():
-                    seeds = {k: -s for k, s in self.seeds.items()}
-                    scheme._totals_directions = seeds
-                    scheme._totals_directional_mode = self.mode
-            else:
-                for scheme in model._approx_schemes.values():
-                    scheme._totals_directions = {}
-                    scheme._totals_directional_mode = None
+            finally:
+                model._tot_jac = None
 
-            # Linearize Model
-            model._linearize(model._assembled_jac,
-                             sub_do_ln=model._linear_solver._linearize_children(),
-                             rel_systems=self.total_relevant_systems)
+            totals = self.J_dict
+            if debug_print:
+                print(f'Elapsed time to approx totals: {time.perf_counter() - t0} secs\n',
+                      flush=True)
 
-        finally:
-            model._tot_jac = None
+            # Driver scaling.
+            if self.has_scaling:
+                self._do_driver_scaling(totals)
 
-        totals = self.J_dict
-        if debug_print:
-            print(f'Elapsed time to approx totals: {time.perf_counter() - t0} secs\n', flush=True)
+            if return_format == 'array':
+                totals = self.J  # change back to array version
 
-        # Driver scaling.
-        if self.has_scaling:
-            self._do_driver_scaling(totals)
-
-        if return_format == 'array':
-            totals = self.J  # change back to array version
-
-        if debug_print:
-            # Debug outputs scaled derivatives.
-            self._print_derivatives()
+            if debug_print:
+                # Debug outputs scaled derivatives.
+                self._print_derivatives()
 
         return totals
 
@@ -2000,25 +2015,18 @@ class _TotalJacInfo(object):
 
         return newJ, slices
 
+    @contextmanager
+    def _relevance_context(self):
+        """
+        Context manager to set current relevance for the Problem.
+        """
+        old_relevance = self.model._problem_meta['relevant']
+        self.model._problem_meta['relevant'] = self.relevance
 
-def _check_voi_meta(name, parallel_deriv_color, simul_coloring):
-    """
-    Check the contents of the given metadata for incompatible options.
-
-    An exception will be raised if options are incompatible.
-
-    Parameters
-    ----------
-    name : str
-        Name of the variable.
-    parallel_deriv_color : str
-        Color of parallel deriv grouping.
-    simul_coloring : ndarray
-        Array of colors. Each entry corresponds to a column or row of the total jacobian.
-    """
-    if simul_coloring and parallel_deriv_color:
-        raise RuntimeError("Using both simul_coloring and parallel_deriv_color with "
-                           f"variable '{name}' is not supported.")
+        try:
+            yield
+        finally:
+            self.model._problem_meta['relevant'] = old_relevance
 
 
 def _fix_pdc_lengths(idx_iter_dict):
