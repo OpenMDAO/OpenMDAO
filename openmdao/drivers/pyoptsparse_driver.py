@@ -581,7 +581,6 @@ class pyOptSparseDriver(Driver):
         else:
             output_dir = self.options['output_dir']
 
-
         optimizers_and_output_files = {
             # ALPSO uses a single option `filename` to determine name of both output files
             'ALPSO': [('filename', 'ALPSO.out')],
@@ -595,7 +594,7 @@ class pyOptSparseDriver(Driver):
         for opt_setting_name, output_file_name in optimizers_and_output_files[optimizer]:
             if self.opt_settings.get(opt_setting_name) is None:
                 self.opt_settings[opt_setting_name] = f'{output_dir}/{output_file_name}'
-            
+
         # Process any default optimizer-specific settings.
         if optimizer in DEFAULT_OPT_SETTINGS:
             for name, value in DEFAULT_OPT_SETTINGS[optimizer].items():
