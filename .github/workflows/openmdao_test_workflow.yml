@@ -420,7 +420,7 @@ jobs:
         with:
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
           status: ${{ job.status }}
-        if: always()
+        if: failure()
 
   windows_tests:
     runs-on: windows-latest
@@ -549,7 +549,7 @@ jobs:
         with:
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
           status: ${{ job.status }}
-        if: always()
+        if: failure()
 
   coveralls:
     name: Finish coverage

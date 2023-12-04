@@ -1,11 +1,11 @@
 # When a pull request is opened, check if it resolves an issue that is associated with a POEM
 # When pull request is merged, update the status of any associated POEM to Integrated
 
-name: Check/Update Associated POEM
+name: Update Associated POEM
 
 on:
-  pull_request_target:
-    types: [ opened, closed ]
+  pull_request:
+    types: [ opened, reopened, closed ]
     branches: [ master ]
 
 permissions: {}
@@ -13,20 +13,20 @@ permissions: {}
 jobs:
 
   check_for_poem:
-    if: github.event.action == 'opened' || github.event.pull_request.merged
+    if: github.event.action == 'opened' || github.event.action == 'reopened' || github.event.pull_request.merged
 
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write
       pull-requests: write
-      repository-projects: write
 
     defaults:
       run:
         shell: bash -l {0}
 
     steps:
+      - uses: actions/checkout@v4
+
       - name: Display run details
         run: |
           echo "============================================================="
@@ -34,65 +34,24 @@ jobs:
           echo "Run ID: ${GITHUB_RUN_ID}"
           echo
           echo "Repository:   ${GITHUB_REPOSITORY}"
-          echo "Triggered by: ${{ github.event_name }} ${{ github.event }}"
+          echo "Triggered by: ${{ github.event_name }} ${{ github.event.number }} ${{ github.event.action }}"
           echo "Initiated by: ${GITHUB_ACTOR}"
           echo "============================================================="
 
       - name: Check for Associated POEM
         id: check_for_poem
         env:
-          BODY: ${{ github.event.pull_request.body }}
+          PR_NUMBER: ${{ github.event.number }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "PULL REQUEST:"
-          echo $BODY
-
-          echo "----------------------"
-
-          while IFS= read -r line; do
-            ISSUE_ID=$(echo $line | grep "Resolves #" -)
-            if [[ "$ISSUE_ID" ]]; then
-              ISSUE_ID=$(echo $ISSUE_ID | cut -d '#' -f 2)
-              break
-            fi
-          done <<< "$BODY"
-
-          ISSUE_ID=$(echo $ISSUE_ID|tr -d '\n\t\r ')
-
-          echo "ISSUE ID: $ISSUE_ID"
-
-          echo "----------------------"
-
-          ISSUE_TEXT=`gh --repo OpenMDAO/OpenMDAO issue view $ISSUE_ID`
-
-          ASSOCIATED_POEM=""
-          POEM_ID=""
-
-          echo "ISSUE:"
-
-          while IFS= read -r line; do
-            echo $line
-            if [[ "$ASSOCIATED_POEM" ]]; then
-              POEM_ID=$(echo $line)
-              if [[ "$POEM_ID" ]]; then
-                break
-              fi
-            else
-              ASSOCIATED_POEM=$(echo $line | grep "Associated POEM" -)
-            fi
-          done <<< "$ISSUE_TEXT"
-
-          if [[ "$POEM_ID" ]]; then
-            echo "----------------------"
-            POEM_ID=$(echo $POEM_ID | tr -d '\n\t\r ')
-            echo "This Pull Request will transition POEM $POEM_ID to Integrated"
-            echo "----------------------"
+          if python .github/scripts/get_poem_id.py ${GITHUB_REPOSITORY} $PR_NUMBER; then
+            cat POEM_ID.txt >> $GITHUB_OUTPUT
+          else
+            echo "POEM_ID=" >> $GITHUB_OUTPUT
           fi
 
-          echo "POEM_ID=$POEM_ID" >> $GITHUB_OUTPUT
-
       - name: Comment on PR
-        if: github.event.action == 'opened' && steps.check_for_poem.outputs.POEM_ID != ''
+        if: (github.event.action == 'opened' || github.event.action == 'reopened') && steps.check_for_poem.outputs.POEM_ID != ''
         env:
           POEM_ID: ${{ steps.check_for_poem.outputs.POEM_ID }}
           POEM_URL: ${{ github.server_url }}/${{ github.repository_owner }}/POEMs/blob/master/POEM_${{ steps.check_for_poem.outputs.POEM_ID }}.md
@@ -108,7 +67,7 @@ jobs:
             })
 
       - name: Slack POEM message
-        if: github.event.action == 'opened' && steps.check_for_poem.outputs.POEM_ID != ''
+        if: (github.event.action == 'opened' || github.event.action == 'reopened') && steps.check_for_poem.outputs.POEM_ID != ''
         uses: act10ns/slack@v2.0.0
         with:
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
