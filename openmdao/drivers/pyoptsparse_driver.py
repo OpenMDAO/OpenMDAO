@@ -591,9 +591,10 @@ class pyOptSparseDriver(Driver):
             'SNOPT': [('Print file', 'SNOPT_print.out'), ('Summary file', 'SNOPT_summary.out')]
         }
 
-        for opt_setting_name, output_file_name in optimizers_and_output_files[optimizer]:
-            if self.opt_settings.get(opt_setting_name) is None:
-                self.opt_settings[opt_setting_name] = f'{output_dir}/{output_file_name}'
+        if optimizer in optimizers_and_output_files:
+            for opt_setting_name, output_file_name in optimizers_and_output_files[optimizer]:
+                if self.opt_settings.get(opt_setting_name) is None:
+                    self.opt_settings[opt_setting_name] = f'{output_dir}/{output_file_name}'
 
         # Process any default optimizer-specific settings.
         if optimizer in DEFAULT_OPT_SETTINGS:
