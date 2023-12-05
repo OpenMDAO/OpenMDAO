@@ -357,7 +357,7 @@ class Jacobian(object):
                 if ridxs is not _full_slice or cidxs is not _full_slice:
                     # replace our local subjac with a smaller one but don't
                     # change the subjac belonging to the system (which has values
-                    # shared with subsystems)
+                    # shared with other systems)
                     if self._subjacs_info is system._subjacs_info:
                         self._subjacs_info = system._subjacs_info.copy()
                     meta = self._subjacs_info[key] = meta.copy()

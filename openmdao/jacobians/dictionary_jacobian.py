@@ -21,6 +21,8 @@ class DictionaryJacobian(Jacobian):
     ----------
     _iter_keys : list of (vname, vname) tuples
         List of tuples of variable names that match subjacs in the this Jacobian.
+    _key_owner : dict
+        Dict mapping subjac keys to the rank where that subjac is local.
     """
 
     def __init__(self, system, **kwargs):
@@ -29,6 +31,7 @@ class DictionaryJacobian(Jacobian):
         """
         super().__init__(system, **kwargs)
         self._iter_keys = None
+        self._key_owner = None
 
     def _iter_abs_keys(self, system):
         """
@@ -47,16 +50,62 @@ class DictionaryJacobian(Jacobian):
             List of keys matching this jacobian for the current system.
         """
         if self._iter_keys is None:
+            # determine the set of remote keys (keys where either of or wrt is remote somewhere)
+            # only if we're under MPI with comm size > 1 and the given system is a Group that
+            # computes its derivatives using finite difference or complex step.
+            include_remotes = system.pathname and \
+                system.comm.size > 1 and system._owns_approx_jac and system._subsystems_allprocs
             subjacs = self._subjacs_info
             keys = []
-            for res_name in system._var_abs2meta['output']:
+            if include_remotes:
+                ofnames = system._var_allprocs_abs2meta['output']
+                wrtnames = system._var_allprocs_abs2meta
+            else:
+                ofnames = system._var_abs2meta['output']
+                wrtnames = system._var_abs2meta
+
+            for res_name in ofnames:
                 for type_ in ('output', 'input'):
-                    for name in system._var_abs2meta[type_]:
+                    for name in wrtnames[type_]:
                         key = (res_name, name)
                         if key in subjacs:
                             keys.append(key)
 
             self._iter_keys = keys
+
+            if include_remotes:
+                local_out = system._var_abs2meta['output']
+                local_in = system._var_abs2meta['input']
+                remote_keys = []
+                for key in keys:
+                    of, wrt = key
+                    if of not in local_out or (wrt not in local_in and wrt not in local_out):
+                        remote_keys.append(key)
+
+                abs2idx = system._var_allprocs_abs2idx
+                sizes_out = system._var_sizes['output']
+                sizes_in = system._var_sizes['input']
+                owner_dict = {}
+                for keys in system.comm.allgather(remote_keys):
+                    for key in keys:
+                        if key not in owner_dict:
+                            of, wrt = key
+                            ofsizes = sizes_out[:, abs2idx[of]]
+                            if wrt in ofnames:
+                                wrtsizes = sizes_out[:, abs2idx[wrt]]
+                            else:
+                                wrtsizes = sizes_in[:, abs2idx[wrt]]
+                            for rank, (ofsz, wrtsz) in enumerate(zip(ofsizes, wrtsizes)):
+                                # find first rank where both of and wrt are local
+                                if ofsz and wrtsz:
+                                    owner_dict[key] = rank
+                                    break
+                            else:  # no rank was found where both were local. Use 'of' local rank
+                                owner_dict[key] = np.min(np.nonzero(ofsizes)[0])
+
+                self._key_owner = owner_dict
+            else:
+                self._key_owner = {}
 
         return self._iter_keys
 
@@ -78,8 +127,8 @@ class DictionaryJacobian(Jacobian):
             'fwd' or 'rev'.
         """
         fwd = mode == 'fwd'
-        d_res_names = d_residuals._names
         d_out_names = d_outputs._names
+        d_res_names = d_residuals._names
         d_inp_names = d_inputs._names
 
         if not d_out_names and not d_inp_names:
@@ -95,33 +144,34 @@ class DictionaryJacobian(Jacobian):
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             for abs_key in self._iter_abs_keys(system):
                 res_name, other_name = abs_key
-                if res_name in d_res_names:
-                    if other_name in d_out_names:
-                        # skip the matvec mult completely for identity subjacs
-                        if is_explicit and res_name is other_name:
-                            if fwd:
-                                val = rflat(res_name)
-                                val -= oflat(other_name)
-                            else:
-                                val = oflat(other_name)
-                                val -= rflat(res_name)
-                            continue
-                        if fwd:
-                            left_vec = rflat(res_name)
-                            right_vec = oflat(other_name)
-                        else:
-                            left_vec = oflat(other_name)
-                            right_vec = rflat(res_name)
-                    elif other_name in d_inp_names:
-                        if fwd:
-                            left_vec = rflat(res_name)
-                            right_vec = iflat(other_name)
-                        else:
-                            left_vec = iflat(other_name)
-                            right_vec = rflat(res_name)
-                    else:
-                        continue
+                ofvec = rflat(res_name) if res_name in d_res_names else None
 
+                if other_name in d_out_names:
+                    wrtvec = oflat(other_name)
+                elif other_name in d_inp_names:
+                    wrtvec = iflat(other_name)
+                else:
+                    wrtvec = None
+
+                if fwd:
+                    if is_explicit and res_name is other_name and wrtvec is not None:
+                        # skip the matvec mult completely for identity subjacs
+                        ofvec -= wrtvec
+                        continue
+                    left_vec = ofvec
+                    right_vec = wrtvec
+                else:  # rev
+                    left_vec = wrtvec
+                    right_vec = ofvec
+
+                if abs_key in self._key_owner and abs_key in system._cross_keys:
+                    wrtowner = system._owning_rank[other_name]
+                    if system.comm.rank == wrtowner:
+                        system.comm.bcast(right_vec, root=wrtowner)
+                    else:
+                        right_vec = system.comm.bcast(None, root=wrtowner)
+
+                if left_vec is not None and right_vec is not None:
                     subjac_info = subjacs_info[abs_key]
                     if randgen:
                         subjac = self._randomize_subjac(subjac_info['val'], abs_key)
@@ -149,6 +199,21 @@ class DictionaryJacobian(Jacobian):
                         else:  # rev
                             subjac = subjac.transpose()
                             left_vec += subjac.dot(right_vec)
+
+                if abs_key in self._key_owner:
+                    owner = self._key_owner[abs_key]
+                    if owner == system.comm.rank:
+                        system.comm.bcast(left_vec, root=owner)
+                    elif owner is not None:
+                        left_vec = system.comm.bcast(None, root=owner)
+                        if fwd:
+                            if res_name in d_res_names:
+                                d_residuals._abs_set_val(res_name, left_vec)
+                        else:  # rev
+                            if other_name in d_out_names:
+                                d_outputs._abs_set_val(other_name, left_vec)
+                            elif other_name in d_inp_names:
+                                d_inputs._abs_set_val(other_name, left_vec)
 
 
 class _CheckingJacobian(DictionaryJacobian):
@@ -268,11 +333,15 @@ class _CheckingJacobian(DictionaryJacobian):
             if key in self._subjacs_info:
                 subjac = self._subjacs_info[key]
                 if subjac['cols'] is None:
+                    if subjac['val'] is None:  # can happen for matrix free comp
+                        subjac['val'] = np.zeros(subjac['shape'])
                     subjac['val'][:, loc_idx] = column[start:end]
                 else:
                     match_inds = np.nonzero(subjac['cols'] == loc_idx)[0]
                     if match_inds.size > 0:
                         row_inds = subjac['rows'][match_inds]
+                        if subjac['val'] is None:
+                            subjac['val'] = np.zeros(len(subjac['rows']))
                         subjac['val'][match_inds] = column[start:end][row_inds]
                     else:
                         row_inds = np.zeros(0, dtype=INT_DTYPE)

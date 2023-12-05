@@ -9,14 +9,101 @@ from openmdao.vectors.transfer import Transfer
 from openmdao.utils.array_utils import _global2local_offsets
 from openmdao.utils.mpi import MPI
 
-_empty_idx_array = np.array([], dtype=INT_DTYPE)
+
+def _fill(arr, indices_list):
+    """
+    Fill the given array with the given list of indices.
+
+    Parameters
+    ----------
+    arr : ndarray
+        Array to be filled.
+    indices_list : list of int ndarrays or ranges
+        List of ranges/indices to be placed into arr.
+    """
+    start = end = 0
+    for inds in indices_list:
+        end += len(inds)
+        arr[start:end] = inds
+        start = end
 
 
-def _merge(indices_list):
-    if len(indices_list) > 0:
-        return np.concatenate(indices_list)
+def _setup_index_views(tot_size, in_xfers, out_xfers):
+    """
+    Create index views for all subsystems and allocate full transfer arrays.
+
+    Parameters
+    ----------
+    tot_size : int
+        Total size of each full array.
+    in_xfers : dict
+        Mapping of subsystem name to input index arrays.
+    out_xfers : dict
+        Mapping of subsystem name to output index arrays.
+    """
+    full_in = np.empty(tot_size, dtype=INT_DTYPE)
+    full_out = np.empty(tot_size, dtype=INT_DTYPE)
+
+    start = end = 0
+    for sname, ranges in in_xfers.items():
+        # input inds are always ranges.  output inds may be ranges or ndarrays.
+        rstart = rend = start
+        for rng in ranges:
+            rend += len(rng)
+            full_in[rstart:rend] = rng
+            rstart = rend
+
+        end += rend - start
+        _fill(full_out[start:end], out_xfers[sname])
+
+        # change subsystem transfer entries to be views of the full transfer arrays
+        in_xfers[sname] = full_in[start:end]
+        out_xfers[sname] = full_out[start:end]
+        start = end
+
+    return full_in, full_out
+
+
+def _setup_index_arrays(tot_size, in_xfers, out_xfers, vectors):
+    """
+    Create index arrays for all subsystems.
+
+    Parameters
+    ----------
+    tot_size : int
+        Total size of each full array.
+    in_xfers : dict
+        Mapping of subsystem name to input index arrays.
+    out_xfers : dict
+        Mapping of subsystem name to output index arrays.
+    vectors : dict
+        Dictionary of input and output vectors.
+
+    Returns
+    -------
+    dict
+        Mapping of subsystem name to Transfer object. None key maps to the
+        'full' transfer across all subsystems.
+    """
+    xfer_in, xfer_out = _setup_index_views(tot_size, in_xfers, out_xfers)
+
+    if tot_size > 0:
+        xfer_all = DefaultTransfer(vectors['input']['nonlinear'],
+                                   vectors['output']['nonlinear'], xfer_in, xfer_out)
     else:
-        return _empty_idx_array
+        xfer_all = None
+
+    xfer_dict = {None: xfer_all}
+
+    for sname, inds in in_xfers.items():
+        if inds.size > 0:
+            xfer_dict[sname] = DefaultTransfer(vectors['input']['nonlinear'],
+                                               vectors['output']['nonlinear'],
+                                               inds, out_xfers[sname])
+        else:
+            xfer_dict[sname] = None
+
+    return xfer_dict
 
 
 class DefaultTransfer(Transfer):
@@ -33,12 +120,10 @@ class DefaultTransfer(Transfer):
         Input indices for the transfer.
     out_inds : int ndarray
         Output indices for the transfer.
-    comm : MPI.Comm or <FakeComm>
-        Communicator of the system that owns this transfer.
     """
 
     @staticmethod
-    def _setup_transfers(group):
+    def _setup_transfers(group, desvars, responses):
         """
         Compute all transfers that are owned by our parent group.
 
@@ -46,12 +131,16 @@ class DefaultTransfer(Transfer):
         ----------
         group : <Group>
             Parent group.
+        desvars : dict
+            Dictionary of all design variable metadata. Keyed by absolute source name or alias.
+        responses : dict
+            Dictionary of all response variable metadata. Keyed by absolute source name or alias.
         """
         iproc = group.comm.rank
         rev = group._mode == 'rev' or group._mode == 'auto'
 
         for subsys in group._subgroups_myproc:
-            subsys._setup_transfers()
+            subsys._setup_transfers(desvars, responses)
 
         abs2meta = group._var_abs2meta
 
@@ -61,8 +150,6 @@ class DefaultTransfer(Transfer):
         mypathlen = len(group.pathname + '.' if group.pathname else '')
 
         # Initialize empty lists for the transfer indices
-        xfer_in = []
-        xfer_out = []
         fwd_xfer_in = defaultdict(list)
         fwd_xfer_out = defaultdict(list)
         if rev:
@@ -79,12 +166,13 @@ class DefaultTransfer(Transfer):
         if offsets_out.size > 0:
             offsets_out = offsets_out[iproc]
 
+        tot_size = 0
+
         # Loop through all connections owned by this group
         for abs_in, abs_out in group._conn_abs_in2out.items():
             # This weeds out discrete vars (all vars are local if using this Transfer)
             if abs_in in abs2meta['input']:
 
-                indices = None
                 # Get meta
                 meta_in = abs2meta['input'][abs_in]
 
@@ -99,15 +187,14 @@ class DefaultTransfer(Transfer):
                 # 1. Compute the output indices
                 offset = offsets_out[idx_out]
                 if src_indices is None:
-                    output_inds = np.arange(offset, offset + meta_in['size'], dtype=INT_DTYPE)
+                    output_inds = range(offset, offset + meta_in['size'])
                 else:
                     output_inds = src_indices + offset
 
                 # 2. Compute the input indices
-                input_inds = np.arange(offsets_in[idx_in],
-                                       offsets_in[idx_in] + sizes_in[idx_in], dtype=INT_DTYPE)
-                if indices is not None:
-                    input_inds = input_inds.reshape(indices.shape)
+                # all input indices can be simple ranges during this part in order to save memory
+                input_inds = range(offsets_in[idx_in], offsets_in[idx_in] + sizes_in[idx_in])
+                tot_size += sizes_in[idx_in]
 
                 # Now the indices are ready - input_inds, output_inds
                 sub_in = abs_in[mypathlen:].split('.', 1)[0]
@@ -118,52 +205,9 @@ class DefaultTransfer(Transfer):
                     rev_xfer_in[sub_out].append(input_inds)
                     rev_xfer_out[sub_out].append(output_inds)
 
-        tot_size = 0
-        for sname, inds in fwd_xfer_in.items():
-            fwd_xfer_in[sname] = arr = _merge(inds)
-            fwd_xfer_out[sname] = _merge(fwd_xfer_out[sname])
-            tot_size += arr.size
-
+        transfers['fwd'] = _setup_index_arrays(tot_size, fwd_xfer_in, fwd_xfer_out, vectors)
         if rev:
-            for sname, inds in rev_xfer_in.items():
-                rev_xfer_in[sname] = _merge(inds)
-                rev_xfer_out[sname] = _merge(rev_xfer_out[sname])
-
-        if tot_size > 0:
-            try:
-                xfer_in = np.concatenate(list(fwd_xfer_in.values()))
-                xfer_out = np.concatenate(list(fwd_xfer_out.values()))
-            except ValueError:
-                xfer_in = xfer_out = np.zeros(0, dtype=INT_DTYPE)
-
-            xfer_all = DefaultTransfer(vectors['input']['nonlinear'],
-                                       vectors['output']['nonlinear'], xfer_in, xfer_out,
-                                       group.comm)
-        else:
-            xfer_all = None
-
-        transfers['fwd'] = xfwd = {}
-        xfwd[None] = xfer_all
-        if rev:
-            transfers['rev'] = xrev = {}
-            xrev[None] = xfer_all
-
-        for sname, inds in fwd_xfer_in.items():
-            if inds.size > 0:
-                xfwd[sname] = DefaultTransfer(vectors['input']['nonlinear'],
-                                              vectors['output']['nonlinear'],
-                                              inds, fwd_xfer_out[sname], group.comm)
-            else:
-                xfwd[sname] = None
-
-        if rev:
-            for sname, inds in rev_xfer_out.items():
-                if inds.size > 0:
-                    xrev[sname] = DefaultTransfer(vectors['input']['nonlinear'],
-                                                  vectors['output']['nonlinear'],
-                                                  rev_xfer_in[sname], inds, group.comm)
-                else:
-                    xrev[sname] = None
+            transfers['rev'] = _setup_index_arrays(tot_size, rev_xfer_in, rev_xfer_out, vectors)
 
     @staticmethod
     def _setup_discrete_transfers(group):

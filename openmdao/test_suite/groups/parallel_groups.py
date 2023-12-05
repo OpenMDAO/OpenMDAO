@@ -233,16 +233,18 @@ class ConvergeDiverge(om.Group):
     Used for testing parallel reverse scatters.
     """
 
-    def __init__(self):
+    def __init__(self, parallel=True, inner_ivc=True):
         super().__init__()
 
-        self.add_subsystem('iv', om.IndepVarComp('x', 2.0))
+        if inner_ivc:
+            self.add_subsystem('iv', om.IndepVarComp('x', 2.0))
 
         self.add_subsystem('c1', om.ExecComp(['y1 = 2.0*x1**2',
                                               'y2 = 3.0*x1'
                                               ]))
 
-        g1 = self.add_subsystem('g1', om.ParallelGroup())
+        grp = om.ParallelGroup() if parallel else om.Group()
+        g1 = self.add_subsystem('g1', grp)
         g1.add_subsystem('c2', om.ExecComp('y1 = 0.5*x1'))
         g1.add_subsystem('c3', om.ExecComp('y1 = 3.5*x1'))
 
@@ -250,14 +252,16 @@ class ConvergeDiverge(om.Group):
                                               'y2 = 3.0*x1 - 5.0*x2'
                                               ]))
 
-        g2 = self.add_subsystem('g2', om.ParallelGroup())
+        grp = om.ParallelGroup() if parallel else om.Group()
+        g2 = self.add_subsystem('g2', grp)
         g2.add_subsystem('c5', om.ExecComp('y1 = 0.8*x1'))
         g2.add_subsystem('c6', om.ExecComp('y1 = 0.5*x1'))
 
         self.add_subsystem('c7', om.ExecComp('y1 = x1 + 3.0*x2'))
 
         # make connections
-        self.connect('iv.x', 'c1.x1')
+        if inner_ivc:
+            self.connect('iv.x', 'c1.x1')
 
         self.connect('c1.y1', 'g1.c2.x1')
         self.connect('c1.y2', 'g1.c3.x1')

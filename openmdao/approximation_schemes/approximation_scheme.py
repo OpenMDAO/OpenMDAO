@@ -1,9 +1,11 @@
 """Base class used to define the interface for derivative approximation schemes."""
 import time
 from collections import defaultdict
+from itertools import repeat
 import numpy as np
 
 from openmdao.core.constants import INT_DTYPE
+from openmdao.vectors.vector import _full_slice
 from openmdao.utils.array_utils import get_input_idx_split
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import _convert_auto_ivc_to_conn_name, LocalRangeIterable
@@ -134,8 +136,8 @@ class ApproximationScheme(object):
         raise NotImplementedError("add_approximation has not been implemented")
 
     def _init_colored_approximations(self, system):
-        is_group = _is_group(system)
-        is_total = is_group and system.pathname == ''
+        is_total = system.pathname == ''
+        is_semi = _is_group(system) and not is_total
         self._colored_approx_groups = []
 
         # don't do anything if the coloring doesn't exist yet
@@ -155,17 +157,17 @@ class ApproximationScheme(object):
             if is_total:
                 ccol2vcol = np.empty(coloring._shape[1], dtype=INT_DTYPE)
 
-            ordered_wrt_iter = list(system._jac_wrt_iter())
             colored_start = colored_end = 0
-            for abs_wrt, cstart, cend, _, cinds, _ in ordered_wrt_iter:
+            for abs_wrt, cstart, cend, vec, cinds, _ in system._jac_wrt_iter():
                 if wrt_matches is None or abs_wrt in wrt_matches:
                     colored_end += cend - cstart
-                    ccol2jcol[colored_start:colored_end] = np.arange(cstart, cend, dtype=INT_DTYPE)
+                    ccol2jcol[colored_start:colored_end] = range(cstart, cend)
                     if is_total and abs_wrt in out_slices:
                         slc = out_slices[abs_wrt]
-                        rng = np.arange(slc.start, slc.stop)
-                        if cinds is not None:
-                            rng = rng[cinds]
+                        if cinds is None or cinds is _full_slice:
+                            rng = range(slc.start, slc.stop)
+                        else:
+                            rng = np.arange(slc.start, slc.stop)[cinds]
                         ccol2vcol[colored_start:colored_end] = rng
                     colored_start = colored_end
 
@@ -198,7 +200,6 @@ class ApproximationScheme(object):
         inputs = system._inputs
 
         from openmdao.core.implicitcomponent import ImplicitComponent
-        is_semi = is_group and not is_total
         use_full_cols = is_semi or isinstance(system, ImplicitComponent)
 
         for cols, nzrows in coloring.color_nonzero_iter('fwd'):
@@ -259,7 +260,7 @@ class ApproximationScheme(object):
 
                 if wrt in approx_wrt_idx:
                     if vec is None:
-                        vec_idx = None
+                        vec_idx = repeat(None, approx_wrt_idx[wrt].shaped_array().size)
                     else:
                         # local index into var
                         vec_idx = approx_wrt_idx[wrt].shaped_array(copy=True)
@@ -271,15 +272,9 @@ class ApproximationScheme(object):
                             in_idx = [list(in_idx)]
                             vec_idx = [vec_idx]
                 else:
-                    if vec is None:  # remote wrt
-                        if wrt in abs2meta['input']:
-                            vec_idx = range(abs2meta['input'][wrt]['global_size'])
-                        else:
-                            vec_idx = range(abs2meta['output'][wrt]['global_size'])
-                    else:
-                        vec_idx = LocalRangeIterable(system, wrt)
-                        if directional:
-                            vec_idx = [v for v in vec_idx if v is not None]
+                    vec_idx = LocalRangeIterable(system, wrt)
+                    if directional and vec is not None:
+                        vec_idx = [v for v in vec_idx if v is not None]
 
                     # Directional derivatives for quick deriv checking.
                     # Place the indices in a list so that they are all stepped at the same time.
@@ -445,6 +440,8 @@ class ApproximationScheme(object):
             entry = [[None, None]]
             ent0 = entry[0]
             for vec, vec_idxs in vec_ind_list:
+                if vec_idxs is None:
+                    continue
                 for vinds in vec_idxs:
                     ent0[0] = vec
                     ent0[1] = vinds
@@ -452,7 +449,7 @@ class ApproximationScheme(object):
 
     def _uncolored_column_iter(self, system, approx_groups):
         """
-        Perform approximations and yields (column_index, column) for each jac column.
+        Perform approximations and yield (column_index, column) for each jac column.
 
         Parameters
         ----------
@@ -477,9 +474,10 @@ class ApproximationScheme(object):
             solution array corresponding to the jacobian column at the given column index
         """
         total = system.pathname == ''
-        ordered_of_iter = list(system._jac_of_iter())
         if total:
-            tot_result = np.zeros(ordered_of_iter[-1][2])
+            for _, _, end, _, _ in system._jac_of_iter():
+                pass
+            tot_result = np.zeros(end)
 
         total_or_semi = total or _is_group(system)
 
