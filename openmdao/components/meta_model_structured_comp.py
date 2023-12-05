@@ -144,10 +144,6 @@ class MetaModelStructuredComp(ExplicitComponent):
         Instantiate surrogates for the output variables that use the default surrogate.
         """
         interp_method = self.options['method']
-
-        opts = {}
-        if 'interp_options' in self.options:
-            opts = self.options['interp_options']
         for name, train_data in self.training_outputs.items():
             self.interps[name] = InterpND(method=interp_method,
                                           points=self.inputs, values=train_data,
