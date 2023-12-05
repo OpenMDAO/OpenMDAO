@@ -11,7 +11,7 @@ import numpy as np
 import openmdao.api as om
 from openmdao.core.driver import Driver
 from openmdao.utils.units import convert_units
-from openmdao.utils.assert_utils import assert_near_equal, assert_warnings
+from openmdao.utils.assert_utils import assert_near_equal, assert_warnings, assert_check_totals
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -1012,7 +1012,9 @@ class TestDriverMPI(unittest.TestCase):
         # non-distributed indep var, 'w'
         ivc = model.add_subsystem('ivc', om.IndepVarComp(distributed=False),
                                   promotes=['*'])
-        ivc.add_output('w', size)
+        # previous version of this test set w to 2 different values depending on rank, which
+        # is not valid for a non-distributed variable.  Changed to be the same on all procs.
+        ivc.add_output('w', 3.0)
 
         # distributed component, 'dc'
         model.add_subsystem('dc', DistribComp(), promotes=['*'])
@@ -1025,7 +1027,6 @@ class TestDriverMPI(unittest.TestCase):
         driver.supports._read_only = False
         driver.supports['distributed_design_vars'] = True
 
-        # run model
         p.setup()
         p.run_model()
 
@@ -1053,10 +1054,9 @@ class TestDriverMPI(unittest.TestCase):
         assert_near_equal(driver.get_design_var_values(get_remote=True)['d_ivc.x'],
                           [5, 5, 5, 9, 9])
 
-        # run driver
         p.run_driver()
 
-        assert_near_equal(p.get_val('dc.y', get_remote=True), [81, 96])
+        assert_near_equal(p.get_val('dc.y', get_remote=True), [81, 81])
         assert_near_equal(p.get_val('dc.z', get_remote=True), [25, 25, 25, 81, 81])
 
     def test_distrib_desvar_bug(self):

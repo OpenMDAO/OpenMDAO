@@ -651,7 +651,6 @@ class CompPost(om.ExplicitComponent):
 
     def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         self.count += 1
-        # print(f'{self.name}: call to compute jacvecs have x? {"x" in d_inputs} have y? {"y" in d_inputs} have w? {"w" in d_inputs}')
         if mode == 'fwd':
             if 'z' in d_outputs:
                 if 'x' in d_inputs:

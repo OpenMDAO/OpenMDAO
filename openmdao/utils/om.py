@@ -43,7 +43,8 @@ from openmdao.components.meta_model_semi_structured_comp import MetaModelSemiStr
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
 from openmdao.core.component import Component
-from openmdao.devtools.debug import config_summary, tree, comm_info
+from openmdao.devtools.debug import config_summary, tree, comm_info, _dist_conns_cmd, \
+    _dist_conns_setup_parser
 from openmdao.devtools.itrace import _itrace_exec, _itrace_setup_parser
 from openmdao.devtools.iprofile_app.iprofile_app import _iprof_exec, _iprof_setup_parser
 from openmdao.devtools.iprofile import _iprof_totals_exec, _iprof_totals_setup_parser
@@ -440,7 +441,7 @@ def _list_pre_post_cmd(options, user_args):
 
 def _get_deps(dep_dict: dict, package_name: str) -> None:
     """
-    Recursively determine all installed depenency versions and add newly found ones to dep_dict.
+    Recursively determine all installed dependency versions and add newly found ones to dep_dict.
 
     Parameters
     ----------
@@ -536,6 +537,8 @@ _command_map = {
                   'Print MPI communicator info for systems.'),
     'compute_entry_points': (_compute_entry_points_setup_parser, _compute_entry_points_exec,
                              'Compute entry point declarations to add to the setup.py file.'),
+    'dist_conns': (_dist_conns_setup_parser, _dist_conns_cmd,
+                   'Display connection information for variables across multiple MPI processes.'),
     'find_plugins': (_find_plugins_setup_parser, _find_plugins_exec,
                      'Find openmdao plugins on github.'),
     'iprof': (_iprof_setup_parser, _iprof_exec,

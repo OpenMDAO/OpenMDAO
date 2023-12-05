@@ -24,7 +24,7 @@ from openmdao.core.driver import Driver, record_iteration, SaveOptResult
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.system import System, _OptStatus
 from openmdao.core.group import Group
-from openmdao.core.total_jac import _TotalJacInfo
+from openmdao.core.total_jac import _TotalJacInfo, _contains_all
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.approximation_schemes.complex_step import ComplexStep
@@ -48,7 +48,7 @@ from openmdao.utils.array_utils import scatter_dist_to_local
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
     clear_reports, get_reports_dir, _load_report_plugins
-from openmdao.utils.general_utils import ContainsAll, pad_name, LocalRangeIterable, \
+from openmdao.utils.general_utils import _contains_all, pad_name, LocalRangeIterable, \
     _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
@@ -62,7 +62,6 @@ except ImportError:
 
 from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
-_contains_all = ContainsAll()
 
 CITATION = """@article{openmdao_2019,
     Author={Justin S. Gray and John T. Hwang and Joaquim R. R. A.
@@ -1004,6 +1003,11 @@ class Problem(object):
             'model_options': self.model_options,  # A dict of options passed to all systems in tree
             'allow_post_setup_reorder': self.options['allow_post_setup_reorder'],  # see option
             'singular_jac_behavior': 'warn',  # How to handle singular jac conditions
+            'parallel_deriv_color': None,  # None unless derivatives involving a parallel deriv
+                                           # colored dv/response are currently being computed
+            'seed_vars': None,  # set of names of seed variables. Seed variables are those that
+                                # have their derivative value set to 1.0 at the beginning of the
+                                # current derivative solve.
             'coloring_randgen': None,  # If total coloring is being computed, will contain a random
                                        # number generator, else None.
         }
@@ -1636,7 +1640,7 @@ class Problem(object):
     def check_totals(self, of=None, wrt=None, out_stream=_DEFAULT_OUT_STREAM, compact_print=False,
                      driver_scaling=False, abs_err_tol=1e-6, rel_err_tol=1e-6, method='fd',
                      step=None, form=None, step_calc='abs', show_progress=False,
-                     show_only_incorrect=False, directional=False):
+                     show_only_incorrect=False, directional=False, sort=False):
         """
         Check total derivatives for the model vs. finite difference.
 
@@ -1686,6 +1690,8 @@ class Problem(object):
         directional : bool
             If True, compute a single directional derivative for each 'of' in rev mode or each
             'wrt' in fwd mode.
+        sort : bool
+            If True, sort the subjacobian keys alphabetically.
 
         Returns
         -------
@@ -1864,8 +1870,12 @@ class Problem(object):
         resp = self.driver._responses
         do_steps = len(Jfds) > 1
 
+        Jcalc_items = Jcalc.items()
+        if sort:
+            Jcalc_items = sorted(Jcalc_items, key=lambda x: x[0])
+
         for Jfd, step in Jfds:
-            for key, val in Jcalc.items():
+            for key, val in Jcalc_items:
                 if key not in data['']:
                     data[''][key] = {}
                 meta = data[''][key]
@@ -1915,7 +1925,7 @@ class Problem(object):
 
         _assemble_derivative_data(data, rel_err_tol, abs_err_tol, out_stream, compact_print,
                                   [model], {'': fd_args}, totals=total_info, lcons=lcons,
-                                  show_only_incorrect=show_only_incorrect)
+                                  show_only_incorrect=show_only_incorrect, sort=sort)
 
         if not do_steps:
             _fix_check_data(data)
@@ -2929,7 +2939,7 @@ def _fix_check_data(data):
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
                               compact_print, system_list, global_options, totals=False,
                               indep_key=None, print_reverse=False,
-                              show_only_incorrect=False, lcons=None):
+                              show_only_incorrect=False, lcons=None, sort=False):
     """
     Compute the relative and absolute errors in the given derivatives and print to the out_stream.
 
@@ -2960,6 +2970,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         Set to True if output should print only the subjacs found to be incorrect.
     lcons : list or None
         For total derivatives only, list of outputs that are actually linear constraints.
+    sort : bool
+        If True, sort subjacobian keys alphabetically.
     """
     suppress_output = out_stream is None
 
@@ -3244,44 +3256,48 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     out_buffer.write(f'\n    MPI Rank {MPI.COMM_WORLD.rank}\n')
                 out_buffer.write('\n')
 
-                # Raw Derivatives
-                if magnitudes[0].forward is not None:
-                    if directional:
-                        out_buffer.write('    Directional Derivative (Jfor)')
-                    else:
-                        out_buffer.write('    Raw Forward Derivative (Jfor)')
-                    out_buffer.write(f"\n    {Jfor}\n\n")
-
-                fdtype = fd_opts['method'].upper()
-
-                if magnitudes[0].reverse is not None:
-                    if directional:
-                        if totals:
-                            out_buffer.write('    Directional Derivative (Jrev) Dot Product')
+                with np.printoptions(linewidth=240):
+                    # Raw Derivatives
+                    if magnitudes[0].forward is not None:
+                        if directional:
+                            out_buffer.write('    Directional Derivative (Jfor)')
                         else:
-                            out_buffer.write('    Directional Derivative (Jrev)')
-                    else:
-                        out_buffer.write('    Raw Reverse Derivative (Jrev)')
-                    out_buffer.write(f"\n    {Jrev}\n\n")
+                            out_buffer.write('    Raw Forward Derivative (Jfor)')
+                        Jstr = textwrap.indent(str(Jfor), '    ')
+                        out_buffer.write(f"\n{Jstr}\n\n")
 
-                try:
-                    fds = derivative_info['J_fd']
-                except KeyError:
-                    fds = [0.]
+                    fdtype = fd_opts['method'].upper()
 
-                for i in range(len(magnitudes)):
-                    fd = fds[i]
-
-                    if directional:
-                        if totals and magnitudes[i].reverse is not None:
-                            out_buffer.write(f'    Directional {fdtype} Derivative (Jfd) '
-                                             f'Dot Product{stepstrs[i]}\n    {fd}\n\n')
+                    if magnitudes[0].reverse is not None:
+                        if directional:
+                            if totals:
+                                out_buffer.write('    Directional Derivative (Jrev) Dot Product')
+                            else:
+                                out_buffer.write('    Directional Derivative (Jrev)')
                         else:
-                            out_buffer.write(f"    Directional {fdtype} Derivative (Jfd)"
-                                             f"{stepstrs[i]}\n    {fd}\n\n")
-                    else:
-                        out_buffer.write(f"    Raw {fdtype} Derivative (Jfd){stepstrs[i]}"
-                                         f"\n    {fd}\n\n")
+                            out_buffer.write('    Raw Reverse Derivative (Jrev)')
+                        Jstr = textwrap.indent(str(Jrev), '    ')
+                        out_buffer.write(f"\n{Jstr}\n\n")
+
+                    try:
+                        fds = derivative_info['J_fd']
+                    except KeyError:
+                        fds = [0.]
+
+                    for i in range(len(magnitudes)):
+                        fd = fds[i]
+
+                        if directional:
+                            if totals and magnitudes[i].reverse is not None:
+                                out_buffer.write(f'    Directional {fdtype} Derivative (Jfd) '
+                                                 f'Dot Product{stepstrs[i]}\n    {fd}\n\n')
+                            else:
+                                out_buffer.write(f"    Directional {fdtype} Derivative (Jfd)"
+                                                 f"{stepstrs[i]}\n    {fd}\n\n")
+                        else:
+                            Jstr = textwrap.indent(str(fd), '    ')
+                            out_buffer.write(f"    Raw {fdtype} Derivative (Jfd){stepstrs[i]}"
+                                             f"\n{Jstr}\n\n")
 
                 out_buffer.write(' -' * 30 + '\n')
 
@@ -3339,7 +3355,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                   f"{ders}.\nThis can happen if a component 'compute_jacvec_product' "
                   "or 'apply_linear'\nmethod does not properly reduce the value of a distributed "
                   "output when computing the\nderivative of that output with respect to a serial "
-                  "input.\nOpenMDAO 3.25 changed the convention used"
+                  "input.\nOpenMDAO 3.25 changed the convention used "
                   "when transferring data between distributed and non-distributed \nvariables "
                   "within a matrix free component. See POEM 75 for details.")
 

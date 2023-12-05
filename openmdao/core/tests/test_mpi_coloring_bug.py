@@ -4,7 +4,7 @@ import numpy as np
 
 import openmdao.api as om
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.testing_utils import use_tempdirs
 
@@ -510,3 +510,32 @@ class TestMPIColoringBug(unittest.TestCase):
         dd = J['phases.burn1.collocation_constraint.defects:deltav']['phases.burn1.indep_states.states:deltav']
 
         assert_near_equal(dd, np.array([[-0.75, 0.75]]), 1e-6)
+
+    def test_bug2(self):
+        size = 3
+        p = om.Problem()
+        phases = p.model.add_subsystem('phases', om.ParallelGroup())
+        phase1 = phases.add_subsystem('phase1', om.Group())
+        phase1.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(size)))
+        phase1.add_subsystem('comp1', om.ExecComp('y=3.0*x', x=np.ones(size), y=np.ones(size)))
+        phase1.add_subsystem('comp2', om.ExecComp('y=5.0*x', x=np.ones(size), y=np.ones(size)))
+        phase1.connect('indep.x', 'comp1.x')
+        phase1.connect('comp1.y', 'comp2.x')
+        phase1.add_design_var('indep.x')
+        phase1.add_constraint('comp2.y', lower=0.0)
+        phase1.add_constraint('comp1.y', lower=0.0)
+
+        phase2 = phases.add_subsystem('phase2', om.Group())
+        phase2.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(size)))
+        phase2.add_subsystem('comp1', om.ExecComp('y=7.0*x', x=np.ones(size), y=np.ones(size)))
+        phase2.add_subsystem('comp2', om.ExecComp('y=9.0*x', x=np.ones(size), y=np.ones(size)))
+        phase2.connect('indep.x', 'comp1.x')
+        phase2.connect('comp1.y', 'comp2.x')
+        phase2.add_design_var('indep.x')
+        phase2.add_constraint('comp2.y', lower=0.0)
+        phase2.add_constraint('comp1.y', lower=0.0)
+
+        p.setup(mode='rev')
+        p.run_model()
+
+        assert_check_totals(p.check_totals())

@@ -854,63 +854,47 @@ class TestAutoIVCParDerivBug(unittest.TestCase):
     N_PROCS = 4
 
     def test_auto_ivc_par_deriv_bug(self):
-        class SimpleAero(om.ExplicitComponent):
-            """Simple aerodynamic model"""
-
-            def initialize(self):
-                self.options.declare( "CLwing", default=0.5, desc="Wing lift factor", )
-                self.options.declare( "CLtail", default=0.25, desc="tail lift factor", )
-                self.options.declare( "CDwing", default=0.05, desc="Wing drag factor", )
-                self.options.declare( "CDtail", default=0.025, desc="tail drag factor", )
+        class Simple(om.ExplicitComponent):
+            def __init__(self, mult1, mult2, mult3, mult4, **kwargs):
+                super().__init__(**kwargs)
+                self.mult1 = mult1
+                self.mult2 = mult2
+                self.mult3 = mult3
+                self.mult4 = mult4
 
             def setup(self):
-                # Inputs
-                self.add_input('alpha', 0.1, desc="Angle of attack of wing")
-                self.add_input('tail_angle', 0.01, desc="Angle of attack of tail")
+                self.add_input('x1', 0.1)
+                self.add_input('x2', 0.01)
 
-                # Outputs
-                self.add_output('L', 0.0, desc="Total lift")
-                self.add_output('D', 0.0, desc="Total drag")
-
-                # Set options
-                self.CLwing = self.options["CLwing"]
-                self.CDwing = self.options["CDwing"]
-                self.CLtail = self.options["CLtail"]
-                self.CDtail = self.options["CDtail"]
+                self.add_output('y1', 0.0)
+                self.add_output('y2', 0.0)
 
                 self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
-                """ A simple surrogate for a 2 dof aero problem"""
-                outputs['L'] = self.CLwing * inputs['alpha'] + self.CLtail * inputs['tail_angle']
-                outputs['D'] = self.CDwing * inputs['alpha'] ** 2 + self.CDtail * inputs['tail_angle'] ** 2
+                outputs['y1'] = self.mult1 * inputs['x1'] + self.mult3 * inputs['x2']
+                outputs['y2'] = self.mult2 * inputs['x1'] ** 2 + self.mult4 * inputs['x2'] ** 2
 
             def compute_partials(self, inputs, partials):
-                """Analytical derivatives"""
-                partials['L', 'alpha'] = self.CLwing
-                partials['L', 'tail_angle'] = self.CLtail
-                partials['D', 'alpha'] = 2 * self.CDwing * inputs['alpha']
-                partials['D', 'tail_angle'] = 2 * self.CDtail * inputs['tail_angle']
+                partials['y1', 'x1'] = self.mult1
+                partials['y1', 'x2'] = self.mult3
+                partials['y2', 'x1'] = 2 * self.mult2 * inputs['x1']
+                partials['y2', 'x2'] = 2 * self.mult4 * inputs['x2']
 
-        # Use parallel group to solve flight conditions simultaneously
-        flight_conds = om.ParallelGroup()
-        flight_conds.add_subsystem("cruise", SimpleAero(CLwing=0.5, CDwing=0.05, CLtail=0.25, CDtail=0.025))
-        flight_conds.add_subsystem("maneuver", SimpleAero(CLwing=0.75, CDwing=0.25, CLtail=0.45, CDtail=0.15))
-
-        # build the model
         prob = om.Problem()
-        prob.model.add_subsystem('flight_conditions', flight_conds)
+        par = prob.model.add_subsystem('par', om.ParallelGroup())
+        par.add_subsystem("C1", Simple(mult1=0.5, mult2=0.15, mult3=0.25, mult4=0.35))
+        par.add_subsystem("C2", Simple(mult1=0.75, mult2=0.65, mult3=0.45, mult4=0.15))
 
-        # Set dvs for each flight condition
-        prob.model.add_design_var('flight_conditions.cruise.alpha', lower=-50, upper=50)
-        prob.model.add_design_var('flight_conditions.cruise.tail_angle', lower=-50, upper=50)
-        prob.model.add_design_var('flight_conditions.maneuver.alpha', lower=-50, upper=50)
-        prob.model.add_design_var('flight_conditions.maneuver.tail_angle', lower=-50, upper=50)
-        # Use the parallel derivative option to solve lift constraint simultaneously
-        prob.model.add_constraint('flight_conditions.cruise.L', equals=1.0, parallel_deriv_color="lift")
-        prob.model.add_constraint('flight_conditions.maneuver.L', equals=2.5, parallel_deriv_color="lift")
-        # Set cruise drag as objective
-        prob.model.add_objective('flight_conditions.cruise.D')
+        prob.model.add_design_var('par.C1.x1', lower=-50, upper=50)
+        prob.model.add_design_var('par.C1.x2', lower=-50, upper=50)
+        prob.model.add_design_var('par.C2.x1', lower=-50, upper=50)
+        prob.model.add_design_var('par.C2.x2', lower=-50, upper=50)
+
+        # Use the parallel derivative option to solve constraint simultaneously
+        prob.model.add_constraint('par.C1.y1', equals=1.0, parallel_deriv_color="pd1")
+        prob.model.add_constraint('par.C2.y1', equals=2.5, parallel_deriv_color="pd1")
+        prob.model.add_objective('par.C1.y2')
 
         prob.setup(mode='rev', force_alloc_complex=True)
 

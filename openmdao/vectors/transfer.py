@@ -15,8 +15,6 @@ class Transfer(object):
         Input indices for the transfer.
     out_inds : int ndarray
         Output indices for the transfer.
-    comm : MPI.Comm or <FakeComm>
-        Communicator of the system that owns this transfer.
 
     Attributes
     ----------
@@ -24,17 +22,14 @@ class Transfer(object):
         input indices for the transfer.
     _out_inds : int ndarray
         output indices for the transfer.
-    _comm : MPI.Comm or FakeComm
-        communicator of the system that owns this transfer.
     """
 
-    def __init__(self, in_vec, out_vec, in_inds, out_inds, comm):
+    def __init__(self, in_vec, out_vec, in_inds, out_inds):
         """
         Initialize all attributes.
         """
         self._in_inds = in_inds
         self._out_inds = out_inds
-        self._comm = comm
 
     def __str__(self):
         """
