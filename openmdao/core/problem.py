@@ -1,6 +1,7 @@
 """Define the Problem class and a FakeComm class for non-MPI users."""
 
 import __main__
+import shutil
 
 import sys
 import pprint
@@ -347,6 +348,13 @@ class Problem(object):
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
                                             '(processed post-includes). Uses fnmatch wildcards')
+
+        # Start a run by deleting any existing reports so that the files
+        #   that are in that directory are all from this run and not a previous run
+        reports_dirpath = pathlib.Path(get_reports_dir()).joinpath(f'{self._name}')
+        if self.comm.rank == 0:
+            if os.path.isdir(reports_dirpath):
+                shutil.rmtree(reports_dirpath)
 
         # register hooks for any reports
         activate_reports(self._reports, self)
