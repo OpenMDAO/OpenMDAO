@@ -867,8 +867,47 @@ def _find_unit(unit, error=False):
     PhysicalUnit
         The actual unit object
     """
-    if isinstance(unit, str):
+    # Special handling for 's' and 'h' in the unit string
+    def simplify_time_units(unit_str):
+        # Split the unit string by multiplication and division
+        units = re.split(r'(\*|/)', unit_str)
 
+        # Create a dictionary to keep track of unit powers
+        unit_powers = {}
+        current_operation = '*'
+        for u in units:
+            if u in ['*', '/']:
+                current_operation = u
+            else:
+                # Adjust the power according to the operation
+                power = 1 if current_operation == '*' else -1
+                if u in unit_powers:
+                    unit_powers[u] += power
+                else:
+                    unit_powers[u] = power
+
+        # Simplify 's' and 'h' if both are present
+        if 's' in unit_powers and 'h' in unit_powers:
+            min_power = min(abs(unit_powers['s']), abs(unit_powers['h']))
+            unit_powers['s'] -= min_power * (1 if unit_powers['s'] > 0 else -1)
+            unit_powers['h'] -= min_power * (1 if unit_powers['h'] > 0 else -1)
+
+        # Reconstruct the unit string
+        new_units = []
+        for u, power in unit_powers.items():
+            if power != 0:
+                # Add the unit and its power (if not 1)
+                new_units.append(f"{u}^{power}" if power != 1 else u)
+
+        # Join the units with multiplication
+        simplified_unit_str = "*".join(new_units)
+
+        # Replace powers of -1 with division
+        simplified_unit_str = re.sub(r'\^(-1)', '/', simplified_unit_str)
+        return simplified_unit_str
+
+    if isinstance(unit, str):
+        unit = simplify_time_units(unit)
         # Deal with 'as' for attoseconds
         reg1 = re.compile(r'\bas\b')
         unit = re.sub(reg1, 'as_', unit)
