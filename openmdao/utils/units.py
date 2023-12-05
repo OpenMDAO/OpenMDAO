@@ -867,7 +867,7 @@ def _find_unit(unit, error=False):
     PhysicalUnit
         The actual unit object
     """
-       # Special handling for 's' and 'h' in the unit string
+    # Special handling for 's' and 'h' in the unit string
     def simplify_time_units(unit_str):
         # Split the unit string by multiplication and division
         units = re.split(r'(\*|/)', unit_str)
@@ -906,7 +906,7 @@ def _find_unit(unit, error=False):
         simplified_unit_str = re.sub(r'\^(-1)', '/', simplified_unit_str)
         return simplified_unit_str
     if isinstance(unit, str):
-         unit = simplify_time_units(unit)
+        unit = simplify_time_units(unit)
         # Deal with 'as' for attoseconds
         reg1 = re.compile(r'\bas\b')
         unit = re.sub(reg1, 'as_', unit)
