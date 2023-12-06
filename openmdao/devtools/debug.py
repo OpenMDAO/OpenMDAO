@@ -423,9 +423,11 @@ def compare_jacs(Jref, J, rel_trigger=1.0):
     return results
 
 
-def trace_mpi(fname='mpi_trace', skip=(), flush=True):
+def trace_dump(fname='trace_dump', skip=(), flush=True):
     """
-    Dump traces to the specified filename<.rank> showing openmdao and mpi/petsc calls.
+    Dump traces to the specified filename<.rank> showing openmdao and c calls.
+
+    Under MPI it will write a separate file for each rank.
 
     Parameters
     ----------
@@ -436,13 +438,14 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
     flush : bool
         If True, flush print buffer after every print call.
     """
-    if MPI is None:
-        issue_warning("MPI is not active.  Trace aborted.", category=MPIWarning)
-        return
+    # if MPI is None:
+    #     issue_warning("MPI is not active.  Trace aborted.", category=MPIWarning)
+    #     return
     if sys.getprofile() is not None:
         raise RuntimeError("another profile function is already active.")
 
-    my_fname = fname + '.' + str(MPI.COMM_WORLD.rank)
+    suffix = '.0' if MPI is None else '.' + str(MPI.COMM_WORLD.rank)
+    my_fname = fname + suffix
 
     outfile = open(my_fname, 'w')
 

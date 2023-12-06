@@ -163,9 +163,11 @@ class ApproximationScheme(object):
                     ccol2jcol[colored_start:colored_end] = np.arange(cstart, cend, dtype=INT_DTYPE)
                     if is_total and abs_wrt in out_slices:
                         slc = out_slices[abs_wrt]
-                        rng = np.arange(slc.start, slc.stop)
                         if cinds is not None:
+                            rng = np.arange(slc.start, slc.stop)
                             rng = rng[cinds]
+                        else:
+                            rng = range(slc.start, slc.stop)
                         ccol2vcol[colored_start:colored_end] = rng
                     colored_start = colored_end
 
@@ -174,9 +176,9 @@ class ApproximationScheme(object):
         abs2prom = system._var_allprocs_abs2prom['output']
 
         if is_total:
-            it = [(of, end - start) for of, start, end, _, _ in system._jac_of_iter()]
+            it = ((of, end - start) for of, start, end, _, _ in system._jac_of_iter())
         else:
-            it = [(n, arr.size) for n, arr in system._outputs._abs_item_iter()]
+            it = ((n, arr.size) for n, arr in system._outputs._abs_item_iter())
 
         start = end = colorstart = colorend = 0
         for name, sz in it:
@@ -184,7 +186,7 @@ class ApproximationScheme(object):
             prom = name if is_total else abs2prom[name]
             if prom in row_var_sizes:
                 colorend += row_var_sizes[prom]
-                row_map[colorstart:colorend] = np.arange(start, end, dtype=INT_DTYPE)
+                row_map[colorstart:colorend] = range(start, end)
                 colorstart = colorend
             start = end
 

@@ -1763,38 +1763,34 @@ class Problem(object):
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
         if wrt is None:
-            wrt = list(self.driver._designvars)
-            if not wrt:
+            if not self.driver._designvars:
                 raise RuntimeError("Driver is not providing any design variables "
                                    "for compute_totals.")
 
         lcons = []
         if of is None:
-            of = list(self.driver._objs)
-            of.extend(self.driver._cons)
-            if not of:
+            if not self.driver._responses:
                 raise RuntimeError("Driver is not providing any response variables "
                                    "for compute_totals.")
             lcons = [n for n, meta in self.driver._cons.items()
                      if ('linear' in meta and meta['linear'])]
+            if lcons:
+                # if driver has linear constraints, construct a full list of driver responses
+                # in order to avoid using any driver coloring that won't include the linear
+                # constraints. (The driver coloring would only be used if the supplied of and
+                # wrt lists were None or identical to the driver's lists.)
+                of = list(self.driver._responses)
 
         # Calculate Total Derivatives
-        if model._owns_approx_jac:
-            # Support this, even though it is a bit silly (though you could compare fd with cs.)
-            total_info = _TotalJacInfo(self, of, wrt, return_format='flat_dict',
-                                       approx=True, driver_scaling=driver_scaling,
-                                       directional=directional)
-            Jcalc = total_info.compute_totals_approx(initialize=True)
-            Jcalc_name = 'J_fwd'
-        else:
-            total_info = _TotalJacInfo(self, of, wrt, return_format='flat_dict',
-                                       driver_scaling=driver_scaling, directional=directional)
-            self._metadata['checking'] = True
-            try:
-                Jcalc = total_info.compute_totals()
-            finally:
-                self._metadata['checking'] = False
-            Jcalc_name = f"J_{total_info.mode}"
+        total_info = _TotalJacInfo(self, of, wrt, return_format='flat_dict',
+                                   approx=model._owns_approx_jac,
+                                   driver_scaling=driver_scaling, directional=directional)
+        self._metadata['checking'] = True
+        try:
+            Jcalc = total_info.compute_totals()
+        finally:
+            self._metadata['checking'] = False
+        Jcalc_name = f"J_{total_info.mode}"
 
         if step is None:
             if method == 'cs':
@@ -1842,10 +1838,9 @@ class Problem(object):
                 Jcalc, Jcalc_slices = total_info._get_as_directional()
 
             if show_progress:
-                Jfd = fd_tot_info.compute_totals_approx(initialize=True,
-                                                        progress_out_stream=out_stream)
+                Jfd = fd_tot_info.compute_totals(progress_out_stream=out_stream)
             else:
-                Jfd = fd_tot_info.compute_totals_approx(initialize=True)
+                Jfd = fd_tot_info.compute_totals()
 
             if directional:
                 Jfd, Jfd_slices = fd_tot_info._get_as_directional(total_info.mode)
@@ -1969,35 +1964,10 @@ class Problem(object):
             with multi_proc_exception_check(self.comm):
                 self.final_setup()
 
-        if self.model._owns_approx_jac:
-            total_info = _TotalJacInfo(self, of, wrt, return_format,
-                                       approx=True, driver_scaling=driver_scaling)
-            return total_info.compute_totals_approx(initialize=True)
-        else:
-            if (of is None and wrt is None) or _vois_match_driver(self.driver, of, wrt):
-                if use_coloring is False:
-                    coloring_meta = None
-                else:
-                    # just use coloring and desvars/responses from driver
-                    coloring_meta = self.driver._coloring_info
-            else:
-                if use_coloring:
-                    coloring_meta = self.driver._coloring_info.copy()
-                    coloring_meta['coloring'] = None
-                    coloring_meta['dynamic'] = True
-                else:
-                    coloring_meta = None
-
-            do_coloring = coloring_meta is not None and coloring_meta['coloring'] is None
-
-            if do_coloring and not self._computing_coloring:
-                coloring_meta['coloring'] = self._get_total_coloring(coloring_meta, of=of, wrt=wrt)
-
-            total_info = _TotalJacInfo(self, of, wrt, return_format,
-                                       debug_print=debug_print, driver_scaling=driver_scaling,
-                                       get_remote=get_remote,
-                                       coloring_info=coloring_meta)
-            return total_info.compute_totals()
+        total_info = _TotalJacInfo(self, of, wrt, return_format, approx=self.model._owns_approx_jac,
+                                   driver_scaling=driver_scaling, get_remote=get_remote,
+                                   debug_print=debug_print, use_coloring=use_coloring)
+        return total_info.compute_totals()
 
     def _active_desvar_iter(self, prom_names=None):
         """
@@ -2060,7 +2030,7 @@ class Problem(object):
                     self.model._update_response_meta(name, meta, get_size=True)
                     yield name, meta
         else:  # use driver responses
-            yield from self.driver._responses.values()
+            yield from self.driver._responses.items()
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
@@ -2776,23 +2746,27 @@ class Problem(object):
         """
         if cmod._use_total_sparsity:
             coloring = None
-            if coloring_info['coloring'] is None and coloring_info['dynamic']:
-                do_run = run_model if run_model is not None else self._run_counter < 0
-                coloring = \
-                    cmod.dynamic_total_coloring(self.driver, run_model=do_run,
-                                                fname=self.driver._get_total_coloring_fname(),
-                                                of=of, wrt=wrt)
+            if coloring_info['coloring'] is None:
+                if coloring_info['dynamic']:
+                    do_run = run_model if run_model is not None else self._run_counter < 0
+                    coloring = \
+                        cmod.dynamic_total_coloring(self.driver, run_model=do_run,
+                                                    fname=self.driver._get_total_coloring_fname(),
+                                                    of=of, wrt=wrt)
+            else:
+                return coloring
 
             if coloring is not None:
                 # if the improvement wasn't large enough, don't use coloring
                 pct = coloring._solves_info()[-1]
-                info = coloring_info
-                if info['min_improve_pct'] > pct:
-                    info['coloring'] = info['static'] = None
+                if coloring_info['min_improve_pct'] > pct:
+                    coloring_info['coloring'] = coloring_info['static'] = None
                     msg = f"Coloring was deactivated.  Improvement of {pct:.1f}% was less " \
-                          f"than min allowed ({info['min_improve_pct']:.1f}%)."
+                          f"than min allowed ({coloring_info['min_improve_pct']:.1f}%)."
                     issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
-                    info['coloring'] = coloring = None
+                    coloring_info['coloring'] = coloring = None
+                else:
+                    coloring_info['coloring'] = coloring
 
             return coloring
 

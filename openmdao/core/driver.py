@@ -310,6 +310,8 @@ class Driver(object):
                 # For Auto-ivcs, we need to check the distributed metadata on the target instead.
                 if meta['source'].startswith('_auto_ivc.'):
                     for abs_name in model._var_allprocs_prom2abs_list['input'][dv]:
+                        # we can use abs name to check for discrete vars here because
+                        # relative names are absolute names at the model level.
                         if abs_name in discrete_in:
                             # Discrete vars aren't distributed.
                             break
@@ -1034,33 +1036,14 @@ class Driver(object):
             print(header)
             print(len(header) * '-' + '\n')
 
-        if problem.model._owns_approx_jac:
-            self._recording_iter.push(('_compute_totals_approx', 0))
+        self._recording_iter.push(('_compute_totals', 0))
 
-            try:
-                if total_jac is None:
-                    total_jac = _TotalJacInfo(problem, of, wrt, return_format, approx=True,
-                                              debug_print=debug_print,
-                                              driver_scaling=driver_scaling)
-
-                    if total_jac.has_lin_cons:
-                        # if we're doing a scaling report, cache the linear total jacobian so we
-                        # don't have to recreate it
-                        if problem._has_active_report('scaling'):
-                            self._total_jac_linear = total_jac
-                    else:
-                        self._total_jac = total_jac
-
-                    totals = total_jac.compute_totals_approx(initialize=True)
-                else:
-                    totals = total_jac.compute_totals_approx()
-            finally:
-                self._recording_iter.pop()
-
-        else:
+        try:
             if total_jac is None:
                 total_jac = _TotalJacInfo(problem, of, wrt, return_format,
-                                          debug_print=debug_print, driver_scaling=driver_scaling)
+                                          approx=problem.model._owns_approx_jac,
+                                          debug_print=debug_print,
+                                          driver_scaling=driver_scaling)
 
                 if total_jac.has_lin_cons:
                     # if we're doing a scaling report, cache the linear total jacobian so we
@@ -1070,12 +1053,9 @@ class Driver(object):
                 else:
                     self._total_jac = total_jac
 
-            self._recording_iter.push(('_compute_totals', 0))
-
-            try:
-                totals = total_jac.compute_totals()
-            finally:
-                self._recording_iter.pop()
+            totals = total_jac.compute_totals()
+        finally:
+            self._recording_iter.pop()
 
         if self._rec_mgr._recorders and self.recording_options['record_derivatives']:
             metadata = create_local_meta(self._get_name())

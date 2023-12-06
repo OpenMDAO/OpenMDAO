@@ -153,8 +153,8 @@ class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
 
         p = om.Problem()
         d_ivc = p.model.add_subsystem('distrib_ivc',
-                                    om.IndepVarComp(distributed=True),
-                                    promotes=['*'])
+                                      om.IndepVarComp(distributed=True),
+                                      promotes=['*'])
         if comm.rank == 0:
             ndvs = 6
             two_d = (3,2)

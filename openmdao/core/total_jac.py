@@ -102,7 +102,7 @@ class _TotalJacInfo(object):
 
     def __init__(self, problem, of, wrt, return_format, approx=False,
                  debug_print=False, driver_scaling=True, get_remote=True, directional=False,
-                 coloring_info=None):
+                 use_coloring=None):
         """
         Initialize object.
 
@@ -128,8 +128,9 @@ class _TotalJacInfo(object):
             Whether to get remote variables if using MPI.
         directional : bool
             If True, perform a single directional derivative.
-        coloring_info : dict
-            Metadata pertaining to coloring.  If None, the driver's coloring_info is used.
+        use_coloring : bool or None
+            If True, use coloring to compute total derivatives.  If False, do not.  If None, use
+            driver coloring if it exists.
         """
         driver = problem.driver
         self.model = model = problem.model
@@ -147,6 +148,11 @@ class _TotalJacInfo(object):
         self.par_deriv_printnames = {}
         self.get_remote = get_remote
         self.directional = directional
+        self.initialize = True
+        self.approx = approx
+
+        orig_of = of
+        orig_wrt = wrt
 
         if isinstance(wrt, str):
             wrt = [wrt]
@@ -272,13 +278,13 @@ class _TotalJacInfo(object):
             # have to compute new relevance
             abs_desvars = {n: m for n, m in problem._active_desvar_iter(prom_wrt)}
             abs_responses = {n: m for n, m in problem._active_response_iter(prom_of)}
-            old_rel = model._relevance_graph
+            rel_save = model._relevance_graph
             model._relevance_graph = None
             try:
                 self.relevance = model._init_relevance(problem._orig_mode,
                                                        abs_desvars, abs_responses)
             finally:
-                model._relevance_graph = old_rel
+                model._relevance_graph = rel_save
         else:
             self.relevance = problem._metadata['relevant']
 
@@ -287,10 +293,32 @@ class _TotalJacInfo(object):
             modes = ['fwd']
         else:
             if not has_lin_cons:
-                if coloring_info is None:
-                    self.simul_coloring = driver._coloring_info['coloring']
+                if (orig_of is None and orig_wrt is None) or not has_custom_derivs:
+                    if use_coloring is False:
+                        coloring_meta = None
+                    else:
+                        # just use coloring and desvars/responses from driver
+                        coloring_meta = driver._coloring_info
                 else:
-                    self.simul_coloring = coloring_info['coloring']
+                    if use_coloring:
+                        coloring_meta = self.driver._coloring_info.copy()
+                        coloring_meta['coloring'] = None
+                        coloring_meta['dynamic'] = True
+                    else:
+                        coloring_meta = None
+
+                do_coloring = coloring_meta is not None and coloring_meta['coloring'] is None and \
+                    (coloring_meta['dynamic'] or coloring_meta['static'])
+
+                if do_coloring and not problem._computing_coloring:
+                    run_model = coloring_meta['run_model'] if 'run_model' in coloring_meta else None
+
+                    coloring_meta['coloring'] = problem._get_total_coloring(coloring_meta,
+                                                                            of=of, wrt=wrt,
+                                                                            run_model=run_model)
+
+                if coloring_meta is not None:
+                    self.simul_coloring = coloring_meta['coloring']
 
             if not isinstance(self.simul_coloring, coloring.Coloring):
                 self.simul_coloring = None
@@ -1513,15 +1541,23 @@ class _TotalJacInfo(object):
                     self._jac_setter_dist(i, mode)
                 break  # only need a single row of jac for directional
 
-    def compute_totals(self):
+    def compute_totals(self, progress_out_stream=None):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
+
+        Parameters
+        ----------
+        progress_out_stream : None or file-like object
+            Where to send human readable output. None by default which suppresses the output.
 
         Returns
         -------
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
+        if self.approx:
+            return self._compute_totals_approx(progress_out_stream=progress_out_stream)
+
         debug_print = self.debug_print
         par_print = self.par_deriv_printnames
 
@@ -1613,7 +1649,7 @@ class _TotalJacInfo(object):
 
         return self.J_final
 
-    def compute_totals_approx(self, initialize=False, progress_out_stream=None):
+    def _compute_totals_approx(self, progress_out_stream=None):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1621,9 +1657,6 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        initialize : bool
-            Set to True to re-initialize the FD in model. This is only needed when manually
-            calling compute_totals on the problem.
         progress_out_stream : None or file-like object
             Where to send human readable output. None by default which suppresses the output.
 
@@ -1649,8 +1682,8 @@ class _TotalJacInfo(object):
         with self._relevance_context():
             model._tot_jac = self
             try:
-                # Re-initialize so that it is clean.
-                if initialize:
+                if self.initialize:
+                    self.initialize = False
 
                     # Need this cache cleared because we re-initialize after linear constraints.
                     model._approx_subjac_keys = None

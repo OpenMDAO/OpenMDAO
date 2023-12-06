@@ -769,7 +769,7 @@ class Group(System):
         """
         Create the relevance dictionary.
 
-        This is only called on the top level System.
+        This is only called on the top level Group.
 
         Parameters
         ----------
@@ -778,7 +778,7 @@ class Group(System):
         abs_desvars : dict or None
             Dictionary of design variable metadata, keyed using absolute names.
         abs_responses : dict or None
-            Dictionary of response variable metadata, keyed using absolute names.
+            Dictionary of response variable metadata, keyed using absolute names or aliases.
 
         Returns
         -------
@@ -1081,17 +1081,33 @@ class Group(System):
                     visited.add(tgt)
                     stack.append(tgt)
 
-    def _check_alias_overlaps(self, responses):
-        # If you have response aliases, check for overlapping indices.  Also adds aliased
-        # sources to responses if they're not already there so relevance will work properly.
-        # the returns responses dict does not contain any alias keys.
+    def _check_alias_overlaps(self, abs_responses):
+        """
+        Check for overlapping indices in aliased responses.
+
+        If the responses contain aliases, the returned response dict will
+        be a copy with the alias keys removed and any missing alias sources
+        added.
+
+        This may only be called on the top level Group.
+
+        Parameters
+        ----------
+        abs_responses : dict
+            Dictionary of response metadata, keyed by absolute name or alias.
+
+        Returns
+        -------
+        dict
+            Dictionary of response metadata with alias keys removed.
+        """
         aliases = set()
         aliased_srcs = {}
         to_add = {}
         discrete = self._var_allprocs_discrete
 
         # group all aliases by source so we can compute overlaps for each source individually
-        for name, meta in responses.items():
+        for name, meta in abs_responses.items():
             if meta['alias'] and not (name in discrete['input'] or name in discrete['output']):
                 aliases.add(meta['alias'])
                 src = meta['source']
@@ -1100,9 +1116,9 @@ class Group(System):
                 else:
                     aliased_srcs[src] = [meta]
 
-                    if src in responses:
+                    if src in abs_responses:
                         # source itself is also a constraint, so need to know indices
-                        aliased_srcs[src].append(responses[src])
+                        aliased_srcs[src].append(abs_responses[src])
                     else:
                         # If an alias is in responses, but the src isn't, then we need to
                         # make sure the src is present for the relevance calculation.
@@ -1136,10 +1152,11 @@ class Group(System):
             # now remove alias entries from the response dict because we don't need them in the
             # relevance calculation. This response dict is used only for relevance and is *not*
             # used by the driver.
-            responses.update(to_add)
-            responses = {r: meta for r, meta in responses.items() if r not in aliases}
+            abs_responses = abs_responses.copy()
+            abs_responses.update(to_add)
+            abs_responses = {r: meta for r, meta in abs_responses.items() if r not in aliases}
 
-        return responses
+        return abs_responses
 
     def _get_var_offsets(self):
         """

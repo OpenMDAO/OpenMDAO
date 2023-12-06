@@ -394,6 +394,8 @@ class pyOptSparseDriver(Driver):
                 model_ran = True
             self.iter_count += 1
 
+        self._coloring_info['run_model'] = not model_ran
+
         comm = None if isinstance(problem.comm, FakeComm) else problem.comm
         opt_prob = Optimization(self.options['title'], WeakMethodWrapper(self, '_objfunc'),
                                 comm=comm)
@@ -455,7 +457,7 @@ class pyOptSparseDriver(Driver):
                             # by pyoptsparse.
                             jacdct[n] = {'coo': [mat.row, mat.col, mat.data], 'shape': mat.shape}
 
-        # compute dynamic simul deriv coloring
+        # # compute dynamic simul deriv coloring
         problem._get_total_coloring(self._coloring_info, run_model=not model_ran)
 
         # Add all equality constraints

@@ -726,7 +726,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         p.run_model()
         # Formerly a KeyError
         derivs = p.check_totals(compact_print=True, out_stream=None)
-        assert_near_equal(0.0, derivs['indeps.y', 'indeps.x']['abs error'][0])
+        assert_near_equal(0.0, derivs['indeps.y', 'indeps.x']['abs error'][1])
 
         # Coverage
         derivs = p.driver._compute_totals(return_format='dict')
