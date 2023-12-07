@@ -290,7 +290,7 @@ class _TotalJacInfo(object):
 
         if approx:
             coloring._initialize_model_approx(model, driver, self.of, self.wrt)
-            modes = ['fwd']
+            modes = [self.mode]
         else:
             if not has_lin_cons:
                 if (orig_of is None and orig_wrt is None) or not has_custom_derivs:

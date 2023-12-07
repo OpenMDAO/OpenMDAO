@@ -19,6 +19,7 @@ from openmdao.core.tests.test_check_partials import ParaboloidTricky, MyCompGood
     MyCompBadPartials, DirectionalVectorizedMatFreeComp
 from openmdao.test_suite.scripts.circle_opt import CircleOpt
 from openmdao.core.constants import _UNDEFINED
+import openmdao.core.total_jac as tot_jac_mod
 
 from openmdao.utils.mpi import MPI
 
@@ -2202,18 +2203,23 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
             'fwd': ('+----------------------------------------------------------------------------------------+------------------+-------------+-------------+-------------+-------------+-------------+------------+', 7),
             'rev': ('+-------------------------------+-----------------------------------------+-------------+-------------+-------------+-------------+-------------+------------+', 13),
         }
-        for mode in ('fwd', 'rev'):
-            with self.subTest(f"{mode} derivatives"):
-                p = om.Problem(model=CircleOpt(), driver=om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False))
-                p.setup(mode=mode)
-                p.run_model()
-                stream = StringIO()
-                J = p.check_totals(step=[1e-6, 1e-7], compact_print=True, directional=True, out_stream=stream)
-                contents = stream.getvalue()
-                self.assertEqual(contents.count("step"), 1)
-                # check number of rows/cols
-                s, times = expected_divs[mode]
-                self.assertEqual(contents.count(s), times)
+        try:
+            rand_save = tot_jac_mod._directional_rng
+            for mode in ('fwd', 'rev'):
+                with self.subTest(f"{mode} derivatives"):
+                    tot_jac_mod._directional_rng = np.random.default_rng(99)  # keep random seeds the same for directional check
+                    p = om.Problem(model=CircleOpt(), driver=om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False))
+                    p.setup(mode=mode)
+                    p.run_model()
+                    stream = StringIO()
+                    J = p.check_totals(step=[1e-6, 1e-7], compact_print=True, directional=True, out_stream=stream)
+                    contents = stream.getvalue()
+                    self.assertEqual(contents.count("step"), 1)
+                    # check number of rows/cols
+                    s, times = expected_divs[mode]
+                    self.assertEqual(contents.count(s), times)
+        finally:
+            tot_jac_mod._directional_rng = rand_save
 
 
 
