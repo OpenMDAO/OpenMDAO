@@ -1,7 +1,7 @@
 ***********************************
 # Release Notes for OpenMDAO 3.30.0
 
-December 08, 2023
+December 07, 2023
 
 This release continues some improvements for MPI and various bug fixes.
 
