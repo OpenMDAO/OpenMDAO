@@ -1969,14 +1969,14 @@ class Problem(object):
                                    debug_print=debug_print, use_coloring=use_coloring)
         return total_info.compute_totals()
 
-    def _active_desvar_iter(self, prom_names=None):
+    def _active_desvar_iter(self, names=None):
         """
         Yield (name, metadata) for each active design variable.
 
         Parameters
         ----------
-        prom_names : iter of str or None
-            Iterator of design variable promoted names.
+        names : iter of str or None
+            Iterator of design variable names.
 
         Yields
         ------
@@ -1985,10 +1985,13 @@ class Problem(object):
         dict
             Metadata for the design variable.
         """
-        if prom_names:
+        if names:
             desvars = self.model.get_design_vars(recurse=True, get_sizes=True)
-            for name in prom_names:
-                if name in desvars:
+            # abs2prom_out = self.model._var_allprocs_abs2prom['output']
+            # abs2prom_in = self.model._var_allprocs_abs2prom['input']
+            srcs = {n: m['source'] for n, m in desvars.items()}
+            for name in names:
+                if name in srcs or name in desvars:
                     yield name, desvars[name]
                 else:
                     meta = {

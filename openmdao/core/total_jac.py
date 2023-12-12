@@ -171,9 +171,11 @@ class _TotalJacInfo(object):
 
         driver_wrt = list(driver._designvars)
         driver_of = driver._get_ordered_nl_responses()
+        wrtsrcs = [m['source'] for m in driver._designvars.values()]
+        list_wrt = list(wrt) if wrt is not None else []
 
         has_custom_derivs = ((of is not None and list(of) != driver_of) or
-                             (wrt is not None and list(wrt) != driver_wrt))
+                             (wrt is not None and list_wrt != driver_wrt and list_wrt != wrtsrcs))
 
         # In normal use, of and wrt always contain variable names. However, there are unit tests
         # that don't specify them, so we need these here.
