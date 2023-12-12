@@ -458,7 +458,7 @@ class pyOptSparseDriver(Driver):
                             jacdct[n] = {'coo': [mat.row, mat.col, mat.data], 'shape': mat.shape}
 
         # # compute dynamic simul deriv coloring
-        problem._get_total_coloring(self._coloring_info, run_model=not model_ran)
+        problem.get_total_coloring(self._coloring_info, run_model=not model_ran)
 
         # Add all equality constraints
         for name, meta in self._cons.items():

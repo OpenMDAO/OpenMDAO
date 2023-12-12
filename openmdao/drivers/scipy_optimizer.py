@@ -456,7 +456,7 @@ class ScipyOptimizeDriver(Driver):
             hess = None
 
         # compute dynamic simul deriv coloring if option is set
-        problem._get_total_coloring(self._coloring_info, run_model=False)
+        problem.get_total_coloring(self._coloring_info, run_model=False)
 
         # optimize
         try:

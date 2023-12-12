@@ -2106,7 +2106,10 @@ def _get_response_info(driver, names=None):
 
     for n, size in namesdict.items():
         if size is None:
-            namesdict[n] = abs2meta_out[prom2abs[n][0]]['global_size']
+            if n in prom2abs:
+                namesdict[n] = abs2meta_out[prom2abs[n][0]]['global_size']
+            else:
+                namesdict[n] = abs2meta_out[n]['global_size']
 
     return names, list(namesdict.values())
 

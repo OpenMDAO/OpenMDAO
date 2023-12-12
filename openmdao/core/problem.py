@@ -2724,9 +2724,9 @@ class Problem(object):
 
         return unique_errors
 
-    def _get_total_coloring(self, coloring_info, of=None, wrt=None, run_model=None):
+    def get_total_coloring(self, coloring_info=None, of=None, wrt=None, run_model=None):
         """
-        Get the total coloring given the coloring info.
+        Get the total coloring.
 
         If necessary, dynamically generate it.
 
@@ -2745,10 +2745,15 @@ class Problem(object):
         Returns
         -------
         Coloring or None
-            Coloring object, possible loaded from a file or dynamically generated, or None
+            Coloring object, possible loaded from a file or dynamically generated, or None.
         """
         if cmod._use_total_sparsity:
             coloring = None
+            if coloring_info is None:
+                coloring_info = self.driver._coloring_info.copy()
+                coloring_info['coloring'] = None
+                coloring_info['dynamic'] = True
+
             if coloring_info['coloring'] is None:
                 if coloring_info['dynamic']:
                     do_run = run_model if run_model is not None else self._run_counter < 0
@@ -2757,7 +2762,7 @@ class Problem(object):
                                                     fname=self.driver._get_total_coloring_fname(),
                                                     of=of, wrt=wrt)
             else:
-                return coloring
+                return coloring_info['coloring']
 
             if coloring is not None:
                 # if the improvement wasn't large enough, don't use coloring

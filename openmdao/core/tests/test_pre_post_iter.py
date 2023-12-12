@@ -32,7 +32,7 @@ class MissingPartialsComp(om.ExplicitComponent):
 class TestPrePostIter(unittest.TestCase):
 
     def setup_problem(self, do_pre_post_opt, mode, use_ivc=False, coloring=False, size=3, group=False,
-                      force=(), approx=False, force_complex=False, recording=False):
+                      force=(), approx=False, force_complex=False, recording=False, set_vois=True):
         prob = om.Problem()
         prob.options['group_by_pre_opt_post'] = do_pre_post_opt
 
@@ -88,9 +88,10 @@ class TestPrePostIter(unittest.TestCase):
         model.connect('iter4.y', 'iter3.x')
         model.connect('post1.y', 'post2.x3')
 
-        prob.model.add_design_var('iter1.x3', lower=-10, upper=10)
-        prob.model.add_constraint('iter2.y', upper=10.)
-        prob.model.add_objective('iter3.y', index=0)
+        if set_vois:
+            prob.model.add_design_var('iter1.x3', lower=-10, upper=10)
+            prob.model.add_constraint('iter2.y', upper=10.)
+            prob.model.add_objective('iter3.y', index=0)
 
         if coloring:
             prob.driver.declare_coloring()
@@ -187,6 +188,17 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.G2.post2.num_nl_solves, 1)
 
         data = prob.check_totals(out_stream=None)
+        assert_check_totals(data)
+
+    def test_pre_post_iter_auto_coloring_grouped_no_vois(self):
+        # this computes totals and does total coloring without declareing dvs/objs/cons in the driver
+        prob = self.setup_problem(do_pre_post_opt=True, coloring=True, group=True, mode='auto', set_vois=False)
+        prob.final_setup()
+        prob.run_model()
+        
+        J = prob.compute_totals(of=['iter2.y', 'iter3.y'], wrt=['iter1.x3'], use_coloring=True)
+
+        data = prob.check_totals(of=['iter2.y', 'iter3.y'], wrt=['iter1.x3'], out_stream=None)
         assert_check_totals(data)
 
     def test_pre_post_iter_rev_ivc(self):

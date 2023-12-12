@@ -1432,10 +1432,10 @@ class Group(System):
     def _top_level_post_connections(self, mode):
         # this is called on the top level group after all connections are known
         self._problem_meta['vars_to_gather'] = self._vars_to_gather
-        self._problem_meta['prom2abs'] = self._get_all_promotes()
 
         self._resolve_group_input_defaults()
         self._setup_auto_ivcs(mode)
+        self._problem_meta['prom2abs'] = self._get_all_promotes()
         self._check_prom_masking()
         self._check_order()
 
@@ -5108,7 +5108,7 @@ class Group(System):
 
     def _gather_full_data(self):
         """
-        Return True if this system should contribute full data to an allgather.
+        Return True if this system should contribute full data to a collective MPI call.
 
         This prevents sending a lot of unnecessary data across the network when
         the data is duplicated across multiple processes.

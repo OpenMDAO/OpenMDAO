@@ -303,21 +303,21 @@ class _TotalJacInfo(object):
                         coloring_meta = driver._coloring_info
                 else:
                     if use_coloring:
-                        coloring_meta = self.driver._coloring_info.copy()
+                        coloring_meta = driver._coloring_info.copy()
                         coloring_meta['coloring'] = None
                         coloring_meta['dynamic'] = True
                     else:
                         coloring_meta = None
 
                 do_coloring = coloring_meta is not None and coloring_meta['coloring'] is None and \
-                    (coloring_meta['dynamic'] or coloring_meta['static'])
+                    (coloring_meta['dynamic'])
 
                 if do_coloring and not problem._computing_coloring:
                     run_model = coloring_meta['run_model'] if 'run_model' in coloring_meta else None
 
-                    coloring_meta['coloring'] = problem._get_total_coloring(coloring_meta,
-                                                                            of=of, wrt=wrt,
-                                                                            run_model=run_model)
+                    coloring_meta['coloring'] = problem.get_total_coloring(coloring_meta,
+                                                                           of=prom_of, wrt=prom_wrt,
+                                                                           run_model=run_model)
 
                 if coloring_meta is not None:
                     self.simul_coloring = coloring_meta['coloring']
