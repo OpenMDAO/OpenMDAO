@@ -946,7 +946,7 @@ class ExecComp(ExplicitComponent):
                                "and/or coloring are not declared manually using declare_partials "
                                "or declare_coloring.")
 
-        if info['coloring'] is None and info['static'] is None:
+        if info.coloring is None and info.static is None:
             info['dynamic'] = True
 
         # match everything
@@ -1028,7 +1028,7 @@ class ExecComp(ExplicitComponent):
         out_slices = self._out_slices
         in_slices = self._in_slices
 
-        for icols, nzrowlists in self._coloring_info['coloring'].color_nonzero_iter('fwd'):
+        for icols, nzrowlists in self._coloring_info.coloring.color_nonzero_iter('fwd'):
             # set a complex input value
             inarr[icols] += step
 
@@ -1071,7 +1071,7 @@ class ExecComp(ExplicitComponent):
                                "level system is using complex step unless you manually call "
                                "declare_partials and/or declare_coloring on this ExecComp.")
 
-        if self._coloring_info['coloring'] is not None:
+        if self._coloring_info.coloring is not None:
             self._compute_colored_partials(partials)
             return
 

@@ -547,7 +547,7 @@ class Group(System):
             info = self._coloring_info
             if comm.size > 1:
                 # if approx_totals has been declared, or there is an approx coloring, setup par FD
-                if self._owns_approx_jac or info['dynamic'] or info['static'] is not None:
+                if self._owns_approx_jac or info['dynamic'] or info.static is not None:
                     comm = self._setup_par_fd_procs(comm)
                 else:
                     msg = "%s: num_par_fd = %d but FD is not active." % (self.msginfo,
@@ -711,8 +711,8 @@ class Group(System):
         self._initial_condition_cache = {}
 
         # reset any coloring if a Coloring object was not set explicitly
-        if self._coloring_info['dynamic'] or self._coloring_info['static'] is not None:
-            self._coloring_info['coloring'] = None
+        if self._coloring_info['dynamic'] or self._coloring_info.static is not None:
+            self._coloring_info.coloring = None
 
         self.pathname = ''
         self.comm = comm
@@ -4186,7 +4186,7 @@ class Group(System):
         abs2meta = self._var_allprocs_abs2meta
         responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
 
-        if self._coloring_info['coloring'] is not None and (self._owns_approx_of is None or
+        if self._coloring_info.coloring is not None and (self._owns_approx_of is None or
                                                             self._owns_approx_wrt is None):
             method = self._coloring_info['method']
         else:
@@ -4257,7 +4257,7 @@ class Group(System):
         """
         Ensure that if coloring is declared, approximations will be set up.
         """
-        if self._coloring_info['coloring'] is not None:
+        if self._coloring_info.coloring is not None:
             self.approx_totals(self._coloring_info['method'],
                                self._coloring_info.get('step'),
                                self._coloring_info.get('form'))
@@ -4268,7 +4268,7 @@ class Group(System):
         Do any error checking on user's setup, before any other recursion happens.
         """
         info = self._coloring_info
-        if (info['static'] or info['dynamic']) and self.pathname != '':
+        if (info.static or info['dynamic']) and self.pathname != '':
             msg = f"{self.msginfo}: semi-total coloring is currently not supported."
             raise RuntimeError(msg)
 

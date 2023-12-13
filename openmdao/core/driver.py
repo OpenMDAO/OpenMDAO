@@ -411,8 +411,8 @@ class Driver(object):
         # set up simultaneous deriv coloring
         if cmod._use_total_sparsity:
             # reset the coloring
-            if self._coloring_info['dynamic'] or self._coloring_info['static'] is not None:
-                self._coloring_info['coloring'] = None
+            if self._coloring_info['dynamic'] or self._coloring_info.static is not None:
+                self._coloring_info.coloring = None
 
             coloring = self._get_static_coloring()
             if coloring is not None and self.supports['simultaneous_derivatives']:
@@ -1136,11 +1136,11 @@ class Driver(object):
         self._coloring_info['orders'] = orders
         self._coloring_info['perturb_size'] = perturb_size
         self._coloring_info['min_improve_pct'] = min_improve_pct
-        if self._coloring_info['static'] is None:
+        if self._coloring_info.static is None:
             self._coloring_info['dynamic'] = True
         else:
             self._coloring_info['dynamic'] = False
-        self._coloring_info['coloring'] = None
+        self._coloring_info.coloring = None
         self._coloring_info['show_summary'] = show_summary
         self._coloring_info['show_sparsity'] = show_sparsity
 
@@ -1158,12 +1158,12 @@ class Driver(object):
             if cmod._force_dyn_coloring and coloring is cmod._STD_COLORING_FNAME:
                 # force the generation of a dynamic coloring this time
                 self._coloring_info['dynamic'] = True
-                self._coloring_info['static'] = None
+                self._coloring_info.static = None
             else:
-                self._coloring_info['static'] = coloring
+                self._coloring_info.static = coloring
                 self._coloring_info['dynamic'] = False
 
-            self._coloring_info['coloring'] = None
+            self._coloring_info.coloring = None
         else:
             raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %
                                self._get_name())
@@ -1193,13 +1193,13 @@ class Driver(object):
             The pre-existing or loaded Coloring, or None
         """
         info = self._coloring_info
-        static = info['static']
+        static = info.static
 
         if isinstance(static, cmod.Coloring):
             coloring = static
-            info['coloring'] = coloring
+            info.coloring = coloring
         else:
-            coloring = info['coloring']
+            coloring = info.coloring
 
         if coloring is not None:
             return coloring
@@ -1210,7 +1210,7 @@ class Driver(object):
             else:
                 fname = static
             print("loading total coloring from file %s" % fname)
-            coloring = info['coloring'] = cmod.Coloring.load(fname)
+            coloring = info.coloring = cmod.Coloring.load(fname)
             info.update(coloring._meta)
             return coloring
 
@@ -1381,21 +1381,9 @@ class Driver(object):
         """
         if cmod._use_total_sparsity:
             coloring = None
-            if self._coloring_info['coloring'] is None and self._coloring_info['dynamic']:
+            if self._coloring_info.coloring is None and self._coloring_info['dynamic']:
                 coloring = cmod.dynamic_total_coloring(self, run_model=run_model,
                                                        fname=self._get_total_coloring_fname())
-
-            if coloring is not None:
-                # if the improvement wasn't large enough, don't use coloring
-                pct = coloring._solves_info()[-1]
-                info = self._coloring_info
-                if info['min_improve_pct'] > pct:
-                    info['coloring'] = info['static'] = None
-                    msg = f"Coloring was deactivated.  Improvement of {pct:.1f}% was less " \
-                          f"than min allowed ({info['min_improve_pct']:.1f}%)."
-                    issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
-                    self._coloring_info['coloring'] = coloring = None
-
             return coloring
 
 

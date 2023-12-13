@@ -111,7 +111,8 @@ class ColoringMeta(object):
     _meta_names = ('num_full_jacs', 'tol', 'orders', 'min_improve_pct', 'dynamic')
 
     def __init__(self, num_full_jacs=3, tol=1e-25, orders=None, min_improve_pct=5.,
-                 show_summary=True, show_sparsity=False, dynamic=False, static=None):
+                 show_summary=True, show_sparsity=False, dynamic=False, static=None,
+                 msginfo=''):
         """
         Initialize data structures.
         """
@@ -128,6 +129,7 @@ class ColoringMeta(object):
         self.static = static  # either _STD_COLORING_FNAME, a filename, or a Coloring object
                               # if use_fixed_coloring was called
         self._coloring = None  # the coloring object
+        self.msginfo = msginfo  # prefix for warning/error messages
 
     def update(self, dct):
         """
@@ -1174,7 +1176,7 @@ class Coloring(object):
             coloring = source
             source_name = ''
         elif hasattr(source, '_coloring_info'):
-            coloring = source._coloring_info['coloring']
+            coloring = source._coloring_info.coloring
             source_name = source._problem()._name
         else:
             raise ValueError(f'display_bokeh was expecting the source to be a valid coloring file '
@@ -2418,7 +2420,7 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
                                       "linear constraint derivatives are computed separately "
                                       "from nonlinear ones.")
         _initialize_model_approx(model, driver, ofs, wrts)
-        if model._coloring_info['coloring'] is None:
+        if model._coloring_info.coloring is None:
             kwargs = {n: v for n, v in model._coloring_info.items()
                       if n in _DEF_COMP_SPARSITY_ARGS and v is not None}
             kwargs['method'] = list(model._approx_schemes)[0]
@@ -2504,7 +2506,7 @@ def dynamic_total_coloring(driver, run_model=True, fname=None, of=None, wrt=None
 
     driver._total_jac = None
 
-    problem.driver._coloring_info['coloring'] = None
+    problem.driver._coloring_info.coloring = None
 
     num_full_jacs = driver._coloring_info.get('num_full_jacs',
                                               _DEF_COMP_SPARSITY_ARGS['num_full_jacs'])
@@ -2514,9 +2516,9 @@ def dynamic_total_coloring(driver, run_model=True, fname=None, of=None, wrt=None
     coloring = compute_total_coloring(problem, of=of, wrt=wrt, num_full_jacs=num_full_jacs, tol=tol,
                                       orders=orders, setup=False, run_model=run_model, fname=fname)
 
-    driver._coloring_info['coloring'] = coloring
+    driver._coloring_info.coloring = coloring
 
-    if driver._coloring_info['coloring'] is not None:
+    if driver._coloring_info.coloring is not None:
         if not problem.model._approx_schemes:  # avoid double display
             if driver._coloring_info['show_sparsity']:
                 coloring.display_txt(summary=False)
@@ -2882,17 +2884,6 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
         }
 
 
-def _get_coloring_meta(coloring=None):
-    if coloring is None:
-        dct = _DEF_COMP_SPARSITY_ARGS.copy()
-        dct['coloring'] = None
-        dct['dynamic'] = False
-        dct['static'] = None
-        return dct
-
-    return coloring._meta.copy()
-
-
 class _ColSparsityJac(object):
     """
     A class to manage the assembly of a sparsity matrix by columns without allocating a dense jac.
@@ -3033,7 +3024,7 @@ def display_coloring(source, output_file='total_coloring.html', as_text=False, s
     elif isinstance(source, Coloring):
         coloring = source
     elif hasattr(source, '_coloring_info'):
-        coloring = source._coloring_info['coloring']
+        coloring = source._coloring_info.coloring
     else:
         raise ValueError(f'display_coloring was expecting the source to be a valid '
                          f'coloring file or an instance of Coloring or driver '

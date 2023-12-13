@@ -1440,7 +1440,7 @@ class System(object):
             self._coloring_info['dynamic'] = True
             return  # don't use static this time
 
-        self._coloring_info['static'] = coloring
+        self._coloring_info.static = coloring
         self._coloring_info['dynamic'] = False
 
         if coloring is not _STD_COLORING_FNAME:
@@ -1521,11 +1521,11 @@ class System(object):
             approx = self._get_approx_scheme(method)
             options.update(approx.DEFAULT_OPTIONS)
 
-        if self._coloring_info['static'] is None:
+        if self._coloring_info.static is None:
             options['dynamic'] = True
         else:
             options['dynamic'] = False
-            options['static'] = self._coloring_info['static']
+            options['static'] = self._coloring_info.static
 
         options['wrt_patterns'] = [wrt] if isinstance(wrt, str) else wrt
         options['method'] = method
@@ -1537,7 +1537,7 @@ class System(object):
         options['min_improve_pct'] = min_improve_pct
         options['show_summary'] = show_summary
         options['show_sparsity'] = show_sparsity
-        options['coloring'] = self._coloring_info['coloring']
+        options['coloring'] = self._coloring_info.coloring
         if form is not None:
             options['form'] = form
         if step is not None:
@@ -1547,22 +1547,9 @@ class System(object):
         self._coloring_info = coloring_mod.PartialColoringMeta()
         self._coloring_info.update(options)
 
-    def _coloring_pct_too_low(self, coloring, info):
-        # if the improvement wasn't large enough, don't use coloring
-        pct = coloring._solves_info()[-1]
-        if info['min_improve_pct'] > pct:
-            info['coloring'] = info['static'] = None
-            msg = f"Coloring was deactivated.  Improvement of {pct:.1f}% was less than min " \
-                  f"allowed ({info['min_improve_pct']:.1f}%)."
-            issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
-            if not info['per_instance']:
-                coloring_mod._CLASS_COLORINGS[self.get_coloring_fname()] = None
-            return True
-        return False
-
     def _finalize_coloring(self, coloring, info, sp_info, sparsity_time):
         # if the improvement wasn't large enough, don't use coloring
-        if self._coloring_pct_too_low(coloring, info):
+        if not info._pct_improvement_good(coloring, self.msginfo):
             return False
 
         sp_info['sparsity_time'] = sparsity_time
@@ -1585,7 +1572,7 @@ class System(object):
         coloring._meta.update(info)  # save metadata we used to create the coloring
         coloring._meta.update(sp_info)
 
-        info['coloring'] = coloring
+        info.coloring = coloring
 
         if info['show_sparsity'] or info['show_summary']:
             print("\nColoring for '%s' (class %s)" % (self.pathname, type(self).__name__))
@@ -1627,11 +1614,11 @@ class System(object):
         """
         if recurse:
             colorings = []
-            my_coloring = self._coloring_info['coloring']
+            my_coloring = self._coloring_info.coloring
             grad_systems = self._get_gradient_nl_solver_systems()
             for s in self.system_iter(include_self=True, recurse=True):
                 if my_coloring is None or s in grad_systems:
-                    if s._coloring_info['coloring'] is not None:
+                    if s._coloring_info.coloring is not None:
                         coloring = s._compute_coloring(recurse=False, **overrides)[0]
                         colorings.append(coloring)
                         if coloring is not None:
@@ -1656,7 +1643,7 @@ class System(object):
         if info['method'] is None and self._approx_schemes:
             info['method'] = list(self._approx_schemes)[0]
 
-        if info['coloring'] is None:
+        if info.coloring is None:
             # check to see if any approx or jax derivs have been declared
             for meta in self._subjacs_info.values():
                 if 'method' in meta and meta['method']:
@@ -1681,7 +1668,7 @@ class System(object):
         if not use_jax:
             approx_scheme = self._get_approx_scheme(info['method'])
 
-        if info['coloring'] is None and info['static'] is None:
+        if info.coloring is None and info.static is None:
             info['dynamic'] = True
 
         coloring_fname = self.get_coloring_fname()
@@ -1689,11 +1676,11 @@ class System(object):
         # if we find a previously computed class coloring for our class, just use that
         # instead of regenerating a coloring.
         if not info['per_instance'] and coloring_fname in coloring_mod._CLASS_COLORINGS:
-            info['coloring'] = coloring = coloring_mod._CLASS_COLORINGS[coloring_fname]
+            info.coloring = coloring = coloring_mod._CLASS_COLORINGS[coloring_fname]
             if coloring is None:
                 print("\nClass coloring for class '{}' wasn't good enough, "
                       "so skipping for '{}'".format(type(self).__name__, self.pathname))
-                info['static'] = None
+                info.static = None
             else:
                 print("\n{} using class coloring for class '{}'".format(self.pathname,
                                                                         type(self).__name__))
@@ -1852,34 +1839,34 @@ class System(object):
             Coloring object, possible loaded from a file, or None
         """
         info = self._coloring_info
-        coloring = info['coloring']
+        coloring = info.coloring
         if coloring is not None:
             return coloring
 
-        static = info['static']
+        static = info.static
         if static is _STD_COLORING_FNAME or isinstance(static, str):
             if static is _STD_COLORING_FNAME:
                 fname = self.get_coloring_fname()
             else:
                 fname = static
             print("%s: loading coloring from file %s" % (self.msginfo, fname))
-            info['coloring'] = coloring = Coloring.load(fname)
+            info.coloring = coloring = Coloring.load(fname)
             if info['wrt_patterns'] != coloring._meta['wrt_patterns']:
                 raise RuntimeError("%s: Loaded coloring has different wrt_patterns (%s) than "
                                    "declared ones (%s)." %
                                    (self.msginfo, coloring._meta['wrt_patterns'],
                                     info['wrt_patterns']))
-            info.update(info['coloring']._meta)
+            info.update(info.coloring._meta)
             approx = self._get_approx_scheme(info['method'])
             # force regen of approx groups during next compute_approximations
             approx._reset()
         elif isinstance(static, coloring_mod.Coloring):
-            info['coloring'] = coloring = static
+            info.coloring = coloring = static
 
         if coloring is not None:
             info['dynamic'] = False
 
-        info['static'] = coloring
+        info.static = coloring
 
         return coloring
 
@@ -1896,7 +1883,7 @@ class System(object):
         """
         coloring = self._get_static_coloring()
         if coloring is None and self._coloring_info['dynamic']:
-            self._coloring_info['coloring'] = coloring = self._compute_coloring()[0]
+            self._coloring_info.coloring = coloring = self._compute_coloring()[0]
             if coloring is not None:
                 self._coloring_info.update(coloring._meta)
 
@@ -2860,7 +2847,7 @@ class System(object):
         list of str or ()
             List of wrt_matches for a static coloring or () if there isn't one.
         """
-        if (self._coloring_info['coloring'] is not None and
+        if (self._coloring_info.coloring is not None and
                 self._coloring_info['wrt_matches'] is None):
             self._update_wrt_matches(self._coloring_info)
 

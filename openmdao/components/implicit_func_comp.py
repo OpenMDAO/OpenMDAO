@@ -237,7 +237,7 @@ class ImplicitFuncComp(ImplicitComponent):
         osize = len(self._outputs)
         isize = len(self._inputs) + osize
         invals = list(self._ordered_func_invals(self._inputs, self._outputs))
-        coloring = self._coloring_info['coloring']
+        coloring = self._coloring_info.coloring
 
         if self._mode == 'rev':  # use reverse mode to compute derivs
             outvals = tuple(self._outputs.values())

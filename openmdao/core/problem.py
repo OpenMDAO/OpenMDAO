@@ -1078,8 +1078,8 @@ class Problem(object):
         driver._setup_driver(self)
 
         info = driver._coloring_info
-        coloring = info['coloring']
-        if coloring is None and info['static'] is not None:
+        coloring = info.coloring
+        if coloring is None and info.static is not None:
             coloring = driver._get_static_coloring()
 
         if coloring and cmod._use_total_sparsity:
@@ -2751,10 +2751,10 @@ class Problem(object):
             coloring = None
             if coloring_info is None:
                 coloring_info = self.driver._coloring_info.copy()
-                coloring_info['coloring'] = None
+                coloring_info.coloring = None
                 coloring_info['dynamic'] = True
 
-            if coloring_info['coloring'] is None:
+            if coloring_info.coloring is None:
                 if coloring_info['dynamic']:
                     do_run = run_model if run_model is not None else self._run_counter < 0
                     coloring = \
@@ -2762,19 +2762,7 @@ class Problem(object):
                                                     fname=self.driver._get_total_coloring_fname(),
                                                     of=of, wrt=wrt)
             else:
-                return coloring_info['coloring']
-
-            if coloring is not None:
-                # if the improvement wasn't large enough, don't use coloring
-                pct = coloring._solves_info()[-1]
-                if coloring_info['min_improve_pct'] > pct:
-                    coloring_info['coloring'] = coloring_info['static'] = None
-                    msg = f"Coloring was deactivated.  Improvement of {pct:.1f}% was less " \
-                          f"than min allowed ({coloring_info['min_improve_pct']:.1f}%)."
-                    issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
-                    coloring_info['coloring'] = coloring = None
-                else:
-                    coloring_info['coloring'] = coloring
+                return coloring_info.coloring
 
             return coloring
 

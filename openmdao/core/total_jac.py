@@ -304,23 +304,23 @@ class _TotalJacInfo(object):
                 else:
                     if use_coloring:
                         coloring_meta = driver._coloring_info.copy()
-                        coloring_meta['coloring'] = None
+                        coloring_meta.coloring = None
                         coloring_meta['dynamic'] = True
                     else:
                         coloring_meta = None
 
-                do_coloring = coloring_meta is not None and coloring_meta['coloring'] is None and \
+                do_coloring = coloring_meta is not None and coloring_meta.coloring is None and \
                     (coloring_meta['dynamic'])
 
                 if do_coloring and not problem._computing_coloring:
                     run_model = coloring_meta['run_model'] if 'run_model' in coloring_meta else None
 
-                    coloring_meta['coloring'] = problem.get_total_coloring(coloring_meta,
+                    coloring_meta.coloring = problem.get_total_coloring(coloring_meta,
                                                                            of=prom_of, wrt=prom_wrt,
                                                                            run_model=run_model)
 
                 if coloring_meta is not None:
-                    self.simul_coloring = coloring_meta['coloring']
+                    self.simul_coloring = coloring_meta.coloring
 
             if not isinstance(self.simul_coloring, coloring.Coloring):
                 self.simul_coloring = None
@@ -1705,7 +1705,7 @@ class _TotalJacInfo(object):
 
                     model._setup_jacobians(recurse=False)
                     model._setup_approx_partials()
-                    if model._coloring_info['coloring'] is not None:
+                    if model._coloring_info.coloring is not None:
                         model._update_wrt_matches(model._coloring_info)
 
                 if self.directional:
