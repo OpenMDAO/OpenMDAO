@@ -17,12 +17,11 @@ from openmdao.utils.record_util import create_local_meta, check_path, has_match
 from openmdao.utils.general_utils import _src_name_iter, _src_or_alias_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
-import openmdao.utils.coloring as coloring_mod
+import openmdao.utils.coloring as cmod
 from openmdao.utils.array_utils import sizes2offsets
 from openmdao.vectors.vector import _full_slice, _flat_full_indexer
 from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, DriverWarning
-import openmdao.utils.coloring as c_mod
 
 
 class Driver(object):
@@ -176,7 +175,8 @@ class Driver(object):
         self.iter_count = 0
         self.cite = ""
 
-        self._coloring_info = coloring_mod._get_coloring_meta()
+        # self._coloring_info = cmod._get_coloring_meta()
+        self._coloring_info = cmod.ColoringMeta()
 
         self._total_jac_sparsity = None
         self._total_jac_format = 'flat_dict'
@@ -409,7 +409,7 @@ class Driver(object):
         self._remote_responses.update(self._remote_objs)
 
         # set up simultaneous deriv coloring
-        if coloring_mod._use_total_sparsity:
+        if cmod._use_total_sparsity:
             # reset the coloring
             if self._coloring_info['dynamic'] or self._coloring_info['static'] is not None:
                 self._coloring_info['coloring'] = None
@@ -1103,13 +1103,13 @@ class Driver(object):
         """
         return "Driver"
 
-    def declare_coloring(self, num_full_jacs=coloring_mod._DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
-                         tol=coloring_mod._DEF_COMP_SPARSITY_ARGS['tol'],
-                         orders=coloring_mod._DEF_COMP_SPARSITY_ARGS['orders'],
-                         perturb_size=coloring_mod._DEF_COMP_SPARSITY_ARGS['perturb_size'],
-                         min_improve_pct=coloring_mod._DEF_COMP_SPARSITY_ARGS['min_improve_pct'],
-                         show_summary=coloring_mod._DEF_COMP_SPARSITY_ARGS['show_summary'],
-                         show_sparsity=coloring_mod._DEF_COMP_SPARSITY_ARGS['show_sparsity']):
+    def declare_coloring(self, num_full_jacs=cmod._DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
+                         tol=cmod._DEF_COMP_SPARSITY_ARGS['tol'],
+                         orders=cmod._DEF_COMP_SPARSITY_ARGS['orders'],
+                         perturb_size=cmod._DEF_COMP_SPARSITY_ARGS['perturb_size'],
+                         min_improve_pct=cmod._DEF_COMP_SPARSITY_ARGS['min_improve_pct'],
+                         show_summary=cmod._DEF_COMP_SPARSITY_ARGS['show_summary'],
+                         show_sparsity=cmod._DEF_COMP_SPARSITY_ARGS['show_sparsity']):
         """
         Set options for total deriv coloring.
 
@@ -1144,7 +1144,7 @@ class Driver(object):
         self._coloring_info['show_summary'] = show_summary
         self._coloring_info['show_sparsity'] = show_sparsity
 
-    def use_fixed_coloring(self, coloring=coloring_mod._STD_COLORING_FNAME):
+    def use_fixed_coloring(self, coloring=cmod._STD_COLORING_FNAME):
         """
         Tell the driver to use a precomputed coloring.
 
@@ -1155,7 +1155,7 @@ class Driver(object):
             automatically.
         """
         if self.supports['simultaneous_derivatives']:
-            if coloring_mod._force_dyn_coloring and coloring is coloring_mod._STD_COLORING_FNAME:
+            if cmod._force_dyn_coloring and coloring is cmod._STD_COLORING_FNAME:
                 # force the generation of a dynamic coloring this time
                 self._coloring_info['dynamic'] = True
                 self._coloring_info['static'] = None
@@ -1195,7 +1195,7 @@ class Driver(object):
         info = self._coloring_info
         static = info['static']
 
-        if isinstance(static, coloring_mod.Coloring):
+        if isinstance(static, cmod.Coloring):
             coloring = static
             info['coloring'] = coloring
         else:
@@ -1204,13 +1204,13 @@ class Driver(object):
         if coloring is not None:
             return coloring
 
-        if static is coloring_mod._STD_COLORING_FNAME or isinstance(static, str):
-            if static is coloring_mod._STD_COLORING_FNAME:
+        if static is cmod._STD_COLORING_FNAME or isinstance(static, str):
+            if static is cmod._STD_COLORING_FNAME:
                 fname = self._get_total_coloring_fname()
             else:
                 fname = static
             print("loading total coloring from file %s" % fname)
-            coloring = info['coloring'] = coloring_mod.Coloring.load(fname)
+            coloring = info['coloring'] = cmod.Coloring.load(fname)
             info.update(coloring._meta)
             return coloring
 
@@ -1224,7 +1224,7 @@ class Driver(object):
         If set_coloring was called with a filename, load the coloring file.
         """
         # command line simul_coloring uses this env var to turn pre-existing coloring off
-        if not coloring_mod._use_total_sparsity:
+        if not cmod._use_total_sparsity:
             return
 
         problem = self._problem()
@@ -1379,11 +1379,11 @@ class Driver(object):
         Coloring or None
             Coloring object, possible loaded from a file or dynamically generated, or None
         """
-        if c_mod._use_total_sparsity:
+        if cmod._use_total_sparsity:
             coloring = None
             if self._coloring_info['coloring'] is None and self._coloring_info['dynamic']:
-                coloring = c_mod.dynamic_total_coloring(self, run_model=run_model,
-                                                        fname=self._get_total_coloring_fname())
+                coloring = cmod.dynamic_total_coloring(self, run_model=run_model,
+                                                       fname=self._get_total_coloring_fname())
 
             if coloring is not None:
                 # if the improvement wasn't large enough, don't use coloring

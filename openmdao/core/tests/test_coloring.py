@@ -1360,12 +1360,12 @@ class DumbComp(om.ExplicitComponent):
         for name, size in zip(self._inames, self._isizes):
             self.add_input(name, val=np.zeros(size))
 
-        for name, size in zip(self._onames, self._osizes):
+        for i, (name, size) in enumerate(zip(self._onames, self._osizes)):
             self.add_output(name, val=np.zeros(size))
+            self.declare_partials(name, self._inames[i], method='cs')
 
         self.add_output('obj', val=0.0)
-
-        self.declare_partials('*', '*', method='cs')
+        self.declare_partials('obj', self._inames[0], method='cs')
 
     def compute(self, inputs, outputs):
         mult = 1.0
