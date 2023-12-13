@@ -1672,8 +1672,6 @@ class Component(System):
             if coloring_mod._use_partial_sparsity:
                 coloring = self._get_coloring()
                 if coloring is not None:
-                    if not self._coloring_info.dynamic:
-                        coloring._check_config_partial(self)
                     self._update_subjac_sparsity(coloring.get_subjac_sparsity())
                 if self._jacobian is not None:
                     self._jacobian._restore_approx_sparsity()

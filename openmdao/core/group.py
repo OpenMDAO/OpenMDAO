@@ -547,7 +547,7 @@ class Group(System):
             info = self._coloring_info
             if comm.size > 1:
                 # if approx_totals has been declared, or there is an approx coloring, setup par FD
-                if self._owns_approx_jac or info['dynamic'] or info.static is not None:
+                if self._owns_approx_jac or info.dynamic or info.static is not None:
                     comm = self._setup_par_fd_procs(comm)
                 else:
                     msg = "%s: num_par_fd = %d but FD is not active." % (self.msginfo,
@@ -3847,9 +3847,8 @@ class Group(System):
             coloring = self._get_coloring() if coloring_mod._use_partial_sparsity else None
 
             if coloring is not None:
-                if not self._coloring_info.dynamic:
-                    coloring._check_config_partial(self)
                 self._setup_approx_coloring()
+
             # TODO: for top level FD, call below is unnecessary, but we need this
             # for some tests that just call run_linearize directly without calling
             # compute_totals.

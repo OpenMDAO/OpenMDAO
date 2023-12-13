@@ -1882,10 +1882,14 @@ class System(object):
             Coloring object, possible loaded from a file or dynamically generated, or None
         """
         coloring = self._get_static_coloring()
-        if coloring is None and self._coloring_info.dynamic:
-            self._coloring_info.coloring = coloring = self._compute_coloring()[0]
-            if coloring is not None:
-                self._coloring_info.update(coloring._meta)
+        if coloring is None:
+            if self._coloring_info.dynamic:
+                self._coloring_info.coloring = coloring = self._compute_coloring()[0]
+                if coloring is not None:
+                    self._coloring_info.update(coloring._meta)
+        else:
+            if not self._coloring_info.dynamic:
+                coloring._check_config_partial(self)
 
         return coloring
 
