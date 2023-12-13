@@ -711,7 +711,7 @@ class Group(System):
         self._initial_condition_cache = {}
 
         # reset any coloring if a Coloring object was not set explicitly
-        if self._coloring_info['dynamic'] or self._coloring_info.static is not None:
+        if self._coloring_info.dynamic or self._coloring_info.static is not None:
             self._coloring_info.coloring = None
 
         self.pathname = ''
@@ -3847,7 +3847,7 @@ class Group(System):
             coloring = self._get_coloring() if coloring_mod._use_partial_sparsity else None
 
             if coloring is not None:
-                if not self._coloring_info['dynamic']:
+                if not self._coloring_info.dynamic:
                     coloring._check_config_partial(self)
                 self._setup_approx_coloring()
             # TODO: for top level FD, call below is unnecessary, but we need this
@@ -4188,7 +4188,7 @@ class Group(System):
 
         if self._coloring_info.coloring is not None and (self._owns_approx_of is None or
                                                             self._owns_approx_wrt is None):
-            method = self._coloring_info['method']
+            method = self._coloring_info.method
         else:
             method = list(self._approx_schemes)[0]
 
@@ -4258,7 +4258,7 @@ class Group(System):
         Ensure that if coloring is declared, approximations will be set up.
         """
         if self._coloring_info.coloring is not None:
-            self.approx_totals(self._coloring_info['method'],
+            self.approx_totals(self._coloring_info.method,
                                self._coloring_info.get('step'),
                                self._coloring_info.get('form'))
         self._setup_approx_partials()

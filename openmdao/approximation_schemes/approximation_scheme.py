@@ -144,7 +144,7 @@ class ApproximationScheme(object):
             return
 
         system._update_wrt_matches(system._coloring_info)
-        wrt_matches = system._coloring_info['wrt_matches']
+        wrt_matches = system._coloring_info.wrt_matches
         out_slices = system._outputs.get_slice_dict()
 
         if wrt_matches is not None:
@@ -235,7 +235,7 @@ class ApproximationScheme(object):
         self._nruns_uncolored = 0
 
         if self._during_sparsity_comp:
-            wrt_matches = system._coloring_info['wrt_matches']
+            wrt_matches = system._coloring_info.wrt_matches
         else:
             wrt_matches = None
 

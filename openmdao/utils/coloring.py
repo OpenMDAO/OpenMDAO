@@ -2520,9 +2520,9 @@ def dynamic_total_coloring(driver, run_model=True, fname=None, of=None, wrt=None
 
     if driver._coloring_info.coloring is not None:
         if not problem.model._approx_schemes:  # avoid double display
-            if driver._coloring_info['show_sparsity']:
+            if driver._coloring_info.show_sparsity:
                 coloring.display_txt(summary=False)
-            if driver._coloring_info['show_summary']:
+            if driver._coloring_info.show_summary:
                 coloring.summary()
 
         driver._setup_simul_coloring()

@@ -1437,11 +1437,11 @@ class System(object):
             if a specific coloring is passed in.
         """
         if coloring_mod._force_dyn_coloring and coloring is _STD_COLORING_FNAME:
-            self._coloring_info['dynamic'] = True
+            self._coloring_info.dynamic = True
             return  # don't use static this time
 
         self._coloring_info.static = coloring
-        self._coloring_info['dynamic'] = False
+        self._coloring_info.dynamic = False
 
         if coloring is not _STD_COLORING_FNAME:
             if recurse:
@@ -1882,7 +1882,7 @@ class System(object):
             Coloring object, possible loaded from a file or dynamically generated, or None
         """
         coloring = self._get_static_coloring()
-        if coloring is None and self._coloring_info['dynamic']:
+        if coloring is None and self._coloring_info.dynamic:
             self._coloring_info.coloring = coloring = self._compute_coloring()[0]
             if coloring is not None:
                 self._coloring_info.update(coloring._meta)
@@ -2848,14 +2848,14 @@ class System(object):
             List of wrt_matches for a static coloring or () if there isn't one.
         """
         if (self._coloring_info.coloring is not None and
-                self._coloring_info['wrt_matches'] is None):
+                self._coloring_info.wrt_matches is None):
             self._update_wrt_matches(self._coloring_info)
 
         # if coloring has been specified, we don't want to have multiple
         # approximations for the same subjac, so don't register any new
         # approximations when the wrt matches those used in the coloring.
         if self._get_static_coloring() is not None:  # static coloring has been specified
-            return self._coloring_info['wrt_matches']
+            return self._coloring_info.wrt_matches
 
         return ()  # for dynamic coloring or no coloring
 

@@ -483,7 +483,7 @@ class TestMPIColoringBug(unittest.TestCase):
                 Color the model.
                 """
                 if coloring_mod._use_total_sparsity:
-                    if self._coloring_info.coloring is None and self._coloring_info['dynamic']:
+                    if self._coloring_info.coloring is None and self._coloring_info.dynamic:
                         coloring_mod.dynamic_total_coloring(self, run_model=True,
                                                             fname=self._get_total_coloring_fname())
                         self._setup_tot_jac_sparsity()

@@ -220,8 +220,8 @@ class ExecComp(ExplicitComponent):
         super().__init__(**options)
 
         # change default coloring values
-        self._coloring_info['method'] = 'cs'
-        self._coloring_info['num_full_jacs'] = 2
+        self._coloring_info.method = 'cs'
+        self._coloring_info.num_full_jacs = 2
 
         # if complex step is used for derivatives, this is the stepsize
         self.complex_stepsize = 1.e-40
@@ -679,12 +679,12 @@ class ExecComp(ExplicitComponent):
                                                    sum(sizes['output'][rank]) > 1):
                     if not self._coloring_declared:
                         super().declare_coloring(wrt=None, method='cs')
-                        self._coloring_info['dynamic'] = True
+                        self._coloring_info.dynamic = True
                         self._manual_decl_partials = False  # this gets reset in declare_partials
                         self._declared_partials = defaultdict(dict)
                 else:
                     self.options['do_coloring'] = False
-                    self._coloring_info['dynamic'] = False
+                    self._coloring_info.dynamic = False
 
             meta = self._var_rel2meta
             decl_partials = super().declare_partials

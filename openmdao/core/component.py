@@ -251,7 +251,7 @@ class Component(System):
                 if 'method' in meta and meta['method'] is not None:
                     break
             else:
-                method = self._coloring_info['method']
+                method = self._coloring_info.method
                 issue_warning("declare_coloring or use_fixed_coloring was called but no approx"
                               " partials were declared.  Declaring all partials as approximated "
                               f"using default metadata and method='{method}'.", prefix=self.msginfo,
@@ -1672,7 +1672,7 @@ class Component(System):
             if coloring_mod._use_partial_sparsity:
                 coloring = self._get_coloring()
                 if coloring is not None:
-                    if not self._coloring_info['dynamic']:
+                    if not self._coloring_info.dynamic:
                         coloring._check_config_partial(self)
                     self._update_subjac_sparsity(coloring.get_subjac_sparsity())
                 if self._jacobian is not None:

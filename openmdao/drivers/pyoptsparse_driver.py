@@ -394,7 +394,7 @@ class pyOptSparseDriver(Driver):
                 model_ran = True
             self.iter_count += 1
 
-        self._coloring_info['run_model'] = not model_ran
+        self._coloring_info.run_model = not model_ran
 
         comm = None if isinstance(problem.comm, FakeComm) else problem.comm
         opt_prob = Optimization(self.options['title'], WeakMethodWrapper(self, '_objfunc'),
