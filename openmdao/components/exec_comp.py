@@ -934,7 +934,7 @@ class ExecComp(ExplicitComponent):
             return super()._compute_coloring(recurse=recurse, **overrides)
 
         info = self._coloring_info
-        info.update(**overrides)
+        info.update(overrides)
         if isinstance(info['wrt_patterns'], str):
             info['wrt_patterns'] = [info['wrt_patterns']]
 

@@ -153,6 +153,18 @@ class ColoringMeta(object):
         for name in self._meta_names:
             yield name, getattr(self, name)
 
+    def items(self):
+        """
+        Iterate over the metadata.
+
+        Yields
+        ------
+        (str, object)
+            Tuple containing the name and value of each metadata item.
+        """
+        for name in self._meta_names:
+            yield name, getattr(self, name)
+
     def get(self, name, default=None):
         """
         Get the value of the named metadata.

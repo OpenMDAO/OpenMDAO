@@ -543,7 +543,8 @@ class System(object):
 
         self._filtered_vars_to_record = {}
         self._owning_rank = None
-        self._coloring_info = _DEFAULT_COLORING_META.copy()
+        # self._coloring_info = _DEFAULT_COLORING_META.copy()
+        self._coloring_info = coloring_mod.PartialColoringMeta()
         self._first_call_to_linearize = True  # will check in first call to _linearize
         self._tot_jac = None
         self._saved_errors = None if env_truthy('OPENMDAO_FAIL_FAST') else []
@@ -1542,7 +1543,9 @@ class System(object):
         if step is not None:
             options['step'] = step
 
-        self._coloring_info = options
+        # self._coloring_info = options
+        self._coloring_info = coloring_mod.PartialColoringMeta()
+        self._coloring_info.update(options)
 
     def _coloring_pct_too_low(self, coloring, info):
         # if the improvement wasn't large enough, don't use coloring
@@ -1580,7 +1583,6 @@ class System(object):
         coloring._col_var_sizes = [t[2] - t[1] for t in ordered_wrt_info]
 
         coloring._meta.update(info)  # save metadata we used to create the coloring
-        del coloring._meta['coloring']
         coloring._meta.update(sp_info)
 
         info['coloring'] = coloring
@@ -1647,7 +1649,7 @@ class System(object):
         except KeyError:
             pass
 
-        info.update(**overrides)
+        info.update(overrides)
         if isinstance(info['wrt_patterns'], str):
             info['wrt_patterns'] = [info['wrt_patterns']]
 
