@@ -935,23 +935,23 @@ class ExecComp(ExplicitComponent):
 
         info = self._coloring_info
         info.update(overrides)
-        if isinstance(info['wrt_patterns'], str):
-            info['wrt_patterns'] = [info['wrt_patterns']]
+        if isinstance(info.wrt_patterns, str):
+            info.wrt_patterns = [info.wrt_patterns]
 
-        if not self._coloring_declared and info['method'] is None:
-            info['method'] = 'cs'
+        if not self._coloring_declared and info.method is None:
+            info.method = 'cs'
 
-        if info['method'] != 'cs':
+        if info.method != 'cs':
             raise RuntimeError(f"{self.msginfo}: 'method' for coloring must be 'cs' if partials "
                                "and/or coloring are not declared manually using declare_partials "
                                "or declare_coloring.")
 
         if info.coloring is None and info.static is None:
-            info['dynamic'] = True
+            info.dynamic = True
 
         # match everything
-        info['wrt_matches_rel'] = None
-        info['wrt_matches'] = None
+        info.wrt_matches_rel = None
+        info.wrt_matches = None
 
         sparsity_start_time = time.perf_counter()
 
@@ -968,12 +968,12 @@ class ExecComp(ExplicitComponent):
         starting_inputs = self._inputs.asarray(copy=not self._relcopy)
         in_offsets = starting_inputs.copy()
         in_offsets[in_offsets == 0.0] = 1.0
-        in_offsets *= info['perturb_size']
+        in_offsets *= info.perturb_size
 
         # use special sparse jacobian to collect sparsity info
         jac = _ColSparsityJac(self, info)
 
-        for i in range(info['num_full_jacs']):
+        for i in range(info.num_full_jacs):
             inarr[:] = starting_inputs + in_offsets * get_random_arr(in_offsets.size, self.comm)
 
             for i in range(inarr.size):

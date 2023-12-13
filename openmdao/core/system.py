@@ -1557,7 +1557,7 @@ class System(object):
         sp_info['class'] = type(self).__name__
         sp_info['type'] = 'semi-total' if self._subsystems_allprocs else 'partial'
 
-        ordered_wrt_info = list(self._jac_wrt_iter(info['wrt_matches']))
+        ordered_wrt_info = list(self._jac_wrt_iter(info.wrt_matches))
         ordered_of_info = list(self._jac_of_iter())
 
         if self.pathname:
@@ -1574,17 +1574,17 @@ class System(object):
 
         info.coloring = coloring
 
-        if info['show_sparsity'] or info['show_summary']:
+        if info.show_sparsity or info.show_summary:
             print("\nColoring for '%s' (class %s)" % (self.pathname, type(self).__name__))
 
-        if info['show_sparsity']:
+        if info.show_sparsity:
             coloring.display_txt(summary=False)
-        if info['show_summary']:
+        if info.show_summary:
             coloring.summary()
 
         self._save_coloring(coloring)
 
-        if not info['per_instance']:
+        if not info.per_instance:
             # save the class coloring for other instances of this class to use
             coloring_mod._CLASS_COLORINGS[self.get_coloring_fname()] = coloring
 
@@ -1631,17 +1631,17 @@ class System(object):
         use_jax = False
         try:
             if self.options['use_jax']:
-                info['method'] = 'jax'
+                info.method = 'jax'
                 use_jax = True
         except KeyError:
             pass
 
         info.update(overrides)
-        if isinstance(info['wrt_patterns'], str):
-            info['wrt_patterns'] = [info['wrt_patterns']]
+        if isinstance(info.wrt_patterns, str):
+            info.wrt_patterns = [info.wrt_patterns]
 
-        if info['method'] is None and self._approx_schemes:
-            info['method'] = list(self._approx_schemes)[0]
+        if info.method is None and self._approx_schemes:
+            info.method = list(self._approx_schemes)[0]
 
         if info.coloring is None:
             # check to see if any approx or jax derivs have been declared
@@ -1652,30 +1652,30 @@ class System(object):
                 if not (self._owns_approx_of or self._owns_approx_wrt):
                     issue_warning("No partials found but coloring was requested.  "
                                   "Declaring ALL partials as dense "
-                                  "(method='{}')".format(info['method']),
+                                  "(method='{}')".format(info.method),
                                   prefix=self.msginfo, category=DerivativesWarning)
                     try:
-                        self.declare_partials('*', '*', method=info['method'])
+                        self.declare_partials('*', '*', method=info.method)
                     except AttributeError:  # assume system is a group
                         from openmdao.core.component import Component
                         from openmdao.core.indepvarcomp import IndepVarComp
                         from openmdao.components.exec_comp import ExecComp
                         for s in self.system_iter(recurse=True, typ=Component):
                             if not isinstance(s, ExecComp) and not isinstance(s, IndepVarComp):
-                                s.declare_partials('*', '*', method=info['method'])
+                                s.declare_partials('*', '*', method=info.method)
                     self._setup_partials()
 
         if not use_jax:
-            approx_scheme = self._get_approx_scheme(info['method'])
+            approx_scheme = self._get_approx_scheme(info.method)
 
         if info.coloring is None and info.static is None:
-            info['dynamic'] = True
+            info.dynamic = True
 
         coloring_fname = self.get_coloring_fname()
 
         # if we find a previously computed class coloring for our class, just use that
         # instead of regenerating a coloring.
-        if not info['per_instance'] and coloring_fname in coloring_mod._CLASS_COLORINGS:
+        if not info.per_instance and coloring_fname in coloring_mod._CLASS_COLORINGS:
             info.coloring = coloring = coloring_mod._CLASS_COLORINGS[coloring_fname]
             if coloring is None:
                 print("\nClass coloring for class '{}' wasn't good enough, "
@@ -1717,18 +1717,18 @@ class System(object):
         starting_inputs = self._inputs.asarray(copy=True)
         in_offsets = starting_inputs.copy()
         in_offsets[in_offsets == 0.0] = 1.0
-        in_offsets *= info['perturb_size']
+        in_offsets *= info.perturb_size
 
         starting_outputs = self._outputs.asarray(copy=True)
 
         if not is_explicit:
             out_offsets = starting_outputs.copy()
             out_offsets[out_offsets == 0.0] = 1.0
-            out_offsets *= info['perturb_size']
+            out_offsets *= info.perturb_size
 
         starting_resids = self._residuals.asarray(copy=True)
 
-        for i in range(info['num_full_jacs']):
+        for i in range(info.num_full_jacs):
             # randomize inputs (and outputs if implicit)
             if i > 0:
                 self._inputs.set_val(starting_inputs +
@@ -1851,20 +1851,20 @@ class System(object):
                 fname = static
             print("%s: loading coloring from file %s" % (self.msginfo, fname))
             info.coloring = coloring = Coloring.load(fname)
-            if info['wrt_patterns'] != coloring._meta['wrt_patterns']:
+            if info.wrt_patterns != coloring._meta['wrt_patterns']:
                 raise RuntimeError("%s: Loaded coloring has different wrt_patterns (%s) than "
                                    "declared ones (%s)." %
                                    (self.msginfo, coloring._meta['wrt_patterns'],
-                                    info['wrt_patterns']))
+                                    info.wrt_patterns))
             info.update(info.coloring._meta)
-            approx = self._get_approx_scheme(info['method'])
+            approx = self._get_approx_scheme(info.method)
             # force regen of approx groups during next compute_approximations
             approx._reset()
         elif isinstance(static, coloring_mod.Coloring):
             info.coloring = coloring = static
 
         if coloring is not None:
-            info['dynamic'] = False
+            info.dynamic = False
 
         info.static = coloring
 

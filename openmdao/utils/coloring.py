@@ -2198,20 +2198,20 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
 
     fullJ *= (1.0 / np.max(fullJ))
 
-    info = _tol_sweep(fullJ, tol, orders)
-    info['num_full_jacs'] = num_full_jacs
-    info['sparsity_time'] = elapsed
-    info['type'] = 'total'
+    spmeta = _tol_sweep(fullJ, tol, orders)
+    spmeta['num_full_jacs'] = num_full_jacs
+    spmeta['sparsity_time'] = elapsed
+    spmeta['type'] = 'total'
 
     print("Full total jacobian was computed %d times, taking %f seconds." % (num_full_jacs,
                                                                              elapsed))
     print("Total jacobian shape:", fullJ.shape, "\n")
 
-    nzrows, nzcols = np.nonzero(fullJ > info['good_tol'])
+    nzrows, nzcols = np.nonzero(fullJ > spmeta['good_tol'])
     shape = fullJ.shape
     fullJ = None
 
-    return coo_matrix((np.ones(nzrows.size, dtype=bool), (nzrows, nzcols)), shape=shape), info
+    return coo_matrix((np.ones(nzrows.size, dtype=bool), (nzrows, nzcols)), shape=shape), spmeta
 
 
 def _get_desvar_info(driver, names=None):
