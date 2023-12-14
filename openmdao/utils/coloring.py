@@ -188,18 +188,6 @@ class ColoringMeta(object):
         except AttributeError:
             return default
 
-    def __getitem__(self, name):
-        try:
-            return getattr(self, name)
-        except AttributeError:
-            raise KeyError(name)
-
-    def __setitem__(self, name, value):
-        try:
-            setattr(self, name, value)
-        except AttributeError:
-            raise KeyError(name)
-
     @property
     def coloring(self):
         return self._coloring
@@ -240,6 +228,17 @@ class ColoringMeta(object):
             issue_warning(msg, prefix=msginfo, category=DerivativesWarning)
             return False
 
+    def copy(self):
+        """
+        Return a copy of the metadata.
+
+        Returns
+        -------
+        ColoringMeta
+            Copy of the metadata.
+        """
+        return type(self)(**dict(self))
+
 
 class PartialColoringMeta(ColoringMeta):
     _meta_names = ('num_full_jacs', 'tol', 'orders', 'min_improve_pct', 'dynamic',
@@ -258,6 +257,7 @@ class PartialColoringMeta(ColoringMeta):
         self.per_instance = per_instance  # assume each instance can have a different coloring
         self.perturb_size = perturb_size  # size of input/output perturbation during generation of
                                           # sparsity
+        self.fname = None  # filename where coloring is stored
         self.wrt_matches = None  # where matched wrt names are stored
         self.wrt_matches_rel = None  # where matched relative wrt names are stored
 
@@ -665,21 +665,21 @@ class Coloring(object):
             System being colored.
         """
         # check the contents (vars and sizes) of the input and output vectors of system
-        info = {'coloring': None, 'wrt_patterns': self._meta.get('wrt_patterns')}
+        info = PartialColoringMeta(wrt_patterns=self._meta.get('wrt_patterns'))
         system._update_wrt_matches(info)
         if system.pathname:
             if info.get('wrt_matches_rel') is None:
                 wrt_matches = None
             else:
                 wrt_matches = set(['.'.join((system.pathname, n))
-                                   for n in info['wrt_matches_rel']])
+                                   for n in info.wrt_matches_rel])
             # for partial and semi-total derivs, convert to promoted names
             ordered_of_info = system._jac_var_info_abs2prom(system._jac_of_iter())
             ordered_wrt_info = \
                 system._jac_var_info_abs2prom(system._jac_wrt_iter(wrt_matches))
         else:
             ordered_of_info = list(system._jac_of_iter())
-            ordered_wrt_info = list(system._jac_wrt_iter(info['wrt_matches']))
+            ordered_wrt_info = list(system._jac_wrt_iter(info.wrt_matches))
 
         of_names = [t[0] for t in ordered_of_info]
         wrt_names = [t[0] for t in ordered_wrt_info]
@@ -2525,7 +2525,6 @@ def dynamic_total_coloring(driver, run_model=True, fname=None, of=None, wrt=None
             if driver._coloring_info.show_summary:
                 coloring.summary()
 
-        driver._setup_simul_coloring()
         driver._setup_tot_jac_sparsity(coloring)
 
     return coloring
@@ -2598,13 +2597,13 @@ def _total_coloring_cmd(options, user_args):
             else:
                 outfile = os.path.join(prob.options['coloring_dir'], 'total_coloring.pkl')
 
-            color_info = prob.driver._coloring_info
+            coloring_info = prob.driver._coloring_info
             if options.tolerance is None:
-                options.tolerance = color_info['tol']
+                options.tolerance = coloring_info.tol
             if options.orders is None:
-                options.orders = color_info['orders']
+                options.orders = coloring_info.orders
             if options.num_jacs is None:
-                options.num_jacs = color_info['num_full_jacs']
+                options.num_jacs = coloring_info.num_full_jacs
 
             with profiling('coloring_profile.out') if options.profile else do_nothing_context():
                 coloring = compute_total_coloring(prob,
@@ -2889,11 +2888,11 @@ class _ColSparsityJac(object):
     A class to manage the assembly of a sparsity matrix by columns without allocating a dense jac.
     """
 
-    def __init__(self, system, color_info):
-        self._color_info = color_info
+    def __init__(self, system, coloring_info):
+        self._coloring_info = coloring_info
 
         nrows = sum([end - start for _, start, end, _, _ in system._jac_of_iter()])
-        ordered_wrt_info = list(system._jac_wrt_iter(color_info['wrt_matches']))
+        ordered_wrt_info = list(system._jac_wrt_iter(coloring_info.wrt_matches))
 
         ncols = ordered_wrt_info[-1][2]
         self._col_list = [None] * ncols
@@ -2955,7 +2954,7 @@ class _ColSparsityJac(object):
         rows = []
         cols = []
         data = []
-        color_info = self._color_info
+        coloring_info = self._coloring_info
         for icol, tup in enumerate(self._col_list):
             if tup is None:
                 continue
@@ -2972,7 +2971,7 @@ class _ColSparsityJac(object):
             # scale the data
             data *= (1. / np.max(data))
 
-            info = _tol_sweep(data, color_info['tol'], color_info['orders'])
+            info = _tol_sweep(data, coloring_info.tol, coloring_info.orders)
             data = data > info['good_tol']  # data is now a bool
             rows = rows[data]
             cols = cols[data]
@@ -2982,9 +2981,9 @@ class _ColSparsityJac(object):
             cols = np.zeros(0, dtype=int)
             data = np.zeros(0, dtype=bool)
             info = {
-                'tol': color_info['tol'],
-                'orders': color_info['orders'],
-                'good_tol': color_info['tol'],
+                'tol': coloring_info.tol,
+                'orders': coloring_info.orders,
+                'good_tol': coloring_info.tol,
                 'nz_matches': 0,
                 'n_tested': 0,
                 'zero_entries': 0,

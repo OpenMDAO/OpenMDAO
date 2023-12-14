@@ -4147,9 +4147,9 @@ class Group(System):
         if not (self._owns_approx_of or self.pathname):
             return
 
-        wrt_color_patterns = info['wrt_patterns']
+        wrt_color_patterns = info.wrt_patterns
 
-        info['wrt_matches'] = wrt_colors_matched = set()
+        info.wrt_matches = wrt_colors_matched = set()
 
         abs2prom = self._var_allprocs_abs2prom
         for _, wrt in self._get_approx_subjac_keys():
@@ -4169,9 +4169,9 @@ class Group(System):
                         break
 
         baselen = len(self.pathname) + 1 if self.pathname else 0
-        info['wrt_matches_rel'] = [n[baselen:] for n in wrt_colors_matched]
+        info.wrt_matches_rel = [n[baselen:] for n in wrt_colors_matched]
 
-        if info.get('dynamic') and info['coloring'] is None and self._owns_approx_of:
+        if info.dynamic and info.coloring is None and self._owns_approx_of:
             if not wrt_colors_matched:
                 raise ValueError("{}: Invalid 'wrt' variable(s) specified for colored approx "
                                  "partial options: {}.".format(self.msginfo, wrt_color_patterns))
@@ -4266,8 +4266,7 @@ class Group(System):
         """
         Do any error checking on user's setup, before any other recursion happens.
         """
-        info = self._coloring_info
-        if (info.static or info['dynamic']) and self.pathname != '':
+        if (self._coloring_info.static or self._coloring_info.dynamic) and self.pathname != '':
             msg = f"{self.msginfo}: semi-total coloring is currently not supported."
             raise RuntimeError(msg)
 

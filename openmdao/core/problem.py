@@ -1077,20 +1077,17 @@ class Problem(object):
 
         driver._setup_driver(self)
 
-        info = driver._coloring_info
-        coloring = info.coloring
-        if coloring is None and info.static is not None:
-            coloring = driver._get_static_coloring()
-
-        if coloring and cmod._use_total_sparsity:
-            # if we're using simultaneous total derivatives then our effective size is less
-            # than the full size
-            if coloring._fwd and coloring._rev:
-                pass  # we're doing both!
-            elif mode == 'fwd' and coloring._fwd:
-                desvar_size = coloring.total_solves()
-            elif mode == 'rev' and coloring._rev:
-                response_size = coloring.total_solves()
+        if cmod._use_total_sparsity:
+            coloring = driver._coloring_info.coloring
+            if coloring is not None:
+                # if we're using simultaneous total derivatives then our effective size is less
+                # than the full size
+                if coloring._fwd and coloring._rev:
+                    pass  # we're doing both!
+                elif mode == 'fwd' and coloring._fwd:
+                    desvar_size = coloring.total_solves()
+                elif mode == 'rev' and coloring._rev:
+                    response_size = coloring.total_solves()
 
         if ((mode == 'fwd' and desvar_size > response_size) or
                 (mode == 'rev' and response_size > desvar_size)):
@@ -2752,10 +2749,10 @@ class Problem(object):
             if coloring_info is None:
                 coloring_info = self.driver._coloring_info.copy()
                 coloring_info.coloring = None
-                coloring_info['dynamic'] = True
+                coloring_info.dynamic = True
 
             if coloring_info.coloring is None:
-                if coloring_info['dynamic']:
+                if coloring_info.dynamic:
                     do_run = run_model if run_model is not None else self._run_counter < 0
                     coloring = \
                         cmod.dynamic_total_coloring(self.driver, run_model=do_run,

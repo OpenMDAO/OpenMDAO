@@ -419,7 +419,10 @@ class Driver(object):
                     coloring._check_config_partial(model)
                 else:
                     coloring._check_config_total(self)
-                self._setup_simul_coloring()
+
+                if not problem.model._use_derivatives:
+                    issue_warning("Derivatives are turned off.  Skipping simul deriv coloring.",
+                                category=DerivativesWarning)
 
     def _check_for_missing_objective(self):
         """
@@ -1149,9 +1152,9 @@ class Driver(object):
 
         Parameters
         ----------
-        coloring : str
-            A coloring filename.  If no arg is passed, filename will be determined
-            automatically.
+        coloring : str or Coloring
+            A coloring filename or a Coloring object.  If a filename and no arg is passed,
+            filename will be determined automatically.
         """
         if self.supports['simultaneous_derivatives']:
             if cmod._force_dyn_coloring and coloring is cmod._STD_COLORING_FNAME:
@@ -1191,6 +1194,7 @@ class Driver(object):
         Coloring or None
             The pre-existing or loaded Coloring, or None
         """
+        coloring = None
         info = self._coloring_info
         static = info.static
 
@@ -1200,50 +1204,33 @@ class Driver(object):
         else:
             coloring = info.coloring
 
-        if coloring is not None:
-            return coloring
+            if coloring is None and (static is cmod._STD_COLORING_FNAME or isinstance(static, str)):
+                if static is cmod._STD_COLORING_FNAME:
+                    fname = self._get_total_coloring_fname()
+                else:
+                    fname = static
 
-        if static is cmod._STD_COLORING_FNAME or isinstance(static, str):
-            if static is cmod._STD_COLORING_FNAME:
-                fname = self._get_total_coloring_fname()
-            else:
-                fname = static
-            print("loading total coloring from file %s" % fname)
-            coloring = info.coloring = cmod.Coloring.load(fname)
-            info.update(coloring._meta)
-            return coloring
+                print("loading total coloring from file %s" % fname)
+                coloring = info.coloring = cmod.Coloring.load(fname)
+                info.update(coloring._meta)
+
+        if coloring is not None and info.static is not None:
+            problem = self._problem()
+            if coloring._rev and problem._orig_mode not in ('rev', 'auto'):
+                revcol = coloring._rev[0][0]
+                if revcol:
+                    raise RuntimeError("Simultaneous coloring does reverse solves but mode has "
+                                       f"been set to '{problem._orig_mode}'")
+            if coloring._fwd and problem._orig_mode not in ('fwd', 'auto'):
+                fwdcol = coloring._fwd[0][0]
+                if fwdcol:
+                    raise RuntimeError("Simultaneous coloring does forward solves but mode has "
+                                       f"been set to '{problem._orig_mode}'")
+
+        return coloring
 
     def _get_total_coloring_fname(self):
         return os.path.join(self._problem().options['coloring_dir'], 'total_coloring.pkl')
-
-    def _setup_simul_coloring(self):
-        """
-        Set up metadata for coloring of total derivative solution.
-
-        If set_coloring was called with a filename, load the coloring file.
-        """
-        # command line simul_coloring uses this env var to turn pre-existing coloring off
-        if not cmod._use_total_sparsity:
-            return
-
-        problem = self._problem()
-        if not problem.model._use_derivatives:
-            issue_warning("Derivatives are turned off.  Skipping simul deriv coloring.",
-                          category=DerivativesWarning)
-            return
-
-        total_coloring = self._get_static_coloring()
-
-        if total_coloring._rev and problem._orig_mode not in ('rev', 'auto'):
-            revcol = total_coloring._rev[0][0]
-            if revcol:
-                raise RuntimeError("Simultaneous coloring does reverse solves but mode has "
-                                   "been set to '%s'" % problem._orig_mode)
-        if total_coloring._fwd and problem._orig_mode not in ('fwd', 'auto'):
-            fwdcol = total_coloring._fwd[0][0]
-            if fwdcol:
-                raise RuntimeError("Simultaneous coloring does forward solves but mode has "
-                                   "been set to '%s'" % problem._orig_mode)
 
     def scaling_report(self, outfile='driver_scaling_report.html', title=None, show_browser=True,
                        jac=True):

@@ -1550,6 +1550,10 @@ class System(object):
     def _finalize_coloring(self, coloring, info, sp_info, sparsity_time):
         # if the improvement wasn't large enough, don't use coloring
         if not info._pct_improvement_good(coloring, self.msginfo):
+            if not info.per_instance:
+                # save the class coloring for so resources won't be wasted computing
+                # a bad coloring
+                coloring_mod._CLASS_COLORINGS[self.get_coloring_fname()] = None
             return False
 
         sp_info['sparsity_time'] = sparsity_time
