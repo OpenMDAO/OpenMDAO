@@ -22,12 +22,13 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM
 from openmdao.utils.general_utils import _src_name_iter, _src_or_alias_item_iter, \
-    _convert_auto_ivc_to_conn_name
+    _convert_auto_ivc_to_conn_name, match_filter
 import openmdao.utils.hooks as hooks
 from openmdao.utils.file_utils import _load_and_exec
 from openmdao.utils.om_warnings import issue_warning, OMDeprecationWarning, DerivativesWarning
 from openmdao.utils.reports_system import register_report
 from openmdao.devtools.memory import mem_usage
+from openmdao.utils.name_maps import rel_name2abs_name
 
 try:
     import matplotlib as mpl
@@ -239,6 +240,28 @@ class ColoringMeta(object):
         """
         return type(self)(**dict(self))
 
+    def _update_wrt_matches(self, system):
+        """
+        Determine the list of wrt variables that match the wildcard(s) given in declare_coloring.
+
+        Parameters
+        ----------
+        info : dict
+            Coloring metadata dict.
+        """
+        if self.wrt_patterns is None or '*' in self.wrt_patterns:
+            self.wrt_matches = None
+            return
+
+        matches_prom = set(match_filter(self.wrt_patterns,
+                                        system._promoted_wrt_iter()))
+        # error if nothing matched
+        if not matches_prom:
+            raise ValueError("{}: Invalid 'wrt' variable(s) specified for colored approx partial "
+                             "options: {}.".format(self.msginfo, self.wrt_patterns))
+
+        self.wrt_matches = set(rel_name2abs_name(system, n) for n in matches_prom)
+
 
 class PartialColoringMeta(ColoringMeta):
     _meta_names = ('num_full_jacs', 'tol', 'orders', 'min_improve_pct', 'dynamic',
@@ -259,7 +282,6 @@ class PartialColoringMeta(ColoringMeta):
                                           # sparsity
         self.fname = None  # filename where coloring is stored
         self.wrt_matches = None  # where matched wrt names are stored
-        self.wrt_matches_rel = None  # where matched relative wrt names are stored
 
     def reset_coloring(self):
         super().reset_coloring()
@@ -666,17 +688,12 @@ class Coloring(object):
         """
         # check the contents (vars and sizes) of the input and output vectors of system
         info = PartialColoringMeta(wrt_patterns=self._meta.get('wrt_patterns'))
-        system._update_wrt_matches(info)
+        info._update_wrt_matches(system)
         if system.pathname:
-            if info.get('wrt_matches_rel') is None:
-                wrt_matches = None
-            else:
-                wrt_matches = set(['.'.join((system.pathname, n))
-                                   for n in info.wrt_matches_rel])
-            # for partial and semi-total derivs, convert to promoted names
+           # for partial and semi-total derivs, convert to promoted names
             ordered_of_info = system._jac_var_info_abs2prom(system._jac_of_iter())
             ordered_wrt_info = \
-                system._jac_var_info_abs2prom(system._jac_wrt_iter(wrt_matches))
+                system._jac_var_info_abs2prom(system._jac_wrt_iter(info.wrt_matches))
         else:
             ordered_of_info = list(system._jac_of_iter())
             ordered_wrt_info = list(system._jac_wrt_iter(info.wrt_matches))

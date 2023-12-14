@@ -4135,46 +4135,20 @@ class Group(System):
         else:
             yield from super()._jac_wrt_iter(wrt_matches)
 
-    def _update_wrt_matches(self, info):
-        """
-        Determine the list of wrt variables that match the wildcard(s) given in declare_coloring.
-
-        Parameters
-        ----------
-        info : dict
-            Coloring metadata dict.
-        """
+    def _promoted_wrt_iter(self):
         if not (self._owns_approx_of or self.pathname):
             return
 
-        wrt_color_patterns = info.wrt_patterns
-
-        info.wrt_matches = wrt_colors_matched = set()
-
         abs2prom = self._var_allprocs_abs2prom
+        seen = set()
         for _, wrt in self._get_approx_subjac_keys():
-            if wrt in wrt_colors_matched:
-                continue
-            if wrt in abs2prom['output']:
-                wrtprom = abs2prom['output'][wrt]
-            else:
-                wrtprom = abs2prom['input'][wrt]
+            if wrt not in seen:
+                seen.add(wrt)
 
-            if wrt_color_patterns is None:
-                wrt_colors_matched.add(wrt)
-            else:
-                for patt in wrt_color_patterns:
-                    if patt == '*' or fnmatchcase(wrtprom, patt):
-                        wrt_colors_matched.add(wrt)
-                        break
-
-        baselen = len(self.pathname) + 1 if self.pathname else 0
-        info.wrt_matches_rel = [n[baselen:] for n in wrt_colors_matched]
-
-        if info.dynamic and info.coloring is None and self._owns_approx_of:
-            if not wrt_colors_matched:
-                raise ValueError("{}: Invalid 'wrt' variable(s) specified for colored approx "
-                                 "partial options: {}.".format(self.msginfo, wrt_color_patterns))
+                if wrt in abs2prom['output']:
+                    yield abs2prom['output'][wrt]
+                else:
+                    yield abs2prom['input'][wrt]
 
     def _setup_approx_partials(self):
         """

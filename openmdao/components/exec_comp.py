@@ -950,7 +950,6 @@ class ExecComp(ExplicitComponent):
             info.dynamic = True
 
         # match everything
-        info.wrt_matches_rel = None
         info.wrt_matches = None
 
         sparsity_start_time = time.perf_counter()

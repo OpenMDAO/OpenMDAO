@@ -20,7 +20,7 @@ from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    find_matches, make_set, convert_src_inds, inconsistent_across_procs
+    find_matches, make_set, inconsistent_across_procs
 from openmdao.utils.indexer import Indexer, indexer
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
@@ -446,32 +446,9 @@ class Component(System):
                 return True
         return False
 
-    def _update_wrt_matches(self, info):
-        """
-        Determine the list of wrt variables that match the wildcard(s) given in declare_coloring.
-
-        Parameters
-        ----------
-        info : dict
-            Coloring metadata dict.
-        """
-        _, allwrt = self._get_partials_varlists()
-        if  info.wrt_patterns is None or '*' in info.wrt_patterns:
-            info.wrt_matches_rel = None
-            info.wrt_matches = None
-            return
-
-        matches_rel = set()
-        for w in info.wrt_patterns:
-            matches_rel.update(find_matches(w, allwrt))
-
-        # error if nothing matched
-        if not matches_rel:
-            raise ValueError("{}: Invalid 'wrt' variable(s) specified for colored approx partial "
-                             "options: {}.".format(self.msginfo, info.wrt_patterns))
-
-        info.wrt_matches_rel = matches_rel
-        info.wrt_matches = [rel_name2abs_name(self, n) for n in matches_rel]
+    def _promoted_wrt_iter(self):
+        _, wrts = self._get_partials_varlists()
+        yield from wrts
 
     def _update_subjac_sparsity(self, sparsity):
         """

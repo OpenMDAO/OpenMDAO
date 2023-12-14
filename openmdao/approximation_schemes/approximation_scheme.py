@@ -138,32 +138,33 @@ class ApproximationScheme(object):
         if not isinstance(coloring, coloring_mod.Coloring):
             return
 
-        system._update_wrt_matches(system._coloring_info)
+        system._coloring_info._update_wrt_matches(system)
         wrt_matches = system._coloring_info.wrt_matches
         out_slices = system._outputs.get_slice_dict()
 
+        # this maps column indices into colored jac into indices into full jac
         if wrt_matches is not None:
-            # this maps column indices into colored jac into indices into full jac
             ccol2jcol = np.empty(coloring._shape[1], dtype=INT_DTYPE)
 
-            # colored col to out vec idx
-            if is_total:
-                ccol2outvec = np.empty(coloring._shape[1], dtype=INT_DTYPE)
+        # colored col to out vec idx
+        if is_total:
+            ccol2outvec = np.empty(coloring._shape[1], dtype=INT_DTYPE)
 
-            colored_start = colored_end = 0
-            for abs_wrt, cstart, cend, _, cinds, _ in system._jac_wrt_iter():
-                if wrt_matches is None or abs_wrt in wrt_matches:
-                    colored_end += cend - cstart
+        colored_start = colored_end = 0
+        for abs_wrt, cstart, cend, _, cinds, _ in system._jac_wrt_iter():
+            if wrt_matches is None or abs_wrt in wrt_matches:
+                colored_end += cend - cstart
+                if wrt_matches is not None:
                     ccol2jcol[colored_start:colored_end] = range(cstart, cend)
-                    if is_total and abs_wrt in out_slices:
-                        slc = out_slices[abs_wrt]
-                        if cinds is not None:
-                            rng = np.arange(slc.start, slc.stop)
-                            rng = rng[cinds]
-                        else:
-                            rng = range(slc.start, slc.stop)
-                        ccol2outvec[colored_start:colored_end] = rng
-                    colored_start = colored_end
+                if is_total and abs_wrt in out_slices:
+                    slc = out_slices[abs_wrt]
+                    if cinds is not None:
+                        rng = np.arange(slc.start, slc.stop)
+                        rng = rng[cinds]
+                    else:
+                        rng = range(slc.start, slc.stop)
+                    ccol2outvec[colored_start:colored_end] = rng
+                colored_start = colored_end
 
         row_var_sizes = {v: sz for v, sz in zip(coloring._row_vars, coloring._row_var_sizes)}
         row_map = np.empty(coloring._shape[0], dtype=INT_DTYPE)

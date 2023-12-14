@@ -1706,7 +1706,7 @@ class _TotalJacInfo(object):
                     model._setup_jacobians(recurse=False)
                     model._setup_approx_partials()
                     if model._coloring_info.coloring is not None:
-                        model._update_wrt_matches(model._coloring_info)
+                        model._coloring_info._update_wrt_matches(model)
 
                 if self.directional:
                     for scheme in model._approx_schemes.values():

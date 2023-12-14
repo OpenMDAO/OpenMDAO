@@ -1711,7 +1711,7 @@ class System(object):
             approx_scheme._reset()
             self._during_sparsity = True
 
-        self._update_wrt_matches(info)
+        info._update_wrt_matches(self)
 
         save_jac = self._jacobian
 
@@ -2863,7 +2863,7 @@ class System(object):
         """
         if (self._coloring_info.coloring is not None and
                 self._coloring_info.wrt_matches is None):
-            self._update_wrt_matches(self._coloring_info)
+            self._coloring_info._update_wrt_matches(self)
 
         # if coloring has been specified, we don't want to have multiple
         # approximations for the same subjac, so don't register any new

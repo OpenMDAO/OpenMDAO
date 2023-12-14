@@ -365,6 +365,32 @@ def find_matches(pattern, var_list):
     return [name for name in var_list if fnmatchcase(name, pattern)]
 
 
+def match_filter(patterns, var_iter):
+    """
+    Yield variable names that match a given pattern.
+
+    Parameters
+    ----------
+    patterns : iter of str
+        Glob patterns or variable names.
+    var_iter : iter of str
+        Iterator of variable names to search for patterns.
+
+    Yields
+    ------
+    str
+        Variable name that matches a pattern.
+    """
+    if '*' in patterns:
+        yield from var_iter
+    else:
+        for vname in var_iter:
+            for pattern in patterns:
+                if fnmatchcase(vname, pattern):
+                    yield vname
+                    break
+
+
 def _find_dict_meta(dct, key):
     """
     Return True if the given key is found in any metadata values in the given dict.
