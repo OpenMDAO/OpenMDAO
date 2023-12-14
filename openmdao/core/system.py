@@ -405,7 +405,10 @@ class System(object):
     _run_on_opt: list of bool
         Indicates whether this system should run before, during, or after the optimization process
         (if there is an optimization process at all).
-    """
+    _during_sparsity : bool
+        If True, we're doing a sparsity computation and uncolored approxs need to be restricted
+        to only colored columns.
+     """
 
     def __init__(self, num_par_fd=1, **kwargs):
         """
@@ -554,6 +557,8 @@ class System(object):
         # need separate values for [PRE, OPTIMIZE, POST] since a Group may participate in
         # multiple phases because some of its subsystems may be in one phase and some in another.
         self._run_on_opt = [False, True, False]
+
+        self._during_sparsity = False
 
     @property
     def under_approx(self):
@@ -1704,7 +1709,7 @@ class System(object):
         # tell approx scheme to limit itself to only colored columns
         if not use_jax:
             approx_scheme._reset()
-            approx_scheme._during_sparsity_comp = True
+            self._during_sparsity = True
 
         self._update_wrt_matches(info)
 
@@ -1748,7 +1753,6 @@ class System(object):
                 if not use_jax:
                     for scheme in self._approx_schemes.values():
                         scheme._reset()  # force a re-initialization of approx
-                        scheme._during_sparsity_comp = True
 
             if use_jax:
                 self._jax_linearize()
@@ -1760,6 +1764,8 @@ class System(object):
         self._jacobian = save_jac
 
         if not use_jax:
+            self._during_sparsity = False
+
             # revert uncolored approx back to normal
             for scheme in self._approx_schemes.values():
                 scheme._reset()

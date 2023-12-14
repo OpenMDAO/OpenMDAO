@@ -38,10 +38,7 @@ class ApproximationScheme(object):
         A dict that maps wrt name to its fd/cs metadata.
     _progress_out : None or file-like object
         Attribute to output the progress of check_totals
-    _during_sparsity_comp : bool
-        If True, we're doing a sparsity computation and uncolored approxs need to be restricted
-        to only colored columns.
-    _jac_scatter : tuple
+   _jac_scatter : tuple
         Data needed to scatter values from results array to a total jacobian column.
     _totals_directions : dict
         If directional total derivatives are being computed, this will contain the direction keyed
@@ -60,7 +57,6 @@ class ApproximationScheme(object):
         self._approx_groups_cached_under_cs = False
         self._wrt_meta = {}
         self._progress_out = None
-        self._during_sparsity_comp = False
         self._jac_scatter = None
         self._totals_directions = {}
         self._totals_directional_mode = None
@@ -82,7 +78,6 @@ class ApproximationScheme(object):
         """
         self._colored_approx_groups = None
         self._approx_groups = None
-        self._during_sparsity_comp = False
 
     def _get_approx_groups(self, system, under_cs=False):
         """
@@ -153,14 +148,13 @@ class ApproximationScheme(object):
 
             # colored col to out vec idx
             if is_total:
-                ccol2vcol = np.empty(coloring._shape[1], dtype=INT_DTYPE)
+                ccol2outvec = np.empty(coloring._shape[1], dtype=INT_DTYPE)
 
-            ordered_wrt_iter = list(system._jac_wrt_iter())
             colored_start = colored_end = 0
-            for abs_wrt, cstart, cend, _, cinds, _ in ordered_wrt_iter:
+            for abs_wrt, cstart, cend, _, cinds, _ in system._jac_wrt_iter():
                 if wrt_matches is None or abs_wrt in wrt_matches:
                     colored_end += cend - cstart
-                    ccol2jcol[colored_start:colored_end] = np.arange(cstart, cend, dtype=INT_DTYPE)
+                    ccol2jcol[colored_start:colored_end] = range(cstart, cend)
                     if is_total and abs_wrt in out_slices:
                         slc = out_slices[abs_wrt]
                         if cinds is not None:
@@ -168,7 +162,7 @@ class ApproximationScheme(object):
                             rng = rng[cinds]
                         else:
                             rng = range(slc.start, slc.stop)
-                        ccol2vcol[colored_start:colored_end] = rng
+                        ccol2outvec[colored_start:colored_end] = rng
                     colored_start = colored_end
 
         row_var_sizes = {v: sz for v, sz in zip(coloring._row_vars, coloring._row_var_sizes)}
@@ -207,7 +201,7 @@ class ApproximationScheme(object):
             nzrows = [row_map[r] for r in nzrows]
             jaccols = cols if wrt_matches is None else ccol2jcol[cols]
             if is_total:
-                vcols = ccol2vcol[cols]
+                vcols = ccol2outvec[cols]
             else:
                 vcols = jaccols
             vec_ind_list = get_input_idx_split(vcols, inputs, outputs, use_full_cols, is_total)
@@ -234,7 +228,7 @@ class ApproximationScheme(object):
         self._approx_groups = []
         self._nruns_uncolored = 0
 
-        if self._during_sparsity_comp:
+        if system._during_sparsity:
             wrt_matches = system._coloring_info.wrt_matches
         else:
             wrt_matches = None
