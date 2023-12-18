@@ -2741,10 +2741,12 @@ class Problem(object):
         Returns
         -------
         Coloring or None
-            Coloring object, possible loaded from a file or dynamically generated, or None.
+            Coloring object, possibly dynamically generated, or None.
         """
         if cmod._use_total_sparsity:
             coloring = None
+            # if no coloring_info is supplied, copy the coloring_info from the driver but
+            # remove any existing coloring, and force dynamic coloring
             if coloring_info is None:
                 coloring_info = self.driver._coloring_info.copy()
                 coloring_info.coloring = None
