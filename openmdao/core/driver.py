@@ -1359,6 +1359,7 @@ class Driver(object):
         ----------
         run_model : bool or None
             If False, don't run model, else use problem _run_counter to decide.
+            This is ignored if the coloring has already been computed.
 
         Returns
         -------
@@ -1366,11 +1367,16 @@ class Driver(object):
             Coloring object, possible loaded from a file or dynamically generated, or None
         """
         if cmod._use_total_sparsity:
-            coloring = None
-            if self._coloring_info.coloring is None and self._coloring_info.dynamic:
-                coloring = cmod.dynamic_total_coloring(self, run_model=run_model,
-                                                       fname=self._get_total_coloring_fname())
-            return coloring
+            if run_model and self._coloring_info.coloring is not None:
+                issue_warning("The 'run_model' argument is ignored because the coloring has "
+                              "already been computed.")
+            if self._coloring_info.dynamic:
+                if self._coloring_info.coloring is None:
+                    self._coloring_info.coloring = \
+                        cmod.dynamic_total_coloring(self, run_model=run_model,
+                                                    fname=self._get_total_coloring_fname())
+
+            return self._coloring_info.coloring
 
 
 class SaveOptResult(object):

@@ -1554,6 +1554,18 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
 
         self.assertEqual(ctx.exception.args[0], "File '_bad_pickle_' is not a valid coloring file.")
 
+    def test_get_coloring(self):
+        p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
+                            sizes=[3, 4, 5], color='total', fixed=False)
+        p.run_driver()
+
+        self.assertIsNotNone(p.driver._get_coloring())
+
+        p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
+                            sizes=[3, 4, 5], color='total', fixed=True)
+        p.run_driver()
+
+        self.assertIsNotNone(p.driver._get_coloring())
 
 if __name__ == '__main__':
     unittest.main()

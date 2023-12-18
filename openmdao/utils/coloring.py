@@ -282,20 +282,9 @@ class _ColoringMeta(object):
             issue_warning(msg, prefix=msginfo, category=DerivativesWarning)
             return False
 
-    def copy_meta(self, coloring_meta):
-        """
-        Copy the metadata from another _ColoringMeta.
-
-        Parameters
-        ----------
-        coloring_meta : _ColoringMeta
-            _ColoringMeta with metadata to copy.
-        """
-        self.update(dict(coloring_meta))
-
     def copy(self):
         """
-        Return a copy of the metadata.
+        Return a new object with metadata copied from this object.
 
         Returns
         -------

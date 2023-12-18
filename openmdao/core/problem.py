@@ -2746,8 +2746,6 @@ class Problem(object):
         if cmod._use_total_sparsity:
             coloring = None
             if coloring_info is None:
-                # coloring_info = cmod._ColoringMeta()
-                # coloring_info.copy_meta(self.driver._coloring_info)
                 coloring_info = self.driver._coloring_info.copy()
                 coloring_info.coloring = None
                 coloring_info.dynamic = True

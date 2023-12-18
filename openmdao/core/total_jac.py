@@ -303,8 +303,6 @@ class _TotalJacInfo(object):
                         coloring_meta = driver._coloring_info
                 else:
                     if use_coloring:
-                        # coloring_meta = coloring_mod._ColoringMeta()
-                        # coloring_meta.copy_meta(driver._coloring_info)
                         coloring_meta = driver._coloring_info.copy()
                         coloring_meta.coloring = None
                         coloring_meta.dynamic = True
