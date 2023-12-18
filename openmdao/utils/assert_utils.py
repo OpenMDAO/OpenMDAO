@@ -363,10 +363,12 @@ def assert_no_approx_partials(system, include_self=True, recurse=True, method='a
             if s._approx_schemes:
                 if method == 'any' or method in s._approx_schemes:
                     has_approx_partials = True
-                    approx_partials = [(k, v['method']) for k, v in s._declared_partials.items()
+                    approx_partials = [(k, v['method'])
+                                       for k, v in s._declared_partials_patterns.items()
                                        if 'method' in v and v['method']]
                     msg += '    ' + s.pathname + '\n'
                     for key, method in approx_partials:
+                        key = (str(key[0]), str(key[1]))
                         msg += '        of={0:12s}    wrt={1:12s}    method={2:2s}\n'.format(key[0],
                                                                                              key[1],
                                                                                              method)

@@ -741,7 +741,7 @@ class TestFuncCompWrapped(unittest.TestCase):
         p.final_setup()
 
         # make sure only the partials that are needed are declared
-        declared_partials = comp._declared_partials
+        declared_partials = comp._declared_partials_patterns
         self.assertListEqual( sorted([('y1', 'x1'), ('y2', 'x2') ]),
                               sorted(declared_partials.keys()))
 
@@ -776,7 +776,7 @@ class TestFuncCompWrapped(unittest.TestCase):
         p.setup()
         p.final_setup()
 
-        declared_partials = comp._declared_partials
+        declared_partials = comp._declared_partials_patterns
         self.assertListEqual( sorted([('y1', 'x1'), ('y2', 'x2') ]),
                               sorted(declared_partials.keys()))
 

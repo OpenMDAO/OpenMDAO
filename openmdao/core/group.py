@@ -4160,7 +4160,7 @@ class Group(System):
         responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
 
         if self._coloring_info.coloring is not None and (self._owns_approx_of is None or
-                                                            self._owns_approx_wrt is None):
+                                                         self._owns_approx_wrt is None):
             method = self._coloring_info.method
         else:
             method = list(self._approx_schemes)[0]

@@ -678,10 +678,10 @@ class ExecComp(ExplicitComponent):
                 if not self._has_distrib_vars and (sum(sizes['input'][rank]) > 1 and
                                                    sum(sizes['output'][rank]) > 1):
                     if not self._coloring_declared:
-                        super().declare_coloring(wrt=None, method='cs')
+                        super().declare_coloring(wrt=('*', ), method='cs')
                         self._coloring_info.dynamic = True
                         self._manual_decl_partials = False  # this gets reset in declare_partials
-                        self._declared_partials = defaultdict(dict)
+                        self._declared_partials_patterns = {}
                 else:
                     self.options['do_coloring'] = False
                     self._coloring_info.dynamic = False
@@ -935,8 +935,8 @@ class ExecComp(ExplicitComponent):
 
         info = self._coloring_info
         info.update(overrides)
-        if isinstance(info.wrt_patterns, str):
-            info.wrt_patterns = [info.wrt_patterns]
+        # if isinstance(info.wrt_patterns, str):
+        #     info.wrt_patterns = (info.wrt_patterns,)
 
         if not self._coloring_declared and info.method is None:
             info.method = 'cs'
@@ -1042,7 +1042,8 @@ class ExecComp(ExplicitComponent):
                 loc_i = icol - in_slices[input_name].start
                 for u in out_names:
                     key = (u, input_name)
-                    if key in self._declared_partials:
+                    # if key in self._declared_partials:
+                    if key in partials:
                         # set the column in the Jacobian entry
                         part = scratch[out_slices[u]]
                         partials[key][:, loc_i] = part
@@ -1095,7 +1096,8 @@ class ExecComp(ExplicitComponent):
                 self._exec()
 
                 for u in out_names:
-                    if (u, inp) in self._declared_partials:
+                    # if (u, inp) in self._declared_partials:
+                    if (u, inp) in partials:
                         partials[u, inp] = imag(vdict[u] * inv_stepsize).flat
 
                 # restore old input value
@@ -1109,7 +1111,8 @@ class ExecComp(ExplicitComponent):
                     self._exec()
 
                     for u in out_names:
-                        if (u, inp) in self._declared_partials:
+                        # if (u, inp) in self._declared_partials:
+                        if (u, inp) in partials:
                             # set the column in the Jacobian entry
                             partials[u, inp][:, i] = imag(vdict[u] * inv_stepsize).flat
 

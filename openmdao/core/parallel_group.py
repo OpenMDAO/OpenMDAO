@@ -126,14 +126,14 @@ class ParallelGroup(Group):
         """
         if self.comm.size > 1:
             if self._gather_full_data():
-                gathered = self.comm.allgather(self._subjacs_info)
+                gathered = self.comm.allgather(list(self._subjacs_info.keys()))
             else:
-                gathered = self.comm.allgather({})
+                gathered = self.comm.allgather([])
             seen = set()
-            for rankdict in gathered:
-                for key, meta in rankdict.items():
+            for ranklist in gathered:
+                for key in ranklist:
                     if key not in seen:
-                        yield key, meta
+                        yield key
                         seen.add(key)
         else:
             yield from super()._declared_partials_iter()

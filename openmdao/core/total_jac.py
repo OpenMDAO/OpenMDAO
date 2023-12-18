@@ -15,7 +15,7 @@ from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.general_utils import ContainsAll, _src_or_alias_dict, _src_or_alias_name
 from openmdao.utils.mpi import MPI, check_mpi_env
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
-import openmdao.utils.coloring as coloring
+import openmdao.utils.coloring as coloring_mod
 
 
 use_mpi = check_mpi_env()
@@ -291,7 +291,7 @@ class _TotalJacInfo(object):
             self.relevance = problem._metadata['relevant']
 
         if approx:
-            coloring._initialize_model_approx(model, driver, self.of, self.wrt)
+            coloring_mod._initialize_model_approx(model, driver, self.of, self.wrt)
             modes = [self.mode]
         else:
             if not has_lin_cons:
@@ -303,6 +303,8 @@ class _TotalJacInfo(object):
                         coloring_meta = driver._coloring_info
                 else:
                     if use_coloring:
+                        # coloring_meta = coloring_mod._ColoringMeta()
+                        # coloring_meta.copy_meta(driver._coloring_info)
                         coloring_meta = driver._coloring_info.copy()
                         coloring_meta.coloring = None
                         coloring_meta.dynamic = True
@@ -322,7 +324,7 @@ class _TotalJacInfo(object):
                 if coloring_meta is not None:
                     self.simul_coloring = coloring_meta.coloring
 
-            if not isinstance(self.simul_coloring, coloring.Coloring):
+            if not isinstance(self.simul_coloring, coloring_mod.Coloring):
                 self.simul_coloring = None
 
             if self.simul_coloring is None:
@@ -443,7 +445,7 @@ class _TotalJacInfo(object):
                 # mapping is between the global row/col index and our local index.
                 locs = np.nonzero(self.in_loc_idxs[mode] != -1)[0]
                 arr = np.full(self.in_loc_idxs[mode].size, -1.0, dtype=INT_DTYPE)
-                arr[locs] = np.arange(locs.size, dtype=INT_DTYPE)
+                arr[locs] = range(locs.size)
                 self.loc_jac_idxs[mode] = arr
 
                 # a mapping of which indices correspond to distrib vars so
@@ -795,7 +797,7 @@ class _TotalJacInfo(object):
                 loc = np.nonzero(np.logical_and(irange >= gstart, irange < gend))[0]
                 if in_idxs is None:
                     if in_var_meta['distributed']:
-                        loc_i[loc] = np.arange(0, gend - gstart, dtype=INT_DTYPE)
+                        loc_i[loc] = range(0, gend - gstart)
                     else:
                         loc_i[loc] = irange[loc] - gstart
                 else:

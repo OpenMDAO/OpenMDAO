@@ -408,7 +408,7 @@ class System(object):
     _during_sparsity : bool
         If True, we're doing a sparsity computation and uncolored approxs need to be restricted
         to only colored columns.
-     """
+    """
 
     def __init__(self, num_par_fd=1, **kwargs):
         """
@@ -547,7 +547,7 @@ class System(object):
         self._filtered_vars_to_record = {}
         self._owning_rank = None
         # self._coloring_info = _DEFAULT_COLORING_META.copy()
-        self._coloring_info = coloring_mod.PartialColoringMeta()
+        self._coloring_info = coloring_mod._Partial_ColoringMeta()
         self._first_call_to_linearize = True  # will check in first call to _linearize
         self._tot_jac = None
         self._saved_errors = None if env_truthy('OPENMDAO_FAIL_FAST') else []
@@ -1520,37 +1520,40 @@ class System(object):
         self._has_approx = True
 
         # start with defaults
-        options = _DEFAULT_COLORING_META.copy()
+        options = coloring_mod._Partial_ColoringMeta()
 
         if method != 'jax':
             approx = self._get_approx_scheme(method)
-            options.update(approx.DEFAULT_OPTIONS)
+            options.update({k: v for k, v in approx.DEFAULT_OPTIONS.items()
+                            if k in ('step', 'form')})
 
         if self._coloring_info.static is None:
-            options['dynamic'] = True
+            options.dynamic = True
         else:
-            options['dynamic'] = False
-            options['static'] = self._coloring_info.static
+            options.dynamic = False
+            options.static = self._coloring_info.static
 
-        options['wrt_patterns'] = [wrt] if isinstance(wrt, str) else wrt
-        options['method'] = method
-        options['per_instance'] = per_instance
-        options['num_full_jacs'] = num_full_jacs
-        options['tol'] = tol
-        options['orders'] = orders
-        options['perturb_size'] = perturb_size
-        options['min_improve_pct'] = min_improve_pct
-        options['show_summary'] = show_summary
-        options['show_sparsity'] = show_sparsity
-        options['coloring'] = self._coloring_info.coloring
+        options.coloring = self._coloring_info.coloring
+
+        if isinstance(wrt, str):
+            options.wrt_patterns = (wrt, )
+        else:
+            options.wrt_patterns = tuple(wrt)
+        options.method = method
+        options.per_instance = per_instance
+        options.num_full_jacs = num_full_jacs
+        options.tol = tol
+        options.orders = orders
+        options.perturb_size = perturb_size
+        options.min_improve_pct = min_improve_pct
+        options.show_summary = show_summary
+        options.show_sparsity = show_sparsity
         if form is not None:
-            options['form'] = form
+            options.form = form
         if step is not None:
-            options['step'] = step
+            options.step = step
 
-        # self._coloring_info = options
-        self._coloring_info = coloring_mod.PartialColoringMeta()
-        self._coloring_info.update(options)
+        self._coloring_info = options
 
     def _finalize_coloring(self, coloring, info, sp_info, sparsity_time):
         # if the improvement wasn't large enough, don't use coloring
@@ -1646,8 +1649,8 @@ class System(object):
             pass
 
         info.update(overrides)
-        if isinstance(info.wrt_patterns, str):
-            info.wrt_patterns = [info.wrt_patterns]
+        # if isinstance(info.wrt_patterns, str):
+        #     info.wrt_patterns = (info.wrt_patterns,)
 
         if info.method is None and self._approx_schemes:
             info.method = list(self._approx_schemes)[0]
@@ -1813,7 +1816,7 @@ class System(object):
             # total coloring
             return os.path.join(directory, 'total_coloring.pkl')
 
-        if self._coloring_info.get('per_instance'):
+        if self._coloring_info.per_instance:
             # base the name on the instance pathname
             fname = 'coloring_' + self.pathname.replace('.', '_') + '.pkl'
         else:

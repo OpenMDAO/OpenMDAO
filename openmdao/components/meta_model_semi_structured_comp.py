@@ -165,17 +165,18 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
         """
         super()._setup_partials()
         arange = np.arange(self.options['vec_size'])
-        pnames = tuple(self.pnames)
-        dct = {
+        wrtnames = tuple(self.pnames)
+        pattern_meta = {
             'rows': arange,
             'cols': arange,
             'dependent': True,
         }
 
-        for name in self._var_rel_names['output']:
-            self._declare_partials(of=name, wrt=pnames, dct=dct)
+        for of in self._var_rel_names['output']:
+            self._resolve_partials_patterns(of=of, wrt=wrtnames, pattern_meta=pattern_meta)
             if self.options['training_data_gradients']:
-                self._declare_partials(of=name, wrt="%s_train" % name, dct={'dependent': True})
+                self._resolve_partials_patterns(of=of, wrt="%s_train" % of,
+                                                pattern_meta={'dependent': True})
 
         # The scipy methods do not support complex step.
         if self.options['method'].startswith('scipy'):

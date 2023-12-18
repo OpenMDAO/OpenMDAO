@@ -247,24 +247,6 @@ class ExplicitFuncComp(ExplicitComponent):
         """
         outputs.set_vals(self._compute(*self._func_values(inputs)))
 
-    def declare_partials(self, *args, **kwargs):
-        """
-        Declare information about this component's subjacobians.
-
-        Parameters
-        ----------
-        *args : list
-            Positional args to be passed to base class version of declare_partials.
-        **kwargs : dict
-            Keyword args  to be passed to base class version of declare_partials.
-
-        Returns
-        -------
-        dict
-            Metadata dict for the specified partial(s).
-        """
-        return super().declare_partials(*args, **kwargs)
-
     def _setup_partials(self):
         """
         Check that all partials are declared.

@@ -22,7 +22,7 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM
 from openmdao.utils.general_utils import _src_name_iter, _src_or_alias_item_iter, \
-    _convert_auto_ivc_to_conn_name, match_filter
+    _convert_auto_ivc_to_conn_name, pattern_filter
 import openmdao.utils.hooks as hooks
 from openmdao.utils.file_utils import _load_and_exec
 from openmdao.utils.om_warnings import issue_warning, OMDeprecationWarning, DerivativesWarning
@@ -108,8 +108,38 @@ _DEF_COMP_SPARSITY_ARGS = {
 _CLASS_COLORINGS = {}
 
 
-class ColoringMeta(object):
-    _meta_names = ('num_full_jacs', 'tol', 'orders', 'min_improve_pct', 'dynamic')
+class _ColoringMeta(object):
+    """
+    Container for all metadata relevant to a coloring.
+
+    Attributes
+    ----------
+    num_full_jacs : int
+        Number of full jacobians to generate while computing sparsity.
+    tol : float
+        Use this tolerance to determine what's a zero when determining sparsity.
+    orders : int or None
+        Number of orders += around 'tol' for the tolerance sweep when determining sparsity.  If
+        None, no tolerance sweep will be performed and whatever 'tol' is specified will be used.
+    min_improve_pct : float
+        Don't use coloring unless at least min_improve_pct percentage decrease in number of solves.
+    show_summary : bool
+        If True, print a short summary of the coloring. Defaults to True.
+    show_sparsity : bool
+        If True, show a plot of the sparsity. Defaults to False.
+    dynamic : bool
+        True if dynamic coloring is being used.
+    static : Coloring, str, or None
+        If a Coloring object, just use that.  If a filename, load the coloring from that file.
+        If None, do not attempt to use a static coloring.
+    msginfo : str
+        Prefix for warning/error messages.
+    _coloring : Coloring or None
+        The coloring object.
+    """
+
+    _meta_names = {'num_full_jacs', 'tol', 'orders', 'min_improve_pct', 'show_summary',
+                   'show_sparsity', 'dynamic'}
 
     def __init__(self, num_full_jacs=3, tol=1e-25, orders=None, min_improve_pct=5.,
                  show_summary=True, show_sparsity=False, dynamic=False, static=None,
@@ -117,20 +147,16 @@ class ColoringMeta(object):
         """
         Initialize data structures.
         """
-        self.num_full_jacs = num_full_jacs  # number of full jacobians to generate before computing
-                                            # sparsity
+        self.num_full_jacs = num_full_jacs  # number of jacobians to generate to compute sparsity
         self.tol = tol  # use this tolerance to determine what's a zero when determining sparsity
-        self.orders = orders  # num orders += around 'tol' for the tolerance sweep when determining
-                              # sparsity
-        self.min_improve_pct = min_improve_pct  # don't use coloring unless at >= 5% decrease in
-                                                # number of solves
+        self.orders = orders  # num orders += around 'tol' for the tolerance sweep (or None)
+        self.min_improve_pct = min_improve_pct  # drop coloring if pct improvement less than this
         self.show_summary = show_summary  # if True, print a short summary of the coloring
         self.show_sparsity = show_sparsity  # if True, show a plot of the sparsity
         self.dynamic = dynamic  # True if dynamic coloring is being used
-        self.static = static  # either _STD_COLORING_FNAME, a filename, or a Coloring object
-                              # if use_fixed_coloring was called
-        self._coloring = None  # the coloring object
+        self.static = static  # a filename, or a Coloring object if use_fixed_coloring was called
         self.msginfo = msginfo  # prefix for warning/error messages
+        self._coloring = None  # the coloring object
 
     def update(self, dct):
         """
@@ -142,21 +168,12 @@ class ColoringMeta(object):
             Dictionary of metadata.
         """
         for name, val in dct.items():
-            setattr(self, name, val)
+            if name in self._meta_names:
+                setattr(self, name, val)
+            else:
+                issue_warning(f"_ColoringMeta: Ignoring unrecognized metadata '{name}'.")
 
     def __iter__(self):
-        """
-        Iterate over the metadata.
-
-        Yields
-        ------
-        (str, object)
-            Tuple containing the name and value of each metadata item.
-        """
-        for name in self._meta_names:
-            yield name, getattr(self, name)
-
-    def items(self):
         """
         Iterate over the metadata.
 
@@ -191,10 +208,26 @@ class ColoringMeta(object):
 
     @property
     def coloring(self):
+        """
+        Return the coloring.
+
+        Returns
+        -------
+        Coloring or None
+            The coloring.
+        """
         return self._coloring
 
     @coloring.setter
     def coloring(self, coloring):
+        """
+        Set the coloring.
+
+        Parameters
+        ----------
+        coloring : Coloring or None
+            The coloring.
+        """
         self.set_coloring(coloring)
 
     def set_coloring(self, coloring, msginfo=''):
@@ -205,6 +238,8 @@ class ColoringMeta(object):
         ----------
         coloring : Coloring or None
             The coloring.
+        msginfo : str
+            Prefix for warning/error messages.
         """
         if coloring is None or self._pct_improvement_good(coloring, msginfo):
             self._coloring = coloring
@@ -213,9 +248,27 @@ class ColoringMeta(object):
             self.reset_coloring()
 
     def reset_coloring(self):
+        """
+        Reset the coloring to None.
+        """
         self._coloring = None
 
     def _pct_improvement_good(self, coloring, msginfo=''):
+        """
+        Return True if the percentage improvement is greater than the minimum allowed.
+
+        Parameters
+        ----------
+        coloring : Coloring
+            The coloring.
+        msginfo : str
+            Prefix for warning/error messages.
+
+        Returns
+        -------
+        bool
+            True if the percentage improvement is greater than the minimum allowed.
+        """
         if coloring is None:
             self.reset_coloring()
             return False
@@ -229,6 +282,17 @@ class ColoringMeta(object):
             issue_warning(msg, prefix=msginfo, category=DerivativesWarning)
             return False
 
+    def copy_meta(self, coloring_meta):
+        """
+        Copy the metadata from another _ColoringMeta.
+
+        Parameters
+        ----------
+        coloring_meta : _ColoringMeta
+            _ColoringMeta with metadata to copy.
+        """
+        self.update(dict(coloring_meta))
+
     def copy(self):
         """
         Return a copy of the metadata.
@@ -240,53 +304,146 @@ class ColoringMeta(object):
         """
         return type(self)(**dict(self))
 
+
+class _Partial_ColoringMeta(_ColoringMeta):
+    """
+    Container for all metadata relevant to a partial coloring.
+
+    Attributes
+    ----------
+    wrt_patterns : list/tuple of str or str
+        Patterns used to match wrt variables.
+    method : str
+        Finite differencing method ('fd' or 'cs').
+    form : str
+        Form of the derivatives ('forward', 'backward', or 'central').  Only used if method is 'fd'.
+    step : float
+        Step size for 'fd', or 'cs'.
+    per_instance : bool
+        Assume each instance can have a different coloring, so coloring will not be saved as
+        a class coloring.
+    perturb_size : float
+        Size of input/output perturbation during generation of sparsity for fd/cs.
+    fname : str or None
+        Filename where coloring is stored.
+    wrt_matches : set of str or None
+        Where matched wrt names are stored.
+    """
+
+    _meta_names = {'num_full_jacs', 'tol', 'orders', 'min_improve_pct', 'dynamic',
+                   'wrt_patterns', 'per_instance', 'perturb_size', 'method', 'form', 'step'}
+    _meta_names.update(_ColoringMeta._meta_names)
+
+    def __init__(self, wrt_patterns=('*',), method='fd', form=None, step=None, per_instance=True,
+                 perturb_size=1e-9, num_full_jacs=3, tol=1e-25, orders=None, min_improve_pct=5.,
+                 show_summary=True, show_sparsity=False, dynamic=False, static=None):
+        """
+        Initialize data structures.
+        """
+        super().__init__(num_full_jacs=num_full_jacs, tol=tol, orders=orders,
+                         min_improve_pct=min_improve_pct, show_summary=show_summary,
+                         show_sparsity=show_sparsity, dynamic=dynamic, static=static)
+        if wrt_patterns is None:
+            wrt_patterns = ()
+        elif isinstance(wrt_patterns, str):
+            wrt_patterns = (wrt_patterns,)
+        else:
+            wrt_patterns = tuple(wrt_patterns)
+        self.wrt_patterns = wrt_patterns  # patterns used to match wrt variables
+        self.method = method  # finite differencing method ('fd' or 'cs')
+        self.form = form  # form of the derivatives ('forward', 'backward', or 'central')
+        self.step = step  # step size for finite difference or complex step
+        self.per_instance = per_instance  # assume each instance can have a different coloring
+        self.perturb_size = perturb_size  # input/output perturbation during generation of sparsity
+        self.fname = None  # filename where coloring is stored
+        self.wrt_matches = None  # where matched wrt names are stored
+
+    @property
+    def wrt_patterns(self):
+        """
+        Return the wrt patterns.
+
+        Returns
+        -------
+        list of tuple or None
+            Patterns used to match wrt variables.
+        """
+        return self._wrt_patterns
+
+    @wrt_patterns.setter
+    def wrt_patterns(self, patterns):
+        """
+        Set the wrt patterns.
+
+        Parameters
+        ----------
+        patterns : list of str or None
+            Patterns used to match wrt variables.
+        """
+        if isinstance(patterns, str):
+            self._wrt_patterns = (patterns,)
+        elif patterns is None:
+            self.wrt_patterns = ()
+        else:
+            newpats = []
+            for pattern in patterns:
+                if isinstance(pattern, str):
+                    newpats.append(pattern)
+                else:
+                    raise RuntimeError("Patterns in wrt_patterns must be strings, but found "
+                                       f"{pattern} instead.")
+            self._wrt_patterns = tuple(newpats)
+
     def _update_wrt_matches(self, system):
         """
         Determine the list of wrt variables that match the wildcard(s) given in declare_coloring.
 
         Parameters
         ----------
-        info : dict
-            Coloring metadata dict.
+        system : System
+            System being colored.
+
+        Returns
+        -------
+        set of str or None
+            Matched absolute wrt variable names or None if all wrt variables match.
         """
-        if self.wrt_patterns is None or '*' in self.wrt_patterns:
-            self.wrt_matches = None
+        if '*' in self._wrt_patterns:
+            self.wrt_matches = None  # None means match everything
             return
 
-        matches_prom = set(match_filter(self.wrt_patterns,
-                                        system._promoted_wrt_iter()))
+        self.wrt_matches = set(rel_name2abs_name(system, n) for n in
+                               pattern_filter(self.wrt_patterns, system._promoted_wrt_iter()))
+
         # error if nothing matched
-        if not matches_prom:
+        if not self.wrt_matches:
             raise ValueError("{}: Invalid 'wrt' variable(s) specified for colored approx partial "
                              "options: {}.".format(self.msginfo, self.wrt_patterns))
 
-        self.wrt_matches = set(rel_name2abs_name(system, n) for n in matches_prom)
-
-
-class PartialColoringMeta(ColoringMeta):
-    _meta_names = ('num_full_jacs', 'tol', 'orders', 'min_improve_pct', 'dynamic',
-                   'wrt_patterns', 'per_instance', 'perturb_size', 'method', 'form', 'step')
-
-    def __init__(self, wrt_patterns=('*',), method='fd', form=None, step=None, per_instance=True,
-                 perturb_size=1e-9, num_full_jacs=3, tol=1e-25, orders=None, min_improve_pct=5.,
-                 show_summary=True, show_sparsity=False, dynamic=False, static=None):
-        super().__init__(num_full_jacs=num_full_jacs, tol=tol, orders=orders,
-                         min_improve_pct=min_improve_pct, show_summary=show_summary,
-                         show_sparsity=show_sparsity, dynamic=dynamic, static=static)
-        self.wrt_patterns = wrt_patterns  # patterns used to match wrt variables
-        self.method = method  # finite differencing method ('fd' or 'cs')
-        self.form = form  # form of the derivatives ('forward', 'backward', or 'central')
-        self.step = step  # step size for finite difference or complex step
-        self.per_instance = per_instance  # assume each instance can have a different coloring
-        self.perturb_size = perturb_size  # size of input/output perturbation during generation of
-                                          # sparsity
-        self.fname = None  # filename where coloring is stored
-        self.wrt_matches = None  # where matched wrt names are stored
+        return self.wrt_matches
 
     def reset_coloring(self):
+        """
+        Reset coloring and fname metadata.
+        """
         super().reset_coloring()
         if not self.per_instance:
             _CLASS_COLORINGS[self.get_coloring_fname()] = None
+
+    def update(self, dct):
+        """
+        Update the metadata.
+
+        Parameters
+        ----------
+        dct : dict
+            Dictionary of metadata.
+        """
+        for name, val in dct.items():
+            if name in self._meta_names:
+                setattr(self, name, val)
+            else:
+                issue_warning(f"_PartialColoringMeta: Ignoring unrecognized metadata '{name}'.")
 
 
 class Coloring(object):
@@ -361,6 +518,7 @@ class Coloring(object):
 
         self._fwd = None
         self._rev = None
+
         self._meta = {
             'version': '1.0',
             'source': '',
@@ -687,10 +845,10 @@ class Coloring(object):
             System being colored.
         """
         # check the contents (vars and sizes) of the input and output vectors of system
-        info = PartialColoringMeta(wrt_patterns=self._meta.get('wrt_patterns'))
+        info = _Partial_ColoringMeta(wrt_patterns=self._meta.get('wrt_patterns', ('*',)))
         info._update_wrt_matches(system)
         if system.pathname:
-           # for partial and semi-total derivs, convert to promoted names
+            # for partial and semi-total derivs, convert to promoted names
             ordered_of_info = system._jac_var_info_abs2prom(system._jac_of_iter())
             ordered_wrt_info = \
                 system._jac_var_info_abs2prom(system._jac_wrt_iter(info.wrt_matches))
@@ -2438,13 +2596,13 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
                                       "from nonlinear ones.")
         _initialize_model_approx(model, driver, ofs, wrts)
         if model._coloring_info.coloring is None:
-            kwargs = {n: v for n, v in model._coloring_info.items()
+            kwargs = {n: v for n, v in model._coloring_info
                       if n in _DEF_COMP_SPARSITY_ARGS and v is not None}
             kwargs['method'] = list(model._approx_schemes)[0]
             model.declare_coloring(**kwargs)
         if run_model:
             problem.run_model()
-        coloring = model._compute_coloring(wrt_patterns='*', method=list(model._approx_schemes)[0],
+        coloring = model._compute_coloring(method=list(model._approx_schemes)[0],
                                            num_full_jacs=num_full_jacs, tol=tol, orders=orders)[0]
     else:
         J, sparsity_info = _get_total_jac_sparsity(problem, num_full_jacs=num_full_jacs, tol=tol,

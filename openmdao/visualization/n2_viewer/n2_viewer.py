@@ -363,7 +363,7 @@ def _get_declare_partials(system):
         beginning from the given system on down.
     """
     declare_partials_list = []
-    for key, _ in system._declared_partials_iter():
+    for key in system._declared_partials_iter():
         of, wrt = key
         if of != wrt:
             declare_partials_list.append(f"{of} > {wrt}")

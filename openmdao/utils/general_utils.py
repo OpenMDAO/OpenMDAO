@@ -360,12 +360,10 @@ def find_matches(pattern, var_list):
     """
     if pattern == '*':
         return var_list
-    elif pattern in var_list:
-        return [pattern]
     return [name for name in var_list if fnmatchcase(name, pattern)]
 
 
-def match_filter(patterns, var_iter):
+def pattern_filter(patterns, var_iter, name_index=None):
     """
     Yield variable names that match a given pattern.
 
@@ -373,8 +371,11 @@ def match_filter(patterns, var_iter):
     ----------
     patterns : iter of str
         Glob patterns or variable names.
-    var_iter : iter of str
-        Iterator of variable names to search for patterns.
+    var_iter : iter of str or iter of tuple/list
+        Iterator of variable names (or tuples containing variable names) to search for patterns.
+    name_index : int or None
+        If not None, the var_iter is assumed to yield tuples, and the
+        name_index is the index of the variable name in the tuple.
 
     Yields
     ------
@@ -384,11 +385,56 @@ def match_filter(patterns, var_iter):
     if '*' in patterns:
         yield from var_iter
     else:
-        for vname in var_iter:
-            for pattern in patterns:
-                if fnmatchcase(vname, pattern):
-                    yield vname
-                    break
+        if name_index is None:
+            for vname in var_iter:
+                for pattern in patterns:
+                    if fnmatchcase(vname, pattern):
+                        yield vname
+                        break
+        else:
+            for tup in var_iter:
+                vname = tup[name_index]
+                for pattern in patterns:
+                    if fnmatchcase(vname, pattern):
+                        yield tup
+                        break
+
+
+def match_filter(patterns, var_iter, name_index=None):
+    """
+    Yield variable names that match a given pattern.
+
+    Parameters
+    ----------
+    patterns : iter of str
+        Glob patterns or variable names.
+    var_iter : iter of str or iter of tuple/list
+        Iterator of variable names (or tuples containing variable names) to search for patterns.
+    name_index : int or None
+        If not None, the var_iter is assumed to yield tuples, and the
+        name_index is the index of the variable name in the tuple.
+
+    Yields
+    ------
+    str
+        Variable name that matches a pattern.
+    """
+    if '*' in patterns:
+        yield from var_iter
+    else:
+        if name_index is None:
+            for vname in var_iter:
+                for pattern in patterns:
+                    if fnmatchcase(vname, pattern):
+                        yield vname
+                        break
+        else:
+            for tup in var_iter:
+                vname = tup[name_index]
+                for pattern in patterns:
+                    if fnmatchcase(vname, pattern):
+                        yield tup
+                        break
 
 
 def _find_dict_meta(dct, key):

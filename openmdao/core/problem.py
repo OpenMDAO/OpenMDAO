@@ -1233,7 +1233,7 @@ class Problem(object):
         for comp in comps:
             local_opts = comp._get_check_partial_options()
 
-            for key, meta in comp._declared_partials.items():
+            for keypats, meta in comp._declared_partials_patterns.items():
 
                 # Get the complete set of options, including defaults
                 #    for the computing of the derivs for this component
@@ -1249,9 +1249,8 @@ class Problem(object):
                 # For each of the partials, check to see if the
                 #   check partials options are different than the options used to compute
                 #   the partials
-                pattern_matches = comp._find_partial_matches(*key)
-                wrt_vars = pattern_matches[1]
-                for wrt_var in wrt_vars:
+                wrt_bundle = comp._find_partial_matches(*keypats)[1]
+                for wrt_var in wrt_bundle:
                     _, vars = wrt_var
                     for var in vars:
                         # we now have individual vars like 'x'
@@ -2747,6 +2746,8 @@ class Problem(object):
         if cmod._use_total_sparsity:
             coloring = None
             if coloring_info is None:
+                # coloring_info = cmod._ColoringMeta()
+                # coloring_info.copy_meta(self.driver._coloring_info)
                 coloring_info = self.driver._coloring_info.copy()
                 coloring_info.coloring = None
                 coloring_info.dynamic = True

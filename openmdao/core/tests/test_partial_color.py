@@ -3,6 +3,7 @@ import tempfile
 import shutil
 import unittest
 import itertools
+from fnmatch import fnmatchcase
 
 try:
     from parameterized import parameterized
@@ -267,10 +268,10 @@ _TOLS = {
 
 def _check_partial_matrix(system, jac, expected, method):
     blocks = []
-    for of, ofmeta in system._var_allprocs_abs2meta['output'].items():
+    for abs_of, ofmeta in system._var_allprocs_abs2meta['output'].items():
         cblocks = []
-        for wrt, wrtmeta in system._var_allprocs_abs2meta['input'].items():
-            key = (of, wrt)
+        for abs_wrt, wrtmeta in system._var_allprocs_abs2meta['input'].items():
+            key = (abs_of, abs_wrt)
             if key in jac:
                 meta = jac[key]
                 if meta['rows'] is not None:
@@ -280,9 +281,22 @@ def _check_partial_matrix(system, jac, expected, method):
                 else:
                     cblocks.append(np.zeros(meta['shape']))
             else: # sparsity was all zeros so we declared this subjac as not dependent
-                relof = of.rsplit('.', 1)[-1]
-                relwrt = wrt.rsplit('.', 1)[-1]
-                if (relof, relwrt) in system._declared_partials and not system._declared_partials[(relof, relwrt)].get('dependent'):
+                relof = abs_of.rsplit('.', 1)[-1]
+                relwrt = abs_wrt.rsplit('.', 1)[-1]
+                for decl_key, meta in system._declared_partials_patterns.items():
+                    if not meta['dependent']:
+                        ofpats, wrtpats = decl_key
+                        done = False
+                        for p in ofpats:
+                            if fnmatchcase(relof, p):
+                                for wp in wrtpats:
+                                    if fnmatchcase(relwrt, wp):
+                                        cblocks.append(np.zeros((ofmeta['size'], wrtmeta['size'])))
+                                        done = True
+                                        break
+                                if done:
+                                    break
+                if (relof, relwrt) in system._declared_partials_patterns and not system._declared_partials_patterns[(relof, relwrt)].get('dependent'):
                     cblocks.append(np.zeros((ofmeta['size'], wrtmeta['size'])))
         if cblocks:
             blocks.append(np.hstack(cblocks))

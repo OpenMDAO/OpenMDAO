@@ -492,7 +492,7 @@ class ImplicitComponent(Component):
             self._dresiduals_wrapper = self._dresiduals
             self._jac_wrapper = self._jacobian
 
-    def _declare_partials(self, of, wrt, dct):
+    def _resolve_partials_patterns(self, of, wrt, pattern_meta):
         """
         Store subjacobian metadata for later use.
 
@@ -505,7 +505,7 @@ class ImplicitComponent(Component):
             The names of the variables that derivatives are taken with respect to.
             This can contain the name of any input or output variable.
             May also contain glob patterns.
-        dct : dict
+        pattern_meta : dict
             Metadata dict specifying shape, and/or approx properties.
         """
         if self._declared_residuals:
@@ -526,13 +526,13 @@ class ImplicitComponent(Component):
                         rmap[resid] = []
 
                     oslc, rslc = _get_overlap_slices(ostart, oend, rstart, rend)
-                    rmap[resid].append((oname[plen:], wrt, dct, oslc, rslc))
+                    rmap[resid].append((oname[plen:], wrt, pattern_meta, oslc, rslc))
 
             for resid, lst in self._resid2out_subjac_map.items():
-                for oname, wrt, dct, _, _ in lst:
-                    super()._declare_partials(oname, wrt, dct)
+                for oname, wrt, patmeta, _, _ in lst:
+                    super()._resolve_partials_patterns(oname, wrt, patmeta)
         else:
-            super()._declare_partials(of, wrt, dct)
+            super()._resolve_partials_patterns(of, wrt, pattern_meta)
 
     def _check_res_vs_out_meta(self, resid, output):
         """

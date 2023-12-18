@@ -175,7 +175,7 @@ class Driver(object):
         self.iter_count = 0
         self.cite = ""
 
-        self._coloring_info = cmod.ColoringMeta()
+        self._coloring_info = cmod._ColoringMeta()
 
         self._total_jac_sparsity = None
         self._total_jac_format = 'flat_dict'
@@ -422,7 +422,7 @@ class Driver(object):
 
                 if not problem.model._use_derivatives:
                     issue_warning("Derivatives are turned off.  Skipping simul deriv coloring.",
-                                category=DerivativesWarning)
+                                  category=DerivativesWarning)
 
     def _check_for_missing_objective(self):
         """
