@@ -14,10 +14,10 @@ from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.unit_conv import SrcComp, TgtCompC, TgtCompF, TgtCompK
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
 from openmdao.test_suite.parametric_suite import parametric_suite
-from openmdao.utils.assert_utils import assert_near_equal, assert_warnings, assert_check_partials, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, \
+    assert_check_totals, assert_warnings
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.mpi import MPI
-from openmdao.utils.om_warnings import OMDeprecationWarning
 from openmdao.utils.testing_utils import use_tempdirs
 
 try:
@@ -2571,13 +2571,12 @@ class CheckTotalsParallelGroup(unittest.TestCase):
         prob = om.Problem(model=model)
         prob.setup(force_alloc_complex=True)
         prob.run_model()
-        data  = prob.check_totals(method='cs', out_stream=None)
-        assert_near_equal(data[('pg.dc1.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc3.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
 
 class CheckTotalsIndices(unittest.TestCase):
 
     def test_w_indices(self):
+        # just checks for indexing error.  Doesn't raise exception if derivs are wrong.
         class TopComp(om.ExplicitComponent):
 
             def setup(self):
@@ -2597,7 +2596,7 @@ class CheckTotalsIndices(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        geom = model.add_subsystem('tcomp', TopComp())
+        model.add_subsystem('tcomp', TopComp())
 
         # setting indices here caused an indexing error later on
         model.add_design_var('tcomp.theta_c2_C', lower=-20., upper=20., indices=range(2, 9))
@@ -2607,6 +2606,440 @@ class CheckTotalsIndices(unittest.TestCase):
 
         prob.run_model()
         check = prob.check_totals(compact_print=True)
+
+
+def _setup_1ivc_fdgroupwithpar_1sink(size=7):
+
+    prob = om.Problem()
+    model = prob.model
+
+    model.add_subsystem('p', om.IndepVarComp('x', np.ones((size, ))))
+
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+
+    sub.add_subsystem('C3', om.ExecComp('y = x1 + x2', shape=size))
+
+    model.connect('p.x', 'sub.par.C1.x')
+    model.connect('p.x', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.C3.x1')
+    model.connect('sub.par.C2.y', 'sub.C3.x2')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_objective('sub.C3.y', index=-1)
+
+    sub.approx_totals(method='fd')
+
+    return prob
+
+def _setup_2ivcs_fdgroupwithpar_1sink(size=7):
+    prob = om.Problem()
+    model = prob.model
+
+    model.add_subsystem('p', om.IndepVarComp('x', np.ones((size, ))))
+    model.add_subsystem('p2', om.IndepVarComp('x', np.ones((size, ))))
+
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+    sub.add_subsystem('C3', om.ExecComp('y = x1 + x2', shape=size))
+
+    model.connect('p.x', 'sub.par.C1.x')
+    model.connect('p2.x', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.C3.x1')
+    model.connect('sub.par.C2.y', 'sub.C3.x2')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_design_var('p2.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_objective('sub.C3.y', index=-1)
+
+    sub.approx_totals(method='fd')
+
+    return prob
+
+
+def _setup_1ivc_dum_fdgroupwithpar_1sink(size=7):
+    prob = om.Problem()
+    model = prob.model
+
+    model.add_subsystem('p', om.IndepVarComp('x', np.ones((size, ))))
+
+    model.add_subsystem('dum', om.ExecComp('y = x', shape=size))
+
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+
+    sub.add_subsystem('C3', om.ExecComp('y = x1 + x2', shape=size))
+
+    model.connect('p.x', 'dum.x')
+    model.connect('dum.y', 'sub.par.C1.x')
+    model.connect('dum.y', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.C3.x1')
+    model.connect('sub.par.C2.y', 'sub.C3.x2')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_objective('sub.C3.y', index=-1)
+
+    sub.approx_totals(method='fd')
+
+    return prob
+
+def _setup_1ivc_dum_fdgroupwithpar_1sink_c4(size=7):
+
+    prob = om.Problem()
+    model = prob.model
+
+    ivc = om.IndepVarComp()
+    ivc.add_output('x', np.ones((size, )))
+
+    model.add_subsystem('p', ivc)
+    model.add_subsystem('dum', om.ExecComp('y = x', shape=size))
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+    sub.add_subsystem('C3', om.ExecComp('y = x1 + x2', shape=size))
+    model.add_subsystem('C4', om.ExecComp('y = x', shape=size))
+
+    model.connect('p.x', 'dum.x')
+    model.connect('dum.y', 'sub.par.C1.x')
+    model.connect('dum.y', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.C3.x1')
+    model.connect('sub.par.C2.y', 'sub.C3.x2')
+    model.connect('sub.C3.y', 'C4.x')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_objective('C4.y', index=-1)
+
+    sub.approx_totals(method='fd')
+
+    return prob
+
+
+def _setup_2ivcs_fdgroupwithpar_2sinks(size=7):
+    prob = om.Problem()
+    model = prob.model
+
+    model.add_subsystem('p', om.IndepVarComp('x', np.ones((size, ))))
+    model.add_subsystem('p2', om.IndepVarComp('x', np.ones((size, ))))
+
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+
+    sub.add_subsystem('C3', om.ExecComp('y = x*.5', shape=size))
+    sub.add_subsystem('C4', om.ExecComp('y = x*3.', shape=size))
+
+    model.connect('p.x', 'sub.par.C1.x')
+    model.connect('p2.x', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.C3.x')
+    model.connect('sub.par.C2.y', 'sub.C4.x')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_design_var('p2.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_constraint('sub.C4.y', lower=0.0)
+    model.add_objective('sub.C3.y', index=-1)
+
+    sub.approx_totals(method='fd')
+
+    return prob
+
+
+def _setup_2ivcs_fdgroupwith2pars_2sinks(size=7):
+    prob = om.Problem()
+    model = prob.model
+
+    model.add_subsystem('p', om.IndepVarComp('x', np.ones((size, ))))
+    model.add_subsystem('p2', om.IndepVarComp('x', np.ones((size, ))))
+
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+
+    par2 = sub.add_subsystem('par2', om.ParallelGroup())
+    par2.add_subsystem('C1a', om.ExecComp('y = 2.*x', shape=size))
+    par2.add_subsystem('C2a', om.ExecComp('y = 3.*x', shape=size))
+
+    sub.add_subsystem('C3', om.ExecComp('y = x*.5', shape=size))
+    sub.add_subsystem('C4', om.ExecComp('y = x*3.', shape=size))
+
+    model.connect('p.x', 'sub.par.C1.x')
+    model.connect('p2.x', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.par2.C1a.x')
+    model.connect('sub.par.C2.y', 'sub.par2.C2a.x')
+    model.connect('sub.par2.C1a.y', 'sub.C3.x')
+    model.connect('sub.par2.C2a.y', 'sub.C4.x')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_design_var('p2.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_constraint('sub.par2.C1a.y', lower=0.0)
+    model.add_constraint('sub.par2.C2a.y', lower=0.0)
+    model.add_constraint('sub.C4.y', lower=0.0)
+    model.add_objective('sub.C3.y', index=-1)
+
+    sub.approx_totals(method='fd')
+
+    return prob
+
+
+def _setup_2ivcs_fdgroupwith2pars_1sink(size=7):
+    prob = om.Problem()
+    model = prob.model
+
+    model.add_subsystem('p', om.IndepVarComp('x', np.ones((size, ))))
+    model.add_subsystem('p2', om.IndepVarComp('x', np.ones((size, ))))
+
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+
+    par2 = sub.add_subsystem('par2', om.ParallelGroup())
+    par2.add_subsystem('C1a', om.ExecComp('y = 2.*x', shape=size))
+    par2.add_subsystem('C2a', om.ExecComp('y = 3.*x', shape=size))
+
+    sub.add_subsystem('C3', om.ExecComp('y = x1 + x2', shape=size))
+
+    model.connect('p.x', 'sub.par.C1.x')
+    model.connect('p2.x', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.par2.C1a.x')
+    model.connect('sub.par.C2.y', 'sub.par2.C2a.x')
+    model.connect('sub.par2.C1a.y', 'sub.C3.x1')
+    model.connect('sub.par2.C2a.y', 'sub.C3.x2')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_design_var('p2.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_constraint('sub.par2.C1a.y', lower=0.0)
+    model.add_constraint('sub.par2.C2a.y', lower=0.0)
+    model.add_objective('sub.C3.y', index=-1)
+
+    sub.approx_totals(method='fd')
+
+    return prob
+
+
+def _setup_2ivcs_fdgroupwithcrisscrosspars_2sinks(size=7):
+    prob = om.Problem()
+    model = prob.model
+
+    model.add_subsystem('p', om.IndepVarComp('x', np.ones((size, ))))
+    model.add_subsystem('p2', om.IndepVarComp('x', np.ones((size, ))))
+
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+
+    par2 = sub.add_subsystem('par2', om.ParallelGroup())
+    par2.add_subsystem('C1a', om.ExecComp('y = 2.*x', shape=size))
+    par2.add_subsystem('C2a', om.ExecComp('y = 3.*x', shape=size))
+
+    sub.add_subsystem('C3', om.ExecComp('y = x*.5', shape=size))
+    sub.add_subsystem('C4', om.ExecComp('y = x*3.', shape=size))
+
+    model.connect('p.x', 'sub.par.C1.x')
+    model.connect('p2.x', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.par2.C2a.x')
+    model.connect('sub.par.C2.y', 'sub.par2.C1a.x')
+    model.connect('sub.par2.C1a.y', 'sub.C3.x')
+    model.connect('sub.par2.C2a.y', 'sub.C4.x')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_design_var('p2.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_constraint('sub.par2.C1a.y', lower=0.0)
+    model.add_constraint('sub.par2.C2a.y', lower=0.0)
+    model.add_constraint('sub.C4.y', lower=0.0)
+    model.add_objective('sub.C3.y', index=-1)
+
+    sub.approx_totals(method='fd')
+
+    return prob
+
+def _setup_2ivcs_fdgroupwithcrisscrosspars_1sink(size=7):
+    prob = om.Problem()
+    model = prob.model
+
+    model.add_subsystem('p', om.IndepVarComp('x', np.ones((size, ))))
+    model.add_subsystem('p2', om.IndepVarComp('x', np.ones((size, ))))
+
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+
+    par2 = sub.add_subsystem('par2', om.ParallelGroup())
+    par2.add_subsystem('C1a', om.ExecComp('y = 2.*x', shape=size))
+    par2.add_subsystem('C2a', om.ExecComp('y = 3.*x', shape=size))
+
+    sub.add_subsystem('C3', om.ExecComp('y = x1 + x2', shape=size))
+
+    model.connect('p.x', 'sub.par.C1.x')
+    model.connect('p2.x', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.par2.C2a.x')
+    model.connect('sub.par.C2.y', 'sub.par2.C1a.x')
+    model.connect('sub.par2.C1a.y', 'sub.C3.x1')
+    model.connect('sub.par2.C2a.y', 'sub.C3.x2')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_design_var('p2.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_constraint('sub.par2.C1a.y', lower=0.0)
+    model.add_constraint('sub.par2.C2a.y', lower=0.0)
+    model.add_objective('sub.C3.y', index=-1)
+
+    sub.approx_totals(method='fd')
+
+    return prob
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestFDWithParallelSubGroups(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_group_fd_inner_par_fwd(self):
+        prob = _setup_1ivc_fdgroupwithpar_1sink(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd'), atol=3e-6)
+
+    def test_group_fd_inner_par_rev(self):
+        prob = _setup_1ivc_fdgroupwithpar_1sink(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        # assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+        assert_check_totals(prob.check_totals(method='fd', show_only_incorrect=True), atol=3e-6)
+
+    def test_group_fd_inner_par2_fwd(self):
+        prob = _setup_2ivcs_fdgroupwithpar_2sinks(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_group_fd_inner_par2_rev(self):
+        prob = _setup_2ivcs_fdgroupwithpar_2sinks(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_2ivcs_fdgroupwithcrisscrosspars_2sinks_fwd(self):
+        prob = _setup_2ivcs_fdgroupwithcrisscrosspars_2sinks(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_2ivcs_fdgroupwithcrisscrosspars_2sinks_rev(self):
+        prob = _setup_2ivcs_fdgroupwithcrisscrosspars_2sinks(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_2ivcs_fdgroupwith2pars_2sinks_fwd(self):
+        prob = _setup_2ivcs_fdgroupwith2pars_2sinks(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_2ivcs_fdgroupwith2pars_2sinks_rev(self):
+        prob = _setup_2ivcs_fdgroupwith2pars_2sinks(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_2ivcs_fdgroupwithcrisscrosspars_1sink_fwd(self):
+        prob = _setup_2ivcs_fdgroupwithcrisscrosspars_1sink(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        prob.compute_totals()
+        import pprint
+        pprint.pprint({n: m['val'] for n,m in prob.model.sub._jacobian._subjacs_info.items()})
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_2ivcs_fdgroupwithcrisscrosspars_1sink_rev(self):
+        prob = _setup_2ivcs_fdgroupwithcrisscrosspars_1sink(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_2ivcs_fdgroupwith2pars_1sink_fwd(self):
+        prob = _setup_2ivcs_fdgroupwith2pars_1sink(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_2ivcs_fdgroupwith2pars_1sink_rev(self):
+        prob = _setup_2ivcs_fdgroupwith2pars_1sink(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_group_fd_inner_par2ivcs_fwd(self):
+        prob = _setup_2ivcs_fdgroupwithpar_1sink(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_group_fd_inner_par2ivcs_rev(self):
+        prob = _setup_2ivcs_fdgroupwithpar_1sink(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd'), atol=3e-6)
+
+    def test_group_fd_inner_par_indirect_fwd(self):
+        prob = _setup_1ivc_dum_fdgroupwithpar_1sink(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_group_fd_inner_par_indirect_rev(self):
+        prob = _setup_1ivc_dum_fdgroupwithpar_1sink(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        # assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+        assert_check_totals(prob.check_totals(method='fd', show_only_incorrect=True), atol=3e-6)
+
+    def test_group_fd_inner_par_indirect2_fwd(self):
+        prob = _setup_1ivc_dum_fdgroupwithpar_1sink_c4(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_group_fd_inner_par_indirect2_rev(self):
+        prob = _setup_1ivc_dum_fdgroupwithpar_1sink_c4(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        # assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+        assert_check_totals(prob.check_totals(method='fd', show_only_incorrect=True), atol=3e-6)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestFDWithParallelSubGroups4(TestFDWithParallelSubGroups):
+
+    N_PROCS = 4
 
 
 if __name__ == "__main__":

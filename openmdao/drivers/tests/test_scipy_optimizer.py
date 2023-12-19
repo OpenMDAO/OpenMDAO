@@ -17,7 +17,7 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, Sell
 from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.test_suite.components.simple_comps import NonSquareArrayComp
 from openmdao.test_suite.groups.sin_fitter import SineFitter
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
 from openmdao.utils.general_utils import run_driver
 from openmdao.utils.testing_utils import set_env_vars_context
 from openmdao.utils.mpi import MPI
@@ -154,6 +154,8 @@ class TestMPIScatter(unittest.TestCase):
         desvar = prob.driver.get_design_var_values()
         con = prob.driver.get_constraint_values()
         obj = prob.driver.get_objective_values()
+
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
 
         assert_near_equal(obj['sum.f_sum'], 0.0, 2e-6)
         assert_near_equal(con['parab.f_xy'],

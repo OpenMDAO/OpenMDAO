@@ -3037,8 +3037,7 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
 
         # Support for indices defined on driver vars.
         model._owns_approx_of_idx = {
-            key: meta['indices']
-                for key, meta in _src_or_alias_item_iter(driver._responses)
+            key: meta['indices'] for key, meta in _src_or_alias_item_iter(driver._responses)
             if meta['indices'] is not None
         }
         model._owns_approx_wrt_idx = {

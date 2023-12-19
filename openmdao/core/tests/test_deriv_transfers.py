@@ -26,10 +26,8 @@ from openmdao.core.tests.test_distrib_derivs import DistribExecComp
 def _test_func_name(func, num, param):
     args = []
     for p in param.args:
-        if isinstance(p, str):
-            p = {p}
-        elif not isinstance(p, Iterable):
-            p = {p}
+        if isinstance(p, str) or not isinstance(p, Iterable):
+            p = [p]
         for item in p:
             try:
                 arg = item.__name__

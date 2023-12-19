@@ -621,8 +621,9 @@ class ScipyOptimizeDriver(Driver):
             return 0
 
         # print("Functions calculated")
-        # print('   xnew', x_new)
-        # print('   fnew', f_new)
+        # rank = MPI.COMM_WORLD.rank if MPI else 0
+        # print(rank, '   xnew', x_new)
+        # print(rank, '   fnew', f_new)
 
         return f_new
 

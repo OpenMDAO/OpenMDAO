@@ -641,9 +641,16 @@ def n2(data_source, outfile=_default_n2_filename, path=None, values=_UNDEFINED, 
         err_msg = str(err)
         issue_warning(err_msg)
 
-    # if MPI is active only display one copy of the viewer
-    if MPI and MPI.COMM_WORLD.rank != 0:
-        return
+    # If MPI is active only display one copy of the viewer.
+    # If the data_source is a Problem, only run on the root proc of its comm.
+    # Otherwise, only run on the global root proc.
+    if MPI:
+        try:
+            comm = data_source.comm
+        except AttributeError:
+            comm = MPI.COMM_WORLD
+        if comm.rank != 0:
+            return
 
     options = {}
     model_data['options'] = options

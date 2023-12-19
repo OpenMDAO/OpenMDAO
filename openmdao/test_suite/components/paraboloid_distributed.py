@@ -30,7 +30,6 @@ class DistParab(om.ExplicitComponent):
         start = offsets[rank]
         io_size = sizes[rank]
         self.offset = offsets[rank]
-        end = start + io_size
 
         # src_indices will be computed automatically
         self.add_input('x', val=np.ones(io_size), distributed=True)

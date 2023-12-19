@@ -35,7 +35,7 @@ from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, \
     DerivativesWarning, PromotionWarning, UnusedOptionWarning, UnitsWarning
 from openmdao.utils.general_utils import determine_adder_scaler, \
-    format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, \
+    format_as_float_or_array, _contains_all, all_ancestors, make_set, match_prom_or_abs, \
     ensure_compatible, env_truthy, make_traceback, _is_slicer_op
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -233,19 +233,19 @@ class System(object):
     _var_prom2inds : dict
         Maps promoted name to src_indices in scope of system.
     _var_allprocs_prom2abs_list : {'input': dict, 'output': dict}
-        Dictionary mapping promoted names to list of all absolute names.
+        Dictionary mapping promoted names (continuous and discrete) to list of all absolute names.
         For outputs, the list will have length one since promoted output names are unique.
     _var_abs2prom : {'input': dict, 'output': dict}
-        Dictionary mapping absolute names to promoted names, on current proc.
+        Dictionary mapping absolute names to promoted names, on current proc. Contains continuous
+        and discrete variables.
     _var_allprocs_abs2prom : {'input': dict, 'output': dict}
-        Dictionary mapping absolute names to promoted names, on all procs.
+        Dictionary mapping absolute names to promoted names, on all procs.  Contains continuous
+        and discrete variables.
     _var_allprocs_abs2meta : dict
-        Dictionary mapping absolute names to metadata dictionaries for allprocs variables.
-        The keys are
-        ('units', 'shape', 'size') for inputs and
-        ('units', 'shape', 'size', 'ref', 'ref0', 'res_ref', 'distributed') for outputs.
+        Dictionary mapping absolute names to metadata dictionaries for allprocs continuous
+        variables.
     _var_abs2meta : dict
-        Dictionary mapping absolute names to metadata dictionaries for myproc variables.
+        Dictionary mapping absolute names to metadata dictionaries for myproc continuous variables.
     _var_discrete : dict
         Dictionary of discrete var metadata and values local to this process.
     _var_allprocs_discrete : dict
@@ -678,8 +678,8 @@ class System(object):
             Starting index.
         int
             Ending index.
-        Vector
-            Either the _outputs or _inputs vector.
+        Vector or None
+            Either the _outputs or _inputs vector if var is local else None.
         slice
             A full slice.
         ndarray or None
@@ -2591,9 +2591,8 @@ class System(object):
         """
         Context manager for vectors.
 
-        For the given vec_name, return vectors that use a set of
-        internal variables that are relevant to the current matrix-vector
-        product.  This is called only from _apply_linear.
+        Return vectors that use a set of internal variables that are relevant to the current
+        matrix-vector product.  This is called only from _apply_linear.
 
         Parameters
         ----------
@@ -4446,7 +4445,7 @@ class System(object):
             If None, all are in the scope.
         """
         with self._scaled_context_all():
-            self._apply_linear(None, ContainsAll(), mode, scope_out, scope_in)
+            self._apply_linear(None, _contains_all, mode, scope_out, scope_in)
 
     def run_solve_linear(self, mode):
         """
@@ -4460,7 +4459,7 @@ class System(object):
             'fwd' or 'rev'.
         """
         with self._scaled_context_all():
-            self._solve_linear(mode, ContainsAll())
+            self._solve_linear(mode, _contains_all)
 
     def run_linearize(self, sub_do_ln=True):
         """
@@ -5446,10 +5445,10 @@ class System(object):
                 if vshape is not None:
                     val = val.reshape(vshape)
             else:
+                var_idx = self._var_allprocs_abs2idx[src]
+                sizes = self._var_sizes['output'][:, var_idx]
                 if distrib and (sdistrib or dynshape or not slocal) and not get_remote:
-                    var_idx = self._var_allprocs_abs2idx[src]
                     # sizes for src var in each proc
-                    sizes = self._var_sizes['output'][:, var_idx]
                     start = np.sum(sizes[:self.comm.rank])
                     end = start + sizes[self.comm.rank]
                     src_indices = src_indices.shaped_array(copy=True)
@@ -5879,7 +5878,7 @@ class System(object):
         else:
             io = 'input'
             scope = self
-        # io = 'output' if abs_name in self._var_allprocs_abs2meta['output'] else 'input'
+
         meta = scope._var_allprocs_abs2meta[io][abs_name]
         var_idx = scope._var_allprocs_abs2idx[abs_name]
         global_size = np.sum(scope._var_sizes[io][:, var_idx])
@@ -6038,7 +6037,7 @@ class System(object):
         abs_vnames : list of str
             List of absolute variable names.
         io : str
-            'input' or 'output'
+            'in' or 'out'
 
         Returns
         -------
@@ -6168,3 +6167,98 @@ class System(object):
 
             for s in self._subsystems_myproc:
                 yield from s.comm_info_iter()
+
+    def dist_size_iter(self, io, top_comm):
+        """
+        Yield names and distributed ranges of all local and remote variables in this system.
+
+        Parameters
+        ----------
+        io : str
+            Either 'input' or 'output'.
+        top_comm : MPI.Comm or None
+            The top-level MPI communicator.
+
+        Yields
+        ------
+        tuple
+            A tuple of the form ((abs_name, rank), start, end).
+        """
+        sizes = self._var_sizes
+        vmeta = self._var_allprocs_abs2meta
+
+        topranks = np.arange(top_comm.size)
+
+        myrank = self.comm.rank
+        toprank = top_comm.rank
+
+        mytopranks = topranks[toprank - myrank: toprank - myrank + self.comm.size]
+
+        for rank in range(self.comm.size):
+            for ivar, vname in enumerate(vmeta[io]):
+                sz = sizes[io][rank, ivar]
+                if sz > 0:
+                    yield (vname, mytopranks[rank]), sz
+
+    def local_range_iter(self, io):
+        """
+        Yield names and local ranges of all local variables in this system.
+
+        Parameters
+        ----------
+        io : str
+            Either 'input' or 'output'.
+
+        Yields
+        ------
+        tuple
+            A tuple of the form (abs_name, start, end).
+        """
+        vmeta = self._var_allprocs_abs2meta
+
+        offset = 0
+        for vname, size in zip(vmeta[io], self._var_sizes[io][self.comm.rank]):
+            if size > 0:
+                yield vname, offset, offset + size
+            offset += size
+
+    def get_var_dup_info(self, name, io):
+        """
+        Return information about how the given variable is duplicated across MPI processes.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
+        io : str
+            Either 'input' or 'output'.
+
+        Returns
+        -------
+        tuple
+            A tuple of the form (is_duplicated, num_zeros, is_distributed).
+        """
+        nz = np.count_nonzero(self._var_sizes[io][:, self._var_allprocs_abs2idx[name]])
+
+        if self._var_allprocs_abs2meta[io][name]['distributed']:
+            return False, self._var_sizes[io].shape[0] - nz, True  # distributed vars are never dups
+
+        return nz > 1, self._var_sizes[io].shape[0] - nz, False
+
+    def get_var_sizes(self, name, io):
+        """
+        Return the sizes of the given variable on all procs.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
+        io : str
+            Either 'input' or 'output'.
+
+        Returns
+        -------
+        ndarray
+            Array of sizes of the variable on all procs.
+        """
+        return self._var_sizes[io][:, self._var_allprocs_abs2idx[name]]
