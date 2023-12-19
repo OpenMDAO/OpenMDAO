@@ -47,3 +47,70 @@ class Relevance(object):
 
     def is_relevant_system(self, system):
         pass
+
+    def _get_irrelevant_vars(self, varname, direction):
+        """
+        Return the set of irrelevant variables for the given 'wrt' or 'of' variable.
+
+        Parameters
+        ----------
+        varname : str
+            Name of the variable.  Must be a 'wrt' variable in fwd mode or a 'of' variable
+            in rev mode.
+        direction : str
+            Direction of the derivative.  'fwd' or 'rev'.
+
+        Returns
+        -------
+        set
+            Set of irrelevant variables.
+        """
+        fnext = self.graph.successors if direction == 'fwd' else self.graph.predecessors
+
+    def _dependent_nodes(self, graph, start):
+        """
+        Return set of all downstream nodes starting at the given node.
+
+        Parameters
+        ----------
+        graph : network.DiGraph
+            Graph being traversed.
+        start : hashable object
+            Identifier of the starting node.
+        local : bool
+            If True and a non-local node is encountered in the traversal, the traversal
+            ends on that branch.
+
+        Returns
+        -------
+        set
+            Set of all downstream nodes.
+        """
+        visited = set()
+
+        if local:
+            abs2meta_in = self._var_abs2meta['input']
+            abs2meta_out = self._var_abs2meta['output']
+            all_abs2meta_in = self._var_allprocs_abs2meta['input']
+            all_abs2meta_out = self._var_allprocs_abs2meta['output']
+
+            def is_local(name):
+                return (name in abs2meta_in or name in abs2meta_out or
+                        (name not in all_abs2meta_in and name not in all_abs2meta_out))
+
+        if not local or is_local(start):
+            stack = [start]
+            visited.add(start)
+        else:
+            return visited
+
+        while stack:
+            src = stack.pop()
+            for tgt in graph[src]:
+                if local and not is_local(tgt):
+                    continue
+                if tgt not in visited:
+                    visited.add(tgt)
+                    stack.append(tgt)
+
+        return visited
