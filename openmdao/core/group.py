@@ -829,24 +829,8 @@ class Group(System):
             return self._relevance_graph
 
         graph = self.get_hybrid_graph()
-        outmeta = self._var_allprocs_abs2meta['output']
-
-        # now add design vars and responses to the graph
-        for dv in meta2src_iter(desvars.values()):
-            if dv not in graph:
-                graph.add_node(dv, type_='output',
-                               dist=outmeta[dv]['distributed'] if dv in outmeta else None)
-                graph.add_edge(dv.rpartition('.')[0], dv)
-            graph.nodes[dv]['isdv'] = True
-
         resps = set(meta2src_iter(responses.values()))
-        for res in resps:
-            if res not in graph:
-                graph.add_node(res, type_='output',
-                               dist=outmeta[res]['distributed'] if res in outmeta else None)
-                graph.add_edge(res.rpartition('.')[0], res, isresponse=True)
-            graph.nodes[res]['isresponse'] = True
-
+        
         # figure out if we can remove any edges based on zero partials we find
         # in components.  By default all component connected outputs
         # are also connected to all connected inputs from the same component.
@@ -854,11 +838,10 @@ class Group(System):
         self._get_missing_partials(missing_partials)
         missing_responses = set()
         for pathname, missing in missing_partials.items():
-            outputs = [n for _, n in graph.out_edges(pathname)]
             inputs = [n for n, _ in graph.in_edges(pathname)]
             graph.remove_node(pathname)
 
-            for output in outputs:
+            for _, output in graph.out_edges(pathname):
                 found = False
                 for inp in inputs:
                     if (output, inp) not in missing:
@@ -905,8 +888,7 @@ class Group(System):
             vmeta = self._var_allprocs_abs2meta[direction]
             for vname in self._var_allprocs_abs2prom[direction]:
                 graph.add_node(vname, type_=direction,
-                               dist=vmeta[vname]['distributed'] if vname in vmeta else None,
-                               isdv=False, isresponse=False)
+                               dist=vmeta[vname]['distributed'] if vname in vmeta else None)
                 comp = vname.rpartition('.')[0]
                 if comp not in comp_seen:
                     graph.add_node(comp)

@@ -34,23 +34,32 @@ class Relevance(object):
         compute_totals or check_totals.
     """
 
-    def __init__(self, graph):
-        self.graph = graph
-        self.irrelevant_sets = {}  # (varname, direction): set of irrelevant vars
-        # self._cache = {}  # possibly cache some results for speed???
+    def __init__(self, graph, prob_meta):
+        self._graph = graph
+        self._all_graph_nodes = set(graph.nodes())
+        self._prob_meta = prob_meta
+        self._irrelevant_sets = {}  # (varname, direction): set of irrelevant vars
+        self.seed_vars = set()  # set of seed vars for the current derivative computation
 
-    def is_relevant_var(self, varname):
-        # step 1: if varname irrelevant to active voi, return False
+    def is_relevant(self, name, direction):
+        # step 1: if varname irrelevant to seed var(s), return False
         # step 2: if varname is not irrelevant to any target voi, return True
         # step 3: return False
-        pass
-
-    def is_relevant_system(self, system):
-        pass
-
-    def _get_irrelevant_vars(self, varname, direction):
+        relseeds = [s for s in self._prob_meta['seed_vars'] 
+                    if name not in self._get_irrelevant_nodes(s, direction)]
+        if not relseeds:
+            return False
+        
+        for seed in relseeds:
+            if name not in self._get_irrelevant_nodes(seed, direction):
+                return True
+        return False
+    
+    def _get_irrelevant_nodes(self, varname, direction):
         """
-        Return the set of irrelevant variables for the given 'wrt' or 'of' variable.
+        Return the set of irrelevant variables and components for the given 'wrt' or 'of' variable.
+
+        The irrelevant set is determined lazily and cached for future use.
 
         Parameters
         ----------
@@ -65,50 +74,40 @@ class Relevance(object):
         set
             Set of irrelevant variables.
         """
-        fnext = self.graph.successors if direction == 'fwd' else self.graph.predecessors
+        try:
+            return self._irrelevant_sets[(varname, direction)]
+        except KeyError:
+            key = (varname, direction)
+            depnodes = self._dependent_nodes(varname, direction)
+            self._irrelevant_sets[key] = self._all_graph_nodes - depnodes
+            return self._irrelevant_sets[key]
 
-    def _dependent_nodes(self, graph, start):
+    def _dependent_nodes(self, start, direction):
         """
         Return set of all downstream nodes starting at the given node.
 
         Parameters
         ----------
-        graph : network.DiGraph
-            Graph being traversed.
         start : hashable object
             Identifier of the starting node.
-        local : bool
-            If True and a non-local node is encountered in the traversal, the traversal
-            ends on that branch.
+        direction : str
+            If 'fwd', traverse downstream.  If 'rev', traverse upstream.
 
         Returns
         -------
         set
-            Set of all downstream nodes.
+            Set of all dependent nodes.
         """
         visited = set()
 
-        if local:
-            abs2meta_in = self._var_abs2meta['input']
-            abs2meta_out = self._var_abs2meta['output']
-            all_abs2meta_in = self._var_allprocs_abs2meta['input']
-            all_abs2meta_out = self._var_allprocs_abs2meta['output']
+        stack = [start]
+        visited.add(start)
 
-            def is_local(name):
-                return (name in abs2meta_in or name in abs2meta_out or
-                        (name not in all_abs2meta_in and name not in all_abs2meta_out))
-
-        if not local or is_local(start):
-            stack = [start]
-            visited.add(start)
-        else:
-            return visited
+        fnext = self._graph.successors if direction == 'fwd' else self._graph.predecessors
 
         while stack:
             src = stack.pop()
-            for tgt in graph[src]:
-                if local and not is_local(tgt):
-                    continue
+            for tgt in fnext(src):
                 if tgt not in visited:
                     visited.add(tgt)
                     stack.append(tgt)

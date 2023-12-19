@@ -69,8 +69,8 @@ class _TotalJacInfo(object):
         (row/column slice, indices, distrib).
     ivc_print_names :dict
         Dictionary that maps auto_ivc names back to their promoted input names.
-    output_list : list of str
-        List of names of output variables for this total jacobian.  In fwd mode, outputs
+    output_tuple : tuple of str
+        Tuple of names of output variables for this total jacobian.  In fwd mode, outputs
         are responses.  In rev mode, outputs are design variables.
     output_vec : dict of Vector.
         Designated linear output vectors based on value of mode ('fwd' or 'rev').
@@ -252,7 +252,7 @@ class _TotalJacInfo(object):
         self.prom_wrt = prom_wrt
 
         self.input_list = {'fwd': wrt, 'rev': of}
-        self.output_list = {'fwd': of, 'rev': wrt}
+        self.output_tuple = {'fwd': tuple(of), 'rev': tuple(wrt)}
         self.input_meta = {'fwd': design_vars, 'rev': responses}
         self.output_meta = {'fwd': responses, 'rev': design_vars}
         self.input_vec = {'fwd': model._dresiduals, 'rev': model._doutputs}
@@ -432,7 +432,7 @@ class _TotalJacInfo(object):
 
             self.sol2jac_map = {}
             for mode in modes:
-                self.sol2jac_map[mode] = self._get_sol2jac_map(self.output_list[mode],
+                self.sol2jac_map[mode] = self._get_sol2jac_map(self.output_tuple[mode],
                                                                self.output_meta[mode],
                                                                all_abs2meta_out, mode)
             self.jac_scatters = {}
@@ -457,7 +457,7 @@ class _TotalJacInfo(object):
                 # we can exclude them from jac scatters or allreduces
                 self.dist_idx_map[mode] = dist_map = np.zeros(arr.size, dtype=bool)
                 start = end = 0
-                for name in self.output_list[mode]:
+                for name in self.output_tuple[mode]:
                     end += all_abs2meta_out[name]['size']
                     if all_abs2meta_out[name]['distributed']:
                         dist_map[start:end] = True
@@ -696,7 +696,7 @@ class _TotalJacInfo(object):
         qoi_o = self.output_meta[mode]
         non_rel_outs = False
         if qoi_i and qoi_o:
-            for out in self.output_list[mode]:
+            for out in self.output_tuple[mode]:
                 if out not in qoi_o and out not in qoi_i:
                     non_rel_outs = True
                     break
@@ -1568,11 +1568,12 @@ class _TotalJacInfo(object):
 
             # Main loop over columns (fwd) or rows (rev) of the jacobian
             for mode in self.modes:
+                self.model._problem_meta['target_vois'] = self.output_tuple[mode]
                 for key, idx_info in self.idx_iter_dict[mode].items():
                     imeta, idx_iter = idx_info
                     for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
                         self.model._problem_meta['seed_vars'] = itermeta['seed_vars']
-                        rel_systems, vec_names, cache_key = input_setter(inds, itermeta, mode)
+                        rel_systems, _, cache_key = input_setter(inds, itermeta, mode)
 
                         if debug_print:
                             if par_print and key in par_print:
@@ -1613,6 +1614,8 @@ class _TotalJacInfo(object):
                         # reset any Problem level data for the current iteration
                         self.model._problem_meta['parallel_deriv_color'] = None
                         self.model._problem_meta['seed_vars'] = None
+
+            self.model._problem_meta['target_vois'] = None
 
             # Driver scaling.
             if self.has_scaling:
