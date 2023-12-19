@@ -186,10 +186,6 @@ class Group(System):
         Sorted list of pathnames of components that are executed prior to the optimization loop.
     _post_components : list of str or None
         Sorted list of pathnames of components that are executed after the optimization loop.
-    _abs_desvars : dict or None
-        Dict of absolute design variable metadata.
-    _abs_responses : dict or None
-        Dict of absolute response metadata.
     _relevance_graph : nx.DiGraph
         Graph of relevance connections.  Always None except in the top level Group.
     _fd_rev_xfer_correction_dist : dict
@@ -225,8 +221,6 @@ class Group(System):
         self._shapes_graph = None
         self._pre_components = None
         self._post_components = None
-        self._abs_desvars = None
-        self._abs_responses = None
         self._relevance_graph = None
         self._fd_rev_xfer_correction_dist = {}
 
@@ -794,13 +788,13 @@ class Group(System):
         dict
             The relevance dictionary.
         """
-        self._abs_desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
-        self._abs_responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
+        abs_desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
+        abs_responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
         assert self.pathname == '', "Relevance can only be initialized on the top level System."
 
         if self._use_derivatives:
-            return self.get_relevant_vars(self._abs_desvars,
-                                          self._check_alias_overlaps(self._abs_responses), mode)
+            return self.get_relevant_vars(abs_desvars,
+                                          self._check_alias_overlaps(abs_responses), mode)
 
         return {'@all': ({'input': _contains_all, 'output': _contains_all}, _contains_all)}
 
@@ -829,7 +823,7 @@ class Group(System):
         # now add design vars and responses to the graph
         for dv in meta2src_iter(desvars.values()):
             if dv not in graph:
-                graph.add_node(dv, type_='out',
+                graph.add_node(dv, type_='output',
                                dist=outmeta[dv]['distributed'] if dv in outmeta else None)
                 graph.add_edge(dv.rpartition('.')[0], dv)
             graph.nodes[dv]['isdv'] = True
@@ -837,7 +831,7 @@ class Group(System):
         resps = set(meta2src_iter(responses.values()))
         for res in resps:
             if res not in graph:
-                graph.add_node(res, type_='out',
+                graph.add_node(res, type_='output',
                                dist=outmeta[res]['distributed'] if res in outmeta else None)
                 graph.add_edge(res.rpartition('.')[0], res, isresponse=True)
             graph.nodes[res]['isresponse'] = True
@@ -893,23 +887,26 @@ class Group(System):
             Graph of all variables and components in the model.
         """
         graph = nx.DiGraph()
-        tgtmeta = self._var_allprocs_abs2meta['input']
-        srcmeta = self._var_allprocs_abs2meta['output']
+        comp_seen = set()
+
+        for direction in ('input', 'output'):
+            isout = direction == 'output'
+            vmeta = self._var_allprocs_abs2meta[direction]
+            for vname in self._var_allprocs_abs2prom[direction]:
+                graph.add_node(vname, type_=direction,
+                               dist=vmeta[vname]['distributed'] if vname in vmeta else None,
+                               isdv=False, isresponse=False)
+                comp = vname.rpartition('.')[0]
+                if comp not in comp_seen:
+                    graph.add_node(comp)
+                    comp_seen.add(comp)
+
+                if isout:
+                    graph.add_edge(comp, vname)
+                else:
+                    graph.add_edge(vname, comp)
 
         for tgt, src in self._conn_global_abs_in2out.items():
-            if src not in graph:
-                dist = srcmeta[src]['distributed'] if src in srcmeta else None
-                graph.add_node(src, type_='out', dist=dist,
-                               isdv=False, isresponse=False)
-
-            dist = tgtmeta[tgt]['distributed'] if tgt in tgtmeta else None
-            graph.add_node(tgt, type_='in', dist=dist,
-                           isdv=False, isresponse=False)
-
-            # create edges to/from the component
-            graph.add_edge(src.rpartition('.')[0], src)
-            graph.add_edge(tgt, tgt.rpartition('.')[0])
-
             # connect the variables src and tgt
             graph.add_edge(src, tgt)
 
@@ -950,18 +947,17 @@ class Group(System):
 
         for dvmeta in desvars.values():
             desvar = dvmeta['source']
-            dvset = set(self.all_connected_nodes(graph, desvar))
+            dvset = self.all_connected_nodes(graph, desvar)
             if dvmeta['parallel_deriv_color']:
-                pd_dv_locs[desvar] = set(self.all_connected_nodes(graph, desvar, local=True))
+                pd_dv_locs[desvar] = self.all_connected_nodes(graph, desvar, local=True)
                 pd_err_chk[dvmeta['parallel_deriv_color']][desvar] = pd_dv_locs[desvar]
 
             for resmeta in responses.values():
                 response = resmeta['source']
                 if response not in rescache:
-                    rescache[response] = set(self.all_connected_nodes(grev, response))
+                    rescache[response] = self.all_connected_nodes(grev, response)
                     if resmeta['parallel_deriv_color']:
-                        pd_res_locs[response] = set(self.all_connected_nodes(grev, response,
-                                                                             local=True))
+                        pd_res_locs[response] = self.all_connected_nodes(grev, response, local=True)
                         pd_err_chk[resmeta['parallel_deriv_color']][response] = \
                             pd_res_locs[response]
 
@@ -980,7 +976,7 @@ class Group(System):
                     for node in common:
                         if 'type_' in nodes[node]:
                             typ = nodes[node]['type_']
-                            if typ == 'in':  # input var
+                            if typ == 'input':  # input var
                                 input_deps.add(node)
                             else:  # output var
                                 output_deps.add(node)
@@ -1081,7 +1077,7 @@ class Group(System):
 
     def all_connected_nodes(self, graph, start, local=False):
         """
-        Yield all downstream nodes starting at the given node.
+        Return set of all downstream nodes starting at the given node.
 
         Parameters
         ----------
@@ -1093,11 +1089,13 @@ class Group(System):
             If True and a non-local node is encountered in the traversal, the traversal
             ends on that branch.
 
-        Yields
-        ------
-        str
-            Each node found when traversal starts at start.
+        Returns
+        -------
+        set
+            Set of all downstream nodes.
         """
+        visited = set()
+
         if local:
             abs2meta_in = self._var_abs2meta['input']
             abs2meta_out = self._var_abs2meta['output']
@@ -1110,21 +1108,21 @@ class Group(System):
 
         if not local or is_local(start):
             stack = [start]
-            visited = set(stack)
-            yield start
+            visited.add(start)
         else:
-            return
+            return visited
 
         while stack:
             src = stack.pop()
             for tgt in graph[src]:
-                if not local or is_local(tgt):
-                    yield tgt
-                else:
+                if local and not is_local(tgt):
                     continue
                 if tgt not in visited:
                     visited.add(tgt)
                     stack.append(tgt)
+
+        return visited
+
 
     def _check_alias_overlaps(self, responses):
         # If you have response aliases, check for overlapping indices.  Also adds aliased
@@ -1322,7 +1320,7 @@ class Group(System):
         self._setup_vectors(self._get_root_vectors())
 
         # Transfers do not require recursion, but they have to be set up after the vector setup.
-        self._setup_transfers(self._abs_desvars, self._abs_responses)
+        self._setup_transfers()
 
         # Same situation with solvers, partials, and Jacobians.
         # If we're updating, we just need to re-run setup on these, but no recursion necessary.
@@ -3177,7 +3175,7 @@ class Group(System):
                 xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
 
                 if self._problem_meta['parallel_deriv_color'] is None:
-                    key = (sub, 'nocolor')
+                    key = (sub, '@nocolor')
                     if key in self._transfers['rev']:
                         xfer = self._transfers['rev'][key]
                         xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
@@ -3244,18 +3242,14 @@ class Group(System):
                                 src_val = src_sys._discrete_outputs[src]
                             tgt_sys._discrete_inputs[tgt] = src_val
 
-    def _setup_transfers(self, desvars, responses):
+    def _setup_transfers(self):
         """
         Compute all transfers that are owned by this system.
-
-        Parameters
-        ----------
-        desvars : dict
-            Dictionary of all design variable metadata. Keyed by absolute source name or alias.
-        responses : dict
-            Dictionary of all response variable metadata. Keyed by absolute source name or alias.
         """
-        self._vector_class.TRANSFER._setup_transfers(self, desvars, responses)
+        for subsys in self._subgroups_myproc:
+            subsys._setup_transfers()
+
+        self._vector_class.TRANSFER._setup_transfers(self)
         if self._conn_discrete_in2out:
             self._vector_class.TRANSFER._setup_discrete_transfers(self)
 
@@ -5043,13 +5037,13 @@ class Group(System):
         # now add design vars and responses to the graph
         for dv in meta2src_iter(designvars.values()):
             if dv not in graph:
-                graph.add_node(dv, type_='out')
+                graph.add_node(dv, type_='output')
                 graph.add_edge(dv.rpartition('.')[0], dv)
 
         resps = set(meta2src_iter(responses.values()))
         for res in resps:
             if res not in graph:
-                graph.add_node(res, type_='out')
+                graph.add_node(res, type_='output')
                 graph.add_edge(res.rpartition('.')[0], res)
 
         dvs = [meta['source'] for meta in designvars.values()]
@@ -5068,7 +5062,7 @@ class Group(System):
             for _, autoivc_var in edges:
                 if autoivc_var not in dvs:
                     new_autoivc_var = autoivc_var.replace('_auto_ivc', '_auto_ivc_other')
-                    graph.add_node(new_autoivc_var, type_='out')
+                    graph.add_node(new_autoivc_var, type_='output')
                     graph.add_edge('_auto_ivc_other', new_autoivc_var)
                     for _, inp in graph.edges(autoivc_var):
                         graph.add_edge(new_autoivc_var, inp)

@@ -60,7 +60,7 @@ else:
                                                    in_indexset).scatter
 
         @staticmethod
-        def _setup_transfers(group, desvars, responses):
+        def _setup_transfers(group):
             """
             Compute all transfers that are owned by our parent group.
 
@@ -68,27 +68,18 @@ else:
             ----------
             group : <Group>
                 Parent group.
-            desvars : dict
-                Dictionary of all design variable metadata. Keyed by absolute source name or alias.
-            responses : dict
-                Dictionary of all response variable metadata. Keyed by absolute source name or
-                alias.
             """
             rev = group._mode != 'fwd'
 
-            for subsys in group._subgroups_myproc:
-                subsys._setup_transfers(desvars, responses)
-
             group._transfers = {
-                'fwd': PETScTransfer._setup_transfers_fwd(group, desvars, responses)
+                'fwd': PETScTransfer._setup_transfers_fwd(group)
             }
 
             if rev:
-                group._transfers['rev'] = PETScTransfer._setup_transfers_rev(group, desvars,
-                                                                             responses)
+                group._transfers['rev'] = PETScTransfer._setup_transfers_rev(group)
 
         @staticmethod
-        def _setup_transfers_fwd(group, desvars, responses):
+        def _setup_transfers_fwd(group):
             transfers = {}
 
             if not group._conn_abs_in2out:
@@ -146,7 +137,7 @@ else:
             return transfers
 
         @staticmethod
-        def _setup_transfers_rev(group, desvars, responses):
+        def _setup_transfers_rev(group):
             abs2meta_in = group._var_abs2meta['input']
             abs2meta_out = group._var_abs2meta['output']
             allprocs_abs2prom = group._var_allprocs_abs2prom
@@ -166,7 +157,7 @@ else:
 
                     for resp, dvdct in group._relevant.items():
                         if resp in all_abs2meta_out:  # resp is continuous and inside this group
-                            if all_abs2meta_out[resp]['distributed']:  # distributed response
+                            if all_abs2meta_out[resp]['distributed']:  # a distributed response
                                 for dv, tup in dvdct.items():
                                     # use only dvs outside of this group.
                                     if dv not in allprocs_abs2prom:
@@ -187,8 +178,8 @@ else:
             offsets = group._get_var_offsets()
             mypathlen = len(group.pathname) + 1 if group.pathname else 0
 
-            has_rev_par_coloring = any([m['parallel_deriv_color'] is not None
-                                        for m in responses.values()])
+            has_par_coloring = group._problem_meta['using_par_deriv_color']
+
             xfer_in = defaultdict(list)
             xfer_out = defaultdict(list)
 
@@ -256,7 +247,7 @@ else:
                                 else:
                                     continue
 
-                                if has_rev_par_coloring:
+                                if has_par_coloring:
                                     # these transfers will only happen if parallel coloring is
                                     # not active for the current seed response
                                     oidxlist_nc.append(oarr)
@@ -279,7 +270,7 @@ else:
                         xfer_in[sub_out].append(input_inds)
                         xfer_out[sub_out].append(output_inds)
 
-                        if has_rev_par_coloring and iidxlist_nc:
+                        if has_par_coloring and iidxlist_nc:
                             # keep transfers separate that shouldn't happen when parallel
                             # deriv coloring is active
                             if len(iidxlist_nc) > 1:
@@ -307,7 +298,7 @@ else:
                     # remote input but still need entries in the transfer dicts to avoid hangs
                     xfer_in[sub_out]
                     xfer_out[sub_out]
-                    if has_rev_par_coloring:
+                    if has_par_coloring:
                         xfer_in_nocolor[sub_out]
                         xfer_out_nocolor[sub_out]
 
@@ -329,13 +320,13 @@ else:
                                                                  xfer_in_nocolor,
                                                                  xfer_out_nocolor)
 
-                transfers[(None, 'nocolor')] = PETScTransfer(vectors['input']['nonlinear'],
+                transfers[(None, '@nocolor')] = PETScTransfer(vectors['input']['nonlinear'],
                                                              vectors['output']['nonlinear'],
                                                              full_xfer_in, full_xfer_out,
                                                              group.comm)
 
                 for sname, inds in xfer_out_nocolor.items():
-                    transfers[(sname, 'nocolor')] = PETScTransfer(vectors['input']['nonlinear'],
+                    transfers[(sname, '@nocolor')] = PETScTransfer(vectors['input']['nonlinear'],
                                                                   vectors['output']['nonlinear'],
                                                                   xfer_in_nocolor[sname], inds,
                                                                   group.comm)

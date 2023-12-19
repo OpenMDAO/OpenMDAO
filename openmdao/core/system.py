@@ -233,19 +233,19 @@ class System(object):
     _var_prom2inds : dict
         Maps promoted name to src_indices in scope of system.
     _var_allprocs_prom2abs_list : {'input': dict, 'output': dict}
-        Dictionary mapping promoted names to list of all absolute names.
+        Dictionary mapping promoted names (continuous and discrete) to list of all absolute names.
         For outputs, the list will have length one since promoted output names are unique.
     _var_abs2prom : {'input': dict, 'output': dict}
-        Dictionary mapping absolute names to promoted names, on current proc.
+        Dictionary mapping absolute names to promoted names, on current proc. Contains continuous
+        and discrete variables.
     _var_allprocs_abs2prom : {'input': dict, 'output': dict}
-        Dictionary mapping absolute names to promoted names, on all procs.
+        Dictionary mapping absolute names to promoted names, on all procs.  Contains continuous
+        and discrete variables.
     _var_allprocs_abs2meta : dict
-        Dictionary mapping absolute names to metadata dictionaries for allprocs variables.
-        The keys are
-        ('units', 'shape', 'size') for inputs and
-        ('units', 'shape', 'size', 'ref', 'ref0', 'res_ref', 'distributed') for outputs.
+        Dictionary mapping absolute names to metadata dictionaries for allprocs continuous
+        variables.
     _var_abs2meta : dict
-        Dictionary mapping absolute names to metadata dictionaries for myproc variables.
+        Dictionary mapping absolute names to metadata dictionaries for myproc continuous variables.
     _var_discrete : dict
         Dictionary of discrete var metadata and values local to this process.
     _var_allprocs_discrete : dict
@@ -2257,16 +2257,9 @@ class System(object):
             subsys._scale_factors = self._scale_factors
             subsys._setup_vectors(root_vectors)
 
-    def _setup_transfers(self, desvars, responses):
+    def _setup_transfers(self):
         """
         Compute all transfers that are owned by this system.
-
-        Parameters
-        ----------
-        desvars : dict
-            Dictionary of all design variable metadata. Keyed by absolute source name or alias.
-        responses : dict
-            Dictionary of all response variable metadata. Keyed by absolute source name or alias.
         """
         pass
 
@@ -6167,7 +6160,7 @@ class System(object):
         abs_vnames : list of str
             List of absolute variable names.
         io : str
-            'input' or 'output'
+            'in' or 'out'
 
         Returns
         -------
