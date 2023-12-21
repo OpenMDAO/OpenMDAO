@@ -436,7 +436,7 @@ class TestProblem(unittest.TestCase):
 
         prob.setup(mode=mode)
         prob.run_model()
-
+        
         of = ['obj', 'con1']
         wrt = ['_auto_ivc.v1', '_auto_ivc.v0']
 

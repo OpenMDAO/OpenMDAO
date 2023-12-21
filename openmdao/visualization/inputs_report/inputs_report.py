@@ -13,8 +13,8 @@ except ImportError:
 
 from openmdao.core.problem import Problem
 from openmdao.utils.mpi import MPI
-from openmdao.utils.general_utils import printoptions, issue_warning
-from openmdao.utils.om_warnings import OMDeprecationWarning
+from openmdao.utils.general_utils import printoptions
+from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.reports_system import register_report
 from openmdao.visualization.tables.table_builder import generate_table
 

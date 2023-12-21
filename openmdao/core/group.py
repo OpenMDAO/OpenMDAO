@@ -6,7 +6,6 @@ from collections.abc import Iterable
 from itertools import product, chain, repeat
 from numbers import Number
 import inspect
-from fnmatch import fnmatchcase
 from difflib import get_close_matches
 
 import numpy as np
@@ -34,6 +33,7 @@ from openmdao.utils.graph_utils import get_sccs_topo, get_out_of_order_nodes
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
+from openmdao.utils.relevance import Relevance
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     PromotionWarning, MPIWarning, DerivativesWarning
 
@@ -830,7 +830,7 @@ class Group(System):
 
         graph = self.get_hybrid_graph()
         resps = set(meta2src_iter(responses.values()))
-        
+
         # figure out if we can remove any edges based on zero partials we find
         # in components.  By default all component connected outputs
         # are also connected to all connected inputs from the same component.
@@ -839,9 +839,11 @@ class Group(System):
         missing_responses = set()
         for pathname, missing in missing_partials.items():
             inputs = [n for n, _ in graph.in_edges(pathname)]
+            outputs = [n for _, n in graph.out_edges(pathname)]
+
             graph.remove_node(pathname)
 
-            for _, output in graph.out_edges(pathname):
+            for output in outputs:
                 found = False
                 for inp in inputs:
                     if (output, inp) not in missing:
@@ -1327,6 +1329,8 @@ class Group(System):
         self._fd_rev_xfer_correction_dist = {}
 
         self._problem_meta['relevant'] = self._init_relevance(mode)
+        if self._relevance_graph is not None:
+            self._problem_meta['relevant2'] = Relevance(self._relevance_graph)
 
         self._setup_vectors(self._get_root_vectors())
 
@@ -3821,23 +3825,21 @@ class Group(System):
         else:
             if mode == 'fwd':
                 self._transfer('linear', mode)
-                if rel_systems is not None and rel_systems is not _contains_all:
-                    for s in self._solver_subsystem_iter(local_only=True):
-                        if s.pathname not in rel_systems:
-                            # zero out dvecs of irrelevant subsystems
-                            s._dresiduals.set_val(0.0)
+                for s in self._relevant2.system_filter(self._solver_subsystem_iter(local_only=True),
+                                                       direction=mode, relevant=False):
+                    # zero out dvecs of irrelevant subsystems
+                    s._dresiduals.set_val(0.0)
 
-            for subsys in self._solver_subsystem_iter(local_only=True):
-                if rel_systems is None or subsys.pathname in rel_systems:
-                    subsys._apply_linear(jac, rel_systems, mode, scope_out, scope_in)
+            for s in self._relevant2.system_filter(self._solver_subsystem_iter(local_only=True),
+                                                   direction=mode, relevant=True):
+                s._apply_linear(jac, rel_systems, mode, scope_out, scope_in)
 
             if mode == 'rev':
                 self._transfer('linear', mode)
-                if rel_systems is not None and rel_systems is not _contains_all:
-                    for s in self._solver_subsystem_iter(local_only=True):
-                        if s.pathname not in rel_systems:
-                            # zero out dvecs of irrelevant subsystems
-                            s._doutputs.set_val(0.0)
+                for s in self._relevant2.system_filter(self._solver_subsystem_iter(local_only=True),
+                                                       direction=mode, relevant=False):
+                    # zero out dvecs of irrelevant subsystems
+                    s._doutputs.set_val(0.0)
 
     def _solve_linear(self, mode, rel_systems, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
@@ -3920,23 +3922,28 @@ class Group(System):
             if self._assembled_jac is not None:
                 jac = self._assembled_jac
 
+            mode = self._problem_meta['mode'] if self._mode == 'auto' else self._mode
+
+            relevant = self._relevant2
+
             # Only linearize subsystems if we aren't approximating the derivs at this level.
-            for subsys in self._solver_subsystem_iter(local_only=True):
-                if subsys.pathname in rel_systems:
-                    do_ln = sub_do_ln and (subsys._linear_solver is not None and
-                                           subsys._linear_solver._linearize_children())
-                    if len(subsys._subsystems_allprocs) > 0:
-                        subsys._linearize(jac, sub_do_ln=do_ln, rel_systems=rel_systems)
-                    else:
-                        subsys._linearize(jac, sub_do_ln=do_ln)
+            for subsys in relevant.system_filter(self._solver_subsystem_iter(local_only=True),
+                                                 direction=mode, relevant=True):
+                do_ln = sub_do_ln and (subsys._linear_solver is not None and
+                                       subsys._linear_solver._linearize_children())
+                if len(subsys._subsystems_allprocs) > 0:  # a Group
+                    subsys._linearize(jac, sub_do_ln=do_ln, rel_systems=rel_systems)
+                else:
+                    subsys._linearize(jac, sub_do_ln=do_ln)
 
             # Update jacobian
             if self._assembled_jac is not None:
                 self._assembled_jac._update(self)
 
             if sub_do_ln:
-                for subsys in self._solver_subsystem_iter(local_only=True):
-                    if subsys._linear_solver is not None and subsys.pathname in rel_systems:
+                for subsys in self._relevant2.system_filter(self._solver_subsystem_iter(local_only=True),
+                                                            direction=mode, relevant=True):
+                    if subsys._linear_solver is not None:
                         subsys._linear_solver._linearize()
 
     def _check_first_linearize(self):
@@ -4949,7 +4956,7 @@ class Group(System):
         else:
             yield from self._subsystems_allprocs
 
-    def _solver_subsystem_iter(self, local_only=False):
+    def _solver_subsystem_iter(self, local_only=False, relevant=None):
         """
         Iterate over subsystems that are being optimized.
 
@@ -4960,6 +4967,9 @@ class Group(System):
         ----------
         local_only : bool
             If True, only iterate over local subsystems.
+        relevant : bool or None
+            If True, only return relevant subsystems. If False, only return
+            irrelevant subsystems. If None, return all subsystems.
 
         Yields
         ------
@@ -4971,7 +4981,9 @@ class Group(System):
         if opt_status is None:
             # we're not under an optimizer loop, so return all subsystems
             if local_only:
-                yield from self._subsystems_myproc
+                if relevant is None:
+                    yield from self._subsystems_myproc
+
             else:
                 for s, _ in self._subsystems_allprocs.values():
                     yield s

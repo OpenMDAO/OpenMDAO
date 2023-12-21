@@ -17,6 +17,7 @@ from openmdao.utils.general_utils import _contains_all, _src_or_alias_dict, _src
 from openmdao.utils.mpi import MPI, check_mpi_env
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.relevance import Relevance
 
 
 use_mpi = check_mpi_env()
@@ -194,7 +195,7 @@ class _TotalJacInfo(object):
 
         # Convert 'wrt' names from promoted to absolute
         prom_wrt = wrt
-        wrt = []
+        wrt = []  # absolute source names
         self.ivc_print_names = {}
         for name in prom_wrt:
             if name in prom2abs_out:
@@ -210,7 +211,7 @@ class _TotalJacInfo(object):
         # Convert 'of' names from promoted to absolute (or alias)
         prom_of = of
         of = []
-        src_of = []
+        src_of = []  # contains only sources, no aliases
         for name in prom_of:  # these names could be aliases
             if name in prom2abs_out:
                 of_name = prom2abs_out[name][0]
@@ -235,6 +236,7 @@ class _TotalJacInfo(object):
 
         # raise an exception if we depend on any discrete outputs
         if model._var_allprocs_discrete['output']:
+            # discrete_outs at the model level are absolute names
             discrete_outs = set(model._var_allprocs_discrete['output'])
             inps = of if self.mode == 'rev' else wrt
 
@@ -253,6 +255,7 @@ class _TotalJacInfo(object):
 
         self.input_list = {'fwd': wrt, 'rev': of}
         self.output_tuple = {'fwd': tuple(of), 'rev': tuple(wrt)}
+        self.output_tuple_no_alias = {'fwd': tuple(src_of), 'rev': tuple(wrt)}
         self.input_meta = {'fwd': design_vars, 'rev': responses}
         self.output_meta = {'fwd': responses, 'rev': design_vars}
         self.input_vec = {'fwd': model._dresiduals, 'rev': model._doutputs}
@@ -285,10 +288,12 @@ class _TotalJacInfo(object):
             try:
                 self.relevance = model._init_relevance(problem._orig_mode,
                                                        abs_desvars, abs_responses)
+                self.relevance2 = Relevance(model._relevance_graph)
             finally:
                 model._relevance_graph = rel_save
         else:
             self.relevance = problem._metadata['relevant']
+            self.relevance2 = model._relevant2
 
         if approx:
             coloring_mod._initialize_model_approx(model, driver, self.of, self.wrt)
@@ -337,7 +342,8 @@ class _TotalJacInfo(object):
             self.nondist_loc_map = {}
             self.loc_jac_idxs = {}
             self.dist_idx_map = {m: None for m in modes}
-            self.modes = modes
+
+        self.modes = modes
 
         self.of_meta, self.of_size, _ = \
             self._get_tuple_map(of, responses, all_abs2meta_out)
@@ -811,21 +817,21 @@ class _TotalJacInfo(object):
                     imeta = defaultdict(bool)
                     imeta['par_deriv_color'] = parallel_deriv_color
                     imeta['idx_list'] = [(start, end)]
-                    imeta['seed_vars'] = {name}
+                    imeta['seed_vars'] = {path}
                     idx_iter_dict[parallel_deriv_color] = (imeta, it)
                 else:
                     imeta = idx_iter_dict[parallel_deriv_color][0]
                     imeta['idx_list'].append((start, end))
-                    imeta['seed_vars'].add(name)
+                    imeta['seed_vars'].add(path)
             elif self.directional:
                 imeta = defaultdict(bool)
                 imeta['idx_list'] = range(start, end)
-                imeta['seed_vars'] = {name}
+                imeta['seed_vars'] = {path}
                 idx_iter_dict[name] = (imeta, self.directional_iter)
             elif not simul_coloring:  # plain old single index iteration
                 imeta = defaultdict(bool)
                 imeta['idx_list'] = range(start, end)
-                imeta['seed_vars'] = {name}
+                imeta['seed_vars'] = {path}
                 idx_iter_dict[name] = (imeta, self.single_index_iter)
 
             if path in relevant and not non_rel_outs:
@@ -1551,6 +1557,11 @@ class _TotalJacInfo(object):
         model._tot_jac = self
 
         with self._relevance_context():
+            relevant2 = self.relevance2
+            for mode in self.modes:
+                relevant2.set_seeds(self.input_list[mode], mode)
+                relevant2.set_targets(self.output_tuple_no_alias[mode], mode)
+
             try:
                 ln_solver = model._linear_solver
                 with model._scaled_context_all():
@@ -1568,12 +1579,20 @@ class _TotalJacInfo(object):
 
             # Main loop over columns (fwd) or rows (rev) of the jacobian
             for mode in self.modes:
-                self.model._problem_meta['target_vois'] = self.output_tuple[mode]
+                old_rel_targets = \
+                    relevant2.set_targets(self.output_tuple_no_alias[mode], mode)
                 for key, idx_info in self.idx_iter_dict[mode].items():
                     imeta, idx_iter = idx_info
                     for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
-                        self.model._problem_meta['seed_vars'] = itermeta['seed_vars']
+                        model._problem_meta['seed_vars'] = itermeta['seed_vars']
+                        relevant2.set_seeds(itermeta['seed_vars'], mode)
                         rel_systems, _, cache_key = input_setter(inds, itermeta, mode)
+
+                        #for s in allsys:
+                            #if s not in rel_systems and relevant2.is_relevant_system(s, mode):
+                                #raise RuntimeError(f"'{s}' should not be relevant.")
+                            #elif s in rel_systems and not relevant2.is_relevant_system(s, mode):
+                                #raise RuntimeError(f"'{s}' should be relevant.")
 
                         if debug_print:
                             if par_print and key in par_print:
@@ -1615,7 +1634,7 @@ class _TotalJacInfo(object):
                         self.model._problem_meta['parallel_deriv_color'] = None
                         self.model._problem_meta['seed_vars'] = None
 
-            self.model._problem_meta['target_vois'] = None
+                relevant2.set_targets(old_rel_targets, mode)
 
             # Driver scaling.
             if self.has_scaling:
@@ -1667,6 +1686,10 @@ class _TotalJacInfo(object):
 
         with self._relevance_context():
             model._tot_jac = self
+            relevant2 = self.relevance2
+            for mode in self.modes:
+                relevant2.set_seeds(self.input_list[mode], mode)
+                relevant2.set_targets(self.output_tuple_no_alias[mode], mode)
             try:
                 if self.initialize:
                     self.initialize = False
@@ -2040,12 +2063,15 @@ class _TotalJacInfo(object):
         Context manager to set current relevance for the Problem.
         """
         old_relevance = self.model._problem_meta['relevant']
+        old_relevance2 = self.model._problem_meta['relevant2']
         self.model._problem_meta['relevant'] = self.relevance
+        self.model._problem_meta['relevant2'] = self.relevance2
 
         try:
             yield
         finally:
             self.model._problem_meta['relevant'] = old_relevance
+            self.model._problem_meta['relevant2'] = old_relevance2
 
 
 def _fix_pdc_lengths(idx_iter_dict):

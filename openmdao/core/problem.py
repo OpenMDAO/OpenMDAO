@@ -782,6 +782,9 @@ class Problem(object):
             lnames, rnames = wrt, of
             lkind, rkind = 'residual', 'output'
 
+        self.model._relevant2.set_seeds(lnames, mode)
+        self.model._relevant2.set_targets(rnames, mode)
+
         rvec = self.model._vectors[rkind]['linear']
         lvec = self.model._vectors[lkind]['linear']
 
@@ -1069,6 +1072,8 @@ class Problem(object):
             self._mode = mode
         else:
             mode = self._orig_mode
+
+        self._metadata['mode'] = mode
 
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             self.model._final_setup(self.comm, self._orig_mode)

@@ -120,6 +120,13 @@ class NewtonSolver(NonlinearSolver):
         if self.linesearch is not None:
             self.linesearch._set_solver_print(level=level, type_=type_)
 
+    def _solve(self):
+        """
+        Run the iterative solver.
+        """
+        with self._system()._relevant2.inactive_context():
+            super()._solve()
+
     def _run_apply(self):
         """
         Run the apply_nonlinear method on the system.
@@ -149,7 +156,8 @@ class NewtonSolver(NonlinearSolver):
         bool
             Flag for indicating child linerization
         """
-        return (self.options['solve_subsystems'] and not system.under_complex_step
+        raise RuntimeError("_linearize_children called on NewtonSolver.")
+        return (self.options['solve_subsystems'] and not self._system().under_complex_step
                 and self._iter_count <= self.options['max_sub_solves'])
 
     def _linearize(self):

@@ -15,7 +15,6 @@ from collections.abc import Iterable
 import numpy as np
 
 from openmdao.core.constants import INF_BOUND
-from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.array_utils import shape_to_len
 
 

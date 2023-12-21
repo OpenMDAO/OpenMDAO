@@ -2766,6 +2766,10 @@ class System(object):
         return self._problem_meta['relevant']
 
     @property
+    def _relevant2(self):
+        return self._problem_meta['relevant2']
+
+    @property
     def _static_mode(self):
         """
         Return True if we are outside of setup.
@@ -2903,7 +2907,7 @@ class System(object):
                 for sub in s.system_iter(recurse=True, typ=typ):
                     yield sub
 
-    def _solver_subsystem_iter(self, local_only=True):
+    def _solver_subsystem_iter(self, local_only=True, relevant=None):
         """
         Do nothing.
 
@@ -2911,6 +2915,9 @@ class System(object):
         ----------
         local_only : bool
             If True, only iterate over local subsystems.
+        relevant : bool or None
+            If True, only return relevant subsystems. If False, only return
+            irrelevant subsystems. If None, return all subsystems.
 
         Returns
         -------
@@ -4459,7 +4466,8 @@ class System(object):
             'fwd' or 'rev'.
         """
         with self._scaled_context_all():
-            self._solve_linear(mode, _contains_all)
+            with self._relevant2.inactive_context():
+                self._solve_linear(mode, _contains_all)
 
     def run_linearize(self, sub_do_ln=True):
         """

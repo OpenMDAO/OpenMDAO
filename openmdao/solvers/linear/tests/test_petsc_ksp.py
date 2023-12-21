@@ -471,7 +471,7 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         model.nonlinear_solver = om.NonlinearBlockGS()
 
         model.linear_solver = om.PETScKrylov()
-        model.linear_solver.options['maxiter'] = 3
+        model.linear_solver.options['maxiter'] = 6
 
         prob.setup()
 
