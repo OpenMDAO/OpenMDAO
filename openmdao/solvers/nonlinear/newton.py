@@ -124,7 +124,7 @@ class NewtonSolver(NonlinearSolver):
         """
         Run the iterative solver.
         """
-        with self._system()._relevant2.inactive_context():
+        with self._system()._relevant2.activity_context(False):
             super()._solve()
 
     def _run_apply(self):

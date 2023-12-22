@@ -890,6 +890,12 @@ class LinearSolver(Solver):
         """
         return False
 
+    def use_relevance(self):
+        """
+        Return True if relevance is should be active.
+        """
+        return True
+
     def _set_matvec_scope(self, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         pass
 

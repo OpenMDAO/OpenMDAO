@@ -225,6 +225,12 @@ class DirectSolver(LinearSolver):
             Flag for indicating child linearization.
         """
         return False
+    
+    def use_relevance(self):
+        """
+        Return True if relevance is should be active.
+        """
+        return False
 
     def _build_mtx(self):
         """
@@ -249,7 +255,7 @@ class DirectSolver(LinearSolver):
         scope_out, scope_in = system._get_matvec_scope()
 
         # temporarily disable relevance to avoid creating a singular matrix
-        with system._relevant2.inactive_context():
+        with system._relevant2.activity_context(False):
             # Assemble the Jacobian by running the identity matrix through apply_linear
             for i, seed in enumerate(identity_column_iter(seed)):
                 # set value of x vector to provided value

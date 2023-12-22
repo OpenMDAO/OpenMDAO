@@ -3926,25 +3926,26 @@ class Group(System):
 
             relevant = self._relevant2
 
-            # Only linearize subsystems if we aren't approximating the derivs at this level.
-            for subsys in relevant.system_filter(self._solver_subsystem_iter(local_only=True),
-                                                 direction=mode, relevant=True):
-                do_ln = sub_do_ln and (subsys._linear_solver is not None and
-                                       subsys._linear_solver._linearize_children())
-                if len(subsys._subsystems_allprocs) > 0:  # a Group
-                    subsys._linearize(jac, sub_do_ln=do_ln, rel_systems=rel_systems)
-                else:
-                    subsys._linearize(jac, sub_do_ln=do_ln)
+            with relevant.activity_context(self.linear_solver.use_relevance()):
+                # Only linearize subsystems if we aren't approximating the derivs at this level.
+                for subsys in relevant.system_filter(self._solver_subsystem_iter(local_only=True),
+                                                    direction=mode, relevant=True):
+                    do_ln = sub_do_ln and (subsys._linear_solver is not None and
+                                        subsys._linear_solver._linearize_children())
+                    if len(subsys._subsystems_allprocs) > 0:  # a Group
+                        subsys._linearize(jac, sub_do_ln=do_ln, rel_systems=rel_systems)
+                    else:
+                        subsys._linearize(jac, sub_do_ln=do_ln)
 
-            # Update jacobian
-            if self._assembled_jac is not None:
-                self._assembled_jac._update(self)
+                # Update jacobian
+                if self._assembled_jac is not None:
+                    self._assembled_jac._update(self)
 
-            if sub_do_ln:
-                for subsys in self._relevant2.system_filter(self._solver_subsystem_iter(local_only=True),
-                                                            direction=mode, relevant=True):
-                    if subsys._linear_solver is not None:
-                        subsys._linear_solver._linearize()
+                if sub_do_ln:
+                    for subsys in self._relevant2.system_filter(self._solver_subsystem_iter(local_only=True),
+                                                                direction=mode, relevant=True):
+                        if subsys._linear_solver is not None:
+                            subsys._linear_solver._linearize()
 
     def _check_first_linearize(self):
         if self._first_call_to_linearize:

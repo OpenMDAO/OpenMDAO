@@ -484,6 +484,7 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         of = ['obj']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
+        
         assert_near_equal(J['obj', 'z'][0][0], 4.93218027, .00001)
         assert_near_equal(J['obj', 'z'][0][1], 1.73406455, .00001)
 

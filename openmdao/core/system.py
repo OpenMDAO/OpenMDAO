@@ -4466,7 +4466,7 @@ class System(object):
             'fwd' or 'rev'.
         """
         with self._scaled_context_all():
-            with self._relevant2.inactive_context():
+            with self._relevant2.activity_context(False):
                 self._solve_linear(mode, _contains_all)
 
     def run_linearize(self, sub_do_ln=True):

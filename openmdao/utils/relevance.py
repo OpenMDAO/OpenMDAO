@@ -61,12 +61,12 @@ class Relevance(object):
         self._active = True
 
     @contextmanager
-    def inactive_context(self):
+    def activity_context(self, active):
         """
-        Context manager for deactivating relevance.
+        Context manager for activating/deactivating relevance.
         """
         save = self._active
-        self._active = False
+        self._active = active
         try:
             yield
         finally:
@@ -88,6 +88,9 @@ class Relevance(object):
         tuple
             Old tuple of target variables.
         """
+        if not self._active:
+            return self._target_vars[direction]
+        
         # print("Setting relevance targets to", target_vars)
         if isinstance(target_vars, str):
             target_vars = [target_vars]
@@ -119,6 +122,9 @@ class Relevance(object):
         tuple
             Old tuple of seed variables.
         """
+        if not self._active:
+            return self._seed_vars[direction]
+        
         # print(direction, id(self), "Setting relevance seeds to", seed_vars)
         if isinstance(seed_vars, str):
             seed_vars = [seed_vars]
