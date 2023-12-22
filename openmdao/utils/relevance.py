@@ -35,6 +35,9 @@ class InverseSetChecker(object):
         return name not in self._set
 
 
+_opposite = {'fwd': 'rev', 'rev': 'fwd'}
+
+
 class Relevance(object):
     """
     Relevance class.
@@ -52,59 +55,55 @@ class Relevance(object):
 
     def __init__(self, graph):
         self._graph = graph  # relevance graph
-        self._all_graph_nodes = None  # set of all nodes in the graph (or None if not initialized)
-        self._var_set_checkers = {}  # maps (varname, direction) to variable set checker
+        self._all_vars = None  # set of all nodes in the graph (or None if not initialized)
+        self._relevant_vars = {}  # maps (varname, direction) to variable set checker
         self._relevant_systems = {}  # maps (varname, direction) to relevant system sets
-        self._seed_vars = {'fwd': (), 'rev': ()}  # seed vars for the current derivative computation
-        self._target_vars = {'fwd': (), 'rev': ()}  # target vars for the current derivative
-                                                    # computation
-        self._active = True
+        self._seed_vars = {'fwd': (), 'rev': (), None: ()}  # seed var(s) for the current derivative
+                                                            # operation
+        self._all_seed_vars = {'fwd': (), 'rev': (), None: ()}  # all seed vars for the entire
+                                                                # derivative computation
+        self._active = None  # not initialized
 
     @contextmanager
     def activity_context(self, active):
         """
         Context manager for activating/deactivating relevance.
         """
-        save = self._active
-        self._active = active
-        try:
+        self._check_active()
+        if self._active is None:
             yield
-        finally:
-            self._active = save
+        else:
+            save = self._active
+            self._active = active
+            try:
+                yield
+            finally:
+                self._active = save
 
-    def set_targets(self, target_vars, direction):
+    def set_all_seeds(self, fwd_seeds, rev_seeds):
         """
-        Set the targets to be used to determine relevance for a given seed.
+        Set the full list of seeds to be used to determine relevance.
 
         Parameters
         ----------
-        target_vars : iter of str
-            Iterator over target variable names.
-        direction : str
-            Direction of the search for relevant variables.  'fwd' or 'rev'.
+        fwd_seeds : iter of str
+            Iterator over forward seed variable names.
+        rev_seeds : iter of str
+            Iterator over reverse seed variable names.
+       """
+        assert not isinstance(fwd_seeds, str), "fwd_seeds must be an iterator of strings"
+        assert not isinstance(rev_seeds, str), "rev_seeds must be an iterator of strings"
 
-        Returns
-        -------
-        tuple
-            Old tuple of target variables.
-        """
-        if not self._active:
-            return self._target_vars[direction]
-        
-        # print("Setting relevance targets to", target_vars)
-        if isinstance(target_vars, str):
-            target_vars = [target_vars]
+        self._all_seed_vars['fwd'] = self._seed_vars['fwd'] = tuple(sorted(fwd_seeds))
+        self._all_seed_vars['rev'] = self._seed_vars['rev'] = tuple(sorted(rev_seeds))
 
-        old_target_vars = self._target_vars[direction]
+        for s in fwd_seeds:
+            self._init_relevance_set(s, 'fwd')
+        for s in rev_seeds:
+            self._init_relevance_set(s, 'rev')
 
-        self._target_vars[direction] = tuple(sorted(target_vars))
-
-        opposite = 'rev' if direction == 'fwd' else 'rev'
-
-        for t in self._target_vars[opposite]:
-            self._get_relevance_set(t, opposite)
-
-        return old_target_vars
+        if self._active is None:
+            self._active = True
 
     def set_seeds(self, seed_vars, direction):
         """
@@ -122,10 +121,9 @@ class Relevance(object):
         tuple
             Old tuple of seed variables.
         """
-        if not self._active:
+        if self._active is False:
             return self._seed_vars[direction]
-        
-        # print(direction, id(self), "Setting relevance seeds to", seed_vars)
+
         if isinstance(seed_vars, str):
             seed_vars = [seed_vars]
 
@@ -134,42 +132,63 @@ class Relevance(object):
         self._seed_vars[direction] = tuple(sorted(seed_vars))
 
         for s in self._seed_vars[direction]:
-            self._get_relevance_set(s, direction)
+            self._init_relevance_set(s, direction)
 
         return old_seed_vars
+
+    def _check_active(self):
+        """
+        Activate if all_seed_vars and all_target_vars are set and active is None.
+        """
+        if self._active is None and self._all_seed_vars['fwd'] and self._all_seed_vars['rev']:
+            self._active = True
+            return
 
     def is_relevant(self, name, direction):
         if not self._active:
             return True
 
-        assert self._seed_vars[direction] and self._target_vars[direction], \
-            "must call set_seeds and set_targets first"
+        assert direction in ('fwd', 'rev')
+
+        assert self._seed_vars[direction] and self._target_vars[_opposite[direction]], \
+            "must call set_all_seeds and set_all_targets first"
+
         for seed in self._seed_vars[direction]:
-            if name in self._get_relevance_set(seed, direction):
-                for tgt in self._target_vars[direction]:
-                    if name in self._get_relevance_set(tgt, direction):
+            if name in self._relevant_vars[seed, direction]:
+                opp = _opposite[direction]
+                for tgt in self._seed_vars[opp]:
+                    if name in self._relevant_vars[tgt, opp]:
                         return True
         return False
 
     def is_relevant_system(self, name, direction):
-        if not self._active:
+        if not self._active:  # False or None
             return True
 
         assert direction in ('fwd', 'rev')
-        if len(self._seed_vars[direction]) == 0 and len(self._target_vars[direction]) == 0:
-            return True  # no relevance is set up, so assume everything is relevant
 
-        opposite = 'rev' if direction == 'fwd' else 'fwd'
-
-        # print(id(self), "is_relevant_system", name, direction)
         for seed in self._seed_vars[direction]:
             if name in self._relevant_systems[seed, direction]:
                 # resolve target dependencies in opposite direction
-                for tgt in self._target_vars[direction]:
-                    self._get_relevance_set(tgt, opposite)
-                    if name in self._relevant_systems[tgt, opposite]:
+                opp = _opposite[direction]
+                for tgt in self._seed_vars[opp]:
+                    if name in self._relevant_systems[tgt, opp]:
                         return True
         return False
+
+    def is_total_relevant_system(self, name):
+        if not self._active:  # False or None
+            return True
+
+        for direction, seeds in self._all_seed_vars.items():
+            for seed in seeds:
+                if name in self._relevant_systems[seed, direction]:
+                    # resolve target dependencies in opposite direction
+                    opp = _opposite[direction]
+                    for tgt in self._all_seed_vars[opp]:
+                        if name in self._relevant_systems[tgt, opp]:
+                            return True
+            return False
 
     def system_filter(self, systems, direction, relevant=True):
         """
@@ -196,11 +215,39 @@ class Relevance(object):
         elif relevant:
             yield from systems
 
-    def _get_relevance_set(self, varname, direction):
+    def total_system_filter(self, systems, relevant=True):
+        """
+        Filter the given iterator of systems to only include those that are relevant.
+
+        Parameters
+        ----------
+        systems : iter of Systems
+            Iterator over systems.
+        direction : str or None
+            Direction of the search for relevant variables.  'fwd' or 'rev'.  None means
+            search in both directions.
+        relevant : bool
+            If True, return only relevant systems.  If False, return only irrelevant systems.
+
+        Yields
+        ------
+        System
+            Relevant system.
+        """
+        if self._active:
+            for system in systems:
+                if relevant == self.is_total_relevant_system(system.pathname):
+                    yield system
+        elif relevant:
+            yield from systems
+
+    def _init_relevance_set(self, varname, direction):
         """
         Return a SetChecker for variables and components for the given variable.
 
-        The irrelevant set is determined lazily and cached for future use.
+        The SetChecker determines all relevant variables/systems found in the
+        relevance graph starting at the given variable and moving in the given
+        direction. It is determined lazily and cached for future use.
 
         Parameters
         ----------
@@ -209,51 +256,26 @@ class Relevance(object):
         direction : str
             Direction of the search for relevant variables.  'fwd' or 'rev'.
             'fwd' will find downstream nodes, 'rev' will find upstream nodes.
-
-        Returnss
-        -------
-        SetChecker, InverseSetChecker, or _contains_all
-            Set checker for testing if any variable is relevant to the given variable.
         """
-        try:
-            return self._var_set_checkers[varname, direction]
-        except KeyError:
+        key = (varname, direction)
+        if key not in self._relevant_vars:
             assert direction in ('fwd', 'rev'), "direction must be 'fwd' or 'rev'"
+
             # first time we've seen this varname/direction pair, so we need to
             # compute the set of relevant variables and the set of relevant systems
             # and store them for future use.
-            key = (varname, direction)
             depnodes = self._dependent_nodes(varname, direction)
 
-            if len(depnodes) < len(self._graph):
-                # only create the full node set if we need it
-                # this set contains all variables and some or all components
-                # in the graph.  Components are included if all of their outputs
-                # depend on all of their inputs.
-                if self._all_graph_nodes is None:
-                    self._all_graph_nodes = set(self._graph.nodes())
+            # this set contains all variables and some or all components
+            # in the graph.  Components are included if all of their outputs
+            # depend on all of their inputs.
+            if self._all_vars is None:
+                self._all_systems = _vars2systems(self._graph.nodes())
+                self._all_vars = set(self._graph.nodes()) - self._all_systems
 
-                rel_systems = set(all_ancestors(varname.rpartition('.')[0]))
-                rel_systems.add('')  # root group is always relevant
-                for name in depnodes:
-                    sysname = name.rpartition('.')[0]
-                    if sysname not in rel_systems:
-                        rel_systems.update(all_ancestors(sysname))
-                self._relevant_systems[key] = rel_systems
-
-                irrelevant = self._all_graph_nodes - depnodes
-                # store whichever type of checker will use the least memory
-                if len(irrelevant) < len(depnodes):
-                    self._var_set_checkers[key] = InverseSetChecker(irrelevant)
-                else:
-                    # remove systems from final var set
-                    self._var_set_checkers[key] = SetChecker(depnodes - rel_systems)
-
-            else:
-                self._var_set_checkers[key] = _contains_all
-                self._relevant_systems[key] = _contains_all
-
-            return self._var_set_checkers[key]
+            rel_systems = _vars2systems(depnodes)
+            self._relevant_systems[key] = _get_set_checker(rel_systems, self._all_systems)
+            self._relevant_vars[key] = _get_set_checker(depnodes, self._all_vars)
 
     def _dependent_nodes(self, start, direction):
         """
@@ -292,3 +314,55 @@ class Relevance(object):
             return visited
 
         return set()
+
+
+def _vars2systems(nameiter):
+    """
+    Return a set of all systems containing the given variables or components.
+
+    This includes all ancestors of each system.
+
+    Parameters
+    ----------
+    nameiter : iter of str
+        Iterator of variable or component pathnames.
+
+    Returns
+    -------
+    set
+        Set of system pathnames.
+    """
+    systems = {''}  # root group is always there
+    for name in nameiter:
+        sysname = name.rpartition('.')[0]
+        if sysname not in systems:
+            systems.update(all_ancestors(sysname))
+
+    return systems
+
+
+def _get_set_checker(relset, allset):
+    """
+    Return a SetChecker, InverseSetChecker, or _contains_all for the given sets.
+
+    Parameters
+    ----------
+    relset : set
+        Set of relevant items.
+    allset : set
+        Set of all items.
+
+    Returns
+    -------
+    SetChecker, InverseSetChecker, or _contiains_all
+        Set checker for the given sets.
+    """
+    if len(allset) == len(relset):
+        return _contains_all
+
+    inverse = allset - relset
+    # store whichever type of checker will use the least memory
+    if len(inverse) < len(relset):
+        return InverseSetChecker(inverse)
+    else:
+        return SetChecker(relset)

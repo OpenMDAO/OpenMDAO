@@ -120,13 +120,6 @@ class NewtonSolver(NonlinearSolver):
         if self.linesearch is not None:
             self.linesearch._set_solver_print(level=level, type_=type_)
 
-    def _solve(self):
-        """
-        Run the iterative solver.
-        """
-        with self._system()._relevant2.activity_context(False):
-            super()._solve()
-
     def _run_apply(self):
         """
         Run the apply_nonlinear method on the system.

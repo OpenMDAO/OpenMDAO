@@ -802,8 +802,6 @@ class Group(System):
                 abs_responses = self.get_responses(recurse=True, get_sizes=False,
                                                    use_prom_ivc=False)
 
-            # the responses passed into get_relevant vars have had any alias keys removed by
-            # check_aias_overlaps.
             return self.get_relevant_vars(abs_desvars,
                                           self._check_alias_overlaps(abs_responses), mode)
 
@@ -1329,8 +1327,7 @@ class Group(System):
         self._fd_rev_xfer_correction_dist = {}
 
         self._problem_meta['relevant'] = self._init_relevance(mode)
-        if self._relevance_graph is not None:
-            self._problem_meta['relevant2'] = Relevance(self._relevance_graph)
+        self._problem_meta['relevant2'] = Relevance(self._relevance_graph)
 
         self._setup_vectors(self._get_root_vectors())
 
@@ -3922,30 +3919,27 @@ class Group(System):
             if self._assembled_jac is not None:
                 jac = self._assembled_jac
 
-            mode = self._problem_meta['mode'] if self._mode == 'auto' else self._mode
-
             relevant = self._relevant2
 
-            with relevant.activity_context(self.linear_solver.use_relevance()):
-                # Only linearize subsystems if we aren't approximating the derivs at this level.
-                for subsys in relevant.system_filter(self._solver_subsystem_iter(local_only=True),
-                                                    direction=mode, relevant=True):
-                    do_ln = sub_do_ln and (subsys._linear_solver is not None and
-                                        subsys._linear_solver._linearize_children())
-                    if len(subsys._subsystems_allprocs) > 0:  # a Group
-                        subsys._linearize(jac, sub_do_ln=do_ln, rel_systems=rel_systems)
-                    else:
-                        subsys._linearize(jac, sub_do_ln=do_ln)
+            # Only linearize subsystems if we aren't approximating the derivs at this level.
+            for subsys in relevant.total_system_filter(self._solver_subsystem_iter(local_only=True),
+                                                        relevant=True):
+                do_ln = sub_do_ln and (subsys._linear_solver is not None and
+                                    subsys._linear_solver._linearize_children())
+                if len(subsys._subsystems_allprocs) > 0:  # a Group
+                    subsys._linearize(jac, sub_do_ln=do_ln, rel_systems=rel_systems)
+                else:
+                    subsys._linearize(jac, sub_do_ln=do_ln)
 
-                # Update jacobian
-                if self._assembled_jac is not None:
-                    self._assembled_jac._update(self)
+            # Update jacobian
+            if self._assembled_jac is not None:
+                self._assembled_jac._update(self)
 
-                if sub_do_ln:
-                    for subsys in self._relevant2.system_filter(self._solver_subsystem_iter(local_only=True),
-                                                                direction=mode, relevant=True):
-                        if subsys._linear_solver is not None:
-                            subsys._linear_solver._linearize()
+            if sub_do_ln:
+                for subsys in self._relevant2.total_system_filter(self._solver_subsystem_iter(local_only=True),
+                                                                  relevant=True):
+                    if subsys._linear_solver is not None:
+                        subsys._linear_solver._linearize()
 
     def _check_first_linearize(self):
         if self._first_call_to_linearize:
@@ -5299,6 +5293,7 @@ class Group(System):
                                       use_prom_ivc=use_prom_ivc)
         if recurse:
             abs2prom_in = self._var_allprocs_abs2prom['input']
+            abs2prom_out = self._var_allprocs_abs2prom['output']
             if (self.comm.size > 1 and self._mpi_proc_allocator.parallel):
 
                 # For parallel groups, we need to make sure that the design variable dictionary is
@@ -5343,10 +5338,14 @@ class Group(System):
                     if use_prom_ivc:
                         # have to promote subsystem prom name to this level
                         sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
+                        sub_pro2abs_out = subsys._var_allprocs_prom2abs_list['output']
                         for dv, meta in dvs.items():
                             if dv in sub_pro2abs_in:
                                 abs_dv = sub_pro2abs_in[dv][0]
                                 out[abs2prom_in[abs_dv]] = meta
+                            elif dv in sub_pro2abs_out:
+                                abs_dv = sub_pro2abs_out[dv][0]
+                                out[abs2prom_out[abs_dv]] = meta
                             else:
                                 out[dv] = meta
                     else:

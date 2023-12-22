@@ -429,6 +429,8 @@ class _TotalJacInfo(object):
                     self.rev_allreduce_mask = None
 
         if not approx:
+            self.relevance2.set_all_seeds(self.output_tuple_no_alias['rev'],
+                                          self.output_tuple_no_alias['fwd'])
             for mode in modes:
                 self._create_in_idx_map(mode)
 
@@ -1558,9 +1560,8 @@ class _TotalJacInfo(object):
 
         with self._relevance_context():
             relevant2 = self.relevance2
-            for mode in self.modes:
-                relevant2.set_seeds(self.input_list[mode], mode)
-                relevant2.set_targets(self.output_tuple_no_alias[mode], mode)
+            self.relevance2.set_all_seeds(self.output_tuple_no_alias['rev'],
+                                          self.output_tuple_no_alias['fwd'])
 
             try:
                 ln_solver = model._linear_solver
@@ -1579,20 +1580,12 @@ class _TotalJacInfo(object):
 
             # Main loop over columns (fwd) or rows (rev) of the jacobian
             for mode in self.modes:
-                old_rel_targets = \
-                    relevant2.set_targets(self.output_tuple_no_alias[mode], mode)
                 for key, idx_info in self.idx_iter_dict[mode].items():
                     imeta, idx_iter = idx_info
                     for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
                         model._problem_meta['seed_vars'] = itermeta['seed_vars']
                         relevant2.set_seeds(itermeta['seed_vars'], mode)
                         rel_systems, _, cache_key = input_setter(inds, itermeta, mode)
-
-                        #for s in allsys:
-                            #if s not in rel_systems and relevant2.is_relevant_system(s, mode):
-                                #raise RuntimeError(f"'{s}' should not be relevant.")
-                            #elif s in rel_systems and not relevant2.is_relevant_system(s, mode):
-                                #raise RuntimeError(f"'{s}' should be relevant.")
 
                         if debug_print:
                             if par_print and key in par_print:
@@ -1633,8 +1626,6 @@ class _TotalJacInfo(object):
                         # reset any Problem level data for the current iteration
                         self.model._problem_meta['parallel_deriv_color'] = None
                         self.model._problem_meta['seed_vars'] = None
-
-                relevant2.set_targets(old_rel_targets, mode)
 
             # Driver scaling.
             if self.has_scaling:
@@ -1686,10 +1677,8 @@ class _TotalJacInfo(object):
 
         with self._relevance_context():
             model._tot_jac = self
-            relevant2 = self.relevance2
-            for mode in self.modes:
-                relevant2.set_seeds(self.input_list[mode], mode)
-                relevant2.set_targets(self.output_tuple_no_alias[mode], mode)
+            self.relevance2.set_all_seeds(self.output_tuple_no_alias['rev'],
+                                          self.output_tuple_no_alias['fwd'])
             try:
                 if self.initialize:
                     self.initialize = False

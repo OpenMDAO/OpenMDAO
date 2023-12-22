@@ -471,7 +471,7 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         model.nonlinear_solver = om.NonlinearBlockGS()
 
         model.linear_solver = om.PETScKrylov()
-        model.linear_solver.options['maxiter'] = 6
+        model.linear_solver.options['maxiter'] = 3
 
         prob.setup()
 
@@ -484,7 +484,7 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         of = ['obj']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        
+
         assert_near_equal(J['obj', 'z'][0][0], 4.93218027, .00001)
         assert_near_equal(J['obj', 'z'][0][1], 1.73406455, .00001)
 

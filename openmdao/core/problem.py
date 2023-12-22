@@ -782,8 +782,7 @@ class Problem(object):
             lnames, rnames = wrt, of
             lkind, rkind = 'residual', 'output'
 
-        self.model._relevant2.set_seeds(lnames, mode)
-        self.model._relevant2.set_targets(rnames, mode)
+        self.model._relevant2.set_all_seeds(wrt, of)
 
         rvec = self.model._vectors[rkind]['linear']
         lvec = self.model._vectors[lkind]['linear']
@@ -814,7 +813,8 @@ class Problem(object):
         data = rvec.asarray()
         data *= -1.
 
-        self.model.run_solve_linear(mode)
+        with self.model._relevant2.activity_context(False):
+            self.model.run_solve_linear(mode)
 
         if mode == 'fwd':
             return {n: lvec[n].copy() for n in lnames}
@@ -2006,18 +2006,15 @@ class Problem(object):
         """
         if names:
             desvars = self.model.get_design_vars(recurse=True, get_sizes=True)
-            # abs2prom_out = self.model._var_allprocs_abs2prom['output']
-            # abs2prom_in = self.model._var_allprocs_abs2prom['input']
-            srcs = {n: m['source'] for n, m in desvars.items()}
             for name in names:
-                if name in srcs or name in desvars:
+                if name in desvars:
                     yield name, desvars[name]
                 else:
                     meta = {
                         'parallel_deriv_color': None,
-                        'indices': None
+                        'indices': None,
                     }
-                    self.model._update_dv_meta(name, meta, get_size=True)
+                    self.model._update_dv_meta(name, meta, get_size=True, use_prom_ivc=False)
                     yield name, meta
         else:  # use driver desvars
             yield from self.driver._designvars.items()
