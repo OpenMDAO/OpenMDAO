@@ -1,38 +1,109 @@
+"""
+Class definitions for Relevance and related classes.
+"""
 
+import sys
+from pprint import pprint
 from contextlib import contextmanager
-from openmdao.utils.general_utils import _contains_all, all_ancestors
+from openmdao.utils.general_utils import _contains_all, all_ancestors, dprint
 
 
 class SetChecker(object):
     """
     Class for checking if a given set of variables is in a relevant set of variables.
 
+    Parameters
+    ----------
+    the_set : set
+        Set of variables to check against.
+
     Attributes
     ----------
     _set : set
         Set of variables to check.
     """
-    def __init__(self, theset):
-        self._set = theset
+
+    def __init__(self, the_set):
+        """
+        Initialize all attributes.
+        """
+        self._set = the_set
 
     def __contains__(self, name):
+        """
+        Return True if the given name is in the set.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
+
+        Returns
+        -------
+        bool
+            True if the given name is in the set.
+        """
         return name in self._set
+
+    def __repr__(self):
+        """
+        Return a string representation of the SetChecker.
+
+        Returns
+        -------
+        str
+            String representation of the SetChecker.
+        """
+        return f"SetChecker({sorted(self._set)})"
 
 
 class InverseSetChecker(object):
     """
     Class for checking if a given set of variables is not in an irrelevant set of variables.
 
+    Parameters
+    ----------
+    the_set : set
+        Set of variables to check against.
+
     Attributes
     ----------
     _set : set
         Set of variables to check.
     """
-    def __init__(self, theset):
-        self._set = theset
+
+    def __init__(self, the_set):
+        """
+        Initialize all attributes.
+        """
+        self._set = the_set
 
     def __contains__(self, name):
+        """
+        Return True if the given name is not in the set.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
+
+        Returns
+        -------
+        bool
+            True if the given name is not in the set.
+        """
         return name not in self._set
+
+    def __repr__(self):
+        """
+        Return a string representation of the InverseSetChecker.
+
+        Returns
+        -------
+        str
+            String representation of the InverseSetChecker.
+        """
+        return f"InverseSetChecker({sorted(self._set)})"
 
 
 _opposite = {'fwd': 'rev', 'rev': 'fwd'}
@@ -42,32 +113,57 @@ class Relevance(object):
     """
     Relevance class.
 
-    Attributes
+    Parameters
     ----------
     graph : <nx.DirectedGraph>
         Dependency graph.  Hybrid graph containing both variables and systems.
-    irrelevant_sets : dict
-        Dictionary of irrelevant sets for each (varname, direction) pair.
-        Sets will only be stored for variables that are either design variables
-        in fwd mode, responses in rev mode, or variables passed directly to
-        compute_totals or check_totals.
+
+    Attributes
+    ----------
+    _graph : <nx.DirectedGraph>
+        Dependency graph.  Hybrid graph containing both variables and systems.
+    _all_vars : set or None
+        Set of all variables in the graph.  None if not initialized.
+    _relevant_vars : dict
+        Maps (varname, direction) to variable set checker.
+    _relevant_systems : dict
+        Maps (varname, direction) to relevant system sets.
+    _seed_vars : dict
+        Maps direction to currently active seed variable names.
+    _all_seed_vars : dict
+        Maps direction to all seed variable names.
+    _active : bool or None
+        If True, relevance is active.  If False, relevance is inactive.  If None, relevance is
+        uninitialized.
     """
 
     def __init__(self, graph):
+        """
+        Initialize all attributes.
+        """
         self._graph = graph  # relevance graph
         self._all_vars = None  # set of all nodes in the graph (or None if not initialized)
         self._relevant_vars = {}  # maps (varname, direction) to variable set checker
         self._relevant_systems = {}  # maps (varname, direction) to relevant system sets
-        self._seed_vars = {'fwd': (), 'rev': (), None: ()}  # seed var(s) for the current derivative
-                                                            # operation
-        self._all_seed_vars = {'fwd': (), 'rev': (), None: ()}  # all seed vars for the entire
-                                                                # derivative computation
+        # seed var(s) for the current derivative operation
+        self._seed_vars = {'fwd': (), 'rev': (), None: ()}
+        # all seed vars for the entire derivative computation
+        self._all_seed_vars = {'fwd': (), 'rev': (), None: ()}
         self._active = None  # not initialized
 
     @contextmanager
     def activity_context(self, active):
         """
         Context manager for activating/deactivating relevance.
+
+        Parameters
+        ----------
+        active : bool
+            If True, activate relevance.  If False, deactivate relevance.
+
+        Yields
+        ------
+        None
         """
         self._check_active()
         if self._active is None:
@@ -90,12 +186,15 @@ class Relevance(object):
             Iterator over forward seed variable names.
         rev_seeds : iter of str
             Iterator over reverse seed variable names.
-       """
+        """
         assert not isinstance(fwd_seeds, str), "fwd_seeds must be an iterator of strings"
         assert not isinstance(rev_seeds, str), "rev_seeds must be an iterator of strings"
 
         self._all_seed_vars['fwd'] = self._seed_vars['fwd'] = tuple(sorted(fwd_seeds))
         self._all_seed_vars['rev'] = self._seed_vars['rev'] = tuple(sorted(rev_seeds))
+
+        dprint("set all seeds to:", tuple(sorted(self._all_seed_vars['fwd'])), "for fwd")
+        dprint("set all seeds to:", tuple(sorted(self._all_seed_vars['rev'])), "for rev")
 
         for s in fwd_seeds:
             self._init_relevance_set(s, 'fwd')
@@ -104,6 +203,15 @@ class Relevance(object):
 
         if self._active is None:
             self._active = True
+
+    def reset_to_all_seeds(self):
+        """
+        Reset the seed vars to the full list of seeds.
+        """
+        dprint("reset all seeds to:", tuple(sorted(self._all_seed_vars['fwd'])), "for fwd")
+        dprint("reset all seeds to:", tuple(sorted(self._all_seed_vars['rev'])), "for rev")
+        self._seed_vars['fwd'] = self._all_seed_vars['fwd']
+        self._seed_vars['rev'] = self._all_seed_vars['rev']
 
     def set_seeds(self, seed_vars, direction):
         """
@@ -115,26 +223,18 @@ class Relevance(object):
             Iterator over seed variable names.
         direction : str
             Direction of the search for relevant variables.  'fwd' or 'rev'.
-
-        Returns
-        -------
-        tuple
-            Old tuple of seed variables.
         """
         if self._active is False:
-            return self._seed_vars[direction]
+            return
 
         if isinstance(seed_vars, str):
             seed_vars = [seed_vars]
 
-        old_seed_vars = self._seed_vars[direction]
-
+        dprint("set seeds to:", tuple(sorted(seed_vars)), "for", direction)
         self._seed_vars[direction] = tuple(sorted(seed_vars))
 
         for s in self._seed_vars[direction]:
             self._init_relevance_set(s, direction)
-
-        return old_seed_vars
 
     def _check_active(self):
         """
@@ -144,24 +244,55 @@ class Relevance(object):
             self._active = True
             return
 
-    def is_relevant(self, name, direction):
-        if not self._active:
-            return True
+    # def is_relevant(self, name, direction):
+    #     """
+    #     Return True if the given variable is relevant.
 
-        assert direction in ('fwd', 'rev')
+    #     Parameters
+    #     ----------
+    #     name : str
+    #         Name of the variable.
+    #     direction : str
+    #         Direction of the search for relevant variables.  'fwd' or 'rev'.
 
-        assert self._seed_vars[direction] and self._target_vars[_opposite[direction]], \
-            "must call set_all_seeds and set_all_targets first"
+    #     Returns
+    #     -------
+    #     bool
+    #         True if the given variable is relevant.
+    #     """
+    #     if not self._active:
+    #         return True
 
-        for seed in self._seed_vars[direction]:
-            if name in self._relevant_vars[seed, direction]:
-                opp = _opposite[direction]
-                for tgt in self._seed_vars[opp]:
-                    if name in self._relevant_vars[tgt, opp]:
-                        return True
-        return False
+    #     assert direction in ('fwd', 'rev')
+
+    #     assert self._seed_vars[direction] and self._seed_vars[_opposite[direction]], \
+    #         "must call set_all_seeds and set_all_targets first"
+
+    #     for seed in self._seed_vars[direction]:
+    #         if name in self._relevant_vars[seed, direction]:
+    #             opp = _opposite[direction]
+    #             for tgt in self._seed_vars[opp]:
+    #                 if name in self._relevant_vars[tgt, opp]:
+    #                     return True
+
+    #     return False
 
     def is_relevant_system(self, name, direction):
+        """
+        Return True if the given named system is relevant.
+
+        Parameters
+        ----------
+        name : str
+            Name of the System.
+        direction : str
+            Direction of the search for relevant systems.  'fwd' or 'rev'.
+
+        Returns
+        -------
+        bool
+            True if the given system is relevant.
+        """
         if not self._active:  # False or None
             return True
 
@@ -174,9 +305,25 @@ class Relevance(object):
                 for tgt in self._seed_vars[opp]:
                     if name in self._relevant_systems[tgt, opp]:
                         return True
+        return True
         return False
 
     def is_total_relevant_system(self, name):
+        """
+        Return True if the given named system is relevant.
+
+        Relevance in this case pertains to all seed/target combinations.
+
+        Parameters
+        ----------
+        name : str
+            Name of the System.
+
+        Returns
+        -------
+        bool
+            True if the given system is relevant.
+        """
         if not self._active:  # False or None
             return True
 
@@ -188,7 +335,8 @@ class Relevance(object):
                     for tgt in self._all_seed_vars[opp]:
                         if name in self._relevant_systems[tgt, opp]:
                             return True
-            return False
+        return True
+        return False
 
     def system_filter(self, systems, direction, relevant=True):
         """
@@ -209,9 +357,17 @@ class Relevance(object):
             Relevant system.
         """
         if self._active:
+            systems = list(systems)
+            allsys = [s.pathname for s in systems]
+            # dprint(direction, "all systems:", allsys)
+            # relsys =  [s for s in allsys if self.is_relevant_system(s, direction)]
+            # dprint(direction, "relevant systems:", relsys)
             for system in systems:
                 if relevant == self.is_relevant_system(system.pathname, direction):
                     yield system
+                else:
+                    if relevant:
+                        dprint(direction, "skipping", system.pathname)
         elif relevant:
             yield from systems
 
@@ -223,9 +379,6 @@ class Relevance(object):
         ----------
         systems : iter of Systems
             Iterator over systems.
-        direction : str or None
-            Direction of the search for relevant variables.  'fwd' or 'rev'.  None means
-            search in both directions.
         relevant : bool
             If True, return only relevant systems.  If False, return only irrelevant systems.
 
@@ -235,9 +388,16 @@ class Relevance(object):
             Relevant system.
         """
         if self._active:
+            systems = list(systems)
+            #dprint("total all systems:", [s.pathname for s in systems])
+            #relsys =  [s.pathname for s in systems if self.is_total_relevant_system(s.pathname)]
+            #dprint("total relevant systems:", relsys)
             for system in systems:
                 if relevant == self.is_total_relevant_system(system.pathname):
                     yield system
+                else:
+                    if relevant:
+                        dprint("(total)", relevant, "skipping", system.pathname)
         elif relevant:
             yield from systems
 
@@ -275,7 +435,8 @@ class Relevance(object):
 
             rel_systems = _vars2systems(depnodes)
             self._relevant_systems[key] = _get_set_checker(rel_systems, self._all_systems)
-            self._relevant_vars[key] = _get_set_checker(depnodes, self._all_vars)
+            self._relevant_vars[key] = _get_set_checker(depnodes - self._all_systems,
+                                                        self._all_vars)
 
     def _dependent_nodes(self, start, direction):
         """
@@ -314,6 +475,32 @@ class Relevance(object):
             return visited
 
         return set()
+
+    def dump(self, out_stream=sys.stdout):
+        """
+        Print out the current relevance information.
+
+        Parameters
+        ----------
+        out_stream : file-like or None
+            Where to send human readable output.  Defaults to sys.stdout.
+        """
+        print("Systems:", file=out_stream)
+        pprint(self._relevant_systems, stream=out_stream)
+        print("Variables:", file=out_stream)
+        pprint(self._relevant_vars, stream=out_stream)
+
+    def _dump_old(self, out_stream=sys.stdout):
+        import pprint
+        pprint.pprint(self.old, stream=out_stream)
+
+    def _show_old_relevant_sys(self, relev):
+        for dv, dct in relev.items():
+            for resp, tup in dct.items():
+                vdct = tup[0]
+                systems = tup[1]
+                print(f"({dv}, {resp}) systems: {sorted(systems)}")
+                print(f"({dv}, {resp}) vars: {sorted(vdct['input'].union(vdct['output']))}")
 
 
 def _vars2systems(nameiter):

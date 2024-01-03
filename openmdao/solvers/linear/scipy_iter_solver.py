@@ -123,6 +123,12 @@ class ScipyKrylov(LinearSolver):
         if self.precon is not None:
             self.precon._linearize()
 
+    def use_relevance(self):
+        """
+        Return True if relevance is should be active.
+        """
+        return False
+
     def _mat_vec(self, in_arr):
         """
         Compute matrix-vector product.

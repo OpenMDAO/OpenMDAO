@@ -225,7 +225,7 @@ class DirectSolver(LinearSolver):
             Flag for indicating child linearization.
         """
         return False
-    
+
     def use_relevance(self):
         """
         Return True if relevance is should be active.

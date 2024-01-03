@@ -104,8 +104,6 @@ class LinearBlockGS(BlockLinearSolver):
 
             for subsys in relevance2.system_filter(system._solver_subsystem_iter(local_only=False),
                                                    direction=mode):
-                # if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
-                #     continue
                 # must always do the transfer on all procs even if subsys not local
                 system._transfer('linear', mode, subsys.name)
 
@@ -136,15 +134,13 @@ class LinearBlockGS(BlockLinearSolver):
                 subsys._solve_linear(mode, self._rel_systems, scope_out, scope_in)
 
         else:  # rev
-            subsystems = list(relevance2.system_filter(system._solver_subsystem_iter(local_only=False),
-                                                       direction=mode))
+            subsystems = list(
+                relevance2.system_filter(system._solver_subsystem_iter(local_only=False),
+                                         direction=mode))
             subsystems.reverse()
             parent_offset = system._doutputs._root_offset
 
             for subsys in subsystems:
-                # if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
-                #     continue
-
                 if subsys._is_local:
                     b_vec = subsys._doutputs
                     b_vec.set_val(0.0)

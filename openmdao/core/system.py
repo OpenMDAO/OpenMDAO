@@ -4562,7 +4562,7 @@ class System(object):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        pass
+        raise NotImplementedError(self.msginfo + ": _linearize has not been overridden")
 
     def _list_states(self):
         """

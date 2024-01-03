@@ -8,6 +8,7 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE, _UNDEFINED
+from openmdao.utils.general_utils import dprint
 
 
 class ExplicitComponent(Component):
@@ -509,6 +510,7 @@ class ExplicitComponent(Component):
         if not (self._has_compute_partials or self._approx_schemes):
             return
 
+        dprint(f"{self.pathname}._linearize")
         self._check_first_linearize()
 
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):

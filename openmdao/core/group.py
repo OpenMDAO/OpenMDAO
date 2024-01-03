@@ -26,7 +26,7 @@ from openmdao.utils.array_utils import array_connection_compatible, _flatten_src
     shape_to_len
 from openmdao.utils.general_utils import common_subpath, all_ancestors, \
     convert_src_inds, _contains_all, shape2tuple, get_connection_owner, ensure_compatible, \
-    meta2src_iter, get_rev_conns
+    meta2src_iter, get_rev_conns, dprint
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
 from openmdao.utils.graph_utils import get_sccs_topo, get_out_of_order_nodes
@@ -1328,6 +1328,7 @@ class Group(System):
 
         self._problem_meta['relevant'] = self._init_relevance(mode)
         self._problem_meta['relevant2'] = Relevance(self._relevance_graph)
+        self._problem_meta['relevant2'].old = self._problem_meta['relevant']
 
         self._setup_vectors(self._get_root_vectors())
 
@@ -3896,6 +3897,7 @@ class Group(System):
             Set of relevant system pathnames passed in to the model during computation of total
             derivatives.
         """
+        dprint(f"{self.pathname}._linearize")
         if self._jacobian is None:
             self._jacobian = DictionaryJacobian(self)
 
@@ -3920,24 +3922,23 @@ class Group(System):
                 jac = self._assembled_jac
 
             relevant = self._relevant2
+            with relevant.activity_context(self.linear_solver.use_relevance()):
+                subs = list(
+                    relevant.total_system_filter(self._solver_subsystem_iter(local_only=True),
+                                                 relevant=True))
 
             # Only linearize subsystems if we aren't approximating the derivs at this level.
-            for subsys in relevant.total_system_filter(self._solver_subsystem_iter(local_only=True),
-                                                        relevant=True):
+            for subsys in subs:
                 do_ln = sub_do_ln and (subsys._linear_solver is not None and
-                                    subsys._linear_solver._linearize_children())
-                if len(subsys._subsystems_allprocs) > 0:  # a Group
-                    subsys._linearize(jac, sub_do_ln=do_ln, rel_systems=rel_systems)
-                else:
-                    subsys._linearize(jac, sub_do_ln=do_ln)
+                                       subsys._linear_solver._linearize_children())
+                subsys._linearize(jac, sub_do_ln=do_ln)
 
             # Update jacobian
             if self._assembled_jac is not None:
                 self._assembled_jac._update(self)
 
             if sub_do_ln:
-                for subsys in self._relevant2.total_system_filter(self._solver_subsystem_iter(local_only=True),
-                                                                  relevant=True):
+                for subsys in subs:
                     if subsys._linear_solver is not None:
                         subsys._linear_solver._linearize()
 

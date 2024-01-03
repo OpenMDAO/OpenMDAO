@@ -273,6 +273,8 @@ class _TotalJacInfo(object):
         else:
             has_lin_cons = False
 
+        has_lin_cons = has_lin_cons and driver.supports['linear_constraints']
+
         self.has_lin_cons = has_lin_cons
         self.dist_input_range_map = {}
 
@@ -280,17 +282,24 @@ class _TotalJacInfo(object):
         self.simul_coloring = None
 
         if has_custom_derivs:
-            # have to compute new relevance
-            abs_desvars = {n: m for n, m in problem._active_desvar_iter(prom_wrt)}
-            abs_responses = {n: m for n, m in problem._active_response_iter(prom_of)}
-            rel_save = model._relevance_graph
-            model._relevance_graph = None
-            try:
-                self.relevance = model._init_relevance(problem._orig_mode,
-                                                       abs_desvars, abs_responses)
-                self.relevance2 = Relevance(model._relevance_graph)
-            finally:
-                model._relevance_graph = rel_save
+            if has_lin_cons:
+                self.relevance = problem._metadata['relevant']
+                self.relevance2 = model._relevant2
+            else:
+                # have to compute new relevance
+                prom_desvars = {n: m for n, m in problem._active_desvar_iter(prom_wrt)}
+                prom_responses = {n: m for n, m in problem._active_response_iter(prom_of)}
+                desvar_srcs = {m['source']: m for m in prom_desvars.values()}
+                response_srcs = {m['source']: m for m in prom_responses.values()}
+                rel_save = model._relevance_graph
+                model._relevance_graph = None
+                try:
+                    self.relevance = model._init_relevance(problem._orig_mode,
+                                                           desvar_srcs, response_srcs)
+                    self.relevance2 = Relevance(model._relevance_graph)
+                    self.relevance2.old = self.relevance
+                finally:
+                    model._relevance_graph = rel_save
         else:
             self.relevance = problem._metadata['relevant']
             self.relevance2 = model._relevant2
@@ -1562,13 +1571,11 @@ class _TotalJacInfo(object):
             relevant2 = self.relevance2
             self.relevance2.set_all_seeds(self.output_tuple_no_alias['rev'],
                                           self.output_tuple_no_alias['fwd'])
-
             try:
                 ln_solver = model._linear_solver
                 with model._scaled_context_all():
                     model._linearize(model._assembled_jac,
-                                     sub_do_ln=ln_solver._linearize_children(),
-                                     rel_systems=self.total_relevant_systems)
+                                     sub_do_ln=ln_solver._linearize_children())
                 if ln_solver._assembled_jac is not None and \
                         ln_solver._assembled_jac._under_complex_step:
                     model.linear_solver._assembled_jac._update(model)
@@ -1586,6 +1593,7 @@ class _TotalJacInfo(object):
                         model._problem_meta['seed_vars'] = itermeta['seed_vars']
                         relevant2.set_seeds(itermeta['seed_vars'], mode)
                         rel_systems, _, cache_key = input_setter(inds, itermeta, mode)
+                        rel_systems = None
 
                         if debug_print:
                             if par_print and key in par_print:
@@ -1716,8 +1724,7 @@ class _TotalJacInfo(object):
 
                 # Linearize Model
                 model._linearize(model._assembled_jac,
-                                 sub_do_ln=model._linear_solver._linearize_children(),
-                                 rel_systems=self.total_relevant_systems)
+                                 sub_do_ln=model._linear_solver._linearize_children())
 
             finally:
                 model._tot_jac = None

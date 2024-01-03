@@ -325,6 +325,12 @@ class PETScKrylov(LinearSolver):
         if self.precon is not None:
             self.precon._linearize()
 
+    # def use_relevance(self):
+    #     """
+    #     Return True if relevance is should be active.
+    #     """
+    #     return False
+
     def solve(self, mode, rel_systems=None):
         """
         Solve the linear system for the problem in self._system().

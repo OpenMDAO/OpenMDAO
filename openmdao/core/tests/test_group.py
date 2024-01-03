@@ -1299,7 +1299,7 @@ class TestGroup(unittest.TestCase):
 
         p.model.connect('parameters.input_value', 'discipline.external_input')
 
-        p.setup(force_alloc_complex=True)
+        p.setup(mode='fwd', force_alloc_complex=True)
         p.run_model()
 
         self.assertEqual(p.model.nonlinear_solver._iter_count, 0)
