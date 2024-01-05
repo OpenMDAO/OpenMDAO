@@ -1008,7 +1008,7 @@ class TestInterpNDFixedPython(unittest.TestCase):
 
         # can use meshgrid to create a 3D array of test data
         P1, P2 = np.meshgrid(p1, p2, indexing='ij')
-        f_p = np.sqrt(P1) + (0.1 * P2) ** 2
+        f_p = np.cos(P1 * P2 / 360.0) + (0.01 * P1 * P2) ** 2
 
         x1 = np.linspace(-2, 101, 5)
         x2 = np.linspace(-10.5, 11, 5)
