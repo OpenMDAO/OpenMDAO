@@ -402,7 +402,7 @@ class Component(System):
         if self.matrix_free and not self._declared_partials_patterns:
             return
 
-        keyset = set(self._declared_partials_iter())
+        keyset = self._subjacs_info
         mset = set()
         for of in self._var_allprocs_abs2meta['output']:
             for wrt in self._var_allprocs_abs2meta['input']:

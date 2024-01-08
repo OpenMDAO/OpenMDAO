@@ -291,15 +291,11 @@ class _TotalJacInfo(object):
                 prom_responses = {n: m for n, m in problem._active_response_iter(prom_of)}
                 desvar_srcs = {m['source']: m for m in prom_desvars.values()}
                 response_srcs = {m['source']: m for m in prom_responses.values()}
-                rel_save = model._relevance_graph
-                model._relevance_graph = None
-                try:
-                    self.relevance = model._init_relevance(problem._orig_mode,
-                                                           desvar_srcs, response_srcs)
-                    self.relevance2 = Relevance(model._relevance_graph)
-                    self.relevance2.old = self.relevance
-                finally:
-                    model._relevance_graph = rel_save
+
+                self.relevance = model._init_relevance(problem._orig_mode,
+                                                       desvar_srcs, response_srcs)
+                self.relevance2 = Relevance(model._relevance_graph)
+                self.relevance2.old = self.relevance
         else:
             self.relevance = problem._metadata['relevant']
             self.relevance2 = model._relevant2
@@ -1568,9 +1564,9 @@ class _TotalJacInfo(object):
         model._tot_jac = self
 
         with self._relevance_context():
-            relevant2 = self.relevance2
-            self.relevance2.set_all_seeds(self.output_tuple_no_alias['rev'],
-                                          self.output_tuple_no_alias['fwd'])
+            relevant = self.relevance2
+            relevant.set_all_seeds(self.output_tuple_no_alias['rev'],
+                                   self.output_tuple_no_alias['fwd'])
             try:
                 ln_solver = model._linear_solver
                 with model._scaled_context_all():
@@ -1591,7 +1587,7 @@ class _TotalJacInfo(object):
                     imeta, idx_iter = idx_info
                     for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
                         model._problem_meta['seed_vars'] = itermeta['seed_vars']
-                        relevant2.set_seeds(itermeta['seed_vars'], mode)
+                        relevant.set_seeds(itermeta['seed_vars'], mode)
                         rel_systems, _, cache_key = input_setter(inds, itermeta, mode)
                         rel_systems = None
 

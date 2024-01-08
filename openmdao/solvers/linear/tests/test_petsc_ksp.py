@@ -472,6 +472,7 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
 
         model.linear_solver = om.PETScKrylov()
         model.linear_solver.options['maxiter'] = 3
+        model.linear_solver.options['err_on_non_converge'] = True
 
         prob.setup()
 
@@ -483,10 +484,11 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
+        with self.assertRaises(om.AnalysisError) as cm:
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
-        assert_near_equal(J['obj', 'z'][0][0], 4.93218027, .00001)
-        assert_near_equal(J['obj', 'z'][0][1], 1.73406455, .00001)
+        msg = "Solver 'LN: PETScKrylov' on system '' failed to converge in 4 iterations."
+        self.assertEqual(str(cm.exception), msg)
 
     def test_feature_atol(self):
 

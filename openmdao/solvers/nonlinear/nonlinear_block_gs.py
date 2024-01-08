@@ -235,11 +235,13 @@ class NonlinearBlockGS(NonlinearSolver):
                 outputs_n = outputs.asarray(copy=True)
 
             self._solver_info.append_subsolver()
-            for subsys in system._solver_subsystem_iter(local_only=False):
-                system._transfer('nonlinear', 'fwd', subsys.name)
-                if subsys._is_local:
-                    subsys._solve_nonlinear()
+            with system._relevant2.activity_context(system.under_approx):
+                for subsys in system._relevant2.system_filter(
+                        system._solver_subsystem_iter(local_only=False), direction='fwd'):
+                    system._transfer('nonlinear', 'fwd', subsys.name)
+                    if subsys._is_local:
+                        subsys._solve_nonlinear()
 
             self._solver_info.pop()
-            with system._unscaled_context(residuals=[residuals]):
+            with system._unscaled_context(residuals=[residuals], outputs=[outputs]):
                 residuals.set_val(outputs.asarray() - outputs_n)

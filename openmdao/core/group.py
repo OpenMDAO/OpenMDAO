@@ -811,6 +811,11 @@ class Group(System):
         """
         Return a graph of the relevance between desvars and responses.
 
+        This graph is the full hybrid graph after removal of components that don't have full
+        ('*', '*') partial derivatives declared.  When such a component is removed, its inputs and
+        outputs are connected to each other whenever there is a partial derivative declared between
+        them.
+
         Parameters
         ----------
         desvars : dict
@@ -827,6 +832,14 @@ class Group(System):
             return self._relevance_graph
 
         graph = self.get_hybrid_graph()
+
+        # if doing top level FD/CS, don't update relevance graph based
+        # on missing partials because FD/CS doesn't require that partials
+        # are declared to compute derivatives
+        if self._owns_approx_jac:
+            self._relevance_graph = graph
+            return graph
+
         resps = set(meta2src_iter(responses.values()))
 
         # figure out if we can remove any edges based on zero partials we find
@@ -3661,8 +3674,12 @@ class Group(System):
         """
         self._transfer('nonlinear', 'fwd')
         # Apply recursion
-        for subsys in self._solver_subsystem_iter(local_only=True):
-            subsys._apply_nonlinear()
+        with self._relevant2.activity_context(self.under_approx):
+            for subsys in self._relevant2.system_filter(
+                    self._solver_subsystem_iter(local_only=True), direction='fwd'):
+                subsys._apply_nonlinear()
+        # for subsys in self._solver_subsystem_iter(local_only=True):
+        #     subsys._apply_nonlinear()
 
         self.iter_count_apply += 1
 
@@ -3923,6 +3940,7 @@ class Group(System):
 
             relevant = self._relevant2
             with relevant.activity_context(self.linear_solver.use_relevance()):
+                # with relevant.total_relevance_context():
                 subs = list(
                     relevant.total_system_filter(self._solver_subsystem_iter(local_only=True),
                                                  relevant=True))
@@ -4952,7 +4970,7 @@ class Group(System):
         else:
             yield from self._subsystems_allprocs
 
-    def _solver_subsystem_iter(self, local_only=False, relevant=None):
+    def _solver_subsystem_iter(self, local_only=False):
         """
         Iterate over subsystems that are being optimized.
 
@@ -4963,9 +4981,6 @@ class Group(System):
         ----------
         local_only : bool
             If True, only iterate over local subsystems.
-        relevant : bool or None
-            If True, only return relevant subsystems. If False, only return
-            irrelevant subsystems. If None, return all subsystems.
 
         Yields
         ------
@@ -4977,9 +4992,7 @@ class Group(System):
         if opt_status is None:
             # we're not under an optimizer loop, so return all subsystems
             if local_only:
-                if relevant is None:
-                    yield from self._subsystems_myproc
-
+                yield from self._subsystems_myproc
             else:
                 for s, _ in self._subsystems_allprocs.values():
                     yield s

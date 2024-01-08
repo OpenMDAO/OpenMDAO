@@ -1,8 +1,6 @@
 """LinearSolver that uses PetSC KSP to solve for a system's derivatives."""
 
 import numpy as np
-import os
-import sys
 
 from openmdao.solvers.solver import LinearSolver
 from openmdao.utils.mpi import check_mpi_env
@@ -160,7 +158,7 @@ class Monitor(object):
             self._norm0 = norm
         self._norm = norm
 
-        self._solver._mpi_print(counter, norm, norm / self._norm0)
+        self._solver._print_resid_norms(counter, norm, norm / self._norm0)
         self._solver._iter_count += 1
 
 
@@ -325,12 +323,6 @@ class PETScKrylov(LinearSolver):
         if self.precon is not None:
             self.precon._linearize()
 
-    # def use_relevance(self):
-    #     """
-    #     Return True if relevance is should be active.
-    #     """
-    #     return False
-
     def solve(self, mode, rel_systems=None):
         """
         Solve the linear system for the problem in self._system().
@@ -382,6 +374,9 @@ class PETScKrylov(LinearSolver):
 
         # stuff the result into the x vector
         x_vec.set_val(sol_array)
+
+        if not self._ksp.converged:
+            self._convergence_failure()
 
         sol_petsc_vec = rhs_petsc_vec = None
 

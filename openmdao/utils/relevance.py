@@ -135,13 +135,16 @@ class Relevance(object):
     _active : bool or None
         If True, relevance is active.  If False, relevance is inactive.  If None, relevance is
         uninitialized.
+    _force_total : bool
+        If True, force use of total relevance (object is relevant if it is relevant for any
+        seed/target combination).
     """
 
     def __init__(self, graph):
         """
         Initialize all attributes.
         """
-        self._graph = graph  # relevance graph
+        self._graph = graph
         self._all_vars = None  # set of all nodes in the graph (or None if not initialized)
         self._relevant_vars = {}  # maps (varname, direction) to variable set checker
         self._relevant_systems = {}  # maps (varname, direction) to relevant system sets
@@ -150,6 +153,7 @@ class Relevance(object):
         # all seed vars for the entire derivative computation
         self._all_seed_vars = {'fwd': (), 'rev': (), None: ()}
         self._active = None  # not initialized
+        self._force_total = False
 
     @contextmanager
     def activity_context(self, active):
@@ -166,7 +170,7 @@ class Relevance(object):
         None
         """
         self._check_active()
-        if self._active is None:
+        if not self._active:  # if already inactive from higher level, don't change it
             yield
         else:
             save = self._active
@@ -175,6 +179,26 @@ class Relevance(object):
                 yield
             finally:
                 self._active = save
+
+    @contextmanager
+    def total_relevance_context(self):
+        """
+        Context manager for activating/deactivating forced total relevance.
+
+        Yields
+        ------
+        None
+        """
+        self._check_active()
+        if not self._active:  # if already inactive from higher level, don't change anything
+            yield
+        else:
+            save = self._force_total
+            self._force_total = True
+            try:
+                yield
+            finally:
+                self._force_total = save
 
     def set_all_seeds(self, fwd_seeds, rev_seeds):
         """
@@ -225,13 +249,14 @@ class Relevance(object):
             Direction of the search for relevant variables.  'fwd' or 'rev'.
         """
         if self._active is False:
-            return
+            return  # don't set seeds if we're inactive
 
         if isinstance(seed_vars, str):
             seed_vars = [seed_vars]
 
         dprint("set seeds to:", tuple(sorted(seed_vars)), "for", direction)
         self._seed_vars[direction] = tuple(sorted(seed_vars))
+        self._seed_vars[_opposite[direction]] = self._all_seed_vars[_opposite[direction]]
 
         for s in self._seed_vars[direction]:
             self._init_relevance_set(s, direction)
@@ -242,40 +267,39 @@ class Relevance(object):
         """
         if self._active is None and self._all_seed_vars['fwd'] and self._all_seed_vars['rev']:
             self._active = True
-            return
 
-    # def is_relevant(self, name, direction):
-    #     """
-    #     Return True if the given variable is relevant.
+    def is_relevant(self, name, direction):
+        """
+        Return True if the given variable is relevant.
 
-    #     Parameters
-    #     ----------
-    #     name : str
-    #         Name of the variable.
-    #     direction : str
-    #         Direction of the search for relevant variables.  'fwd' or 'rev'.
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
+        direction : str
+            Direction of the search for relevant variables.  'fwd' or 'rev'.
 
-    #     Returns
-    #     -------
-    #     bool
-    #         True if the given variable is relevant.
-    #     """
-    #     if not self._active:
-    #         return True
+        Returns
+        -------
+        bool
+            True if the given variable is relevant.
+        """
+        if not self._active:
+            return True
 
-    #     assert direction in ('fwd', 'rev')
+        assert direction in ('fwd', 'rev')
 
-    #     assert self._seed_vars[direction] and self._seed_vars[_opposite[direction]], \
-    #         "must call set_all_seeds and set_all_targets first"
+        assert self._seed_vars[direction] and self._seed_vars[_opposite[direction]], \
+            "must call set_all_seeds and set_all_targets first"
 
-    #     for seed in self._seed_vars[direction]:
-    #         if name in self._relevant_vars[seed, direction]:
-    #             opp = _opposite[direction]
-    #             for tgt in self._seed_vars[opp]:
-    #                 if name in self._relevant_vars[tgt, opp]:
-    #                     return True
+        for seed in self._seed_vars[direction]:
+            if name in self._relevant_vars[seed, direction]:
+                opp = _opposite[direction]
+                for tgt in self._seed_vars[opp]:
+                    if name in self._relevant_vars[tgt, opp]:
+                        return True
 
-    #     return False
+        return False
 
     def is_relevant_system(self, name, direction):
         """
@@ -293,7 +317,7 @@ class Relevance(object):
         bool
             True if the given system is relevant.
         """
-        if not self._active:  # False or None
+        if not self._active:
             return True
 
         assert direction in ('fwd', 'rev')
@@ -305,7 +329,6 @@ class Relevance(object):
                 for tgt in self._seed_vars[opp]:
                     if name in self._relevant_systems[tgt, opp]:
                         return True
-        return True
         return False
 
     def is_total_relevant_system(self, name):
@@ -324,7 +347,7 @@ class Relevance(object):
         bool
             True if the given system is relevant.
         """
-        if not self._active:  # False or None
+        if not self._active:
             return True
 
         for direction, seeds in self._all_seed_vars.items():
@@ -335,10 +358,9 @@ class Relevance(object):
                     for tgt in self._all_seed_vars[opp]:
                         if name in self._relevant_systems[tgt, opp]:
                             return True
-        return True
         return False
 
-    def system_filter(self, systems, direction, relevant=True):
+    def system_filter(self, systems, direction=None, relevant=True):
         """
         Filter the given iterator of systems to only include those that are relevant.
 
@@ -346,8 +368,10 @@ class Relevance(object):
         ----------
         systems : iter of Systems
             Iterator over systems.
-        direction : str
-            Direction of the search for relevant variables.  'fwd' or 'rev'.
+        direction : str or None
+            Direction of the search for relevant variables.  'fwd', 'rev', or None. None is
+            only valid if relevance is not active or if doing 'total' relevance, where
+            relevance is True if a system is relevant to any pair of of/wrt variables.
         relevant : bool
             If True, return only relevant systems.  If False, return only irrelevant systems.
 
@@ -357,17 +381,18 @@ class Relevance(object):
             Relevant system.
         """
         if self._active:
-            systems = list(systems)
-            allsys = [s.pathname for s in systems]
-            # dprint(direction, "all systems:", allsys)
-            # relsys =  [s for s in allsys if self.is_relevant_system(s, direction)]
-            # dprint(direction, "relevant systems:", relsys)
-            for system in systems:
-                if relevant == self.is_relevant_system(system.pathname, direction):
-                    yield system
-                else:
-                    if relevant:
-                        dprint(direction, "skipping", system.pathname)
+            if self._force_total:
+                relcheck = self.is_total_relevant_system
+                for system in systems:
+                    if relevant == relcheck(system.pathname):
+                        yield system
+            else:
+                if direction is None:
+                    raise RuntimeError("direction must be 'fwd' or 'rev' if relevance is active.")
+                relcheck = self.is_relevant_system
+                for system in systems:
+                    if relevant == relcheck(system.pathname, direction):
+                        yield system
         elif relevant:
             yield from systems
 
@@ -400,7 +425,6 @@ class Relevance(object):
                         dprint("(total)", relevant, "skipping", system.pathname)
         elif relevant:
             yield from systems
-
     def _init_relevance_set(self, varname, direction):
         """
         Return a SetChecker for variables and components for the given variable.

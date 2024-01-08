@@ -229,6 +229,11 @@ class DirectSolver(LinearSolver):
     def use_relevance(self):
         """
         Return True if relevance is should be active.
+
+        Returns
+        -------
+        bool
+            True if relevance is should be active.
         """
         return False
 

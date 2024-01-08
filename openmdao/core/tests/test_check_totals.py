@@ -814,7 +814,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         p.model.linear_solver = om.ScipyKrylov(assemble_jac=True)
 
         p.setup(mode='fwd')
-        p.set_solver_print(level=0)
+        p.set_solver_print(level=1)
         p.run_model()
 
         # Make sure we don't bomb out with an error.

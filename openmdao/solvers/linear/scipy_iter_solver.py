@@ -6,6 +6,7 @@ import scipy
 from scipy.sparse.linalg import LinearOperator, gmres
 
 from openmdao.solvers.solver import LinearSolver
+from openmdao.utils.general_utils import dprint
 
 _SOLVER_TYPES = {
     # 'bicg': bicg,
@@ -123,12 +124,6 @@ class ScipyKrylov(LinearSolver):
         if self.precon is not None:
             self.precon._linearize()
 
-    def use_relevance(self):
-        """
-        Return True if relevance is should be active.
-        """
-        return False
-
     def _mat_vec(self, in_arr):
         """
         Compute matrix-vector product.
@@ -179,7 +174,7 @@ class ScipyKrylov(LinearSolver):
             else:
                 self._norm0 = 1.0
 
-        self._mpi_print(self._iter_count, norm, norm / self._norm0)
+        self._print_resid_norms(self._iter_count, norm, norm / self._norm0)
         self._iter_count += 1
 
     def solve(self, mode, rel_systems=None):
@@ -203,8 +198,6 @@ class ScipyKrylov(LinearSolver):
 
         maxiter = self.options['maxiter']
         atol = self.options['atol']
-
-        fail = False
 
         if mode == 'fwd':
             x_vec = system._doutputs
@@ -238,8 +231,15 @@ class ScipyKrylov(LinearSolver):
                              x0=x_vec_combined, maxiter=maxiter, tol=atol, atol='legacy',
                              callback=self._monitor, callback_type='legacy')
 
-        fail |= (info != 0)
-        x_vec.set_val(x)
+        if info == 0:
+            x_vec.set_val(x)
+        elif info > 0:
+            self._convergence_failure()
+        else:
+            msg = (f"Solver '{self.SOLVER}' on system '{self._system().pathname}': "
+                   f"had an illegal input or breakdown (info={info}) after {self._iter_count} "
+                   "iterations.")
+            self.report_failure(msg)
 
     def _apply_precon(self, in_vec):
         """
