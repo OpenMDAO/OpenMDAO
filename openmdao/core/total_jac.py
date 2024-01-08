@@ -1587,7 +1587,9 @@ class _TotalJacInfo(object):
                     imeta, idx_iter = idx_info
                     for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
                         model._problem_meta['seed_vars'] = itermeta['seed_vars']
-                        relevant.set_seeds(itermeta['seed_vars'], mode)
+                        # setting this causes issues with DirectSolvers in some cases, so don't
+                        # do it until we can figure out exactly what's happening.
+                        # relevant.set_seeds(itermeta['seed_vars'], mode)
                         rel_systems, _, cache_key = input_setter(inds, itermeta, mode)
                         rel_systems = None
 
