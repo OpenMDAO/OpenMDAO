@@ -1360,27 +1360,15 @@ class TestProblem(unittest.TestCase):
         indep1_outs = {'C8.y', 'G1.C1.z', 'G2.C5.x', 'indep1.x'}
         indep1_sys = {'C8', 'G1.C1', 'G2.C5', 'indep1', 'G1', 'G2', ''}
 
-        dct, systems = relevant['C8.y']['indep1.x']
-        inputs = dct['input']
-        outputs = dct['output']
+        inputs, outputs, systems = relevant.all_relevant('indep1.x', 'C8.y')
 
         self.assertEqual(inputs, indep1_ins)
         self.assertEqual(outputs, indep1_outs)
         self.assertEqual(systems, indep1_sys)
 
-        dct, systems = relevant['C8.y']['indep1.x']
-        inputs = dct['input']
-        outputs = dct['output']
+        self.assertTrue('indep2.x' not in outputs)
 
-        self.assertEqual(inputs, indep1_ins)
-        self.assertEqual(outputs, indep1_outs)
-        self.assertEqual(systems, indep1_sys)
-
-        self.assertTrue('indep2.x' not in relevant['C8.y'])
-
-        dct, systems = relevant['C8.y']['@all']
-        inputs = dct['input']
-        outputs = dct['output']
+        inputs, outputs, systems = relevant.all_relevant(['indep1.x', 'indep2.x'], 'C8.y')
 
         self.assertEqual(inputs, indep1_ins)
         self.assertEqual(outputs, indep1_outs)

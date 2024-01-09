@@ -2765,9 +2765,9 @@ class System(object):
     def _relevant(self):
         return self._problem_meta['relevant']
 
-    @property
-    def _relevant2(self):
-        return self._problem_meta['relevant2']
+    # @property
+    # def _relevant2(self):
+    #     return self._problem_meta['relevant2']
 
     @property
     def _static_mode(self):

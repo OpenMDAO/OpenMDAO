@@ -782,7 +782,7 @@ class Problem(object):
             lnames, rnames = wrt, of
             lkind, rkind = 'residual', 'output'
 
-        self.model._relevant2.set_all_seeds(wrt, of)
+        self.model._relevant.set_all_seeds(wrt, of)
 
         rvec = self.model._vectors[rkind]['linear']
         lvec = self.model._vectors[lkind]['linear']
@@ -814,7 +814,7 @@ class Problem(object):
         data *= -1.
 
         # TODO: why turn off relevance here?
-        with self.model._relevant2.active(False):
+        with self.model._relevant.active(False):
             self.model.run_solve_linear(mode)
 
         if mode == 'fwd':

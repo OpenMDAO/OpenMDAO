@@ -438,8 +438,6 @@ class pyOptSparseDriver(Driver):
             opt_prob.addObj(model._get_prom_name(name))
             self._quantities.append(name)
 
-        cons_to_remove = set()
-
         # Calculate and save derivatives for any linear constraints.
         if linear_constraints:
             _lin_jacs = self._compute_totals(of=linear_constraints, wrt=indep_list,
@@ -466,26 +464,27 @@ class pyOptSparseDriver(Driver):
         # # compute dynamic simul deriv coloring
         problem.get_total_coloring(self._coloring_info, run_model=not model_ran)
 
+        bad_cons = self.get_constraints_without_dv()
+        if bad_cons:
+            issue_warning(f"Equality constraint(s) {sorted(bad_cons)} do not depend on any design "
+                          "variables and were not added to the optimization.")
+
+            for name in bad_cons:
+                del self._cons[name]
+                del self._responses[name]
+
+        # set equality constraints as reverse seeds to see what dvs are relevant
+        relevant.set_seeds([m['source'] for m in self._cons.values() if m['equals'] is None], 'rev')
+
         # Add all equality constraints
         for name, meta in self._cons.items():
             if meta['equals'] is None:
                 continue
             size = meta['global_size'] if meta['distributed'] else meta['size']
             lower = upper = meta['equals']
-            path = meta['source']
-            if fwd:
-                wrt = [v for v in indep_list if path in relevant[self._designvars[v]['source']]]
-            else:
-                rels = relevant[path]
-                wrt = [v for v in indep_list if self._designvars[v]['source'] in rels]
-
+            wrt = [v for v in indep_list if relevant.is_relevant(self._designvars[v]['source'],
+                                                                 'rev')]
             prom_name = model._get_prom_name(name)
-
-            if not wrt:
-                issue_warning(f"Equality constraint '{prom_name}' does not depend on any design "
-                              "variables and was not added to the optimization.")
-                cons_to_remove.add(name)
-                continue
 
             # convert wrt to use promoted names
             wrt_prom = model._prom_names_list(wrt)
@@ -510,6 +509,9 @@ class pyOptSparseDriver(Driver):
                                      wrt=wrt_prom, jac=jac_prom)
                 self._quantities.append(name)
 
+        # set inequality constraints as reverse seeds to see what dvs are relevant
+        relevant.set_seeds([m['source'] for m in self._cons.values() if m['equals']], 'rev')
+
         # Add all inequality constraints
         for name, meta in self._cons.items():
             if meta['equals'] is not None:
@@ -520,21 +522,9 @@ class pyOptSparseDriver(Driver):
             lower = meta['lower']
             upper = meta['upper']
 
-            path = meta['source']
-
-            if fwd:
-                wrt = [v for v in indep_list if path in relevant[self._designvars[v]['source']]]
-            else:
-                rels = relevant[path]
-                wrt = [v for v in indep_list if self._designvars[v]['source'] in rels]
-
+            wrt = [v for v in indep_list if relevant.is_relevant(self._designvars[v]['source'],
+                                                                 'rev')]
             prom_name = model._get_prom_name(name)
-
-            if not wrt:
-                issue_warning(f"Inequality constraint '{prom_name}' does not depend on any design "
-                              "variables and was not added to the optimization.")
-                cons_to_remove.add(name)
-                continue
 
             # convert wrt to use promoted names
             wrt_prom = model._prom_names_list(wrt)
@@ -557,10 +547,6 @@ class pyOptSparseDriver(Driver):
                 opt_prob.addConGroup(prom_name, size, upper=upper, lower=lower,
                                      wrt=wrt_prom, jac=jac_prom)
                 self._quantities.append(name)
-
-        for name in cons_to_remove:
-            del self._cons[name]
-            del self._responses[name]
 
         # Instantiate the requested optimizer
         try:

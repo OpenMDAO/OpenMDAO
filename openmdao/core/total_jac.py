@@ -93,8 +93,6 @@ class _TotalJacInfo(object):
     in_idx_map : dict
         Mapping of jacobian row/col index to a tuple of the form
         (relevant_systems, cache_linear_solutions_flag, voi name)
-    total_relevant_systems : set
-        The set of names of all systems relevant to the computation of the total derivatives.
     directional : bool
         If True, perform a single directional derivative.
     relevance : dict
@@ -278,13 +276,13 @@ class _TotalJacInfo(object):
         self.has_lin_cons = has_lin_cons
         self.dist_input_range_map = {}
 
-        self.total_relevant_systems = set()
+        # self.total_relevant_systems = set()
         self.simul_coloring = None
 
         if has_custom_derivs:
             if has_lin_cons:
                 self.relevance = problem._metadata['relevant']
-                self.relevance2 = model._relevant2
+                # self.relevance2 = model._relevant2
             else:
                 # have to compute new relevance
                 prom_desvars = {n: m for n, m in problem._active_desvar_iter(prom_wrt)}
@@ -294,11 +292,10 @@ class _TotalJacInfo(object):
 
                 self.relevance = model._init_relevance(problem._orig_mode,
                                                        desvar_srcs, response_srcs)
-                self.relevance2 = Relevance(model._relevance_graph)
-                self.relevance2.old = self.relevance
+                # self.relevance = Relevance(model._relevance_graph)
         else:
             self.relevance = problem._metadata['relevant']
-            self.relevance2 = model._relevant2
+            # self.relevance2 = model._relevant2
 
         if approx:
             coloring_mod._initialize_model_approx(model, driver, self.of, self.wrt)
@@ -434,8 +431,8 @@ class _TotalJacInfo(object):
                     self.rev_allreduce_mask = None
 
         if not approx:
-            self.relevance2.set_all_seeds(self.output_tuple_no_alias['rev'],
-                                          self.output_tuple_no_alias['fwd'])
+            self.relevance.set_all_seeds(self.output_tuple_no_alias['rev'],
+                                         self.output_tuple_no_alias['fwd'])
             for mode in modes:
                 self._create_in_idx_map(mode)
 
@@ -841,14 +838,14 @@ class _TotalJacInfo(object):
                 imeta['seed_vars'] = {path}
                 idx_iter_dict[name] = (imeta, self.single_index_iter)
 
-            if path in relevant and not non_rel_outs:
-                relsystems = relevant[path]['@all'][1]
-                if self.total_relevant_systems is not _contains_all:
-                    self.total_relevant_systems.update(relsystems)
-                tup = (relsystems, cache_lin_sol, name)
-            else:
-                self.total_relevant_systems = _contains_all
-                tup = (_contains_all, cache_lin_sol, name)
+            # if path in relevant and not non_rel_outs:
+                # relsystems = relevant[path]['@all'][1]
+                # if self.total_relevant_systems is not _contains_all:
+                #     self.total_relevant_systems.update(relsystems)
+                # tup = (relsystems, cache_lin_sol, name)
+            # else:
+                # self.total_relevant_systems = _contains_all
+            tup = (None, cache_lin_sol, name)
 
             idx_map.extend([tup] * (end - start))
             start = end
@@ -1564,7 +1561,7 @@ class _TotalJacInfo(object):
         model._tot_jac = self
 
         with self._relevance_context():
-            relevant = self.relevance2
+            relevant = self.relevance
             relevant.set_all_seeds(self.output_tuple_no_alias['rev'],
                                    self.output_tuple_no_alias['fwd'])
             try:
@@ -1683,8 +1680,8 @@ class _TotalJacInfo(object):
 
         with self._relevance_context():
             model._tot_jac = self
-            self.relevance2.set_all_seeds(self.output_tuple_no_alias['rev'],
-                                          self.output_tuple_no_alias['fwd'])
+            self.relevance.set_all_seeds(self.output_tuple_no_alias['rev'],
+                                         self.output_tuple_no_alias['fwd'])
             try:
                 if self.initialize:
                     self.initialize = False
@@ -2057,15 +2054,15 @@ class _TotalJacInfo(object):
         Context manager to set current relevance for the Problem.
         """
         old_relevance = self.model._problem_meta['relevant']
-        old_relevance2 = self.model._problem_meta['relevant2']
+        # old_relevance2 = self.model._problem_meta['relevant2']
         self.model._problem_meta['relevant'] = self.relevance
-        self.model._problem_meta['relevant2'] = self.relevance2
+        # self.model._problem_meta['relevant2'] = self.relevance2
 
         try:
             yield
         finally:
             self.model._problem_meta['relevant'] = old_relevance
-            self.model._problem_meta['relevant2'] = old_relevance2
+            # self.model._problem_meta['relevant2'] = old_relevance2
 
 
 def _fix_pdc_lengths(idx_iter_dict):

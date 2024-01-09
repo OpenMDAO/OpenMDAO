@@ -56,8 +56,24 @@ class SetChecker(object):
         """
         return f"SetChecker({sorted(self._set)})"
 
+    def intersection(self, other_set):
+        """
+        Return a new set with elements common to the set and all others.
 
-class InverseSetChecker(object):
+        Parameters
+        ----------
+        other_set : set
+            Other set to check against.
+
+        Returns
+        -------
+        set
+            Set of common elements.
+        """
+        return self._set.intersection(other_set)
+
+
+class ComplementSetChecker(object):
     """
     Class for checking if a given set of variables is not in an irrelevant set of variables.
 
@@ -96,14 +112,30 @@ class InverseSetChecker(object):
 
     def __repr__(self):
         """
-        Return a string representation of the InverseSetChecker.
+        Return a string representation of the ComplementSetChecker.
 
         Returns
         -------
         str
-            String representation of the InverseSetChecker.
+            String representation of the ComplementSetChecker.
         """
-        return f"InverseSetChecker({sorted(self._set)})"
+        return f"ComplementSetChecker({sorted(self._set)})"
+
+    def intersection(self, other_set):
+        """
+        Return a new set with elements common to the set and all others.
+
+        Parameters
+        ----------
+        other_set : set
+            Other set to check against.
+
+        Returns
+        -------
+        set
+            Set of common elements.
+        """
+        return other_set.difference(self._set)
 
 
 _opposite = {'fwd': 'rev', 'rev': 'fwd'}
@@ -417,9 +449,6 @@ class Relevance(object):
             for system in systems:
                 if relevant == self.is_total_relevant_system(system.pathname):
                     yield system
-                else:
-                    if relevant:
-                        dprint("(total)", relevant, "skipping", system.pathname)
         elif relevant:
             yield from systems
 
@@ -459,6 +488,40 @@ class Relevance(object):
             self._relevant_systems[key] = _get_set_checker(rel_systems, self._all_systems)
             self._relevant_vars[key] = _get_set_checker(depnodes - self._all_systems,
                                                         self._all_vars)
+
+    def all_relevant(self, fwd_seeds, rev_seeds):
+        """
+        """
+        if isinstance(fwd_seeds, str):
+            fwd_seeds = [fwd_seeds]
+        if isinstance(rev_seeds, str):
+            rev_seeds = [rev_seeds]
+
+        for seed in fwd_seeds:
+            self._init_relevance_set(seed, 'fwd')
+        for seed in rev_seeds:
+            self._init_relevance_set(seed, 'rev')
+
+        relevant_vars = set()
+        for seed in fwd_seeds:
+            allfwdvars = self._relevant_vars[seed, 'fwd'].intersection(self._all_vars)
+            for rseed in rev_seeds:
+                revchecker = self._relevant_vars[rseed, 'rev']
+                relevant_vars.update(revchecker.intersection(allfwdvars))
+
+        inputs = set()
+        outputs = set()
+        for var in relevant_vars:
+            if var in self._graph:
+                varmeta = self._graph.nodes[var]
+                if varmeta['type_'] == 'input':
+                    inputs.add(var)
+                elif varmeta['type_'] == 'output':
+                    outputs.add(var)
+
+        systems = _vars2systems(relevant_vars)
+
+        return inputs, outputs, systems
 
     def _dependent_nodes(self, start, direction):
         """
@@ -512,18 +575,6 @@ class Relevance(object):
         print("Variables:", file=out_stream)
         pprint(self._relevant_vars, stream=out_stream)
 
-    def _dump_old(self, out_stream=sys.stdout):
-        import pprint
-        pprint.pprint(self.old, stream=out_stream)
-
-    def _show_old_relevant_sys(self, relev):
-        for dv, dct in relev.items():
-            for resp, tup in dct.items():
-                vdct = tup[0]
-                systems = tup[1]
-                print(f"({dv}, {resp}) systems: {sorted(systems)}")
-                print(f"({dv}, {resp}) vars: {sorted(vdct['input'].union(vdct['output']))}")
-
 
 def _vars2systems(nameiter):
     """
@@ -552,7 +603,7 @@ def _vars2systems(nameiter):
 
 def _get_set_checker(relset, allset):
     """
-    Return a SetChecker, InverseSetChecker, or _contains_all for the given sets.
+    Return a SetChecker, ComplementSetChecker, or _contains_all for the given sets.
 
     Parameters
     ----------
@@ -563,7 +614,7 @@ def _get_set_checker(relset, allset):
 
     Returns
     -------
-    SetChecker, InverseSetChecker, or _contiains_all
+    SetChecker, ComplementSetChecker, or _contiains_all
         Set checker for the given sets.
     """
     if len(allset) == len(relset):
@@ -572,6 +623,6 @@ def _get_set_checker(relset, allset):
     inverse = allset - relset
     # store whichever type of checker will use the least memory
     if len(inverse) < len(relset):
-        return InverseSetChecker(inverse)
+        return ComplementSetChecker(inverse)
     else:
         return SetChecker(relset)

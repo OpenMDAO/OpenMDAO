@@ -22,7 +22,7 @@ class LinearBlockJac(BlockLinearSolver):
         mode = self._mode
 
         subs = [s for s in
-                system._relevant2.system_filter(system._solver_subsystem_iter(local_only=True),
+                system._relevant.system_filter(system._solver_subsystem_iter(local_only=True),
                                                 direction=mode)]
         scopelist = [None] * len(subs)
 

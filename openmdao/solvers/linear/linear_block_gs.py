@@ -97,12 +97,12 @@ class LinearBlockGS(BlockLinearSolver):
             d_n = d_out_vec.asarray(copy=True)
             delta_d_n = d_out_vec.asarray(copy=True)
 
-        relevance2 = system._relevant2
+        relevance = system._relevant
 
         if mode == 'fwd':
             parent_offset = system._dresiduals._root_offset
 
-            for subsys in relevance2.system_filter(system._solver_subsystem_iter(local_only=False),
+            for subsys in relevance.system_filter(system._solver_subsystem_iter(local_only=False),
                                                    direction=mode):
                 # must always do the transfer on all procs even if subsys not local
                 system._transfer('linear', mode, subsys.name)
@@ -135,7 +135,7 @@ class LinearBlockGS(BlockLinearSolver):
 
         else:  # rev
             subsystems = list(
-                relevance2.system_filter(system._solver_subsystem_iter(local_only=False),
+                relevance.system_filter(system._solver_subsystem_iter(local_only=False),
                                          direction=mode))
             subsystems.reverse()
             parent_offset = system._doutputs._root_offset

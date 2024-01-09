@@ -225,7 +225,7 @@ class NewtonSolver(NonlinearSolver):
             system._dresiduals *= -1.0
             my_asm_jac = self.linear_solver._assembled_jac
 
-            with system._relevant2.active(False):
+            with system._relevant.active(False):
                 system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
                 if (my_asm_jac is not None and
                         system.linear_solver._assembled_jac is not my_asm_jac):

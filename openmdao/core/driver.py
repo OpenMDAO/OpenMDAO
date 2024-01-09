@@ -942,6 +942,15 @@ class Driver(object):
         """
         return 'FAIL' if self.fail else 'SUCCESS'
 
+    def get_constraints_without_dv(self):
+        """
+        Return a list of constraint names that don't depend on any design variables.
+        """
+        relevant = self._problem().model._relevant
+        relevant.set_seeds([m['source'] for m in self._designvars.values()], 'fwd')
+        return [name for name, meta in self._cons.items()
+                if not relevant.is_relevant(meta['source'], 'fwd')]
+
     def check_relevance(self):
         """
         Check if there are constraints that don't depend on any design vars.
@@ -952,31 +961,13 @@ class Driver(object):
         if not self.supports['gradients']:
             return
 
-        problem = self._problem()
-        relevant = problem.model._relevant
-        fwd = problem._mode == 'fwd'
-
-        des_vars = self._designvars
-        constraints = self._cons
-
-        indep_list = list(des_vars)
-
-        for name, meta in constraints.items():
-
-            path = meta['source']
-
-            if fwd:
-                wrt = [v for v in indep_list if path in relevant[des_vars[v]['source']]]
-            else:
-                rels = relevant[path]
-                wrt = [v for v in indep_list if des_vars[v]['source'] in rels]
-
+        bad_cons = [n for n in self.get_constraints_without_dv() if n not in self._designvars]
+        if bad_cons:
             # Note: There is a hack in ScipyOptimizeDriver for older versions of COBYLA that
             #       implements bounds on design variables by adding them as constraints.
             #       These design variables as constraints will not appear in the wrt list.
-            if not wrt and name not in indep_list:
-                raise RuntimeError(f"{self.msginfo}: Constraint '{name}' does not depend on any "
-                                   "design variables. Please check your problem formulation.")
+            raise RuntimeError(f"{self.msginfo}: Constraint(s) '{bad_cons}' do not depend on any "
+                               "design variables. Please check your problem formulation.")
 
     def run(self):
         """
