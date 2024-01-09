@@ -603,7 +603,7 @@ class Interp2DSlinear(InterpAlgorithmFixed):
 
         a[2] = (c01 - c00) * x1 + (c10 - c11) * x0
 
-        a[3] = c01 + c10 - c11 - c00
+        a[3] = c00 + c11 - c01 - c10
 
         rec_vol = 1.0 / ((x0 - x1) * (y0 - y1))
         return a * rec_vol
@@ -715,7 +715,7 @@ class Interp2DSlinear(InterpAlgorithmFixed):
 
         a[:, 2] = (c01 - c00) * x1 + (c10 - c11) * x0
 
-        a[:, 3] = c01 + c10 - c11 - c00
+        a[:, 3] = c00 + c11 - c01 - c10
 
         rec_vol = 1.0 / ((x0 - x1) * (y0 - y1))
         return np.einsum('i,ij->ij', rec_vol, a)
