@@ -439,9 +439,6 @@ def trace_dump(fname='trace_dump', skip=(), flush=True):
     flush : bool
         If True, flush print buffer after every print call.
     """
-    # if MPI is None:
-    #     issue_warning("MPI is not active.  Trace aborted.", category=MPIWarning)
-    #     return
     if sys.getprofile() is not None:
         raise RuntimeError("another profile function is already active.")
 

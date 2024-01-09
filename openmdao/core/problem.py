@@ -814,7 +814,7 @@ class Problem(object):
         data *= -1.
 
         # TODO: why turn off relevance here?
-        with self.model._relevant2.activity_context(False):
+        with self.model._relevant2.active(False):
             self.model.run_solve_linear(mode)
 
         if mode == 'fwd':

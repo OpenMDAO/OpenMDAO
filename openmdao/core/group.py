@@ -3674,7 +3674,7 @@ class Group(System):
         """
         self._transfer('nonlinear', 'fwd')
         # Apply recursion
-        with self._relevant2.activity_context(self.under_approx):
+        with self._relevant2.active(self.under_approx):
             for subsys in self._relevant2.system_filter(
                     self._solver_subsystem_iter(local_only=True), direction='fwd'):
                 subsys._apply_nonlinear()
@@ -3939,7 +3939,7 @@ class Group(System):
                 jac = self._assembled_jac
 
             relevant = self._relevant2
-            with relevant.activity_context(self.linear_solver.use_relevance()):
+            with relevant.active(self.linear_solver.use_relevance()):
                 # with relevant.total_relevance_context():
                 subs = list(
                     relevant.total_system_filter(self._solver_subsystem_iter(local_only=True),

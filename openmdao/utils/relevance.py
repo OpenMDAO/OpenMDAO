@@ -156,7 +156,7 @@ class Relevance(object):
         self._force_total = False
 
     @contextmanager
-    def activity_context(self, active):
+    def active(self, active):
         """
         Context manager for activating/deactivating relevance.
 
@@ -398,7 +398,7 @@ class Relevance(object):
 
     def total_system_filter(self, systems, relevant=True):
         """
-        Filter the given iterator of systems to only include those that are relevant.
+        Filter the systems to those that are relevant to any pair of desvar/response variables.
 
         Parameters
         ----------
@@ -414,9 +414,6 @@ class Relevance(object):
         """
         if self._active:
             systems = list(systems)
-            #dprint("total all systems:", [s.pathname for s in systems])
-            #relsys =  [s.pathname for s in systems if self.is_total_relevant_system(s.pathname)]
-            #dprint("total relevant systems:", relsys)
             for system in systems:
                 if relevant == self.is_total_relevant_system(system.pathname):
                     yield system
@@ -425,6 +422,7 @@ class Relevance(object):
                         dprint("(total)", relevant, "skipping", system.pathname)
         elif relevant:
             yield from systems
+
     def _init_relevance_set(self, varname, direction):
         """
         Return a SetChecker for variables and components for the given variable.
