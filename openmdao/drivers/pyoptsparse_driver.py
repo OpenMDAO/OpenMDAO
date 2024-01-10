@@ -473,8 +473,10 @@ class pyOptSparseDriver(Driver):
                 del self._cons[name]
                 del self._responses[name]
 
-        # set equality constraints as reverse seeds to see what dvs are relevant
-        relevant.set_seeds([m['source'] for m in self._cons.values() if m['equals'] is None], 'rev')
+        eqcons = [m['source'] for m in self._cons.values() if m['equals'] is not None]
+        if eqcons:
+            # set equality constraints as reverse seeds to see what dvs are relevant
+            relevant.set_all_seeds([m['source'] for m in self._designvars.values()], eqcons)
 
         # Add all equality constraints
         for name, meta in self._cons.items():
@@ -482,6 +484,7 @@ class pyOptSparseDriver(Driver):
                 continue
             size = meta['global_size'] if meta['distributed'] else meta['size']
             lower = upper = meta['equals']
+            relevant.set_seeds([meta['source']], 'rev')
             wrt = [v for v in indep_list if relevant.is_relevant(self._designvars[v]['source'],
                                                                  'rev')]
             prom_name = model._get_prom_name(name)
@@ -509,8 +512,11 @@ class pyOptSparseDriver(Driver):
                                      wrt=wrt_prom, jac=jac_prom)
                 self._quantities.append(name)
 
-        # set inequality constraints as reverse seeds to see what dvs are relevant
-        relevant.set_seeds([m['source'] for m in self._cons.values() if m['equals']], 'rev')
+        ineqcons = [m['source'] for m in self._cons.values() if m['equals'] is None]
+        if ineqcons:
+            # set inequality constraints as reverse seeds to see what dvs are relevant
+            relevant.set_all_seeds([m['source'] for m in self._designvars.values()],
+                                   ineqcons)
 
         # Add all inequality constraints
         for name, meta in self._cons.items():
@@ -522,6 +528,7 @@ class pyOptSparseDriver(Driver):
             lower = meta['lower']
             upper = meta['upper']
 
+            relevant.set_seeds([meta['source']], 'rev')
             wrt = [v for v in indep_list if relevant.is_relevant(self._designvars[v]['source'],
                                                                  'rev')]
             prom_name = model._get_prom_name(name)

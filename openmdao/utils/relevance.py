@@ -181,9 +181,9 @@ class Relevance(object):
         self._relevant_vars = {}  # maps (varname, direction) to variable set checker
         self._relevant_systems = {}  # maps (varname, direction) to relevant system sets
         # seed var(s) for the current derivative operation
-        self._seed_vars = {'fwd': (), 'rev': (), None: ()}
+        self._seed_vars = {'fwd': (), 'rev': ()}
         # all seed vars for the entire derivative computation
-        self._all_seed_vars = {'fwd': (), 'rev': (), None: ()}
+        self._all_seed_vars = {'fwd': (), 'rev': ()}
         self._active = None  # not initialized
         self._force_total = False
 

@@ -280,7 +280,7 @@ class _TotalJacInfo(object):
         self.simul_coloring = None
 
         if has_custom_derivs:
-            if has_lin_cons:
+            if False: # has_lin_cons:
                 self.relevance = problem._metadata['relevant']
                 # self.relevance2 = model._relevant2
             else:

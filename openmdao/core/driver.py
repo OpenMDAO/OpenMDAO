@@ -948,8 +948,9 @@ class Driver(object):
         """
         relevant = self._problem().model._relevant
         relevant.set_seeds([m['source'] for m in self._designvars.values()], 'fwd')
-        return [name for name, meta in self._cons.items()
-                if not relevant.is_relevant(meta['source'], 'fwd')]
+        bad = [name for name, meta in self._cons.items()
+               if not relevant.is_relevant(meta['source'], 'fwd')]
+        return bad
 
     def check_relevance(self):
         """
