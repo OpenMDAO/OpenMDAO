@@ -232,20 +232,6 @@ class _TotalJacInfo(object):
         else:
             self.remote_vois = frozenset()
 
-        # raise an exception if we depend on any discrete outputs
-        if model._var_allprocs_discrete['output']:
-            # discrete_outs at the model level are absolute names
-            discrete_outs = set(model._var_allprocs_discrete['output'])
-            inps = of if self.mode == 'rev' else wrt
-
-            for inp in inps:
-                inter = discrete_outs.intersection(model._relevant[inp]['@all'][0]['output'])
-                if inter:
-                    kind = 'of' if self.mode == 'rev' else 'with respect to'
-                    raise RuntimeError("Total derivative %s '%s' depends upon "
-                                       "discrete output variables %s." %
-                                       (kind, inp, sorted(inter)))
-
         self.of = of
         self.wrt = wrt
         self.prom_of = prom_of
@@ -292,10 +278,10 @@ class _TotalJacInfo(object):
 
                 self.relevance = model._init_relevance(problem._orig_mode,
                                                        desvar_srcs, response_srcs)
-                # self.relevance = Relevance(model._relevance_graph)
         else:
             self.relevance = problem._metadata['relevant']
-            # self.relevance2 = model._relevant2
+
+        self._check_discrete_dependence()
 
         if approx:
             coloring_mod._initialize_model_approx(model, driver, self.of, self.wrt)
@@ -486,6 +472,23 @@ class _TotalJacInfo(object):
         if self.has_scaling:
             self.prom_design_vars = {prom_wrt[i]: design_vars[dv] for i, dv in enumerate(wrt)}
             self.prom_responses = {prom_of[i]: responses[r] for i, r in enumerate(of)}
+
+    def _check_discrete_dependence(self):
+        model = self.model
+        # raise an exception if we depend on any discrete outputs
+        if model._var_allprocs_discrete['output']:
+            # discrete_outs at the model level are absolute names
+            discrete_outs = set(model._var_allprocs_discrete['output'])
+            pair_iter = self.relevance.iter_seed_pair_relevance
+            for seed, rseed, rels in pair_iter(self.output_tuple_no_alias['rev'],
+                                               self.output_tuple_no_alias['fwd']):
+                inter = discrete_outs.intersection(rels)
+                if inter:
+                    inp = seed if self.mode == 'fwd' else rseed
+                    kind = 'of' if self.mode == 'rev' else 'with respect to'
+                    raise RuntimeError("Total derivative %s '%s' depends upon "
+                                        "discrete output variables %s." %
+                                        (kind, inp, sorted(inter)))
 
     @property
     def msginfo(self):
@@ -776,10 +779,8 @@ class _TotalJacInfo(object):
             # if we're doing parallel deriv coloring, we only want to set the seed on one proc
             # for each var in a given color
             if parallel_deriv_color is not None:
-                if fwd:
-                    relev = relevant[name]['@all'][0]['output']
-                else:
-                    relev = relevant[name]['@all'][0]['input']
+                self.relevance.set_seeds([path], mode)
+                relev = self.relevance.is_total_relevant_var(path)
             else:
                 relev = None
 
@@ -866,7 +867,7 @@ class _TotalJacInfo(object):
         elif simul_coloring and simul_color_mode is not None:
             imeta = defaultdict(bool)
             imeta['coloring'] = simul_coloring
-            all_rel_systems = set()
+            # all_rel_systems = set()
             cache = False
             imeta['itermeta'] = itermeta = []
             locs = None
@@ -875,7 +876,7 @@ class _TotalJacInfo(object):
 
                 for i in ilist:
                     rel_systems, cache_lin_sol, voiname = idx_map[i]
-                    all_rel_systems = _update_rel_systems(all_rel_systems, rel_systems)
+                    # all_rel_systems = _update_rel_systems(all_rel_systems, rel_systems)
                     cache |= cache_lin_sol
                     all_vois.add(voiname)
 
@@ -887,7 +888,7 @@ class _TotalJacInfo(object):
                     iterdict['local_in_idxs'] = locs[active]
                     iterdict['seeds'] = seed[ilist][active]
 
-                iterdict['relevant_systems'] = all_rel_systems
+                # iterdict['relevant_systems'] = all_rel_systems
                 iterdict['cache_lin_solve'] = cache
                 iterdict['seed_vars'] = all_vois
                 itermeta.append(iterdict)
@@ -1253,9 +1254,9 @@ class _TotalJacInfo(object):
         self.input_vec[mode].set_val(itermeta['seeds'], itermeta['local_in_idxs'])
 
         if itermeta['cache_lin_solve']:
-            return itermeta['relevant_systems'], ('linear',), (inds[0], mode)
+            return None, ('linear',), (inds[0], mode)
         else:
-            return itermeta['relevant_systems'], None, None
+            return None, None, None
 
     def par_deriv_input_setter(self, inds, imeta, mode):
         """
@@ -1279,24 +1280,24 @@ class _TotalJacInfo(object):
         int or None
             key used for storage of cached linear solve (if active, else None).
         """
-        all_rel_systems = set()
+        # all_rel_systems = set()
         vec_names = set()
 
         for i in inds:
             if self.in_loc_idxs[mode][i] >= 0:
-                rel_systems, vnames, _ = self.single_input_setter(i, imeta, mode)
+                _, vnames, _ = self.single_input_setter(i, imeta, mode)
                 if vnames is not None:
                     vec_names.add(vnames[0])
-            else:
-                rel_systems, _, _ = self.in_idx_map[mode][i]
-            all_rel_systems = _update_rel_systems(all_rel_systems, rel_systems)
+            # else:
+            #     rel_systems, _, _ = self.in_idx_map[mode][i]
+            # all_rel_systems = _update_rel_systems(all_rel_systems, rel_systems)
 
         self.model._problem_meta['parallel_deriv_color'] = imeta['par_deriv_color']
 
         if vec_names:
-            return all_rel_systems, sorted(vec_names), (inds[0], mode)
+            return None, sorted(vec_names), (inds[0], mode)
         else:
-            return all_rel_systems, None, None
+            return None, None, None
 
     def directional_input_setter(self, inds, itermeta, mode):
         """
@@ -2095,25 +2096,25 @@ def _fix_pdc_lengths(idx_iter_dict):
                     range_list[i] = range(start, end)
 
 
-def _update_rel_systems(all_rel_systems, rel_systems):
-    """
-    Combine all relevant systems in those cases where we have multiple input variables involved.
+# def _update_rel_systems(all_rel_systems, rel_systems):
+#     """
+#     Combine all relevant systems in those cases where we have multiple input variables involved.
 
-    Parameters
-    ----------
-    all_rel_systems : set
-        Current set of all relevant system names.
-    rel_systems : set
-        Set of relevant system names for the latest iteration.
+#     Parameters
+#     ----------
+#     all_rel_systems : set
+#         Current set of all relevant system names.
+#     rel_systems : set
+#         Set of relevant system names for the latest iteration.
 
-    Returns
-    -------
-    set or ContainsAll
-        Updated set of all relevant system names.
-    """
-    if all_rel_systems is _contains_all or rel_systems is _contains_all:
-        return _contains_all
+#     Returns
+#     -------
+#     set or ContainsAll
+#         Updated set of all relevant system names.
+#     """
+#     if all_rel_systems is _contains_all or rel_systems is _contains_all:
+#         return _contains_all
 
-    all_rel_systems.update(rel_systems)
+#     all_rel_systems.update(rel_systems)
 
-    return all_rel_systems
+#     return all_rel_systems

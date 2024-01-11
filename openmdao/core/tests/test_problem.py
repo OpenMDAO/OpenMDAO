@@ -436,7 +436,7 @@ class TestProblem(unittest.TestCase):
 
         prob.setup(mode=mode)
         prob.run_model()
-        
+
         of = ['obj', 'con1']
         wrt = ['_auto_ivc.v1', '_auto_ivc.v0']
 
@@ -1360,7 +1360,7 @@ class TestProblem(unittest.TestCase):
         indep1_outs = {'C8.y', 'G1.C1.z', 'G2.C5.x', 'indep1.x'}
         indep1_sys = {'C8', 'G1.C1', 'G2.C5', 'indep1', 'G1', 'G2', ''}
 
-        inputs, outputs, systems = relevant.all_relevant('indep1.x', 'C8.y')
+        inputs, outputs, systems = relevant._all_relevant('indep1.x', 'C8.y')
 
         self.assertEqual(inputs, indep1_ins)
         self.assertEqual(outputs, indep1_outs)
@@ -1368,7 +1368,7 @@ class TestProblem(unittest.TestCase):
 
         self.assertTrue('indep2.x' not in outputs)
 
-        inputs, outputs, systems = relevant.all_relevant(['indep1.x', 'indep2.x'], 'C8.y')
+        inputs, outputs, systems = relevant._all_relevant(['indep1.x', 'indep2.x'], 'C8.y')
 
         self.assertEqual(inputs, indep1_ins)
         self.assertEqual(outputs, indep1_outs)

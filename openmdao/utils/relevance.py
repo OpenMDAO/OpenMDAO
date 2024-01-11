@@ -5,7 +5,7 @@ Class definitions for Relevance and related classes.
 import sys
 from pprint import pprint
 from contextlib import contextmanager
-from openmdao.utils.general_utils import _contains_all, all_ancestors, dprint
+from openmdao.utils.general_utils import all_ancestors, dprint
 
 
 class SetChecker(object):
@@ -73,7 +73,7 @@ class SetChecker(object):
         return self._set.intersection(other_set)
 
 
-class ComplementSetChecker(object):
+class InverseSetChecker(object):
     """
     Class for checking if a given set of variables is not in an irrelevant set of variables.
 
@@ -112,14 +112,14 @@ class ComplementSetChecker(object):
 
     def __repr__(self):
         """
-        Return a string representation of the ComplementSetChecker.
+        Return a string representation of the InverseSetChecker.
 
         Returns
         -------
         str
-            String representation of the ComplementSetChecker.
+            String representation of the InverseSetChecker.
         """
-        return f"ComplementSetChecker({sorted(self._set)})"
+        return f"InverseSetChecker({sorted(self._set)})"
 
     def intersection(self, other_set):
         """
@@ -186,6 +186,17 @@ class Relevance(object):
         self._all_seed_vars = {'fwd': (), 'rev': ()}
         self._active = None  # not initialized
         self._force_total = False
+
+    def __repr__(self):
+        """
+        Return a string representation of the Relevance.
+
+        Returns
+        -------
+        str
+            String representation of the Relevance.
+        """
+        return f"Relevance({self._seed_vars}, active={self._active})"
 
     @contextmanager
     def active(self, active):
@@ -363,6 +374,35 @@ class Relevance(object):
                         return True
         return False
 
+    def is_total_relevant_var(self, name):
+        """
+        Return True if the given named variable is relevant.
+
+        Relevance in this case pertains to all seed/target combinations.
+
+        Parameters
+        ----------
+        name : str
+            Name of the System.
+
+        Returns
+        -------
+        bool
+            True if the given variable is relevant.
+        """
+        if not self._active:
+            return True
+
+        for direction, seeds in self._all_seed_vars.items():
+            for seed in seeds:
+                if name in self._relevant_vars[seed, direction]:
+                    # resolve target dependencies in opposite direction
+                    opp = _opposite[direction]
+                    for tgt in self._all_seed_vars[opp]:
+                        if name in self._relevant_vars[tgt, opp]:
+                            return True
+        return False
+
     def is_total_relevant_system(self, name):
         """
         Return True if the given named system is relevant.
@@ -489,9 +529,31 @@ class Relevance(object):
             self._relevant_vars[key] = _get_set_checker(depnodes - self._all_systems,
                                                         self._all_vars)
 
-    def all_relevant(self, fwd_seeds, rev_seeds):
+    def iter_seed_pair_relevance(self, fwd_seeds=None, rev_seeds=None, inputs=True, outputs=True):
         """
+        Yield all relevant variables for each pair of seeds.
+
+        Parameters
+        ----------
+        fwd_seeds : iter of str or None
+            Iterator over forward seed variable names. If None use current registered seeds.
+        rev_seeds : iter of str or None
+            Iterator over reverse seed variable names. If None use current registered seeds.
+        inputs : bool
+            If True, include inputs.
+        outputs : bool
+            If True, include outputs.
+
+        Yields
+        ------
+        set
+            Set of names of relevant variables.
         """
+        if fwd_seeds is None:
+            fwd_seeds = self._seed_vars['fwd']
+        if rev_seeds is None:
+            rev_seeds = self._seed_vars['rev']
+
         if isinstance(fwd_seeds, str):
             fwd_seeds = [fwd_seeds]
         if isinstance(rev_seeds, str):
@@ -502,12 +564,125 @@ class Relevance(object):
         for seed in rev_seeds:
             self._init_relevance_set(seed, 'rev')
 
-        relevant_vars = set()
+        if inputs and outputs:
+            def filt(x):
+                return x
+        elif inputs:
+            filt = self.filter_inputs
+        elif outputs:
+            filt = self.filter_outputs
+        else:
+            return
+
         for seed in fwd_seeds:
+            # since _relevant_vars may be InverseSetCheckers, we need to call their intersection
+            # function with _all_vars to get a set of variables that are relevant.
             allfwdvars = self._relevant_vars[seed, 'fwd'].intersection(self._all_vars)
             for rseed in rev_seeds:
-                revchecker = self._relevant_vars[rseed, 'rev']
-                relevant_vars.update(revchecker.intersection(allfwdvars))
+                inter = self._relevant_vars[rseed, 'rev'].intersection(allfwdvars)
+                if inter:
+                    inter = filt(inter)
+                    if inter:
+                        yield seed, rseed, inter
+
+    def filter_inputs(self, varnames):
+        """
+        Return only the input variables from the given set of variables.
+
+        Parameters
+        ----------
+        varnames : iter of str
+            Iterator over variable names.
+
+        Returns
+        -------
+        set
+            Set of input variable names.
+        """
+        nodes = self._graph.nodes
+        return {n for n in varnames if nodes[n]['type_'] == 'input'}
+
+    def filter_outputs(self, varnames):
+        """
+        Return only the output variables from the given set of variables.
+
+        Parameters
+        ----------
+        varnames : iter of str
+            Iterator over variable names.
+
+        Returns
+        -------
+        set
+            Set of output variable names.
+        """
+        nodes = self._graph.nodes
+        return {n for n in varnames if nodes[n]['type_'] == 'output'}
+
+    def all_relevant_vars(self, fwd_seeds=None, rev_seeds=None, inputs=True, outputs=True):
+        """
+        Return all relevant variables for the given seeds.
+
+        Parameters
+        ----------
+        fwd_seeds : iter of str or None
+            Iterator over forward seed variable names. If None use current registered seeds.
+        rev_seeds : iter of str or None
+            Iterator over reverse seed variable names. If None use current registered seeds.
+        inputs : bool
+            If True, include inputs.
+        outputs : bool
+            If True, include outputs.
+
+        Returns
+        -------
+        set
+            Set of names of relevant variables.
+        """
+        relevant_vars = set()
+        for _, _, relvars in self.iter_seed_pair_relevance(fwd_seeds, rev_seeds, inputs, outputs):
+            relevant_vars.update(relvars)
+
+        return relevant_vars
+
+    def all_relevant_systems(self, fwd_seeds, rev_seeds):
+        """
+        Return all relevant systems for the given seeds.
+
+        Parameters
+        ----------
+        fwd_seeds : iter of str
+            Iterator over forward seed variable names.
+        rev_seeds : iter of str
+            Iterator over reverse seed variable names.
+
+        Returns
+        -------
+        set
+            Set of names of relevant systems.
+        """
+        return _vars2systems(self.all_relevant_vars(fwd_seeds, rev_seeds))
+
+    def _all_relevant(self, fwd_seeds, rev_seeds):
+        """
+        Return all relevant inputs, outputs, and systems for the given seeds.
+
+        This is primarily used a a convenience function for testing.
+
+        Parameters
+        ----------
+        fwd_seeds : iter of str
+            Iterator over forward seed variable names.
+        rev_seeds : iter of str
+            Iterator over reverse seed variable names.
+
+        Returns
+        -------
+        tuple
+            (set of relevant inputs, set of relevant outputs, set of relevant systems)
+        """
+        relevant_vars = self.all_relevant_vars(fwd_seeds, rev_seeds)
+        systems = _vars2systems(relevant_vars)
 
         inputs = set()
         outputs = set()
@@ -518,8 +693,6 @@ class Relevance(object):
                     inputs.add(var)
                 elif varmeta['type_'] == 'output':
                     outputs.add(var)
-
-        systems = _vars2systems(relevant_vars)
 
         return inputs, outputs, systems
 
@@ -603,7 +776,7 @@ def _vars2systems(nameiter):
 
 def _get_set_checker(relset, allset):
     """
-    Return a SetChecker, ComplementSetChecker, or _contains_all for the given sets.
+    Return a SetChecker or InverseSetChecker for the given sets.
 
     Parameters
     ----------
@@ -614,15 +787,15 @@ def _get_set_checker(relset, allset):
 
     Returns
     -------
-    SetChecker, ComplementSetChecker, or _contiains_all
+    SetChecker, InverseSetChecker
         Set checker for the given sets.
     """
     if len(allset) == len(relset):
-        return _contains_all
+        return InverseSetChecker(set())
 
     inverse = allset - relset
     # store whichever type of checker will use the least memory
     if len(inverse) < len(relset):
-        return ComplementSetChecker(inverse)
+        return InverseSetChecker(inverse)
     else:
         return SetChecker(relset)

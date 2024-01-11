@@ -945,9 +945,15 @@ class Driver(object):
     def get_constraints_without_dv(self):
         """
         Return a list of constraint names that don't depend on any design variables.
+
+        Returns
+        -------
+        list of str
+            Names of constraints that don't depend on any design variables.
         """
         relevant = self._problem().model._relevant
-        relevant.set_seeds([m['source'] for m in self._designvars.values()], 'fwd')
+        relevant.set_all_seeds([m['source'] for m in self._designvars.values()],
+                               [m['source'] for m in self._responses.values()])
         bad = [name for name, meta in self._cons.items()
                if not relevant.is_relevant(meta['source'], 'fwd')]
         return bad
@@ -967,7 +973,7 @@ class Driver(object):
             # Note: There is a hack in ScipyOptimizeDriver for older versions of COBYLA that
             #       implements bounds on design variables by adding them as constraints.
             #       These design variables as constraints will not appear in the wrt list.
-            raise RuntimeError(f"{self.msginfo}: Constraint(s) '{bad_cons}' do not depend on any "
+            raise RuntimeError(f"{self.msginfo}: Constraint(s) {bad_cons} do not depend on any "
                                "design variables. Please check your problem formulation.")
 
     def run(self):
