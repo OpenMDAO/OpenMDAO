@@ -56,6 +56,24 @@ class SetChecker(object):
         """
         return f"SetChecker({sorted(self._set)})"
 
+    def to_set(self, allset):
+        """
+        Return a set of names of relevant variables.
+
+        allset is ignored here, but is included for compatibility with InverseSetChecker.
+
+        Parameters
+        ----------
+        allset : set
+            Set of all entries.
+
+        Returns
+        -------
+        set
+            Set of our entries.
+        """
+        return self._set
+
     def intersection(self, other_set):
         """
         Return a new set with elements common to the set and all others.
@@ -121,6 +139,24 @@ class InverseSetChecker(object):
         """
         return f"InverseSetChecker({sorted(self._set)})"
 
+    def to_set(self, allset):
+        """
+        Return a set of names of relevant variables.
+
+        Parameters
+        ----------
+        allset : set
+            Set of all entries.
+
+        Returns
+        -------
+        set
+            Set of our entries.
+        """
+        if self._set:
+            return allset - self._set
+        return allset
+
     def intersection(self, other_set):
         """
         Return a new set with elements common to the set and all others.
@@ -135,7 +171,9 @@ class InverseSetChecker(object):
         set
             Set of common elements.
         """
-        return other_set.difference(self._set)
+        if self._set:
+            return other_set - self._set
+        return other_set
 
 
 _opposite = {'fwd': 'rev', 'rev': 'fwd'}
@@ -184,6 +222,7 @@ class Relevance(object):
         self._seed_vars = {'fwd': (), 'rev': ()}
         # all seed vars for the entire derivative computation
         self._all_seed_vars = {'fwd': (), 'rev': ()}
+        self._local_seeds = set()  # set of seed vars restricted to local dependencies
         self._active = None  # not initialized
         self._force_total = False
 
@@ -223,25 +262,36 @@ class Relevance(object):
             finally:
                 self._active = save
 
-    @contextmanager
-    def total_relevance_context(self):
+    def relevant_vars(self, name, direction, inputs=True, outputs=True):
         """
-        Context manager for activating/deactivating forced total relevance.
+        Return a set of variables relevant to the given variable in the given direction.
 
-        Yields
-        ------
-        None
+        Parameters
+        ----------
+        name : str
+            Name of the variable of interest.
+        direction : str
+            Direction of the search for relevant variables.  'fwd' or 'rev'.
+        inputs : bool
+            If True, include inputs.
+        outputs : bool
+            If True, include outputs.
+
+        Returns
+        -------
+        set
+            Set of the relevant variables.
         """
-        self._check_active()
-        if not self._active:  # if already inactive from higher level, don't change anything
-            yield
-        else:
-            save = self._force_total
-            self._force_total = True
-            try:
-                yield
-            finally:
-                self._force_total = save
+        self._init_relevance_set(name, direction)
+        if inputs and outputs:
+            return self._relevant_vars[name, direction].to_set(self._all_vars)
+        elif inputs:
+            return self._apply_filter(self._relevant_vars[name, direction].to_set(self._all_vars),
+                                      _is_input)
+        elif outputs:
+            return self._apply_filter(self._relevant_vars[name, direction].to_set(self._all_vars),
+                                      _is_output)
+        return set()
 
     def set_all_seeds(self, fwd_seeds, rev_seeds):
         """
@@ -280,9 +330,9 @@ class Relevance(object):
         self._seed_vars['fwd'] = self._all_seed_vars['fwd']
         self._seed_vars['rev'] = self._all_seed_vars['rev']
 
-    def set_seeds(self, seed_vars, direction):
+    def set_seeds(self, seed_vars, direction, local=False):
         """
-        Set the seed(s) to be used to determine relevance for a given variable.
+        Set the seed(s) to determine relevance for a given variable in a given direction.
 
         Parameters
         ----------
@@ -290,6 +340,8 @@ class Relevance(object):
             Iterator over seed variable names.
         direction : str
             Direction of the search for relevant variables.  'fwd' or 'rev'.
+        local : bool
+            If True, update relevance set if necessary to include only local variables.
         """
         if self._active is False:
             return  # don't set seeds if we're inactive
@@ -302,7 +354,7 @@ class Relevance(object):
         self._seed_vars[_opposite[direction]] = self._all_seed_vars[_opposite[direction]]
 
         for s in self._seed_vars[direction]:
-            self._init_relevance_set(s, direction)
+            self._init_relevance_set(s, direction, local=local)
 
     def _check_active(self):
         """
@@ -453,18 +505,12 @@ class Relevance(object):
             Relevant system.
         """
         if self._active:
-            if self._force_total:
-                relcheck = self.is_total_relevant_system
-                for system in systems:
-                    if relevant == relcheck(system.pathname):
-                        yield system
-            else:
-                if direction is None:
-                    raise RuntimeError("direction must be 'fwd' or 'rev' if relevance is active.")
-                relcheck = self.is_relevant_system
-                for system in systems:
-                    if relevant == relcheck(system.pathname, direction):
-                        yield system
+            if direction is None:
+                raise RuntimeError("direction must be 'fwd' or 'rev' if relevance is active.")
+            relcheck = self.is_relevant_system
+            for system in systems:
+                if relevant == relcheck(system.pathname, direction):
+                    yield system
         elif relevant:
             yield from systems
 
@@ -492,7 +538,7 @@ class Relevance(object):
         elif relevant:
             yield from systems
 
-    def _init_relevance_set(self, varname, direction):
+    def _init_relevance_set(self, varname, direction, local=False):
         """
         Return a SetChecker for variables and components for the given variable.
 
@@ -507,15 +553,19 @@ class Relevance(object):
         direction : str
             Direction of the search for relevant variables.  'fwd' or 'rev'.
             'fwd' will find downstream nodes, 'rev' will find upstream nodes.
+        local : bool
+            If True, update relevance set if necessary to include only local variables.
         """
         key = (varname, direction)
-        if key not in self._relevant_vars:
+        if key not in self._relevant_vars or (local and key not in self._local_seeds):
             assert direction in ('fwd', 'rev'), "direction must be 'fwd' or 'rev'"
 
             # first time we've seen this varname/direction pair, so we need to
             # compute the set of relevant variables and the set of relevant systems
             # and store them for future use.
             depnodes = self._dependent_nodes(varname, direction)
+
+            rel_systems = _vars2systems(depnodes)
 
             # this set contains all variables and some or all components
             # in the graph.  Components are included if all of their outputs
@@ -524,12 +574,53 @@ class Relevance(object):
                 self._all_systems = _vars2systems(self._graph.nodes())
                 self._all_vars = set(self._graph.nodes()) - self._all_systems
 
-            rel_systems = _vars2systems(depnodes)
-            self._relevant_systems[key] = _get_set_checker(rel_systems, self._all_systems)
-            self._relevant_vars[key] = _get_set_checker(depnodes - self._all_systems,
-                                                        self._all_vars)
+            rel_vars = depnodes - self._all_systems
 
-    def iter_seed_pair_relevance(self, fwd_seeds=None, rev_seeds=None, inputs=True, outputs=True):
+            if local:
+                # if we're restricting to local variables, we need to remove any
+                # variables that are not local
+                rel_vars = self._apply_filter(rel_vars, _is_local)
+                self._local_seeds.add(key)
+
+            self._relevant_systems[key] = _get_set_checker(rel_systems, self._all_systems)
+            self._relevant_vars[key] = _get_set_checker(rel_vars, self._all_vars)
+
+    def get_seed_pair_relevance(self, fwd_seed, rev_seed, inputs=True, outputs=True):
+        """
+        Yield all relevant variables for the specified pair of seeds.
+
+        Parameters
+        ----------
+        fwd_seed : str
+            Iterator over forward seed variable names. If None use current registered seeds.
+        rev_seed : str
+            Iterator over reverse seed variable names. If None use current registered seeds.
+        inputs : bool
+            If True, include inputs.
+        outputs : bool
+            If True, include outputs.
+
+        Returns
+        -------
+        set
+            Set of names of relevant variables.
+        """
+        filt = _get_io_filter(inputs, outputs)
+        if filt is False:
+            return set()
+
+        self._init_relevance_set(fwd_seed, 'fwd')
+        self._init_relevance_set(rev_seed, 'rev')
+
+        # since _relevant_vars may be InverseSetCheckers, we need to call their intersection
+        # function with _all_vars to get a set of variables that are relevant.
+        allfwdvars = self._relevant_vars[fwd_seed, 'fwd'].intersection(self._all_vars)
+        inter = self._relevant_vars[rev_seed, 'rev'].intersection(allfwdvars)
+        if filt is True:  # not need to make a copy if we're returning all vars
+            return inter
+        return set(self._filter_nodes_iter(inter, filt))
+
+    def iter_seed_pair_relevance(self, fwd_seeds=None, rev_seeds=None, inputs=False, outputs=False):
         """
         Yield all relevant variables for each pair of seeds.
 
@@ -549,6 +640,10 @@ class Relevance(object):
         set
             Set of names of relevant variables.
         """
+        filt = _get_io_filter(inputs, outputs)
+        if filt is False:
+            return
+
         if fwd_seeds is None:
             fwd_seeds = self._seed_vars['fwd']
         if rev_seeds is None:
@@ -564,16 +659,6 @@ class Relevance(object):
         for seed in rev_seeds:
             self._init_relevance_set(seed, 'rev')
 
-        if inputs and outputs:
-            def filt(x):
-                return x
-        elif inputs:
-            filt = self.filter_inputs
-        elif outputs:
-            filt = self.filter_outputs
-        else:
-            return
-
         for seed in fwd_seeds:
             # since _relevant_vars may be InverseSetCheckers, we need to call their intersection
             # function with _all_vars to get a set of variables that are relevant.
@@ -581,43 +666,53 @@ class Relevance(object):
             for rseed in rev_seeds:
                 inter = self._relevant_vars[rseed, 'rev'].intersection(allfwdvars)
                 if inter:
-                    inter = filt(inter)
-                    if inter:
-                        yield seed, rseed, inter
+                    inter = self._apply_filter(inter, filt)
+                    yield seed, rseed, inter
 
-    def filter_inputs(self, varnames):
+    def _apply_filter(self, names, filt):
         """
-        Return only the input variables from the given set of variables.
+        Return only the nodes from the given set of nodes that pass the given filter.
 
         Parameters
         ----------
-        varnames : iter of str
-            Iterator over variable names.
+        names : set of str
+            Set of node names.
+        filt : callable
+            Filter function taking a graph node as an argument and returning True if the node
+            should be included in the output.
 
         Returns
         -------
         set
-            Set of input variable names.
+            Set of node names that passed the filter.
         """
-        nodes = self._graph.nodes
-        return {n for n in varnames if nodes[n]['type_'] == 'input'}
+        if filt is True:
+            return names  # not need to make a copy if we're returning all vars
+        elif filt is False:
+            return set()
+        return set(self._filter_nodes_iter(names, filt))
 
-    def filter_outputs(self, varnames):
+    def _filter_nodes_iter(self, names, filt):
         """
-        Return only the output variables from the given set of variables.
+        Return only the nodes from the given set of nodes that pass the given filter.
 
         Parameters
         ----------
-        varnames : iter of str
-            Iterator over variable names.
+        names : iter of str
+            Iterator over node names.
+        filt : callable
+            Filter function taking a graph node as an argument and returning True if the node
+            should be included in the output.
 
-        Returns
-        -------
-        set
-            Set of output variable names.
+        Yields
+        ------
+        str
+            Node name that passed the filter.
         """
         nodes = self._graph.nodes
-        return {n for n in varnames if nodes[n]['type_'] == 'output'}
+        for n in names:
+            if filt(nodes[n]):
+                yield n
 
     def all_relevant_vars(self, fwd_seeds=None, rev_seeds=None, inputs=True, outputs=True):
         """
@@ -663,7 +758,7 @@ class Relevance(object):
         """
         return _vars2systems(self.all_relevant_vars(fwd_seeds, rev_seeds))
 
-    def _all_relevant(self, fwd_seeds, rev_seeds):
+    def _all_relevant(self, fwd_seeds, rev_seeds, inputs=True, outputs=True):
         """
         Return all relevant inputs, outputs, and systems for the given seeds.
 
@@ -675,26 +770,27 @@ class Relevance(object):
             Iterator over forward seed variable names.
         rev_seeds : iter of str
             Iterator over reverse seed variable names.
+        inputs : bool
+            If True, include inputs.
+        outputs : bool
+            If True, include outputs.
 
         Returns
         -------
         tuple
             (set of relevant inputs, set of relevant outputs, set of relevant systems)
+            If a given inputs/outputs is False, the corresponding set will be empty. The
+            returned systems will be the set of all systems containing any
+            relevant variables based on the values of inputs and outputs, i.e. if outputs is False,
+            the returned systems will be the set of all systems containing any relevant inputs.
         """
-        relevant_vars = self.all_relevant_vars(fwd_seeds, rev_seeds)
-        systems = _vars2systems(relevant_vars)
+        relevant_vars = self.all_relevant_vars(fwd_seeds, rev_seeds, inputs=inputs, outputs=outputs)
+        relevant_systems = _vars2systems(relevant_vars)
 
-        inputs = set()
-        outputs = set()
-        for var in relevant_vars:
-            if var in self._graph:
-                varmeta = self._graph.nodes[var]
-                if varmeta['type_'] == 'input':
-                    inputs.add(var)
-                elif varmeta['type_'] == 'output':
-                    outputs.add(var)
+        inputs = set(self._filter_nodes_iter(relevant_vars, _is_input))
+        outputs = set(self._filter_nodes_iter(relevant_vars, _is_output))
 
-        return inputs, outputs, systems
+        return inputs, outputs, relevant_systems
 
     def _dependent_nodes(self, start, direction):
         """
@@ -702,8 +798,8 @@ class Relevance(object):
 
         Parameters
         ----------
-        start : hashable object
-            Identifier of the starting node.
+        start : str
+            Name of the starting node.
         direction : str
             If 'fwd', traverse downstream.  If 'rev', traverse upstream.
 
@@ -753,7 +849,7 @@ def _vars2systems(nameiter):
     """
     Return a set of all systems containing the given variables or components.
 
-    This includes all ancestors of each system.
+    This includes all ancestors of each system, including ''.
 
     Parameters
     ----------
@@ -799,3 +895,42 @@ def _get_set_checker(relset, allset):
         return InverseSetChecker(inverse)
     else:
         return SetChecker(relset)
+
+
+def _get_io_filter(inputs, outputs):
+    if inputs and outputs:
+        return True
+    elif inputs:
+        return _is_input
+    elif outputs:
+        return _is_output
+    else:
+        return False
+
+
+def _is_input(node):
+    return node['type_'] == 'input'
+
+
+def _is_output(node):
+    return node['type_'] == 'output'
+
+
+def _is_discrete(node):
+    return node['discrete']
+
+
+def _is_distributed(node):
+    return node['distributed']
+
+
+def _is_local(node):
+    return node['local']
+
+
+def _always_true(node):
+    return True
+
+
+def _always_false(node):
+    return False

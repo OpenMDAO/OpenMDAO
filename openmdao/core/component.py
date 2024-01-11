@@ -441,7 +441,7 @@ class Component(System):
                 if self._num_par_fd > 1:
                     raise RuntimeError(f"{self.msginfo}: Can't set 'run_root_only' option when "
                                        "using parallel FD.")
-                if self._problem_meta['using_par_deriv_color']:
+                if self._problem_meta['has_par_deriv_color']:
                     raise RuntimeError(f"{self.msginfo}: Can't set 'run_root_only' option when "
                                        "using parallel_deriv_color.")
                 return True

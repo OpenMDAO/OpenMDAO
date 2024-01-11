@@ -175,7 +175,7 @@ else:
             offsets = group._get_var_offsets()
             mypathlen = len(group.pathname) + 1 if group.pathname else 0
 
-            has_par_coloring = group._problem_meta['using_par_deriv_color']
+            has_par_coloring = group._problem_meta['has_par_deriv_color']
 
             xfer_in = defaultdict(list)
             xfer_out = defaultdict(list)

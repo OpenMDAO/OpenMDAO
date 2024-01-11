@@ -33,7 +33,7 @@ from openmdao.utils.graph_utils import get_sccs_topo, get_out_of_order_nodes
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
-from openmdao.utils.relevance import Relevance
+from openmdao.utils.relevance import Relevance, _is_local
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     PromotionWarning, MPIWarning, DerivativesWarning
 
@@ -772,7 +772,7 @@ class Group(System):
         # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
 
-    def _init_relevance(self, mode, abs_desvars=None, abs_responses=None):
+    def _init_relevance(self, mode, abs_desvars, abs_responses):
         """
         Create the relevance dictionary.
 
@@ -782,9 +782,9 @@ class Group(System):
         ----------
         mode : str
             Derivative direction, either 'fwd' or 'rev'.
-        abs_desvars : dict or None
+        abs_desvars : dict
             Dictionary of design variable metadata, keyed using absolute names.
-        abs_responses : dict or None
+        abs_responses : dict
             Dictionary of response variable metadata, keyed using absolute names or aliases.
 
         Returns
@@ -795,19 +795,24 @@ class Group(System):
         assert self.pathname == '', "Relevance can only be initialized on the top level System."
 
         if self._use_derivatives:
-            if abs_desvars is None:
-                abs_desvars = self.get_design_vars(recurse=True, get_sizes=False,
-                                                   use_prom_ivc=False)
-            if abs_responses is None:
-                abs_responses = self.get_responses(recurse=True, get_sizes=False,
-                                                   use_prom_ivc=False)
-
-                abs_responses = self._check_alias_overlaps(abs_responses)
-
             self._relevance_graph = self.get_relevance_graph(abs_desvars, abs_responses)
 
-        return Relevance(self._relevance_graph)
+            rel = Relevance(self._relevance_graph)
+            rel.set_all_seeds([m['source'] for m in abs_desvars.values()],
+                              [m['source'] for m in abs_responses.values()])
 
+            # for any parallel deriv colored dv/responses, update the relevant sets for those
+            # seeds to contain local vars only
+            for meta in abs_desvars.values():
+                if meta['parallel_deriv_color'] is not None:
+                    rel.set_seeds([meta['source']], 'fwd', local=True)
+            for meta in abs_responses.values():
+                if meta['parallel_deriv_color'] is not None:
+                    rel.set_seeds([meta['source']], 'rev', local=True)
+
+            return rel
+
+        return Relevance(nx.DiGraph())
 
     def get_relevance_graph(self, desvars, responses):
         """
@@ -833,7 +838,7 @@ class Group(System):
         if self._relevance_graph is not None:
             return self._relevance_graph
 
-        graph = self.get_hybrid_graph()
+        graph = self._get_hybrid_graph()
 
         # if doing top level FD/CS, don't update relevance graph based
         # on missing partials because FD/CS doesn't require that partials
@@ -878,7 +883,7 @@ class Group(System):
         self._relevance_graph = graph
         return graph
 
-    def get_hybrid_graph(self):
+    def _get_hybrid_graph(self):
         """
         Return a graph of all variables and components in the model.
 
@@ -890,6 +895,8 @@ class Group(System):
         graph where all inputs to a particular component would have to be connected to all outputs
         from that component.
 
+        This should only be called on the top level Group.
+
         Returns
         -------
         networkx.DiGraph
@@ -897,19 +904,35 @@ class Group(System):
         """
         graph = nx.DiGraph()
         comp_seen = set()
+        discrete_comps = set()  # components containing discrete vars
+        dist_comps = set()  # components containing distributed vars
 
         for direction in ('input', 'output'):
             isout = direction == 'output'
-            vmeta = self._var_allprocs_abs2meta[direction]
+            allvmeta = self._var_allprocs_abs2meta[direction]
+            vmeta = self._var_abs2meta[direction]
             for vname in self._var_allprocs_abs2prom[direction]:
-                if vname in vmeta:
-                    graph.add_node(vname, type_=direction)  # , dist=vmeta[vname]['distributed'])
+                if vname in allvmeta:
+                    allmeta = allvmeta[vname]
+                    dist = dist=allmeta['distributed']
+                    discrete = False
+                    graph.add_node(vname, type_=direction, discrete=discrete,
+                                   local=vname in vmeta, dist=dist)
                 else:  # var is discrete
-                    graph.add_node(vname, type_=direction, discrete=True)  # , dist=False)
+                    dist = False
+                    discrete = True
+                    graph.add_node(vname, type_=direction, discrete=True,
+                                   local=vname in self._var_discrete[direction], dist=dist)
+
                 comp = vname.rpartition('.')[0]
                 if comp not in comp_seen:
                     graph.add_node(comp)
                     comp_seen.add(comp)
+
+                if dist:
+                    dist_comps.add(comp)
+                if discrete:
+                    discrete_comps.add(comp)
 
                 if isout:
                     graph.add_edge(comp, vname)
@@ -920,44 +943,29 @@ class Group(System):
             # connect the variables src and tgt
             graph.add_edge(src, tgt)
 
+        # add dist and discrete flags to all components
+        for comp in comp_seen:
+            graph.nodes[comp]['dist'] = comp in dist_comps
+            graph.nodes[comp]['discrete'] = comp in discrete_comps
+
         return graph
 
     def _setup_par_deriv_relevance(self, desvars, responses, mode):
-        relevant = self._relevant
-        graph = relevant.graph
-        rescache = {}
-        pd_dv_locs = {}  # local nodes dependent on a par deriv desvar
-        pd_res_locs = {}  # local nodes dependent on a par deriv response
-        pd_common = defaultdict(dict)
-        # for each par deriv color, keep list of all local dep nodes for each var
         pd_err_chk = defaultdict(dict)
+        relevant = self._relevant
+        for desvar, response, relset in relevant.iter_seed_pair_relevance(inputs=True,
+                                                                          outputs=True):
+            if desvar in desvars:
+                dvcolor = desvars[desvar]['parallel_deriv_color']
+                dvcolorset = relevant._apply_filter(relset, _is_local)
+                pd_err_chk[dvcolor][desvar] = dvcolorset
 
-        for dvmeta in desvars.values():
-            desvar = dvmeta['source']
-            dvset = self.all_connected_nodes(graph, desvar)
-            if dvmeta['parallel_deriv_color']:
-                pd_dv_locs[desvar] = self.all_connected_nodes(graph, desvar, local=True)
-                pd_err_chk[dvmeta['parallel_deriv_color']][desvar] = pd_dv_locs[desvar]
+            if response in responses:
+                rescolor = responses[response]['parallel_deriv_color']
+                rescolorset = relevant._apply_filter(relset, _is_local)
+                pd_err_chk[rescolor][response] = rescolorset
 
-            for resmeta in responses.values():
-                response = resmeta['source']
-                if response not in rescache:
-                    rescache[response] = self.all_connected_nodes(grev, response)
-                    if resmeta['parallel_deriv_color']:
-                        pd_res_locs[response] = self.all_connected_nodes(grev, response, local=True)
-                        pd_err_chk[resmeta['parallel_deriv_color']][response] = \
-                            pd_res_locs[response]
-
-                common = dvset.intersection(rescache[response])
-
-                if common:
-                    if desvar in pd_dv_locs and pd_dv_locs[desvar]:
-                        pd_common[desvar][response] = \
-                            pd_dv_locs[desvar].intersection(rescache[response])
-                    elif response in pd_res_locs and pd_res_locs[response]:
-                        pd_common[response][desvar] = pd_res_locs[response].intersection(dvset)
-
-        if pd_dv_locs or pd_res_locs:
+        if pd_err_chk:
             # check to make sure we don't have any overlapping dependencies between vars of the
             # same color
             err = (None, None)
@@ -977,18 +985,84 @@ class Group(System):
                                        f" on the same rank with other {vtype}s in "
                                        f"parallel_deriv_color '{color}'.")
 
-            # we have some parallel deriv colors, so update relevance entries to throw out
-            # any dependencies that aren't on the same rank.
-            if pd_common:
-                for inp, sub in relevant.items():
-                    for out, tup in sub.items():
-                        meta = tup[0]
-                        if inp in pd_common:
-                            meta['input'] = meta['input'].intersection(pd_common[inp][out])
-                            meta['output'] = meta['output'].intersection(pd_common[inp][out])
-                            if out not in meta['output']:
-                                meta['input'] = set()
-                                meta['output'] = set()
+            # # we have some parallel deriv colors, so update relevance entries to throw out
+            # # any dependencies that aren't on the same rank.
+            # if pd_common:
+            #     for inp, sub in relevant.items():
+            #         for out, tup in sub.items():
+            #             meta = tup[0]
+            #             if inp in pd_common:
+            #                 meta['input'] = meta['input'].intersection(pd_common[inp][out])
+            #                 meta['output'] = meta['output'].intersection(pd_common[inp][out])
+            #                 if out not in meta['output']:
+            #                     meta['input'] = set()
+            #                     meta['output'] = set()
+
+        # graph = relevant.graph
+        # rescache = {}
+        # pd_dv_locs = {}  # local nodes dependent on a par deriv desvar
+        # pd_res_locs = {}  # local nodes dependent on a par deriv response
+        # pd_common = defaultdict(dict)
+        # # for each par deriv color, keep list of all local dep nodes for each var
+        # pd_err_chk = defaultdict(dict)
+
+        # for dvmeta in desvars.values():
+        #     desvar = dvmeta['source']
+        #     dvset = self.all_connected_nodes(graph, desvar)
+        #     if dvmeta['parallel_deriv_color']:
+        #         pd_dv_locs[desvar] = self.all_connected_nodes(graph, desvar, local=True)
+        #         pd_err_chk[dvmeta['parallel_deriv_color']][desvar] = pd_dv_locs[desvar]
+
+        #     for resmeta in responses.values():
+        #         response = resmeta['source']
+        #         if response not in rescache:
+        #             rescache[response] = self.all_connected_nodes(grev, response)
+        #             if resmeta['parallel_deriv_color']:
+        #                 pd_res_locs[response] = self.all_connected_nodes(grev, response, local=True)
+        #                 pd_err_chk[resmeta['parallel_deriv_color']][response] = \
+        #                     pd_res_locs[response]
+
+        #         common = dvset.intersection(rescache[response])
+
+        #         if common:
+        #             if desvar in pd_dv_locs and pd_dv_locs[desvar]:
+        #                 pd_common[desvar][response] = \
+        #                     pd_dv_locs[desvar].intersection(rescache[response])
+        #             elif response in pd_res_locs and pd_res_locs[response]:
+        #                 pd_common[response][desvar] = pd_res_locs[response].intersection(dvset)
+
+        # if pd_dv_locs or pd_res_locs:
+        #     # check to make sure we don't have any overlapping dependencies between vars of the
+        #     # same color
+        #     err = (None, None)
+        #     for pdcolor, dct in pd_err_chk.items():
+        #         seen = set()
+        #         for vname, nodes in dct.items():
+        #             if seen.intersection(nodes):
+        #                 err = (vname, pdcolor)
+        #                 break
+        #             seen.update(nodes)
+
+        #     all_errs = self.comm.allgather(err)
+        #     for n, color in all_errs:
+        #         if n is not None:
+        #             vtype = 'design variable' if mode == 'fwd' else 'response'
+        #             raise RuntimeError(f"{self.msginfo}: {vtype} '{n}' has overlapping dependencies"
+        #                                f" on the same rank with other {vtype}s in "
+        #                                f"parallel_deriv_color '{color}'.")
+
+        #     # we have some parallel deriv colors, so update relevance entries to throw out
+        #     # any dependencies that aren't on the same rank.
+        #     if pd_common:
+        #         for inp, sub in relevant.items():
+        #             for out, tup in sub.items():
+        #                 meta = tup[0]
+        #                 if inp in pd_common:
+        #                     meta['input'] = meta['input'].intersection(pd_common[inp][out])
+        #                     meta['output'] = meta['output'].intersection(pd_common[inp][out])
+        #                     if out not in meta['output']:
+        #                         meta['input'] = set()
+        #                         meta['output'] = set()
 
     # def get_relevant_vars(self, desvars, responses, mode):
     #     """
@@ -1411,9 +1485,12 @@ class Group(System):
 
         self._fd_rev_xfer_correction_dist = {}
 
-        self._init_relevance(mode)
-        # self._problem_meta['relevant'] =
-        self._problem_meta['relevant'] = Relevance(self._relevance_graph)
+        abs_desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
+        abs_responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
+        abs_responses = self._check_alias_overlaps(abs_responses)
+
+        self._problem_meta['relevant'] = self._init_relevance(mode, abs_desvars, abs_responses)
+        self._setup_par_deriv_relevance(abs_desvars, abs_responses, mode)
 
         self._setup_vectors(self._get_root_vectors())
 
@@ -4012,7 +4089,6 @@ class Group(System):
 
             relevant = self._relevant
             with relevant.active(self.linear_solver.use_relevance()):
-                # with relevant.total_relevance_context():
                 subs = list(
                     relevant.total_system_filter(self._solver_subsystem_iter(local_only=True),
                                                  relevant=True))
@@ -4390,7 +4466,8 @@ class Group(System):
                 if np.count_nonzero(sout[sin == 0]) > 0 and np.count_nonzero(sin[sout == 0]) > 0:
                     # we have of and wrt that exist on different procs. Now see if they're relevant
                     # to each other
-                    for _, _, rel in self._relevant.iter_seed_pair_relevance():
+                    for _, _, rel in self._relevant.iter_seed_pair_relevance(inputs=True,
+                                                                             outputs=True):
                         if left in rel and right in rel:
                             self._cross_keys.add(key)
                             break
@@ -5105,7 +5182,7 @@ class Group(System):
         if not designvars or not responses:
             return
 
-        graph = self.get_hybrid_graph()
+        graph = self._get_hybrid_graph()
 
         # now add design vars and responses to the graph
         for dv in meta2src_iter(designvars.values()):

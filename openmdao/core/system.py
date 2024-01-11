@@ -3550,7 +3550,7 @@ class System(object):
         try:
             for prom_name, data in self._design_vars.items():
                 if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
-                    self._problem_meta['using_par_deriv_color'] = True
+                    self._problem_meta['has_par_deriv_color'] = True
 
                 key = self._update_dv_meta(prom_name, data, get_size=get_sizes,
                                            use_prom_ivc=use_prom_ivc)
@@ -3669,7 +3669,7 @@ class System(object):
             # keys of self._responses are the alias or the promoted name
             for prom_or_alias, data in self._responses.items():
                 if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
-                    self._problem_meta['using_par_deriv_color'] = True
+                    self._problem_meta['has_par_deriv_color'] = True
 
                 key = self._update_response_meta(prom_or_alias, data, get_size=get_sizes,
                                                  use_prom_ivc=use_prom_ivc)

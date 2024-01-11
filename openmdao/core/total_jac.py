@@ -480,8 +480,8 @@ class _TotalJacInfo(object):
             # discrete_outs at the model level are absolute names
             discrete_outs = set(model._var_allprocs_discrete['output'])
             pair_iter = self.relevance.iter_seed_pair_relevance
-            for seed, rseed, rels in pair_iter(self.output_tuple_no_alias['rev'],
-                                               self.output_tuple_no_alias['fwd']):
+            for seed, rseed, rels in pair_iter(self.output_tuple_no_alias['rev'],   # inputs
+                                               self.output_tuple_no_alias['fwd']):  # outputs
                 inter = discrete_outs.intersection(rels)
                 if inter:
                     inp = seed if self.mode == 'fwd' else rseed
@@ -680,7 +680,6 @@ class _TotalJacInfo(object):
         """
         iproc = self.comm.rank
         model = self.model
-        relevant = model._relevant
         has_par_deriv_color = False
         all_abs2meta_out = model._var_allprocs_abs2meta['output']
         var_sizes = model._var_sizes
@@ -705,14 +704,14 @@ class _TotalJacInfo(object):
         # var set, then we need to ignore the computed relevancy and perform GS iterations on all
         # comps. Note, the inputs are handled individually by direct check vs the relevancy dict,
         # so we just bulk check the outputs here.
-        qoi_i = self.input_meta[mode]
-        qoi_o = self.output_meta[mode]
-        non_rel_outs = False
-        if qoi_i and qoi_o:
-            for out in self.output_tuple[mode]:
-                if out not in qoi_o and out not in qoi_i:
-                    non_rel_outs = True
-                    break
+        # qoi_i = self.input_meta[mode]
+        # qoi_o = self.output_meta[mode]
+        # non_rel_outs = False
+        # if qoi_i and qoi_o:
+        #     for out in self.output_tuple[mode]:
+        #         if out not in qoi_o and out not in qoi_i:
+        #             non_rel_outs = True
+        #             break
 
         for name in input_list:
             parallel_deriv_color = None
@@ -779,8 +778,13 @@ class _TotalJacInfo(object):
             # if we're doing parallel deriv coloring, we only want to set the seed on one proc
             # for each var in a given color
             if parallel_deriv_color is not None:
-                self.relevance.set_seeds([path], mode)
-                relev = self.relevance.is_total_relevant_var(path)
+                # relev = self.relevance.is_total_relevant_var(path)
+                if fwd:
+                    # relev = relevant[name]['@all'][0]['output']
+                    relev = self.relevance.relevant_vars(path, 'fwd', inputs=False)
+                else:
+                    # relev = relevant[name]['@all'][0]['input']
+                    relev = self.relevance.relevant_vars(path, 'rev', outputs=False)
             else:
                 relev = None
 
@@ -839,13 +843,6 @@ class _TotalJacInfo(object):
                 imeta['seed_vars'] = {path}
                 idx_iter_dict[name] = (imeta, self.single_index_iter)
 
-            # if path in relevant and not non_rel_outs:
-                # relsystems = relevant[path]['@all'][1]
-                # if self.total_relevant_systems is not _contains_all:
-                #     self.total_relevant_systems.update(relsystems)
-                # tup = (relsystems, cache_lin_sol, name)
-            # else:
-                # self.total_relevant_systems = _contains_all
             tup = (None, cache_lin_sol, name)
 
             idx_map.extend([tup] * (end - start))
@@ -867,7 +864,6 @@ class _TotalJacInfo(object):
         elif simul_coloring and simul_color_mode is not None:
             imeta = defaultdict(bool)
             imeta['coloring'] = simul_coloring
-            # all_rel_systems = set()
             cache = False
             imeta['itermeta'] = itermeta = []
             locs = None
@@ -876,7 +872,6 @@ class _TotalJacInfo(object):
 
                 for i in ilist:
                     rel_systems, cache_lin_sol, voiname = idx_map[i]
-                    # all_rel_systems = _update_rel_systems(all_rel_systems, rel_systems)
                     cache |= cache_lin_sol
                     all_vois.add(voiname)
 
@@ -888,7 +883,6 @@ class _TotalJacInfo(object):
                     iterdict['local_in_idxs'] = locs[active]
                     iterdict['seeds'] = seed[ilist][active]
 
-                # iterdict['relevant_systems'] = all_rel_systems
                 iterdict['cache_lin_solve'] = cache
                 iterdict['seed_vars'] = all_vois
                 itermeta.append(iterdict)
@@ -1280,7 +1274,6 @@ class _TotalJacInfo(object):
         int or None
             key used for storage of cached linear solve (if active, else None).
         """
-        # all_rel_systems = set()
         vec_names = set()
 
         for i in inds:
@@ -1288,9 +1281,6 @@ class _TotalJacInfo(object):
                 _, vnames, _ = self.single_input_setter(i, imeta, mode)
                 if vnames is not None:
                     vec_names.add(vnames[0])
-            # else:
-            #     rel_systems, _, _ = self.in_idx_map[mode][i]
-            # all_rel_systems = _update_rel_systems(all_rel_systems, rel_systems)
 
         self.model._problem_meta['parallel_deriv_color'] = imeta['par_deriv_color']
 
@@ -2055,15 +2045,12 @@ class _TotalJacInfo(object):
         Context manager to set current relevance for the Problem.
         """
         old_relevance = self.model._problem_meta['relevant']
-        # old_relevance2 = self.model._problem_meta['relevant2']
         self.model._problem_meta['relevant'] = self.relevance
-        # self.model._problem_meta['relevant2'] = self.relevance2
 
         try:
             yield
         finally:
             self.model._problem_meta['relevant'] = old_relevance
-            # self.model._problem_meta['relevant2'] = old_relevance2
 
 
 def _fix_pdc_lengths(idx_iter_dict):

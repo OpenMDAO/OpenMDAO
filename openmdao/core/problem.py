@@ -1002,7 +1002,7 @@ class Problem(object):
             'setup_status': _SetupStatus.PRE_SETUP,
             'model_ref': weakref.ref(model),  # ref to the model (needed to get out-of-scope
                                               # src data for inputs)
-            'using_par_deriv_color': False,  # True if parallel derivative coloring is being used
+            'has_par_deriv_color': False,  # True if any dvs/responses have parallel deriv colors
             'mode': mode,  # mode (derivative direction) set by the user.  'auto' by default
             'abs_in2prom_info': {},  # map of abs input name to list of length = sys tree height
                                      # down to var location, to allow quick resolution of local
@@ -1020,7 +1020,7 @@ class Problem(object):
             'allow_post_setup_reorder': self.options['allow_post_setup_reorder'],  # see option
             'singular_jac_behavior': 'warn',  # How to handle singular jac conditions
             'parallel_deriv_color': None,  # None unless derivatives involving a parallel deriv
-                                           # colored dv/response are currently being computed
+                                           # colored dv/response are currently being computed.
             'seed_vars': None,  # set of names of seed variables. Seed variables are those that
                                 # have their derivative value set to 1.0 at the beginning of the
                                 # current derivative solve.
