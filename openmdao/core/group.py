@@ -5110,8 +5110,6 @@ class Group(System):
             grad_groups = self.comm.allgather(grad_groups)
             grad_groups = {g for grp in grad_groups for g in grp}
 
-        print(f"GRAD GROUPS:", sorted(grad_groups))
-
         if grad_groups:
             remaining = set(grad_groups)
             for name in sorted(grad_groups, key=lambda x: x.count('.')):
