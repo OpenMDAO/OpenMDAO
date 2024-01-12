@@ -17,7 +17,7 @@ from openmdao.utils.general_utils import _contains_all, _src_or_alias_dict, _src
 from openmdao.utils.mpi import MPI, check_mpi_env
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.relevance import Relevance
+from openmdao.utils.general_utils import dprint
 
 
 use_mpi = check_mpi_env()
@@ -1211,6 +1211,7 @@ class _TotalJacInfo(object):
 
         loc_idx = self.in_loc_idxs[mode][idx]
         if loc_idx >= 0:
+            dprint(f"setting {loc_idx} loc_idx to {self.seeds[mode][idx]}")
             self.input_vec[mode].set_val(self.seeds[mode][idx], loc_idx)
 
         if cache_lin_sol:
@@ -1275,9 +1276,11 @@ class _TotalJacInfo(object):
             key used for storage of cached linear solve (if active, else None).
         """
         vec_names = set()
+        dprint("PD INPUT SETTER", inds, 'loc_inds')
 
         for i in inds:
             if self.in_loc_idxs[mode][i] >= 0:
+                dprint("SET LOC IND", self.in_loc_idxs[mode][i])
                 _, vnames, _ = self.single_input_setter(i, imeta, mode)
                 if vnames is not None:
                     vec_names.add(vnames[0])
@@ -1410,6 +1413,7 @@ class _TotalJacInfo(object):
         meta : dict
             Metadata dict.
         """
+        dprint("PD JAC SETTER:", inds, mode)
         if self.comm.size > 1:
             for i in inds:
                 if self.in_loc_idxs[mode][i] >= 0:
@@ -1572,11 +1576,11 @@ class _TotalJacInfo(object):
             # Main loop over columns (fwd) or rows (rev) of the jacobian
             for mode in self.modes:
                 for key, idx_info in self.idx_iter_dict[mode].items():
+                    dprint("KEY:", key, "mode:", mode)
                     imeta, idx_iter = idx_info
                     for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
                         model._problem_meta['seed_vars'] = itermeta['seed_vars']
-                        # setting this causes issues with DirectSolvers in some cases, so don't
-                        # do it until we can figure out exactly what's happening.
+                        dprint("SETTING relevant SEEDS:", itermeta['seed_vars'],)
                         relevant.set_seeds(itermeta['seed_vars'], mode)
                         rel_systems, _, cache_key = input_setter(inds, itermeta, mode)
                         rel_systems = None
@@ -1604,6 +1608,7 @@ class _TotalJacInfo(object):
 
                         # restore old linear solution if cache_linear_solution was set by the user
                         # for any input variables involved in this linear solution.
+                        dprint("RUNNING SOLVE_LINEAR", mode)
                         with model._scaled_context_all():
                             if cache_key is not None and not has_lin_cons and self.mode == mode:
                                 self._restore_linear_solution(cache_key, mode)
@@ -1615,6 +1620,7 @@ class _TotalJacInfo(object):
                         if debug_print:
                             print(f'Elapsed Time: {time.perf_counter() - t0} secs\n', flush=True)
 
+                        print("SETTING JAC", mode)
                         jac_setter(inds, mode, imeta)
 
                         # reset any Problem level data for the current iteration

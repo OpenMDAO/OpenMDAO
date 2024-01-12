@@ -392,12 +392,21 @@ class ExplicitComponent(Component):
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
             d_inputs, d_outputs, d_residuals = vecs
 
+            dprint(mode, f"{self.pathname}: before _apply_linear:")
+            dprint(f"d_inputs:", self._dinputs.asarray())
+            dprint(f"d_outputs:", self._doutputs.asarray())
+            dprint(f"d_residuals:", self._dresiduals.asarray())
+
             if not self.matrix_free:
                 # if we're not matrix free, we can skip the rest because
                 # compute_jacvec_product does nothing.
 
                 # Jacobian and vectors are all scaled, unitless
                 J._apply(self, d_inputs, d_outputs, d_residuals, mode)
+                dprint(mode, f"{self.pathname}: after _apply_linear:")
+                dprint(f"d_inputs:", self._dinputs.asarray())
+                dprint(f"d_outputs:", self._doutputs.asarray())
+                dprint(f"d_residuals:", self._dresiduals.asarray())
                 return
 
             # Jacobian and vectors are all unscaled, dimensional
@@ -455,6 +464,10 @@ class ExplicitComponent(Component):
         d_outputs = self._doutputs
         d_residuals = self._dresiduals
 
+        dprint(mode, f"{self.pathname}: before _solve_linear:")
+        dprint(f"d_inputs:", self._dinputs.asarray())
+        dprint(f"d_outputs:", self._doutputs.asarray())
+        dprint(f"d_residuals:", self._dresiduals.asarray())
         if mode == 'fwd':
             if self._has_resid_scaling:
                 with self._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
@@ -474,6 +487,11 @@ class ExplicitComponent(Component):
 
             # ExplicitComponent jacobian defined with -1 on diagonal.
             d_residuals *= -1.0
+
+        dprint(mode, f"{self.pathname}: after _solve_linear:")
+        dprint(f"d_inputs:", self._dinputs.asarray())
+        dprint(f"d_outputs:", self._doutputs.asarray())
+        dprint(f"d_residuals:", self._dresiduals.asarray())
 
     def _compute_partials_wrapper(self):
         """
