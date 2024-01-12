@@ -299,6 +299,11 @@ else:
                         xfer_in_nocolor[sub_out]
                         xfer_out_nocolor[sub_out]
 
+                print(f"rank {myrank} {sub_out}: xfer_in: {xfer_in[sub_out]}")
+                print(f"rank {myrank} {sub_out}: xfer_out: {xfer_out[sub_out]}")
+                print(f"rank {myrank} {sub_out}: xfer_in_nocolor: {xfer_in_nocolor[sub_out]}")
+                print(f"rank {myrank} {sub_out}: xfer_out_nocolor: {xfer_out_nocolor[sub_out]}")
+
             full_xfer_in, full_xfer_out = _setup_index_views(total_size, xfer_in, xfer_out)
 
             transfers = {
