@@ -788,6 +788,7 @@ class _TotalJacInfo(object):
             else:
                 relev = None
 
+            dprint("****** RELEV:", relev)
             if not dist:
                 # if the var is not distributed, convert the indices to global.
                 # We don't iterate over the full distributed size in this case.
