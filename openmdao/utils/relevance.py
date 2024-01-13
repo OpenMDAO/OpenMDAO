@@ -262,7 +262,7 @@ class Relevance(object):
             finally:
                 self._active = save
 
-    def relevant_vars(self, name, direction, inputs=True, outputs=True):
+    def relevant_vars(self, name, direction, inputs=True, outputs=True, local=False):
         """
         Return a set of variables relevant to the given variable in the given direction.
 
@@ -276,6 +276,8 @@ class Relevance(object):
             If True, include inputs.
         outputs : bool
             If True, include outputs.
+        local : bool
+            If True, include only local variables.
 
         Returns
         -------
@@ -284,14 +286,20 @@ class Relevance(object):
         """
         self._init_relevance_set(name, direction)
         if inputs and outputs:
-            return self._relevant_vars[name, direction].to_set(self._all_vars)
+            vlist = self._relevant_vars[name, direction].to_set(self._all_vars)
         elif inputs:
-            return self._apply_filter(self._relevant_vars[name, direction].to_set(self._all_vars),
+            vlist = self._apply_filter(self._relevant_vars[name, direction].to_set(self._all_vars),
                                       _is_input)
         elif outputs:
-            return self._apply_filter(self._relevant_vars[name, direction].to_set(self._all_vars),
+            vlist = self._apply_filter(self._relevant_vars[name, direction].to_set(self._all_vars),
                                       _is_output)
-        return set()
+        else:
+            vlist = set()
+
+        if local:
+            vlist = self._apply_filter(vlist, _is_local)
+
+        return vlist
 
     def set_all_seeds(self, fwd_seeds, rev_seeds):
         """
@@ -563,7 +571,7 @@ class Relevance(object):
             # first time we've seen this varname/direction pair, so we need to
             # compute the set of relevant variables and the set of relevant systems
             # and store them for future use.
-            depnodes = self._dependent_nodes(varname, direction)
+            depnodes = self._dependent_nodes(varname, direction, local=local)
 
             rel_systems = _vars2systems(depnodes)
 
@@ -577,9 +585,6 @@ class Relevance(object):
             rel_vars = depnodes - self._all_systems
 
             if local:
-                # if we're restricting to local variables, we need to remove any
-                # variables that are not local
-                rel_vars = self._apply_filter(rel_vars, _is_local)
                 self._local_seeds.add(key)
 
             self._relevant_systems[key] = _get_set_checker(rel_systems, self._all_systems)
@@ -792,7 +797,7 @@ class Relevance(object):
 
         return inputs, outputs, relevant_systems
 
-    def _dependent_nodes(self, start, direction):
+    def _dependent_nodes(self, start, direction, local=False):
         """
         Return set of all connected nodes in the given direction starting at the given node.
 
@@ -802,6 +807,8 @@ class Relevance(object):
             Name of the starting node.
         direction : str
             If 'fwd', traverse downstream.  If 'rev', traverse upstream.
+        local : bool
+            If True, include only local variables.
 
         Returns
         -------
@@ -823,6 +830,11 @@ class Relevance(object):
                 src = stack.pop()
                 for tgt in fnext(src):
                     if tgt not in visited:
+                        if local:
+                            node = self._graph.nodes[tgt]
+                            if 'local' in node and not node['local']:
+                                return visited
+
                         visited.add(tgt)
                         stack.append(tgt)
 

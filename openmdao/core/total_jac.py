@@ -781,14 +781,14 @@ class _TotalJacInfo(object):
                 # relev = self.relevance.is_total_relevant_var(path)
                 if fwd:
                     # relev = relevant[name]['@all'][0]['output']
-                    relev = self.relevance.relevant_vars(path, 'fwd', inputs=False)
+                    relev = self.relevance.relevant_vars(path, 'fwd', inputs=False, local=True)
                 else:
                     # relev = relevant[name]['@all'][0]['input']
-                    relev = self.relevance.relevant_vars(path, 'rev', outputs=False)
+                    relev = self.relevance.relevant_vars(path, 'rev', outputs=False, local=True)
             else:
                 relev = None
 
-            dprint("****** RELEV:", relev)
+            dprint("****** RELEV:", relev, 'name', name, 'path', path)
             if not dist:
                 # if the var is not distributed, convert the indices to global.
                 # We don't iterate over the full distributed size in this case.
