@@ -816,6 +816,8 @@ class Relevance(object):
             Set of all dependent nodes.
         """
         if start in self._graph:
+            if local and not self._graph.nodes[start]['local']:
+                return set()
             stack = [start]
             visited = {start}
 

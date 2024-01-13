@@ -810,6 +810,9 @@ class Group(System):
                 if meta['parallel_deriv_color'] is not None:
                     rel.set_seeds([meta['source']], 'rev', local=True)
 
+            grev = rel._graph.reverse(copy=False)
+            stuff = self.all_connected_nodes(grev, 'c2.y', local=True)
+
             return rel
 
         return Relevance(nx.DiGraph())
@@ -913,20 +916,20 @@ class Group(System):
             vmeta = self._var_abs2meta[direction]
             for vname in self._var_allprocs_abs2prom[direction]:
                 if vname in allvmeta:
-                    allmeta = allvmeta[vname]
-                    dist = dist=allmeta['distributed']
+                    dist = dist=allvmeta[vname]['distributed']
                     discrete = False
-                    graph.add_node(vname, type_=direction, discrete=discrete,
-                                   local=vname in vmeta, dist=dist)
+                    local = vname in vmeta
                 else:  # var is discrete
                     dist = False
                     discrete = True
-                    graph.add_node(vname, type_=direction, discrete=True,
-                                   local=vname in self._var_discrete[direction], dist=dist)
+                    local=vname in self._var_discrete[direction]
+
+                graph.add_node(vname, type_=direction, discrete=discrete,
+                               local=local, dist=dist)
 
                 comp = vname.rpartition('.')[0]
                 if comp not in comp_seen:
-                    graph.add_node(comp)
+                    graph.add_node(comp, local=local)
                     comp_seen.add(comp)
 
                 if dist:
@@ -1227,53 +1230,53 @@ class Group(System):
 
     #     return relevant
 
-    # def all_connected_nodes(self, graph, start, local=False):
-    #     """
-    #     Return set of all downstream nodes starting at the given node.
+    def all_connected_nodes(self, graph, start, local=False):
+        """
+        Return set of all downstream nodes starting at the given node.
 
-    #     Parameters
-    #     ----------
-    #     graph : network.DiGraph
-    #         Graph being traversed.
-    #     start : hashable object
-    #         Identifier of the starting node.
-    #     local : bool
-    #         If True and a non-local node is encountered in the traversal, the traversal
-    #         ends on that branch.
+        Parameters
+        ----------
+        graph : network.DiGraph
+            Graph being traversed.
+        start : hashable object
+            Identifier of the starting node.
+        local : bool
+            If True and a non-local node is encountered in the traversal, the traversal
+            ends on that branch.
 
-    #     Returns
-    #     -------
-    #     set
-    #         Set of all downstream nodes.
-    #     """
-    #     visited = set()
+        Returns
+        -------
+        set
+            Set of all downstream nodes.
+        """
+        visited = set()
 
-    #     if local:
-    #         abs2meta_in = self._var_abs2meta['input']
-    #         abs2meta_out = self._var_abs2meta['output']
-    #         all_abs2meta_in = self._var_allprocs_abs2meta['input']
-    #         all_abs2meta_out = self._var_allprocs_abs2meta['output']
+        if local:
+            abs2meta_in = self._var_abs2meta['input']
+            abs2meta_out = self._var_abs2meta['output']
+            all_abs2meta_in = self._var_allprocs_abs2meta['input']
+            all_abs2meta_out = self._var_allprocs_abs2meta['output']
 
-    #         def is_local(name):
-    #             return (name in abs2meta_in or name in abs2meta_out or
-    #                     (name not in all_abs2meta_in and name not in all_abs2meta_out))
+            def is_local(name):
+                return (name in abs2meta_in or name in abs2meta_out or
+                        (name not in all_abs2meta_in and name not in all_abs2meta_out))
 
-    #     if not local or is_local(start):
-    #         stack = [start]
-    #         visited.add(start)
-    #     else:
-    #         return visited
+        if not local or is_local(start):
+            stack = [start]
+            visited.add(start)
+        else:
+            return visited
 
-    #     while stack:
-    #         src = stack.pop()
-    #         for tgt in graph[src]:
-    #             if local and not is_local(tgt):
-    #                 continue
-    #             if tgt not in visited:
-    #                 visited.add(tgt)
-    #                 stack.append(tgt)
+        while stack:
+            src = stack.pop()
+            for tgt in graph[src]:
+                if local and not is_local(tgt):
+                    continue
+                if tgt not in visited:
+                    visited.add(tgt)
+                    stack.append(tgt)
 
-    #     return visited
+        return visited
 
     def _check_alias_overlaps(self, abs_responses):
         """
