@@ -5,7 +5,8 @@ Class definitions for Relevance and related classes.
 import sys
 from pprint import pprint
 from contextlib import contextmanager
-from openmdao.utils.general_utils import all_ancestors, dprint
+from openmdao.utils.general_utils import all_ancestors, dprint, meta2src_iter
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 
 
 class SetChecker(object):
@@ -185,8 +186,12 @@ class Relevance(object):
 
     Parameters
     ----------
-    graph : <nx.DirectedGraph>
-        Dependency graph.  Hybrid graph containing both variables and systems.
+    group : <System>
+        The top level group in the system hierarchy.
+    abs_desvars : dict
+        Dictionary of absolute names of design variables.
+    abs_responses : dict
+        Dictionary of absolute names of response variables.
 
     Attributes
     ----------
@@ -202,6 +207,8 @@ class Relevance(object):
         Maps direction to currently active seed variable names.
     _all_seed_vars : dict
         Maps direction to all seed variable names.
+    _local_seeds : set
+        Set of seed vars restricted to local dependencies.
     _active : bool or None
         If True, relevance is active.  If False, relevance is inactive.  If None, relevance is
         uninitialized.
@@ -210,11 +217,10 @@ class Relevance(object):
         seed/target combination).
     """
 
-    def __init__(self, graph):
+    def __init__(self, group, abs_desvars, abs_responses):
         """
         Initialize all attributes.
         """
-        self._graph = graph
         self._all_vars = None  # set of all nodes in the graph (or None if not initialized)
         self._relevant_vars = {}  # maps (varname, direction) to variable set checker
         self._relevant_systems = {}  # maps (varname, direction) to relevant system sets
@@ -225,6 +231,22 @@ class Relevance(object):
         self._local_seeds = set()  # set of seed vars restricted to local dependencies
         self._active = None  # not initialized
         self._force_total = False
+        self._graph = self.get_relevance_graph(group, abs_desvars, abs_responses)
+
+        # for any parallel deriv colored dv/responses, update the graph to include vars with
+        # local only dependencies
+        for meta in abs_desvars.values():
+            if meta['parallel_deriv_color'] is not None:
+                self.set_seeds([meta['source']], 'fwd', local=True)
+        for meta in abs_responses.values():
+            if meta['parallel_deriv_color'] is not None:
+                self.set_seeds([meta['source']], 'rev', local=True)
+
+        if abs_desvars and abs_responses:
+            self.set_all_seeds([m['source'] for m in abs_desvars.values()],
+                               [m['source'] for m in abs_responses.values()])
+        else:
+            self._active = False
 
     def __repr__(self):
         """
@@ -262,7 +284,73 @@ class Relevance(object):
             finally:
                 self._active = save
 
-    def relevant_vars(self, name, direction, inputs=True, outputs=True, local=False):
+    def get_relevance_graph(self, group, desvars, responses):
+        """
+        Return a graph of the relevance between desvars and responses.
+
+        This graph is the full hybrid graph after removal of components that don't have full
+        ('*', '*') partial derivatives declared.  When such a component is removed, its inputs and
+        outputs are connected to each other whenever there is a partial derivative declared between
+        them.
+
+        Parameters
+        ----------
+        group : <Group>
+            The top level group in the system hierarchy.
+        desvars : dict
+            Dictionary of design variable metadata.
+        responses : dict
+            Dictionary of response variable metadata.
+
+        Returns
+        -------
+        DiGraph
+            Graph of the relevance between desvars and responses.
+        """
+        graph = group._get_hybrid_graph()
+
+        # if doing top level FD/CS, don't update relevance graph based
+        # on missing partials because FD/CS doesn't require that partials
+        # are declared to compute derivatives
+        if group._owns_approx_jac:
+            return graph
+
+        resps = set(meta2src_iter(responses.values()))
+
+        # figure out if we can remove any edges based on zero partials we find
+        # in components.  By default all component connected outputs
+        # are also connected to all connected inputs from the same component.
+        missing_partials = {}
+        group._get_missing_partials(missing_partials)
+        missing_responses = set()
+        for pathname, missing in missing_partials.items():
+            inputs = [n for n, _ in graph.in_edges(pathname)]
+            outputs = [n for _, n in graph.out_edges(pathname)]
+
+            graph.remove_node(pathname)
+
+            for output in outputs:
+                found = False
+                for inp in inputs:
+                    if (output, inp) not in missing:
+                        graph.add_edge(inp, output)
+                        found = True
+
+                if not found and output in resps:
+                    missing_responses.add(output)
+
+        if missing_responses:
+            msg = (f"Constraints or objectives [{', '.join(sorted(missing_responses))}] cannot"
+                   " be impacted by the design variables of the problem because no partials "
+                   "were defined for them in their parent component(s).")
+            if group._problem_meta['singular_jac_behavior'] == 'error':
+                raise RuntimeError(msg)
+            else:
+                issue_warning(msg, category=DerivativesWarning)
+
+        return graph
+
+    def relevant_vars(self, name, direction, inputs=True, outputs=True):
         """
         Return a set of variables relevant to the given variable in the given direction.
 
@@ -276,8 +364,6 @@ class Relevance(object):
             If True, include inputs.
         outputs : bool
             If True, include outputs.
-        local : bool
-            If True, include only local variables.
 
         Returns
         -------
@@ -286,20 +372,15 @@ class Relevance(object):
         """
         self._init_relevance_set(name, direction)
         if inputs and outputs:
-            vlist = self._relevant_vars[name, direction].to_set(self._all_vars)
+            return self._relevant_vars[name, direction].to_set(self._all_vars)
         elif inputs:
-            vlist = self._apply_filter(self._relevant_vars[name, direction].to_set(self._all_vars),
+            return self._apply_filter(self._relevant_vars[name, direction].to_set(self._all_vars),
                                       _is_input)
         elif outputs:
-            vlist = self._apply_filter(self._relevant_vars[name, direction].to_set(self._all_vars),
+            return self._apply_filter(self._relevant_vars[name, direction].to_set(self._all_vars),
                                       _is_output)
         else:
-            vlist = set()
-
-        if local:
-            vlist = self._apply_filter(vlist, _is_local)
-
-        return vlist
+            return set()
 
     def set_all_seeds(self, fwd_seeds, rev_seeds):
         """
@@ -434,7 +515,7 @@ class Relevance(object):
                         return True
         return False
 
-    def is_total_relevant_var(self, name):
+    def is_total_relevant_var(self, name, direction=None):
         """
         Return True if the given named variable is relevant.
 
@@ -444,6 +525,10 @@ class Relevance(object):
         ----------
         name : str
             Name of the System.
+        direction : str or None
+            Direction of the search for relevant variables.  'fwd', 'rev', or None. None is
+            only valid if relevance is not active or if doing 'total' relevance, where
+            relevance is True if a variable is relevant to any pair of of/wrt variables.
 
         Returns
         -------
@@ -453,7 +538,12 @@ class Relevance(object):
         if not self._active:
             return True
 
-        for direction, seeds in self._all_seed_vars.items():
+        if direction is None:
+            seediter = list(self._all_seed_vars.items())
+        else:
+            seediter = [(direction, self._seed_vars[direction])]
+
+        for direction, seeds in seediter:
             for seed in seeds:
                 if name in self._relevant_vars[seed, direction]:
                     # resolve target dependencies in opposite direction

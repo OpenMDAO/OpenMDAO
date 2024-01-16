@@ -103,7 +103,7 @@ class LinearBlockGS(BlockLinearSolver):
             parent_offset = system._dresiduals._root_offset
 
             for subsys in relevance.system_filter(system._solver_subsystem_iter(local_only=False),
-                                                   direction=mode):
+                                                  direction=mode):
                 # must always do the transfer on all procs even if subsys not local
                 system._transfer('linear', mode, subsys.name)
 
@@ -136,7 +136,7 @@ class LinearBlockGS(BlockLinearSolver):
         else:  # rev
             subsystems = list(
                 relevance.system_filter(system._solver_subsystem_iter(local_only=False),
-                                         direction=mode))
+                                        direction=mode))
             subsystems.reverse()
             parent_offset = system._doutputs._root_offset
 

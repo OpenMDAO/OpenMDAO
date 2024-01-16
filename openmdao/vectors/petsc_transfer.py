@@ -155,7 +155,7 @@ else:
 
                     inp_boundary_set = set(all_abs2meta_in).difference(conns)
 
-                    for dv, resp, rel in group._relevant.iter_seed_pair_relevance(outputs=False):
+                    for dv, resp, rel in group._relevant.iter_seed_pair_relevance(inputs=True):
                         # resp is continuous and inside this group and dv is outside this group
                         if resp in all_abs2meta_out and dv not in allprocs_abs2prom:
                             if all_abs2meta_out[resp]['distributed']:  # a distributed response
@@ -165,6 +165,8 @@ else:
                                             group._fd_rev_xfer_correction_dist[resp] = set()
                                         group._fd_rev_xfer_correction_dist[resp].add(inp)
 
+                from pprint import pprint
+                pprint(group._fd_rev_xfer_correction_dist)
                 # FD groups don't need reverse transfers
                 return {}
 

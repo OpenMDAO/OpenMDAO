@@ -845,8 +845,7 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.final_setup()
         self.assertEqual(str(ctx.exception),
-           "<model> <class Group>: response 'pg.dc2.y' has overlapping dependencies on the "
-           "same rank with other responses in parallel_deriv_color 'a'.")
+           "Parallel derivative color 'a' has responses ['pg.dc2.y', 'pg.dc2.y2'] with overlapping dependencies on the same rank.")
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

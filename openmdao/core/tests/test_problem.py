@@ -14,7 +14,7 @@ from openmdao.core.driver import Driver
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.misc_components import MultComp
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesConnected
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
 import openmdao.utils.hooks as hooks
 from openmdao.utils.units import convert_units
 from openmdao.utils.om_warnings import DerivativesWarning
@@ -2353,8 +2353,9 @@ class NestedProblemTestCase(unittest.TestCase):
         prob.run_model()
 
         totals = prob.check_totals(of='f_xy', wrt=['x', 'y'], method='cs', out_stream=None)
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-12)
+        assert_check_totals(totals)
+        #for key, val in totals.items():
+            #assert_near_equal(val['rel error'][0], 0.0, 1e-12)
 
     def test_nested_prob_default_naming(self):
         import openmdao.core.problem

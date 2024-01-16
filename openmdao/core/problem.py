@@ -1825,7 +1825,6 @@ class Problem(object):
         old_jac = model._jacobian
         old_subjacs = model._subjacs_info.copy()
         old_schemes = model._approx_schemes
-        old_rel_graph = model._relevance_graph
 
         Jfds = []
         # prevent form from showing as None in check_totals output
@@ -1874,7 +1873,6 @@ class Problem(object):
             model._owns_approx_jac_meta = approx_jac_meta
             model._subjacs_info = old_subjacs
             model._approx_schemes = old_schemes
-            model._relevance_graph = old_rel_graph
 
         # Assemble and Return all metrics.
         data = {'': {}}

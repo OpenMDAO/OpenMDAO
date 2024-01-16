@@ -266,7 +266,7 @@ class _TotalJacInfo(object):
         self.simul_coloring = None
 
         if has_custom_derivs:
-            if False: # has_lin_cons:
+            if False:  # has_lin_cons:
                 self.relevance = problem._metadata['relevant']
                 # self.relevance2 = model._relevant2
             else:
@@ -276,8 +276,7 @@ class _TotalJacInfo(object):
                 desvar_srcs = {m['source']: m for m in prom_desvars.values()}
                 response_srcs = {m['source']: m for m in prom_responses.values()}
 
-                self.relevance = model._init_relevance(problem._orig_mode,
-                                                       desvar_srcs, response_srcs)
+                self.relevance = model._init_relevance(desvar_srcs, response_srcs)
         else:
             self.relevance = problem._metadata['relevant']
 
@@ -480,15 +479,14 @@ class _TotalJacInfo(object):
             # discrete_outs at the model level are absolute names
             discrete_outs = set(model._var_allprocs_discrete['output'])
             pair_iter = self.relevance.iter_seed_pair_relevance
-            for seed, rseed, rels in pair_iter(self.output_tuple_no_alias['rev'],   # inputs
-                                               self.output_tuple_no_alias['fwd']):  # outputs
+            for seed, rseed, rels in pair_iter(self.output_tuple_no_alias['rev'],
+                                               self.output_tuple_no_alias['fwd'], outputs=True):
                 inter = discrete_outs.intersection(rels)
                 if inter:
                     inp = seed if self.mode == 'fwd' else rseed
                     kind = 'of' if self.mode == 'rev' else 'with respect to'
                     raise RuntimeError("Total derivative %s '%s' depends upon "
-                                        "discrete output variables %s." %
-                                        (kind, inp, sorted(inter)))
+                                       "discrete output variables %s." % (kind, inp, sorted(inter)))
 
     @property
     def msginfo(self):
@@ -781,10 +779,22 @@ class _TotalJacInfo(object):
                 # relev = self.relevance.is_total_relevant_var(path)
                 if fwd:
                     # relev = relevant[name]['@all'][0]['output']
-                    relev = self.relevance.relevant_vars(path, 'fwd', inputs=False, local=True)
+                    self.relevance.set_seeds((path,), 'fwd')
+                    relev = self.relevance.relevant_vars(path, 'fwd', inputs=False)
+                    for s in self.relevance._all_seed_vars['rev']:
+                        if s in relev:
+                            break
+                    else:
+                        relev = set()
                 else:
                     # relev = relevant[name]['@all'][0]['input']
-                    relev = self.relevance.relevant_vars(path, 'rev', outputs=False, local=True)
+                    self.relevance.set_seeds((path,), 'rev')
+                    relev = self.relevance.relevant_vars(path, 'rev', inputs=False)
+                    for s in self.relevance._all_seed_vars['fwd']:
+                        if s in relev:
+                            break
+                    else:
+                        relev = set()
             else:
                 relev = None
 
@@ -1621,7 +1631,6 @@ class _TotalJacInfo(object):
                         if debug_print:
                             print(f'Elapsed Time: {time.perf_counter() - t0} secs\n', flush=True)
 
-                        print("SETTING JAC", mode)
                         jac_setter(inds, mode, imeta)
 
                         # reset any Problem level data for the current iteration
