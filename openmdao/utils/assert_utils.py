@@ -39,6 +39,7 @@ def assert_warning(category, msg, contains_msg=False, ranks=None):
         Set to True to check that the warning text contains msg, rather than checking equality.
     ranks : int or list of int, optional
         The global ranks on which the warning is expected.
+
     Yields
     ------
     None
