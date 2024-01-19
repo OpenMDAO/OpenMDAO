@@ -5397,9 +5397,11 @@ class System(object):
                                     model._outputs.set_var(src, value, src_indices.apply(indices),
                                                            True, var_name=var_name)
                         else:
-                            raise RuntimeError(f"{model.msginfo}: Can't set {abs_name}: remote"
-                                               " connected inputs with src_indices currently not"
-                                               " supported.")
+                            issue_warning(f"{model.msginfo}: Cannot set the value of '{abs_name}':"
+                                          " Setting the value of a remote connected input with"
+                                          " src_indices is currently not supported, you must call"
+                                          " `run_model()` to have the outputs populate their"
+                                          " corresponding inputs.")
                     else:
                         value = np.asarray(value)
                         if indices is not _full_slice:
