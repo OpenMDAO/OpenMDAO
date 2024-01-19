@@ -467,8 +467,7 @@ jobs:
         with:
           python-version: ${{ matrix.PY }}
           conda-version: "*"
-          channels: conda-forge,defaults
-          channel-priority: true
+          channels: conda-forge
 
       - name: Install OpenDMAO
         run: |
