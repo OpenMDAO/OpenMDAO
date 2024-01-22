@@ -49,8 +49,7 @@ jobs:
         with:
           python-version: 3.11
           conda-version: "*"
-          channels: conda-forge,defaults
-          channel-priority: true
+          channels: conda-forge
 
       - name: Install lxml
         if: matrix.OS == 'windows-latest'
