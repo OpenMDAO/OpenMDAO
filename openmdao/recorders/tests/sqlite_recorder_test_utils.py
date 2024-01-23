@@ -176,10 +176,13 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
 
                         # ivc sources
                         if vartype == 'outputs' and key in prom2abs['input']:
-                            prom_in = prom2abs['input'][key][0]
-                            src_key = conns[prom_in]
+                            abs_in = prom2abs['input'][key][0]
+                            src_key = conns[abs_in]
                         else:
-                            src_key = key
+                            if vartype == 'outputs' and key in prom2abs['output']:
+                                src_key = prom2abs['output'][key][0]
+                            else:
+                                src_key = key
 
                         # Check to see if the keys in the actual and expected match
                         test.assertTrue(src_key in actual.dtype.names,

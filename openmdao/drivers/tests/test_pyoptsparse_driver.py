@@ -425,7 +425,7 @@ class TestPyoptSparse(unittest.TestCase):
         assert_near_equal(prob['x'], 7.16667, 1e-6)
         assert_near_equal(prob['y'], -7.833334, 1e-6)
 
-        self.assertEqual(prob.driver._quantities, ['comp.f_xy'])
+        self.assertEqual(prob.driver._quantities, ['f_xy'])
 
         # make sure multiple driver runs don't grow the list of _quantities
         quants = copy.copy(prob.driver._quantities)
@@ -1522,7 +1522,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         self.assertTrue('In mode: rev.' in output)
-        self.assertTrue("('comp.f_xy', [0])" in output)
+        self.assertTrue("('f_xy', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
         prob = om.Problem()
@@ -1556,7 +1556,7 @@ class TestPyoptSparse(unittest.TestCase):
                              str(prob.driver.pyopt_solution.optInform))
 
         self.assertTrue('In mode: fwd.' in output)
-        self.assertTrue("('p2.y', [1])" in output)
+        self.assertTrue("('y', [1])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
     def test_debug_print_option_totals_no_ivc(self):
@@ -1593,7 +1593,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         self.assertTrue('In mode: rev.' in output)
-        self.assertTrue("('comp.f_xy', [0])" in output)
+        self.assertTrue("('f_xy', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
         prob = om.Problem()
@@ -1627,7 +1627,7 @@ class TestPyoptSparse(unittest.TestCase):
                              str(prob.driver.pyopt_solution.optInform))
 
         self.assertTrue('In mode: fwd.' in output)
-        self.assertTrue("('p2.y', [1])" in output)
+        self.assertTrue("('y', [1])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
     def test_debug_print_option(self):
@@ -1673,13 +1673,13 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertTrue(output.count("Objectives") > 1,
                         "Should be more than one objective header printed")
 
-        self.assertTrue(len([s for s in output if s.startswith("{'p1.x")]) > 1,
+        self.assertTrue(len([s for s in output if s.startswith("{'x")]) > 1,
                         "Should be more than one p1.x printed")
-        self.assertTrue(len([s for s in output if "'p2.y'" in s]) > 1,
+        self.assertTrue(len([s for s in output if "'y'" in s]) > 1,
                         "Should be more than one p2.y printed")
-        self.assertTrue(len([s for s in output if s.startswith("{'con.c")]) > 1,
+        self.assertTrue(len([s for s in output if s.startswith("{'c")]) > 1,
                         "Should be more than one con.c printed")
-        self.assertTrue(len([s for s in output if s.startswith("{'comp.f_xy")]) > 1,
+        self.assertTrue(len([s for s in output if s.startswith("{'f_xy")]) > 1,
                         "Should be more than one comp.f_xy printed")
 
     def test_show_exception_bad_opt(self):

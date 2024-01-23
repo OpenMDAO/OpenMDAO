@@ -76,8 +76,6 @@ class Driver(object):
         Object that manages all recorders added to this driver.
     _coloring_info : dict
         Metadata pertaining to total coloring.
-    _total_jac_sparsity : dict, str, or None
-        Specifies sparsity of sub-jacobians of the total jacobian. Only used by pyOptSparseDriver.
     _total_jac_format : str
         Specifies the format of the total jacobian. Allowed values are 'flat_dict', 'dict', and
         'array'.
@@ -177,7 +175,6 @@ class Driver(object):
 
         self._coloring_info = cmod._ColoringMeta()
 
-        self._total_jac_sparsity = None
         self._total_jac_format = 'flat_dict'
         self._res_subjacs = {}
         self._total_jac = None
@@ -357,11 +354,11 @@ class Driver(object):
 
             # Loop over all VOIs.
             for vname, voimeta in chain(self._responses.items(), self._designvars.items()):
-                # vname may be a abs output, promoted input, or an alias
+                # vname may be a promoted name or an alias
 
                 indices = voimeta['indices']
                 vsrc = voimeta['source']
-                drv_name = _src_or_alias_name(voimeta)
+                # drv_name = _src_or_alias_name(voimeta)
 
                 meta = abs2meta_out[vsrc]
                 i = abs2idx[vsrc]
@@ -387,9 +384,9 @@ class Driver(object):
                                 distrib_indices = dist_inds
 
                         ind = indexer(local_indices, src_shape=(tot_size,), flat_src=True)
-                        dist_dict[drv_name] = (ind, true_sizes, distrib_indices)
+                        dist_dict[vname] = (ind, true_sizes, distrib_indices)
                     else:
-                        dist_dict[drv_name] = (_flat_full_indexer, dist_sizes,
+                        dist_dict[vname] = (_flat_full_indexer, dist_sizes,
                                                slice(offsets[rank],
                                                      offsets[rank] + dist_sizes[rank]))
 
@@ -418,7 +415,7 @@ class Driver(object):
                 if model._owns_approx_jac:
                     coloring._check_config_partial(model)
                 else:
-                    coloring._check_config_total(self)
+                    coloring._check_config_total(self, model)
 
                 if not problem.model._use_derivatives:
                     issue_warning("Derivatives are turned off.  Skipping simul deriv coloring.",
@@ -737,9 +734,9 @@ class Driver(object):
         dict
            Dictionary containing values of each design variable.
         """
-        return {n: self._get_voi_val(n, dv, self._remote_dvs, get_remote=get_remote,
+        return {n: self._get_voi_val(n, dvmeta, self._remote_dvs, get_remote=get_remote,
                                      driver_scaling=driver_scaling)
-                for n, dv in self._designvars.items()}
+                for n, dvmeta in self._designvars.items()}
 
     def set_design_var(self, name, value, set_remote=True):
         """

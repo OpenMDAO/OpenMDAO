@@ -1320,7 +1320,7 @@ class LocalRangeIterable(object):
                 self._inds = range(slices[vname].stop - slices[vname].start)
             self._var_size = all_abs2meta[vname]['global_size']
 
-    def __str__(self):
+    def __repr__(self):
         """
         Return a string representation of the iterator.
 

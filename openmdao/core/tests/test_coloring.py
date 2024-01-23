@@ -697,16 +697,16 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         except:
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
+        # run w/o coloring
+        p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SLSQP', print_results=False)
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+
         p_color = run_opt(pyOptSparseDriver, 'fwd', optimizer='SLSQP', print_results=False,
                           dynamic_total_coloring=True)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
         # Tests a bug where coloring ran the model when not needed.
         self.assertEqual(p_color.model.iter_count, 9)
-
-        # run w/o coloring
-        p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SLSQP', print_results=False)
-        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
 
         p.model._solve_count = 0
         p_color.model._solve_count = 0

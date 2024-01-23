@@ -538,6 +538,9 @@ class Solver(object):
         """
         return self._system().get_reports_dir()
 
+    def use_relevance(self):
+        return True
+
 
 class NonlinearSolver(Solver):
     """
@@ -651,83 +654,84 @@ class NonlinearSolver(Solver):
         """
         Run the iterative solver.
         """
-        maxiter = self.options['maxiter']
-        atol = self.options['atol']
-        rtol = self.options['rtol']
-        iprint = self.options['iprint']
-        stall_limit = self.options['stall_limit']
-        stall_tol = self.options['stall_tol']
-
-        self._print_solve_header()
-
-        self._iter_count = 0
-        norm0, norm = self._iter_initialize()
-
-        self._norm0 = norm0
-
-        self._print_resid_norms(self._iter_count, norm, norm / norm0)
-
         system = self._system()
 
-        stalled = False
-        stall_count = 0
-        if stall_limit > 0:
-            stall_norm = norm0
+        with system._relevant.active(self.use_relevance()):
+            maxiter = self.options['maxiter']
+            atol = self.options['atol']
+            rtol = self.options['rtol']
+            iprint = self.options['iprint']
+            stall_limit = self.options['stall_limit']
+            stall_tol = self.options['stall_tol']
 
-        force_one_iteration = system.under_complex_step
+            self._print_solve_header()
 
-        while ((self._iter_count < maxiter and norm > atol and norm / norm0 > rtol and
-               not stalled) or force_one_iteration):
+            self._iter_count = 0
+            norm0, norm = self._iter_initialize()
 
-            if system.under_complex_step:
-                force_one_iteration = False
-
-            with Recording(type(self).__name__, self._iter_count, self) as rec:
-
-                if stall_count == 3 and not self.linesearch.options['print_bound_enforce']:
-
-                    self.linesearch.options['print_bound_enforce'] = True
-
-                    if self._system().pathname:
-                        pathname = f"{self._system().pathname}."
-                    else:
-                        pathname = ""
-
-                    msg = (f"Your model has stalled three times and may be violating the bounds. "
-                           f"In the future, turn on print_bound_enforce in your solver options "
-                           f"here: \n{pathname}nonlinear_solver.linesearch.options"
-                           f"['print_bound_enforce']=True. "
-                           f"\nThe bound(s) being violated now are:\n")
-                    issue_warning(msg, category=SolverWarning)
-
-                    self._single_iteration()
-                    self.linesearch.options['print_bound_enforce'] = False
-                else:
-                    self._single_iteration()
-
-                self._iter_count += 1
-                self._run_apply()
-                norm = self._iter_get_norm()
-
-                # Save the norm values in the context manager so they can also be recorded.
-                rec.abs = norm
-                if norm0 == 0:
-                    norm0 = 1
-                rec.rel = norm / norm0
-
-                # Check if convergence is stalled.
-                if stall_limit > 0:
-                    rel_norm = rec.rel
-                    norm_diff = np.abs(stall_norm - rel_norm)
-                    if norm_diff <= stall_tol:
-                        stall_count += 1
-                        if stall_count >= stall_limit:
-                            stalled = True
-                    else:
-                        stall_count = 0
-                        stall_norm = rel_norm
+            self._norm0 = norm0
 
             self._print_resid_norms(self._iter_count, norm, norm / norm0)
+
+            stalled = False
+            stall_count = 0
+            if stall_limit > 0:
+                stall_norm = norm0
+
+            force_one_iteration = system.under_complex_step
+
+            while ((self._iter_count < maxiter and norm > atol and norm / norm0 > rtol and
+                not stalled) or force_one_iteration):
+
+                if system.under_complex_step:
+                    force_one_iteration = False
+
+                with Recording(type(self).__name__, self._iter_count, self) as rec:
+
+                    if stall_count == 3 and not self.linesearch.options['print_bound_enforce']:
+
+                        self.linesearch.options['print_bound_enforce'] = True
+
+                        if self._system().pathname:
+                            pathname = f"{self._system().pathname}."
+                        else:
+                            pathname = ""
+
+                        msg = ("Your model has stalled three times and may be violating the bounds."
+                               " In the future, turn on print_bound_enforce in your solver options "
+                               f"here: \n{pathname}nonlinear_solver.linesearch.options"
+                               "['print_bound_enforce']=True. \nThe bound(s) being violated now "
+                               "are:\n")
+                        issue_warning(msg, category=SolverWarning)
+
+                        self._single_iteration()
+                        self.linesearch.options['print_bound_enforce'] = False
+                    else:
+                        self._single_iteration()
+
+                    self._iter_count += 1
+                    self._run_apply()
+                    norm = self._iter_get_norm()
+
+                    # Save the norm values in the context manager so they can also be recorded.
+                    rec.abs = norm
+                    if norm0 == 0:
+                        norm0 = 1
+                    rec.rel = norm / norm0
+
+                    # Check if convergence is stalled.
+                    if stall_limit > 0:
+                        rel_norm = rec.rel
+                        norm_diff = np.abs(stall_norm - rel_norm)
+                        if norm_diff <= stall_tol:
+                            stall_count += 1
+                            if stall_count >= stall_limit:
+                                stalled = True
+                        else:
+                            stall_count = 0
+                            stall_norm = rel_norm
+
+                self._print_resid_norms(self._iter_count, norm, norm / norm0)
 
         # flag for the print statements. we only print on root if USE_PROC_FILES is not set to True
         print_flag = system.comm.rank == 0 or os.environ.get('USE_PROC_FILES')
@@ -987,32 +991,33 @@ class LinearSolver(Solver):
         rtol = self.options['rtol']
         iprint = self.options['iprint']
 
-        self._print_solve_header()
+        with self._system()._relevant.active(self.use_relevance()):
+            self._print_solve_header()
 
-        self._iter_count = 0
-        norm0, norm = self._iter_initialize()
+            self._iter_count = 0
+            norm0, norm = self._iter_initialize()
 
-        self._norm0 = norm0
+            self._norm0 = norm0
 
-        system = self._system()
-
-        self._print_resid_norms(self._iter_count, norm, norm / norm0)
-
-        while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol:
-
-            with Recording(type(self).__name__, self._iter_count, self) as rec:
-                self._single_iteration()
-                self._iter_count += 1
-                self._run_apply()
-                norm = self._iter_get_norm()
-
-                # Save the norm values in the context manager so they can also be recorded.
-                rec.abs = norm
-                if norm0 == 0:
-                    norm0 = 1
-                rec.rel = norm / norm0
+            system = self._system()
 
             self._print_resid_norms(self._iter_count, norm, norm / norm0)
+
+            while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol:
+
+                with Recording(type(self).__name__, self._iter_count, self) as rec:
+                    self._single_iteration()
+                    self._iter_count += 1
+                    self._run_apply()
+                    norm = self._iter_get_norm()
+
+                    # Save the norm values in the context manager so they can also be recorded.
+                    rec.abs = norm
+                    if norm0 == 0:
+                        norm0 = 1
+                    rec.rel = norm / norm0
+
+                self._print_resid_norms(self._iter_count, norm, norm / norm0)
 
         # flag for the print statements. we only print on root if USE_PROC_FILES is not set to True
         print_flag = system.comm.rank == 0 or os.environ.get('USE_PROC_FILES')

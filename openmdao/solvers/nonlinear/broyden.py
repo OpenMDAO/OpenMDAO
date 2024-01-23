@@ -564,39 +564,40 @@ class BroydenSolver(NonlinearSolver):
         approx_status = system._owns_approx_jac
         system._owns_approx_jac = False
 
-        # Linearize model.
-        ln_solver = self.linear_solver
-        do_sub_ln = ln_solver._linearize_children()
-        my_asm_jac = ln_solver._assembled_jac
-        system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
-        if my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac:
-            my_asm_jac._update(system)
-        self._linearize()
+        try:
+            # Linearize model.
+            ln_solver = self.linear_solver
+            do_sub_ln = ln_solver._linearize_children()
+            my_asm_jac = ln_solver._assembled_jac
+            system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
+            if my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac:
+                my_asm_jac._update(system)
+            self._linearize()
 
-        for wrt_name in states:
-            i_wrt, j_wrt = self._idx[wrt_name]
-            if wrt_name in d_res:
-                d_wrt = d_res[wrt_name]
-
-            for j in range(j_wrt - i_wrt):
-
-                # Increment each variable.
+            for wrt_name in states:
+                i_wrt, j_wrt = self._idx[wrt_name]
                 if wrt_name in d_res:
-                    d_wrt[j] = 1.0
+                    d_wrt = d_res[wrt_name]
 
-                # Solve for total derivatives.
-                ln_solver.solve('fwd')
+                for j in range(j_wrt - i_wrt):
 
-                # Extract results.
-                for of_name in states:
-                    i_of, j_of = self._idx[of_name]
-                    inv_jac[i_of:j_of, i_wrt + j] = d_out[of_name]
+                    # Increment each variable.
+                    if wrt_name in d_res:
+                        d_wrt[j] = 1.0
 
-                if wrt_name in d_res:
-                    d_wrt[j] = 0.0
+                    # Solve for total derivatives.
+                    ln_solver.solve('fwd')
 
-        # Enable local fd
-        system._owns_approx_jac = approx_status
+                    # Extract results.
+                    for of_name in states:
+                        i_of, j_of = self._idx[of_name]
+                        inv_jac[i_of:j_of, i_wrt + j] = d_out[of_name]
+
+                    if wrt_name in d_res:
+                        d_wrt[j] = 0.0
+        finally:
+            # Enable local fd
+            system._owns_approx_jac = approx_status
 
         return inv_jac
 
@@ -617,18 +618,19 @@ class BroydenSolver(NonlinearSolver):
         approx_status = system._owns_approx_jac
         system._owns_approx_jac = False
 
-        # Linearize model.
-        ln_solver = self.linear_solver
-        do_sub_ln = ln_solver._linearize_children()
-        my_asm_jac = ln_solver._assembled_jac
-        system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
-        if my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac:
-            my_asm_jac._update(system)
+        try:
+            # Linearize model.
+            ln_solver = self.linear_solver
+            do_sub_ln = ln_solver._linearize_children()
+            my_asm_jac = ln_solver._assembled_jac
+            system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
+            if my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac:
+                my_asm_jac._update(system)
 
-        inv_jac = self.linear_solver._inverse()
-
-        # Enable local fd
-        system._owns_approx_jac = approx_status
+            inv_jac = self.linear_solver._inverse()
+        finally:
+            # Enable local fd
+            system._owns_approx_jac = approx_status
 
         return inv_jac
 

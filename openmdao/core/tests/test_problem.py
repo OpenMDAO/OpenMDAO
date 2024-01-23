@@ -424,7 +424,7 @@ class TestProblem(unittest.TestCase):
 
         derivs = p.compute_totals()
 
-        assert_near_equal(derivs['calc.y', 'des_vars.x'], [[2.0]], 1e-6)
+        assert_near_equal(derivs['y', 'x'], [[2.0]], 1e-6)
 
     @parameterized.expand(itertools.product(['fwd', 'rev']))
     def test_compute_jacvec_product(self, mode):
@@ -1711,8 +1711,8 @@ class TestProblem(unittest.TestCase):
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
         self.assertRegex(output[5], r'^z +\|[0-9. e+-]+\| +2')
-        self.assertRegex(output[14], r'^con_cmp2.con2 +\[[0-9. e+-]+\] +1')
-        self.assertRegex(output[21], r'^obj_cmp.obj +\[[0-9. e+-]+\] +1')
+        self.assertRegex(output[14], r'^con2 +\[[0-9. e+-]+\] +1')
+        self.assertRegex(output[21], r'^obj +\[[0-9. e+-]+\] +1')
 
         # With all the optional columns
         stdout = sys.stdout

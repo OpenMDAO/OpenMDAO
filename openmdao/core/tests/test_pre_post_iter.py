@@ -195,7 +195,7 @@ class TestPrePostIter(unittest.TestCase):
         prob = self.setup_problem(do_pre_post_opt=True, coloring=True, group=True, mode='auto', set_vois=False)
         prob.final_setup()
         prob.run_model()
-        
+
         J = prob.compute_totals(of=['iter2.y', 'iter3.y'], wrt=['iter1.x3'], use_coloring=True)
 
         data = prob.check_totals(of=['iter2.y', 'iter3.y'], wrt=['iter1.x3'], out_stream=None)
@@ -537,7 +537,7 @@ class TestPrePostIter(unittest.TestCase):
                 prob.run_model()
 
                 J = prob.compute_totals(return_format='flat_dict')
-                assert_near_equal(J[('obj_cmp.obj', 'pz.z')], np.array([[9.62568658, 1.78576699]]), .00001)
+                assert_near_equal(J[('obj', 'z')], np.array([[9.62568658, 1.78576699]]), .00001)
 
     def test_reading_system_cases_pre_opt_post(self):
         prob = self.setup_problem(do_pre_post_opt=True, mode='fwd', recording=True)

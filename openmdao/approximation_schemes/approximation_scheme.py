@@ -218,7 +218,6 @@ class ApproximationScheme(object):
             The system having its derivs approximated.
         """
         total = system.pathname == ''
-        abs2meta = system._var_allprocs_abs2meta
 
         in_slices = system._inputs.get_slice_dict()
         out_slices = system._outputs.get_slice_dict()
@@ -239,7 +238,9 @@ class ApproximationScheme(object):
             in_inds_directional = []
             vec_inds_directional = defaultdict(list)
 
+        print("MATCHES:", wrt_matches)
         for wrt, start, end, vec, _, _ in system._jac_wrt_iter(wrt_matches):
+            print('wrt', wrt, start, end)
             if wrt in self._wrt_meta:
                 meta = self._wrt_meta[wrt]
                 if coloring is not None and 'coloring' in meta:

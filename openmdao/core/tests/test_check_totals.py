@@ -1285,10 +1285,10 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         totals = prob.check_totals(out_stream=None)
 
-        assert_near_equal(totals['comp.areas', 'p1.widths']['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(totals['a2', 'p1.widths']['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(totals['a3', 'p1.widths']['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(totals['a4', 'p1.widths']['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(totals['areas', 'widths']['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(totals['a2', 'widths']['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(totals['a3', 'widths']['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(totals['a4', 'widths']['abs error'][0], 0.0, 1e-6)
 
         l = prob.list_problem_vars(show_promoted_name=True, print_arrays=False,
                                    cons_opts=['indices', 'alias'])

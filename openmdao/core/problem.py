@@ -1989,69 +1989,6 @@ class Problem(object):
                                    debug_print=debug_print, use_coloring=use_coloring)
         return total_info.compute_totals()
 
-    def _active_desvar_iter(self, names=None):
-        """
-        Yield (name, metadata) for each active design variable.
-
-        Parameters
-        ----------
-        names : iter of str or None
-            Iterator of design variable names.
-
-        Yields
-        ------
-        str
-            Promoted name of the design variable.
-        dict
-            Metadata for the design variable.
-        """
-        if names:
-            desvars = self.model.get_design_vars(recurse=True, get_sizes=True)
-            for name in names:
-                if name in desvars:
-                    yield name, desvars[name]
-                else:
-                    meta = {
-                        'parallel_deriv_color': None,
-                        'indices': None,
-                    }
-                    self.model._update_dv_meta(name, meta, get_size=True, use_prom_ivc=False)
-                    yield name, meta
-        else:  # use driver desvars
-            yield from self.driver._designvars.items()
-
-    def _active_response_iter(self, prom_names_or_aliases=None):
-        """
-        Yield (name, metadata) for each active response.
-
-        Parameters
-        ----------
-        prom_names_or_aliases : iter of str or None
-            Iterator of response promoted names or aliases.
-
-        Yields
-        ------
-        str
-            Promoted name or alias of the response.
-        dict
-            Metadata for the response.
-        """
-        if prom_names_or_aliases:
-            resps = self.model.get_responses(recurse=True, get_sizes=True)
-            for name in prom_names_or_aliases:
-                if name in resps:
-                    yield name, resps[name]
-                else:
-                    meta = {
-                        'parallel_deriv_color': None,
-                        'indices': None,
-                        'alias': None,
-                    }
-                    self.model._update_response_meta(name, meta, get_size=True)
-                    yield name, meta
-        else:  # use driver responses
-            yield from self.driver._responses.items()
-
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
         Control printing for solvers and subsolvers in the model.

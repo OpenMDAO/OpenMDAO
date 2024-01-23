@@ -85,14 +85,14 @@ class DistributedDriverDebugPrintOptionsTest(unittest.TestCase):
             self.assertTrue(output.count("Objectives") > 1,
                             "Should be more than one objective header printed")
 
-            self.assertTrue(len([s for s in output if 'par.G1.indep_var_comp.x' in s]) > 1,
-                            "Should be more than one par.G1.indep_var_comp.x printed")
-            self.assertTrue(len([s for s in output if 'par.G2.indep_var_comp.x' in s]) > 1,
-                            "Should be more than one par.G2.indep_var_comp.x printed")
-            self.assertTrue(len([s for s in output if 'par.G1.Cc.c' in s]) > 1,
-                            "Should be more than one par.G1.Cc.c printed")
-            self.assertTrue(len([s for s in output if 'par.G2.Cc.c' in s]) > 1,
-                            "Should be more than one par.G2.Cc.c printed")
+            self.assertTrue(len([s for s in output if 'par.G1.x' in s]) > 1,
+                            "Should be more than one par.G1.x printed")
+            self.assertTrue(len([s for s in output if 'par.G2.x' in s]) > 1,
+                            "Should be more than one par.G2.x printed")
+            self.assertTrue(len([s for s in output if 'par.G1.c' in s]) > 1,
+                            "Should be more than one par.G1.c printed")
+            self.assertTrue(len([s for s in output if 'par.G2.c' in s]) > 1,
+                            "Should be more than one par.G2.c printed")
             self.assertTrue(len([s for s in output if s.startswith('None')]) > 1,
                             "Should be more than one None printed")
             self.assertTrue(len([s for s in output if 'Obj.obj' in s]) > 1,

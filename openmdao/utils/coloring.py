@@ -810,7 +810,7 @@ class Coloring(object):
             raise TypeError("Can't save coloring.  Expected a string for fname but got a %s" %
                             type(fname).__name__)
 
-    def _check_config_total(self, driver):
+    def _check_config_total(self, driver, model):
         """
         Check the config of this total Coloring vs. the existing driver config.
 
@@ -819,10 +819,13 @@ class Coloring(object):
         driver : Driver
             Current driver object.
         """
-        of_names, of_sizes = _get_response_info(driver)
-        wrt_names, wrt_sizes = _get_desvar_info(driver)
+        ofs = model._active_responses(driver._get_ordered_nl_responses(), driver._responses)
+        of_sizes = [m['size'] for m in ofs.values()]
 
-        self._config_check_msgs(of_names, of_sizes, wrt_names, wrt_sizes, driver)
+        wrts = model._active_desvars(driver._designvars.keys(), driver._designvars)
+        wrt_sizes = [m['size'] for m in wrts.values()]
+
+        self._config_check_msgs(ofs, of_sizes, wrts, wrt_sizes, driver)
 
     def _check_config_partial(self, system):
         """
@@ -861,6 +864,7 @@ class Coloring(object):
         msg = ["%s: Current coloring configuration does not match the "
                "configuration of the current model." % obj.msginfo]
 
+        of_names = list(of_names)
         if of_names != self._row_vars:
             of_diff = set(of_names) - set(self._row_vars)
             if of_diff:
@@ -872,6 +876,7 @@ class Coloring(object):
                 else:
                     msg.append('   The row vars have changed order.')
 
+        wrt_names = list(wrt_names)
         if wrt_names != self._col_vars:
             wrt_diff = set(wrt_names) - set(self._col_vars)
             if wrt_diff:
@@ -2562,10 +2567,10 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
     """
     driver = problem.driver
 
-    # if of and wrt are None, ofs will be the 'driver' names of the responses (promoted or alias),
-    # and wrts will be the abs names of the wrt sources.
-    ofs, of_sizes = _get_response_info(driver, of)
-    wrts, wrt_sizes = _get_desvar_info(driver, wrt)
+    ofs, wrts, _ = problem.model._get_totals_metadata(driver, of, wrt)
+
+    of_sizes = [m['size'] for m in ofs.values()]
+    wrt_sizes = [m['size'] for m in wrts.values()]
 
     model = problem.model
 
@@ -2599,9 +2604,9 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
                                                    run_model=run_model, of=ofs, wrt=wrts)
         coloring = _compute_coloring(J, mode)
         if coloring is not None:
-            coloring._row_vars = ofs
+            coloring._row_vars = list(ofs)
             coloring._row_var_sizes = of_sizes
-            coloring._col_vars = wrts
+            coloring._col_vars = list(wrts)
             coloring._col_var_sizes = wrt_sizes
 
             # save metadata we used to create the coloring
@@ -3023,25 +3028,37 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
     """
     Set up internal data structures needed for computing approx totals.
     """
-    if of is None:
-        of = driver._get_ordered_nl_responses()
-    if wrt is None:
-        wrt = list(driver._designvars)
+    # if of is None:
+    #     ofdct = driver._responses
+    #     of = driver._get_ordered_nl_responses()
+    # else:
+    #     ofdct = of
+    #     of = list(ofdct)
+
+    # if wrt is None:
+    #     wrtdct = driver._designvars
+    # else:
+    #     wrtdct = wrt
+    # wrt = list(wrtdct)
+
+    if of is None or wrt is None:
+        of, wrt, _ = model._get_totals_metadata(driver, of, wrt)
 
     # Initialization based on driver (or user) -requested "of" and "wrt".
     if (not model._owns_approx_jac or model._owns_approx_of is None or
             model._owns_approx_of != of or model._owns_approx_wrt is None or
             model._owns_approx_wrt != wrt):
+
         model._owns_approx_of = of
         model._owns_approx_wrt = wrt
 
         # Support for indices defined on driver vars.
         model._owns_approx_of_idx = {
-            key: meta['indices'] for key, meta in _src_or_alias_item_iter(driver._responses)
+            key: meta['indices'] for key, meta in _src_or_alias_item_iter(of)
             if meta['indices'] is not None
         }
         model._owns_approx_wrt_idx = {
-            key: meta['indices'] for key, meta in _src_or_alias_item_iter(driver._designvars)
+            key: meta['indices'] for key, meta in _src_or_alias_item_iter(wrt)
             if meta['indices'] is not None
         }
 

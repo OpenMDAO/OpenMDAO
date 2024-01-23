@@ -180,6 +180,8 @@ class pyOptSparseDriver(Driver):
     _signal_cache : <Function>
         Cached function pointer that was assigned as handler for signal defined in option
         user_terminate_signal.
+    _total_jac_sparsity : dict, str, or None
+        Specifies sparsity of sub-jacobians of the total jacobian.
     _user_termination_flag : bool
         This is set to True when the user sends a signal to terminate the job.
     """
@@ -233,6 +235,7 @@ class pyOptSparseDriver(Driver):
         self._check_jac = False
         self._exc_info = None
         self._total_jac_format = 'dict'
+        self._total_jac_sparsity = None
 
         self.cite = CITATIONS
 
@@ -970,7 +973,7 @@ class pyOptSparseDriver(Driver):
                 rows = np.array(rows, dtype=INT_DTYPE)
                 cols = np.array(cols, dtype=INT_DTYPE)
 
-                self._res_subjacs[res][dv] = {
+                self._res_subjacs[res][self._designvars[dv]['source']] = {
                     'coo': [rows, cols, np.zeros(rows.size)],
                     'shape': shape,
                 }

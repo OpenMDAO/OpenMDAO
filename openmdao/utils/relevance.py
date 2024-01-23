@@ -188,10 +188,10 @@ class Relevance(object):
     ----------
     group : <System>
         The top level group in the system hierarchy.
-    abs_desvars : dict
-        Dictionary of absolute names of design variables.
-    abs_responses : dict
-        Dictionary of absolute names of response variables.
+    desvars : dict
+        Dictionary of design variables.  Keys don't matter.
+    responses : dict
+        Dictionary of response variables.  Keys don't matter.
 
     Attributes
     ----------
@@ -217,7 +217,7 @@ class Relevance(object):
         seed/target combination).
     """
 
-    def __init__(self, group, abs_desvars, abs_responses):
+    def __init__(self, group, desvars, responses):
         """
         Initialize all attributes.
         """
@@ -229,22 +229,31 @@ class Relevance(object):
         # all seed vars for the entire derivative computation
         self._all_seed_vars = {'fwd': (), 'rev': ()}
         self._local_seeds = set()  # set of seed vars restricted to local dependencies
-        self._active = None  # not initialized
         self._force_total = False
-        self._graph = self.get_relevance_graph(group, abs_desvars, abs_responses)
+        self._graph = self.get_relevance_graph(group, desvars, responses)
+        self._active = None  # not initialized
 
         # for any parallel deriv colored dv/responses, update the graph to include vars with
         # local only dependencies
-        for meta in abs_desvars.values():
+        for meta in desvars.values():
             if meta['parallel_deriv_color'] is not None:
                 self.set_seeds([meta['source']], 'fwd', local=True)
-        for meta in abs_responses.values():
+        for meta in responses.values():
             if meta['parallel_deriv_color'] is not None:
                 self.set_seeds([meta['source']], 'rev', local=True)
 
-        if abs_desvars and abs_responses:
-            self.set_all_seeds([m['source'] for m in abs_desvars.values()],
-                               [m['source'] for m in abs_responses.values()])
+        # print("DESVARS:")
+        # for m in desvars.values():
+        #     print('name', m['name'], 'src', m['source'])
+        # print("RESPONSES:")
+        # for m in responses.values():
+        #     print('name', m['name'], 'src', m['source'])
+
+        # self._active = False   # turn off relevance globally for debugging
+
+        if desvars and responses:
+            self.set_all_seeds([m['source'] for m in desvars.values()],
+                               [m['source'] for m in responses.values()])
         else:
             self._active = False
 
@@ -273,7 +282,6 @@ class Relevance(object):
         ------
         None
         """
-        self._check_active()
         if not self._active:  # if already inactive from higher level, don't change it
             yield
         else:
@@ -444,13 +452,6 @@ class Relevance(object):
 
         for s in self._seed_vars[direction]:
             self._init_relevance_set(s, direction, local=local)
-
-    def _check_active(self):
-        """
-        Activate if all_seed_vars and all_target_vars are set and active is None.
-        """
-        if self._active is None and self._all_seed_vars['fwd'] and self._all_seed_vars['rev']:
-            self._active = True
 
     def is_relevant(self, name, direction):
         """

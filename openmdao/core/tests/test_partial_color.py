@@ -305,16 +305,18 @@ def _check_partial_matrix(system, jac, expected, method):
 
 
 def _check_total_matrix(system, jac, expected, method):
-    blocks = []
-    for of in system._var_allprocs_abs2meta['output']:
-        cblocks = []
-        for wrt in itertools.chain(system._var_allprocs_abs2meta['output'], system._var_allprocs_abs2meta['input']):
-            key = (of, wrt)
-            if key in jac:
-                cblocks.append(jac[key])
-        if cblocks:
-            blocks.append(np.hstack(cblocks))
-    fullJ = np.vstack(blocks)
+    ofs = {}
+    for key, subjac in jac.items():
+        of, wrt = key
+        if of not in ofs:
+            ofs[of] = [subjac]
+        else:
+            ofs[of].append(subjac)
+            
+    for of, sjacs in ofs.items():
+        ofs[of] = np.hstack(sjacs)
+        
+    fullJ = np.vstack(ofs.values())
     np.testing.assert_allclose(fullJ, expected, rtol=_TOLS[method])
 
 

@@ -634,7 +634,7 @@ class System(object):
         Iterate over (name, offset, end, slice, dist_sizes) for each 'of' (row) var in the jacobian.
 
         The slice is internal to the given variable in the result, and this is always a full
-        slice except possible for groups where _owns_approx_of_idx is defined.
+        slice except when indices are defined for the 'of' variable.
 
         Yields
         ------
@@ -1037,7 +1037,7 @@ class System(object):
                                equals=_UNDEFINED, lower=_UNDEFINED, upper=_UNDEFINED,
                                adder=_UNDEFINED, scaler=_UNDEFINED, alias=_UNDEFINED):
         """
-        Set options for objectives in the model.
+        Set options for constraints in the model.
 
         Can be used to set options that were set using add_constraint.
 
@@ -1416,7 +1416,10 @@ class System(object):
 
     def _get_approx_subjac_keys(self):
         """
-        Return a list of (of, wrt) keys needed for approx derivs for this group.
+        Return a list of (of, wrt) keys needed for approx derivs for this system.
+
+        If this is the top level group, the keys will be promoted names and/or
+        aliases.  If not, they will be absolute names.
 
         Returns
         -------
@@ -1425,6 +1428,7 @@ class System(object):
         """
         if self._approx_subjac_keys is None:
             self._approx_subjac_keys = list(self._approx_subjac_keys_iter())
+            # print("APPROX SUBJAC KEYS:", self._approx_subjac_keys)
 
         return self._approx_subjac_keys
 
@@ -3029,8 +3033,6 @@ class System(object):
             except ValueError as e:
                 raise ValueError(f"{str(e)[:-1]} for design_var '{name}'.")
 
-        dv = {}
-
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
         ref0 = format_as_float_or_array('ref0', ref0, val_if_none=None, flatten=True)
@@ -3066,35 +3068,36 @@ class System(object):
                 scaler = None
         elif scaler == 1.0:
             scaler = None
-        dv['scaler'] = scaler
-        dv['total_scaler'] = scaler
 
         if isinstance(adder, np.ndarray):
             if not np.any(adder):
                 adder = None
         elif adder == 0.0:
             adder = None
-        dv['adder'] = adder
-        dv['total_adder'] = adder
-
-        dv['name'] = name
-        dv['upper'] = upper
-        dv['lower'] = lower
-        dv['ref'] = ref
-        dv['ref0'] = ref0
-        dv['units'] = units
-        dv['cache_linear_solution'] = cache_linear_solution
 
         if indices is not None:
-            indices, size = self._create_indexer(indices, 'design var', name, flat_src=flat_indices)
-            if size is not None:
-                dv['size'] = size
+            indices, size = self._create_indexer(indices, 'design var', name,
+                                                  flat_src=flat_indices)
+        else:
+            size = None
 
-        dv['indices'] = indices
-        dv['flat_indices'] = flat_indices
-        dv['parallel_deriv_color'] = parallel_deriv_color
-
-        design_vars[name] = dv
+        design_vars[name] = {
+            'adder': adder,
+            'scaler': scaler,
+            'name': name,
+            'upper': upper,
+            'lower': lower,
+            'ref': ref,
+            'ref0': ref0,
+            'units': units,
+            'cache_linear_solution': cache_linear_solution,
+            'total_scaler': scaler,
+            'total_adder': adder,
+            'indices': indices,
+            'flat_indices': flat_indices,
+            'parallel_deriv_color': parallel_deriv_color,
+            'size': size,
+        }
 
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, index=None, units=None,
@@ -3185,8 +3188,6 @@ class System(object):
 
         resp['name'] = name
         resp['alias'] = alias
-        if alias is not None:
-            name = alias
 
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
@@ -3198,7 +3199,11 @@ class System(object):
         # A constraint cannot be an equality and inequality constraint
         if equals is not None and (lower is not None or upper is not None):
             msg = "{}: Constraint '{}' cannot be both equality and inequality."
-            raise ValueError(msg.format(self.msginfo, name))
+            if alias is not None:
+                namestr = f"'{name}' (alias '{alias}')"
+            else:
+                namestr = name
+            raise ValueError(msg.format(self.msginfo, namestr))
 
         if type_ == 'con':
 
@@ -3289,7 +3294,10 @@ class System(object):
             raise TypeError(f"{self.msginfo}: Constraint alias '{alias}' is a duplicate of an "
                             "existing alias or variable name.")
 
-        responses[name] = resp
+        if alias is not None:
+            responses[alias] = resp
+        else:
+            responses[name] = resp
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None, units=None,
@@ -3431,14 +3439,12 @@ class System(object):
                           cache_linear_solution=cache_linear_solution,
                           flat_indices=flat_indices, alias=alias)
 
-    def _update_dv_meta(self, prom_name, meta, get_size=False, use_prom_ivc=False):
+    def _update_dv_meta(self, meta, get_size=False, use_prom_ivc=False):
         """
         Update the design variable metadata.
 
         Parameters
         ----------
-        prom_name : str
-            Promoted name of the design variable in the system.
         meta : dict
             Metadata dictionary that is populated by this method.
         get_size : bool
@@ -3446,48 +3452,47 @@ class System(object):
         use_prom_ivc : bool
             Determines whether return key is promoted name or source name.
         """
-        pro2abs_out = self._var_allprocs_prom2abs_list['output']
-        pro2abs_in = self._var_allprocs_prom2abs_list['input']
         model = self._problem_meta['model_ref']()
-        conns = model._conn_global_abs_in2out
+        pro2abs_out = self._var_allprocs_prom2abs_list['output']
         abs2meta_out = model._var_allprocs_abs2meta['output']
+        prom_name = meta['name']
 
         if prom_name in pro2abs_out:  # promoted output
-            abs_out = pro2abs_out[prom_name][0]
-            key = abs_out
+            src_name = pro2abs_out[prom_name][0]
             meta['orig'] = (prom_name, None)
 
         else:  # Design variable on an input connected to an ivc.
-            abs_out = conns[pro2abs_in[prom_name][0]]
-            key = prom_name if use_prom_ivc else abs_out
+            pro2abs_in = self._var_allprocs_prom2abs_list['input']
+            src_name = model._conn_global_abs_in2out[pro2abs_in[prom_name][0]]
             meta['orig'] = (None, prom_name)
 
-        meta['source'] = abs_out
+        key = prom_name if use_prom_ivc else src_name
+
+        meta['source'] = src_name
         meta['distributed'] = \
-            abs_out in abs2meta_out and abs2meta_out[abs_out]['distributed']
+            src_name in abs2meta_out and abs2meta_out[src_name]['distributed']
 
         if get_size:
             if 'indices' not in meta:
                 meta['indices'] = None
-            sizes = model._var_sizes['output']
             abs2idx = model._var_allprocs_abs2idx
-            src_name = meta['source']
 
-            if 'size' in meta:
-                meta['size'] = int(meta['size'])  # make default int so will be json serializable
-            else:
-                if src_name in abs2idx:
-                    if meta['distributed']:
-                        meta['size'] = sizes[model.comm.rank, abs2idx[src_name]]
-                    else:
-                        meta['size'] = sizes[model._owning_rank[src_name], abs2idx[src_name]]
-                else:
-                    meta['size'] = 0  # discrete var, don't know size
+            # sizes = model._var_sizes['output']
+            # if 'size' in meta and meta['size'] is not None:
+            #     meta['size'] = int(meta['size'])  # make int so will be json serializable
+            # else:
+            #     if src_name in abs2idx:
+            #         if meta['distributed']:
+            #             meta['size'] = sizes[model.comm.rank, abs2idx[src_name]]
+            #         else:
+            #             meta['size'] = sizes[model._owning_rank[src_name], abs2idx[src_name]]
+            #     else:
+            #         meta['size'] = 0  # discrete var, don't know size
 
             if src_name in abs2idx:  # var is continuous
-                indices = meta['indices']
                 vmeta = abs2meta_out[src_name]
                 meta['distributed'] = vmeta['distributed']
+                indices = meta['indices']
                 if indices is not None:
                     # Index defined in this design var.
                     # update src shapes for Indexer objects
@@ -3495,9 +3500,10 @@ class System(object):
                     indices = indices.shaped_instance()
                     meta['size'] = meta['global_size'] = indices.indexed_src_size
                 else:
+                    meta['size'] = vmeta['size']
                     meta['global_size'] = vmeta['global_size']
             else:
-                meta['global_size'] = 0  # discrete var
+                meta['global_size'] = meta['size'] = 0  # discrete var
 
         return key
 
@@ -3533,7 +3539,7 @@ class System(object):
         Parameters
         ----------
         recurse : bool
-            If True, recurse through the subsystems and return the path of
+            If True, recurse through the subsystems of a group and return the path of
             all design vars relative to the this system.
         get_sizes : bool, optional
             If True, compute the size of each design variable.
@@ -3548,11 +3554,11 @@ class System(object):
         """
         out = {}
         try:
-            for prom_name, data in self._design_vars.items():
+            for data in self._design_vars.values():
                 if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
                     self._problem_meta['has_par_deriv_color'] = True
 
-                key = self._update_dv_meta(prom_name, data, get_size=get_sizes,
+                key = self._update_dv_meta(data, get_size=get_sizes,
                                            use_prom_ivc=use_prom_ivc)
                 if get_sizes and data['source'] in self._var_allprocs_abs2idx:
                     self._check_voi_meta_sizes(
@@ -3565,14 +3571,12 @@ class System(object):
 
         return out
 
-    def _update_response_meta(self, prom_name, meta, get_size=False, use_prom_ivc=False):
+    def _update_response_meta(self, meta, get_size=False, use_prom_ivc=False):
         """
         Update the design variable metadata.
 
         Parameters
         ----------
-        prom_name : str
-            Promoted name of the design variable in the system.
         meta : dict
             Metadata dictionary.
         get_size : bool
@@ -3587,10 +3591,7 @@ class System(object):
         abs2meta_out = model._var_allprocs_abs2meta['output']
 
         alias = meta['alias']
-        try:
-            prom = meta['name']  # always a promoted var name
-        except KeyError:
-            meta['name'] = prom = prom_name
+        prom = meta['name']  # always a promoted name
 
         if alias is not None:
             if alias in prom2abs_out or alias in prom2abs_in:
@@ -3601,32 +3602,28 @@ class System(object):
             meta['alias_path'] = self.pathname
 
         if prom in prom2abs_out:  # promoted output
-            abs_out = prom2abs_out[prom][0]
+            src_name = prom2abs_out[prom][0]
         else:  # promoted input
-            abs_out = conns[prom2abs_in[prom][0]]
+            src_name = conns[prom2abs_in[prom][0]]
 
         if alias:
             key = alias
-        elif prom in prom2abs_out or not use_prom_ivc:
-            key = abs_out
-        else:
+        elif use_prom_ivc:
             key = prom
+        else:
+            key = src_name
 
-        meta['source'] = abs_out
+        meta['source'] = src_name
         meta['distributed'] = \
-            abs_out in abs2meta_out and abs2meta_out[abs_out]['distributed']
+            src_name in abs2meta_out and abs2meta_out[src_name]['distributed']
 
         if get_size:
-            # Size them all
             sizes = model._var_sizes['output']
             abs2idx = model._var_allprocs_abs2idx
             owning_rank = model._owning_rank
 
-            # Discrete vars
-            if abs_out not in abs2idx:
-                meta['size'] = meta['global_size'] = 0  # discrete var, don't know size
-            else:
-                out_meta = abs2meta_out[abs_out]
+            if src_name in abs2idx:
+                out_meta = abs2meta_out[src_name]
 
                 if 'indices' in meta and meta['indices'] is not None:
                     indices = meta['indices']
@@ -3634,8 +3631,10 @@ class System(object):
                     indices = indices.shaped_instance()
                     meta['size'] = meta['global_size'] = indices.indexed_src_size
                 else:
-                    meta['size'] = sizes[owning_rank[abs_out], abs2idx[abs_out]]
+                    meta['size'] = sizes[owning_rank[src_name], abs2idx[src_name]]
                     meta['global_size'] = out_meta['global_size']
+            else:
+                meta['size'] = meta['global_size'] = 0  # discrete var, don't know size
 
         return key
 
@@ -3667,11 +3666,11 @@ class System(object):
         out = {}
         try:
             # keys of self._responses are the alias or the promoted name
-            for prom_or_alias, data in self._responses.items():
+            for data in self._responses.values():
                 if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
                     self._problem_meta['has_par_deriv_color'] = True
 
-                key = self._update_response_meta(prom_or_alias, data, get_size=get_sizes,
+                key = self._update_response_meta(data, get_size=get_sizes,
                                                  use_prom_ivc=use_prom_ivc)
                 if get_sizes:
                     self._check_voi_meta_sizes(
@@ -4468,7 +4467,7 @@ class System(object):
         with self._scaled_context_all():
             self._solve_linear(mode, _contains_all)
 
-    def run_linearize(self, sub_do_ln=True):
+    def run_linearize(self, sub_do_ln=True, driver=None):
         """
         Compute jacobian / factorization.
 
@@ -4478,7 +4477,19 @@ class System(object):
         ----------
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
+        driver : Driver or None
+            If this system is the top level system and approx derivatives have not been
+            initialized, the driver for this model must be supplied in order to properly
+            initialize the approximations.
         """
+        #if self.pathname == '' and self._owns_approx_jac:
+            #if not self._owns_approx_of:  # approx not initialized
+                #if driver is None:
+                    #raise RuntimeError(self.msginfo + ": driver must be supplied when calling "
+                                       #"run_linearize on the root system if approximations have "
+                                       #"not been initialized.")
+                #coloring_mod._initialize_model_approx(self, driver)
+
         with self._scaled_context_all():
             do_ln = self._linear_solver is not None and self._linear_solver._linearize_children()
             self._linearize(self._assembled_jac, sub_do_ln=do_ln)
