@@ -2,7 +2,7 @@
 Class definition for SqliteRecorder, which provides dictionary backed by SQLite.
 """
 
-from copy import deepcopy
+from copy import copy
 from io import BytesIO
 
 import os
@@ -304,11 +304,13 @@ class SqliteRecorder(CaseRecorder):
         var_settings : dict
             Dictionary mapping absolute variable names to var settings that are JSON compatible.
         """
-        # otherwise we trample on values that are used elsewhere
-        var_settings = deepcopy(var_settings)
-        for name in var_settings:
-            for prop in var_settings[name]:
-                var_settings[name][prop] = make_serializable(var_settings[name][prop])
+        # var_settings is already a copy at the outer level, so we just have to copy the
+        # inner dicts to prevent modifying the original designvars, objectives, and constraints.
+        for name, meta in var_settings.items():
+            meta = meta.copy()
+            for prop, val in meta.items():
+                meta[prop] = make_serializable(val)
+            var_settings[name] = meta
         return var_settings
 
     def startup(self, recording_requester, comm=None):
@@ -449,6 +451,8 @@ class SqliteRecorder(CaseRecorder):
             conns = zlib.compress(json.dumps(
                 system._problem_meta['model_ref']()._conn_global_abs_in2out).encode('ascii'))
 
+            # TODO: seems like we could clobber the var_settings for a desvar in cases where a
+            # desvar is also a constraint... Make a test case and fix if needed.
             var_settings = {}
             var_settings.update(desvars)
             var_settings.update(objectives)

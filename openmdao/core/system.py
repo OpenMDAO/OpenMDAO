@@ -3683,7 +3683,7 @@ class System(object):
 
         return out
 
-    def get_constraints(self, recurse=True, get_sizes=True, use_prom_ivc=False):
+    def get_constraints(self, recurse=True, get_sizes=True, use_prom_ivc=True):
         """
         Get the Constraint settings from this system.
 
@@ -3712,7 +3712,7 @@ class System(object):
             if response['type'] == 'con'
         }
 
-    def get_objectives(self, recurse=True, get_sizes=True, use_prom_ivc=False):
+    def get_objectives(self, recurse=True, get_sizes=True, use_prom_ivc=True):
         """
         Get the Objective settings from this system.
 

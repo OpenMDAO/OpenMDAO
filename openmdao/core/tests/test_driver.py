@@ -47,10 +47,10 @@ class TestDriver(unittest.TestCase):
         self.assertEqual(designvars['z'][0], 5.0 )
 
         designvars = prob.driver.get_objective_values()
-        self.assertEqual(designvars['obj_cmp.obj'], prob['obj'] )
+        self.assertEqual(designvars['obj'], prob['obj'] )
 
         designvars = prob.driver.get_constraint_values()
-        self.assertEqual(designvars['con_cmp1.con1'], prob['con1']  )
+        self.assertEqual(designvars['con1'], prob['con1']  )
 
     def test_scaled_design_vars(self):
 
@@ -88,7 +88,7 @@ class TestDriver(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        cv = prob.driver.get_constraint_values()['con_cmp1.con1'][0]
+        cv = prob.driver.get_constraint_values()['con1'][0]
         base = prob['con1']
         self.assertEqual((base-3.0)/(2.0-3.0), cv)
 
@@ -105,7 +105,7 @@ class TestDriver(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        cv = prob.driver.get_objective_values()['obj_cmp.obj'][0]
+        cv = prob.driver.get_objective_values()['obj'][0]
         base = prob['obj']
         self.assertEqual((base-3.0)/(2.0-3.0), cv)
 
@@ -319,8 +319,8 @@ class TestDriver(unittest.TestCase):
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
-        self.assertIn("{('obj_cmp.obj', 'z'):", output[12])
-        self.assertIn("{('con_cmp1.con1', 'z'):", output[13])
+        self.assertIn("{('obj', 'z'):", output[12])
+        self.assertIn("{('con1', 'z'):", output[13])
 
     def test_debug_print_desvar_physical_with_indices(self):
         prob = om.Problem()
@@ -506,21 +506,21 @@ class TestDriver(unittest.TestCase):
         prob.run_driver()
 
         dv = prob.driver.get_design_var_values()
-        assert_near_equal(dv['p.x'][0], 3.0 * 5 / 9, 1e-8)
+        assert_near_equal(dv['x'][0], 3.0 * 5 / 9, 1e-8)
 
         obj = prob.driver.get_objective_values(driver_scaling=True)
-        assert_near_equal(obj['comp2.y2'][0], 73.0 * 5 / 9, 1e-8)
+        assert_near_equal(obj['y2'][0], 73.0 * 5 / 9, 1e-8)
 
         con = prob.driver.get_constraint_values(driver_scaling=True)
-        assert_near_equal(con['comp1.y1'][0], 38.0 * 5 / 9, 1e-8)
+        assert_near_equal(con['y1'][0], 38.0 * 5 / 9, 1e-8)
 
         meta = model.get_design_vars()
-        assert_near_equal(meta['p.x']['lower'], 0.0, 1e-7)
-        assert_near_equal(meta['p.x']['upper'], 100.0, 1e-7)
+        assert_near_equal(meta['x']['lower'], 0.0, 1e-7)
+        assert_near_equal(meta['x']['upper'], 100.0, 1e-7)
 
         meta = model.get_constraints()
-        assert_near_equal(meta['comp1.y1']['lower'], 0.0, 1e-7)
-        assert_near_equal(meta['comp1.y1']['upper'], 100.0, 1e-7)
+        assert_near_equal(meta['y1']['lower'], 0.0, 1e-7)
+        assert_near_equal(meta['y1']['upper'], 100.0, 1e-7)
 
         stdout = sys.stdout
         strout = StringIO()
@@ -565,21 +565,21 @@ class TestDriver(unittest.TestCase):
         prob.run_driver()
 
         dv = prob.driver.get_design_var_values()
-        assert_near_equal(dv['p.x'][0], 35.0, 1e-8)
+        assert_near_equal(dv['x'][0], 35.0, 1e-8)
 
         obj = prob.driver.get_objective_values(driver_scaling=True)
-        assert_near_equal(obj['comp2.y2'][0], 105.0, 1e-8)
+        assert_near_equal(obj['y2'][0], 105.0, 1e-8)
 
         con = prob.driver.get_constraint_values(driver_scaling=True)
-        assert_near_equal(con['comp1.y1'][0], 70.0, 1e-8)
+        assert_near_equal(con['y1'][0], 70.0, 1e-8)
 
         meta = model.get_design_vars()
-        self.assertEqual(meta['p.x']['scaler'], None)
-        self.assertEqual(meta['p.x']['adder'], None)
+        self.assertEqual(meta['x']['scaler'], None)
+        self.assertEqual(meta['x']['adder'], None)
 
         meta = model.get_constraints()
-        self.assertEqual(meta['comp1.y1']['scaler'], None)
-        self.assertEqual(meta['comp1.y1']['adder'], None)
+        self.assertEqual(meta['y1']['scaler'], None)
+        self.assertEqual(meta['y1']['adder'], None)
 
     def test_units_with_scaling(self):
         prob = om.Problem()
@@ -615,21 +615,21 @@ class TestDriver(unittest.TestCase):
         prob.run_driver()
 
         dv = prob.driver.get_design_var_values()
-        assert_near_equal(dv['p.x'][0], ((3.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
+        assert_near_equal(dv['x'][0], ((3.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
 
         obj = prob.driver.get_objective_values(driver_scaling=True)
-        assert_near_equal(obj['comp2.y2'][0], ((73.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
+        assert_near_equal(obj['y2'][0], ((73.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
 
         con = prob.driver.get_constraint_values(driver_scaling=True)
-        assert_near_equal(con['comp1.y1'][0], ((38.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
+        assert_near_equal(con['y1'][0], ((38.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
 
         meta = model.get_design_vars()
-        assert_near_equal(meta['p.x']['lower'], ((0.0) + 77.0) * 3.5, 1e-7)
-        assert_near_equal(meta['p.x']['upper'], ((100.0) + 77.0) * 3.5, 1e-7)
+        assert_near_equal(meta['x']['lower'], ((0.0) + 77.0) * 3.5, 1e-7)
+        assert_near_equal(meta['x']['upper'], ((100.0) + 77.0) * 3.5, 1e-7)
 
         meta = model.get_constraints()
-        assert_near_equal(meta['comp1.y1']['lower'], ((0.0) + 77.0) * 3.5, 1e-7)
-        assert_near_equal(meta['comp1.y1']['upper'], ((100.0) + 77.0) * 3.5, 1e-7)
+        assert_near_equal(meta['y1']['lower'], ((0.0) + 77.0) * 3.5, 1e-7)
+        assert_near_equal(meta['y1']['upper'], ((100.0) + 77.0) * 3.5, 1e-7)
 
         stdout = sys.stdout
         strout = StringIO()
@@ -647,23 +647,20 @@ class TestDriver(unittest.TestCase):
         self.assertTrue('degC' in output[12])
         self.assertTrue('degC' in output[19])
 
-        totals = prob.check_totals(out_stream=None, driver_scaling=True)
-
-        for val in totals.values():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+        assert_check_totals(prob.check_totals(out_stream=None, driver_scaling=True))
 
         cr = om.CaseReader("cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
         case = cr.get_case(cases[0])
 
         dv = case.get_design_vars()
-        assert_near_equal(dv['p.x'][0], ((3.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
+        assert_near_equal(dv['x'][0], ((3.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
 
         obj = case.get_objectives()
-        assert_near_equal(obj['comp2.y2'][0], ((73.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
+        assert_near_equal(obj['y2'][0], ((73.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
 
         con = case.get_constraints()
-        assert_near_equal(con['comp1.y1'][0], ((38.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
+        assert_near_equal(con['y1'][0], ((38.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
 
     def test_units_compute_totals(self):
         p = om.Problem()
@@ -686,8 +683,8 @@ class TestDriver(unittest.TestCase):
         J_driver = p.driver._compute_totals()
 
         fact = convert_units(1.0, 'kg/inch', 'lbm/ft')
-        assert_near_equal(J_driver['stuff.y', 'x'][0,0], fact, 1e-5)
-        assert_near_equal(J_driver['stuff.cy', 'x'][0,0], fact, 1e-5)
+        assert_near_equal(J_driver['y', 'x'][0,0], fact, 1e-5)
+        assert_near_equal(J_driver['cy', 'x'][0,0], fact, 1e-5)
 
     def test_units_error_messages(self):
         prob = om.Problem()
@@ -808,10 +805,10 @@ class TestDriver(unittest.TestCase):
 
         totals=prob.check_totals(out_stream=None)
 
-        assert_near_equal(totals['sub.comp.f_xy', 'sub.x']['J_fwd'], [[1.44e2]], 1e-5)
-        assert_near_equal(totals['sub.comp.f_xy', 'sub.y']['J_fwd'], [[1.58e2]], 1e-5)
-        assert_near_equal(totals['sub.comp.f_xy', 'sub.x']['J_fd'], [[1.44e2]], 1e-5)
-        assert_near_equal(totals['sub.comp.f_xy', 'sub.y']['J_fd'], [[1.58e2]], 1e-5)
+        assert_near_equal(totals['sub.f_xy', 'sub.x']['J_fwd'], [[1.44e2]], 1e-5)
+        assert_near_equal(totals['sub.f_xy', 'sub.y']['J_fwd'], [[1.58e2]], 1e-5)
+        assert_near_equal(totals['sub.f_xy', 'sub.x']['J_fd'], [[1.44e2]], 1e-5)
+        assert_near_equal(totals['sub.f_xy', 'sub.y']['J_fd'], [[1.58e2]], 1e-5)
 
     def test_get_vars_to_record(self):
         recorder = om.SqliteRecorder("cases.sql")

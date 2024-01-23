@@ -3985,11 +3985,11 @@ class Group(System):
                 indices = ofmeta['indices']
                 if indices is not None:  # of in approx_of_idx:
                     end += indices.indexed_src_size
-                    print('_jac_of_iter:', name, src, start, end, indices, dist_sizes)
+                    dprint('_jac_of_iter:', name, src, start, end, indices, dist_sizes)
                     yield src, start, end, indices.shaped_array().ravel(), dist_sizes
                 else:
                     end += abs2meta[src][szname]
-                    print('_jac_of_iter:', name, src, start, end, _full_slice, dist_sizes)
+                    dprint('_jac_of_iter:', name, src, start, end, _full_slice, dist_sizes)
                     yield src, start, end, _full_slice, dist_sizes
 
                 start = end
