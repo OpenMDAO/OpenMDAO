@@ -377,6 +377,9 @@ class PETScKrylov(LinearSolver):
         # stuff the result into the x vector
         x_vec.set_val(sol_array)
 
+        if not self._ksp.converged:
+            self._convergence_failure()
+
         sol_petsc_vec = rhs_petsc_vec = None
 
     def apply(self, mat, in_vec, result):
