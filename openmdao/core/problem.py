@@ -2088,7 +2088,7 @@ class Problem(object):
             self._write_var_info_table(header, col_names, desvars, vals,
                                        show_promoted_name=show_promoted_name,
                                        print_arrays=print_arrays,
-                                       col_spacing=2)
+                                       col_spacing=2, out_stream=out_stream)
 
         des_vars = [[i, j] for i, j in desvars.items()]
         for d in des_vars:
@@ -2108,7 +2108,7 @@ class Problem(object):
             self._write_var_info_table(header, col_names, cons, vals,
                                        show_promoted_name=show_promoted_name,
                                        print_arrays=print_arrays,
-                                       col_spacing=2)
+                                       col_spacing=2, out_stream=out_stream)
 
         cons_vars = [[i, j] for i, j in cons.items()]
         for c in cons_vars:
@@ -2126,7 +2126,7 @@ class Problem(object):
             self._write_var_info_table(header, col_names, objs, vals,
                                        show_promoted_name=show_promoted_name,
                                        print_arrays=print_arrays,
-                                       col_spacing=2)
+                                       col_spacing=2, out_stream=out_stream)
 
         obj_vars = [[i, j] for i, j in objs.items()]
         for o in obj_vars:
