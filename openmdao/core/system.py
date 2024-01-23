@@ -3476,8 +3476,8 @@ class System(object):
             if 'indices' not in meta:
                 meta['indices'] = None
             abs2idx = model._var_allprocs_abs2idx
-
-            # sizes = model._var_sizes['output']
+            sizes = model._var_sizes['output']
+            
             # if 'size' in meta and meta['size'] is not None:
             #     meta['size'] = int(meta['size'])  # make int so will be json serializable
             # else:
@@ -3491,7 +3491,7 @@ class System(object):
 
             if src_name in abs2idx:  # var is continuous
                 vmeta = abs2meta_out[src_name]
-                meta['distributed'] = vmeta['distributed']
+                # meta['distributed'] = vmeta['distributed']
                 indices = meta['indices']
                 if indices is not None:
                     # Index defined in this design var.
@@ -3500,7 +3500,10 @@ class System(object):
                     indices = indices.shaped_instance()
                     meta['size'] = meta['global_size'] = indices.indexed_src_size
                 else:
-                    meta['size'] = vmeta['size']
+                    if meta['distributed']:
+                        meta['size'] = sizes[model.comm.rank, abs2idx[src_name]]
+                    else:
+                        meta['size'] = sizes[model._owning_rank[src_name], abs2idx[src_name]]
                     meta['global_size'] = vmeta['global_size']
             else:
                 meta['global_size'] = meta['size'] = 0  # discrete var

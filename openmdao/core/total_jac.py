@@ -541,9 +541,11 @@ class _TotalJacInfo(object):
                 if not get_remote and ofmeta['remote']:
                     continue
                 out_slice = ofmeta['jac_slice']
+                if not ofmeta['alias']:
+                    out = ofmeta['source']  # make absolute
                 for inp, wrtmeta in wrt_metadata.items():
                     if get_remote or not wrtmeta['remote']:
-                        key = '!'.join((out, inp))
+                        key = '!'.join((out, wrtmeta['source']))
                         J_dict[key] = J[out_slice, wrtmeta['jac_slice']]
         else:
             raise ValueError("'%s' is not a valid jacobian return format." % return_format)

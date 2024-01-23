@@ -926,7 +926,7 @@ class TestCheckRelevance(unittest.TestCase):
         with self.assertRaises(RuntimeError) as err:
             prob.run_driver()
 
-        self.assertTrue("Constraint(s) ['bad.bad'] do not depend on any design variables."
+        self.assertTrue("Constraint(s) ['bad'] do not depend on any design variables."
                         in str(err.exception))
 
 

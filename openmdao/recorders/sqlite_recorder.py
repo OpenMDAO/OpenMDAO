@@ -366,10 +366,10 @@ class SqliteRecorder(CaseRecorder):
         if self.connection:
 
             if driver is not None:
-                desvars = driver._designvars.copy()
-                responses = driver._responses.copy()
-                constraints = driver._cons.copy()
-                objectives = driver._objs.copy()
+                desvars = {m['source']: m for m in driver._designvars.values()}
+                responses = {m['source']: m for m in driver._responses.values()}
+                constraints ={m['source']: m for m in driver._cons.values()}
+                objectives = {m['source']: m for m in driver._objs.values()}
 
             inputs = list(system.abs_name_iter('input', local=False, discrete=True))
             outputs = list(system.abs_name_iter('output', local=False, discrete=True))

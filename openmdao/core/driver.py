@@ -608,19 +608,18 @@ class Driver(object):
         comm = model.comm
         get = model._outputs._abs_get_val
         indices = meta['indices']
-
         src_name = meta['source']
 
-        # If there's an alias, use that for driver related stuff
-        drv_name = _src_or_alias_name(meta)
+        # # If there's an alias, use that for driver related stuff
+        # drv_name = _src_or_alias_name(meta)
 
         if MPI:
-            distributed = comm.size > 0 and drv_name in self._dist_driver_vars
+            distributed = comm.size > 0 and name in self._dist_driver_vars
         else:
             distributed = False
 
-        if drv_name in remote_vois:
-            owner, size = remote_vois[drv_name]
+        if name in remote_vois:
+            owner, size = remote_vois[name]
             # if var is distributed or only gathering to one rank
             # TODO - support distributed var under a parallel group.
             if owner is None or rank is not None:
@@ -643,7 +642,7 @@ class Driver(object):
 
         elif distributed:
             local_val = model.get_val(src_name, get_remote=False, flat=True)
-            local_indices, sizes, _ = self._dist_driver_vars[drv_name]
+            local_indices, sizes, _ = self._dist_driver_vars[name]
             if local_indices is not _full_slice:
                 local_val = local_val[local_indices()]
 

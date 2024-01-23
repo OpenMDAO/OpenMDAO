@@ -1035,17 +1035,6 @@ class PromAbsDict(dict):
                     # TODO - maybe get rid of this by always saving the source name
                     super().__setitem__(key, self._values[key])
 
-    def __str__(self):
-        """
-        Get string representation of the dictionary.
-
-        Returns
-        -------
-        str
-            String representation of the dictionary.
-        """
-        return super().__str__()
-
     def _deriv_keys(self, key):
         """
         Get the absolute and promoted name versions of the provided derivative key.

@@ -426,8 +426,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertTrue('9.80614' in lines[6], "'9.80614' not found in '%s'" % lines[6])
         self.assertTrue('cs:None' in lines[6], "'cs:None not found in '%s'" % lines[6])
 
-        assert_near_equal(totals['con_cmp2.con2', 'x']['J_fwd'], [[0.09692762]], 1e-5)
-        assert_near_equal(totals['con_cmp2.con2', 'x']['J_fd'], [[0.09692762]], 1e-5)
+        assert_near_equal(totals['con2', 'x']['J_fwd'], [[0.09692762]], 1e-5)
+        assert_near_equal(totals['con2', 'x']['J_fd'], [[0.09692762]], 1e-5)
 
         # Test compact_print output
         compact_stream = StringIO()
@@ -572,7 +572,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_near_equal(J['y1', 'x1'][1][1], Jbase[2, 3], 1e-8)
 
         totals = prob.check_totals()
-        jac = totals[('mycomp.y1', 'x_param1.x1')]['J_fd']
+        jac = totals[('y1', 'x1')]['J_fd']
         assert_near_equal(jac[0][0], Jbase[0, 1], 1e-8)
         assert_near_equal(jac[0][1], Jbase[0, 3], 1e-8)
         assert_near_equal(jac[1][0], Jbase[2, 1], 1e-8)
@@ -607,7 +607,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_near_equal(J['y1', 'x1'][0][1], Jbase[1, 3], 1e-8)
 
         totals = prob.check_totals()
-        jac = totals[('mycomp.y1', 'x_param1.x1')]['J_fd']
+        jac = totals[('y1', 'x1')]['J_fd']
         assert_near_equal(jac[0][0], Jbase[1, 1], 1e-8)
         assert_near_equal(jac[0][1], Jbase[1, 3], 1e-8)
 
@@ -636,7 +636,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         # check derivatives with complex step and a larger step size.
         totals = prob.check_totals(method='cs', out_stream=None)
 
-        data = totals['con_cmp2.con2', 'x']
+        data = totals['con2', 'x']
         self.assertTrue('J_fwd' in data)
         self.assertTrue('rel error' in data)
         self.assertTrue('abs error' in data)
@@ -820,8 +820,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         # Make sure we don't bomb out with an error.
         J = p.check_totals(out_stream=None)
 
-        assert_near_equal(J[('time.time', 'time_extents.t_duration')]['J_fwd'][0], 17.0, 1e-5)
-        assert_near_equal(J[('time.time', 'time_extents.t_duration')]['J_fd'][0], 17.0, 1e-5)
+        assert_near_equal(J[('time', 't_duration')]['J_fwd'][0], 17.0, 1e-5)
+        assert_near_equal(J[('time', 't_duration')]['J_fd'][0], 17.0, 1e-5)
 
         # Try again with a direct solver and sparse assembled hierarchy.
 
@@ -839,14 +839,14 @@ class TestProblemCheckTotals(unittest.TestCase):
         # Make sure we don't bomb out with an error.
         J = p.check_totals(out_stream=None)
 
-        assert_near_equal(J[('sub.time.time', 'sub.time_extents.t_duration')]['J_fwd'][0], 17.0, 1e-5)
-        assert_near_equal(J[('sub.time.time', 'sub.time_extents.t_duration')]['J_fd'][0], 17.0, 1e-5)
+        assert_near_equal(J[('sub.time', 'sub.t_duration')]['J_fwd'][0], 17.0, 1e-5)
+        assert_near_equal(J[('sub.time', 'sub.t_duration')]['J_fd'][0], 17.0, 1e-5)
 
-        # Make sure check_totals cleans up after itself by running it a second time.
+        # Make sure check_totals cleans up after itself by running it a second time
         J = p.check_totals(out_stream=None)
 
-        assert_near_equal(J[('sub.time.time', 'sub.time_extents.t_duration')]['J_fwd'][0], 17.0, 1e-5)
-        assert_near_equal(J[('sub.time.time', 'sub.time_extents.t_duration')]['J_fd'][0], 17.0, 1e-5)
+        assert_near_equal(J[('sub.time', 'sub.t_duration')]['J_fwd'][0], 17.0, 1e-5)
+        assert_near_equal(J[('sub.time', 'sub.t_duration')]['J_fd'][0], 17.0, 1e-5)
 
     def test_vector_scaled_derivs(self):
 
@@ -1253,12 +1253,12 @@ class TestProblemCheckTotals(unittest.TestCase):
         J_driver = p.check_totals(out_stream=stream)
         lines = stream.getvalue().splitlines()
 
-        self.assertTrue("Full Model: 'stuff.lcy' wrt 'x' (Linear constraint)" in lines[4])
+        self.assertTrue("Full Model: 'lcy' wrt 'x' (Linear constraint)" in lines[4])
         self.assertTrue("Absolute Error (Jfor - Jfd)" in lines[8])
         self.assertTrue("Relative Error (Jfor - Jfd) / Jfd" in lines[10])
 
-        assert_near_equal(J_driver['stuff.y', 'x']['J_fwd'][0, 0], 1.0)
-        assert_near_equal(J_driver['stuff.lcy', 'x']['J_fwd'][0, 0], 3.0)
+        assert_near_equal(J_driver['y', 'x']['J_fwd'][0, 0], 1.0)
+        assert_near_equal(J_driver['lcy', 'x']['J_fwd'][0, 0], 3.0)
 
     def test_alias_constraints(self):
         prob = om.Problem()
@@ -1320,10 +1320,10 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         totals = prob.check_totals(out_stream=None)
 
-        assert_near_equal(totals['comp.areas', 'p1.widths']['abs error'][1], 0.0, 1e-6)
-        assert_near_equal(totals['a2', 'p1.widths']['abs error'][1], 0.0, 1e-6)
-        assert_near_equal(totals['a3', 'p1.widths']['abs error'][1], 0.0, 1e-6)
-        assert_near_equal(totals['a4', 'p1.widths']['abs error'][1], 0.0, 1e-6)
+        assert_near_equal(totals['areas', 'widths']['abs error'][1], 0.0, 1e-6)
+        assert_near_equal(totals['a2', 'widths']['abs error'][1], 0.0, 1e-6)
+        assert_near_equal(totals['a3', 'widths']['abs error'][1], 0.0, 1e-6)
+        assert_near_equal(totals['a4', 'widths']['abs error'][1], 0.0, 1e-6)
 
     def test_alias_constraints_nested(self):
         # Tests a bug where we need to lookup the constraint alias on a response that is from

@@ -381,10 +381,10 @@ class TestPETScKrylov(unittest.TestCase):
         self.assertEqual(str(cm.exception), msg)
 
 
-#@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(PETScVector, "PETSc is required.")
 class TestPETScKrylovSolverFeature(unittest.TestCase):
 
-    #N_PROCS = 1
+    N_PROCS = 1
 
     def test_specify_solver(self):
 

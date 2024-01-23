@@ -606,22 +606,22 @@ class MPITests2(unittest.TestCase):
         desvar = prob.driver.get_design_var_values()
         con = prob.driver.get_constraint_values()
 
-        assert_near_equal(desvar['p.x'], np.ones(size), 1e-6)
-        assert_near_equal(con['parab.f_xy'],
+        assert_near_equal(desvar['x'], np.ones(size), 1e-6)
+        assert_near_equal(con['f_xy'],
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
         J = prob.check_totals(method='fd', out_stream=None)
-        assert_near_equal(J['parab.f_xy', 'p.x']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['parab.f_xy', 'p.y']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['sum.f_sum', 'p.x']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['sum.f_sum', 'p.y']['abs error'].forward, 0.0, 1e-5)
+        assert_near_equal(J['f_xy', 'x']['abs error'].forward, 0.0, 1e-5)
+        assert_near_equal(J['f_xy', 'y']['abs error'].forward, 0.0, 1e-5)
+        assert_near_equal(J['f_sum', 'x']['abs error'].forward, 0.0, 1e-5)
+        assert_near_equal(J['f_sum', 'y']['abs error'].forward, 0.0, 1e-5)
 
         J = prob.check_totals(method='cs', out_stream=None)
-        assert_near_equal(J['parab.f_xy', 'p.x']['abs error'].forward, 0.0, 1e-14)
-        assert_near_equal(J['parab.f_xy', 'p.y']['abs error'].forward, 0.0, 1e-14)
-        assert_near_equal(J['sum.f_sum', 'p.x']['abs error'].forward, 0.0, 1e-14)
-        assert_near_equal(J['sum.f_sum', 'p.y']['abs error'].forward, 0.0, 1e-14)
+        assert_near_equal(J['f_xy', 'x']['abs error'].forward, 0.0, 1e-14)
+        assert_near_equal(J['f_xy', 'y']['abs error'].forward, 0.0, 1e-14)
+        assert_near_equal(J['f_sum', 'x']['abs error'].forward, 0.0, 1e-14)
+        assert_near_equal(J['f_sum', 'y']['abs error'].forward, 0.0, 1e-14)
 
         # rev mode
 
@@ -632,22 +632,22 @@ class MPITests2(unittest.TestCase):
         desvar = prob.driver.get_design_var_values()
         con = prob.driver.get_constraint_values()
 
-        assert_near_equal(desvar['p.x'], np.ones(size), 1e-6)
-        assert_near_equal(con['parab.f_xy'],
+        assert_near_equal(desvar['x'], np.ones(size), 1e-6)
+        assert_near_equal(con['f_xy'],
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
         J = prob.check_totals(method='fd', show_only_incorrect=True)
-        assert_near_equal(J['parab.f_xy', 'p.x']['abs error'].reverse, 0.0, 1e-5)
-        assert_near_equal(J['parab.f_xy', 'p.y']['abs error'].reverse, 0.0, 1e-5)
-        assert_near_equal(J['sum.f_sum', 'p.x']['abs error'].reverse, 0.0, 1e-5)
-        assert_near_equal(J['sum.f_sum', 'p.y']['abs error'].reverse, 0.0, 1e-5)
+        assert_near_equal(J['f_xy', 'x']['abs error'].reverse, 0.0, 1e-5)
+        assert_near_equal(J['f_xy', 'y']['abs error'].reverse, 0.0, 1e-5)
+        assert_near_equal(J['f_sum', 'x']['abs error'].reverse, 0.0, 1e-5)
+        assert_near_equal(J['f_sum', 'y']['abs error'].reverse, 0.0, 1e-5)
 
         J = prob.check_totals(method='cs', show_only_incorrect=True)
-        assert_near_equal(J['parab.f_xy', 'p.x']['abs error'].reverse, 0.0, 1e-14)
-        assert_near_equal(J['parab.f_xy', 'p.y']['abs error'].reverse, 0.0, 1e-14)
-        assert_near_equal(J['sum.f_sum', 'p.x']['abs error'].reverse, 0.0, 1e-14)
-        assert_near_equal(J['sum.f_sum', 'p.y']['abs error'].reverse, 0.0, 1e-14)
+        assert_near_equal(J['f_xy', 'x']['abs error'].reverse, 0.0, 1e-14)
+        assert_near_equal(J['f_xy', 'y']['abs error'].reverse, 0.0, 1e-14)
+        assert_near_equal(J['f_sum', 'x']['abs error'].reverse, 0.0, 1e-14)
+        assert_near_equal(J['f_sum', 'y']['abs error'].reverse, 0.0, 1e-14)
 
     def test_distrib_voi_sparse(self):
         size = 7
@@ -756,16 +756,16 @@ class MPITests2(unittest.TestCase):
         desvar = prob.driver.get_design_var_values()
         con = prob.driver.get_constraint_values()
 
-        assert_near_equal(desvar['p.x'], np.ones(size), 1e-6)
-        assert_near_equal(con['parab.f_xy'],
+        assert_near_equal(desvar['x'], np.ones(size), 1e-6)
+        assert_near_equal(con['f_xy'],
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
         J = prob.check_totals(out_stream=None, method='cs')
-        assert_near_equal(J['parab.f_xy', 'p.x']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['parab.f_xy', 'p.y']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['sum.f_sum', 'p.x']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['sum.f_sum', 'p.y']['abs error'].forward, 0.0, 1e-5)
+        assert_near_equal(J['f_xy', 'x']['abs error'].forward, 0.0, 1e-5)
+        assert_near_equal(J['f_xy', 'y']['abs error'].forward, 0.0, 1e-5)
+        assert_near_equal(J['f_sum', 'x']['abs error'].forward, 0.0, 1e-5)
+        assert_near_equal(J['f_sum', 'y']['abs error'].forward, 0.0, 1e-5)
 
         # rev mode
 
@@ -776,16 +776,16 @@ class MPITests2(unittest.TestCase):
         desvar = prob.driver.get_design_var_values()
         con = prob.driver.get_constraint_values()
 
-        assert_near_equal(desvar['p.x'], np.ones(size), 1e-6)
-        assert_near_equal(con['parab.f_xy'],
+        assert_near_equal(desvar['x'], np.ones(size), 1e-6)
+        assert_near_equal(con['f_xy'],
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
         J = prob.check_totals(method='cs', show_only_incorrect=True)
-        assert_near_equal(J['parab.f_xy', 'p.x']['abs error'].reverse, 0.0, 1e-5)
-        assert_near_equal(J['parab.f_xy', 'p.y']['abs error'].reverse, 0.0, 1e-5)
-        assert_near_equal(J['sum.f_sum', 'p.x']['abs error'].reverse, 0.0, 1e-5)
-        assert_near_equal(J['sum.f_sum', 'p.y']['abs error'].reverse, 0.0, 1e-5)
+        assert_near_equal(J['f_xy', 'x']['abs error'].reverse, 0.0, 1e-5)
+        assert_near_equal(J['f_xy', 'y']['abs error'].reverse, 0.0, 1e-5)
+        assert_near_equal(J['f_sum', 'x']['abs error'].reverse, 0.0, 1e-5)
+        assert_near_equal(J['f_sum', 'y']['abs error'].reverse, 0.0, 1e-5)
 
     def _setup_distrib_voi_group_fd(self, mode, size=7):
         # Only supports groups where the inputs to the distributed component whose inputs are
@@ -838,8 +838,8 @@ class MPITests2(unittest.TestCase):
         desvar = prob.driver.get_design_var_values()
         con = prob.driver.get_constraint_values()
 
-        assert_near_equal(desvar['p.x'], np.ones(size), 1e-6)
-        assert_near_equal(con['sub.parab.f_xy'],
+        assert_near_equal(desvar['x'], np.ones(size), 1e-6)
+        assert_near_equal(con['f_xy'],
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
@@ -851,8 +851,8 @@ class MPITests2(unittest.TestCase):
         desvar = prob.driver.get_design_var_values()
         con = prob.driver.get_constraint_values()
 
-        assert_near_equal(desvar['p.x'], np.ones(size), 1e-6)
-        assert_near_equal(con['sub.parab.f_xy'],
+        assert_near_equal(desvar['x'], np.ones(size), 1e-6)
+        assert_near_equal(con['f_xy'],
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
@@ -2155,7 +2155,7 @@ class DeclarePartialsWithoutRowCol(unittest.TestCase):
         assert_near_equal(prob['execcomp.z'], np.ones((size,))*-38.4450, 1e-9)
 
         data = prob.check_totals(out_stream=None)
-        assert_near_equal(data[('execcomp.z', 'dvs.x')]['abs error'].forward, 0.0, 1e-6)
+        assert_near_equal(data[('execcomp.z', 'x')]['abs error'].forward, 0.0, 1e-6)
 
 
 class TestBugs(unittest.TestCase):

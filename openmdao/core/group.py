@@ -3866,7 +3866,7 @@ class Group(System):
             else:
                 for abs_inps in pro2abs['input'].values():
                     for inp in abs_inps:
-                        src = self._conn_abs_in2out[inp]
+                        src = self._conn_global_abs_in2out[inp]
                         if 'openmdao:indep_var' in all_abs2meta_out[src]['tags']:
                             wrt.add(src)
                             ivc.add(src)
