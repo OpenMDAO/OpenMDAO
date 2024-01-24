@@ -198,8 +198,6 @@ class ScipyKrylov(LinearSolver):
         maxiter = self.options['maxiter']
         atol = self.options['atol']
 
-        fail = False
-
         if mode == 'fwd':
             x_vec = system._doutputs
             b_vec = system._dresiduals
@@ -232,8 +230,15 @@ class ScipyKrylov(LinearSolver):
                              x0=x_vec_combined, maxiter=maxiter, tol=atol, atol='legacy',
                              callback=self._monitor, callback_type='legacy')
 
-        fail |= (info != 0)
-        x_vec.set_val(x)
+        if info == 0:
+            x_vec.set_val(x)
+        elif info > 0:
+            self._convergence_failure()
+        else:
+            msg = (f"Solver '{self.SOLVER}' on system '{self._system().pathname}': "
+                   f"had an illegal input or breakdown (info={info}) after {self._iter_count} "
+                   "iterations.")
+            self.report_failure(msg)
 
     def _apply_precon(self, in_vec):
         """
