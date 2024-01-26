@@ -136,11 +136,11 @@ class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
         dv_vals = p.driver.get_design_var_values(get_remote=False)
 
         # Compute totals and check the length of the gradient array on each proc
-        objcongrad = p.compute_totals(get_remote=False)
+        J = p.compute_totals(get_remote=False)
 
         # Check the values of the gradient array
-        assert_near_equal(objcongrad[('dp.y', 'distrib_ivc.x')][0], -6.0*np.ones(ndvs))
-        assert_near_equal(objcongrad[('dp.y', 'distrib_ivc.x')][1], -18.0*np.ones(ndvs))
+        assert_near_equal(J[('y', 'x')][0], -6.0*np.ones(ndvs))
+        assert_near_equal(J[('y', 'x')][1], -18.0*np.ones(ndvs))
 
     def test_distrib_compute_totals_fwd(self):
         self._do_compute_totals('fwd')
@@ -182,10 +182,10 @@ class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
         dv_vals = p.driver.get_design_var_values(get_remote=False)
 
         # Compute totals and check the length of the gradient array on each proc
-        objcongrad = p.compute_totals(get_remote=False)
+        J = p.compute_totals(get_remote=False)
 
         # Check the values of the gradient array
-        assert_near_equal(objcongrad[('dp.y', 'distrib_ivc.x')][0], -6.0*np.ones(ndvs))
+        assert_near_equal(J[('y', 'x')][0], -6.0*np.ones(ndvs))
 
     def test_distrib_compute_totals_2D_fwd(self):
         self._do_compute_totals_2D('fwd')
@@ -2200,8 +2200,8 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
 
     def test_multi_fd_steps_compact_directional(self):
         expected_divs = {
-            'fwd': ('+----------------------------------------------------------------------------------------+------------------+-------------+-------------+-------------+-------------+-------------+------------+', 7),
-            'rev': ('+-------------------------------+-----------------------------------------+-------------+-------------+-------------+-------------+-------------+------------+', 13),
+            'fwd': 7,
+            'rev': 13,
         }
         try:
             rand_save = tot_jac_mod._directional_rng
@@ -2216,8 +2216,8 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                     contents = stream.getvalue()
                     self.assertEqual(contents.count("step"), 1)
                     # check number of rows/cols
-                    s, times = expected_divs[mode]
-                    self.assertEqual(contents.count(s), times)
+                    nrows = expected_divs[mode]
+                    self.assertEqual(contents.count('\n+-'), nrows)
         finally:
             tot_jac_mod._directional_rng = rand_save
 

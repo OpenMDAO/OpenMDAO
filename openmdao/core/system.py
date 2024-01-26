@@ -2114,8 +2114,7 @@ class System(object):
 
         has_scaling = False
 
-        dv = self._design_vars
-        for name, meta in dv.items():
+        for name, meta in self._design_vars.items():
 
             units = meta['units']
             meta['total_adder'] = meta['adder']
@@ -3077,7 +3076,7 @@ class System(object):
 
         if indices is not None:
             indices, size = self._create_indexer(indices, 'design var', name,
-                                                  flat_src=flat_indices)
+                                                 flat_src=flat_indices)
         else:
             size = None
 
@@ -3180,8 +3179,8 @@ class System(object):
 
         resp = {}
 
-        typemap = {'con': 'Constraint', 'obj': 'Objective'}
         if (name in self._responses or name in self._static_responses) and alias is None:
+            typemap = {'con': 'Constraint', 'obj': 'Objective'}
             msg = ("{}: {} '{}' already exists. Use the 'alias' argument to apply a second "
                    "constraint".format(self.msginfo, typemap[type_], name))
             raise RuntimeError(msg.format(name))
@@ -3477,7 +3476,7 @@ class System(object):
                 meta['indices'] = None
             abs2idx = model._var_allprocs_abs2idx
             sizes = model._var_sizes['output']
-            
+
             # if 'size' in meta and meta['size'] is not None:
             #     meta['size'] = int(meta['size'])  # make int so will be json serializable
             # else:
@@ -3594,8 +3593,7 @@ class System(object):
         abs2meta_out = model._var_allprocs_abs2meta['output']
 
         alias = meta['alias']
-        prom = meta['name']  # always a promoted name
-
+        prom = meta['name']  # 'usually' a promoted name, but can be absolute
         if alias is not None:
             if alias in prom2abs_out or alias in prom2abs_in:
                 # Constraint alias should never be the same as any openmdao variable.
@@ -3606,8 +3604,12 @@ class System(object):
 
         if prom in prom2abs_out:  # promoted output
             src_name = prom2abs_out[prom][0]
-        else:  # promoted input
+        elif prom in abs2meta_out:
+            src_name = prom
+        elif prom in prom2abs_in:
             src_name = conns[prom2abs_in[prom][0]]
+        else:  # abs input
+            src_name = conns[prom][0]
 
         if alias:
             key = alias
@@ -4485,13 +4487,13 @@ class System(object):
             initialized, the driver for this model must be supplied in order to properly
             initialize the approximations.
         """
-        #if self.pathname == '' and self._owns_approx_jac:
-            #if not self._owns_approx_of:  # approx not initialized
-                #if driver is None:
-                    #raise RuntimeError(self.msginfo + ": driver must be supplied when calling "
-                                       #"run_linearize on the root system if approximations have "
-                                       #"not been initialized.")
-                #coloring_mod._initialize_model_approx(self, driver)
+        # if self.pathname == '' and self._owns_approx_jac:
+        #     if not self._owns_approx_of:  # approx not initialized
+        #         if driver is None:
+        #             raise RuntimeError(self.msginfo + ": driver must be supplied when calling "
+        #                                "run_linearize on the root system if approximations have "
+        #                                "not been initialized.")
+        #         coloring_mod._initialize_model_approx(self, driver)
 
         with self._scaled_context_all():
             do_ln = self._linear_solver is not None and self._linear_solver._linearize_children()

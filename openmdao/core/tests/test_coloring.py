@@ -321,15 +321,6 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         coloring = compute_total_coloring(p_color)
 
         stream = StringIO()
-        coloring.display_txt(out_stream=stream, use_prom_names=False)
-        color_txt = stream.getvalue().split('\n')
-
-        self.assertTrue(color_txt[0].endswith('  circle.area'))
-        self.assertEqual(color_txt[22].strip(), '|_auto_ivc.v0')
-        self.assertEqual(color_txt[23].strip(), '|_auto_ivc.v1')
-        self.assertEqual(color_txt[24].strip(), '|_auto_ivc.v2')
-
-        stream = StringIO()
         coloring.display_txt(out_stream=stream)           # use_prom_names=True is the default
         color_txt = stream.getvalue().split('\n')
 
@@ -583,7 +574,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
         self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
-        self.assertTrue("('indeps.y', [1, 3, 5, 7, 9])" in output)
+        self.assertTrue("('y', [1, 3, 5, 7, 9])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")

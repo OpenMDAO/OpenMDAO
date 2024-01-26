@@ -229,6 +229,7 @@ class ScipyOptimizeDriver(Driver):
                     self._cons[name] = meta.copy()
                     self._cons[name]['equals'] = None
                     self._cons[name]['linear'] = True
+                    self._cons[name]['alias'] = None
 
     def get_driver_objective_calls(self):
         """

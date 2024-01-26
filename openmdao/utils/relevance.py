@@ -242,15 +242,6 @@ class Relevance(object):
             if meta['parallel_deriv_color'] is not None:
                 self.set_seeds([meta['source']], 'rev', local=True)
 
-        # print("DESVARS:")
-        # for m in desvars.values():
-        #     print('name', m['name'], 'src', m['source'])
-        # print("RESPONSES:")
-        # for m in responses.values():
-        #     print('name', m['name'], 'src', m['source'])
-
-        # self._active = False   # turn off relevance globally for debugging
-
         if desvars and responses:
             self.set_all_seeds([m['source'] for m in desvars.values()],
                                [m['source'] for m in responses.values()])
@@ -680,6 +671,23 @@ class Relevance(object):
 
             self._relevant_systems[key] = _get_set_checker(rel_systems, self._all_systems)
             self._relevant_vars[key] = _get_set_checker(rel_vars, self._all_vars)
+
+    # def _update_set_checkers(self):
+    #     for direction in ('fwd', 'rev'):
+    #         mydirseeds = set(self._all_seed_vars[direction])
+    #         for seed in mydirseeds:
+    #             # find all total seed vars in the opposite direction that depend on seed and
+    #             # add any total seed vars in our direction that depend on those
+    #             mydeps = self._relevant_vars[seed, direction]
+    #             toadd = set()
+    #             for opp_seed in mydeps.intersection(self._all_seed_vars[_opposite[direction]]):
+    #                 relset = self._relevant_vars[opp_seed, _opposite[direction]]
+    #                 toadd.update(relset.intersection(mydirseeds))
+
+    #             # update the set checker
+    #             mydeps.update(toadd)
+    #             systoadd = _vars2systems(toadd)
+    #             self._relevant_systems[seed, direction].update(systoadd)
 
     def get_seed_pair_relevance(self, fwd_seed, rev_seed, inputs=True, outputs=True):
         """

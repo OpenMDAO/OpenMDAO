@@ -2757,10 +2757,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         c1 = cr.get_case('c1')
 
         J = prob.compute_totals()
-        np.testing.assert_almost_equal(c1.derivatives[('f(xy)', 'x,1')], J[('comp.f(xy)', 'p1.x,1')])
-        np.testing.assert_almost_equal(c1.derivatives[('f(xy)', 'y:2')], J[('comp.f(xy)', 'p2.y:2')])
-        np.testing.assert_almost_equal(c1.derivatives[('c', 'x,1')], J[('con.c', 'p1.x,1')])
-        np.testing.assert_almost_equal(c1.derivatives[('c', 'y:2')], J[('con.c', 'p2.y:2')])
+        np.testing.assert_almost_equal(c1.derivatives[('f(xy)', 'x,1')], J[('f(xy)', 'x,1')])
+        np.testing.assert_almost_equal(c1.derivatives[('f(xy)', 'y:2')], J[('f(xy)', 'y:2')])
+        np.testing.assert_almost_equal(c1.derivatives[('c', 'x,1')], J[('c', 'x,1')])
+        np.testing.assert_almost_equal(c1.derivatives[('c', 'y:2')], J[('c', 'y:2')])
 
     def test_comma_comp(self):
         class CommaComp(om.ExplicitComponent):

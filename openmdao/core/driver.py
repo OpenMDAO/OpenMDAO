@@ -79,7 +79,7 @@ class Driver(object):
     _total_jac_format : str
         Specifies the format of the total jacobian. Allowed values are 'flat_dict', 'dict', and
         'array'.
-    _res_subjacs : dict
+    _con_subjacs : dict
         Dict of sparse subjacobians for use with certain optimizers, e.g. pyOptSparseDriver.
         Keyed by sources and aliases.
     _total_jac : _TotalJacInfo or None
@@ -176,7 +176,7 @@ class Driver(object):
         self._coloring_info = cmod._ColoringMeta()
 
         self._total_jac_format = 'flat_dict'
-        self._res_subjacs = {}
+        self._con_subjacs = {}
         self._total_jac = None
         self._total_jac_linear = None
 
@@ -387,8 +387,7 @@ class Driver(object):
                         dist_dict[vname] = (ind, true_sizes, distrib_indices)
                     else:
                         dist_dict[vname] = (_flat_full_indexer, dist_sizes,
-                                               slice(offsets[rank],
-                                                     offsets[rank] + dist_sizes[rank]))
+                                            slice(offsets[rank], offsets[rank] + dist_sizes[rank]))
 
                 else:
                     owner = owning_ranks[vsrc]
@@ -758,9 +757,6 @@ class Driver(object):
 
         src_name = meta['source']
 
-        # If there's an alias, use that for driver related stuff
-        drv_name = _src_or_alias_name(meta)
-
         # if the value is not local, don't set the value
         if (src_name in self._remote_dvs and
                 problem.model._owning_rank[src_name] != problem.comm.rank):
@@ -784,8 +780,8 @@ class Driver(object):
 
         elif problem.model._outputs._contains_abs(src_name):
             desvar = problem.model._outputs._abs_get_val(src_name)
-            if drv_name in self._dist_driver_vars:
-                loc_idxs, _, dist_idxs = self._dist_driver_vars[drv_name]
+            if name in self._dist_driver_vars:
+                loc_idxs, _, dist_idxs = self._dist_driver_vars[name]
                 loc_idxs = loc_idxs()  # don't use indexer here
             else:
                 loc_idxs = meta['indices']

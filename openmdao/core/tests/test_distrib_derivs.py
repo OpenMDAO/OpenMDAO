@@ -681,22 +681,22 @@ class MPITests2(unittest.TestCase):
         desvar = prob.driver.get_design_var_values()
         con = prob.driver.get_constraint_values()
 
-        assert_near_equal(desvar['p.x'], np.ones(size), 1e-6)
-        assert_near_equal(con['parab.f_xy'],
+        assert_near_equal(desvar['x'], np.ones(size), 1e-6)
+        assert_near_equal(con['f_xy'],
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
         J = prob.check_totals(method='fd', show_only_incorrect=True)
-        assert_near_equal(J['parab.f_xy', 'p.x']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['parab.f_xy', 'p.y']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['sum.f_sum', 'p.x']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['sum.f_sum', 'p.y']['abs error'].forward, 0.0, 1e-5)
+        assert_near_equal(J['f_xy', 'x']['abs error'].forward, 0.0, 1e-5)
+        assert_near_equal(J['f_xy', 'y']['abs error'].forward, 0.0, 1e-5)
+        assert_near_equal(J['f_sum', 'x']['abs error'].forward, 0.0, 1e-5)
+        assert_near_equal(J['f_sum', 'y']['abs error'].forward, 0.0, 1e-5)
 
         J = prob.check_totals(method='cs', show_only_incorrect=True)
-        assert_near_equal(J['parab.f_xy', 'p.x']['abs error'].forward, 0.0, 1e-14)
-        assert_near_equal(J['parab.f_xy', 'p.y']['abs error'].forward, 0.0, 1e-14)
-        assert_near_equal(J['sum.f_sum', 'p.x']['abs error'].forward, 0.0, 1e-14)
-        assert_near_equal(J['sum.f_sum', 'p.y']['abs error'].forward, 0.0, 1e-14)
+        assert_near_equal(J['f_xy', 'x']['abs error'].forward, 0.0, 1e-14)
+        assert_near_equal(J['f_xy', 'y']['abs error'].forward, 0.0, 1e-14)
+        assert_near_equal(J['f_sum', 'x']['abs error'].forward, 0.0, 1e-14)
+        assert_near_equal(J['f_sum', 'y']['abs error'].forward, 0.0, 1e-14)
 
         # rev mode
 
@@ -707,22 +707,22 @@ class MPITests2(unittest.TestCase):
         desvar = prob.driver.get_design_var_values()
         con = prob.driver.get_constraint_values()
 
-        assert_near_equal(desvar['p.x'], np.ones(size), 1e-6)
-        assert_near_equal(con['parab.f_xy'],
+        assert_near_equal(desvar['x'], np.ones(size), 1e-6)
+        assert_near_equal(con['f_xy'],
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
         J = prob.check_totals(method='fd', show_only_incorrect=True)
-        assert_near_equal(J['parab.f_xy', 'p.x']['abs error'].reverse, 0.0, 1e-5)
-        assert_near_equal(J['parab.f_xy', 'p.y']['abs error'].reverse, 0.0, 1e-5)
-        assert_near_equal(J['sum.f_sum', 'p.x']['abs error'].reverse, 0.0, 1e-5)
-        assert_near_equal(J['sum.f_sum', 'p.y']['abs error'].reverse, 0.0, 1e-5)
+        assert_near_equal(J['f_xy', 'x']['abs error'].reverse, 0.0, 1e-5)
+        assert_near_equal(J['f_xy', 'y']['abs error'].reverse, 0.0, 1e-5)
+        assert_near_equal(J['f_sum', 'x']['abs error'].reverse, 0.0, 1e-5)
+        assert_near_equal(J['f_sum', 'y']['abs error'].reverse, 0.0, 1e-5)
 
         J = prob.check_totals(method='cs', show_only_incorrect=True)
-        assert_near_equal(J['parab.f_xy', 'p.x']['abs error'].reverse, 0.0, 1e-14)
-        assert_near_equal(J['parab.f_xy', 'p.y']['abs error'].reverse, 0.0, 1e-14)
-        assert_near_equal(J['sum.f_sum', 'p.x']['abs error'].reverse, 0.0, 1e-14)
-        assert_near_equal(J['sum.f_sum', 'p.y']['abs error'].reverse, 0.0, 1e-14)
+        assert_near_equal(J['f_xy', 'x']['abs error'].reverse, 0.0, 1e-14)
+        assert_near_equal(J['f_xy', 'y']['abs error'].reverse, 0.0, 1e-14)
+        assert_near_equal(J['f_sum', 'x']['abs error'].reverse, 0.0, 1e-14)
+        assert_near_equal(J['f_sum', 'y']['abs error'].reverse, 0.0, 1e-14)
 
     def test_distrib_voi_fd(self):
         size = 7
@@ -1544,18 +1544,17 @@ class MPITests3(unittest.TestCase):
         prob.run_model()
 
         con = prob.driver.get_constraint_values()
-        assert_near_equal(con['parab.f_xy'],
+        assert_near_equal(con['f_xy'],
                           np.array([12.48]),
                           1e-6)
 
         totals = prob.check_totals(method='cs', show_only_incorrect=True)
         assert_check_totals(totals, rtol=1e-6)
 
-        of = ['parab.f_xy']
-        J = prob.driver._compute_totals(of=of, wrt=['p.x', 'p.y'], return_format='dict')
-        assert_near_equal(J['parab.f_xy']['p.x'], np.array([[-0. , -0. , -0., 0.6 , -0. , -0. , -0. ]]),
+        J = prob.driver._compute_totals(of=['f_xy'], wrt=['x', 'y'], return_format='dict')
+        assert_near_equal(J['f_xy']['x'], np.array([[-0. , -0. , -0., 0.6 , -0. , -0. , -0. ]]),
                           1e-11)
-        assert_near_equal(J['parab.f_xy']['p.y'], np.array([[-0. , -0. , -0., 8.6, -0. , -0. , -0. ]]),
+        assert_near_equal(J['f_xy']['y'], np.array([[-0. , -0. , -0., 8.6, -0. , -0. , -0. ]]),
                           1e-11)
 
         prob.setup(force_alloc_complex=True, mode='rev')
@@ -1565,11 +1564,10 @@ class MPITests3(unittest.TestCase):
         totals = prob.check_totals(method='cs', show_only_incorrect=True)
         assert_check_totals(totals, rtol=1e-6)
 
-        of = ['parab.f_xy']
-        J = prob.driver._compute_totals(of=of, wrt=['p.x', 'p.y'], return_format='dict')
-        assert_near_equal(J['parab.f_xy']['p.x'], np.array([[-0. , -0. , -0., 0.6 , -0. , -0. , -0. ]]),
+        J = prob.driver._compute_totals(of=['f_xy'], wrt=['x', 'y'], return_format='dict')
+        assert_near_equal(J['f_xy']['x'], np.array([[-0. , -0. , -0., 0.6 , -0. , -0. , -0. ]]),
                           1e-11)
-        assert_near_equal(J['parab.f_xy']['p.y'], np.array([[-0. , -0. , -0., 8.6, -0. , -0. , -0. ]]),
+        assert_near_equal(J['f_xy']['y'], np.array([[-0. , -0. , -0., 8.6, -0. , -0. , -0. ]]),
                           1e-11)
 
     def test_distrib_obj_indices(self):
@@ -1641,19 +1639,19 @@ class MPITests3(unittest.TestCase):
         prob.run_model()
 
         con = prob.driver.get_constraint_values()
-        assert_near_equal(con['parab.f_xy'],
+        assert_near_equal(con['f_xy'],
                           np.array([ 8.88, 31.92]),
                           1e-6)
 
         totals = prob.check_totals(method='cs', show_only_incorrect=True)
         assert_check_totals(totals, rtol=1e-6)
 
-        of = ['parab.f_xy']
-        J = prob.driver._compute_totals(of=of, wrt=['p.x', 'p.y'], return_format='dict')
-        assert_near_equal(J['parab.f_xy']['p.x'], np.array([[-0. , -0. , -0.6, -0. , -0. , -0. , -0. ],
+        of = ['f_xy']
+        J = prob.driver._compute_totals(of=of, wrt=['x', 'y'], return_format='dict')
+        assert_near_equal(J['f_xy']['x'], np.array([[-0. , -0. , -0.6, -0. , -0. , -0. , -0. ],
                                                             [-0. , -0. , -0. , -0. , -0. , -0. ,  4.2]]),
                           1e-11)
-        assert_near_equal(J['parab.f_xy']['p.y'], np.array([[-0. , -0. ,  7.4, -0. , -0. , -0. , -0. ],
+        assert_near_equal(J['f_xy']['y'], np.array([[-0. , -0. ,  7.4, -0. , -0. , -0. , -0. ],
                                                             [-0. , -0. , -0. , -0. , -0. , -0. , 12.2]]),
                           1e-11)
 
@@ -1664,12 +1662,12 @@ class MPITests3(unittest.TestCase):
         totals = prob.check_totals(method='cs', show_only_incorrect=True)
         assert_check_totals(totals, rtol=1e-6)
 
-        of = ['parab.f_xy']
-        J = prob.driver._compute_totals(of=of, wrt=['p.x', 'p.y'], return_format='dict')
-        assert_near_equal(J['parab.f_xy']['p.x'], np.array([[-0. , -0. , -0.6, -0. , -0. , -0. , -0. ],
+        of = ['f_xy']
+        J = prob.driver._compute_totals(of=of, wrt=['x', 'y'], return_format='dict')
+        assert_near_equal(J['f_xy']['x'], np.array([[-0. , -0. , -0.6, -0. , -0. , -0. , -0. ],
                                                             [-0. , -0. , -0. , -0. , -0. , -0. ,  4.2]]),
                           1e-11)
-        assert_near_equal(J['parab.f_xy']['p.y'], np.array([[-0. , -0. ,  7.4, -0. , -0. , -0. , -0. ],
+        assert_near_equal(J['f_xy']['y'], np.array([[-0. , -0. ,  7.4, -0. , -0. , -0. , -0. ],
                                                             [-0. , -0. , -0. , -0. , -0. , -0. , 12.2]]),
                           1e-11)
 
@@ -2620,7 +2618,7 @@ class TestDistribBugs(unittest.TestCase):
         desvar = prob.driver.get_design_var_values()
         con = prob.driver.get_constraint_values()
 
-        assert_near_equal(con['parab.f_xy'], 24.0)
+        assert_near_equal(con['f_xy'], 24.0)
         assert_near_equal(con['a2'], 24.96)
 
         totals = prob.check_totals(method='cs', out_stream=None)

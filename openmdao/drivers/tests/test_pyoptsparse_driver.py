@@ -230,8 +230,8 @@ class TestMPIScatter(unittest.TestCase):
         con = prob.driver.get_constraint_values()
         obj = prob.driver.get_objective_values()
 
-        assert_near_equal(obj['sum.f_sum'], 0.0, 2e-6)
-        assert_near_equal(con['parab.f_xy'],
+        assert_near_equal(obj['f_sum'], 0.0, 2e-6)
+        assert_near_equal(con['f_xy'],
                           np.zeros(7),
                           1e-5)
 

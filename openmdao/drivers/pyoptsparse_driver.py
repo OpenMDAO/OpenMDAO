@@ -476,10 +476,10 @@ class pyOptSparseDriver(Driver):
                 del self._cons[name]
                 del self._responses[name]
 
-        eqcons = [m['source'] for m in self._cons.values() if m['equals'] is not None]
+        eqcons = {m['source'] for m in self._cons.values() if m['equals'] is not None}
         if eqcons:
             # set equality constraints as reverse seeds to see what dvs are relevant
-            relevant.set_all_seeds([m['source'] for m in self._designvars.values()], eqcons)
+            relevant.set_all_seeds([m['source'] for m in self._designvars.values()], sorted(eqcons))
 
         # Add all equality constraints
         for name, meta in self._cons.items():
@@ -490,36 +490,36 @@ class pyOptSparseDriver(Driver):
             relevant.set_seeds([meta['source']], 'rev')
             wrt = [v for v in indep_list if relevant.is_relevant(self._designvars[v]['source'],
                                                                  'rev')]
-            prom_name = model._get_prom_name(name)
+            # prom_name = model._get_prom_name(name)
 
             # convert wrt to use promoted names
-            wrt_prom = model._prom_names_list(wrt)
+            # wrt_prom = model._prom_names_list(wrt)
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
-                jac_prom = model._prom_names_dict(jac)
-                opt_prob.addConGroup(prom_name, size,
+                # jac_prom = model._prom_names_dict(jac)
+                opt_prob.addConGroup(name, size,
                                      lower=lower - _y_intercepts[name],
                                      upper=upper - _y_intercepts[name],
-                                     linear=True, wrt=wrt_prom, jac=jac_prom)
+                                     linear=True, wrt=wrt, jac=jac)
             else:
-                if name in self._res_subjacs:
-                    resjac = self._res_subjacs[name]
-                    jac = {n: resjac[self._designvars[n]['source']] for n in wrt}
-                    jac_prom = model._prom_names_jac(jac)
+                if name in self._con_subjacs:
+                    resjac = self._con_subjacs[name]
+                    jac = {n: resjac[n] for n in wrt}
+                    # jac_prom = model._prom_names_jac(jac)
                 else:
                     jac = None
-                    jac_prom = None
+                    # jac_prom = None
 
-                opt_prob.addConGroup(prom_name, size, lower=lower, upper=upper,
-                                     wrt=wrt_prom, jac=jac_prom)
+                opt_prob.addConGroup(name, size, lower=lower, upper=upper,
+                                     wrt=wrt, jac=jac)
                 self._quantities.append(name)
 
-        ineqcons = [m['source'] for m in self._cons.values() if m['equals'] is None]
+        ineqcons = {m['source'] for m in self._cons.values() if m['equals'] is None}
         if ineqcons:
             # set inequality constraints as reverse seeds to see what dvs are relevant
             relevant.set_all_seeds([m['source'] for m in self._designvars.values()],
-                                   ineqcons)
+                                   sorted(ineqcons))
 
         # Add all inequality constraints
         for name, meta in self._cons.items():
@@ -534,28 +534,28 @@ class pyOptSparseDriver(Driver):
             relevant.set_seeds([meta['source']], 'rev')
             wrt = [v for v in indep_list if relevant.is_relevant(self._designvars[v]['source'],
                                                                  'rev')]
-            prom_name = model._get_prom_name(name)
+            # prom_name = model._get_prom_name(name)
 
             # convert wrt to use promoted names
-            wrt_prom = model._prom_names_list(wrt)
+            # wrt_prom = model._prom_names_list(wrt)
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
-                jac_prom = model._prom_names_dict(jac)
-                opt_prob.addConGroup(prom_name, size,
+                # jac_prom = model._prom_names_dict(jac)
+                opt_prob.addConGroup(name, size,
                                      upper=upper - _y_intercepts[name],
                                      lower=lower - _y_intercepts[name],
-                                     linear=True, wrt=wrt_prom, jac=jac_prom)
+                                     linear=True, wrt=wrt, jac=jac)
             else:
-                if name in self._res_subjacs:
-                    resjac = self._res_subjacs[name]
-                    jac = {n: resjac[self._designvars[n]['source']] for n in wrt}
-                    jac_prom = model._prom_names_jac(jac)
+                if name in self._con_subjacs:
+                    resjac = self._con_subjacs[name]
+                    jac = {n: resjac[n] for n in wrt}
+                    # jac_prom = model._prom_names_jac(jac)
                 else:
                     jac = None
-                    jac_prom = None
-                opt_prob.addConGroup(prom_name, size, upper=upper, lower=lower,
-                                     wrt=wrt_prom, jac=jac_prom)
+                    # jac_prom = None
+                opt_prob.addConGroup(name, size, upper=upper, lower=lower,
+                                     wrt=wrt, jac=jac)
                 self._quantities.append(name)
 
         # Instantiate the requested optimizer
@@ -857,15 +857,15 @@ class pyOptSparseDriver(Driver):
                 # conversion of our dense array into a fully dense 'coo', which is bad.
                 # TODO: look into getting rid of all of these conversions!
                 new_sens = {}
-                res_subjacs = self._res_subjacs
+                res_subjacs = self._con_subjacs
 
                 for okey in self._quantities:
                     new_sens[okey] = newdv = {}
                     for ikey in self._designvars.keys():
-                        ikey_src = self._designvars[ikey]['source']
-                        if okey in res_subjacs and ikey_src in res_subjacs[okey]:
+                        # ikey_src = self._designvars[ikey]['source']
+                        if okey in res_subjacs and ikey in res_subjacs[okey]:
                             arr = sens_dict[okey][ikey]
-                            coo = res_subjacs[okey][ikey_src]
+                            coo = res_subjacs[okey][ikey]
                             row, col, _ = coo['coo']
                             coo['coo'][2] = arr[row, col].flatten()
                             newdv[ikey] = coo
@@ -949,7 +949,7 @@ class pyOptSparseDriver(Driver):
             Current coloring.
         """
         total_sparsity = None
-        self._res_subjacs = {}
+        self._con_subjacs = {}
         coloring = coloring if coloring is not None else self._get_static_coloring()
         if coloring is not None:
             total_sparsity = coloring.get_subjac_sparsity()
@@ -965,15 +965,21 @@ class pyOptSparseDriver(Driver):
         if total_sparsity is None:
             return
 
-        for res, dvdict in total_sparsity.items():  # res are 'driver' names (prom name or alias)
-            if res in self._objs:  # skip objectives
-                continue
-            self._res_subjacs[res] = {}
-            for dv, (rows, cols, shape) in dvdict.items():  # dvs are src names
-                rows = np.array(rows, dtype=INT_DTYPE)
-                cols = np.array(cols, dtype=INT_DTYPE)
+        use_approx = self._problem().model._owns_approx_of is not None
 
-                self._res_subjacs[res][self._designvars[dv]['source']] = {
+        for con, conmeta in self._cons.items():
+            if conmeta['linear']:
+                continue  # skip linear constraints because they're not in the coloring
+
+            self._con_subjacs[con] = {}
+            consrc = conmeta['source']
+            for dv, dvmeta in self._designvars.items():
+                if use_approx:
+                    dvsrc = dvmeta['source']
+                    rows, cols, shape = total_sparsity[consrc][dvsrc]
+                else:
+                    rows, cols, shape = total_sparsity[con][dv]
+                self._con_subjacs[con][dv] = {
                     'coo': [rows, cols, np.zeros(rows.size)],
                     'shape': shape,
                 }

@@ -356,9 +356,9 @@ class _TotalJacInfo(object):
             self.J_final = self.J_dict = self._get_dict_J(J, wrt_metadata, of_metadata,
                                                           return_format)
 
-        #if self.has_scaling:
-            #self.prom_design_vars = {prom_wrt[i]: design_var_srcs[dv] for i, dv in enumerate(wrt)}
-            #self.prom_responses = {prom_of[i]: responses[r] for i, r in enumerate(of)}
+        # if self.has_scaling:
+        #     self.prom_design_vars = {prom_wrt[i]: design_var_srcs[dv] for i, dv in enumerate(wrt)}
+        #     self.prom_responses = {prom_of[i]: responses[r] for i, r in enumerate(of)}
 
     def _check_discrete_dependence(self):
         model = self.model
@@ -366,10 +366,10 @@ class _TotalJacInfo(object):
         if model._var_allprocs_discrete['output']:
             # discrete_outs at the model level are absolute names
             discrete_outs = set(model._var_allprocs_discrete['output'])
-            pair_iter = self.relevance.iter_seed_pair_relevance
-            for seed, rseed, rels in pair_iter([m['source'] for m in self.input_meta['fwd'].values()],
-                                               [m['source'] for m in self.input_meta['rev'].values()],
-                                               outputs=True):
+            piter = self.relevance.iter_seed_pair_relevance
+            for seed, rseed, rels in piter([m['source'] for m in self.input_meta['fwd'].values()],
+                                           [m['source'] for m in self.input_meta['rev'].values()],
+                                           outputs=True):
                 inter = discrete_outs.intersection(rels)
                 if inter:
                     inp = seed if self.mode == 'fwd' else rseed
@@ -501,7 +501,7 @@ class _TotalJacInfo(object):
         ----------
         J : ndarray
             Array jacobian.
-        wrt_metadta : dict
+        wrt_metadata : dict
             Dict containing metadata for 'wrt' variables.
         of_metadata : dict
             Dict containing metadata for 'of' variables.
@@ -541,12 +541,11 @@ class _TotalJacInfo(object):
                 if not get_remote and ofmeta['remote']:
                     continue
                 out_slice = ofmeta['jac_slice']
-                if not ofmeta['alias']:
-                    out = ofmeta['source']  # make absolute
+                # if not ofmeta['alias']:
+                #     out = ofmeta['source']  # make absolute
                 for inp, wrtmeta in wrt_metadata.items():
                     if get_remote or not wrtmeta['remote']:
-                        key = '!'.join((out, wrtmeta['source']))
-                        J_dict[key] = J[out_slice, wrtmeta['jac_slice']]
+                        J_dict[f"{out}!{inp}"] = J[out_slice, wrtmeta['jac_slice']]
         else:
             raise ValueError("'%s' is not a valid jacobian return format." % return_format)
 
@@ -597,15 +596,11 @@ class _TotalJacInfo(object):
 
             if simul_coloring and parallel_deriv_color:
                 raise RuntimeError("Using both simul_coloring and parallel_deriv_color with "
-                                    f"variable '{name}' is not supported.")
+                                   f"variable '{name}' is not supported.")
 
             if parallel_deriv_color is not None:
                 if parallel_deriv_color not in self.par_deriv_printnames:
                     self.par_deriv_printnames[parallel_deriv_color] = []
-
-                # print_name = name
-                # if name in self.ivc_print_names:
-                #     print_name = self.ivc_print_names[name]
 
                 self.par_deriv_printnames[parallel_deriv_color].append(name)
 
@@ -704,7 +699,7 @@ class _TotalJacInfo(object):
                 imeta['seed_vars'] = {source}
                 idx_iter_dict[name] = (imeta, self.single_index_iter)
 
-            tup = (None, cache_lin_sol, name)
+            tup = (None, cache_lin_sol, name, source)
 
             idx_map.extend([tup] * (end - start))
             start = end
@@ -732,9 +727,9 @@ class _TotalJacInfo(object):
                 all_vois = set()
 
                 for i in ilist:
-                    rel_systems, cache_lin_sol, voiname = idx_map[i]
+                    rel_systems, cache_lin_sol, voiname, voisrc = idx_map[i]
                     cache |= cache_lin_sol
-                    all_vois.add(voiname)
+                    all_vois.add(voisrc)
 
                 iterdict = defaultdict(bool)
 
@@ -793,29 +788,28 @@ class _TotalJacInfo(object):
         jstart = jend = 0
 
         for name, vmeta in vois.items():
-            path = vmeta['source']
-
+            src = vmeta['source']
             indices = vmeta['indices']
-            drv_name = _src_or_alias_name(vmeta)
+            # drv_name = _src_or_alias_name(vmeta)
 
-            meta = allprocs_abs2meta_out[path]
+            meta = allprocs_abs2meta_out[src]
             sz = vmeta['global_size'] if self.get_remote else vmeta['size']
 
-            if (path in abs2idx and path in slices and (self.get_remote or not vmeta['remote'])):
-                var_idx = abs2idx[path]
-                slc = slices[path]
+            if (src in abs2idx and src in slices and (self.get_remote or not vmeta['remote'])):
+                var_idx = abs2idx[src]
+                slc = slices[src]
                 slcsize = slc.stop - slc.start
 
                 if MPI and meta['distributed'] and self.get_remote:
                     if indices is not None:
-                        local_idx, sizes_idx, _ = self._dist_driver_vars[drv_name]
+                        local_idx, sizes_idx, _ = self._dist_driver_vars[name]
 
                         dist_offset = np.sum(sizes_idx[:myproc])
                         full_inds = np.arange(slc.start, slc.stop, dtype=INT_DTYPE)
                         inds.append(full_inds[local_idx.as_array()])
                         jac_inds.append(jstart + dist_offset +
                                         np.arange(local_idx.indexed_src_size, dtype=INT_DTYPE))
-                        name2jinds.append((path, jac_inds[-1]))
+                        name2jinds.append((src, jac_inds[-1]))
                     else:
                         dist_offset = np.sum(sizes[:myproc, var_idx])
                         inds.append(range(slc.start, slc.stop) if slcsize > 0
@@ -823,7 +817,7 @@ class _TotalJacInfo(object):
                         jac_inds.append(np.arange(jstart + dist_offset,
                                         jstart + dist_offset + sizes[myproc, var_idx],
                                         dtype=INT_DTYPE))
-                        name2jinds.append((path, jac_inds[-1]))
+                        name2jinds.append((src, jac_inds[-1]))
                 else:
                     if indices is None:
                         sol_inds = range(slc.start, slc.stop) if slcsize > 0 \
@@ -834,7 +828,7 @@ class _TotalJacInfo(object):
                     inds.append(sol_inds)
                     jac_inds.append(np.arange(jstart, jstart + sz, dtype=INT_DTYPE))
                     if fwd or not self.get_remote:
-                        name2jinds.append((path, jac_inds[-1]))
+                        name2jinds.append((src, jac_inds[-1]))
 
             if self.get_remote or not vmeta['remote']:
                 jend += sz
@@ -1040,7 +1034,7 @@ class _TotalJacInfo(object):
         int or None
             key used for storage of cached linear solve (if active, else None).
         """
-        rel_systems, cache_lin_sol, _ = self.in_idx_map[mode][idx]
+        rel_systems, cache_lin_sol, _, _ = self.in_idx_map[mode][idx]
 
         self._zero_vecs(mode)
 
@@ -1150,7 +1144,7 @@ class _TotalJacInfo(object):
             Not used.
         """
         for i in inds:
-            rel_systems, _, _ = self.in_idx_map[mode][i]
+            rel_systems, _, _, _ = self.in_idx_map[mode][i]
             break
 
         self._zero_vecs(mode)
@@ -1435,7 +1429,7 @@ class _TotalJacInfo(object):
                                     print(f"In mode: {mode}.\n, Solving for directional derivative "
                                           f"wrt '{key}'",)
                                 else:
-                                    print(f"In mode: {mode}.\n('{key}', [{inds}])",flush=True)
+                                    print(f"In mode: {mode}.\n('{key}', [{inds}])", flush=True)
 
                             t0 = time.perf_counter()
 
@@ -1832,7 +1826,7 @@ class _TotalJacInfo(object):
             mode = self.mode
 
         # get a nested dict version of J
-        Jdict = self._get_dict_J(self.J, self.input_meta[mode], self.output_meta[mode], 'dict')
+        Jdict = self._get_dict_J(self.J, self.input_meta['fwd'], self.output_meta['fwd'], 'dict')
         ofsizes = {}
         wrtsizes = {}
         slices = {'of': {}, 'wrt': {}}

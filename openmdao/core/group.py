@@ -934,7 +934,7 @@ class Group(System):
         # group all aliases by source so we can compute overlaps for each source individually
         for meta in responses.values():
             src = meta['source']
-            if not src in discrete_outs:
+            if src not in discrete_outs:
                 if meta['alias']:
                     aliases.add(meta['alias'])
                 if src in srcdict:
@@ -3733,7 +3733,7 @@ class Group(System):
                 # Only linearize subsystems if we aren't approximating the derivs at this level.
                 for subsys in subs:
                     do_ln = sub_do_ln and (subsys._linear_solver is not None and
-                                        subsys._linear_solver._linearize_children())
+                                           subsys._linear_solver._linearize_children())
                     subsys._linearize(jac, sub_do_ln=do_ln)
 
                 # Update jacobian
@@ -3885,29 +3885,15 @@ class Group(System):
             # get rid of any old stuff in here
             self._owns_approx_of = self._owns_approx_wrt = None
 
-            # # When computing totals, weed out inputs connected to anything inside our system unless
-            # # the source is an indepvarcomp.
-            # for var in candidate_wrt:
-            #     if var in self._conn_abs_in2out:
-            #         pass  # this seems wrong, but leave it for now.  As is it appears to leave
-            #               # all inputs out of wrt when doing semitotals...
-            #         # if totals:
-            #         #     src = self._conn_abs_in2out[var]
-            #         #     if 'openmdao:indep_var' in all_abs2meta_out[src]['tags']:
-            #         #         wrt.add(src)
-            #         #         ivc.add(src)
-            #     else:
-            #         wrt.add(var)
-
         if self._owns_approx_of:  # can only be total at this point
             of = set(m['source'] for m in self._owns_approx_of.values())
         else:
             of = set(self._var_allprocs_abs2meta['output'])
             # Skip indepvarcomp res wrt other srcs
             of -= ivc
-            #if totals:
-                #abs2prom = self._var_allprocs_abs2prom['output']
-                #of = {abs2prom[n] for n in of}
+            # if totals:
+            #     abs2prom = self._var_allprocs_abs2prom['output']
+            #     of = {abs2prom[n] for n in of}
 
         if totals:
             yield from product(of, wrt.union(of))
@@ -3939,7 +3925,7 @@ class Group(System):
         Yields
         ------
         str
-            Name of 'of' variable.
+            Absolute name of 'of' variable source.
         int
             Starting index.
         int
@@ -4101,18 +4087,15 @@ class Group(System):
         self._jacobian = DictionaryJacobian(system=self)
 
         abs2meta = self._var_allprocs_abs2meta
-        prom2abs_in = self._var_allprocs_prom2abs_list['input']
-        prom2abs_out = self._var_allprocs_prom2abs_list['output']
-        conns = self._conn_global_abs_in2out
         total = self.pathname == ''
         nprocs = self.comm.size
 
-        if total:
-            responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=True)
-            toabs = {m['name']: m['source'] for m in responses.values()}
-            toabs.update({m['alias']: m['source'] for m in responses.values() if m['alias']})
-            dvs = self.get_design_vars(get_sizes=False, use_prom_ivc=True)
-            toabs.update({m['name']: m['source'] for m in dvs.values()})
+        # if total:
+        #     responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=True)
+        #     toabs = {m['name']: m['source'] for m in responses.values()}
+        #     toabs.update({m['alias']: m['source'] for m in responses.values() if m['alias']})
+        #     dvs = self.get_design_vars(get_sizes=False, use_prom_ivc=True)
+        #     toabs.update({m['name']: m['source'] for m in dvs.values()})
 
         if self._coloring_info.coloring is not None and (self._owns_approx_of is None or
                                                          self._owns_approx_wrt is None):
@@ -4135,29 +4118,29 @@ class Group(System):
         approx_keys = self._get_approx_subjac_keys()
         for key in approx_keys:
             left, right = key
-            #if total:
-                #if left in toabs:  # it's an alias
-                    #lsrc = toabs[left]
-                #else:
-                    #lsrc = prom2abs_out[left][0]
-                #if right in toabs:
-                    #rsrc = toabs[right]
-                #else:
-                    #if right in prom2abs_in:
-                        #rabs = prom2abs_in[right][0]
-                        #rsrc = conns[rabs]
-                    #else:
-                        #rsrc = prom2abs_out[right][0]
-            #else:
-                #lsrc = left
-                #rsrc = right
-            #abskey = (lsrc, rsrc)
-            #lsrc = toabs[left] if total and toabs else left
-            #if total:
-                #if left in responses and responses[left]['alias'] is not None:
-                    #left = responses[left]['source']
-                #if right in responses and responses[right]['alias'] is not None:
-                    #right = responses[right]['source']
+            # if total:
+            #     if left in toabs:  # it's an alias
+            #         lsrc = toabs[left]
+            #     else:
+            #         lsrc = prom2abs_out[left][0]
+            #     if right in toabs:
+            #         rsrc = toabs[right]
+            #     else:
+            #         if right in prom2abs_in:
+            #             rabs = prom2abs_in[right][0]
+            #             rsrc = conns[rabs]
+            #         else:
+            #             rsrc = prom2abs_out[right][0]
+            # else:
+            #     lsrc = left
+            #     rsrc = right
+            # abskey = (lsrc, rsrc)
+            # lsrc = toabs[left] if total and toabs else left
+            # if total:
+            #     if left in responses and responses[left]['alias'] is not None:
+            #         left = responses[left]['source']
+            #     if right in responses and responses[right]['alias'] is not None:
+            #         right = responses[right]['source']
             if not total and nprocs > 1 and self._has_fd_group:
                 sout = sizes_out[:, abs2idx[left]]
                 sin = sizes_in[:, abs2idx[right]]
@@ -4194,17 +4177,17 @@ class Group(System):
                 if not total and right in abs2meta['input']:
                     sz = abs2meta['input'][right]['size']
                 else:
-                    #if total:
-                        #if right in toabs:
-                            #rsrc = toabs[right]
-                        #else:
-                            #if right in prom2abs_in:
-                                #rabs = prom2abs_in[right][0]
-                                #rsrc = conns[rabs]
-                            #else:
-                                #rsrc = prom2abs_out[right][0]
-                        #sz = abs2meta['output'][rsrc]['size']
-                    #else:
+                    # if total:
+                    #     if right in toabs:
+                    #         rsrc = toabs[right]
+                    #     else:
+                    #         if right in prom2abs_in:
+                    #             rabs = prom2abs_in[right][0]
+                    #             rsrc = conns[rabs]
+                    #         else:
+                    #             rsrc = prom2abs_out[right][0]
+                    #     sz = abs2meta['output'][rsrc]['size']
+                    # else:
                     sz = abs2meta['output'][right]['size']
                 shape = (abs2meta['output'][left]['size'], sz)
                 meta['shape'] = shape
@@ -5193,12 +5176,33 @@ class Group(System):
                     if use_prom_ivc:
                         # have to promote subsystem prom name to this level
                         sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
+                        sub_pro2abs_out = subsys._var_allprocs_prom2abs_list['output']
                         for dv, meta in dvs.items():
                             if dv in sub_pro2abs_in:
                                 abs_dv = sub_pro2abs_in[dv][0]
                                 sub_out[abs2prom_in[abs_dv]] = meta
+                            elif dv in sub_pro2abs_out:
+                                abs_dv = sub_pro2abs_out[dv][0]
+                                sub_out[abs2prom_out[abs_dv]] = meta
                             else:
                                 sub_out[dv] = meta
+                        # # have to promote subsystem prom name to this level
+                        # sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
+                        # sub_abs2meta_in = subsys._var_allprocs_abs2meta['input']
+                        # sub_abs2meta_out = subsys._var_allprocs_abs2meta['output']
+                        # for dv, meta in dvs.items():
+                        #     if dv in sub_pro2abs_in:
+                        #         abs_dv = sub_pro2abs_in[dv][0]
+                        #         out[abs2prom_in[abs_dv]] = meta
+                        #     elif dv in sub_pro2abs_out:
+                        #         abs_dv = sub_pro2abs_out[dv][0]
+                        #         out[abs2prom_out[abs_dv]] = meta
+                        #     elif dv in sub_abs2meta_out:
+                        #         out[abs2prom_out[dv]] = meta
+                        #     elif dv in sub_abs2meta_in:
+                        #         out[abs2prom_in[dv]] = meta
+                        #     else:
+                        #         out[dv] = meta
                     else:
                         sub_out.update(dvs)
 
@@ -5239,7 +5243,7 @@ class Group(System):
         model = self._problem_meta['model_ref']()
         if self is model:
             abs2meta_out = model._var_allprocs_abs2meta['output']
-            for var, outmeta in out.items():
+            for outmeta in out.values():
                 src = outmeta['source']
                 if src in abs2meta_out and "openmdao:allow_desvar" not in abs2meta_out[src]['tags']:
                     prom_src, prom_tgt = outmeta['orig']
@@ -5391,12 +5395,13 @@ class Group(System):
                 raise RuntimeError("No response variables were passed to compute_totals and "
                                    "the driver is not providing any.")
         else:
-            if list(of) != driver_ordered_nl_resp_names:
+            of_src_names = [m['source'] for n, m in driver._responses.items()
+                            if n in driver_ordered_nl_resp_names]
+            if list(of) != driver_ordered_nl_resp_names and list(of) != of_src_names:
                 has_custom_derivs = True
 
         return self._active_responses(of, driver._responses), \
             self._active_desvars(wrt, driver._designvars), has_custom_derivs
-
 
     def _active_desvars(self, user_dv_names, designvars=None):
         """
@@ -5479,13 +5484,9 @@ class Group(System):
         if not responses:
             responses = self.get_responses(recurse=True, get_sizes=True, use_prom_ivc=True)
 
-        for meta in responses.values():
-            if meta['alias'] in active_resps:
-                active_resps[meta['alias']] = meta.copy()
-            elif meta['name'] in active_resps:
-                active_resps[meta['name']] = meta.copy()
-            elif meta['source'] in active_resps:
-                active_resps[meta['source']] = meta.copy()
+        for name, meta in responses.items():
+            if name in active_resps:
+                active_resps[name] = meta.copy()
 
         for name, meta in active_resps.items():
             if meta is None:
@@ -5505,4 +5506,3 @@ class Group(System):
             meta['remote'] = meta['source'] not in self._var_abs2meta['output']
 
         return active_resps
-

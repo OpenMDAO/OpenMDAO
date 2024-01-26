@@ -161,7 +161,7 @@ class ParDerivTestCase(unittest.TestCase):
         if not prob.comm.rank:
             self.assertTrue('Solving color: par_dv (x1, x2)' in output)
             self.assertTrue('In mode: fwd.' in output)
-            self.assertTrue("('p.x3', [2])" in output)
+            self.assertTrue("('x3', [2])" in output)
 
     def test_fan_out_parallel_sets_rev(self):
 
@@ -784,10 +784,10 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         prob.setup(mode='rev', force_alloc_complex=True)
         prob.run_model()
         data = prob.check_totals(method='cs', out_stream=None)
-        assert_near_equal(data[('pg.dc1.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc2.y2', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc2.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc3.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc1.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc2.y2', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc2.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc3.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
 
         comm = MPI.COMM_WORLD
         # should only need one jacvec product per linear solve
@@ -814,10 +814,10 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         prob.setup(mode='rev', force_alloc_complex=True)
         prob.run_model()
         data = prob.check_totals(method='cs', out_stream=None)
-        assert_near_equal(data[('pg.dc1.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc2.y2', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc2.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc3.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc1.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc2.y2', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc2.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc3.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
 
         # should only need one jacvec product per linear solve
         comm = MPI.COMM_WORLD

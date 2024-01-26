@@ -290,7 +290,7 @@ class SqliteRecorder(CaseRecorder):
             for prop in self._abs2meta[name]:
                 self._abs2meta[name][prop] = make_serializable(self._abs2meta[name][prop])
 
-    def _cleanup_var_settings(self, var_settings):
+    def _make_var_setting_serializable(self, var_settings):
         """
         Convert all var_settings variable properties to a form that can be dumped as JSON.
 
@@ -366,10 +366,10 @@ class SqliteRecorder(CaseRecorder):
         if self.connection:
 
             if driver is not None:
-                desvars = {m['source']: m for m in driver._designvars.values()}
-                responses = {m['source']: m for m in driver._responses.values()}
-                constraints ={m['source']: m for m in driver._cons.values()}
-                objectives = {m['source']: m for m in driver._objs.values()}
+                desvars = driver._designvars
+                responses = driver._responses
+                constraints = driver._cons
+                objectives = driver._objs
 
             inputs = list(system.abs_name_iter('input', local=False, discrete=True))
             outputs = list(system.abs_name_iter('output', local=False, discrete=True))
@@ -397,18 +397,22 @@ class SqliteRecorder(CaseRecorder):
             disc_meta_in = system._var_allprocs_discrete['input']
             disc_meta_out = system._var_allprocs_discrete['output']
 
-            full_var_set = [(outputs, 'output'),
+            all_var_info = [(outputs, 'output'),
                             (desvars, 'desvar'), (responses, 'response'),
                             (objectives, 'objective'), (constraints, 'constraint')]
 
-            for var_set, var_type in full_var_set:
-                for name in var_set:
+            for varinfo, var_type in all_var_info:
+                if var_type != 'output':
+                    varinfo = varinfo.items()
+
+                for data in varinfo:
 
                     # Design variables, constraints and objectives can be requested by input name.
                     if var_type != 'output':
-                        srcname = var_set[name]['source']
+                        name, vmeta = data
+                        srcname = vmeta['source']
                     else:
-                        srcname = name
+                        srcname = name = data
 
                     if srcname not in self._abs2meta:
                         if srcname in real_meta_out:
@@ -457,7 +461,7 @@ class SqliteRecorder(CaseRecorder):
             var_settings.update(desvars)
             var_settings.update(objectives)
             var_settings.update(constraints)
-            var_settings = self._cleanup_var_settings(var_settings)
+            var_settings = self._make_var_setting_serializable(var_settings)
             var_settings['execution_order'] = var_order
             var_settings_json = zlib.compress(
                 json.dumps(var_settings, default=default_noraise).encode('ascii'))

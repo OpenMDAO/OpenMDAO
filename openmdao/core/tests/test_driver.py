@@ -135,10 +135,10 @@ class TestDriver(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        derivs = prob.driver._compute_totals(of=['obj_cmp.obj', 'con_cmp1.con1'], wrt=['z'],
+        derivs = prob.driver._compute_totals(of=['obj', 'con1'], wrt=['z'],
                                              return_format='dict')
-        assert_near_equal(base[('con1', 'z')][0], derivs['con_cmp1.con1']['z'][0], 1e-5)
-        assert_near_equal(base[('obj', 'z')][0]*2.0, derivs['obj_cmp.obj']['z'][0], 1e-5)
+        assert_near_equal(base[('con1', 'z')][0], derivs['con1']['z'][0], 1e-5)
+        assert_near_equal(base[('obj', 'z')][0]*2.0, derivs['obj']['z'][0], 1e-5)
 
     def test_vector_scaled_derivs(self):
 
@@ -1029,25 +1029,25 @@ class TestDriverMPI(unittest.TestCase):
         # get distributed design var
         driver.get_design_var_values(get_remote=None)
 
-        assert_near_equal(driver.get_design_var_values(get_remote=True)['d_ivc.x'],
+        assert_near_equal(driver.get_design_var_values(get_remote=True)['x'],
                           [2, 2, 2, 2, 2])
 
-        assert_near_equal(driver.get_design_var_values(get_remote=False)['d_ivc.x'],
+        assert_near_equal(driver.get_design_var_values(get_remote=False)['x'],
                           2*np.ones(size))
 
         # set distributed design var, set_remote=True
-        driver.set_design_var('d_ivc.x', [3, 3, 3, 3, 3], set_remote=True)
+        driver.set_design_var('x', [3, 3, 3, 3, 3], set_remote=True)
 
-        assert_near_equal(driver.get_design_var_values(get_remote=True)['d_ivc.x'],
+        assert_near_equal(driver.get_design_var_values(get_remote=True)['x'],
                           [3, 3, 3, 3, 3])
 
         # set distributed design var, set_remote=False
         if comm.rank == 0:
-            driver.set_design_var('d_ivc.x', 5.0*np.ones(size), set_remote=False)
+            driver.set_design_var('x', 5.0*np.ones(size), set_remote=False)
         else:
-            driver.set_design_var('d_ivc.x', 9.0*np.ones(size), set_remote=False)
+            driver.set_design_var('x', 9.0*np.ones(size), set_remote=False)
 
-        assert_near_equal(driver.get_design_var_values(get_remote=True)['d_ivc.x'],
+        assert_near_equal(driver.get_design_var_values(get_remote=True)['x'],
                           [5, 5, 5, 9, 9])
 
         p.run_driver()

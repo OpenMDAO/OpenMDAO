@@ -539,6 +539,14 @@ class Solver(object):
         return self._system().get_reports_dir()
 
     def use_relevance(self):
+        """
+        Return True if relevance is should be active.
+
+        Returns
+        -------
+        bool
+            True if relevance is should be active.
+        """
         return True
 
 
@@ -681,7 +689,7 @@ class NonlinearSolver(Solver):
             force_one_iteration = system.under_complex_step
 
             while ((self._iter_count < maxiter and norm > atol and norm / norm0 > rtol and
-                not stalled) or force_one_iteration):
+                    not stalled) or force_one_iteration):
 
                 if system.under_complex_step:
                     force_one_iteration = False
@@ -911,17 +919,6 @@ class LinearSolver(Solver):
             True if solver makes recursive apply_linear calls on its subsystems.
         """
         return False
-
-    def use_relevance(self):
-        """
-        Return True if relevance is should be active.
-
-        Returns
-        -------
-        bool
-            True if relevance is should be active.
-        """
-        return True
 
     def _set_matvec_scope(self, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         pass

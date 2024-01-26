@@ -42,8 +42,8 @@ class TestDesVarsResponses(unittest.TestCase):
         constraints = prob.model.get_constraints()
 
         self.assertEqual(set(des_vars.keys()), {'x', 'z'})
-        self.assertEqual(set(obj.keys()), {'obj_cmp.obj'})
-        self.assertEqual(set(constraints.keys()), {'con_cmp1.con1', 'con_cmp2.con2'})
+        self.assertEqual(set(obj.keys()), {'obj'})
+        self.assertEqual(set(constraints.keys()), {'con1', 'con2'})
 
     def test_api_response_on_model(self):
 
@@ -61,14 +61,14 @@ class TestDesVarsResponses(unittest.TestCase):
         prob.setup()
 
         des_vars = prob.model.get_design_vars()
-        responses = prob.model.get_responses()
+        responses = prob.model.get_responses(use_prom_ivc=True)
         obj = prob.model.get_objectives()
         constraints = prob.model.get_constraints()
 
         self.assertEqual(set(des_vars.keys()), {'x', 'z'})
-        self.assertEqual(set(obj.keys()), {'obj_cmp.obj'})
-        self.assertEqual(set(constraints.keys()), {'con_cmp1.con1', 'con_cmp2.con2'})
-        self.assertEqual(set(responses.keys()), {'obj_cmp.obj', 'con_cmp1.con1', 'con_cmp2.con2'})
+        self.assertEqual(set(obj.keys()), {'obj'})
+        self.assertEqual(set(constraints.keys()), {'con1', 'con2'})
+        self.assertEqual(set(responses.keys()), {'obj', 'con1', 'con2'})
 
     def test_api_list_on_model(self):
 
@@ -90,8 +90,8 @@ class TestDesVarsResponses(unittest.TestCase):
         constraints = prob.model.get_constraints()
 
         self.assertEqual(set(des_vars.keys()), {'x', 'z'})
-        self.assertEqual(set(obj.keys()), {'obj_cmp.obj',})
-        self.assertEqual(set(constraints.keys()), {'con_cmp1.con1', 'con_cmp2.con2'})
+        self.assertEqual(set(obj.keys()), {'obj',})
+        self.assertEqual(set(constraints.keys()), {'con1', 'con2'})
 
     def test_api_array_on_model(self):
 
@@ -115,8 +115,8 @@ class TestDesVarsResponses(unittest.TestCase):
         constraints = prob.model.get_constraints()
 
         self.assertEqual(set(des_vars.keys()), {'x', 'z'})
-        self.assertEqual(set(obj.keys()), {'obj_cmp.obj',})
-        self.assertEqual(set(constraints.keys()), {'con_cmp1.con1', 'con_cmp2.con2'})
+        self.assertEqual(set(obj.keys()), {'obj',})
+        self.assertEqual(set(constraints.keys()), {'con1', 'con2'})
 
     def test_api_iter_on_model(self):
 
@@ -141,8 +141,8 @@ class TestDesVarsResponses(unittest.TestCase):
         constraints = prob.model.get_constraints()
 
         self.assertEqual(set(des_vars.keys()), {'x', 'z'})
-        self.assertEqual(set(obj.keys()), {'obj_cmp.obj',})
-        self.assertEqual(set(constraints.keys()), {'con_cmp1.con1', 'con_cmp2.con2'})
+        self.assertEqual(set(obj.keys()), {'obj',})
+        self.assertEqual(set(constraints.keys()), {'con1', 'con2'})
 
     def test_api_on_subsystems(self):
 
@@ -572,10 +572,10 @@ class TestConstraintOnModel(unittest.TestCase):
 
         constraints = prob.model.get_constraints()
 
-        con1_ref0 = constraints['con_cmp1.con1']['ref0']
-        con1_ref = constraints['con_cmp1.con1']['ref']
-        con1_scaler = constraints['con_cmp1.con1']['scaler']
-        con1_adder = constraints['con_cmp1.con1']['adder']
+        con1_ref0 = constraints['con1']['ref0']
+        con1_ref = constraints['con1']['ref']
+        con1_scaler = constraints['con1']['scaler']
+        con1_adder = constraints['con1']['adder']
 
         self.assertAlmostEqual( con1_scaler*(con1_ref0 + con1_adder), 0.0,
                                 places=12)
@@ -933,10 +933,10 @@ class TestObjectiveOnModel(unittest.TestCase):
 
         objectives = prob.model.get_objectives()
 
-        obj_ref0 = objectives['obj_cmp.obj']['ref0']
-        obj_ref = objectives['obj_cmp.obj']['ref']
-        obj_scaler = objectives['obj_cmp.obj']['scaler']
-        obj_adder = objectives['obj_cmp.obj']['adder']
+        obj_ref0 = objectives['obj']['ref0']
+        obj_ref = objectives['obj']['ref']
+        obj_scaler = objectives['obj']['scaler']
+        obj_adder = objectives['obj']['adder']
 
         self.assertAlmostEqual( obj_scaler*(obj_ref0 + obj_adder), 0.0,
                                 places=12)

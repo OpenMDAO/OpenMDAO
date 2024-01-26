@@ -102,6 +102,9 @@ class Case(object):
         self.source = source
         self._format_version = data_format
 
+        # save VOI dict reference for use by self._scale()
+        self._var_info = var_info
+
         if 'iteration_coordinate' in data.keys():
             self.name = data['iteration_coordinate']
             parts = self.name.split('|')
@@ -198,9 +201,6 @@ class Case(object):
         self._abs2meta = abs2meta
         self._conns = conns
         self._auto_ivc_map = auto_ivc_map
-
-        # save VOI dict reference for use by self._scale()
-        self._var_info = var_info
 
     def __str__(self):
         """
@@ -863,53 +863,35 @@ class Case(object):
             return PromAbsDict({}, self._prom2abs, self._abs2prom)
 
         abs2meta = self._abs2meta
-        prom2abs = self._prom2abs['input']
-        conns = self._conns
+        prom2abs_in = self._prom2abs['input']
         auto_ivc_map = self._auto_ivc_map
 
         ret_vars = {}
         update_vals = scaled or use_indices
 
-        names = [name for name in self.outputs.absolute_names()]
-        if var_type == 'constraint':
-            # Add the aliased constraints.
-            alias_cons = [k for k, v in self._var_info.items()
-                          if isinstance(v, dict) and v.get('alias')]
-            names.extend(alias_cons)
+        for name, meta in self._var_info.items():
+            # FIXME: _var_info contains dvs, responses, and 'execution_order'. It
+            # should be reorganized to prevent dvs and responses from being at the
+            # same level as execution_order.  While unlikely, it is possible that
+            # a dv/response could have the name 'execution_order'.  Mainly though,
+            # separating them will prevent needing the following kludge.
+            if name == 'execution_order':
+                continue
+            src = meta['source']
 
-        for name in names:
-            if name in abs2meta:
-                type_match = var_type in abs2meta[name]['type']
-                val_name = name
-            elif name in prom2abs:
-                abs_name = prom2abs[name][0]
-                src_name = conns[abs_name]
-                type_match = var_type in abs2meta[src_name]['type']
-                val_name = name
-            else:
-                # Support for constraint aliases.
-                type_match = var_type == 'constraint'
-                val_name = self._var_info[name]['source']
-
-            if type_match:
-                if name in auto_ivc_map:
-                    return_name = auto_ivc_map[name]
-                else:
-                    return_name = name
-                ret_vars[return_name] = val = self.outputs[val_name].copy()
-                if update_vals and name in self._var_info:
-                    meta = self._var_info[name]
-                    if use_indices and meta['indices'] is not None:
-                        val = val[meta['indices']]
-                    if scaled:
-                        if meta['total_adder'] is not None:
-                            val += meta['total_adder']
-                        if meta['total_scaler'] is not None:
-                            val *= meta['total_scaler']
-                    ret_vars[return_name] = val
+            if var_type in abs2meta[src]['type']:
+                val = self.outputs[src].copy()
+                if use_indices and meta['indices'] is not None:
+                    val = val[meta['indices']]
+                if scaled:
+                    if meta['total_adder'] is not None:
+                        val += meta['total_adder']
+                    if meta['total_scaler'] is not None:
+                        val *= meta['total_scaler']
+                ret_vars[name] = val
 
         return PromAbsDict(ret_vars, self._prom2abs['output'], self._abs2prom['output'],
-                           in_prom2abs=prom2abs, auto_ivc_map=auto_ivc_map,
+                           in_prom2abs=prom2abs_in, auto_ivc_map=auto_ivc_map,
                            var_info=self._var_info)
 
 
@@ -1057,10 +1039,8 @@ class PromAbsDict(dict):
         DERIV_KEY_SEP = self._DERIV_KEY_SEP
 
         # derivative could be tuple or string, using absolute or promoted names
-        if isinstance(key, tuple):
-            of, wrt = key
-        else:
-            of, wrt = key.split(DERIV_KEY_SEP)
+
+        of, wrt = key if isinstance(key, tuple) else key.split(DERIV_KEY_SEP)
 
         if of in abs2prom:
             # if promoted, will map to all connected absolute names
@@ -1081,7 +1061,7 @@ class PromAbsDict(dict):
         else:
             abs_wrt = [wrt]
 
-        abs_keys = ['%s%s%s' % (o, DERIV_KEY_SEP, w) for o, w in itertools.product(abs_of, abs_wrt)]
+        abs_keys = [f'{o}{DERIV_KEY_SEP}{w}' for o, w in itertools.product(abs_of, abs_wrt)]
 
         if wrt in abs2prom:
             prom_wrt = abs2prom[wrt]
@@ -1129,7 +1109,7 @@ class PromAbsDict(dict):
 
         elif isinstance(key, tuple) or self._DERIV_KEY_SEP in key:
             # derivative keys can be either (of, wrt) or 'of!wrt'
-            abs_keys, prom_key = self._deriv_keys(key)
+            _, prom_key = self._deriv_keys(key)
             return super().__getitem__(prom_key)
 
         raise KeyError('Variable name "%s" not found.' % key)
@@ -1149,12 +1129,15 @@ class PromAbsDict(dict):
         abs2prom = self._abs2prom
         prom2abs = self._prom2abs
 
-        if isinstance(key, tuple) or self._DERIV_KEY_SEP in key:
+        if isinstance(key, tuple):
+            _, prom_key = self._deriv_keys(key)
+            self._values[f"{prom_key[0]}!{prom_key[1]}"] = value
+            super().__setitem__(prom_key, value)
+        elif self._DERIV_KEY_SEP in key:
             # derivative keys can be either (of, wrt) or 'of!wrt'
-            abs_keys, prom_key = self._deriv_keys(key)
+            _, prom_key = self._deriv_keys(key)
 
-            for abs_key in abs_keys:
-                self._values[abs_key] = value
+            self._values[f"{prom_key[0]}!{prom_key[1]}"] = value
 
             super().__setitem__(prom_key, value)
 
@@ -1196,6 +1179,13 @@ class PromAbsDict(dict):
             if DERIV_KEY_SEP in key:
                 # return derivative keys as tuples instead of strings
                 of, wrt = key.split(DERIV_KEY_SEP)
+                if of in self._prom2abs:
+                    of = self._prom2abs[of][0]
+                if wrt in self._prom2abs:
+                    abswrts = self._prom2abs[wrt]
+                    if len(abswrts) == 1:
+                        wrt = abswrts[0]
+                        # for now, if wrt is ambiguous, leave as promoted
                 yield (of, wrt)
             else:
                 yield key

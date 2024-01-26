@@ -818,6 +818,8 @@ class Coloring(object):
         ----------
         driver : Driver
             Current driver object.
+        model : Group
+            Current model object.
         """
         ofs = model._active_responses(driver._get_ordered_nl_responses(), driver._responses)
         of_sizes = [m['size'] for m in ofs.values()]
@@ -2328,7 +2330,7 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
     """
     # clear out any old simul coloring info
     driver = prob.driver
-    driver._res_subjacs = {}
+    driver._con_subjacs = {}
 
     if setup and not prob._computing_coloring:
         prob.setup(mode=prob._mode)
