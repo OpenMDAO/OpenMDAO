@@ -5429,8 +5429,10 @@ class Group(System):
         if not designvars:
             designvars = self.get_design_vars(recurse=True, get_sizes=True, use_prom_ivc=True)
 
-        for meta in designvars.values():
-            if meta['name'] in active_dvs:
+        for name, meta in designvars.items():
+            if name in active_dvs:
+                active_dvs[name] = meta.copy()
+            elif meta['name'] in active_dvs:
                 active_dvs[meta['name']] = meta.copy()
             elif meta['source'] in active_dvs:
                 active_dvs[meta['source']] = meta.copy()
