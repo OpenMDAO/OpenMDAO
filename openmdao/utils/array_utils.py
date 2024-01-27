@@ -689,34 +689,69 @@ class ValueRepeater(object):
     size : int
         The number of times to repeat the value.
 
-    Yields
-    ------
-    object
-        The value.
-
     Attributes
     ----------
     val : object
         The value to be repeated.
     size : int
         The number of times to repeat the value.
+
+    Yields
+    ------
+    object
+        The value.
     """
 
     def __init__(self, val, size):
+        """
+        Initialize all attributes.
+        """
         self.val = val
         self.size = size
 
     def __iter__(self):
+        """
+        Return an iterator over the value.
+
+        Yields
+        ------
+        object
+            The value.
+        """
         for i in range(self.size):
             yield self.val
 
     def __len__(self):
+        """
+        Return the size of the value.
+
+        Returns
+        -------
+        int
+            The size of the value.
+        """
         return self.size
 
     def __contains__(self, item):
+        """
+        Return True if the given item is equal to the value.
+
+        Parameters
+        ----------
+        item : object
+            The item to be checked for containment.
+        """
         return item == self.val
 
     def __getitem__(self, idx):
+        """
+        Return the value.
+
+        Parameters
+        ----------
+        idx : int
+            The index of the value to be returned.
+        """
         if idx < 0:
             idx += self.size
         if idx >= self.size:

@@ -4016,7 +4016,7 @@ class Group(System):
                     meta = abs2meta[io][wrt]
                     if total and wrtmeta['indices'] is not None:
                         sub_wrt_idx = wrtmeta['indices'].as_array()
-                        size = sub_wrt_idx
+                        size = sub_wrt_idx.size
                         sub_wrt_idx = sub_wrt_idx
                     else:
                         sub_wrt_idx = _full_slice
