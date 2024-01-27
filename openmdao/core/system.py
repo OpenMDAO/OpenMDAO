@@ -18,6 +18,7 @@ import numpy as np
 
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE, INF_BOUND, \
     _SetupStatus
+from openmdao.jacobians.jacobian import Jacobian
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import _full_slice
@@ -39,6 +40,7 @@ from openmdao.utils.general_utils import determine_adder_scaler, \
     ensure_compatible, env_truthy, make_traceback, _is_slicer_op
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
+from openmdao.core.total_jac import _TotalJacInfo
 
 _empty_frozen_set = frozenset()
 
@@ -305,20 +307,10 @@ class System(object):
         Overrides aproximation outputs. This is set when calculating system derivatives, and serves
         as a way to communicate the driver's output quantities to the approximation objects so that
         we only take derivatives of variables that the driver needs.
-    _owns_approx_of_idx : dict
-        Index for override 'of' approximations if declared. When the user calls  `add_objective`
-        or `add_constraint`, they may optionally specify an "indices" argument. This argument must
-        also be communicated to the approximations when they are set up so that 1) the Jacobian is
-        the correct size, and 2) we don't perform any extra unnecessary calculations.
     _owns_approx_wrt : list or None
         Overrides aproximation inputs. This is set when calculating system derivatives, and serves
         as a way to communicate the driver's input quantities to the approximation objects so that
         we only take derivatives with respect to variables that the driver needs.
-    _owns_approx_wrt_idx : dict
-        Index for override 'wrt' approximations if declared. When the user calls  `add_designvar`
-        they may optionally specify an "indices" argument. This argument must also be communicated
-        to the approximations when they are set up so that 1) the Jacobian is the correct size, and
-        2) we don't perform any extra unnecessary calculations.
     _subjacs_info : dict of dict
         Sub-jacobian metadata for each (output, input) pair added using
         declare_partials. Members of each pair may be glob patterns.
@@ -501,8 +493,8 @@ class System(object):
         self._owns_approx_jac_meta = {}
         self._owns_approx_wrt = None
         self._owns_approx_of = None
-        self._owns_approx_wrt_idx = {}
-        self._owns_approx_of_idx = {}
+        # self._owns_approx_wrt_idx = {}
+        # self._owns_approx_of_idx = {}
 
         self.under_complex_step = False
         self.under_finite_difference = False
@@ -4467,6 +4459,9 @@ class System(object):
             initialized, the driver for this model must be supplied in order to properly
             initialize the approximations.
         """
+        if self.pathname == '' and self._owns_approx_jac and driver is not None:
+            self._tot_jac = _TotalJacInfo(driver._problem(), None, None, 'flat_dict', approx=True)
+
         with self._scaled_context_all():
             do_ln = self._linear_solver is not None and self._linear_solver._linearize_children()
             self._linearize(self._assembled_jac, sub_do_ln=do_ln)
@@ -4739,7 +4734,7 @@ class System(object):
             if self.linear_solver:
                 self.linear_solver._set_complex_step_mode(active)
 
-            if self._owns_approx_jac:
+            if self._owns_approx_jac and isinstance(self._jacobian, Jacobian):
                 self._jacobian.set_complex_step_mode(active)
 
             if self._assembled_jac:

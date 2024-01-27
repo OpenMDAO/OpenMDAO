@@ -3041,15 +3041,15 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
         model._owns_approx_of = of
         model._owns_approx_wrt = wrt
 
-        # Support for indices defined on driver vars.
-        model._owns_approx_of_idx = {
-            key: meta['indices'] for key, meta in _src_or_alias_item_iter(of)
-            if meta['indices'] is not None
-        }
-        model._owns_approx_wrt_idx = {
-            key: meta['indices'] for key, meta in _src_or_alias_item_iter(wrt)
-            if meta['indices'] is not None
-        }
+        # # Support for indices defined on driver vars.
+        # model._owns_approx_of_idx = {
+        #     key: meta['indices'] for key, meta in _src_or_alias_item_iter(of)
+        #     if meta['indices'] is not None
+        # }
+        # model._owns_approx_wrt_idx = {
+        #     key: meta['indices'] for key, meta in _src_or_alias_item_iter(wrt)
+        #     if meta['indices'] is not None
+        # }
 
 
 class _ColSparsityJac(object):

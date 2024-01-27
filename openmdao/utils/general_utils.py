@@ -402,43 +402,6 @@ def pattern_filter(patterns, var_iter, name_index=None):
                         break
 
 
-def match_filter(patterns, var_iter, name_index=None):
-    """
-    Yield variable names that match a given pattern.
-
-    Parameters
-    ----------
-    patterns : iter of str
-        Glob patterns or variable names.
-    var_iter : iter of str or iter of tuple/list
-        Iterator of variable names (or tuples containing variable names) to search for patterns.
-    name_index : int or None
-        If not None, the var_iter is assumed to yield tuples, and the
-        name_index is the index of the variable name in the tuple.
-
-    Yields
-    ------
-    str
-        Variable name that matches a pattern.
-    """
-    if '*' in patterns:
-        yield from var_iter
-    else:
-        if name_index is None:
-            for vname in var_iter:
-                for pattern in patterns:
-                    if fnmatchcase(vname, pattern):
-                        yield vname
-                        break
-        else:
-            for tup in var_iter:
-                vname = tup[name_index]
-                for pattern in patterns:
-                    if fnmatchcase(vname, pattern):
-                        yield tup
-                        break
-
-
 def _find_dict_meta(dct, key):
     """
     Return True if the given key is found in any metadata values in the given dict.
@@ -667,27 +630,6 @@ def remove_whitespace(s, right=False, left=False):
         return re.sub(r"^\s+", "", s, flags=re.UNICODE)
 
 
-_badtab = r'`~@#$%^&*()[]{}-+=|\/?<>,.:;'
-_transtab = str.maketrans(_badtab, '_' * len(_badtab))
-
-
-def str2valid_python_name(s):
-    """
-    Translate a given string into a valid python variable name.
-
-    Parameters
-    ----------
-    s : str
-        The string to be translated.
-
-    Returns
-    -------
-    str
-        The valid python name string.
-    """
-    return s.translate(_transtab)
-
-
 _container_classes = (list, tuple, set)
 
 
@@ -871,30 +813,6 @@ def match_includes_excludes(name, includes=None, excludes=None):
                 return True
 
     return False
-
-
-def filtered_name_iter(name_iter, includes=None, excludes=None):
-    """
-    Yield names that pass through the includes and excludes filters.
-
-    Parameters
-    ----------
-    name_iter : iter of str
-        Iterator over names to be checked for match.
-    includes : iter of str or None
-        Glob patterns for name to include in the filtering.  None, the default, means
-        include all.
-    excludes : iter of str or None
-        Glob patterns for name to exclude in the filtering.
-
-    Yields
-    ------
-    str
-        Each name that passes through the filters.
-    """
-    for name in name_iter:
-        if match_includes_excludes(name, includes, excludes):
-            yield name
 
 
 def meta2src_iter(meta_iter):
@@ -1081,14 +999,6 @@ def _src_name_iter(proms):
     """
     for meta in proms.values():
         yield meta['source']
-
-
-def _src_or_alias_name(meta):
-    if 'alias' in meta:
-        alias = meta['alias']
-        if alias:
-            return alias
-    return meta['source']
 
 
 def _src_or_alias_item_iter(proms):

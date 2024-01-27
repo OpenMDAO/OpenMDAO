@@ -163,14 +163,6 @@ class RangeTreeNode(RangeMapper):
         return f"RangeTreeNode({self.key}, ({self.start}:{self.stop}))"
 
 
-def _size_of_ranges(ranges):
-    size = 0
-    for _, start, stop in ranges:
-        size += stop - start
-
-    return size
-
-
 class RangeTree(RangeMapper):
     """
     A binary search tree of sizes, mapping key to an index range.

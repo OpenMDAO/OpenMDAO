@@ -676,3 +676,49 @@ def get_random_arr(shape, comm=None, generator=None):
         arr = np.empty(shape)
     comm.Bcast(arr, root=0)
     return arr
+
+
+class ValueRepeater(object):
+    """
+    An iterable over a single value that repeats a given number of times.
+
+    Parameters
+    ----------
+    val : object
+        The value to be repeated.
+    size : int
+        The number of times to repeat the value.
+
+    Yields
+    ------
+    object
+        The value.
+
+    Attributes
+    ----------
+    val : object
+        The value to be repeated.
+    size : int
+        The number of times to repeat the value.
+    """
+
+    def __init__(self, val, size):
+        self.val = val
+        self.size = size
+
+    def __iter__(self):
+        for i in range(self.size):
+            yield self.val
+
+    def __len__(self):
+        return self.size
+
+    def __contains__(self, item):
+        return item == self.val
+
+    def __getitem__(self, idx):
+        if idx < 0:
+            idx += self.size
+        if idx >= self.size:
+            raise IndexError(f"index {idx} is out of bounds for size {self.size}")
+        return self.val

@@ -3,7 +3,7 @@ import sys
 from collections import Counter, defaultdict
 from collections.abc import Iterable
 
-from itertools import product, chain, repeat
+from itertools import product, chain
 from numbers import Number
 import inspect
 from difflib import get_close_matches
@@ -23,7 +23,7 @@ from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
-    shape_to_len
+    shape_to_len, ValueRepeater
 from openmdao.utils.general_utils import common_subpath, all_ancestors, \
     convert_src_inds, _contains_all, shape2tuple, get_connection_owner, ensure_compatible, \
     meta2src_iter, get_rev_conns
@@ -33,9 +33,9 @@ from openmdao.utils.graph_utils import get_sccs_topo, get_out_of_order_nodes
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
-from openmdao.utils.relevance import Relevance, _is_local
+from openmdao.utils.relevance import Relevance
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
-    PromotionWarning, MPIWarning, DerivativesWarning
+    PromotionWarning, MPIWarning
 
 # regex to check for valid names.
 import re
@@ -3681,7 +3681,9 @@ class Group(System):
             Set of relevant system pathnames passed in to the model during computation of total
             derivatives.
         """
-        if self._jacobian is None:
+        if self._tot_jac is not None and self._owns_approx_jac:
+            self._jacobian = self._tot_jac.J_dict
+        elif self._jacobian is None:
             self._jacobian = DictionaryJacobian(self)
 
         self._check_first_linearize()
@@ -3978,7 +3980,6 @@ class Group(System):
             sizes = self._var_sizes
             toidx = self._var_allprocs_abs2idx
             abs2meta = self._var_allprocs_abs2meta
-            approx_wrt_idx = self._owns_approx_wrt_idx
             local_ins = self._var_abs2meta['input']
             local_outs = self._var_abs2meta['output']
 
@@ -4014,14 +4015,14 @@ class Group(System):
                     io = 'input' if wrt in abs2meta['input'] else 'output'
                     meta = abs2meta[io][wrt]
                     if total and wrtmeta['indices'] is not None:
-                        sub_wrt_idx = wrtmeta['indices']
-                        size = sub_wrt_idx.indexed_src_size
-                        sub_wrt_idx = sub_wrt_idx.flat()
+                        sub_wrt_idx = wrtmeta['indices'].as_array()
+                        size = sub_wrt_idx
+                        sub_wrt_idx = sub_wrt_idx
                     else:
                         sub_wrt_idx = _full_slice
                         size = abs2meta[io][wrt][szname]
                     if vec is None:
-                        sub_wrt_idx = repeat(None, size)
+                        sub_wrt_idx = ValueRepeater(None, size)
                     end += size
                     dist_sizes = sizes[io][:, toidx[wrt]] if meta['distributed'] else None
                     yield wrt, start, end, vec, sub_wrt_idx, dist_sizes
@@ -4048,7 +4049,8 @@ class Group(System):
         """
         Add approximations for all approx derivs.
         """
-        self._jacobian = DictionaryJacobian(system=self)
+        if self._jacobian is None:
+            self._jacobian = DictionaryJacobian(system=self)
 
         abs2meta = self._var_allprocs_abs2meta
         total = self.pathname == ''

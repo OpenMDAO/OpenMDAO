@@ -212,9 +212,6 @@ class Relevance(object):
     _active : bool or None
         If True, relevance is active.  If False, relevance is inactive.  If None, relevance is
         uninitialized.
-    _force_total : bool
-        If True, force use of total relevance (object is relevant if it is relevant for any
-        seed/target combination).
     """
 
     def __init__(self, group, desvars, responses):
@@ -229,7 +226,6 @@ class Relevance(object):
         # all seed vars for the entire derivative computation
         self._all_seed_vars = {'fwd': (), 'rev': ()}
         self._local_seeds = set()  # set of seed vars restricted to local dependencies
-        self._force_total = False
         self._graph = self.get_relevance_graph(group, desvars, responses)
         self._active = None  # not initialized
 
@@ -406,13 +402,6 @@ class Relevance(object):
         if self._active is None:
             self._active = True
 
-    def reset_to_all_seeds(self):
-        """
-        Reset the seed vars to the full list of seeds.
-        """
-        self._seed_vars['fwd'] = self._all_seed_vars['fwd']
-        self._seed_vars['rev'] = self._all_seed_vars['rev']
-
     def set_seeds(self, seed_vars, direction, local=False):
         """
         Set the seed(s) to determine relevance for a given variable in a given direction.
@@ -499,44 +488,6 @@ class Relevance(object):
                 for tgt in self._seed_vars[opp]:
                     if name in self._relevant_systems[tgt, opp]:
                         return True
-        return False
-
-    def is_total_relevant_var(self, name, direction=None):
-        """
-        Return True if the given named variable is relevant.
-
-        Relevance in this case pertains to all seed/target combinations.
-
-        Parameters
-        ----------
-        name : str
-            Name of the System.
-        direction : str or None
-            Direction of the search for relevant variables.  'fwd', 'rev', or None. None is
-            only valid if relevance is not active or if doing 'total' relevance, where
-            relevance is True if a variable is relevant to any pair of of/wrt variables.
-
-        Returns
-        -------
-        bool
-            True if the given variable is relevant.
-        """
-        if not self._active:
-            return True
-
-        if direction is None:
-            seediter = list(self._all_seed_vars.items())
-        else:
-            seediter = [(direction, self._seed_vars[direction])]
-
-        for direction, seeds in seediter:
-            for seed in seeds:
-                if name in self._relevant_vars[seed, direction]:
-                    # resolve target dependencies in opposite direction
-                    opp = _opposite[direction]
-                    for tgt in self._all_seed_vars[opp]:
-                        if name in self._relevant_vars[tgt, opp]:
-                            return True
         return False
 
     def is_total_relevant_system(self, name):
@@ -666,41 +617,6 @@ class Relevance(object):
             self._relevant_systems[key] = _get_set_checker(rel_systems, self._all_systems)
             self._relevant_vars[key] = _get_set_checker(rel_vars, self._all_vars)
 
-    def get_seed_pair_relevance(self, fwd_seed, rev_seed, inputs=True, outputs=True):
-        """
-        Yield all relevant variables for the specified pair of seeds.
-
-        Parameters
-        ----------
-        fwd_seed : str
-            Iterator over forward seed variable names. If None use current registered seeds.
-        rev_seed : str
-            Iterator over reverse seed variable names. If None use current registered seeds.
-        inputs : bool
-            If True, include inputs.
-        outputs : bool
-            If True, include outputs.
-
-        Returns
-        -------
-        set
-            Set of names of relevant variables.
-        """
-        filt = _get_io_filter(inputs, outputs)
-        if filt is False:
-            return set()
-
-        self._init_relevance_set(fwd_seed, 'fwd')
-        self._init_relevance_set(rev_seed, 'rev')
-
-        # since _relevant_vars may be InverseSetCheckers, we need to call their intersection
-        # function with _all_vars to get a set of variables that are relevant.
-        allfwdvars = self._relevant_vars[fwd_seed, 'fwd'].intersection(self._all_vars)
-        inter = self._relevant_vars[rev_seed, 'rev'].intersection(allfwdvars)
-        if filt is True:  # not need to make a copy if we're returning all vars
-            return inter
-        return set(self._filter_nodes_iter(inter, filt))
-
     def iter_seed_pair_relevance(self, fwd_seeds=None, rev_seeds=None, inputs=False, outputs=False):
         """
         Yield all relevant variables for each pair of seeds.
@@ -820,24 +736,6 @@ class Relevance(object):
             relevant_vars.update(relvars)
 
         return relevant_vars
-
-    def all_relevant_systems(self, fwd_seeds, rev_seeds):
-        """
-        Return all relevant systems for the given seeds.
-
-        Parameters
-        ----------
-        fwd_seeds : iter of str
-            Iterator over forward seed variable names.
-        rev_seeds : iter of str
-            Iterator over reverse seed variable names.
-
-        Returns
-        -------
-        set
-            Set of names of relevant systems.
-        """
-        return _vars2systems(self.all_relevant_vars(fwd_seeds, rev_seeds))
 
     def _all_relevant(self, fwd_seeds, rev_seeds, inputs=True, outputs=True):
         """
@@ -1008,19 +906,3 @@ def _is_output(node):
 
 def _is_discrete(node):
     return node['discrete']
-
-
-def _is_distributed(node):
-    return node['distributed']
-
-
-def _is_local(node):
-    return node['local']
-
-
-def _always_true(node):
-    return True
-
-
-def _always_false(node):
-    return False

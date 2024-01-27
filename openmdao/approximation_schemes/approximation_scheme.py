@@ -6,7 +6,7 @@ import numpy as np
 
 from openmdao.core.constants import INT_DTYPE
 from openmdao.vectors.vector import _full_slice
-from openmdao.utils.array_utils import get_input_idx_split
+from openmdao.utils.array_utils import get_input_idx_split, ValueRepeater
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import _convert_auto_ivc_to_conn_name, LocalRangeIterable
 from openmdao.utils.mpi import check_mpi_env
@@ -222,7 +222,6 @@ class ApproximationScheme(object):
         in_slices = system._inputs.get_slice_dict()
         out_slices = system._outputs.get_slice_dict()
 
-        approx_wrt_idx = system._owns_approx_wrt_idx
         coloring = system._get_static_coloring()
 
         self._approx_groups = []
@@ -238,7 +237,7 @@ class ApproximationScheme(object):
             in_inds_directional = []
             vec_inds_directional = defaultdict(list)
 
-        for wrt, start, end, vec, _, _ in system._jac_wrt_iter(wrt_matches):
+        for wrt, start, end, vec, sinds, _ in system._jac_wrt_iter(wrt_matches):
             if wrt in self._wrt_meta:
                 meta = self._wrt_meta[wrt]
                 if coloring is not None and 'coloring' in meta:
@@ -253,12 +252,12 @@ class ApproximationScheme(object):
 
                 in_idx = range(start, end)
 
-                if wrt in approx_wrt_idx:
+                if total and sinds is not _full_slice:
                     if vec is None:
-                        vec_idx = repeat(None, approx_wrt_idx[wrt].shaped_array().size)
+                        vec_idx = ValueRepeater(None, sinds.size)
                     else:
                         # local index into var
-                        vec_idx = approx_wrt_idx[wrt].shaped_array(copy=True)
+                        vec_idx = sinds.copy()
                         # convert into index into input or output vector
                         vec_idx += slices[wrt].start
                         # Directional derivatives for quick deriv checking.

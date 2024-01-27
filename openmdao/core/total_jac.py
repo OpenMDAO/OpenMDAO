@@ -6,14 +6,12 @@ import time
 import pprint
 from contextlib import contextmanager
 from collections import defaultdict
-from itertools import chain, repeat
+from itertools import repeat
 from copy import deepcopy
 
 import numpy as np
 
 from openmdao.core.constants import INT_DTYPE
-from openmdao.utils.general_utils import _contains_all, _src_or_alias_dict, _src_or_alias_name
-
 from openmdao.utils.mpi import MPI, check_mpi_env
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 import openmdao.utils.coloring as coloring_mod
