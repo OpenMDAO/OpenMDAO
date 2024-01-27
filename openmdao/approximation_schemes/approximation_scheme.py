@@ -8,7 +8,7 @@ from openmdao.core.constants import INT_DTYPE
 from openmdao.vectors.vector import _full_slice
 from openmdao.utils.array_utils import get_input_idx_split
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.general_utils import _convert_auto_ivc_to_conn_name, LocalRangeIterable, dprint
+from openmdao.utils.general_utils import _convert_auto_ivc_to_conn_name, LocalRangeIterable
 from openmdao.utils.mpi import check_mpi_env
 
 use_mpi = check_mpi_env()
@@ -238,9 +238,7 @@ class ApproximationScheme(object):
             in_inds_directional = []
             vec_inds_directional = defaultdict(list)
 
-        dprint("MATCHES:", wrt_matches)
         for wrt, start, end, vec, _, _ in system._jac_wrt_iter(wrt_matches):
-            dprint('wrt', wrt, start, end)
             if wrt in self._wrt_meta:
                 meta = self._wrt_meta[wrt]
                 if coloring is not None and 'coloring' in meta:

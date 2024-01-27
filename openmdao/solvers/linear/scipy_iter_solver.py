@@ -6,7 +6,6 @@ import scipy
 from scipy.sparse.linalg import LinearOperator, gmres
 
 from openmdao.solvers.solver import LinearSolver
-from openmdao.utils.general_utils import dprint
 
 _SOLVER_TYPES = {
     # 'bicg': bicg,

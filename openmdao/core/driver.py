@@ -358,7 +358,6 @@ class Driver(object):
 
                 indices = voimeta['indices']
                 vsrc = voimeta['source']
-                # drv_name = _src_or_alias_name(voimeta)
 
                 meta = abs2meta_out[vsrc]
                 i = abs2idx[vsrc]
@@ -608,9 +607,6 @@ class Driver(object):
         get = model._outputs._abs_get_val
         indices = meta['indices']
         src_name = meta['source']
-
-        # # If there's an alias, use that for driver related stuff
-        # drv_name = _src_or_alias_name(meta)
 
         if MPI:
             distributed = comm.size > 0 and name in self._dist_driver_vars

@@ -17,7 +17,6 @@ from openmdao.utils.general_utils import _contains_all, _src_or_alias_dict, _src
 from openmdao.utils.mpi import MPI, check_mpi_env
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.general_utils import dprint
 
 
 use_mpi = check_mpi_env()
@@ -356,10 +355,6 @@ class _TotalJacInfo(object):
             self.J_final = self.J_dict = self._get_dict_J(J, wrt_metadata, of_metadata,
                                                           return_format)
 
-        # if self.has_scaling:
-        #     self.prom_design_vars = {prom_wrt[i]: design_var_srcs[dv] for i, dv in enumerate(wrt)}
-        #     self.prom_responses = {prom_of[i]: responses[r] for i, r in enumerate(of)}
-
     def _check_discrete_dependence(self):
         model = self.model
         # raise an exception if we depend on any discrete outputs
@@ -541,8 +536,6 @@ class _TotalJacInfo(object):
                 if not get_remote and ofmeta['remote']:
                     continue
                 out_slice = ofmeta['jac_slice']
-                # if not ofmeta['alias']:
-                #     out = ofmeta['source']  # make absolute
                 for inp, wrtmeta in wrt_metadata.items():
                     if get_remote or not wrtmeta['remote']:
                         J_dict[f"{out}!{inp}"] = J[out_slice, wrtmeta['jac_slice']]
@@ -639,8 +632,6 @@ class _TotalJacInfo(object):
                             break
                     else:
                         relev = set()
-                dprint("****** RELEV:", relev, 'color', parallel_deriv_color, 'name', name,
-                       'source', source)
             else:
                 relev = None
 
@@ -790,7 +781,6 @@ class _TotalJacInfo(object):
         for name, vmeta in vois.items():
             src = vmeta['source']
             indices = vmeta['indices']
-            # drv_name = _src_or_alias_name(vmeta)
 
             meta = allprocs_abs2meta_out[src]
             sz = vmeta['global_size'] if self.get_remote else vmeta['size']
@@ -872,7 +862,6 @@ class _TotalJacInfo(object):
 
         for voi, meta in vois.items():
             if not get_remote and meta['remote']:
-                # print(voi, "is REMOTE! skipping...")
                 continue
 
             src = meta['source']
@@ -882,17 +871,12 @@ class _TotalJacInfo(object):
                 size = meta['global_size']
             else:
                 size = meta['size']
-            # indices = meta['indices']
-            # if indices:
-            #     size = indices.indexed_src_size
 
             has_dist |= abs2meta_out[src]['distributed']
 
             end += size
 
             meta['jac_slice'] = slice(start, end)
-
-            # print("get_tuple_map:", voi, start, end, has_dist)
 
             start = end
 
@@ -1040,7 +1024,6 @@ class _TotalJacInfo(object):
 
         loc_idx = self.in_loc_idxs[mode][idx]
         if loc_idx >= 0:
-            dprint(f"setting {loc_idx} loc_idx to {self.seeds[mode][idx]}")
             self.input_vec[mode].set_val(self.seeds[mode][idx], loc_idx)
 
         if cache_lin_sol:
@@ -1105,11 +1088,9 @@ class _TotalJacInfo(object):
             key used for storage of cached linear solve (if active, else None).
         """
         vec_names = set()
-        dprint("PD INPUT SETTER", inds, 'loc_inds')
 
         for i in inds:
             if self.in_loc_idxs[mode][i] >= 0:
-                dprint("SET LOC IND", self.in_loc_idxs[mode][i])
                 _, vnames, _ = self.single_input_setter(i, imeta, mode)
                 if vnames is not None:
                     vec_names.add(vnames[0])
@@ -1242,7 +1223,6 @@ class _TotalJacInfo(object):
         meta : dict
             Metadata dict.
         """
-        dprint("PD JAC SETTER:", inds, mode)
         if self.comm.size > 1:
             for i in inds:
                 if self.in_loc_idxs[mode][i] >= 0:
@@ -1405,11 +1385,9 @@ class _TotalJacInfo(object):
             # Main loop over columns (fwd) or rows (rev) of the jacobian
             for mode in self.modes:
                 for key, idx_info in self.idx_iter_dict[mode].items():
-                    dprint("KEY:", key, "mode:", mode)
                     imeta, idx_iter = idx_info
                     for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
                         model._problem_meta['seed_vars'] = itermeta['seed_vars']
-                        dprint("SETTING relevant SEEDS:", itermeta['seed_vars'],)
                         relevant.set_seeds(itermeta['seed_vars'], mode)
                         rel_systems, _, cache_key = input_setter(inds, itermeta, mode)
                         rel_systems = None
@@ -1435,7 +1413,6 @@ class _TotalJacInfo(object):
 
                         # restore old linear solution if cache_linear_solution was set by the user
                         # for any input variables involved in this linear solution.
-                        dprint("RUNNING SOLVE_LINEAR", mode)
                         with model._scaled_context_all():
                             if cache_key is not None and not has_lin_cons and self.mode == mode:
                                 self._restore_linear_solution(cache_key, mode)
@@ -1748,8 +1725,6 @@ class _TotalJacInfo(object):
             J_dict = self.J_dict
             for of, wrt_dict in J_dict.items():
                 for wrt, J_sub in wrt_dict.items():
-                    # if wrt in self.ivc_print_names:
-                    #     wrt = self.ivc_print_names[wrt]
                     pprint.pprint({(of, wrt): J_sub})
         else:
             J = self.J
@@ -1760,8 +1735,6 @@ class _TotalJacInfo(object):
                 for wrt, wrtmeta in self.input_meta['fwd'].items():
                     if self.get_remote or not wrtmeta['remote']:
                         deriv = J[out_slice, wrtmeta['jac_slice']]
-                        # if wrt in self.ivc_print_names:
-                        #     wrt = self.ivc_print_names[wrt]
                         pprint.pprint({(of, wrt): deriv})
 
         print('')
@@ -1901,27 +1874,3 @@ def _fix_pdc_lengths(idx_iter_dict):
                 # just convert all (start, end) tuples to ranges
                 for i, (start, end) in enumerate(range_list):
                     range_list[i] = range(start, end)
-
-
-# def _update_rel_systems(all_rel_systems, rel_systems):
-#     """
-#     Combine all relevant systems in those cases where we have multiple input variables involved.
-
-#     Parameters
-#     ----------
-#     all_rel_systems : set
-#         Current set of all relevant system names.
-#     rel_systems : set
-#         Set of relevant system names for the latest iteration.
-
-#     Returns
-#     -------
-#     set or ContainsAll
-#         Updated set of all relevant system names.
-#     """
-#     if all_rel_systems is _contains_all or rel_systems is _contains_all:
-#         return _contains_all
-
-#     all_rel_systems.update(rel_systems)
-
-#     return all_rel_systems

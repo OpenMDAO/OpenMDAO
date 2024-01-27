@@ -935,8 +935,6 @@ class ExecComp(ExplicitComponent):
 
         info = self._coloring_info
         info.update(overrides)
-        # if isinstance(info.wrt_patterns, str):
-        #     info.wrt_patterns = (info.wrt_patterns,)
 
         if not self._coloring_declared and info.method is None:
             info.method = 'cs'
@@ -1042,7 +1040,6 @@ class ExecComp(ExplicitComponent):
                 loc_i = icol - in_slices[input_name].start
                 for u in out_names:
                     key = (u, input_name)
-                    # if key in self._declared_partials:
                     if key in partials:
                         # set the column in the Jacobian entry
                         part = scratch[out_slices[u]]
@@ -1096,7 +1093,6 @@ class ExecComp(ExplicitComponent):
                 self._exec()
 
                 for u in out_names:
-                    # if (u, inp) in self._declared_partials:
                     if (u, inp) in partials:
                         partials[u, inp] = imag(vdict[u] * inv_stepsize).flat
 
@@ -1111,7 +1107,6 @@ class ExecComp(ExplicitComponent):
                     self._exec()
 
                     for u in out_names:
-                        # if (u, inp) in self._declared_partials:
                         if (u, inp) in partials:
                             # set the column in the Jacobian entry
                             partials[u, inp][:, i] = imag(vdict[u] * inv_stepsize).flat

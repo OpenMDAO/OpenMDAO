@@ -676,32 +676,3 @@ def get_random_arr(shape, comm=None, generator=None):
         arr = np.empty(shape)
     comm.Bcast(arr, root=0)
     return arr
-
-
-def consolidate_slices(slices):
-    """
-    Given a list of slices, return a list of consolidated slices.
-
-    Slices are assumed to be non-overlapping and in order from lowest to highest.
-
-    Parameters
-    ----------
-    slices : list of slice
-        List of slices to be consolidated.
-
-    Returns
-    -------
-    list of slice
-        List of consolidated slices.
-    """
-    consolidated_slices = []
-
-    for s in slices:
-        if consolidated_slices:
-            prev = consolidated_slices[-1]
-            if prev.stop == s.start and prev.step == s.step:
-                consolidated_slices[-1] = slice(prev.start, s.stop, s.step)
-                continue
-        consolidated_slices.append(s)
-
-    return consolidated_slices

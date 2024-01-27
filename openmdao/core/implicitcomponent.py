@@ -9,7 +9,7 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.array_utils import shape_to_len
-from openmdao.utils.general_utils import format_as_float_or_array, dprint
+from openmdao.utils.general_utils import format_as_float_or_array
 from openmdao.utils.units import simplify_unit
 
 
@@ -342,7 +342,6 @@ class ImplicitComponent(Component):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        dprint(f"{self.pathname}._linearize")
         self._check_first_linearize()
 
         with self._unscaled_context(outputs=[self._outputs]):

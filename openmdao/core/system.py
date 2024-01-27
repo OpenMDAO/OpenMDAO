@@ -546,7 +546,6 @@ class System(object):
 
         self._filtered_vars_to_record = {}
         self._owning_rank = None
-        # self._coloring_info = _DEFAULT_COLORING_META.copy()
         self._coloring_info = coloring_mod._Partial_ColoringMeta()
         self._first_call_to_linearize = True  # will check in first call to _linearize
         self._tot_jac = None
@@ -1428,7 +1427,6 @@ class System(object):
         """
         if self._approx_subjac_keys is None:
             self._approx_subjac_keys = list(self._approx_subjac_keys_iter())
-            # print("APPROX SUBJAC KEYS:", self._approx_subjac_keys)
 
         return self._approx_subjac_keys
 
@@ -1653,8 +1651,6 @@ class System(object):
             pass
 
         info.update(overrides)
-        # if isinstance(info.wrt_patterns, str):
-        #     info.wrt_patterns = (info.wrt_patterns,)
 
         if info.method is None and self._approx_schemes:
             info.method = list(self._approx_schemes)[0]
@@ -2768,10 +2764,6 @@ class System(object):
     def _relevant(self):
         return self._problem_meta['relevant']
 
-    # @property
-    # def _relevant2(self):
-    #     return self._problem_meta['relevant2']
-
     @property
     def _static_mode(self):
         """
@@ -3477,20 +3469,8 @@ class System(object):
             abs2idx = model._var_allprocs_abs2idx
             sizes = model._var_sizes['output']
 
-            # if 'size' in meta and meta['size'] is not None:
-            #     meta['size'] = int(meta['size'])  # make int so will be json serializable
-            # else:
-            #     if src_name in abs2idx:
-            #         if meta['distributed']:
-            #             meta['size'] = sizes[model.comm.rank, abs2idx[src_name]]
-            #         else:
-            #             meta['size'] = sizes[model._owning_rank[src_name], abs2idx[src_name]]
-            #     else:
-            #         meta['size'] = 0  # discrete var, don't know size
-
             if src_name in abs2idx:  # var is continuous
                 vmeta = abs2meta_out[src_name]
-                # meta['distributed'] = vmeta['distributed']
                 indices = meta['indices']
                 if indices is not None:
                     # Index defined in this design var.
@@ -4487,14 +4467,6 @@ class System(object):
             initialized, the driver for this model must be supplied in order to properly
             initialize the approximations.
         """
-        # if self.pathname == '' and self._owns_approx_jac:
-        #     if not self._owns_approx_of:  # approx not initialized
-        #         if driver is None:
-        #             raise RuntimeError(self.msginfo + ": driver must be supplied when calling "
-        #                                "run_linearize on the root system if approximations have "
-        #                                "not been initialized.")
-        #         coloring_mod._initialize_model_approx(self, driver)
-
         with self._scaled_context_all():
             do_ln = self._linear_solver is not None and self._linear_solver._linearize_children()
             self._linearize(self._assembled_jac, sub_do_ln=do_ln)

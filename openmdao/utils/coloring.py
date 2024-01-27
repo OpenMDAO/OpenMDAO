@@ -3030,19 +3030,6 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
     """
     Set up internal data structures needed for computing approx totals.
     """
-    # if of is None:
-    #     ofdct = driver._responses
-    #     of = driver._get_ordered_nl_responses()
-    # else:
-    #     ofdct = of
-    #     of = list(ofdct)
-
-    # if wrt is None:
-    #     wrtdct = driver._designvars
-    # else:
-    #     wrtdct = wrt
-    # wrt = list(wrtdct)
-
     if of is None or wrt is None:
         of, wrt, _ = model._get_totals_metadata(driver, of, wrt)
 

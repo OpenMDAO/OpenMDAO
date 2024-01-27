@@ -5,7 +5,7 @@ Class definitions for Relevance and related classes.
 import sys
 from pprint import pprint
 from contextlib import contextmanager
-from openmdao.utils.general_utils import all_ancestors, dprint, meta2src_iter
+from openmdao.utils.general_utils import all_ancestors, meta2src_iter
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 
 
@@ -398,9 +398,6 @@ class Relevance(object):
         self._all_seed_vars['fwd'] = self._seed_vars['fwd'] = tuple(sorted(fwd_seeds))
         self._all_seed_vars['rev'] = self._seed_vars['rev'] = tuple(sorted(rev_seeds))
 
-        dprint("set all seeds to:", tuple(sorted(self._all_seed_vars['fwd'])), "for fwd")
-        dprint("set all seeds to:", tuple(sorted(self._all_seed_vars['rev'])), "for rev")
-
         for s in fwd_seeds:
             self._init_relevance_set(s, 'fwd')
         for s in rev_seeds:
@@ -413,8 +410,6 @@ class Relevance(object):
         """
         Reset the seed vars to the full list of seeds.
         """
-        dprint("reset all seeds to:", tuple(sorted(self._all_seed_vars['fwd'])), "for fwd")
-        dprint("reset all seeds to:", tuple(sorted(self._all_seed_vars['rev'])), "for rev")
         self._seed_vars['fwd'] = self._all_seed_vars['fwd']
         self._seed_vars['rev'] = self._all_seed_vars['rev']
 
@@ -437,7 +432,6 @@ class Relevance(object):
         if isinstance(seed_vars, str):
             seed_vars = [seed_vars]
 
-        dprint("set seeds to:", tuple(sorted(seed_vars)), "for", direction)
         self._seed_vars[direction] = tuple(sorted(seed_vars))
         self._seed_vars[_opposite[direction]] = self._all_seed_vars[_opposite[direction]]
 
@@ -671,23 +665,6 @@ class Relevance(object):
 
             self._relevant_systems[key] = _get_set_checker(rel_systems, self._all_systems)
             self._relevant_vars[key] = _get_set_checker(rel_vars, self._all_vars)
-
-    # def _update_set_checkers(self):
-    #     for direction in ('fwd', 'rev'):
-    #         mydirseeds = set(self._all_seed_vars[direction])
-    #         for seed in mydirseeds:
-    #             # find all total seed vars in the opposite direction that depend on seed and
-    #             # add any total seed vars in our direction that depend on those
-    #             mydeps = self._relevant_vars[seed, direction]
-    #             toadd = set()
-    #             for opp_seed in mydeps.intersection(self._all_seed_vars[_opposite[direction]]):
-    #                 relset = self._relevant_vars[opp_seed, _opposite[direction]]
-    #                 toadd.update(relset.intersection(mydirseeds))
-
-    #             # update the set checker
-    #             mydeps.update(toadd)
-    #             systoadd = _vars2systems(toadd)
-    #             self._relevant_systems[seed, direction].update(systoadd)
 
     def get_seed_pair_relevance(self, fwd_seed, rev_seed, inputs=True, outputs=True):
         """

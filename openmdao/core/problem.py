@@ -3494,28 +3494,3 @@ def _get_fd_options(var, global_method, local_opts, global_step, global_form, gl
                 fd_options[name] = value
 
     return fd_options, could_not_cs
-
-
-def _vois_match_driver(driver, ofs, wrts):
-    """
-    Return True if the given of/wrt pair matches the driver's voi lists.
-
-    Parameters
-    ----------
-    driver : <Driver>
-        The driver.
-    ofs : list of str
-        List of response names.
-    wrts : list of str
-        List of design variable names.
-
-    Returns
-    -------
-    bool
-        True if the given of/wrt pair matches the driver's voi lists.
-    """
-    driver_ofs = driver._get_ordered_nl_responses()
-    if ofs != driver_ofs:
-        return False
-    driver_wrts = list(driver._designvars)
-    return wrts == driver_wrts

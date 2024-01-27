@@ -490,14 +490,9 @@ class pyOptSparseDriver(Driver):
             relevant.set_seeds([meta['source']], 'rev')
             wrt = [v for v in indep_list if relevant.is_relevant(self._designvars[v]['source'],
                                                                  'rev')]
-            # prom_name = model._get_prom_name(name)
-
-            # convert wrt to use promoted names
-            # wrt_prom = model._prom_names_list(wrt)
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
-                # jac_prom = model._prom_names_dict(jac)
                 opt_prob.addConGroup(name, size,
                                      lower=lower - _y_intercepts[name],
                                      upper=upper - _y_intercepts[name],
@@ -506,10 +501,8 @@ class pyOptSparseDriver(Driver):
                 if name in self._con_subjacs:
                     resjac = self._con_subjacs[name]
                     jac = {n: resjac[n] for n in wrt}
-                    # jac_prom = model._prom_names_jac(jac)
                 else:
                     jac = None
-                    # jac_prom = None
 
                 opt_prob.addConGroup(name, size, lower=lower, upper=upper,
                                      wrt=wrt, jac=jac)
@@ -534,14 +527,9 @@ class pyOptSparseDriver(Driver):
             relevant.set_seeds([meta['source']], 'rev')
             wrt = [v for v in indep_list if relevant.is_relevant(self._designvars[v]['source'],
                                                                  'rev')]
-            # prom_name = model._get_prom_name(name)
-
-            # convert wrt to use promoted names
-            # wrt_prom = model._prom_names_list(wrt)
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
-                # jac_prom = model._prom_names_dict(jac)
                 opt_prob.addConGroup(name, size,
                                      upper=upper - _y_intercepts[name],
                                      lower=lower - _y_intercepts[name],
@@ -550,10 +538,8 @@ class pyOptSparseDriver(Driver):
                 if name in self._con_subjacs:
                     resjac = self._con_subjacs[name]
                     jac = {n: resjac[n] for n in wrt}
-                    # jac_prom = model._prom_names_jac(jac)
                 else:
                     jac = None
-                    # jac_prom = None
                 opt_prob.addConGroup(name, size, upper=upper, lower=lower,
                                      wrt=wrt, jac=jac)
                 self._quantities.append(name)
@@ -862,7 +848,6 @@ class pyOptSparseDriver(Driver):
                 for okey in self._quantities:
                     new_sens[okey] = newdv = {}
                     for ikey in self._designvars.keys():
-                        # ikey_src = self._designvars[ikey]['source']
                         if okey in res_subjacs and ikey in res_subjacs[okey]:
                             arr = sens_dict[okey][ikey]
                             coo = res_subjacs[okey][ikey]

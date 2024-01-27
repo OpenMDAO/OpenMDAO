@@ -2,7 +2,6 @@
 Class definition for SqliteRecorder, which provides dictionary backed by SQLite.
 """
 
-from copy import copy
 from io import BytesIO
 
 import os

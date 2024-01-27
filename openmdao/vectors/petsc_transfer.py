@@ -2,8 +2,6 @@
 import numpy as np
 from openmdao.utils.mpi import check_mpi_env
 from openmdao.core.constants import INT_DTYPE
-from openmdao.utils.general_utils import dprint
-
 
 use_mpi = check_mpi_env()
 _empty_idx_array = np.array([], dtype=INT_DTYPE)
@@ -165,8 +163,6 @@ else:
                                             group._fd_rev_xfer_correction_dist[resp] = set()
                                         group._fd_rev_xfer_correction_dist[resp].add(inp)
 
-                from pprint import pprint
-                pprint(group._fd_rev_xfer_correction_dist)
                 # FD groups don't need reverse transfers
                 return {}
 
@@ -300,11 +296,6 @@ else:
                     if has_par_coloring:
                         xfer_in_nocolor[sub_out]
                         xfer_out_nocolor[sub_out]
-
-                dprint(f"rank {myrank} {sub_out}: xfer_in: {xfer_in[sub_out]}")
-                dprint(f"rank {myrank} {sub_out}: xfer_out: {xfer_out[sub_out]}")
-                dprint(f"rank {myrank} {sub_out}: xfer_in_nocolor: {xfer_in_nocolor[sub_out]}")
-                dprint(f"rank {myrank} {sub_out}: xfer_out_nocolor: {xfer_out_nocolor[sub_out]}")
 
             full_xfer_in, full_xfer_out = _setup_index_views(total_size, xfer_in, xfer_out)
 
