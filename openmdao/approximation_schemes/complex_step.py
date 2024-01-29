@@ -136,7 +136,9 @@ class ComplexStep(ApproximationScheme):
         system._set_complex_step_mode(True)
 
         try:
-            yield from self._compute_approx_col_iter(system, under_cs=True)
+            for tup in self._compute_approx_col_iter(system, under_cs=True):
+                yield tup
+                system._outputs.set_val(saved_outputs)
         finally:
             # Turn off complex step.
             system._set_complex_step_mode(False)

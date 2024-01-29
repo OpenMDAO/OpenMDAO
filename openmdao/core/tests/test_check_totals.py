@@ -1862,21 +1862,21 @@ class TestProblemCheckTotals(unittest.TestCase):
         data = p.check_totals(method='cs', directional=True)
         assert_check_totals(data, atol=1e-6, rtol=1e-6)
 
-    def _build_sparse_model(self, driver, coloring=False):
+    def _build_sparse_model(self, driver, coloring=False, size=5):
         prob = om.Problem()
         prob.driver = driver
 
-        prob.model.add_subsystem('comp1', Simple(size=5))
-        prob.model.add_subsystem('comp2', Simple(size=5))
-        prob.model.add_subsystem('comp3', Simple(size=5))
-        prob.model.add_subsystem('comp4', Simple(size=5))
+        prob.model.add_subsystem('comp1', Simple(size=size))
+        prob.model.add_subsystem('comp2', Simple(size=size))
+        prob.model.add_subsystem('comp3', Simple(size=size))
+        prob.model.add_subsystem('comp4', Simple(size=size))
 
-        prob.model.add_subsystem('comp', SparseJacVec(size=5))
+        prob.model.add_subsystem('comp', SparseJacVec(size=size))
 
-        prob.model.add_subsystem('comp5', Simple(size=5))
-        prob.model.add_subsystem('comp6', Simple(size=5))
-        prob.model.add_subsystem('comp7', Simple(size=5))
-        prob.model.add_subsystem('comp8', Simple(size=5))
+        prob.model.add_subsystem('comp5', Simple(size=size))
+        prob.model.add_subsystem('comp6', Simple(size=size))
+        prob.model.add_subsystem('comp7', Simple(size=size))
+        prob.model.add_subsystem('comp8', Simple(size=size))
 
         prob.model.connect('comp1.y', 'comp.in1')
         prob.model.connect('comp2.y', 'comp.in2')
@@ -1906,9 +1906,11 @@ class TestProblemCheckTotals(unittest.TestCase):
     def test_sparse_matfree_fwd(self):
         prob = self._build_sparse_model(driver=om.ScipyOptimizeDriver())
         m = prob.model
+        #m.approx_totals(method='cs')
         prob.setup(force_alloc_complex=True, mode='fwd')
         prob.run_model()
 
+        #J = prob.compute_totals()
         assert_check_totals(prob.check_totals(method='cs', out_stream=None))
 
         nsolves = [c.nsolve_linear for c in [m.comp5, m.comp6, m.comp7, m.comp8]]

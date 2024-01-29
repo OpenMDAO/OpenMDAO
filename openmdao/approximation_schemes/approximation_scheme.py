@@ -491,6 +491,9 @@ class ApproximationScheme(object):
         # now do uncolored solves
         for group_i, tup in enumerate(approx_groups):
             wrt, data, jcol_idxs, vec_ind_list, directional, direction = tup
+            if total:
+                system._relevant.set_seeds(wrt, 'fwd')
+
             if self._progress_out:
                 start_time = time.perf_counter()
 
