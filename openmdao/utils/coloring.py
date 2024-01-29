@@ -100,6 +100,8 @@ _DEF_COMP_SPARSITY_ARGS = {
     'show_sparsity': False,  # if True, show a plot of the sparsity
 }
 
+_COLORING_VERSION = '1.0'
+
 
 # A dict containing colorings that have been generated during the current execution.
 # When a dynamic coloring is specified for a particular class and per_instance is False,
@@ -139,7 +141,7 @@ class _ColoringMeta(object):
     """
 
     _meta_names = {'num_full_jacs', 'tol', 'orders', 'min_improve_pct', 'show_summary',
-                   'show_sparsity', 'dynamic'}
+                   'show_sparsity', 'dynamic', 'version'}
 
     def __init__(self, num_full_jacs=3, tol=1e-25, orders=None, min_improve_pct=5.,
                  show_summary=True, show_sparsity=False, dynamic=False, static=None,
@@ -156,6 +158,7 @@ class _ColoringMeta(object):
         self.dynamic = dynamic  # True if dynamic coloring is being used
         self.static = static  # a filename, or a Coloring object if use_fixed_coloring was called
         self.msginfo = msginfo  # prefix for warning/error messages
+        self.version = _COLORING_VERSION
         self._coloring = None  # the coloring object
 
     def update(self, dct):
@@ -170,8 +173,6 @@ class _ColoringMeta(object):
         for name, val in dct.items():
             if name in self._meta_names:
                 setattr(self, name, val)
-            else:
-                issue_warning(f"_ColoringMeta: Ignoring unrecognized metadata '{name}'.")
 
     def __iter__(self):
         """
@@ -509,7 +510,7 @@ class Coloring(object):
         self._rev = None
 
         self._meta = {
-            'version': '1.0',
+            'version': _COLORING_VERSION,
             'source': '',
         }
 
