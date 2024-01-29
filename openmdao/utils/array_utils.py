@@ -752,8 +752,9 @@ class ValueRepeater(object):
         idx : int
             The index of the value to be returned.
         """
+        i = idx
         if idx < 0:
             idx += self.size
         if idx >= self.size:
-            raise IndexError(f"index {idx} is out of bounds for size {self.size}")
+            raise IndexError(f"index {i} is out of bounds for size {self.size}")
         return self.val

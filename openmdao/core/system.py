@@ -493,8 +493,6 @@ class System(object):
         self._owns_approx_jac_meta = {}
         self._owns_approx_wrt = None
         self._owns_approx_of = None
-        # self._owns_approx_wrt_idx = {}
-        # self._owns_approx_of_idx = {}
 
         self.under_complex_step = False
         self.under_finite_difference = False
