@@ -585,7 +585,7 @@ class ImplicitComponent(Component):
         Returns
         -------
         tuple(list, list)
-            'of' and 'wrt' variable lists.
+            'of' and 'wrt' variable lists (promoted names).
         """
         of = list(self._var_allprocs_prom2abs_list['output'])
         wrt = list(self._var_allprocs_prom2abs_list['input'])

@@ -320,8 +320,7 @@ class _Partial_ColoringMeta(_ColoringMeta):
         Where matched wrt names are stored.
     """
 
-    _meta_names = {'num_full_jacs', 'tol', 'orders', 'min_improve_pct', 'dynamic',
-                   'wrt_patterns', 'per_instance', 'perturb_size', 'method', 'form', 'step'}
+    _meta_names = {'wrt_patterns', 'per_instance', 'perturb_size', 'method', 'form', 'step'}
     _meta_names.update(_ColoringMeta._meta_names)
 
     def __init__(self, wrt_patterns=('*',), method='fd', form=None, step=None, per_instance=True,
