@@ -6,6 +6,12 @@ from openmdao.utils.assert_utils import assert_check_totals, assert_near_equal
 from openmdao.test_suite.components.exec_comp_for_test import ExecComp4Test
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.utils.mpi import MPI
+
+try:
+    from openmdao.parallel_api import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 class MissingPartialsComp(om.ExplicitComponent):
@@ -27,6 +33,104 @@ class MissingPartialsComp(om.ExplicitComponent):
         partials['y', 'a'] = 2.0
         partials['z', 'b'] = 3.0
 
+
+def setup_problem(do_pre_post_opt, mode, use_ivc=False, coloring=False, size=3, group=False,
+                  force=(), approx=False, force_complex=False, recording=False, parallel=False):
+    prob = om.Problem()
+    prob.options['group_by_pre_opt_post'] = do_pre_post_opt
+
+    prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False)
+    prob.set_solver_print(level=0)
+
+    model = prob.model
+
+    if approx:
+        model.approx_totals()
+
+    if use_ivc:
+        model.add_subsystem('ivc', om.IndepVarComp('x', np.ones(size)))
+
+    if parallel:
+        par = model.add_subsystem('par', om.ParallelGroup(), promotes=['*'])
+        par.nonlinear_solver = om.NonlinearBlockJac()
+        parent = par
+    else:
+        parent = model
+
+    if group:
+        G1 = parent.add_subsystem('G1', om.Group(), promotes=['*'])
+        G2 = parent.add_subsystem('G2', om.Group(), promotes=['*'])
+        if parallel:
+            G2.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+            G2.linear_solver = om.DirectSolver(assemble_jac=True)
+            # this guy wouldn't be included in the iteration loop were it not under Newton
+            G1.add_subsystem('sub_post_comp', ExecComp4Test('y=.5*x', x=np.ones(size), y=np.zeros(size)))
+    else:
+        G1 = parent
+        G2 = parent
+
+    comps = {
+        'pre1': G1.add_subsystem('pre1', ExecComp4Test('y=2.*x', x=np.ones(size), y=np.zeros(size))),
+        'pre2': G1.add_subsystem('pre2', ExecComp4Test('y=3.*x - 7.*xx', x=np.ones(size), xx=np.ones(size), y=np.zeros(size))),
+
+        'iter1': G1.add_subsystem('iter1', ExecComp4Test('y=x1 + x2*4. + x3',
+                                                x1=np.ones(size), x2=np.ones(size),
+                                                x3=np.ones(size), y=np.zeros(size))),
+        'iter2': G1.add_subsystem('iter2', ExecComp4Test('y=.5*x', x=np.ones(size), y=np.zeros(size))),
+        'iter4': G2.add_subsystem('iter4', ExecComp4Test('y=7.*x', x=np.ones(size), y=np.zeros(size))),
+        'iter3': G2.add_subsystem('iter3', ExecComp4Test('y=6.*x', x=np.ones(size), y=np.zeros(size))),
+
+        'post1': G2.add_subsystem('post1', ExecComp4Test('y=8.*x', x=np.ones(size), y=np.zeros(size))),
+        'post2': G2.add_subsystem('post2', ExecComp4Test('y=x1*9. + x2*5. + x3*3.', x1=np.ones(size),
+                                                x2=np.ones(size), x3=np.zeros(size),
+                                                y=np.zeros(size))),
+    }
+
+    for name in force:
+        if name in comps:
+            comps[name].options['always_opt'] = True
+        else:
+            raise RuntimeError(f'"{name}" not in comps')
+
+    if use_ivc:
+        model.connect('ivc.x', 'iter1.x3')
+
+    model.connect('pre1.y', ['iter1.x1', 'post2.x1', 'pre2.xx'])
+    model.connect('pre2.y', 'iter1.x2')
+    model.connect('iter1.y', ['iter2.x', 'iter4.x'])
+    model.connect('iter2.y', 'post2.x2')
+    model.connect('iter3.y', 'post1.x')
+    model.connect('iter4.y', 'iter3.x')
+    model.connect('post1.y', 'post2.x3')
+
+    prob.model.add_design_var('iter1.x3', lower=-10, upper=10)
+    prob.model.add_constraint('iter2.y', upper=10.)
+    prob.model.add_objective('iter3.y', index=0)
+
+    if coloring:
+        prob.driver.declare_coloring()
+
+    if recording:
+        model.recording_options['record_inputs'] = True
+        model.recording_options['record_outputs'] = True
+        model.recording_options['record_residuals'] = True
+
+        recorder = om.SqliteRecorder("sqlite_test_pre_post", record_viewer_data=False)
+
+        model.add_recorder(recorder)
+        prob.driver.add_recorder(recorder)
+
+        for comp in comps.values():
+            comp.add_recorder(recorder)
+
+    prob.setup(mode=mode, force_alloc_complex=force_complex)
+
+    # we don't want ExecComps to be colored because it makes the iter counting more complicated.
+    for comp in model.system_iter(recurse=True, typ=ExecComp4Test):
+        comp.options['do_coloring'] = False
+        comp.options['has_diag_partials'] = True
+
+    return prob
 
 @use_tempdirs
 class TestPrePostIter(unittest.TestCase):
@@ -119,7 +223,7 @@ class TestPrePostIter(unittest.TestCase):
         return prob
 
     def test_pre_post_iter_rev(self):
-        prob = self.setup_problem(do_pre_post_opt=True, mode='rev')
+        prob = setup_problem(do_pre_post_opt=True, mode='rev')
         prob.run_driver()
 
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
@@ -137,7 +241,7 @@ class TestPrePostIter(unittest.TestCase):
         assert_check_totals(data)
 
     def test_pre_post_iter_rev_grouped(self):
-        prob = self.setup_problem(do_pre_post_opt=True, group=True, mode='rev')
+        prob = setup_problem(do_pre_post_opt=True, group=True, mode='rev')
         prob.run_driver()
 
         self.assertEqual(prob.model.G1.pre1.num_nl_solves, 1)
@@ -155,7 +259,7 @@ class TestPrePostIter(unittest.TestCase):
         assert_check_totals(data)
 
     def test_pre_post_iter_rev_coloring(self):
-        prob = self.setup_problem(do_pre_post_opt=True, coloring=True, mode='rev')
+        prob = setup_problem(do_pre_post_opt=True, coloring=True, mode='rev')
         prob.run_driver()
 
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
@@ -173,7 +277,7 @@ class TestPrePostIter(unittest.TestCase):
         assert_check_totals(data)
 
     def test_pre_post_iter_rev_coloring_grouped(self):
-        prob = self.setup_problem(do_pre_post_opt=True, coloring=True, group=True, mode='rev')
+        prob = setup_problem(do_pre_post_opt=True, coloring=True, group=True, mode='rev')
         prob.run_driver()
 
         self.assertEqual(prob.model.G1.pre1.num_nl_solves, 1)
@@ -202,7 +306,7 @@ class TestPrePostIter(unittest.TestCase):
         assert_check_totals(data)
 
     def test_pre_post_iter_rev_ivc(self):
-        prob = self.setup_problem(do_pre_post_opt=True, use_ivc=True, mode='rev')
+        prob = setup_problem(do_pre_post_opt=True, use_ivc=True, mode='rev')
         prob.run_driver()
 
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
@@ -220,7 +324,7 @@ class TestPrePostIter(unittest.TestCase):
         assert_check_totals(data)
 
     def test_pre_post_iter_rev_ivc_grouped(self):
-        prob = self.setup_problem(do_pre_post_opt=True, use_ivc=True, group=True, mode='rev')
+        prob = setup_problem(do_pre_post_opt=True, use_ivc=True, group=True, mode='rev')
         prob.run_driver()
 
         self.assertEqual(prob.model.G1.pre1.num_nl_solves, 1)
@@ -238,7 +342,7 @@ class TestPrePostIter(unittest.TestCase):
         assert_check_totals(data)
 
     def test_pre_post_iter_rev_ivc_coloring(self):
-        prob = self.setup_problem(do_pre_post_opt=True, use_ivc=True, coloring=True, mode='rev')
+        prob = setup_problem(do_pre_post_opt=True, use_ivc=True, coloring=True, mode='rev')
         prob.run_driver()
 
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
@@ -256,7 +360,7 @@ class TestPrePostIter(unittest.TestCase):
         assert_check_totals(data)
 
     def test_pre_post_iter_fwd(self):
-        prob = self.setup_problem(do_pre_post_opt=True, mode='fwd')
+        prob = setup_problem(do_pre_post_opt=True, mode='fwd')
         prob.run_driver()
 
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
@@ -274,7 +378,7 @@ class TestPrePostIter(unittest.TestCase):
         assert_check_totals(data)
 
     def test_pre_post_iter_fwd_grouped(self):
-        prob = self.setup_problem(do_pre_post_opt=True, group=True, mode='fwd')
+        prob = setup_problem(do_pre_post_opt=True, group=True, mode='fwd')
         prob.run_driver()
 
         self.assertEqual(prob.model.G1.pre1.num_nl_solves, 1)
@@ -292,7 +396,7 @@ class TestPrePostIter(unittest.TestCase):
         assert_check_totals(data)
 
     def test_pre_post_iter_fwd_coloring(self):
-        prob = self.setup_problem(do_pre_post_opt=True, coloring=True, mode='fwd')
+        prob = setup_problem(do_pre_post_opt=True, coloring=True, mode='fwd')
         prob.run_driver()
 
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
@@ -310,7 +414,7 @@ class TestPrePostIter(unittest.TestCase):
         assert_check_totals(data)
 
     def test_pre_post_iter_fwd_coloring_grouped(self):
-        prob = self.setup_problem(do_pre_post_opt=True, coloring=True, group=True, mode='fwd')
+        prob = setup_problem(do_pre_post_opt=True, coloring=True, group=True, mode='fwd')
         prob.run_driver()
 
         self.assertEqual(prob.model.G1.pre1.num_nl_solves, 1)
@@ -328,7 +432,7 @@ class TestPrePostIter(unittest.TestCase):
         assert_check_totals(data)
 
     def test_pre_post_iter_fwd_coloring_grouped_force_post(self):
-        prob = self.setup_problem(do_pre_post_opt=True, coloring=True, group=True,
+        prob = setup_problem(do_pre_post_opt=True, coloring=True, group=True,
                                   force=['post2'], mode='fwd')
         prob.run_driver()
 
@@ -350,7 +454,7 @@ class TestPrePostIter(unittest.TestCase):
         assert_check_totals(data)
 
     def test_pre_post_iter_fwd_coloring_grouped_force_pre(self):
-        prob = self.setup_problem(do_pre_post_opt=True, coloring=True, group=True,
+        prob = setup_problem(do_pre_post_opt=True, coloring=True, group=True,
                                   force=['pre1'], mode='fwd')
         prob.run_driver()
 
@@ -372,7 +476,7 @@ class TestPrePostIter(unittest.TestCase):
         assert_check_totals(data)
 
     def test_pre_post_iter_fwd_ivc(self):
-        prob = self.setup_problem(do_pre_post_opt=True, use_ivc=True, mode='fwd')
+        prob = setup_problem(do_pre_post_opt=True, use_ivc=True, mode='fwd')
         prob.run_driver()
 
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
@@ -390,7 +494,7 @@ class TestPrePostIter(unittest.TestCase):
         assert_check_totals(data)
 
     def test_pre_post_iter_fwd_ivc_coloring(self):
-        prob = self.setup_problem(do_pre_post_opt=True, use_ivc=True, coloring=True, mode='fwd')
+        prob = setup_problem(do_pre_post_opt=True, use_ivc=True, coloring=True, mode='fwd')
         prob.run_driver()
 
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
@@ -408,7 +512,7 @@ class TestPrePostIter(unittest.TestCase):
         assert_check_totals(data)
 
     def test_pre_post_iter_approx(self):
-        prob = self.setup_problem(do_pre_post_opt=True, mode='fwd', approx=True, force_complex=True)
+        prob = setup_problem(do_pre_post_opt=True, mode='fwd', approx=True, force_complex=True)
 
         prob.run_driver()
 
@@ -427,7 +531,7 @@ class TestPrePostIter(unittest.TestCase):
         assert_check_totals(data)
 
     def test_pre_post_iter_approx_grouped(self):
-        prob = self.setup_problem(do_pre_post_opt=True, group=True, approx=True, force_complex=True, mode='fwd')
+        prob = setup_problem(do_pre_post_opt=True, group=True, approx=True, force_complex=True, mode='fwd')
         prob.run_driver()
 
         self.assertEqual(prob.model.G1.pre1.num_nl_solves, 1)
@@ -445,7 +549,7 @@ class TestPrePostIter(unittest.TestCase):
         assert_check_totals(data)
 
     def test_pre_post_iter_approx_coloring(self):
-        prob = self.setup_problem(do_pre_post_opt=True, coloring=True, approx=True, force_complex=True, mode='fwd')
+        prob = setup_problem(do_pre_post_opt=True, coloring=True, approx=True, force_complex=True, mode='fwd')
         prob.run_driver()
 
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
@@ -463,7 +567,7 @@ class TestPrePostIter(unittest.TestCase):
         assert_check_totals(data)
 
     def test_pre_post_iter_approx_ivc(self):
-        prob = self.setup_problem(do_pre_post_opt=True, use_ivc=True, approx=True, force_complex=True, mode='fwd')
+        prob = setup_problem(do_pre_post_opt=True, use_ivc=True, approx=True, force_complex=True, mode='fwd')
         prob.run_driver()
 
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
@@ -481,7 +585,7 @@ class TestPrePostIter(unittest.TestCase):
         assert_check_totals(data)
 
     def test_pre_post_iter_approx_ivc_coloring(self):
-        prob = self.setup_problem(do_pre_post_opt=True, use_ivc=True, coloring=True, approx=True, force_complex=True, mode='fwd')
+        prob = setup_problem(do_pre_post_opt=True, use_ivc=True, coloring=True, approx=True, force_complex=True, mode='fwd')
         prob.run_driver()
 
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
@@ -540,7 +644,7 @@ class TestPrePostIter(unittest.TestCase):
                 assert_near_equal(J[('obj', 'z')], np.array([[9.62568658, 1.78576699]]), .00001)
 
     def test_reading_system_cases_pre_opt_post(self):
-        prob = self.setup_problem(do_pre_post_opt=True, mode='fwd', recording=True)
+        prob = setup_problem(do_pre_post_opt=True, mode='fwd', recording=True)
         prob.run_driver()
         prob.cleanup()
 
@@ -657,6 +761,17 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(C3._run_on_opt, [False, True, False])
         self.assertEqual(C4._run_on_opt, [False, True, False])
         self.assertEqual(C5._run_on_opt, [False, False, True])
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class PrePostMPITestCase(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_newton_on_one_rank(self):
+        prob = setup_problem(do_pre_post_opt=True, mode='fwd', parallel=True, group=True)
+
+        prob.run_driver()
+
 
 if __name__ == "__main__":
     unittest.main()

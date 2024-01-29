@@ -2224,6 +2224,42 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(p.get_val('exec.z')[0], 25)
         assert_near_equal(p.get_val('exec.z')[50], -75)
 
+    def test_nelder_mead_bounded(self):
+
+        class dummy_function(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', val=0.)
+                self.add_output('y', val=0.)
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+
+                outputs['y'] = 2*x + 1
+
+        model = om.Group()
+        model.add_subsystem('dummy_function',
+                            dummy_function(),
+                            promotes=['*'])
+        prob = om.Problem(model=model)
+
+        model.add_objective('y')
+        model.add_design_var('x', lower=0, upper=100)
+        model.set_input_defaults('x', 25)
+
+        driver = prob.driver = om.ScipyOptimizeDriver()
+        driver.options["optimizer"] = 'Nelder-Mead'
+
+        driver.options['debug_print'] = ['desvars',
+                                        'nl_cons', 'ln_cons', 'objs', 'totals']
+
+        prob.setup()
+
+        prob.run_driver()
+
+        y_out = prob.get_val('y')
+
+        assert_near_equal(y_out, 1.0, tolerance=1.0E-3)
+
 
 if __name__ == "__main__":
     unittest.main()

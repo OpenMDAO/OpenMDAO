@@ -21,10 +21,11 @@ from openmdao.core.group import Group
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.general_utils import pad_name
 from openmdao.utils.om_warnings import reset_warning_registry
+from openmdao.utils.mpi import MPI
 
 
 @contextmanager
-def assert_warning(category, msg, contains_msg=False):
+def assert_warning(category, msg, contains_msg=False, ranks=None):
     """
     Context manager asserting that a warning is issued.
 
@@ -36,6 +37,8 @@ def assert_warning(category, msg, contains_msg=False):
         The text of the expected warning.
     contains_msg : bool
         Set to True to check that the warning text contains msg, rather than checking equality.
+    ranks : int or list of int, optional
+        The global ranks on which the warning is expected.
 
     Yields
     ------
@@ -50,6 +53,15 @@ def assert_warning(category, msg, contains_msg=False):
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             yield
+
+    if ranks is not None:
+        if MPI is None:
+            raise RuntimeError("ranks argument has been specified but MPI is not active")
+        else:
+            if not isinstance(ranks, list):
+                ranks = [ranks]
+            if MPI.COMM_WORLD.rank not in ranks:
+                return
 
     for warn in w:
         if contains_msg:

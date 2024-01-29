@@ -141,7 +141,7 @@ class _ColoringMeta(object):
     """
 
     _meta_names = {'num_full_jacs', 'tol', 'orders', 'min_improve_pct', 'show_summary',
-                   'show_sparsity', 'dynamic', 'version'}
+                   'show_sparsity', 'dynamic'}
 
     def __init__(self, num_full_jacs=3, tol=1e-25, orders=None, min_improve_pct=5.,
                  show_summary=True, show_sparsity=False, dynamic=False, static=None,
@@ -158,7 +158,6 @@ class _ColoringMeta(object):
         self.dynamic = dynamic  # True if dynamic coloring is being used
         self.static = static  # a filename, or a Coloring object if use_fixed_coloring was called
         self.msginfo = msginfo  # prefix for warning/error messages
-        self.version = _COLORING_VERSION
         self._coloring = None  # the coloring object
 
     def update(self, dct):

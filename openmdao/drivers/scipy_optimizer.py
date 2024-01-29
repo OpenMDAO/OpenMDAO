@@ -25,7 +25,7 @@ _gradient_optimizers = {'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC', 'SLSQP', '
                         'trust-ncg', 'trust-constr', 'basinhopping', 'shgo'}
 _hessian_optimizers = {'trust-constr', 'trust-ncg'}
 _bounds_optimizers = {'L-BFGS-B', 'TNC', 'SLSQP', 'trust-constr', 'dual_annealing', 'shgo',
-                      'differential_evolution', 'basinhopping'}
+                      'differential_evolution', 'basinhopping', 'Nelder-Mead'}
 if Version(scipy_version) >= Version("1.11"):
     # COBYLA supports bounds starting with SciPy Version 1.11
     _bounds_optimizers |= {'COBYLA'}

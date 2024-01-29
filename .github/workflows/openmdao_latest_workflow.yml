@@ -69,7 +69,6 @@ jobs:
           python-version: ${{ matrix.PY }}
           conda-version: "*"
           channels: conda-forge
-          channel-priority: true
 
       - name: Install OpenMDAO
         run: |

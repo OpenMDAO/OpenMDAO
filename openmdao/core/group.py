@@ -4883,11 +4883,11 @@ class Group(System):
             graph.add_edge(opt_sys, response0)
             graph.add_edge(response0, opt_sys)
 
-        if grad_groups:
-            if self.comm.size > 1:
-                grad_groups = self.comm.allgather(grad_groups)
-                grad_groups = {g for grp in grad_groups for g in grp}
+        if self.comm.size > 1:
+            grad_groups = self.comm.allgather(grad_groups)
+            grad_groups = {g for grp in grad_groups for g in grp}
 
+        if grad_groups:
             remaining = set(grad_groups)
             for name in sorted(grad_groups, key=lambda x: x.count('.')):
                 prefix = name + '.'
