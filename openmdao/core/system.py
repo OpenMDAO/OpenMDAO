@@ -1561,7 +1561,7 @@ class System(object):
         sp_info['class'] = type(self).__name__
         sp_info['type'] = 'semi-total' if self._subsystems_allprocs else 'partial'
 
-        ordered_wrt_info = list(self._jac_wrt_iter(info.wrt_matches))
+        ordered_wrt_info = list(self._jac_wrt_iter(info['wrt_matches']))
         ordered_of_info = list(self._jac_of_iter())
 
         if self.pathname:
@@ -1635,15 +1635,15 @@ class System(object):
         use_jax = False
         try:
             if self.options['use_jax']:
-                info.method = 'jax'
+                info['method'] = 'jax'
                 use_jax = True
         except KeyError:
             pass
 
         info.update(overrides)
 
-        if info.method is None and self._approx_schemes:
-            info.method = list(self._approx_schemes)[0]
+        if info['method'] is None and self._approx_schemes:
+            info['method'] = list(self._approx_schemes)[0]
 
         if info['coloring'] is None:
             # check to see if any approx or jax derivs have been declared
@@ -1654,21 +1654,21 @@ class System(object):
                 if not (self._owns_approx_of or self._owns_approx_wrt):
                     issue_warning("No partials found but coloring was requested.  "
                                   "Declaring ALL partials as dense "
-                                  "(method='{}')".format(info.method),
+                                  "(method='{}')".format(info['method']),
                                   prefix=self.msginfo, category=DerivativesWarning)
                     try:
-                        self.declare_partials('*', '*', method=info.method)
+                        self.declare_partials('*', '*', method=info['method'])
                     except AttributeError:  # assume system is a group
                         from openmdao.core.component import Component
                         from openmdao.core.indepvarcomp import IndepVarComp
                         from openmdao.components.exec_comp import ExecComp
                         for s in self.system_iter(recurse=True, typ=Component):
                             if not isinstance(s, ExecComp) and not isinstance(s, IndepVarComp):
-                                s.declare_partials('*', '*', method=info.method)
+                                s.declare_partials('*', '*', method=info['method'])
                     self._setup_partials()
 
         if not use_jax:
-            approx_scheme = self._get_approx_scheme(info.method)
+            approx_scheme = self._get_approx_scheme(info['method'])
 
         if info['coloring'] is None and info['static'] is None:
             info['dynamic'] = True
@@ -1719,18 +1719,18 @@ class System(object):
         starting_inputs = self._inputs.asarray(copy=True)
         in_offsets = starting_inputs.copy()
         in_offsets[in_offsets == 0.0] = 1.0
-        in_offsets *= info.perturb_size
+        in_offsets *= info['perturb_size']
 
         starting_outputs = self._outputs.asarray(copy=True)
 
         if not is_explicit:
             out_offsets = starting_outputs.copy()
             out_offsets[out_offsets == 0.0] = 1.0
-            out_offsets *= info.perturb_size
+            out_offsets *= info['perturb_size']
 
         starting_resids = self._residuals.asarray(copy=True)
 
-        for i in range(info.num_full_jacs):
+        for i in range(info['num_full_jacs']):
             # randomize inputs (and outputs if implicit)
             if i > 0:
                 self._inputs.set_val(starting_inputs +
@@ -1860,7 +1860,7 @@ class System(object):
                                    (self.msginfo, coloring._meta['wrt_patterns'],
                                     info.wrt_patterns))
             info.update(info['coloring']._meta)
-            approx = self._get_approx_scheme(info.method)
+            approx = self._get_approx_scheme(info['method'])
             # force regen of approx groups during next compute_approximations
             approx._reset()
         elif isinstance(static, coloring_mod.Coloring):
@@ -2853,14 +2853,14 @@ class System(object):
             List of wrt_matches for a static coloring or () if there isn't one.
         """
         if (self._coloring_info['coloring'] is not None and
-                self._coloring_info.wrt_matches is None):
+                self._coloring_info['wrt_matches'] is None):
             self._coloring_info._update_wrt_matches(self)
 
         # if coloring has been specified, we don't want to have multiple
         # approximations for the same subjac, so don't register any new
         # approximations when the wrt matches those used in the coloring.
         if self._get_static_coloring() is not None:  # static coloring has been specified
-            return self._coloring_info.wrt_matches
+            return self._coloring_info['wrt_matches']
 
         return ()  # for dynamic coloring or no coloring
 

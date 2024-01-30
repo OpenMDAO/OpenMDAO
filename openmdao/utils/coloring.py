@@ -134,6 +134,8 @@ class _ColoringMeta(object):
     static : Coloring, str, or None
         If a Coloring object, just use that.  If a filename, load the coloring from that file.
         If None, do not attempt to use a static coloring.
+    perturb_size : float
+        Size of input/output perturbation during generation of sparsity.
     msginfo : str
         Prefix for warning/error messages.
     _coloring : Coloring or None
@@ -141,11 +143,11 @@ class _ColoringMeta(object):
     """
 
     _meta_names = {'num_full_jacs', 'tol', 'orders', 'min_improve_pct', 'show_summary',
-                   'show_sparsity', 'dynamic'}
+                   'show_sparsity', 'dynamic', 'perturb_size'}
 
     def __init__(self, num_full_jacs=3, tol=1e-25, orders=None, min_improve_pct=5.,
                  show_summary=True, show_sparsity=False, dynamic=False, static=None,
-                 msginfo=''):
+                 perturb_size=1e-9, msginfo=''):
         """
         Initialize data structures.
         """
@@ -158,6 +160,7 @@ class _ColoringMeta(object):
         self.dynamic = dynamic  # True if dynamic coloring is being used
         self.static = static  # a filename, or a Coloring object if use_fixed_coloring was called
         self.msginfo = msginfo  # prefix for warning/error messages
+        self.perturb_size = perturb_size  # input/output perturbation during generation of sparsity
         self._coloring = None  # the coloring object
 
     def update(self, dct):
@@ -354,7 +357,7 @@ class _Partial_ColoringMeta(_ColoringMeta):
         Where matched wrt names are stored.
     """
 
-    _meta_names = {'wrt_patterns', 'per_instance', 'perturb_size', 'method', 'form', 'step'}
+    _meta_names = {'wrt_patterns', 'per_instance', 'method', 'form', 'step'}
     _meta_names.update(_ColoringMeta._meta_names)
 
     def __init__(self, wrt_patterns=('*',), method='fd', form=None, step=None, per_instance=True,
@@ -365,7 +368,8 @@ class _Partial_ColoringMeta(_ColoringMeta):
         """
         super().__init__(num_full_jacs=num_full_jacs, tol=tol, orders=orders,
                          min_improve_pct=min_improve_pct, show_summary=show_summary,
-                         show_sparsity=show_sparsity, dynamic=dynamic, static=static)
+                         show_sparsity=show_sparsity, dynamic=dynamic, static=static,
+                         perturb_size=perturb_size)
         if wrt_patterns is None:
             wrt_patterns = ()
         elif isinstance(wrt_patterns, str):
@@ -377,7 +381,6 @@ class _Partial_ColoringMeta(_ColoringMeta):
         self.form = form  # form of the derivatives ('forward', 'backward', or 'central')
         self.step = step  # step size for finite difference or complex step
         self.per_instance = per_instance  # assume each instance can have a different coloring
-        self.perturb_size = perturb_size  # input/output perturbation during generation of sparsity
         self.fname = None  # filename where coloring is stored
         self.wrt_matches = None  # where matched wrt names are stored
 
@@ -1381,7 +1384,7 @@ class Coloring(object):
             coloring = source
             source_name = ''
         elif hasattr(source, '_coloring_info'):
-            coloring = source._coloring_info['coloring']
+            coloring = source._coloring_info.coloring
             source_name = source._problem()._name
         else:
             raise ValueError(f'display_bokeh was expecting the source to be a valid coloring file '
@@ -2625,7 +2628,7 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
                                       "linear constraint derivatives are computed separately "
                                       "from nonlinear ones.")
         _initialize_model_approx(model, driver, ofs, wrts)
-        if model._coloring_info['coloring'] is None:
+        if model._coloring_info.coloring is None:
             kwargs = {n: v for n, v in model._coloring_info
                       if n in _DEF_COMP_SPARSITY_ARGS and v is not None}
             kwargs['method'] = list(model._approx_schemes)[0]
@@ -2711,7 +2714,7 @@ def dynamic_total_coloring(driver, run_model=True, fname=None, of=None, wrt=None
 
     driver._total_jac = None
 
-    problem.driver._coloring_info['coloring'] = None
+    problem.driver._coloring_info.coloring = None
 
     num_full_jacs = driver._coloring_info.get('num_full_jacs',
                                               _DEF_COMP_SPARSITY_ARGS['num_full_jacs'])
@@ -2721,9 +2724,9 @@ def dynamic_total_coloring(driver, run_model=True, fname=None, of=None, wrt=None
     coloring = compute_total_coloring(problem, of=of, wrt=wrt, num_full_jacs=num_full_jacs, tol=tol,
                                       orders=orders, setup=False, run_model=run_model, fname=fname)
 
-    driver._coloring_info['coloring'] = coloring
+    driver._coloring_info.coloring = coloring
 
-    if driver._coloring_info['coloring'] is not None:
+    if driver._coloring_info.coloring is not None:
         if not problem.model._approx_schemes:  # avoid double display
             if driver._coloring_info.show_sparsity:
                 coloring.display_txt(summary=False)
@@ -3216,7 +3219,7 @@ def display_coloring(source, output_file='total_coloring.html', as_text=False, s
     elif isinstance(source, Coloring):
         coloring = source
     elif hasattr(source, '_coloring_info'):
-        coloring = source._coloring_info['coloring']
+        coloring = source._coloring_info.coloring
     else:
         raise ValueError(f'display_coloring was expecting the source to be a valid '
                          f'coloring file or an instance of Coloring or driver '

@@ -77,8 +77,8 @@ class _TotalJacInfo(object):
     simul_coloring : Coloring or None
         Contains all data necessary to simultaneously solve for groups of total derivatives.
     _dist_driver_vars : dict
-        Dict of constraints that are distributed outputs. Key is abs variable name, values are
-        (local indices, local sizes).
+        Dict of constraints that are distributed outputs. Key is 'user' variable name, typically
+        promoted name or an alias, and values are (local indices, local sizes).
     in_idx_map : dict
         Mapping of jacobian row/col index to a tuple of the form
         (relevant_systems, cache_linear_solutions_flag, voi name)

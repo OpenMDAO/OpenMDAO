@@ -252,7 +252,7 @@ class Component(System):
                 if 'method' in meta and meta['method'] is not None:
                     break
             else:
-                method = self._coloring_info.method
+                method = self._coloring_info['method']
                 issue_warning("declare_coloring or use_fixed_coloring was called but no approx"
                               " partials were declared.  Declaring all partials as approximated "
                               f"using default metadata and method='{method}'.", prefix=self.msginfo,

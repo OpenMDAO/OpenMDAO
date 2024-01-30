@@ -235,7 +235,7 @@ class ApproximationScheme(object):
         self._nruns_uncolored = 0
 
         if system._during_sparsity:
-            wrt_matches = system._coloring_info.wrt_matches
+            wrt_matches = system._coloring_info['wrt_matches']
         else:
             wrt_matches = None
 

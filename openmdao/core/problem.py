@@ -53,7 +53,7 @@ from openmdao.utils.general_utils import _contains_all, pad_name, LocalRangeIter
     _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
-import openmdao.utils.coloring as cmod
+import openmdao.utils.coloring as coloring_mod
 from openmdao.visualization.tables.table_builder import generate_table
 
 try:
@@ -1095,7 +1095,7 @@ class Problem(object):
 
         driver._setup_driver(self)
 
-        if cmod._use_total_sparsity:
+        if coloring_mod._use_total_sparsity:
             coloring = driver._coloring_info['coloring']
             if coloring is not None:
                 # if we're using simultaneous total derivatives then our effective size is less
@@ -2704,7 +2704,7 @@ class Problem(object):
         Coloring or None
             Coloring object, possibly dynamically generated, or None.
         """
-        if cmod._use_total_sparsity:
+        if coloring_mod._use_total_sparsity:
             coloring = None
             # if no coloring_info is supplied, copy the coloring_info from the driver but
             # remove any existing coloring, and force dynamic coloring
@@ -2717,9 +2717,9 @@ class Problem(object):
                 if coloring_info['dynamic']:
                     do_run = run_model if run_model is not None else self._run_counter < 0
                     coloring = \
-                        cmod.dynamic_total_coloring(self.driver, run_model=do_run,
-                                                    fname=self.driver._get_total_coloring_fname(),
-                                                    of=of, wrt=wrt)
+                        coloring_mod.dynamic_total_coloring(
+                            self.driver, run_model=do_run,
+                            fname=self.driver._get_total_coloring_fname(), of=of, wrt=wrt)
             else:
                 return coloring_info['coloring']
 

@@ -965,7 +965,7 @@ class Group(System):
             # now remove alias entries from the response dict because we don't need them in the
             # relevance calculation. This response dict is used only for relevance and is *not*
             # used by the driver.
-            responses = {m['name']: m for m in responses.values() if not m['alias']}
+            responses = {m['source']: m for m in responses.values() if not m['alias']}
 
         return responses
 
@@ -4058,7 +4058,7 @@ class Group(System):
 
         if self._coloring_info['coloring'] is not None and (self._owns_approx_of is None or
                                                             self._owns_approx_wrt is None):
-            method = self._coloring_info.method
+            method = self._coloring_info['method']
         else:
             method = list(self._approx_schemes)[0]
 
@@ -4156,7 +4156,7 @@ class Group(System):
         Ensure that if coloring is declared, approximations will be set up.
         """
         if self._coloring_info['coloring'] is not None:
-            self.approx_totals(self._coloring_info.method,
+            self.approx_totals(self._coloring_info['method'],
                                self._coloring_info.get('step'),
                                self._coloring_info.get('form'))
         self._setup_approx_derivs()
