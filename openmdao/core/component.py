@@ -247,7 +247,7 @@ class Component(System):
         # Check here if declare_coloring was called during setup but declare_partials wasn't.
         # If declare partials wasn't called, call it with of='*' and wrt='*' so we'll have
         # something to color.
-        if self._coloring_info.coloring is not None:
+        if self._coloring_info['coloring'] is not None:
             for meta in self._declared_partials_patterns.values():
                 if 'method' in meta and meta['method'] is not None:
                     break

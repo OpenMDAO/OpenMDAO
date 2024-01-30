@@ -115,7 +115,7 @@ from openmdao.utils.om_warnings import issue_warning, reset_warnings, OpenMDAOWa
     OMInvalidCheckDerivativesOptionsWarning
 
 # Utils
-from openmdao.utils.general_utils import wing_dbg, env_truthy, dprint
+from openmdao.utils.general_utils import wing_dbg, env_truthy
 from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.jax_utils import register_jax_component
 

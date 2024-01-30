@@ -154,8 +154,8 @@ else:
                     inp_boundary_set = set(all_abs2meta_in).difference(conns)
 
                     for dv, resp, rel in group._relevant.iter_seed_pair_relevance(inputs=True):
-                        # resp is continuous and inside this group and dv is outside this group
                         if resp in all_abs2meta_out and dv not in allprocs_abs2prom:
+                            # resp is continuous and inside this group and dv is outside this group
                             if all_abs2meta_out[resp]['distributed']:  # a distributed response
                                 for inp in inp_boundary_set.intersection(rel):
                                     if inp in abs2meta_in:

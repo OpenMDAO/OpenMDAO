@@ -162,7 +162,7 @@ class ExplicitFuncComp(ExplicitComponent):
         osize = len(self._outputs)
         isize = len(self._inputs)
         invals = list(self._func_values(self._inputs))
-        coloring = self._coloring_info.coloring
+        coloring = self._coloring_info['coloring']
         func = self._compute_jax
 
         if self._mode == 'rev':  # use reverse mode to compute derivs

@@ -136,7 +136,7 @@ class ApproximationScheme(object):
         self._colored_approx_groups = []
 
         # don't do anything if the coloring doesn't exist yet
-        coloring = system._coloring_info.coloring
+        coloring = system._coloring_info['coloring']
         if not isinstance(coloring, coloring_mod.Coloring):
             return
 

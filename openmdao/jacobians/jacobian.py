@@ -322,7 +322,7 @@ class Jacobian(object):
     def _setup_index_maps(self, system):
         self._col_var_offset = {}
         col_var_info = []
-        for wrt, start, end, _, inds, _ in system._jac_wrt_iter():
+        for wrt, start, end, _, _, _ in system._jac_wrt_iter():
             self._col_var_offset[wrt] = start
             col_var_info.append(end)
 

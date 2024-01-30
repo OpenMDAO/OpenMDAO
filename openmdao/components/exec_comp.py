@@ -679,12 +679,12 @@ class ExecComp(ExplicitComponent):
                                                    sum(sizes['output'][rank]) > 1):
                     if not self._coloring_declared:
                         super().declare_coloring(wrt=('*', ), method='cs')
-                        self._coloring_info.dynamic = True
+                        self._coloring_info['dynamic'] = True
                         self._manual_decl_partials = False  # this gets reset in declare_partials
                         self._declared_partials_patterns = {}
                 else:
                     self.options['do_coloring'] = False
-                    self._coloring_info.dynamic = False
+                    self._coloring_info['dynamic'] = False
 
             meta = self._var_rel2meta
             decl_partials = super().declare_partials
@@ -944,8 +944,8 @@ class ExecComp(ExplicitComponent):
                                "and/or coloring are not declared manually using declare_partials "
                                "or declare_coloring.")
 
-        if info.coloring is None and info.static is None:
-            info.dynamic = True
+        if info['coloring'] is None and info['static'] is None:
+            info['dynamic'] = True
 
         # match everything
         info.wrt_matches = None
@@ -1025,7 +1025,7 @@ class ExecComp(ExplicitComponent):
         out_slices = self._out_slices
         in_slices = self._in_slices
 
-        for icols, nzrowlists in self._coloring_info.coloring.color_nonzero_iter('fwd'):
+        for icols, nzrowlists in self._coloring_info['coloring'].color_nonzero_iter('fwd'):
             # set a complex input value
             inarr[icols] += step
 
@@ -1068,7 +1068,7 @@ class ExecComp(ExplicitComponent):
                                "level system is using complex step unless you manually call "
                                "declare_partials and/or declare_coloring on this ExecComp.")
 
-        if self._coloring_info.coloring is not None:
+        if self._coloring_info['coloring'] is not None:
             self._compute_colored_partials(partials)
             return
 

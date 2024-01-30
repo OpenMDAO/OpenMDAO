@@ -405,8 +405,8 @@ class Driver(object):
         # set up simultaneous deriv coloring
         if cmod._use_total_sparsity:
             # reset the coloring
-            if self._coloring_info.dynamic or self._coloring_info.static is not None:
-                self._coloring_info.coloring = None
+            if self._coloring_info['dynamic'] or self._coloring_info['static'] is not None:
+                self._coloring_info['coloring'] = None
 
             coloring = self._get_static_coloring()
             if coloring is not None and self.supports['simultaneous_derivatives']:
@@ -1124,11 +1124,11 @@ class Driver(object):
         self._coloring_info.orders = orders
         self._coloring_info.perturb_size = perturb_size
         self._coloring_info.min_improve_pct = min_improve_pct
-        if self._coloring_info.static is None:
-            self._coloring_info.dynamic = True
+        if self._coloring_info['static'] is None:
+            self._coloring_info['dynamic'] = True
         else:
-            self._coloring_info.dynamic = False
-        self._coloring_info.coloring = None
+            self._coloring_info['dynamic'] = False
+        self._coloring_info['coloring'] = None
         self._coloring_info.show_summary = show_summary
         self._coloring_info.show_sparsity = show_sparsity
 
@@ -1145,13 +1145,13 @@ class Driver(object):
         if self.supports['simultaneous_derivatives']:
             if cmod._force_dyn_coloring and coloring is cmod._STD_COLORING_FNAME:
                 # force the generation of a dynamic coloring this time
-                self._coloring_info.dynamic = True
-                self._coloring_info.static = None
+                self._coloring_info['dynamic'] = True
+                self._coloring_info['static'] = None
             else:
-                self._coloring_info.static = coloring
-                self._coloring_info.dynamic = False
+                self._coloring_info['static'] = coloring
+                self._coloring_info['dynamic'] = False
 
-            self._coloring_info.coloring = None
+            self._coloring_info['coloring'] = None
         else:
             raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %
                                self._get_name())
@@ -1182,13 +1182,13 @@ class Driver(object):
         """
         coloring = None
         info = self._coloring_info
-        static = info.static
+        static = info['static']
 
         if isinstance(static, cmod.Coloring):
             coloring = static
-            info.coloring = coloring
+            info['coloring'] = coloring
         else:
-            coloring = info.coloring
+            coloring = info['coloring']
 
             if coloring is None and (static is cmod._STD_COLORING_FNAME or isinstance(static, str)):
                 if static is cmod._STD_COLORING_FNAME:
@@ -1197,10 +1197,10 @@ class Driver(object):
                     fname = static
 
                 print("loading total coloring from file %s" % fname)
-                coloring = info.coloring = cmod.Coloring.load(fname)
+                coloring = info['coloring'] = cmod.Coloring.load(fname)
                 info.update(coloring._meta)
 
-        if coloring is not None and info.static is not None:
+        if coloring is not None and info['static'] is not None:
             problem = self._problem()
             if coloring._rev and problem._orig_mode not in ('rev', 'auto'):
                 revcol = coloring._rev[0][0]
@@ -1353,16 +1353,16 @@ class Driver(object):
             Coloring object, possible loaded from a file or dynamically generated, or None
         """
         if cmod._use_total_sparsity:
-            if run_model and self._coloring_info.coloring is not None:
+            if run_model and self._coloring_info['coloring'] is not None:
                 issue_warning("The 'run_model' argument is ignored because the coloring has "
                               "already been computed.")
-            if self._coloring_info.dynamic:
-                if self._coloring_info.coloring is None:
-                    self._coloring_info.coloring = \
+            if self._coloring_info['dynamic']:
+                if self._coloring_info['coloring'] is None:
+                    self._coloring_info['coloring'] = \
                         cmod.dynamic_total_coloring(self, run_model=run_model,
                                                     fname=self._get_total_coloring_fname())
 
-            return self._coloring_info.coloring
+            return self._coloring_info['coloring']
 
 
 class SaveOptResult(object):

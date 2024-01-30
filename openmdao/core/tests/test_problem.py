@@ -2134,7 +2134,7 @@ class RelevanceTestCase(unittest.TestCase):
         p['C6.y'] = 1.
 
         p.run_model()
-        
+
         allcomps = [getattr(p.model, f"C{i}") for i in range(1, 7)]
 
         if approx:
@@ -2374,8 +2374,6 @@ class NestedProblemTestCase(unittest.TestCase):
 
         totals = prob.check_totals(of='f_xy', wrt=['x', 'y'], method='cs', out_stream=None)
         assert_check_totals(totals)
-        #for key, val in totals.items():
-            #assert_near_equal(val['rel error'][0], 0.0, 1e-12)
 
     def test_nested_prob_default_naming(self):
         import openmdao.core.problem

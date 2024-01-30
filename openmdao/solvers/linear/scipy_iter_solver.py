@@ -173,7 +173,7 @@ class ScipyKrylov(LinearSolver):
             else:
                 self._norm0 = 1.0
 
-        self._print_resid_norms(self._iter_count, norm, norm / self._norm0)
+        self._mpi_print(self._iter_count, norm, norm / self._norm0)
         self._iter_count += 1
 
     def solve(self, mode, rel_systems=None):

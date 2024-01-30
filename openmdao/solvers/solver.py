@@ -368,7 +368,7 @@ class Solver(object):
         """
         self.options['iprint'] = level
 
-    def _print_resid_norms(self, iteration, abs_res, rel_res):
+    def _mpi_print(self, iteration, abs_res, rel_res):
         """
         Print residuals from an iteration if iprint == 2.
 
@@ -679,7 +679,7 @@ class NonlinearSolver(Solver):
 
             self._norm0 = norm0
 
-            self._print_resid_norms(self._iter_count, norm, norm / norm0)
+            self._mpi_print(self._iter_count, norm, norm / norm0)
 
             stalled = False
             stall_count = 0
@@ -739,7 +739,7 @@ class NonlinearSolver(Solver):
                             stall_count = 0
                             stall_norm = rel_norm
 
-                self._print_resid_norms(self._iter_count, norm, norm / norm0)
+                self._mpi_print(self._iter_count, norm, norm / norm0)
 
         # flag for the print statements. we only print on root if USE_PROC_FILES is not set to True
         print_flag = system.comm.rank == 0 or os.environ.get('USE_PROC_FILES')
@@ -998,7 +998,7 @@ class LinearSolver(Solver):
 
             system = self._system()
 
-            self._print_resid_norms(self._iter_count, norm, norm / norm0)
+            self._mpi_print(self._iter_count, norm, norm / norm0)
 
             while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol:
 
@@ -1014,7 +1014,7 @@ class LinearSolver(Solver):
                         norm0 = 1
                     rec.rel = norm / norm0
 
-                self._print_resid_norms(self._iter_count, norm, norm / norm0)
+                self._mpi_print(self._iter_count, norm, norm / norm0)
 
         # flag for the print statements. we only print on root if USE_PROC_FILES is not set to True
         print_flag = system.comm.rank == 0 or os.environ.get('USE_PROC_FILES')

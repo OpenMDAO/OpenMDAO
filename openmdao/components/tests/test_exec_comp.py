@@ -1848,7 +1848,7 @@ class TestFunctionRegistrationColoring(unittest.TestCase):
 
             assert_near_equal(J['comp.y', 'comp.x'], sparsity)
 
-            self.assertTrue(np.all(comp._coloring_info.coloring.get_dense_sparsity() == _MASK))
+            self.assertTrue(np.all(comp._coloring_info['coloring'].get_dense_sparsity() == _MASK))
 
     def test_auto_coloring(self):
         with _temporary_expr_dict():
@@ -1874,7 +1874,7 @@ class TestFunctionRegistrationColoring(unittest.TestCase):
 
             assert_near_equal(J['comp.y', 'comp.x'], sparsity)
 
-            self.assertTrue(np.all(comp._coloring_info.coloring.get_dense_sparsity() == _MASK))
+            self.assertTrue(np.all(comp._coloring_info['coloring'].get_dense_sparsity() == _MASK))
 
 
 class TestExecCompParameterized(unittest.TestCase):

@@ -349,7 +349,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         self.assertEqual(p.model._solve_count, 21)
         self.assertEqual(p_color.model._solve_count, 5)
 
-        partial_coloring = p_color.model._get_subsystem('arctan_yox')._coloring_info.coloring
+        partial_coloring = p_color.model._get_subsystem('arctan_yox')._coloring_info['coloring']
         expected = [
             "self.declare_partials(of='g', wrt='x', rows=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], cols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])",
             "self.declare_partials(of='g', wrt='y', rows=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], cols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])",
@@ -358,7 +358,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         for i, d in enumerate(decl_partials_calls.split('\n')):
             self.assertEqual(d.strip(), expected[i])
 
-        fwd_solves, rev_solves = p_color.driver._coloring_info.coloring.get_row_var_coloring('delta_theta_con.g')
+        fwd_solves, rev_solves = p_color.driver._coloring_info['coloring'].get_row_var_coloring('delta_theta_con.g')
         self.assertEqual(fwd_solves, 4)
         self.assertEqual(rev_solves, 0)
 
@@ -556,7 +556,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         self.assertEqual(p_color.model._solve_count, 5)
 
         # test __repr__
-        rep = repr(p_color.driver._coloring_info.coloring)
+        rep = repr(p_color.driver._coloring_info['coloring'])
         self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21), pct nonzero: 13.42, tol: 1e-15)')
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
@@ -637,7 +637,7 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         self.assertEqual(p_color.model._solve_count, 11)
 
         # improve coverage of coloring.py
-        coloring = p_color.driver._coloring_info.coloring
+        coloring = p_color.driver._coloring_info['coloring']
         om.display_coloring(source=coloring, output_file=None, as_text=True, show=False)
         om.display_coloring(source=coloring, output_file=None, as_text=False, show=False)
 
@@ -769,7 +769,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 
     def test_bad_mode(self):
         p_color_fwd = run_opt(om.ScipyOptimizeDriver, 'fwd', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
-        coloring = p_color_fwd.driver._coloring_info.coloring
+        coloring = p_color_fwd.driver._coloring_info['coloring']
 
         with self.assertRaises(Exception) as context:
             p_color = run_opt(om.ScipyOptimizeDriver, 'rev', color_info=coloring, optimizer='SLSQP', disp=False)
@@ -1051,7 +1051,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
 
     def test_summary(self):
         p_color = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
-        coloring = p_color.driver._coloring_info.coloring
+        coloring = p_color.driver._coloring_info['coloring']
         save_out = sys.stdout
         sys.stdout = StringIO()
         try:
@@ -1083,7 +1083,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
 
     def test_repr(self):
         p_color = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
-        coloring = p_color.driver._coloring_info.coloring
+        coloring = p_color.driver._coloring_info['coloring']
         rep = repr(coloring)
         self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21), pct nonzero: 13.42, tol: 1e-15)')
 
@@ -1094,7 +1094,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
 
     def test_bad_mode(self):
         p_color_rev = run_opt(om.ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
-        coloring = p_color_rev.driver._coloring_info.coloring
+        coloring = p_color_rev.driver._coloring_info['coloring']
 
         with self.assertRaises(Exception) as context:
             p_color = run_opt(om.ScipyOptimizeDriver, 'fwd', color_info=coloring, optimizer='SLSQP', disp=False)

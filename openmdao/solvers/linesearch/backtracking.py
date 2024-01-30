@@ -239,7 +239,7 @@ class BoundsEnforceLS(LinesearchSolver):
             rec.abs = norm
             rec.rel = norm / norm0
 
-        self._print_resid_norms(self._iter_count, norm, norm / norm0)
+        self._mpi_print(self._iter_count, norm, norm / norm0)
 
 
 class ArmijoGoldsteinLS(LinesearchSolver):
@@ -466,8 +466,8 @@ class ArmijoGoldsteinLS(LinesearchSolver):
                     else:
                         raise err
 
-            # self._print_resid_norms(self._iter_count, norm, norm / norm0)
-            self._print_resid_norms(self._iter_count, phi, self.alpha)
+            # self._mpi_print(self._iter_count, norm, norm / norm0)
+            self._mpi_print(self._iter_count, phi, self.alpha)
 
 
 def _enforce_bounds_vector(u, du, alpha, lower_bounds, upper_bounds):

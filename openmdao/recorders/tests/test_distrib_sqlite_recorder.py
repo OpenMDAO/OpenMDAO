@@ -225,21 +225,17 @@ class DistributedRecorderTest(unittest.TestCase):
         # Since the test will compare the last case recorded, just check the
         # current values in the problem. This next section is about getting those values
 
-        # These involve collective gathers so all ranks need to run this.  Keys converted to
-        # absolute names to match inputs/outputs
+        # Keys converted to absolute names to match inputs/outputs
         expected_outputs = {}
         for meta, val in zip(driver._designvars.values(), driver.get_design_var_values().values()):
             src = meta['source']
             expected_outputs[src] = val
-        # expected_outputs = driver.get_design_var_values()
         for meta, val in zip(driver._objs.values(), driver.get_objective_values().values()):
             src = meta['source']
             expected_outputs[src] = val
-        # expected_outputs.update(driver.get_objective_values())
         for meta, val in zip(driver._cons.values(), driver.get_constraint_values().values()):
             src = meta['source']
             expected_outputs[src] = val
-        # expected_outputs.update(driver.get_constraint_values())
 
         # includes for outputs are specified as promoted names but we need absolute names
         prom2abs = model._var_allprocs_prom2abs_list['output']

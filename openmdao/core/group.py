@@ -550,7 +550,7 @@ class Group(System):
             info = self._coloring_info
             if comm.size > 1:
                 # if approx_totals has been declared, or there is an approx coloring, setup par FD
-                if self._owns_approx_jac or info.dynamic or info.static is not None:
+                if self._owns_approx_jac or info['dynamic'] or info['static'] is not None:
                     comm = self._setup_par_fd_procs(comm)
                 else:
                     msg = "%s: num_par_fd = %d but FD is not active." % (self.msginfo,
@@ -714,8 +714,8 @@ class Group(System):
         self._initial_condition_cache = {}
 
         # reset any coloring if a Coloring object was not set explicitly
-        if self._coloring_info.dynamic or self._coloring_info.static is not None:
-            self._coloring_info.coloring = None
+        if self._coloring_info['dynamic'] or self._coloring_info['static'] is not None:
+            self._coloring_info['coloring'] = None
 
         self.pathname = ''
         self.comm = comm
@@ -4056,8 +4056,8 @@ class Group(System):
         total = self.pathname == ''
         nprocs = self.comm.size
 
-        if self._coloring_info.coloring is not None and (self._owns_approx_of is None or
-                                                         self._owns_approx_wrt is None):
+        if self._coloring_info['coloring'] is not None and (self._owns_approx_of is None or
+                                                            self._owns_approx_wrt is None):
             method = self._coloring_info.method
         else:
             method = list(self._approx_schemes)[0]
@@ -4155,7 +4155,7 @@ class Group(System):
         """
         Ensure that if coloring is declared, approximations will be set up.
         """
-        if self._coloring_info.coloring is not None:
+        if self._coloring_info['coloring'] is not None:
             self.approx_totals(self._coloring_info.method,
                                self._coloring_info.get('step'),
                                self._coloring_info.get('form'))
