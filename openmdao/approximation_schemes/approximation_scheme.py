@@ -10,6 +10,8 @@ from openmdao.utils.array_utils import get_input_idx_split, ValueRepeater
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import _convert_auto_ivc_to_conn_name, LocalRangeIterable
 from openmdao.utils.mpi import check_mpi_env
+from openmdao.utils.rangemapper import RangeMapper
+
 
 use_mpi = check_mpi_env()
 if use_mpi is False:
@@ -134,6 +136,7 @@ class ApproximationScheme(object):
         is_total = system.pathname == ''
         is_semi = _is_group(system) and not is_total
         self._colored_approx_groups = []
+        wrt_ranges = []
 
         # don't do anything if the coloring doesn't exist yet
         coloring = system._coloring_info['coloring']
@@ -164,6 +167,7 @@ class ApproximationScheme(object):
                             rng = np.arange(slc.start, slc.stop)[cinds]
                         else:
                             rng = range(slc.start, slc.stop)
+                        wrt_ranges.append((abs_wrt, slc.stop - slc.start))
                         ccol2outvec[colored_start:colored_end] = rng
                     colored_start = colored_end
 
@@ -173,6 +177,7 @@ class ApproximationScheme(object):
 
         if is_total:
             it = ((of, end - start) for of, start, end, _, _ in system._jac_of_iter())
+            rangemapper = RangeMapper.create(wrt_ranges)
         else:
             it = ((n, arr.size) for n, arr in system._outputs._abs_item_iter())
 
@@ -203,10 +208,12 @@ class ApproximationScheme(object):
             jaccols = cols if wrt_matches is None else ccol2jcol[cols]
             if is_total:
                 vcols = ccol2outvec[cols]
+                seed_vars = rangemapper.inds2keys(cols)
             else:
                 vcols = jaccols
+                seed_vars = None
             vec_ind_list = get_input_idx_split(vcols, inputs, outputs, use_full_cols, is_total)
-            self._colored_approx_groups.append((data, jaccols, vec_ind_list, nzrows))
+            self._colored_approx_groups.append((data, jaccols, vec_ind_list, nzrows, seed_vars))
 
     def _init_approximations(self, system):
         """
@@ -342,8 +349,8 @@ class ApproximationScheme(object):
         ndarray
             solution array corresponding to the jacobian column at the given column index
         """
-        total_or_semi = _is_group(system)
         total = system.pathname == ''
+        total_or_semi = total or _is_group(system)
 
         if total:
             tot_result = np.zeros(sum([end - start for _, start, end, _, _
@@ -366,10 +373,13 @@ class ApproximationScheme(object):
         nruns = len(colored_approx_groups)
         tosend = None
 
-        for data, jcols, vec_ind_list, nzrows in colored_approx_groups:
+        for data, jcols, vec_ind_list, nzrows, seed_vars, in colored_approx_groups:
             mult = self._get_multiplier(data)
 
             if fd_count % num_par_fd == system._par_fd_id:
+                if total:
+                    system._relevant.set_seeds(seed_vars, 'fwd')
+
                 # run the finite difference
                 result = self._run_point(system, vec_ind_list, data, results_array, total_or_semi)
 
@@ -406,7 +416,7 @@ class ApproximationScheme(object):
 
                 i, res = tup
 
-                _, jcols, _, nzrows = colored_approx_groups[i]
+                _, jcols, _, nzrows, _ = colored_approx_groups[i]
 
                 for i, col in enumerate(jcols):
                     scratch[:] = 0.0
