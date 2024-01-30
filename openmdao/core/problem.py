@@ -2506,30 +2506,33 @@ class Problem(object):
             raise RuntimeError("list_indep_vars requires that final_setup has been "
                                "run for the Problem.")
 
-        desvar_prom_names = model.get_design_vars(recurse=True,
-                                                  use_prom_ivc=True,
-                                                  get_sizes=False).keys()
+        design_vars = model.get_design_vars(recurse=True,
+                                            use_prom_ivc=True,
+                                            get_sizes=False)
 
         problem_indep_vars = []
         indep_var_names = set()
 
-        default_col_names = ['name', 'units', 'val']
-        col_names = default_col_names + ([] if options is None else options)
+        col_names = ['name', 'units', 'val']
+        if options is not None:
+            col_names.extend(options)
 
         abs2meta = model._var_allprocs_abs2meta['output']
-        prom2abs = self.model._var_allprocs_prom2abs_list['input']
 
-        prom2src = {prom: model.get_source(prom) for prom in prom2abs.keys()
-                    if 'openmdao:indep_var' in abs2meta[model.get_source(prom)]['tags']}
+        prom2src = {}
+        for prom in self.model._var_allprocs_prom2abs_list['input']:
+            src = model.get_source(prom)
+            if 'openmdao:indep_var' in abs2meta[src]['tags']:
+                prom2src[prom] = src
 
         for prom, src in prom2src.items():
             name = prom if src.startswith('_auto_ivc.') else src
-            meta = abs2meta[src]
-            meta = {key: val for key, val in meta.items() if key in col_names}
-            meta['val'] = self.get_val(prom)
 
-            if (include_design_vars or name not in desvar_prom_names) \
+            if (include_design_vars or name not in design_vars) \
                     and name not in indep_var_names:
+                meta = abs2meta[src]
+                meta = {key: meta[key] for key in col_names if key in meta}
+                meta['val'] = self.get_val(prom)
                 problem_indep_vars.append((name, meta))
                 indep_var_names.add(name)
 
