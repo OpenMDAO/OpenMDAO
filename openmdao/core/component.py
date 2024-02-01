@@ -379,7 +379,7 @@ class Component(System):
         Yields
         ------
         key : tuple (of, wrt)
-            Subjacobian key
+            Subjacobian key.
         """
         yield from self._subjacs_info.keys()
 
@@ -1105,11 +1105,11 @@ class Component(System):
             msg = '{}: d({})/d({}): method "{}" is not supported, method must be one of {}'
             raise ValueError(msg.format(self.msginfo, of, wrt, method, sorted(_supported_methods)))
 
-        if of is None:
-            raise ValueError(f"{self.msginfo}: in declare_partials, the 'of'' arg must be a string "
+        if not isinstance(of, (str, Iterable)):
+            raise ValueError(f"{self.msginfo}: in declare_partials, the 'of' arg must be a string "
                              f"or an iter of strings, but got {of}.")
-        if wrt is None:
-            raise ValueError(f"{self.msginfo}: in declare_partials, the 'wrt'' arg must be a "
+        if not isinstance(wrt, (str, Iterable)):
+            raise ValueError(f"{self.msginfo}: in declare_partials, the 'wrt' arg must be a "
                              f"string or an iter of strings, but got {wrt}.")
 
         of = of if isinstance(of, str) else tuple(of)

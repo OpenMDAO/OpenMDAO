@@ -55,7 +55,7 @@ class Driver(object):
     _designvars_discrete : list
         List of design variables that are discrete.
     _dist_driver_vars : dict
-        Dict of constraints that are distributed outputs. Key is Key is 'user' variable name,
+        Dict of constraints that are distributed outputs. Key is a 'user' variable name,
         typically promoted name or an alias. Values are (local indices, local sizes).
     _cons : dict
         Contains all constraint info.

@@ -578,7 +578,7 @@ class Relevance(object):
             Set of names of relevant variables.
         """
         filt = _get_io_filter(inputs, outputs)
-        if filt is False:
+        if filt is True:  # everything is filtered out
             return
 
         if fwd_seeds is None:
@@ -591,20 +591,13 @@ class Relevance(object):
         if isinstance(rev_seeds, str):
             rev_seeds = [rev_seeds]
 
-        # for seed in fwd_seeds:
-        #     self._init_relevance_set(seed, 'fwd')
-        # for seed in rev_seeds:
-        #     self._init_relevance_set(seed, 'rev')
-
         for seed in fwd_seeds:
-            # since _relevant_vars may be inverted SetCheckers, we need to call their intersection
-            # function with _all_vars to get a set of variables that are relevant.
-            allfwdvars = self._relevant_vars[seed, 'fwd'].to_set()
+            fwdvars = self._relevant_vars[seed, 'fwd'].to_set()
             for rseed in rev_seeds:
-                inter = self._relevant_vars[rseed, 'rev'].intersection(allfwdvars)
-                if inter:
-                    inter = self._apply_filter(inter, filt)
-                    yield seed, rseed, inter
+                if rseed in fwdvars:
+                    inter = self._relevant_vars[rseed, 'rev'].intersection(fwdvars)
+                    if inter:
+                        yield seed, rseed, self._apply_filter(inter, filt)
 
     def _apply_filter(self, names, filt):
         """
@@ -616,17 +609,22 @@ class Relevance(object):
             Iterator of node names.
         filt : callable
             Filter function taking a graph node as an argument and returning True if the node
-            should be included in the output.
+            should be included in the output.  If True, no filtering is done.  If False, the
+            returned set will be empty.
 
         Returns
         -------
         set
             Set of node names that passed the filter.
         """
-        if filt is True:
+        if not filt:  # no filtering needed
+            if isinstance(names, set):
+                return names
             return set(names)
-        elif filt is False:
+        elif filt is True:
             return set()
+
+        # filt is a function.  Apply it to named graph nodes.
         return set(self._filter_nodes_iter(names, filt))
 
     def _filter_nodes_iter(self, names, filt):
@@ -805,13 +803,13 @@ def _get_set_checker(relset, allset):
 
 def _get_io_filter(inputs, outputs):
     if inputs and outputs:
-        return True
+        return False  # no filtering needed
     elif inputs:
         return _is_input
     elif outputs:
         return _is_output
     else:
-        return False
+        return True  # filter out everything
 
 
 def _is_input(node):
