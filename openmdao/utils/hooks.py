@@ -3,7 +3,7 @@ Functions for handling runtime function hooks.
 """
 
 from functools import wraps
-from inspect import getmro
+import inspect
 import warnings
 import sys
 
@@ -47,30 +47,36 @@ def _setup_hooks(obj):
     # valid pathname.
     if use_hooks:
 
+        classes = inspect.getmro(obj.__class__)
+        for c in classes:
+            if c.__name__ in _hooks:
+                classmeta = _hooks[c.__name__]
+                break
+        else:
+            return
+
         # any object where we register hooks must define the '_get_inst_id' method.
         ident = obj._get_inst_id()
 
-        for c in getmro(obj.__class__):
-            if c.__name__ in _hooks:
-                classmeta = _hooks[c.__name__]
+        instmetas = []
 
-                if ident in classmeta:
-                    instmeta = classmeta[ident]
-                    for funcname, fmeta in instmeta.items():
-                        method = getattr(obj, funcname, None)
-                        # We don't need to combine pre/post hook data for inst and None hooks here
-                        # because it has already been done earlier
-                        # (in register_hook/_get_hook_list_iters).
-                        if method is not None and not hasattr(method, '_hashook_'):
-                            setattr(obj, funcname, _hook_decorator(method, obj, fmeta))
+        if ident in classmeta:
+            instmetas.append(classmeta[ident])
 
-                # ident of None applies to all instances of a class
-                if ident is not None and None in classmeta:
-                    instmeta = classmeta[None]
-                    for funcname, fmeta in instmeta.items():
-                        method = getattr(obj, funcname, None)
-                        if method is not None and not hasattr(method, '_hashook_'):
-                            setattr(obj, funcname, _hook_decorator(method, obj, fmeta))
+        # ident of None applies to all instances of a class
+        if ident is not None and None in classmeta:
+            instmetas.append(classmeta[None])
+
+        if not instmetas:
+            return
+
+        for instmeta in instmetas:
+            for funcname, fmeta in instmeta.items():
+                method = getattr(obj, funcname, None)
+                # We don't need to combine pre/post hook data for inst and None hooks here
+                # because it has already been done earlier (in register_hook/_get_hook_list_iters).
+                if method is not None and not hasattr(method, '_hashook_'):
+                    setattr(obj, funcname, _hook_decorator(method, obj, fmeta))
 
 
 def _run_hooks(hooks, inst):
