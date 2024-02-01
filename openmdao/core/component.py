@@ -378,9 +378,8 @@ class Component(System):
 
         Yields
         ------
-        (key, meta) : (key, dict)
-            key: a tuple of the form (of, wrt)
-            meta: a dict containing the partial metadata
+        key : tuple (of, wrt)
+            Subjacobian key
         """
         yield from self._subjacs_info.keys()
 

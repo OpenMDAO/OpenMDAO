@@ -120,9 +120,8 @@ class ParallelGroup(Group):
 
         Yields
         ------
-        (key, meta) : (key, dict)
-            key: a tuple of the form (of, wrt)
-            meta: a dict containing the partial metadata
+        key : tuple (of, wrt)
+            Subjacobian key.
         """
         if self.comm.size > 1:
             if self._gather_full_data():
@@ -130,8 +129,8 @@ class ParallelGroup(Group):
             else:
                 gathered = self.comm.allgather([])
             seen = set()
-            for ranklist in gathered:
-                for key in ranklist:
+            for keylist in gathered:
+                for key in keylist:
                     if key not in seen:
                         yield key
                         seen.add(key)

@@ -3809,9 +3809,8 @@ class Group(System):
 
         Yields
         ------
-        (key, meta) : (key, dict)
-            key: a tuple of the form (of, wrt)
-            meta: a dict containing the partial metadata
+        key : tuple (of, wrt)
+            Subjacobian key.
         """
         for subsys in self._subsystems_myproc:
             yield from subsys._declared_partials_iter()
