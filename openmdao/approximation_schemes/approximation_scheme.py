@@ -244,7 +244,7 @@ class ApproximationScheme(object):
             in_inds_directional = []
             vec_inds_directional = defaultdict(list)
 
-        # wrt here is a source name
+        # wrt here is an absolute name (source if total)
         for wrt, start, end, vec, sinds, _ in system._jac_wrt_iter(wrt_matches):
             if wrt in self._wrt_meta:
                 meta = self._wrt_meta[wrt]
