@@ -392,7 +392,7 @@ class Solver(object):
 
             print(f"{prefix}{solver_name} {iteration} ; {abs_res:.9g} {rel_res:.9g}")
 
-    def _print_solve_header(self):
+    def _mpi_print_header(self):
         """
         Print header text before solving.
         """
@@ -672,7 +672,7 @@ class NonlinearSolver(Solver):
             stall_limit = self.options['stall_limit']
             stall_tol = self.options['stall_tol']
 
-            self._print_solve_header()
+            self._mpi_print_header()
 
             self._iter_count = 0
             norm0, norm = self._iter_initialize()
@@ -989,7 +989,7 @@ class LinearSolver(Solver):
         iprint = self.options['iprint']
 
         with self._system()._relevant.active(self.use_relevance()):
-            self._print_solve_header()
+            self._mpi_print_header()
 
             self._iter_count = 0
             norm0, norm = self._iter_initialize()

@@ -814,7 +814,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         p.model.linear_solver = om.ScipyKrylov(assemble_jac=True)
 
         p.setup(mode='fwd')
-        p.set_solver_print(level=1)
+        p.set_solver_print(level=0)
         p.run_model()
 
         # Make sure we don't bomb out with an error.
@@ -1906,11 +1906,9 @@ class TestProblemCheckTotals(unittest.TestCase):
     def test_sparse_matfree_fwd(self):
         prob = self._build_sparse_model(driver=om.ScipyOptimizeDriver())
         m = prob.model
-        #m.approx_totals(method='cs')
         prob.setup(force_alloc_complex=True, mode='fwd')
         prob.run_model()
 
-        #J = prob.compute_totals()
         assert_check_totals(prob.check_totals(method='cs', out_stream=None))
 
         nsolves = [c.nsolve_linear for c in [m.comp5, m.comp6, m.comp7, m.comp8]]

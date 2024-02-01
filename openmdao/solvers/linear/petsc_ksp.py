@@ -1,6 +1,8 @@
 """LinearSolver that uses PetSC KSP to solve for a system's derivatives."""
 
 import numpy as np
+import os
+import sys
 
 from openmdao.solvers.solver import LinearSolver
 from openmdao.utils.mpi import check_mpi_env

@@ -841,14 +841,14 @@ class pyOptSparseDriver(Driver):
                 # conversion of our dense array into a fully dense 'coo', which is bad.
                 # TODO: look into getting rid of all of these conversions!
                 new_sens = {}
-                res_subjacs = self._con_subjacs
+                con_subjacs = self._con_subjacs
 
                 for okey in self._quantities:
                     new_sens[okey] = newdv = {}
                     for ikey in self._designvars.keys():
-                        if okey in res_subjacs and ikey in res_subjacs[okey]:
+                        if okey in con_subjacs and ikey in con_subjacs[okey]:
                             arr = sens_dict[okey][ikey]
-                            coo = res_subjacs[okey][ikey]
+                            coo = con_subjacs[okey][ikey]
                             row, col, _ = coo['coo']
                             coo['coo'][2] = arr[row, col].flatten()
                             newdv[ikey] = coo
@@ -938,7 +938,7 @@ class pyOptSparseDriver(Driver):
             total_sparsity = coloring.get_subjac_sparsity()
             if self._total_jac_sparsity is not None:
                 raise RuntimeError("Total jac sparsity was set in both _total_coloring"
-                                   " and _total_jac_sparsity.")
+                                   " and _setup_tot_jac_sparsity.")
         elif self._total_jac_sparsity is not None:
             if isinstance(self._total_jac_sparsity, str):
                 with open(self._total_jac_sparsity, 'r') as f:

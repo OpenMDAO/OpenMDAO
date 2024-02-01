@@ -813,9 +813,7 @@ class Problem(object):
         data = rvec.asarray()
         data *= -1.
 
-        # TODO: why turn off relevance here?
-        with self.model._relevant.active(False):
-            self.model.run_solve_linear(mode)
+        self.model.run_solve_linear(mode)
 
         if mode == 'fwd':
             return {n: lvec[n].copy() for n in lnames}
@@ -1096,7 +1094,7 @@ class Problem(object):
         driver._setup_driver(self)
 
         if coloring_mod._use_total_sparsity:
-            coloring = driver._coloring_info['coloring']
+            coloring = driver._coloring_info.coloring
             if coloring is not None:
                 # if we're using simultaneous total derivatives then our effective size is less
                 # than the full size

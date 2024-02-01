@@ -1407,8 +1407,8 @@ class System(object):
         """
         Return a list of (of, wrt) keys needed for approx derivs for this system.
 
-        If this is the top level group, the keys will be promoted names and/or
-        aliases.  If not, they will be absolute names.
+        All keys are absolute names. If this system is the top level Group, the keys will be source
+        names.  If not, they will be absolute input and output names.
 
         Returns
         -------

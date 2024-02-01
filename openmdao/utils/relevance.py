@@ -189,7 +189,7 @@ class Relevance(object):
         self._graph = self.get_relevance_graph(group, desvars, responses)
         self._active = None  # not initialized
 
-        # for any parallel deriv colored dv/responses, update the graph to include vars with
+        # for any parallel deriv colored dv/responses, update the relevant sets to include vars with
         # local only dependencies
         for meta in desvars.values():
             if meta['parallel_deriv_color'] is not None:
@@ -546,8 +546,8 @@ class Relevance(object):
             # in the graph.  Components are included if all of their outputs
             # depend on all of their inputs.
             if self._all_vars is None:
-                self._all_systems = _vars2systems(self._graph.nodes())
-                self._all_vars = set(self._graph.nodes()) - self._all_systems
+                self._all_systems = allsystems = _vars2systems(self._graph.nodes())
+                self._all_vars = {n for n in self._graph.nodes() if n not in allsystems}
 
             rel_vars = depnodes - self._all_systems
 
@@ -776,6 +776,8 @@ def _vars2systems(nameiter):
 def _get_set_checker(relset, allset):
     """
     Return a SetChecker for the given sets.
+
+    The SetChecker will be inverted if that will use less memory than a non-inverted checker.
 
     Parameters
     ----------

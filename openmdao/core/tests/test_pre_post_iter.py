@@ -295,7 +295,7 @@ class TestPrePostIter(unittest.TestCase):
         assert_check_totals(data)
 
     def test_pre_post_iter_auto_coloring_grouped_no_vois(self):
-        # this computes totals and does total coloring without declareing dvs/objs/cons in the driver
+        # this computes totals and does total coloring without declaring dvs/objs/cons in the driver
         prob = self.setup_problem(do_pre_post_opt=True, coloring=True, group=True, mode='auto', set_vois=False)
         prob.final_setup()
         prob.run_model()

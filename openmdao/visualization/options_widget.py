@@ -10,7 +10,8 @@ try:
 except Exception:
     widgets = None
 
-from openmdao.utils.om_warnings import issue_warning
+from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.utils.general_utils import issue_warning
 
 
 class OptionsWidget(object):
