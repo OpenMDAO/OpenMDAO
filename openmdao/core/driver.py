@@ -942,9 +942,8 @@ class Driver(object):
         relevant = self._problem().model._relevant
         relevant.set_all_seeds([m['source'] for m in self._designvars.values()],
                                [m['source'] for m in self._responses.values()])
-        bad = [name for name, meta in self._cons.items()
-               if not relevant.is_relevant(meta['source'], 'fwd')]
-        return bad
+        return [name for name, meta in self._cons.items()
+                if not relevant.is_relevant(meta['source'])]
 
     def check_relevance(self):
         """
@@ -1024,26 +1023,21 @@ class Driver(object):
             print(header)
             print(len(header) * '-' + '\n')
 
-        self._recording_iter.push(('_compute_totals', 0))
+        if total_jac is None:
+            total_jac = _TotalJacInfo(problem, of, wrt, return_format,
+                                      approx=problem.model._owns_approx_jac,
+                                      debug_print=debug_print,
+                                      driver_scaling=driver_scaling)
 
-        try:
-            if total_jac is None:
-                total_jac = _TotalJacInfo(problem, of, wrt, return_format,
-                                          approx=problem.model._owns_approx_jac,
-                                          debug_print=debug_print,
-                                          driver_scaling=driver_scaling)
+            if total_jac.has_lin_cons:
+                # if we're doing a scaling report, cache the linear total jacobian so we
+                # don't have to recreate it
+                if problem._has_active_report('scaling'):
+                    self._total_jac_linear = total_jac
+            else:
+                self._total_jac = total_jac
 
-                if total_jac.has_lin_cons:
-                    # if we're doing a scaling report, cache the linear total jacobian so we
-                    # don't have to recreate it
-                    if problem._has_active_report('scaling'):
-                        self._total_jac_linear = total_jac
-                else:
-                    self._total_jac = total_jac
-
-            totals = total_jac.compute_totals()
-        finally:
-            self._recording_iter.pop()
+        totals = total_jac.compute_totals()
 
         if self._rec_mgr._recorders and self.recording_options['record_derivatives']:
             metadata = create_local_meta(self._get_name())
@@ -1139,8 +1133,8 @@ class Driver(object):
         Parameters
         ----------
         coloring : str or Coloring
-            A coloring filename or a Coloring object.  If a filename and no arg is passed,
-            filename will be determined automatically.
+            A coloring filename or a Coloring object.  If no arg is passed, filename will be
+            determined automatically.
         """
         if self.supports['simultaneous_derivatives']:
             if coloring_mod._force_dyn_coloring and coloring is coloring_mod._STD_COLORING_FNAME:

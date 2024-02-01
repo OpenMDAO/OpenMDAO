@@ -488,8 +488,7 @@ class pyOptSparseDriver(Driver):
             size = meta['global_size'] if meta['distributed'] else meta['size']
             lower = upper = meta['equals']
             relevant.set_seeds([meta['source']], 'rev')
-            wrt = [v for v in indep_list if relevant.is_relevant(self._designvars[v]['source'],
-                                                                 'rev')]
+            wrt = [v for v in indep_list if relevant.is_relevant(self._designvars[v]['source'])]
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
@@ -525,8 +524,7 @@ class pyOptSparseDriver(Driver):
             upper = meta['upper']
 
             relevant.set_seeds([meta['source']], 'rev')
-            wrt = [v for v in indep_list if relevant.is_relevant(self._designvars[v]['source'],
-                                                                 'rev')]
+            wrt = [v for v in indep_list if relevant.is_relevant(self._designvars[v]['source'])]
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}

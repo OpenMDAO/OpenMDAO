@@ -17,18 +17,30 @@ class SetChecker(object):
     ----------
     the_set : set
         Set of variables to check against.
+    full_set : set or None
+        Set of all variables.  Not used if _invert is False.
+    invert : bool
+        If True, the set is inverted.
 
     Attributes
     ----------
     _set : set
         Set of variables to check.
+    _full_set : set or None
+        Set of all variables.  None if _invert is False.
+    _invert : bool
+        If True, the set is inverted.
     """
 
-    def __init__(self, the_set):
+    def __init__(self, the_set, full_set=None, invert=False):
         """
         Initialize all attributes.
         """
+        assert not invert or full_set is not None, \
+            "full_set must be provided if invert is True"
         self._set = the_set
+        self._full_set = full_set
+        self._invert = invert
 
     def __contains__(self, name):
         """
@@ -44,7 +56,25 @@ class SetChecker(object):
         bool
             True if the given name is in the set.
         """
+        if self._invert:
+            return name not in self._set
         return name in self._set
+
+    def __iter__(self):
+        """
+        Return an iterator over the set.
+
+        Returns
+        -------
+        iter
+            Iterator over the set.
+        """
+        if self._invert:
+            for name in self._full_set:
+                if name not in self._set:
+                    yield name
+        else:
+            yield from self._set
 
     def __repr__(self):
         """
@@ -55,24 +85,34 @@ class SetChecker(object):
         str
             String representation of the SetChecker.
         """
-        return f"SetChecker({sorted(self._set)})"
+        return f"SetChecker({sorted(self._set)}, invert={self._invert}"
 
-    def to_set(self, allset):
+    def __len__(self):
+        """
+        Return the number of elements in the set.
+
+        Returns
+        -------
+        int
+            Number of elements in the set.
+        """
+        if self._invert:
+            return len(self._full_set) - len(self._set)
+        return len(self._set)
+
+    def to_set(self):
         """
         Return a set of names of relevant variables.
-
-        allset is ignored here, but is included for compatibility with InverseSetChecker.
-
-        Parameters
-        ----------
-        allset : set
-            Set of all entries.
 
         Returns
         -------
         set
             Set of our entries.
         """
+        if self._invert:
+            if self._set:  # check to avoid a set copy
+                return self._full_set - self._set
+            return self._full_set
         return self._set
 
     def intersection(self, other_set):
@@ -89,92 +129,12 @@ class SetChecker(object):
         set
             Set of common elements.
         """
+        if self._invert:
+            if self._set:
+                return other_set - self._set
+            return other_set
+
         return self._set.intersection(other_set)
-
-
-class InverseSetChecker(object):
-    """
-    Class for checking if a given set of variables is not in an irrelevant set of variables.
-
-    Parameters
-    ----------
-    the_set : set
-        Set of variables to check against.
-
-    Attributes
-    ----------
-    _set : set
-        Set of variables to check.
-    """
-
-    def __init__(self, the_set):
-        """
-        Initialize all attributes.
-        """
-        self._set = the_set
-
-    def __contains__(self, name):
-        """
-        Return True if the given name is not in the set.
-
-        Parameters
-        ----------
-        name : str
-            Name of the variable.
-
-        Returns
-        -------
-        bool
-            True if the given name is not in the set.
-        """
-        return name not in self._set
-
-    def __repr__(self):
-        """
-        Return a string representation of the InverseSetChecker.
-
-        Returns
-        -------
-        str
-            String representation of the InverseSetChecker.
-        """
-        return f"InverseSetChecker({sorted(self._set)})"
-
-    def to_set(self, allset):
-        """
-        Return a set of names of relevant variables.
-
-        Parameters
-        ----------
-        allset : set
-            Set of all entries.
-
-        Returns
-        -------
-        set
-            Set of our entries.
-        """
-        if self._set:
-            return allset - self._set
-        return allset
-
-    def intersection(self, other_set):
-        """
-        Return a new set with elements common to the set and all others.
-
-        Parameters
-        ----------
-        other_set : set
-            Other set to check against.
-
-        Returns
-        -------
-        set
-            Set of common elements.
-        """
-        if self._set:
-            return other_set - self._set
-        return other_set
 
 
 _opposite = {'fwd': 'rev', 'rev': 'fwd'}
@@ -182,7 +142,7 @@ _opposite = {'fwd': 'rev', 'rev': 'fwd'}
 
 class Relevance(object):
     """
-    Relevance class.
+    Class that computes relevance based on a data flow graph.
 
     Parameters
     ----------
@@ -367,13 +327,11 @@ class Relevance(object):
         """
         self._init_relevance_set(name, direction)
         if inputs and outputs:
-            return self._relevant_vars[name, direction].to_set(self._all_vars)
+            return self._relevant_vars[name, direction].to_set()
         elif inputs:
-            return self._apply_filter(self._relevant_vars[name, direction].to_set(self._all_vars),
-                                      _is_input)
+            return self._apply_filter(self._relevant_vars[name, direction], _is_input)
         elif outputs:
-            return self._apply_filter(self._relevant_vars[name, direction].to_set(self._all_vars),
-                                      _is_output)
+            return self._apply_filter(self._relevant_vars[name, direction], _is_output)
         else:
             return set()
 
@@ -421,13 +379,15 @@ class Relevance(object):
         if isinstance(seed_vars, str):
             seed_vars = [seed_vars]
 
-        self._seed_vars[direction] = tuple(sorted(seed_vars))
+        seed_vars = tuple(sorted(seed_vars))
+
+        self._seed_vars[direction] = seed_vars
         self._seed_vars[_opposite[direction]] = self._all_seed_vars[_opposite[direction]]
 
-        for s in self._seed_vars[direction]:
+        for s in seed_vars:
             self._init_relevance_set(s, direction, local=local)
 
-    def is_relevant(self, name, direction):
+    def is_relevant(self, name):
         """
         Return True if the given variable is relevant.
 
@@ -435,8 +395,6 @@ class Relevance(object):
         ----------
         name : str
             Name of the variable.
-        direction : str
-            Direction of the search for relevant variables.  'fwd' or 'rev'.
 
         Returns
         -------
@@ -446,21 +404,20 @@ class Relevance(object):
         if not self._active:
             return True
 
-        assert direction in ('fwd', 'rev')
-
-        assert self._seed_vars[direction] and self._seed_vars[_opposite[direction]], \
+        assert self._seed_vars['fwd'] and self._seed_vars['rev'], \
             "must call set_all_seeds and set_all_targets first"
 
-        for seed in self._seed_vars[direction]:
-            if name in self._relevant_vars[seed, direction]:
-                opp = _opposite[direction]
-                for tgt in self._seed_vars[opp]:
-                    if name in self._relevant_vars[tgt, opp]:
+        # return name in self._intersection_cache[self._seed_vars['fwd'], self._seed_vars['rev']]
+
+        for seed in self._seed_vars['fwd']:
+            if name in self._relevant_vars[seed, 'fwd']:
+                for tgt in self._seed_vars['rev']:
+                    if name in self._relevant_vars[tgt, 'rev']:
                         return True
 
         return False
 
-    def is_relevant_system(self, name, direction):
+    def is_relevant_system(self, name):
         """
         Return True if the given named system is relevant.
 
@@ -468,8 +425,6 @@ class Relevance(object):
         ----------
         name : str
             Name of the System.
-        direction : str
-            Direction of the search for relevant systems.  'fwd' or 'rev'.
 
         Returns
         -------
@@ -479,14 +434,10 @@ class Relevance(object):
         if not self._active:
             return True
 
-        assert direction in ('fwd', 'rev')
-
-        for seed in self._seed_vars[direction]:
-            if name in self._relevant_systems[seed, direction]:
-                # resolve target dependencies in opposite direction
-                opp = _opposite[direction]
-                for tgt in self._seed_vars[opp]:
-                    if name in self._relevant_systems[tgt, opp]:
+        for seed in self._seed_vars['fwd']:
+            if name in self._relevant_systems[seed, 'fwd']:
+                for tgt in self._seed_vars['rev']:
+                    if name in self._relevant_systems[tgt, 'rev']:
                         return True
         return False
 
@@ -509,17 +460,14 @@ class Relevance(object):
         if not self._active:
             return True
 
-        for direction, seeds in self._all_seed_vars.items():
-            for seed in seeds:
-                if name in self._relevant_systems[seed, direction]:
-                    # resolve target dependencies in opposite direction
-                    opp = _opposite[direction]
-                    for tgt in self._all_seed_vars[opp]:
-                        if name in self._relevant_systems[tgt, opp]:
-                            return True
+        for fseed in self._all_seed_vars['fwd']:
+            if name in self._relevant_systems[fseed, 'fwd']:
+                for rseed in self._all_seed_vars['rev']:
+                    if name in self._relevant_systems[rseed, 'rev']:
+                        return True
         return False
 
-    def system_filter(self, systems, direction=None, relevant=True):
+    def system_filter(self, systems, relevant=True):
         """
         Filter the given iterator of systems to only include those that are relevant.
 
@@ -527,10 +475,6 @@ class Relevance(object):
         ----------
         systems : iter of Systems
             Iterator over systems.
-        direction : str or None
-            Direction of the search for relevant variables.  'fwd', 'rev', or None. None is
-            only valid if relevance is not active or if doing 'total' relevance, where
-            relevance is True if a system is relevant to any pair of of/wrt variables.
         relevant : bool
             If True, return only relevant systems.  If False, return only irrelevant systems.
 
@@ -540,11 +484,8 @@ class Relevance(object):
             Relevant system.
         """
         if self._active:
-            if direction is None:
-                raise RuntimeError("direction must be 'fwd' or 'rev' if relevance is active.")
-            relcheck = self.is_relevant_system
             for system in systems:
-                if relevant == relcheck(system.pathname, direction):
+                if relevant == self.is_relevant_system(system.pathname):
                     yield system
         elif relevant:
             yield from systems
@@ -566,7 +507,6 @@ class Relevance(object):
             Relevant system.
         """
         if self._active:
-            systems = list(systems)
             for system in systems:
                 if relevant == self.is_total_relevant_system(system.pathname):
                     yield system
@@ -651,15 +591,15 @@ class Relevance(object):
         if isinstance(rev_seeds, str):
             rev_seeds = [rev_seeds]
 
-        for seed in fwd_seeds:
-            self._init_relevance_set(seed, 'fwd')
-        for seed in rev_seeds:
-            self._init_relevance_set(seed, 'rev')
+        # for seed in fwd_seeds:
+        #     self._init_relevance_set(seed, 'fwd')
+        # for seed in rev_seeds:
+        #     self._init_relevance_set(seed, 'rev')
 
         for seed in fwd_seeds:
-            # since _relevant_vars may be InverseSetCheckers, we need to call their intersection
+            # since _relevant_vars may be inverted SetCheckers, we need to call their intersection
             # function with _all_vars to get a set of variables that are relevant.
-            allfwdvars = self._relevant_vars[seed, 'fwd'].intersection(self._all_vars)
+            allfwdvars = self._relevant_vars[seed, 'fwd'].to_set()
             for rseed in rev_seeds:
                 inter = self._relevant_vars[rseed, 'rev'].intersection(allfwdvars)
                 if inter:
@@ -672,8 +612,8 @@ class Relevance(object):
 
         Parameters
         ----------
-        names : set of str
-            Set of node names.
+        names : iter of str
+            Iterator of node names.
         filt : callable
             Filter function taking a graph node as an argument and returning True if the node
             should be included in the output.
@@ -684,7 +624,7 @@ class Relevance(object):
             Set of node names that passed the filter.
         """
         if filt is True:
-            return names  # not need to make a copy if we're returning all vars
+            return set(names)
         elif filt is False:
             return set()
         return set(self._filter_nodes_iter(names, filt))
@@ -711,37 +651,12 @@ class Relevance(object):
             if filt(nodes[n]):
                 yield n
 
-    def all_relevant_vars(self, fwd_seeds=None, rev_seeds=None, inputs=True, outputs=True):
-        """
-        Return all relevant variables for the given seeds.
-
-        Parameters
-        ----------
-        fwd_seeds : iter of str or None
-            Iterator over forward seed variable names. If None use current registered seeds.
-        rev_seeds : iter of str or None
-            Iterator over reverse seed variable names. If None use current registered seeds.
-        inputs : bool
-            If True, include inputs.
-        outputs : bool
-            If True, include outputs.
-
-        Returns
-        -------
-        set
-            Set of names of relevant variables.
-        """
-        relevant_vars = set()
-        for _, _, relvars in self.iter_seed_pair_relevance(fwd_seeds, rev_seeds, inputs, outputs):
-            relevant_vars.update(relvars)
-
-        return relevant_vars
-
     def _all_relevant(self, fwd_seeds, rev_seeds, inputs=True, outputs=True):
         """
         Return all relevant inputs, outputs, and systems for the given seeds.
 
-        This is primarily used a a convenience function for testing.
+        This is primarily used as a convenience function for testing and is not particularly
+        efficient.
 
         Parameters
         ----------
@@ -763,7 +678,9 @@ class Relevance(object):
             relevant variables based on the values of inputs and outputs, i.e. if outputs is False,
             the returned systems will be the set of all systems containing any relevant inputs.
         """
-        relevant_vars = self.all_relevant_vars(fwd_seeds, rev_seeds, inputs=inputs, outputs=outputs)
+        relevant_vars = set()
+        for _, _, relvars in self.iter_seed_pair_relevance(fwd_seeds, rev_seeds, inputs, outputs):
+            relevant_vars.update(relvars)
         relevant_systems = _vars2systems(relevant_vars)
 
         inputs = set(self._filter_nodes_iter(relevant_vars, _is_input))
@@ -860,7 +777,7 @@ def _vars2systems(nameiter):
 
 def _get_set_checker(relset, allset):
     """
-    Return a SetChecker or InverseSetChecker for the given sets.
+    Return a SetChecker for the given sets.
 
     Parameters
     ----------
@@ -875,14 +792,15 @@ def _get_set_checker(relset, allset):
         Set checker for the given sets.
     """
     if len(allset) == len(relset):
-        return InverseSetChecker(set())
+        return SetChecker(set(), allset, invert=True)
 
-    inverse = allset - relset
+    nrel = len(relset)
+
     # store whichever type of checker will use the least memory
-    if len(inverse) < len(relset):
-        return InverseSetChecker(inverse)
-    else:
+    if nrel < (len(allset) - nrel):
         return SetChecker(relset)
+    else:
+        return SetChecker(allset - relset, allset, invert=True)
 
 
 def _get_io_filter(inputs, outputs):

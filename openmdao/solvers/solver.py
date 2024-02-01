@@ -825,7 +825,7 @@ class NonlinearSolver(Solver):
         system = self._system()
         with system._relevant.active(system.under_approx):
             for subsys in system._relevant.system_filter(
-                    system._solver_subsystem_iter(local_only=False), direction='fwd'):
+                    system._solver_subsystem_iter(local_only=False)):
                 system._transfer('nonlinear', 'fwd', subsys.name)
 
                 if subsys._is_local:

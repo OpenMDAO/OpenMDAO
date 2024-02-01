@@ -882,9 +882,9 @@ class Group(System):
         # same color
         errs = {}
         for pdcolor, dct in pd_err_chk.items():
-            for vname, nodes in dct.items():
+            for vname, relset in dct.items():
                 for n, nds in dct.items():
-                    if vname != n and nodes.intersection(nds):
+                    if vname != n and relset.intersection(nds):
                         if pdcolor not in errs:
                             errs[pdcolor] = []
                         errs[pdcolor].append(vname)
@@ -3445,7 +3445,7 @@ class Group(System):
         # Apply recursion
         with self._relevant.active(self.under_approx):
             for subsys in self._relevant.system_filter(
-                    self._solver_subsystem_iter(local_only=True), direction='fwd'):
+                    self._solver_subsystem_iter(local_only=True)):
                 subsys._apply_nonlinear()
 
         self.iter_count_apply += 1
@@ -3608,18 +3608,18 @@ class Group(System):
             if mode == 'fwd':
                 self._transfer('linear', mode)
                 for s in self._relevant.system_filter(self._solver_subsystem_iter(local_only=True),
-                                                      direction=mode, relevant=False):
+                                                      relevant=False):
                     # zero out dvecs of irrelevant subsystems
                     s._dresiduals.set_val(0.0)
 
             for s in self._relevant.system_filter(self._solver_subsystem_iter(local_only=True),
-                                                  direction=mode, relevant=True):
+                                                  relevant=True):
                 s._apply_linear(jac, rel_systems, mode, scope_out, scope_in)
 
             if mode == 'rev':
                 self._transfer('linear', mode)
                 for s in self._relevant.system_filter(self._solver_subsystem_iter(local_only=True),
-                                                      direction=mode, relevant=False):
+                                                      relevant=False):
                     # zero out dvecs of irrelevant subsystems
                     s._doutputs.set_val(0.0)
 

@@ -613,7 +613,6 @@ class _TotalJacInfo(object):
             # for each var in a given color
             if parallel_deriv_color is not None:
                 if fwd:
-                    # relev = relevant[name]['@all'][0]['output']
                     self.relevance.set_seeds((source,), 'fwd')
                     relev = self.relevance.relevant_vars(source, 'fwd', inputs=False)
                     for s in self.relevance._all_seed_vars['rev']:
@@ -622,7 +621,6 @@ class _TotalJacInfo(object):
                     else:
                         relev = set()
                 else:
-                    # relev = relevant[name]['@all'][0]['input']
                     self.relevance.set_seeds((source,), 'rev')
                     relev = self.relevance.relevant_vars(source, 'rev', inputs=False)
                     for s in self.relevance._all_seed_vars['fwd']:
@@ -1345,104 +1343,114 @@ class _TotalJacInfo(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
+        self.model._recording_iter.push(('_compute_totals', 0))
+
         if self.approx:
-            return self._compute_totals_approx(progress_out_stream=progress_out_stream)
-
-        debug_print = self.debug_print
-        par_print = self.par_deriv_printnames
-
-        has_lin_cons = self.has_lin_cons
-
-        model = self.model
-        # Prepare model for calculation by cleaning out the derivatives vectors.
-        model._dinputs.set_val(0.0)
-        model._doutputs.set_val(0.0)
-        model._dresiduals.set_val(0.0)
-
-        # Linearize Model
-        model._tot_jac = self
-
-        with self._relevance_context():
-            relevant = self.relevance
-            relevant.set_all_seeds([m['source'] for m in self.input_meta['fwd'].values()],
-                                   [m['source'] for m in self.input_meta['rev'].values()])
             try:
-                ln_solver = model._linear_solver
-                with model._scaled_context_all():
-                    model._linearize(model._assembled_jac,
-                                     sub_do_ln=ln_solver._linearize_children())
-                if ln_solver._assembled_jac is not None and \
-                        ln_solver._assembled_jac._under_complex_step:
-                    model.linear_solver._assembled_jac._update(model)
-                ln_solver._linearize()
+                return self._compute_totals_approx(progress_out_stream=progress_out_stream)
             finally:
-                model._tot_jac = None
+                self.model._recording_iter.pop()
 
-            self.J[:] = 0.0
+        try:
+            debug_print = self.debug_print
+            par_print = self.par_deriv_printnames
 
-            # Main loop over columns (fwd) or rows (rev) of the jacobian
-            for mode in self.modes:
-                for key, idx_info in self.idx_iter_dict[mode].items():
-                    imeta, idx_iter = idx_info
-                    for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
-                        model._problem_meta['seed_vars'] = itermeta['seed_vars']
-                        relevant.set_seeds(itermeta['seed_vars'], mode)
-                        rel_systems, _, cache_key = input_setter(inds, itermeta, mode)
-                        rel_systems = None
+            has_lin_cons = self.has_lin_cons
 
-                        if debug_print:
-                            if par_print and key in par_print:
-                                varlist = '(' + ', '.join([name for name in par_print[key]]) + ')'
-                                print('Solving color:', key, varlist, flush=True)
-                            else:
-                                if key == '@simul_coloring':
-                                    print(f'In mode: {mode}, Solving variable(s) using simul '
-                                          'coloring:')
-                                    for local_ind in imeta['coloring']._local_indices(inds=inds,
-                                                                                      mode=mode):
-                                        print(f"   {local_ind}", flush=True)
-                                elif self.directional:
-                                    print(f"In mode: {mode}.\n, Solving for directional derivative "
-                                          f"wrt '{key}'",)
+            model = self.model
+            # Prepare model for calculation by cleaning out the derivatives vectors.
+            model._dinputs.set_val(0.0)
+            model._doutputs.set_val(0.0)
+            model._dresiduals.set_val(0.0)
+
+            # Linearize Model
+            model._tot_jac = self
+
+            with self._relevance_context():
+                relevant = self.relevance
+                relevant.set_all_seeds([m['source'] for m in self.input_meta['fwd'].values()],
+                                       [m['source'] for m in self.input_meta['rev'].values()])
+                try:
+                    ln_solver = model._linear_solver
+                    with model._scaled_context_all():
+                        model._linearize(model._assembled_jac,
+                                         sub_do_ln=ln_solver._linearize_children())
+                    if ln_solver._assembled_jac is not None and \
+                            ln_solver._assembled_jac._under_complex_step:
+                        model.linear_solver._assembled_jac._update(model)
+                    ln_solver._linearize()
+                finally:
+                    model._tot_jac = None
+
+                self.J[:] = 0.0
+
+                # Main loop over columns (fwd) or rows (rev) of the jacobian
+                for mode in self.modes:
+                    for key, idx_info in self.idx_iter_dict[mode].items():
+                        imeta, idx_iter = idx_info
+                        for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
+                            model._problem_meta['seed_vars'] = itermeta['seed_vars']
+                            relevant.set_seeds(itermeta['seed_vars'], mode)
+                            rel_systems, _, cache_key = input_setter(inds, itermeta, mode)
+                            rel_systems = None
+
+                            if debug_print:
+                                if par_print and key in par_print:
+                                    print('Solving color:', key,
+                                          '(' + ', '.join([name for name in par_print[key]]) + ')',
+                                          flush=True)
                                 else:
-                                    print(f"In mode: {mode}.\n('{key}', [{inds}])", flush=True)
+                                    if key == '@simul_coloring':
+                                        print(f'In mode: {mode}, Solving variable(s) using simul '
+                                              'coloring:')
+                                        for local_ind in imeta['coloring']._local_indices(inds,
+                                                                                          mode):
+                                            print(f"   {local_ind}", flush=True)
+                                    elif self.directional:
+                                        print(f"In mode: {mode}.\n, Solving for directional "
+                                              f"derivative wrt '{key}'",)
+                                    else:
+                                        print(f"In mode: {mode}.\n('{key}', [{inds}])", flush=True)
 
-                            t0 = time.perf_counter()
+                                t0 = time.perf_counter()
 
-                        # restore old linear solution if cache_linear_solution was set by the user
-                        # for any input variables involved in this linear solution.
-                        with model._scaled_context_all():
-                            if cache_key is not None and not has_lin_cons and self.mode == mode:
-                                self._restore_linear_solution(cache_key, mode)
-                                model._solve_linear(mode, rel_systems)
-                                self._save_linear_solution(cache_key, mode)
-                            else:
-                                model._solve_linear(mode, rel_systems)
+                            # restore old linear solution if cache_linear_solution was set by the
+                            # user for any input variables involved in this linear solution.
+                            with model._scaled_context_all():
+                                if cache_key is not None and not has_lin_cons and self.mode == mode:
+                                    self._restore_linear_solution(cache_key, mode)
+                                    model._solve_linear(mode, rel_systems)
+                                    self._save_linear_solution(cache_key, mode)
+                                else:
+                                    model._solve_linear(mode, rel_systems)
 
-                        if debug_print:
-                            print(f'Elapsed Time: {time.perf_counter() - t0} secs\n', flush=True)
+                            if debug_print:
+                                print(f'Elapsed Time: {time.perf_counter() - t0} secs\n',
+                                      flush=True)
 
-                        jac_setter(inds, mode, imeta)
+                            jac_setter(inds, mode, imeta)
 
-                        # reset any Problem level data for the current iteration
-                        self.model._problem_meta['parallel_deriv_color'] = None
-                        self.model._problem_meta['seed_vars'] = None
+                            # reset any Problem level data for the current iteration
+                            self.model._problem_meta['parallel_deriv_color'] = None
+                            self.model._problem_meta['seed_vars'] = None
 
-            # Driver scaling.
-            if self.has_scaling:
-                self._do_driver_scaling(self.J_dict)
+                # Driver scaling.
+                if self.has_scaling:
+                    self._do_driver_scaling(self.J_dict)
 
-            # if some of the wrt vars are distributed in fwd mode, we bcast from the rank
-            # where each part of the distrib var exists
-            if self.get_remote and mode == 'fwd' and self.has_wrt_dist:
-                for start, stop, rank in self.dist_input_range_map[mode]:
-                    contig = self.J[:, start:stop].copy()
-                    model.comm.Bcast(contig, root=rank)
-                    self.J[:, start:stop] = contig
+                # if some of the wrt vars are distributed in fwd mode, we bcast from the rank
+                # where each part of the distrib var exists
+                if self.get_remote and mode == 'fwd' and self.has_wrt_dist:
+                    for start, stop, rank in self.dist_input_range_map[mode]:
+                        contig = self.J[:, start:stop].copy()
+                        model.comm.Bcast(contig, root=rank)
+                        self.J[:, start:stop] = contig
 
-            if debug_print:
-                # Debug outputs scaled derivatives.
-                self._print_derivatives()
+                if debug_print:
+                    # Debug outputs scaled derivatives.
+                    self._print_derivatives()
+        finally:
+            self.model._recording_iter.pop()
 
         return self.J_final
 

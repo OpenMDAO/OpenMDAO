@@ -468,8 +468,6 @@ class _Partial_ColoringMeta(_ColoringMeta):
         for name, val in dct.items():
             if name in self._meta_names:
                 setattr(self, name, val)
-            else:
-                issue_warning(f"_PartialColoringMeta: Ignoring unrecognized metadata '{name}'.")
 
 
 class Coloring(object):
