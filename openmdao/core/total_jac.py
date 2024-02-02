@@ -302,9 +302,10 @@ class _TotalJacInfo(object):
                 if not (has_dist or any(model.comm.allgather(need_allreduce))):
                     self.rev_allreduce_mask = None
 
+        self.relevance.set_all_seeds([m['source'] for m in wrt_metadata.values()],
+                                     set(m['source'] for m in of_metadata.values()))
+
         if not approx:
-            self.relevance.set_all_seeds(set(m['source'] for m in wrt_metadata.values()),
-                                         set(m['source'] for m in of_metadata.values()))
             for mode in modes:
                 self._create_in_idx_map(mode)
 
@@ -1369,7 +1370,7 @@ class _TotalJacInfo(object):
             with self._relevance_context():
                 relevant = self.relevance
                 relevant.set_all_seeds([m['source'] for m in self.input_meta['fwd'].values()],
-                                       [m['source'] for m in self.input_meta['rev'].values()])
+                                       set(m['source'] for m in self.input_meta['rev'].values()))
                 try:
                     ln_solver = model._linear_solver
                     with model._scaled_context_all():
@@ -1487,7 +1488,7 @@ class _TotalJacInfo(object):
         with self._relevance_context():
             model._tot_jac = self
             self.relevance.set_all_seeds([m['source'] for m in self.input_meta['fwd'].values()],
-                                         [m['source'] for m in self.input_meta['rev'].values()])
+                                         set(m['source'] for m in self.input_meta['rev'].values()))
             try:
                 if self.initialize:
                     self.initialize = False

@@ -200,7 +200,7 @@ class Relevance(object):
 
         if desvars and responses:
             self.set_all_seeds([m['source'] for m in desvars.values()],
-                               [m['source'] for m in responses.values()])
+                               set(m['source'] for m in responses.values()))  # set removes dups
         else:
             self._active = False
 
@@ -346,9 +346,6 @@ class Relevance(object):
         rev_seeds : iter of str
             Iterator over reverse seed variable names.
         """
-        assert not isinstance(fwd_seeds, str), "fwd_seeds must be an iterator of strings"
-        assert not isinstance(rev_seeds, str), "rev_seeds must be an iterator of strings"
-
         self._all_seed_vars['fwd'] = self._seed_vars['fwd'] = tuple(sorted(fwd_seeds))
         self._all_seed_vars['rev'] = self._seed_vars['rev'] = tuple(sorted(rev_seeds))
 
@@ -441,32 +438,6 @@ class Relevance(object):
                         return True
         return False
 
-    def is_total_relevant_system(self, name):
-        """
-        Return True if the given named system is relevant.
-
-        Relevance in this case pertains to all seed/target combinations.
-
-        Parameters
-        ----------
-        name : str
-            Name of the System.
-
-        Returns
-        -------
-        bool
-            True if the given system is relevant.
-        """
-        if not self._active:
-            return True
-
-        for fseed in self._all_seed_vars['fwd']:
-            if name in self._relevant_systems[fseed, 'fwd']:
-                for rseed in self._all_seed_vars['rev']:
-                    if name in self._relevant_systems[rseed, 'rev']:
-                        return True
-        return False
-
     def system_filter(self, systems, relevant=True):
         """
         Filter the given iterator of systems to only include those that are relevant.
@@ -486,29 +457,6 @@ class Relevance(object):
         if self._active:
             for system in systems:
                 if relevant == self.is_relevant_system(system.pathname):
-                    yield system
-        elif relevant:
-            yield from systems
-
-    def total_system_filter(self, systems, relevant=True):
-        """
-        Filter the systems to those that are relevant to any pair of desvar/response variables.
-
-        Parameters
-        ----------
-        systems : iter of Systems
-            Iterator over systems.
-        relevant : bool
-            If True, return only relevant systems.  If False, return only irrelevant systems.
-
-        Yields
-        ------
-        System
-            Relevant system.
-        """
-        if self._active:
-            for system in systems:
-                if relevant == self.is_total_relevant_system(system.pathname):
                     yield system
         elif relevant:
             yield from systems

@@ -710,6 +710,7 @@ class pyOptSparseDriver(Driver):
             1 for unsuccessful function evaluation
         """
         model = self._problem().model
+        model._problem_meta['computing_objective'] = True
         fail = 0
 
         # Note: we place our handler as late as possible so that codes that run in the
@@ -760,6 +761,8 @@ class pyOptSparseDriver(Driver):
             if self._exc_info is None:  # avoid overwriting an earlier exception
                 self._exc_info = sys.exc_info()
             fail = 1
+        finally:
+            model._problem_meta['computing_objective'] = False
 
         func_dict = self.get_objective_values()
         func_dict.update(self.get_constraint_values(lintype='nonlinear'))

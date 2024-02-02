@@ -3709,8 +3709,8 @@ class Group(System):
             relevant = self._relevant
             with relevant.active(self.linear_solver.use_relevance()):
                 subs = list(
-                    relevant.total_system_filter(self._solver_subsystem_iter(local_only=True),
-                                                 relevant=True))
+                    relevant.system_filter(self._solver_subsystem_iter(local_only=True),
+                                           relevant=True))
 
                 # Only linearize subsystems if we aren't approximating the derivs at this level.
                 for subsys in subs:
