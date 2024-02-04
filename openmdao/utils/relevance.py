@@ -150,12 +150,12 @@ def get_relevance(model, of, wrt):
 
     Parameters
     ----------
-    model : <System>
+    model : <Group>
         The top level group in the system hierarchy.
     of : dict
-        Dictionary of response variables.  Keys don't matter.
+        Dictionary of 'of' variables.  Keys don't matter.
     wrt : dict
-        Dictionary of design variables.  Keys don't matter.
+        Dictionary of 'wrt' variables.  Keys don't matter.
 
     Returns
     -------
@@ -166,10 +166,10 @@ def get_relevance(model, of, wrt):
         # in this case, an permanantly inactive relevance object is returned
         of = {}
         wrt = {}
-        key = ((), (), id(model))
+        key = (frozenset(), frozenset(), id(model))
     else:
-        key = (tuple(sorted([m['source'] for m in of.values()])),
-               tuple(sorted([m['source'] for m in wrt.values()])),
+        key = (frozenset([m['source'] for m in of.values()]),
+               frozenset([m['source'] for m in wrt.values()]),
                id(model))  # include model id in case we have multiple Problems in the same process
 
     if key in _relevance_cache:
@@ -484,29 +484,6 @@ class Relevance(object):
         if msg:
             raise RuntimeError('\n'.join(msg))
 
-    def is_seed_pair_dependent(self, fwd_seed, rev_seed):
-        """
-        Return True if the given pair of seeds are dependent.
-
-        Parameters
-        ----------
-        fwd_seed : str
-            Name of the forward seed variable.
-        rev_seed : str
-            Name of the reverse seed variable.
-
-        Returns
-        -------
-        bool
-            True if the given pair of seeds are dependent.
-        """
-        if fwd_seed not in self._relevant_vars['fwd']:
-            raise RuntimeError(f"{fwd_seed} is not a valid forward seed variable.")
-        if rev_seed not in self._relevant_vars['rev']:
-            raise RuntimeError(f"{rev_seed} is not a valid reverse seed variable.")
-
-        return fwd_seed in self._relevant_vars[rev_seed, 'rev']
-
     def _set_all_seeds(self, fwd_seeds, rev_seeds):
         """
         Set the full list of seeds to be used to determine relevance.
@@ -518,8 +495,8 @@ class Relevance(object):
         rev_seeds : iter of str
             Iterator over reverse seed variable names.
         """
-        self._all_seed_vars['fwd'] = self._seed_vars['fwd'] = tuple(sorted(fwd_seeds))
-        self._all_seed_vars['rev'] = self._seed_vars['rev'] = tuple(sorted(rev_seeds))
+        self._all_seed_vars['fwd'] = self._seed_vars['fwd'] = fwd_seeds
+        self._all_seed_vars['rev'] = self._seed_vars['rev'] = rev_seeds
 
         for s in fwd_seeds:
             self._init_relevance_set(s, 'fwd')
