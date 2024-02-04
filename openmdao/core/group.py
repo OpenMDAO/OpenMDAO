@@ -1065,8 +1065,6 @@ class Group(System):
         responses = self._check_alias_overlaps(self.get_responses(get_sizes=False))
 
         self._problem_meta['relevant'] = get_relevance(self, responses, desvars)
-        if self._problem_meta['has_par_deriv_color'] and self.comm.size > 1:
-            self._setup_par_deriv_relevance(responses, desvars, mode)
 
         self._setup_vectors(self._get_root_vectors())
 

@@ -139,8 +139,6 @@ class SetChecker(object):
         return self._set.intersection(other_set)
 
 
-_opposite = {'fwd': 'rev', 'rev': 'fwd'}
-
 _relevance_cache = {}
 
 
@@ -234,11 +232,15 @@ class Relevance(object):
 
         # for any parallel deriv colored dv/responses, update the relevant sets to include vars with
         # local only dependencies
-        par_fwd = [m['source'] for m in desvars.values() if m['parallel_deriv_color'] is not None]
-        par_rev = [m['source'] for m in responses.values() if m['parallel_deriv_color'] is not None]
+        if group.comm.size > 1:
+            par_fwd = [m['source'] for m in desvars.values()
+                       if m['parallel_deriv_color'] is not None]
+            par_rev = [m['source'] for m in responses.values()
+                       if m['parallel_deriv_color'] is not None]
 
-        if par_fwd or par_rev:
-            self._set_seeds(par_fwd, par_rev, local=True, init=True)
+            if par_fwd or par_rev:
+                self._set_seeds(par_fwd, par_rev, local=True, init=True)
+                self._setup_par_deriv_relevance(group, responses, desvars)
 
         if desvars and responses:
             self._set_all_seeds([m['source'] for m in desvars.values()],
