@@ -139,6 +139,34 @@ class SetChecker(object):
 
 _opposite = {'fwd': 'rev', 'rev': 'fwd'}
 
+_relevance_cache = {}
+
+
+def get_relevance(model, of, wrt):
+    """
+    Return a Relevance object for the given design vars, and responses.
+
+    Parameters
+    ----------
+    model : <System>
+        The top level group in the system hierarchy.
+    of : dict
+        Dictionary of response variables.  Keys don't matter.
+    wrt : dict
+        Dictionary of design variables.  Keys don't matter.
+
+    Returns
+    -------
+    Relevance
+        Relevance object.
+    """
+    key = (tuple(sorted([m['source'] for m in of.values()])),
+           tuple(sorted([m['source'] for m in wrt.values()])))
+    if key in _relevance_cache:
+        return _relevance_cache[key]
+    _relevance_cache[key] = rel = Relevance(model, wrt, of)
+    return rel
+
 
 class Relevance(object):
     """
@@ -262,7 +290,7 @@ class Relevance(object):
         DiGraph
             Graph of the relevance between desvars and responses.
         """
-        graph = group._get_hybrid_graph()
+        graph = group._get_dataflow_graph()
 
         # if doing top level FD/CS, don't update relevance graph based
         # on missing partials because FD/CS doesn't require that partials
@@ -277,6 +305,10 @@ class Relevance(object):
         # are also connected to all connected inputs from the same component.
         missing_partials = {}
         group._get_missing_partials(missing_partials)
+
+        if missing_partials:
+            graph = graph.copy()  # we're changing the graph, so make a copy
+
         missing_responses = set()
         for pathname, missing in missing_partials.items():
             inputs = [n for n, _ in graph.in_edges(pathname)]
@@ -768,7 +800,3 @@ def _is_input(node):
 
 def _is_output(node):
     return node['type_'] == 'output'
-
-
-def _is_discrete(node):
-    return node['discrete']

@@ -793,13 +793,12 @@ class Group(System):
 
         return Relevance(self, {}, {})
 
-    def _get_hybrid_graph(self):
+    def _get_dataflow_graph(self):
         """
         Return a graph of all variables and components in the model.
 
-        Each component is connected to each of its input and output variables, and
-        those variables are connected to other variables based on the connections
-        in the model.
+        Each component is connected to each of its input and output variables, and those variables
+        are connected to other variables based on the connections in the model.
 
         This results in a smaller graph (fewer edges) than would be the case for a pure variable
         graph where all inputs to a particular component would have to be connected to all outputs
@@ -812,10 +811,10 @@ class Group(System):
         networkx.DiGraph
             Graph of all variables and components in the model.
         """
+        assert self.pathname == '', "call _get_dataflow_graph on the top level Group only."
+
         graph = nx.DiGraph()
         comp_seen = set()
-        discrete_comps = set()  # components containing discrete vars
-        dist_comps = set()  # components containing distributed vars
 
         for direction in ('input', 'output'):
             isout = direction == 'output'
@@ -823,26 +822,16 @@ class Group(System):
             vmeta = self._var_abs2meta[direction]
             for vname in self._var_allprocs_abs2prom[direction]:
                 if vname in allvmeta:
-                    dist = allvmeta[vname]['distributed']
-                    discrete = False
                     local = vname in vmeta
                 else:  # var is discrete
-                    dist = False
-                    discrete = True
                     local = vname in self._var_discrete[direction]
 
-                graph.add_node(vname, type_=direction, discrete=discrete,
-                               local=local, dist=dist)
+                graph.add_node(vname, type_=direction, local=local)
 
                 comp = vname.rpartition('.')[0]
                 if comp not in comp_seen:
                     graph.add_node(comp, local=local)
                     comp_seen.add(comp)
-
-                if dist:
-                    dist_comps.add(comp)
-                if discrete:
-                    discrete_comps.add(comp)
 
                 if isout:
                     graph.add_edge(comp, vname)
@@ -852,11 +841,6 @@ class Group(System):
         for tgt, src in self._conn_global_abs_in2out.items():
             # connect the variables src and tgt
             graph.add_edge(src, tgt)
-
-        # add dist and discrete flags to all components
-        for comp in comp_seen:
-            graph.nodes[comp]['dist'] = comp in dist_comps
-            graph.nodes[comp]['discrete'] = comp in discrete_comps
 
         return graph
 
@@ -4814,7 +4798,7 @@ class Group(System):
         if not designvars or not responses:
             return
 
-        graph = self._get_hybrid_graph()
+        graph = self._get_dataflow_graph()
 
         # now add design vars and responses to the graph
         for dv in meta2src_iter(designvars.values()):
