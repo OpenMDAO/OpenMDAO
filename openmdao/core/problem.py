@@ -782,7 +782,7 @@ class Problem(object):
             lnames, rnames = wrt, of
             lkind, rkind = 'residual', 'output'
 
-        self.model._relevant.set_all_seeds(wrt, of)
+        # self.model._relevant.set_all_seeds(wrt, of)
 
         rvec = self.model._vectors[rkind]['linear']
         lvec = self.model._vectors[lkind]['linear']

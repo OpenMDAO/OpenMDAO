@@ -417,16 +417,15 @@ class pyOptSparseDriver(Driver):
 
         for name, meta in self._designvars.items():
             # translate absolute var names to promoted names for pyoptsparse
-            prom_name = model._get_prom_name(name)
-            indep_list_prom.append(prom_name)
+            indep_list_prom.append(name)
 
             size = meta['global_size'] if meta['distributed'] else meta['size']
             if pyoptsparse_version is None or pyoptsparse_version < Version('2.6.1'):
-                opt_prob.addVarGroup(prom_name, size, type='c',
+                opt_prob.addVarGroup(name, size, type='c',
                                      value=input_vals[name],
                                      lower=meta['lower'], upper=meta['upper'])
             else:
-                opt_prob.addVarGroup(prom_name, size, varType='c',
+                opt_prob.addVarGroup(name, size, varType='c',
                                      value=input_vals[name],
                                      lower=meta['lower'], upper=meta['upper'])
 
@@ -476,71 +475,66 @@ class pyOptSparseDriver(Driver):
                 del self._cons[name]
                 del self._responses[name]
 
-        eqcons = {m['source'] for m in self._cons.values() if m['equals'] is not None}
+        eqcons = {n: m for n, m in self._cons.items() if m['equals'] is not None}
         if eqcons:
             # set equality constraints as reverse seeds to see what dvs are relevant
-            relevant.set_all_seeds([m['source'] for m in self._designvars.values()], sorted(eqcons))
+            with relevant.seeds_active(rev_seeds=eqcons):
+                # Add all equality constraints
+                for name, meta in eqcons.items():
+                    size = meta['global_size'] if meta['distributed'] else meta['size']
+                    lower = upper = meta['equals']
+                    with relevant.seeds_active(rev_seeds=(meta['source'],)):
+                        wrts = [v for v in indep_list
+                                if relevant.is_relevant(self._designvars[v]['source'])]
 
-        # Add all equality constraints
-        for name, meta in self._cons.items():
-            if meta['equals'] is None:
-                continue
-            size = meta['global_size'] if meta['distributed'] else meta['size']
-            lower = upper = meta['equals']
-            relevant.set_seeds([meta['source']], 'rev')
-            wrt = [v for v in indep_list if relevant.is_relevant(self._designvars[v]['source'])]
+                    if meta['linear']:
+                        jac = {w: _lin_jacs[name][w] for w in wrts}
+                        opt_prob.addConGroup(name, size,
+                                             lower=lower - _y_intercepts[name],
+                                             upper=upper - _y_intercepts[name],
+                                             linear=True, wrt=wrts, jac=jac)
+                    else:
+                        if name in self._con_subjacs:
+                            resjac = self._con_subjacs[name]
+                            jac = {n: resjac[n] for n in wrts}
+                        else:
+                            jac = None
 
-            if meta['linear']:
-                jac = {w: _lin_jacs[name][w] for w in wrt}
-                opt_prob.addConGroup(name, size,
-                                     lower=lower - _y_intercepts[name],
-                                     upper=upper - _y_intercepts[name],
-                                     linear=True, wrt=wrt, jac=jac)
-            else:
-                if name in self._con_subjacs:
-                    resjac = self._con_subjacs[name]
-                    jac = {n: resjac[n] for n in wrt}
-                else:
-                    jac = None
+                        opt_prob.addConGroup(name, size, lower=lower, upper=upper, wrt=wrts,
+                                             jac=jac)
+                        self._quantities.append(name)
 
-                opt_prob.addConGroup(name, size, lower=lower, upper=upper,
-                                     wrt=wrt, jac=jac)
-                self._quantities.append(name)
-
-        ineqcons = {m['source'] for m in self._cons.values() if m['equals'] is None}
+        ineqcons = {n: m for n, m in self._cons.items() if m['equals'] is None}
         if ineqcons:
             # set inequality constraints as reverse seeds to see what dvs are relevant
-            relevant.set_all_seeds([m['source'] for m in self._designvars.values()],
-                                   sorted(ineqcons))
+            with relevant.seeds_active(rev_seeds=ineqcons):
+                # Add all inequality constraints
+                for name, meta in ineqcons.items():
+                    size = meta['global_size'] if meta['distributed'] else meta['size']
 
-        # Add all inequality constraints
-        for name, meta in self._cons.items():
-            if meta['equals'] is not None:
-                continue
-            size = meta['global_size'] if meta['distributed'] else meta['size']
+                    # Bounds - double sided is supported
+                    lower = meta['lower']
+                    upper = meta['upper']
 
-            # Bounds - double sided is supported
-            lower = meta['lower']
-            upper = meta['upper']
+                    with relevant.seeds_active(rev_seeds=(meta['source'],)):
+                        wrts = [v for v in indep_list
+                                if relevant.is_relevant(self._designvars[v]['source'])]
 
-            relevant.set_seeds([meta['source']], 'rev')
-            wrt = [v for v in indep_list if relevant.is_relevant(self._designvars[v]['source'])]
-
-            if meta['linear']:
-                jac = {w: _lin_jacs[name][w] for w in wrt}
-                opt_prob.addConGroup(name, size,
-                                     upper=upper - _y_intercepts[name],
-                                     lower=lower - _y_intercepts[name],
-                                     linear=True, wrt=wrt, jac=jac)
-            else:
-                if name in self._con_subjacs:
-                    resjac = self._con_subjacs[name]
-                    jac = {n: resjac[n] for n in wrt}
-                else:
-                    jac = None
-                opt_prob.addConGroup(name, size, upper=upper, lower=lower,
-                                     wrt=wrt, jac=jac)
-                self._quantities.append(name)
+                    if meta['linear']:
+                        jac = {w: _lin_jacs[name][w] for w in wrts}
+                        opt_prob.addConGroup(name, size,
+                                             upper=upper - _y_intercepts[name],
+                                             lower=lower - _y_intercepts[name],
+                                             linear=True, wrt=wrts, jac=jac)
+                    else:
+                        if name in self._con_subjacs:
+                            resjac = self._con_subjacs[name]
+                            jac = {n: resjac[n] for n in wrts}
+                        else:
+                            jac = None
+                        opt_prob.addConGroup(name, size, upper=upper, lower=lower,
+                                             wrt=wrts, jac=jac)
+                        self._quantities.append(name)
 
         # Instantiate the requested optimizer
         try:
@@ -710,7 +704,6 @@ class pyOptSparseDriver(Driver):
             1 for unsuccessful function evaluation
         """
         model = self._problem().model
-        model._problem_meta['computing_objective'] = True
         fail = 0
 
         # Note: we place our handler as late as possible so that codes that run in the
@@ -761,8 +754,6 @@ class pyOptSparseDriver(Driver):
             if self._exc_info is None:  # avoid overwriting an earlier exception
                 self._exc_info = sys.exc_info()
             fail = 1
-        finally:
-            model._problem_meta['computing_objective'] = False
 
         func_dict = self.get_objective_values()
         func_dict.update(self.get_constraint_values(lintype='nonlinear'))

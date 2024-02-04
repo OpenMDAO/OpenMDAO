@@ -940,10 +940,9 @@ class Driver(object):
             Names of constraints that don't depend on any design variables.
         """
         relevant = self._problem().model._relevant
-        relevant.set_all_seeds([m['source'] for m in self._designvars.values()],
-                               [m['source'] for m in self._responses.values()])
-        return [name for name, meta in self._cons.items()
-                if not relevant.is_relevant(meta['source'])]
+        with relevant.all_seeds_active():
+            return [name for name, meta in self._cons.items()
+                    if not relevant.is_relevant(meta['source'])]
 
     def check_relevance(self):
         """

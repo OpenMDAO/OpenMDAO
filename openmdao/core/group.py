@@ -33,7 +33,7 @@ from openmdao.utils.graph_utils import get_sccs_topo, get_out_of_order_nodes
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
-from openmdao.utils.relevance import Relevance
+from openmdao.utils.relevance import get_relevance
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     PromotionWarning, MPIWarning
 
@@ -768,31 +768,6 @@ class Group(System):
         # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
 
-    def _init_relevance(self, desvars, responses):
-        """
-        Create the relevance dictionary.
-
-        This is only called on the top level Group.
-
-        Parameters
-        ----------
-        desvars : dict
-            Dictionary of design variable metadata. Keys don't matter.
-        responses : dict
-            Dictionary of response variable metadata. Keys don't matter.
-
-        Returns
-        -------
-        dict
-            The relevance dictionary.
-        """
-        assert self.pathname == '', "Relevance can only be initialized on the top level System."
-
-        if self._use_derivatives:
-            return Relevance(self, desvars, responses)
-
-        return Relevance(self, {}, {})
-
     def _get_dataflow_graph(self):
         """
         Return a graph of all variables and components in the model.
@@ -844,7 +819,7 @@ class Group(System):
 
         return graph
 
-    def _setup_par_deriv_relevance(self, desvars, responses, mode):
+    def _setup_par_deriv_relevance(self, responses, desvars, mode):
         pd_err_chk = defaultdict(dict)
         relevant = self._relevant
 
@@ -945,11 +920,11 @@ class Group(System):
                 raise RuntimeError(f"{self.msginfo}: Indices for aliases {matching_aliases} are "
                                    f"overlapping constraint/objective '{src}'.")
 
-        if aliases:
-            # now remove alias entries from the response dict because we don't need them in the
-            # relevance calculation. This response dict is used only for relevance and is *not*
-            # used by the driver.
-            responses = {m['source']: m for m in responses.values() if not m['alias']}
+        # if aliases:
+        #     # now remove alias entries from the response dict because we don't need them in the
+        #     # relevance calculation. This response dict is used only for relevance and is *not*
+        #     # used by the driver.
+        #     responses = {m['source']: m for m in responses.values() if not m['alias']}
 
         return responses
 
@@ -1087,14 +1062,11 @@ class Group(System):
         self._fd_rev_xfer_correction_dist = {}
 
         desvars = self.get_design_vars(get_sizes=False)
-        responses = self.get_responses(get_sizes=False)
+        responses = self._check_alias_overlaps(self.get_responses(get_sizes=False))
 
-        # this checks overlaps AND replaces alias keys with absolute names
-        responses = self._check_alias_overlaps(responses)
-
-        self._problem_meta['relevant'] = self._init_relevance(desvars, responses)
+        self._problem_meta['relevant'] = get_relevance(self, responses, desvars)
         if self._problem_meta['has_par_deriv_color'] and self.comm.size > 1:
-            self._setup_par_deriv_relevance(desvars, responses, mode)
+            self._setup_par_deriv_relevance(responses, desvars, mode)
 
         self._setup_vectors(self._get_root_vectors())
 
@@ -5298,9 +5270,9 @@ class Group(System):
         """
         Return a design variable dictionary.
 
-        Whatever names match the names of design variables in this system will be use the metadata
-        from the response.  For other variables that have not been registered as design variables,
-        metadata will be constructed based on variable metadata.
+        Whatever names match the names of design variables in this system will use the metadata
+        from the design variable.  For other variables that have not been registered as design
+        variables, metadata will be constructed based on variable metadata.
 
         Parameters
         ----------

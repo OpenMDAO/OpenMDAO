@@ -146,7 +146,6 @@ def _setup_func_group():
             ('_add_submat', (Matrix,)),
             ('_get_promotion_maps', (System,)),
             ('_set_approx_partials_meta', (System,)),
-            ('_init_relevance', (System,)),
             ('_get_initial_*', (System,)),
             ('_initialize_*', (DefaultVector,)),
             ('_create_*', (DefaultVector,)),

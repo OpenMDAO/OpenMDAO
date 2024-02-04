@@ -299,8 +299,8 @@ class ApproximationScheme(object):
                         direction = self._totals_directions['fwd'][start:end]
                     else:
                         direction = meta['vector']
-                    self._approx_groups.append((wrt, data, in_idx, [(vec, vec_idx)], directional,
-                                                direction))
+                    self._approx_groups.append(((wrt,) if directional else wrt, data, in_idx,
+                                                [(vec, vec_idx)], directional, direction))
 
         if total:
             if self._totals_directional_mode == 'rev':
@@ -377,11 +377,14 @@ class ApproximationScheme(object):
             mult = self._get_multiplier(data)
 
             if fd_count % num_par_fd == system._par_fd_id:
-                if total:
-                    system._relevant.set_seeds(seed_vars, 'fwd')
-
                 # run the finite difference
-                result = self._run_point(system, vec_ind_list, data, results_array, total_or_semi)
+                if total:
+                    with system._relevant.seeds_active(fwd_seeds=seed_vars):
+                        result = self._run_point(system, vec_ind_list, data, results_array,
+                                                 total_or_semi)
+                else:
+                    result = self._run_point(system, vec_ind_list, data, results_array,
+                                             total_or_semi)
 
                 if par_fd_w_serial_model or not use_parallel_fd:
                     result = self._transform_result(result)
@@ -501,9 +504,6 @@ class ApproximationScheme(object):
         # now do uncolored solves
         for group_i, tup in enumerate(approx_groups):
             wrt, data, jcol_idxs, vec_ind_list, directional, direction = tup
-            if total:
-                system._relevant.set_seeds(wrt, 'fwd')
-
             if self._progress_out:
                 start_time = time.perf_counter()
 
@@ -519,9 +519,16 @@ class ApproximationScheme(object):
 
                 if fd_count % num_par_fd == system._par_fd_id:
                     # run the finite difference
-                    result = self._run_point(system, vec_ind_info,
-                                             app_data, results_array, total_or_semi,
-                                             jcol_idxs)
+                    if total:
+                        seeds = wrt if directional else (wrt,)
+                        with system._relevant.seeds_active(fwd_seeds=seeds):
+                            result = self._run_point(system, vec_ind_info,
+                                                     app_data, results_array, total_or_semi,
+                                                     jcol_idxs)
+                    else:
+                        result = self._run_point(system, vec_ind_info,
+                                                 app_data, results_array, total_or_semi,
+                                                 jcol_idxs)
 
                     result = self._transform_result(result)
 

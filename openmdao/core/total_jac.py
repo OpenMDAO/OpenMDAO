@@ -15,6 +15,7 @@ from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.mpi import MPI, check_mpi_env
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.relevance import get_relevance
 
 
 use_mpi = check_mpi_env()
@@ -169,7 +170,7 @@ class _TotalJacInfo(object):
 
         if has_custom_derivs:
             # have to compute new relevance
-            self.relevance = model._init_relevance(wrt_metadata, of_metadata)
+            self.relevance = get_relevance(model, of_metadata, wrt_metadata)
         else:
             self.relevance = problem._metadata['relevant']
 
@@ -301,9 +302,6 @@ class _TotalJacInfo(object):
                 need_allreduce = not np.all(self.rev_allreduce_mask)
                 if not (has_dist or any(model.comm.allgather(need_allreduce))):
                     self.rev_allreduce_mask = None
-
-        self.relevance.set_all_seeds([m['source'] for m in wrt_metadata.values()],
-                                     set(m['source'] for m in of_metadata.values()))
 
         if not approx:
             for mode in modes:
@@ -614,21 +612,21 @@ class _TotalJacInfo(object):
             # for each var in a given color
             if parallel_deriv_color is not None:
                 if fwd:
-                    self.relevance.set_seeds((source,), 'fwd')
-                    relev = self.relevance.relevant_vars(source, 'fwd', inputs=False)
-                    for s in self.relevance._all_seed_vars['rev']:
-                        if s in relev:
-                            break
-                    else:
-                        relev = set()
+                    with self.relevance.seeds_active(fwd_seeds=(source,)):
+                        relev = self.relevance.relevant_vars(source, 'fwd', inputs=False)
+                        for s in self.relevance._all_seed_vars['rev']:
+                            if s in relev:
+                                break
+                        else:
+                            relev = set()
                 else:
-                    self.relevance.set_seeds((source,), 'rev')
-                    relev = self.relevance.relevant_vars(source, 'rev', inputs=False)
-                    for s in self.relevance._all_seed_vars['fwd']:
-                        if s in relev:
-                            break
-                    else:
-                        relev = set()
+                    with self.relevance.seeds_active(rev_seeds=(source,)):
+                        relev = self.relevance.relevant_vars(source, 'rev', inputs=False)
+                        for s in self.relevance._all_seed_vars['fwd']:
+                            if s in relev:
+                                break
+                        else:
+                            relev = set()
             else:
                 relev = None
 
@@ -1369,19 +1367,18 @@ class _TotalJacInfo(object):
 
             with self._relevance_context():
                 relevant = self.relevance
-                relevant.set_all_seeds([m['source'] for m in self.input_meta['fwd'].values()],
-                                       set(m['source'] for m in self.input_meta['rev'].values()))
-                try:
-                    ln_solver = model._linear_solver
-                    with model._scaled_context_all():
-                        model._linearize(model._assembled_jac,
-                                         sub_do_ln=ln_solver._linearize_children())
-                    if ln_solver._assembled_jac is not None and \
-                            ln_solver._assembled_jac._under_complex_step:
-                        model.linear_solver._assembled_jac._update(model)
-                    ln_solver._linearize()
-                finally:
-                    model._tot_jac = None
+                with relevant.all_seeds_active():
+                    try:
+                        ln_solver = model._linear_solver
+                        with model._scaled_context_all():
+                            model._linearize(model._assembled_jac,
+                                             sub_do_ln=ln_solver._linearize_children())
+                        if ln_solver._assembled_jac is not None and \
+                                ln_solver._assembled_jac._under_complex_step:
+                            model.linear_solver._assembled_jac._update(model)
+                        ln_solver._linearize()
+                    finally:
+                        model._tot_jac = None
 
                 self.J[:] = 0.0
 
@@ -1391,7 +1388,6 @@ class _TotalJacInfo(object):
                         imeta, idx_iter = idx_info
                         for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
                             model._problem_meta['seed_vars'] = itermeta['seed_vars']
-                            relevant.set_seeds(itermeta['seed_vars'], mode)
                             rel_systems, _, cache_key = input_setter(inds, itermeta, mode)
                             rel_systems = None
 
@@ -1415,15 +1411,19 @@ class _TotalJacInfo(object):
 
                                 t0 = time.perf_counter()
 
-                            # restore old linear solution if cache_linear_solution was set by the
-                            # user for any input variables involved in this linear solution.
-                            with model._scaled_context_all():
-                                if cache_key is not None and not has_lin_cons and self.mode == mode:
-                                    self._restore_linear_solution(cache_key, mode)
-                                    model._solve_linear(mode, rel_systems)
-                                    self._save_linear_solution(cache_key, mode)
-                                else:
-                                    model._solve_linear(mode, rel_systems)
+                            fwd_seeds = itermeta['seed_vars'] if mode == 'fwd' else None
+                            rev_seeds = itermeta['seed_vars'] if mode == 'rev' else None
+                            with relevant.seeds_active(fwd_seeds=fwd_seeds, rev_seeds=rev_seeds):
+                                # restore old linear solution if cache_linear_solution was set by
+                                # the user for any input variables involved in this linear solution.
+                                with model._scaled_context_all():
+                                    if (cache_key is not None and not has_lin_cons and
+                                            self.mode == mode):
+                                        self._restore_linear_solution(cache_key, mode)
+                                        model._solve_linear(mode, rel_systems)
+                                        self._save_linear_solution(cache_key, mode)
+                                    else:
+                                        model._solve_linear(mode, rel_systems)
 
                             if debug_print:
                                 print(f'Elapsed Time: {time.perf_counter() - t0} secs\n',
@@ -1487,8 +1487,6 @@ class _TotalJacInfo(object):
 
         with self._relevance_context():
             model._tot_jac = self
-            self.relevance.set_all_seeds([m['source'] for m in self.input_meta['fwd'].values()],
-                                         set(m['source'] for m in self.input_meta['rev'].values()))
             try:
                 if self.initialize:
                     self.initialize = False
@@ -1606,14 +1604,14 @@ class _TotalJacInfo(object):
         col[nzrows] = False  # False in this case means nonzero
         if np.any(col):  # there's at least 1 row that's zero across all columns
             zero_rows = []
-            for meta in self.output_meta['fwd'].values():
+            for n, meta in self.output_meta['fwd'].items():
                 zero_idxs = self._get_zero_inds(meta, col)
 
                 if zero_idxs[0].size > 0:
                     if len(zero_idxs) == 1:
-                        zero_rows.append((meta['name'], list(zero_idxs[0])))
+                        zero_rows.append((n, list(zero_idxs[0])))
                     else:
-                        zero_rows.append((meta['name'], list(zip(*zero_idxs))))
+                        zero_rows.append((n, list(zip(*zero_idxs))))
 
             if zero_rows:
                 zero_rows = [f"('{n}', inds={idxs})" for n, idxs in zero_rows]
@@ -1629,15 +1627,15 @@ class _TotalJacInfo(object):
         row[nzcols] = False  # False in this case means nonzero
         if np.any(row):  # there's at least 1 col that's zero across all rows
             zero_cols = []
-            for meta in self.input_meta['fwd'].values():
+            for n, meta in self.input_meta['fwd'].items():
 
                 zero_idxs = self._get_zero_inds(meta, row)
 
                 if zero_idxs[0].size > 0:
                     if len(zero_idxs) == 1:
-                        zero_cols.append((meta['name'], list(zero_idxs[0])))
+                        zero_cols.append((n, list(zero_idxs[0])))
                     else:
-                        zero_cols.append((meta['name'], list(zip(*zero_idxs))))
+                        zero_cols.append((n, list(zip(*zero_idxs))))
 
             if zero_cols:
                 zero_cols = [f"('{n}', inds={idxs})" for n, idxs in zero_cols]
