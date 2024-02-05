@@ -310,14 +310,6 @@ class Relevance(object):
         """
         graph = group._get_dataflow_graph()
 
-        # if doing top level FD/CS, don't update relevance graph based
-        # on missing partials because FD/CS doesn't require that partials
-        # are declared to compute derivatives
-        if group._owns_approx_jac:
-            return graph
-
-        resps = set(meta2src_iter(responses.values()))
-
         # figure out if we can remove any edges based on zero partials we find
         # in components.  By default all component connected outputs
         # are also connected to all connected inputs from the same component.
@@ -326,32 +318,33 @@ class Relevance(object):
 
         if missing_partials:
             graph = graph.copy()  # we're changing the graph, so make a copy
+            resps = set(meta2src_iter(responses.values()))
 
-        missing_responses = set()
-        for pathname, missing in missing_partials.items():
-            inputs = [n for n, _ in graph.in_edges(pathname)]
-            outputs = [n for _, n in graph.out_edges(pathname)]
+            missing_responses = set()
+            for pathname, missing in missing_partials.items():
+                inputs = [n for n, _ in graph.in_edges(pathname)]
+                outputs = [n for _, n in graph.out_edges(pathname)]
 
-            graph.remove_node(pathname)
+                graph.remove_node(pathname)
 
-            for output in outputs:
-                found = False
-                for inp in inputs:
-                    if (output, inp) not in missing:
-                        graph.add_edge(inp, output)
-                        found = True
+                for output in outputs:
+                    found = False
+                    for inp in inputs:
+                        if (output, inp) not in missing:
+                            graph.add_edge(inp, output)
+                            found = True
 
-                if not found and output in resps:
-                    missing_responses.add(output)
+                    if not found and output in resps:
+                        missing_responses.add(output)
 
-        if missing_responses:
-            msg = (f"Constraints or objectives [{', '.join(sorted(missing_responses))}] cannot"
-                   " be impacted by the design variables of the problem because no partials "
-                   "were defined for them in their parent component(s).")
-            if group._problem_meta['singular_jac_behavior'] == 'error':
-                raise RuntimeError(msg)
-            else:
-                issue_warning(msg, category=DerivativesWarning)
+            if missing_responses:
+                msg = (f"Constraints or objectives [{', '.join(sorted(missing_responses))}] cannot"
+                       " be impacted by the design variables of the problem because no partials "
+                       "were defined for them in their parent component(s).")
+                if group._problem_meta['singular_jac_behavior'] == 'error':
+                    raise RuntimeError(msg)
+                else:
+                    issue_warning(msg, category=DerivativesWarning)
 
         return graph
 

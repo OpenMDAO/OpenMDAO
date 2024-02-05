@@ -204,8 +204,8 @@ try:
 
         Returns
         -------
-        set
-            set of tuples of the form (typename, count)
+        dict
+            Dict mapping typename to increase in count between the last two iterations.
         """
         if niter < 2:
             raise RuntimeError("Must run the function at least twice, but niter={}".format(niter))
@@ -217,32 +217,47 @@ try:
         start_objs['function'] += 1
         start_objs['builtin_function_or_method'] += 1
         start_objs['cell'] += 1
+        ultimate = None
+        penultimate = None
         for i in range(niter):
             func(*args, **kwargs)
             gc.collect()
             lst = [(str(o), delta) for o, _, delta in objgraph.growth(peak_stats=start_objs)]
-            iters.append(lst)
+            if ultimate is None:
+                ultimate = lst
+            else:
+                penultimate = ultimate
+                ultimate = lst
 
-        set1 = set(iters[-2])
-        set2 = set(iters[-1])
+        ultimate = {oname: delta for oname, delta in ultimate}
+        penultimate = {oname: delta for oname, delta in penultimate}
 
-        return set2 - set1
+        leaking = {}
+        for oname, delta in ultimate.items():
+            if oname in penultimate:
+                delta_ob = delta - penultimate[oname]
+                if delta_ob > 0:
+                    leaking[oname] = delta_ob
+            else:
+                leaking[oname] = delta
+
+        return leaking
 
 
-    def list_iter_leaks(leakset, out=sys.stdout):
+    def list_iter_leaks(leaks, out=sys.stdout):
         """
         Print any new objects left over after each call to the specified function.
 
         Parameters
         ----------
-        leakset : set of tuples of the form (objtype, count)
+        leaks : iter of tuples of the form (objtype, count)
             Output of check_iter_leaks.
         out : file-like
             Output stream.
         """
-        if leakset:
+        if leaks:
             print("\nPossible leaked objects:", file=out)
-            for objstr, deltas in leakset:
+            for objstr, deltas in leaks:
                 print(objstr, deltas, file=out)
             print(file=out)
         else:
