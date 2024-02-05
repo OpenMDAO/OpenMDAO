@@ -434,6 +434,7 @@ class SellarStateConnection(om.Group):
 
     def initialize(self):
         self.options.declare('nonlinear_solver', default=om.NewtonSolver(solve_subsystems=False),
+                             recordable=False,
                              desc='Nonlinear solver (class or instance) for Sellar MDA')
         self.options.declare('nl_atol', default=None,
                              desc='User-specified atol for nonlinear solver.')

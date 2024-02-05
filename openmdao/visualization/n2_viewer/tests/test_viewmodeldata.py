@@ -65,13 +65,19 @@ def save_viewer_data(viewer_data, filename):
 # @use_tempdirs
 class TestViewerData(unittest.TestCase):
 
-    def check_viewer_data(self, viewer_data, filename, partials=True):
+    def check_viewer_data(self, viewer_data, filename, partials=True, debug=False):
         """
         Check viewer data against expected.
         """
         # check model tree from JSON file
         with open(os.path.join(parent_dir, filename)) as json_file:
             expected_tree = json.load(json_file)
+
+        if debug:
+            from pprint import pprint
+            pprint(viewer_data['tree'])
+            print()
+            pprint(expected_tree)
 
         np.testing.assert_equal(viewer_data['tree'], expected_tree, err_msg='', verbose=True)
 
@@ -243,7 +249,7 @@ class TestViewerData(unittest.TestCase):
         self.check_viewer_data(_get_viewer_data(p), 'sellar_initial_values.json')
 
         # recorded viewer data should match
-        self.check_viewer_data(_get_viewer_data(filename), 'sellar_initial_values.json')
+        self.check_viewer_data(_get_viewer_data(filename), 'sellar_initial_values.json', debug=True)
 
         # there should be final values when data is generated after run_model
         p.run_model()
