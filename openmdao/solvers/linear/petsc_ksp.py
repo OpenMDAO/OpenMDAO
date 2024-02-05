@@ -377,6 +377,13 @@ class PETScKrylov(LinearSolver):
         # stuff the result into the x vector
         x_vec.set_val(sol_array)
 
+        # as of petsc4py v3.20, the 'converged' attribute has been renamed to 'is_converged'
+        if hasattr(self._ksp, 'is_converged'):
+            if not self._ksp.is_converged:
+                self._convergence_failure()
+        elif not self._ksp.converged:
+            self._convergence_failure()
+
         sol_petsc_vec = rhs_petsc_vec = None
 
     def apply(self, mat, in_vec, result):

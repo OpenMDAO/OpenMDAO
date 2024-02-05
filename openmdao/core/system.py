@@ -23,7 +23,7 @@ from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import _full_slice
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.record_util import create_local_meta, check_path
+from openmdao.utils.record_util import create_local_meta, check_path, has_match
 from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len
@@ -35,7 +35,7 @@ from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, \
     DerivativesWarning, PromotionWarning, UnusedOptionWarning, UnitsWarning
 from openmdao.utils.general_utils import determine_adder_scaler, \
-    format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, \
+    format_as_float_or_array, _contains_all, all_ancestors, make_set, match_prom_or_abs, \
     ensure_compatible, env_truthy, make_traceback, _is_slicer_op
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -672,8 +672,8 @@ class System(object):
             Starting index.
         int
             Ending index.
-        Vector
-            Either the _outputs or _inputs vector.
+        Vector or None
+            Either the _outputs or _inputs vector if var is local else None.
         slice
             A full slice.
         ndarray or None
@@ -1589,7 +1589,7 @@ class System(object):
             print("\nColoring for '%s' (class %s)" % (self.pathname, type(self).__name__))
 
         if info['show_sparsity']:
-            coloring.display_txt()
+            coloring.display_txt(summary=False)
         if info['show_summary']:
             coloring.summary()
 
@@ -1948,16 +1948,27 @@ class System(object):
             incl = options['includes']
             excl = options['excludes']
 
+            # includes and excludes for outputs are specified using promoted names
+            # includes and excludes for inputs are specified using _absolute_ names
+            abs2prom_output = self._var_allprocs_abs2prom['output']
+            abs2prom_inputs = self._var_allprocs_abs2prom['input']
+
+            # set of promoted output names and absolute input and residual names
+            # used for matching includes/excludes
+            match_names = set()
+
             # includes and excludes for inputs are specified using _absolute_ names
             # vectors are keyed on absolute name, discretes on relative/promoted name
             if options['record_inputs']:
-                myinputs = sorted([n for n in self._var_abs2prom['input']
+                match_names.update(abs2prom_inputs.keys())
+                myinputs = sorted([n for n in abs2prom_inputs
                                    if check_path(n, incl, excl)])
 
             # includes and excludes for outputs are specified using _promoted_ names
             # vectors are keyed on absolute name, discretes on relative/promoted name
             if options['record_outputs']:
-                myoutputs = sorted([n for n, prom in self._var_abs2prom['output'].items()
+                match_names.update(abs2prom_output.values())
+                myoutputs = sorted([n for n, prom in abs2prom_output.items()
                                     if check_path(prom, incl, excl)])
 
                 if self._var_discrete['output']:
@@ -1969,9 +1980,19 @@ class System(object):
                     myresiduals = myoutputs
 
             elif options['record_residuals']:
-                abs2prom = self._var_abs2prom['output']
+                match_names.update(self._residuals.keys())
                 myresiduals = [n for n in self._residuals._abs_iter()
-                               if check_path(abs2prom[n], incl, excl)]
+                               if check_path(abs2prom_output[n], incl, excl)]
+
+            # check that all exclude/include globs have at least one matching output or input name
+            for pattern in excl:
+                if not has_match(pattern, match_names):
+                    issue_warning(f"{self.msginfo}: No matches for pattern '{pattern}' in "
+                                  "recording_options['excludes'].")
+            for pattern in incl:
+                if not has_match(pattern, match_names):
+                    issue_warning(f"{self.msginfo}: No matches for pattern '{pattern}' in "
+                                  "recording_options['includes'].")
 
             self._filtered_vars_to_record = {
                 'input': myinputs,
@@ -2236,9 +2257,16 @@ class System(object):
             subsys._scale_factors = self._scale_factors
             subsys._setup_vectors(root_vectors)
 
-    def _setup_transfers(self):
+    def _setup_transfers(self, desvars, responses):
         """
         Compute all transfers that are owned by this system.
+
+        Parameters
+        ----------
+        desvars : dict
+            Dictionary of all design variable metadata. Keyed by absolute source name or alias.
+        responses : dict
+            Dictionary of all response variable metadata. Keyed by absolute source name or alias.
         """
         pass
 
@@ -2564,9 +2592,8 @@ class System(object):
         """
         Context manager for vectors.
 
-        For the given vec_name, return vectors that use a set of
-        internal variables that are relevant to the current matrix-vector
-        product.  This is called only from _apply_linear.
+        Return vectors that use a set of internal variables that are relevant to the current
+        matrix-vector product.  This is called only from _apply_linear.
 
         Parameters
         ----------
@@ -3523,32 +3550,59 @@ class System(object):
 
         if recurse:
             abs2prom_in = self._var_allprocs_abs2prom['input']
-            for subsys in self._sorted_sys_iter():
-                dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
-                                             use_prom_ivc=use_prom_ivc)
-                if use_prom_ivc:
-                    # have to promote subsystem prom name to this level
-                    sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
-                    for dv, meta in dvs.items():
-                        if dv in sub_pro2abs_in:
-                            abs_dv = sub_pro2abs_in[dv][0]
-                            out[abs2prom_in[abs_dv]] = meta
-                        else:
-                            out[dv] = meta
-                else:
-                    out.update(dvs)
-
             if (self.comm.size > 1 and self._subsystems_allprocs and
                     self._mpi_proc_allocator.parallel):
-                my_out = out
-                out = {}
-                for all_out in self.comm.allgather(my_out):
-                    for name, meta in all_out.items():
-                        if name not in out:
-                            if name in my_out:
-                                out[name] = my_out[name]
+
+                # For parallel groups, we need to make sure that the design variable dictionary is
+                # assembled in the same order under mpi as for serial runs.
+                out_by_sys = {}
+
+                for subsys in self._sorted_sys_iter():
+                    sub_out = {}
+                    name = subsys.name
+                    dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
+                                                 use_prom_ivc=use_prom_ivc)
+                    if use_prom_ivc:
+                        # have to promote subsystem prom name to this level
+                        sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
+                        for dv, meta in dvs.items():
+                            if dv in sub_pro2abs_in:
+                                abs_dv = sub_pro2abs_in[dv][0]
+                                sub_out[abs2prom_in[abs_dv]] = meta
                             else:
-                                out[name] = meta
+                                sub_out[dv] = meta
+                    else:
+                        sub_out.update(dvs)
+
+                    out_by_sys[name] = sub_out
+
+                out_by_sys_by_rank = self.comm.allgather(out_by_sys)
+                all_outs_by_sys = {}
+                for outs in out_by_sys_by_rank:
+                    for name, meta in outs.items():
+                        all_outs_by_sys[name] = meta
+
+                for subsys_name in self._sorted_sys_iter_all_procs():
+                    for name, meta in all_outs_by_sys[subsys_name].items():
+                        if name not in out:
+                            out[name] = meta
+
+            else:
+
+                for subsys in self._sorted_sys_iter():
+                    dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
+                                                 use_prom_ivc=use_prom_ivc)
+                    if use_prom_ivc:
+                        # have to promote subsystem prom name to this level
+                        sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
+                        for dv, meta in dvs.items():
+                            if dv in sub_pro2abs_in:
+                                abs_dv = sub_pro2abs_in[dv][0]
+                                out[abs2prom_in[abs_dv]] = meta
+                            else:
+                                out[dv] = meta
+                    else:
+                        out.update(dvs)
 
         if out and self is model:
             for var, outmeta in out.items():
@@ -3674,39 +3728,82 @@ class System(object):
 
         if recurse:
             abs2prom_in = self._var_allprocs_abs2prom['input']
-            for subsys in self._sorted_sys_iter():
-                resps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
-                                             use_prom_ivc=use_prom_ivc)
-                if use_prom_ivc:
-                    # have to promote subsystem prom name to this level
-                    sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
-                    for dv, meta in resps.items():
-                        if dv in sub_pro2abs_in:
-                            abs_resp = sub_pro2abs_in[dv][0]
-                            out[abs2prom_in[abs_resp]] = meta
-                        else:
-                            out[dv] = meta
-                else:
-                    for rkey, rmeta in resps.items():
-                        if rkey in out:
-                            tdict = {'con': 'constraint', 'obj': 'objective'}
-                            rpath = rmeta['alias_path']
-                            rname = '.'.join((rpath, rmeta['name'])) if rpath else rkey
-                            rtype = tdict[rmeta['type']]
-                            ometa = out[rkey]
-                            opath = ometa['alias_path']
-                            oname = '.'.join((opath, ometa['name'])) if opath else ometa['name']
-                            otype = tdict[ometa['type']]
-                            raise NameError(f"The same response alias, '{rkey}' was declared for "
-                                            f"{rtype} '{rname}' and {otype} '{oname}'.")
-                        out[rkey] = rmeta
-
             if (self.comm.size > 1 and self._subsystems_allprocs and
                     self._mpi_proc_allocator.parallel):
-                all_outs = self.comm.allgather(out)
-                out = {}
-                for all_out in all_outs:
-                    out.update(all_out)
+
+                # For parallel groups, we need to make sure that the design variable dictionary is
+                # assembled in the same order under mpi as for serial runs.
+                out_by_sys = {}
+
+                for subsys in self._sorted_sys_iter():
+                    name = subsys.name
+                    sub_out = {}
+
+                    resps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
+                                                 use_prom_ivc=use_prom_ivc)
+                    if use_prom_ivc:
+                        # have to promote subsystem prom name to this level
+                        sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
+                        for dv, meta in resps.items():
+                            if dv in sub_pro2abs_in:
+                                abs_resp = sub_pro2abs_in[dv][0]
+                                sub_out[abs2prom_in[abs_resp]] = meta
+                            else:
+                                sub_out[dv] = meta
+                    else:
+                        for rkey, rmeta in resps.items():
+                            if rkey in out:
+                                tdict = {'con': 'constraint', 'obj': 'objective'}
+                                rpath = rmeta['alias_path']
+                                rname = '.'.join((rpath, rmeta['name'])) if rpath else rkey
+                                rtype = tdict[rmeta['type']]
+                                ometa = sub_out[rkey]
+                                opath = ometa['alias_path']
+                                oname = '.'.join((opath, ometa['name'])) if opath else ometa['name']
+                                otype = tdict[ometa['type']]
+                                raise NameError(f"The same response alias, '{rkey}' was declared"
+                                                f" for {rtype} '{rname}' and {otype} '{oname}'.")
+                            sub_out[rkey] = rmeta
+
+                    out_by_sys[name] = sub_out
+
+                out_by_sys_by_rank = self.comm.allgather(out_by_sys)
+                all_outs_by_sys = {}
+                for outs in out_by_sys_by_rank:
+                    for name, meta in outs.items():
+                        all_outs_by_sys[name] = meta
+
+                for subsys_name in self._sorted_sys_iter_all_procs():
+                    for name, meta in all_outs_by_sys[subsys_name].items():
+                        out[name] = meta
+
+            else:
+                for subsys in self._sorted_sys_iter():
+                    resps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
+                                                 use_prom_ivc=use_prom_ivc)
+                    if use_prom_ivc:
+                        # have to promote subsystem prom name to this level
+                        sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
+                        for dv, meta in resps.items():
+                            if dv in sub_pro2abs_in:
+                                abs_resp = sub_pro2abs_in[dv][0]
+                                out[abs2prom_in[abs_resp]] = meta
+                            else:
+                                out[dv] = meta
+                    else:
+                        for rkey, rmeta in resps.items():
+                            if rkey in out:
+                                tdict = {'con': 'constraint', 'obj': 'objective'}
+                                rpath = rmeta['alias_path']
+                                rname = '.'.join((rpath, rmeta['name'])) if rpath else rkey
+                                rtype = tdict[rmeta['type']]
+                                ometa = out[rkey]
+                                opath = ometa['alias_path']
+                                oname = '.'.join((opath, ometa['name'])) if opath else ometa['name']
+                                otype = tdict[ometa['type']]
+                                raise NameError(f"The same response alias, '{rkey}' was declared"
+                                                f" for {rtype} '{rname}' and {otype} '{oname}'.")
+                            out[rkey] = rmeta
 
         return out
 
@@ -4478,7 +4575,7 @@ class System(object):
             If None, all are in the scope.
         """
         with self._scaled_context_all():
-            self._apply_linear(None, ContainsAll(), mode, scope_out, scope_in)
+            self._apply_linear(None, _contains_all, mode, scope_out, scope_in)
 
     def run_solve_linear(self, mode):
         """
@@ -4492,7 +4589,7 @@ class System(object):
             'fwd' or 'rev'.
         """
         with self._scaled_context_all():
-            self._solve_linear(mode, ContainsAll())
+            self._solve_linear(mode, _contains_all)
 
     def run_linearize(self, sub_do_ln=True):
         """
@@ -4762,27 +4859,29 @@ class System(object):
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
-        for sub in self.system_iter(include_self=True, recurse=True):
-            sub.under_complex_step = active
-            sub._inputs.set_complex_step_mode(active)
-            sub._outputs.set_complex_step_mode(active)
-            sub._residuals.set_complex_step_mode(active)
+        self.under_complex_step = active
+        self._inputs.set_complex_step_mode(active)
+        self._outputs.set_complex_step_mode(active)
+        self._residuals.set_complex_step_mode(active)
 
-            if sub._doutputs._alloc_complex:
-                sub._doutputs.set_complex_step_mode(active)
-                sub._dinputs.set_complex_step_mode(active)
-                sub._dresiduals.set_complex_step_mode(active)
-                if sub.nonlinear_solver:
-                    sub.nonlinear_solver._set_complex_step_mode(active)
+        if self._doutputs._alloc_complex:
+            self._doutputs.set_complex_step_mode(active)
+            self._dinputs.set_complex_step_mode(active)
+            self._dresiduals.set_complex_step_mode(active)
+            if self.nonlinear_solver:
+                self.nonlinear_solver._set_complex_step_mode(active)
 
-                if sub.linear_solver:
-                    sub.linear_solver._set_complex_step_mode(active)
+            if self.linear_solver:
+                self.linear_solver._set_complex_step_mode(active)
 
-                if sub._owns_approx_jac:
-                    sub._jacobian.set_complex_step_mode(active)
+            if self._owns_approx_jac:
+                self._jacobian.set_complex_step_mode(active)
 
-                if sub._assembled_jac:
-                    sub._assembled_jac.set_complex_step_mode(active)
+            if self._assembled_jac:
+                self._assembled_jac.set_complex_step_mode(active)
+
+        for sub in self.system_iter(include_self=False, recurse=True):
+            sub._set_complex_step_mode(active)
 
     def cleanup(self):
         """
@@ -5298,9 +5397,11 @@ class System(object):
                                     model._outputs.set_var(src, value, src_indices.apply(indices),
                                                            True, var_name=var_name)
                         else:
-                            raise RuntimeError(f"{model.msginfo}: Can't set {abs_name}: remote"
-                                               " connected inputs with src_indices currently not"
-                                               " supported.")
+                            issue_warning(f"{model.msginfo}: Cannot set the value of '{abs_name}':"
+                                          " Setting the value of a remote connected input with"
+                                          " src_indices is currently not supported, you must call"
+                                          " `run_model()` to have the outputs populate their"
+                                          " corresponding inputs.")
                     else:
                         value = np.asarray(value)
                         if indices is not _full_slice:
@@ -5476,10 +5577,10 @@ class System(object):
                 if vshape is not None:
                     val = val.reshape(vshape)
             else:
+                var_idx = self._var_allprocs_abs2idx[src]
+                sizes = self._var_sizes['output'][:, var_idx]
                 if distrib and (sdistrib or dynshape or not slocal) and not get_remote:
-                    var_idx = self._var_allprocs_abs2idx[src]
                     # sizes for src var in each proc
-                    sizes = self._var_sizes['output'][:, var_idx]
                     start = np.sum(sizes[:self.comm.rank])
                     end = start + sizes[self.comm.rank]
                     src_indices = src_indices.shaped_array(copy=True)
@@ -5909,7 +6010,7 @@ class System(object):
         else:
             io = 'input'
             scope = self
-        # io = 'output' if abs_name in self._var_allprocs_abs2meta['output'] else 'input'
+
         meta = scope._var_allprocs_abs2meta[io][abs_name]
         var_idx = scope._var_allprocs_abs2idx[abs_name]
         global_size = np.sum(scope._var_sizes[io][:, var_idx])
@@ -6198,3 +6299,98 @@ class System(object):
 
             for s in self._subsystems_myproc:
                 yield from s.comm_info_iter()
+
+    def dist_size_iter(self, io, top_comm):
+        """
+        Yield names and distributed ranges of all local and remote variables in this system.
+
+        Parameters
+        ----------
+        io : str
+            Either 'input' or 'output'.
+        top_comm : MPI.Comm or None
+            The top-level MPI communicator.
+
+        Yields
+        ------
+        tuple
+            A tuple of the form ((abs_name, rank), start, end).
+        """
+        sizes = self._var_sizes
+        vmeta = self._var_allprocs_abs2meta
+
+        topranks = np.arange(top_comm.size)
+
+        myrank = self.comm.rank
+        toprank = top_comm.rank
+
+        mytopranks = topranks[toprank - myrank: toprank - myrank + self.comm.size]
+
+        for rank in range(self.comm.size):
+            for ivar, vname in enumerate(vmeta[io]):
+                sz = sizes[io][rank, ivar]
+                if sz > 0:
+                    yield (vname, mytopranks[rank]), sz
+
+    def local_range_iter(self, io):
+        """
+        Yield names and local ranges of all local variables in this system.
+
+        Parameters
+        ----------
+        io : str
+            Either 'input' or 'output'.
+
+        Yields
+        ------
+        tuple
+            A tuple of the form (abs_name, start, end).
+        """
+        vmeta = self._var_allprocs_abs2meta
+
+        offset = 0
+        for vname, size in zip(vmeta[io], self._var_sizes[io][self.comm.rank]):
+            if size > 0:
+                yield vname, offset, offset + size
+            offset += size
+
+    def get_var_dup_info(self, name, io):
+        """
+        Return information about how the given variable is duplicated across MPI processes.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
+        io : str
+            Either 'input' or 'output'.
+
+        Returns
+        -------
+        tuple
+            A tuple of the form (is_duplicated, num_zeros, is_distributed).
+        """
+        nz = np.count_nonzero(self._var_sizes[io][:, self._var_allprocs_abs2idx[name]])
+
+        if self._var_allprocs_abs2meta[io][name]['distributed']:
+            return False, self._var_sizes[io].shape[0] - nz, True  # distributed vars are never dups
+
+        return nz > 1, self._var_sizes[io].shape[0] - nz, False
+
+    def get_var_sizes(self, name, io):
+        """
+        Return the sizes of the given variable on all procs.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
+        io : str
+            Either 'input' or 'output'.
+
+        Returns
+        -------
+        ndarray
+            Array of sizes of the variable on all procs.
+        """
+        return self._var_sizes[io][:, self._var_allprocs_abs2idx[name]]

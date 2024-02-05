@@ -2703,11 +2703,13 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.add_recorder(self.recorder)
         prob.setup()
 
-        msg = "Problem .*: Problem.record\(\) cannot be called before " \
-                         "`Problem\.run_model\(\)`, `Problem\.run_driver\(\)`, or " \
-                         "`Problem\.final_setup\(\)`\."
-        with self.assertRaisesRegex(RuntimeError, msg):
+        msg = f"Problem {prob._get_inst_id()}: Problem.record() cannot be called before " \
+              "`Problem.run_model()`, `Problem.run_driver()`, or `Problem.final_setup()`."
+
+        with self.assertRaises(RuntimeError) as cm:
             prob.record('initial')
+
+        self.assertEqual(str(cm.exception), msg)
 
         prob.cleanup()
 

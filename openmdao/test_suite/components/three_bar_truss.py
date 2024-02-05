@@ -55,9 +55,9 @@ def stress_calc(A, E):
 
     #Delta change in length
     DL = np.zeros([3])
-    DL[0] = np.sqrt((-L[0]*np.cos(theta1) - u[0])**2 + (-L[0]*np.sin(theta1) - u[1])**2) - L[0]
-    DL[1] = np.sqrt((-L[1]*np.cos(theta2) - u[0])**2 + (-L[1]*np.sin(theta2) - u[1])**2) - L[1]
-    DL[2] = np.sqrt((-L[2]*np.cos(theta3) - u[0])**2 + (-L[2]*np.sin(theta3) - u[1])**2) - L[2]
+    DL[0] = np.sqrt((-L[0]*np.cos(theta1) - u[0])**2 + (-L[0]*np.sin(theta1) - u[1])**2).item() - L[0]
+    DL[1] = np.sqrt((-L[1]*np.cos(theta2) - u[0])**2 + (-L[1]*np.sin(theta2) - u[1])**2).item() - L[1]
+    DL[2] = np.sqrt((-L[2]*np.cos(theta3) - u[0])**2 + (-L[2]*np.sin(theta3) - u[1])**2).item() - L[2]
 
     #Stress in each element
     sigma = E*DL/L
@@ -127,9 +127,9 @@ class ThreeBarTruss(om.ExplicitComponent):
         area1 = inputs['area1']*.0001
         area2 = inputs['area2']*.0001
         area3 = inputs['area3']*.0001
-        mat1 = int(inputs['mat1'])
-        mat2 = int(inputs['mat2'])
-        mat3 = int(inputs['mat3'])
+        mat1 = int(inputs['mat1'].item())
+        mat2 = int(inputs['mat2'].item())
+        mat3 = int(inputs['mat3'].item())
         area1 *= 2.
 
         len1 = np.sqrt(1.2**2 + 1.2**2)

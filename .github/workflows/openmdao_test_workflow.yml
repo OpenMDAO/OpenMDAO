@@ -11,6 +11,8 @@ on:
   # Allow running the workflow manually from the Actions tab
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
 
   tests:
@@ -25,10 +27,10 @@ jobs:
           - NAME: Ubuntu Baseline
             OS: ubuntu-latest
             PY: '3.11'
-            NUMPY: '1.24'
+            NUMPY: '1.26'
             SCIPY: '1.11'
             PETSc: '3.18'
-            PYOPTSPARSE: 'v2.9.2'
+            PYOPTSPARSE: 'v2.10.1'
             # PAROPT: true
             SNOPT: '7.7'
             OPTIONAL: '[all]'
@@ -51,10 +53,10 @@ jobs:
           - NAME: MacOS Baseline
             OS: macos-latest
             PY: '3.11'
-            NUMPY: '1.24'
+            NUMPY: '1.26'
             SCIPY: '1.11'
             PETSc: '3.18'
-            # PYOPTSPARSE: 'v2.9.2'
+            # PYOPTSPARSE: 'v2.10.1'
             # PAROPT: true
             # SNOPT: '7.7'
             OPTIONAL: '[all]'
@@ -64,9 +66,9 @@ jobs:
           # test minimal install
           - NAME: Ubuntu Minimal
             OS: ubuntu-latest
-            PY: '3'
-            NUMPY: '1.24'
-            SCIPY: '1.10'
+            PY: '3.11'
+            NUMPY: '1.26'
+            SCIPY: '1.11'
             OPTIONAL: '[test]'
             TESTS: true
 
@@ -88,10 +90,10 @@ jobs:
           - NAME: Build Docs
             OS: ubuntu-latest
             PY: '3.11'
-            NUMPY: '1.24'
-            SCIPY: '1.10'
+            NUMPY: '1.26'
+            SCIPY: '1.11'
             PETSc: '3.18'
-            PYOPTSPARSE: 'v2.9.2'
+            PYOPTSPARSE: 'v2.10.1'
             SNOPT: '7.7'
             OPTIONAL: '[all]'
             JAX: '0.4.14'
@@ -266,6 +268,8 @@ jobs:
           python -m pip install pyparsing psutil objgraph pyxdsm
 
       - name: Display environment info
+        id: env_info
+        continue-on-error: true
         run: |
           conda info
           conda list
@@ -273,14 +277,26 @@ jobs:
           echo "============================================================="
           echo "Check installed versions of Python, Numpy and Scipy"
           echo "============================================================="
-          python -c "import platform; assert  platform.python_version().startswith(str(${{ matrix.PY }})), \
-                    f'Python version {platform.python_version()} is not the requested version (${{ matrix.PY }})'"
+          echo 'errors<<EOF' >> $GITHUB_OUTPUT
 
-          python -c "import numpy; assert str(numpy.__version__).startswith(str(${{ matrix.NUMPY }})), \
-                    f'Numpy version {numpy.__version__} is not the requested version (${{ matrix.NUMPY }})'"
+          FINAL_VER=`python -c "import platform; print(platform.python_version())"`
+          if [[ ! "$FINAL_VER" == "${{ matrix.PY }}"* ]]; then
+            echo "Python version was changed from ${{ matrix.PY }} to $FINAL_VER" >> $GITHUB_OUTPUT
+          fi
 
-          python -c "import scipy; assert str(scipy.__version__).startswith(str(${{ matrix.SCIPY }})), \
-                    f'Scipy version {scipy.__version__} is not the requested version (${{ matrix.SCIPY }})'"
+          FINAL_VER=`python -c "import numpy; print(numpy.__version__)"`
+          if [[ ! "$FINAL_VER" == "${{ matrix.NUMPY }}"* ]]; then
+            echo "NumPy version was changed from ${{ matrix.NUMPY }} to $FINAL_VER" >> $GITHUB_OUTPUT
+          fi
+
+          FINAL_VER=`python -c "import scipy; print(scipy.__version__)"`
+          if [[ ! "$FINAL_VER" == "${{ matrix.SCIPY }}"* ]]; then
+            echo "SciPy version was changed from ${{ matrix.SCIPY }} to $FINAL_VER" >> $GITHUB_OUTPUT
+          fi
+
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+          grep changed $GITHUB_OUTPUT || echo ""
 
       - name: Setup tmate session
         if: matrix.DEBUG
@@ -302,7 +318,9 @@ jobs:
           testflo -n 2 openmdao --timeout=240 --show_skipped --coverage --coverpkg openmdao --durations=20
 
       - name: Submit coverage
+        id: coveralls
         if: matrix.TESTS
+        continue-on-error: true
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COVERALLS_SERVICE_NAME: "github"
@@ -315,6 +333,16 @@ jobs:
           python -m pip install coveralls
           SITE_DIR=`python -c 'import site; print(site.getsitepackages()[-1])'`
           coveralls --basedir $SITE_DIR
+
+      - name: Slack failure to upload to coveralls.io
+        if: steps.coveralls.outcome == 'failure'
+        uses: act10ns/slack@v2.0.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: 'warning'
+          message: |
+            Uploading of coverage data to coveralls.io failed.
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Build docs
         if: matrix.BUILD_DOCS
@@ -349,7 +377,7 @@ jobs:
       - name: Display doc build reports
         if: failure() && matrix.BUILD_DOCS && steps.build_docs.outcome == 'failure'
         run: |
-          for f in /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports/*; do
+          for f in $(find /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports -name '*.log'); do
             echo "============================================================="
             echo $f
             echo "============================================================="
@@ -387,13 +415,24 @@ jobs:
           cd $GITHUB_WORKSPACE
           python -m bandit -c bandit.yml -ll -r openmdao
 
-      - name: Notify slack
-        uses: act10ns/slack@v1.6.0
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      - name: Slack env change
+        if: steps.env_info.outputs.errors != ''
+        uses: act10ns/slack@v2.0.0
         with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: 'warning'
+          message: |
+            Environment change detected on `${{ matrix.NAME }}` build.
+            Python, NumPy or SciPy was not the requested version:
+            ```${{steps.env_info.outputs.errors}}```
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Notify slack
+        uses: act10ns/slack@v2.0.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
           status: ${{ job.status }}
-        if: always()
+        if: failure()
 
   windows_tests:
     runs-on: windows-latest
@@ -406,10 +445,10 @@ jobs:
         include:
           # baseline versions
           - NAME: Windows Baseline
-            PY: '3.10'
-            NUMPY: 1.22
-            SCIPY: 1.7
-            PYOPTSPARSE: '2.9.1'
+            PY: '3.11'
+            NUMPY: '1.24'
+            SCIPY: '1.11'
+            PYOPTSPARSE: '2.10.1'
 
     name: ${{ matrix.NAME }}
 
@@ -440,8 +479,7 @@ jobs:
         with:
           python-version: ${{ matrix.PY }}
           conda-version: "*"
-          channels: conda-forge,defaults
-          channel-priority: true
+          channels: conda-forge
 
       - name: Install OpenDMAO
         run: |
@@ -522,7 +560,7 @@ jobs:
         with:
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
           status: ${{ job.status }}
-        if: always()
+        if: failure()
 
   coveralls:
     name: Finish coverage

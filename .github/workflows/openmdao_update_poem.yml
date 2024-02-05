@@ -1,0 +1,88 @@
+# When a pull request is opened, check if it resolves an issue that is associated with a POEM
+# When pull request is merged, update the status of any associated POEM to Integrated
+
+name: Update Associated POEM
+
+on:
+  pull_request:
+    types: [ opened, reopened, closed ]
+    branches: [ master ]
+
+permissions: {}
+
+jobs:
+
+  check_for_poem:
+    if: github.event.action == 'opened' || github.event.action == 'reopened' || github.event.pull_request.merged
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      pull-requests: write
+
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Display run details
+        run: |
+          echo "============================================================="
+          echo "Run #${GITHUB_RUN_NUMBER}"
+          echo "Run ID: ${GITHUB_RUN_ID}"
+          echo
+          echo "Repository:   ${GITHUB_REPOSITORY}"
+          echo "Triggered by: ${{ github.event_name }} ${{ github.event.number }} ${{ github.event.action }}"
+          echo "Initiated by: ${GITHUB_ACTOR}"
+          echo "============================================================="
+
+      - name: Check for Associated POEM
+        id: check_for_poem
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if python .github/scripts/get_poem_id.py ${GITHUB_REPOSITORY} $PR_NUMBER; then
+            cat POEM_ID.txt >> $GITHUB_OUTPUT
+          else
+            echo "POEM_ID=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Comment on PR
+        if: (github.event.action == 'opened' || github.event.action == 'reopened') && steps.check_for_poem.outputs.POEM_ID != ''
+        env:
+          POEM_ID: ${{ steps.check_for_poem.outputs.POEM_ID }}
+          POEM_URL: ${{ github.server_url }}/${{ github.repository_owner }}/POEMs/blob/master/POEM_${{ steps.check_for_poem.outputs.POEM_ID }}.md
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            github.rest.issues.createComment({
+              issue_number: ${{ github.event.number }},
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: 'This pull request will transition [POEM_${{ env.POEM_ID }}](${{ env.POEM_URL }}) to `Integrated`'
+            })
+
+      - name: Slack POEM message
+        if: (github.event.action == 'opened' || github.event.action == 'reopened') && steps.check_for_poem.outputs.POEM_ID != ''
+        uses: act10ns/slack@v2.0.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: 'warning'
+          message: |
+            Pull Request #${{ github.event.number }} will transition POEM_${{ steps.check_for_poem.outputs.POEM_ID }} to `Integrated`
+            ${{ github.server_url }}/${{ github.repository }}/pull/${{ github.event.number}}
+            ${{ github.server_url }}/${{ github.repository_owner }}/POEMs/blob/master/POEM_091.md
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Update POEM status
+        if: github.event.pull_request.merged == true && steps.check_for_poem.outputs.POEM_ID != ''
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          repo: ${{ github.repository_owner }}/POEMs
+          workflow: Update POEM status to Integrated
+          inputs: '{ "poem_integrated": "${{ steps.check_for_poem.outputs.POEM_ID }}" }'
+          token: ${{ secrets.ACCESS_TOKEN }}

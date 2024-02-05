@@ -320,6 +320,9 @@ class ContainsAll(object):
         return True
 
 
+_contains_all = ContainsAll()
+
+
 def all_ancestors(pathname, delim='.'):
     """
     Return a generator of pathnames of the starting object and all of its parents.
@@ -1173,10 +1176,12 @@ def wing_dbg():
 
 class LocalRangeIterable(object):
     """
-    Iterable object yielding local indices while iterating over local or distributed vars.
+    Iterable object yielding local indices while iterating over local, distributed, or remote vars.
 
     The number of iterations for a distributed variable will be the full distributed size of the
-    variable but None will be returned for any indices that are not local to the given rank.
+    variable.
+
+    None will be returned for any indices that are not local to the given rank.
 
     Parameters
     ----------
@@ -1185,15 +1190,17 @@ class LocalRangeIterable(object):
     vname : str
         Name of the variable.
     use_vec_offset : bool
-        If True, return indices for the given variable within its vector, else just return
+        If True, return indices for the given variable within its parent vector, else just return
         indices within the variable itself, i.e. range(var_size).
 
     Attributes
     ----------
+    _vname : str
+        Name of the variable.
     _inds : ndarray
         Variable indices (unused for distributed variables).
-    _dist_size : int
-        Full size of distributed variable.
+    _var_size : int
+        Full size of distributed or remote variable.
     _start : int
         Starting index of distributed variable on this rank.
     _end : int
@@ -1208,18 +1215,21 @@ class LocalRangeIterable(object):
         """
         Initialize the iterator.
         """
-        self._dist_size = 0
+        self._vname = vname
+        self._var_size = 0
 
-        abs2meta = system._var_allprocs_abs2meta['output']
-        if vname in abs2meta:
+        all_abs2meta = system._var_allprocs_abs2meta['output']
+        if vname in all_abs2meta:
             sizes = system._var_sizes['output']
             slices = system._outputs.get_slice_dict()
+            abs2meta = system._var_abs2meta['output']
         else:
-            abs2meta = system._var_allprocs_abs2meta['input']
+            all_abs2meta = system._var_allprocs_abs2meta['input']
             sizes = system._var_sizes['input']
             slices = system._inputs.get_slice_dict()
+            abs2meta = system._var_abs2meta['input']
 
-        if abs2meta[vname]['distributed']:
+        if all_abs2meta[vname]['distributed']:
             var_idx = system._var_allprocs_abs2idx[vname]
             rank = system.comm.rank
             self._offset = np.sum(sizes[rank, :var_idx]) if use_vec_offset else 0
@@ -1227,13 +1237,32 @@ class LocalRangeIterable(object):
             self._iter = self._dist_iter
             self._start = np.sum(sizes[:rank, var_idx])
             self._end = self._start + sizes[rank, var_idx]
-            self._dist_size = np.sum(sizes[:, var_idx])
+            self._var_size = np.sum(sizes[:, var_idx])
+        elif vname not in abs2meta:  # variable is remote
+            self._iter = self._remote_iter
+            self._var_size = all_abs2meta[vname]['global_size']
         else:
             self._iter = self._serial_iter
             if use_vec_offset:
                 self._inds = range(slices[vname].start, slices[vname].stop)
             else:
                 self._inds = range(slices[vname].stop - slices[vname].start)
+            self._var_size = all_abs2meta[vname]['global_size']
+
+    def __str__(self):
+        """
+        Return a string representation of the iterator.
+
+        Returns
+        -------
+        str
+            String representation of the iterator.
+        """
+        if self._iter is self._dist_iter:
+            return f"LocalRangeIterable({self._vname}, dist: {self._start} to {self._end})"
+        elif self._iter is self._remote_iter:
+            return f"LocalRangeIterable({self._vname}, remote: size={self._var_size})"
+        return f"LocalRangeIterable({self._vname}, serial: size={self._var_size})"
 
     def _serial_iter(self):
         """
@@ -1258,11 +1287,23 @@ class LocalRangeIterable(object):
         start = self._start
         end = self._end
 
-        for i in range(self._dist_size):
+        for i in range(self._var_size):
             if i >= start and i < end:
                 yield i - start + self._offset
             else:
                 yield None
+
+    def _remote_iter(self):
+        """
+        Iterate over a remote variable.
+
+        Yields
+        ------
+        None
+            Always yields None.
+        """
+        for _ in range(self._var_size):
+            yield None
 
     def __iter__(self):
         """
@@ -1363,3 +1404,26 @@ def inconsistent_across_procs(comm, arr, tol=1e-15, return_array=True):
 
     comm.gather(arr, root=0)
     return comm.bcast(None, root=0)
+
+
+def get_rev_conns(conns):
+    """
+    Return a dict mapping each connected output to a list of its connected inputs.
+
+    Parameters
+    ----------
+    conns : dict
+        Dict mapping each input to its connected output.
+
+    Returns
+    -------
+    dict
+        Dict mapping each connected output to a list of its connected inputs.
+    """
+    rev = {}
+    for tgt, src in conns.items():
+        if src in rev:
+            rev[src].append(tgt)
+        else:
+            rev[src] = [tgt]
+    return rev

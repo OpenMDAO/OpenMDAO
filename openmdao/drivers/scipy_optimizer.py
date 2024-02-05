@@ -25,7 +25,7 @@ _gradient_optimizers = {'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC', 'SLSQP', '
                         'trust-ncg', 'trust-constr', 'basinhopping', 'shgo'}
 _hessian_optimizers = {'trust-constr', 'trust-ncg'}
 _bounds_optimizers = {'L-BFGS-B', 'TNC', 'SLSQP', 'trust-constr', 'dual_annealing', 'shgo',
-                      'differential_evolution', 'basinhopping'}
+                      'differential_evolution', 'basinhopping', 'Nelder-Mead'}
 if Version(scipy_version) >= Version("1.11"):
     # COBYLA supports bounds starting with SciPy Version 1.11
     _bounds_optimizers |= {'COBYLA'}
@@ -621,8 +621,9 @@ class ScipyOptimizeDriver(Driver):
             return 0
 
         # print("Functions calculated")
-        # print('   xnew', x_new)
-        # print('   fnew', f_new)
+        # rank = MPI.COMM_WORLD.rank if MPI else 0
+        # print(rank, '   xnew', x_new)
+        # print(rank, '   fnew', f_new)
 
         return f_new
 

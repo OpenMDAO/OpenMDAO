@@ -1,6 +1,7 @@
 """ Unit tests for the Pyoptsparse Driver."""
 
 import copy
+import pathlib
 import unittest
 import os.path
 
@@ -16,6 +17,7 @@ from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
 from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
+from openmdao.utils.reports_system import get_reports_dir
 from openmdao.utils.testing_utils import use_tempdirs, require_pyoptsparse
 from openmdao.utils.om_warnings import OMDeprecationWarning
 from openmdao.utils.mpi import MPI
@@ -2747,6 +2749,39 @@ class TestPyoptSparse(unittest.TestCase):
         assert_near_equal(p.get_val('exec.z')[0], 25, tolerance=1e-4)
         assert_near_equal(p.get_val('exec.z')[50], -75, tolerance=1e-4)
 
+    def test_prom_names(self):
+
+        p = om.Problem()
+
+        exec = om.ExecComp(['y = a*x**2',
+                            'z = a + x**2'],
+                            a={'shape': (1,)},
+                            y={'shape': (101,)},
+                            x={'shape': (101,)},
+                            z={'shape': (101,)})
+
+        p.model.add_subsystem('exec', exec,
+                              promotes_inputs=['a', 'x'],
+                              promotes_outputs=['y', 'z'])
+
+        p.model.add_design_var('a', lower=-1000, upper=1000)
+        p.model.add_objective('y', index=50)
+        p.model.add_constraint('z', indices=[0], equals=25)
+        p.model.add_constraint('z', indices=[-1], lower=20, alias="ALIAS_TEST")
+
+        p.driver = om.pyOptSparseDriver(optimizer=OPTIMIZER)
+
+        p.setup(mode='rev')
+        p.set_val('x', np.linspace(-10, 10, 101))
+        p.run_driver()
+
+        # check that the pyoptsparse solution uses promoted names
+        sol = p.driver.pyopt_solution
+
+        self.assertEqual(set(sol.variables.keys()), {'a'})
+        self.assertEqual(set(sol.objectives.keys()), {'y'})
+        self.assertEqual(set(sol.constraints.keys()), {'z', 'ALIAS_TEST'})
+
     def test_hist_file_hotstart(self):
         filename = "hist_file"
 
@@ -3254,6 +3289,110 @@ class TestResizingTestCase(unittest.TestCase):
         p.setup()
         p.run_driver()
         p.compute_totals()
+
+@unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
+@use_tempdirs
+class TestPyoptSparseOutputFiles(unittest.TestCase):
+    # dict of optimizers with the values being a list of tuples of ( option_name, output_file_name )
+    optimizers_and_output_files = {
+        # ALPSO uses a single option `filename` to determine name of both output files
+        'ALPSO': [('filename', 'ALPSO_print.out'), ('filename', 'ALPSO_summary.out')],
+        'CONMIN': [('IFILE', 'CONMIN.out')],
+        'IPOPT': [('output_file', 'IPOPT.out')],
+        'PSQP': [('IFILE', 'PSQP.out')],
+        'SLSQP': [('IFILE', 'SLSQP.out')],
+        'SNOPT': [('Print file', 'SNOPT_print.out'), ('Summary file', 'SNOPT_summary.out')]
+    }
+
+    def createParaboloidProblem(self):
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+        prob.set_solver_print(level=0)
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+        prob.setup()
+        return prob
+
+    def run_and_test_default_output_dir(self, optimizer, output_file_names):
+        # default is to put the files in the reports directory under the problem name folder
+        # output_file_names is a list of tuples of setting name and output file name
+        prob = self.createParaboloidProblem()
+        prob.driver = pyOptSparseDriver(optimizer=optimizer, print_results=False)
+
+        if optimizer == 'ALPSO':
+            prob.driver.opt_settings['fileout'] = 3 # need this to be 3 to get the output files
+
+        prob.run_driver()
+        default_output_dir = pathlib.Path(get_reports_dir()).joinpath(prob._name)
+        for opt_setting_name, output_file_name in output_file_names:
+            output_file = default_output_dir.joinpath(output_file_name)
+            self.assertTrue(output_file.is_file(),
+                        f"{output_file_name} output file not found at {str(output_file)}")
+
+    def run_and_test_previous_behavior_output_dir(self, optimizer, output_file_names):
+        # Previous behavior is to put files in current working directory. Indicated with None
+        # output_file_names is a list of tuples of setting name and output file name
+        prob = self.createParaboloidProblem()
+        prob.driver = pyOptSparseDriver(optimizer=optimizer, print_results=False)
+
+        if optimizer == 'ALPSO':
+            prob.driver.opt_settings['fileout'] = 3
+
+        prob.driver.options['output_dir'] = None
+
+        prob.run_driver()
+        for opt_setting_name, output_file_name in output_file_names:
+            output_file = pathlib.Path(output_file_name)
+            self.assertTrue(output_file.is_file(),
+                        f"{output_file_name} output file not found at {str(output_file)}")
+
+    def run_and_test_user_set_output_dir(self, optimizer, output_file_names):
+        # output_file_names is a list of tuples of setting name and output file name
+
+        user_directory_name = 'user_reports_dir'
+        pathlib.Path(user_directory_name).mkdir(exist_ok=True)
+
+        prob = self.createParaboloidProblem()
+        prob.driver = pyOptSparseDriver(optimizer=optimizer, print_results=False)
+
+        if optimizer == 'ALPSO':
+            prob.driver.opt_settings['fileout'] = 3
+
+
+        prob.driver.options['output_dir'] = user_directory_name
+
+        prob.run_driver()
+
+        for opt_setting_name, output_file_name in output_file_names:
+            output_file_path = pathlib.Path(user_directory_name).joinpath(output_file_name)
+            self.assertTrue(output_file_path.is_file(),
+                        f"{str(output_file_path)} output file not found at {str(output_file_path)}")
+
+    def test_default_output_dir(self):
+        for optimizer, output_files in self.optimizers_and_output_files.items():
+            _, loc_opt = set_pyoptsparse_opt(optimizer)
+            if loc_opt == optimizer: # Only do optimizers that are installed
+                self.run_and_test_default_output_dir(optimizer, output_files)
+
+    def test_previous_behavior_output_dir(self):
+        for optimizer, output_files in self.optimizers_and_output_files.items():
+            _, loc_opt = set_pyoptsparse_opt(optimizer)
+            if loc_opt == optimizer: # Only do optimizers that are installed
+                self.run_and_test_previous_behavior_output_dir(optimizer, output_files)
+
+    def test_user_set_output_dir(self):
+        for optimizer, output_files in self.optimizers_and_output_files.items():
+            _, loc_opt = set_pyoptsparse_opt(optimizer)
+            if loc_opt == optimizer: # Only do optimizers that are installed
+                self.run_and_test_user_set_output_dir(optimizer, output_files)
+
+
 
 
 if __name__ == "__main__":

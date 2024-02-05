@@ -29,7 +29,7 @@ class NonlinearBlockJac(NonlinearSolver):
             # If this is a parallel group, check for analysis errors and reraise.
             if len(system._subsystems_myproc) != len(system._subsystems_allprocs):
                 with multi_proc_fail_check(system.comm):
-                    for subsys in system._subsystems_myproc:
+                    for subsys in system._solver_subsystem_iter(local_only=True):
                         subsys._solve_nonlinear()
             else:
                 for subsys in system._solver_subsystem_iter(local_only=True):

@@ -5,14 +5,12 @@ import numpy as np
 
 from openmdao.core.component import Component, _allowed_types
 from openmdao.core.constants import _UNDEFINED, _SetupStatus
+from openmdao.vectors.vector import _full_slice
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.general_utils import format_as_float_or_array
 from openmdao.utils.units import simplify_unit
-
-
-_full_slice = slice(None)
 
 
 def _get_slice_shape_dict(name_shape_iter):
@@ -242,12 +240,11 @@ class ImplicitComponent(Component):
             d_inputs, d_outputs, d_residuals = vecs
             d_residuals = self._dresiduals_wrapper
 
-            # Jacobian and vectors are all scaled, unitless
-            jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
-
             # if we're not matrix free, we can skip the bottom of
             # this loop because apply_linear does nothing.
             if not self.matrix_free:
+                # Jacobian and vectors are all scaled, unitless
+                jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
                 return
 
             # Jacobian and vectors are all unscaled, dimensional
@@ -322,8 +319,9 @@ class ImplicitComponent(Component):
                                        self._discrete_inputs, self._discrete_outputs)
                     else:
                         self.linearize(self._inputs, self._outputs, self._jac_wrapper)
-                    self.comm.bcast(list(self._jacobian.items()), root=0)
-                else:
+                    if self._jacobian is not None:
+                        self.comm.bcast(list(self._jacobian.items()), root=0)
+                elif self._jacobian is not None:
                     for key, val in self.comm.bcast(None, root=0):
                         self._jac_wrapper[key] = val
             else:
@@ -420,8 +418,8 @@ class ImplicitComponent(Component):
             raise ValueError(f"{self.msginfo}: Residual name '{name}' already exists.")
 
         if self._problem_meta is not None:
-            if self._problem_meta['setup_status'] >= _SetupStatus.POST_SETUP:
-                raise RuntimeError(f"{self.msginfo}: Can't add residual '{name}' after setup.")
+            if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
+                raise RuntimeError(f"{self.msginfo}: Can't add residual '{name}' after configure.")
 
         # check ref shape
         if ref is not None:
@@ -462,26 +460,6 @@ class ImplicitComponent(Component):
         super()._reset_setup_vars()
         self._declared_residuals = {}
         self._resid2out_subjac_map = {}
-
-    def _setup_procs(self, pathname, comm, mode, prob_meta):
-        """
-        Execute first phase of the setup process.
-
-        Distribute processors, assign pathnames, and call setup on the component.
-
-        Parameters
-        ----------
-        pathname : str
-            Global name of the system, including the path.
-        comm : MPI.Comm or <FakeComm>
-            MPI communicator object.
-        mode : str
-            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
-            reverse (adjoint). Default is 'rev'.
-        prob_meta : dict
-            Problem level metadata.
-        """
-        super()._setup_procs(pathname, comm, mode, prob_meta)
 
     def _resid_name_shape_iter(self):
         for name, meta in self._declared_residuals.items():

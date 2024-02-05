@@ -4,8 +4,8 @@ import unittest
 import numpy as np
 from openmdao.api import Problem, Group, ExecComp, IndepVarComp, DirectSolver, ParallelGroup
 from openmdao.utils.mpi import MPI
-from openmdao.utils.assert_utils import assert_near_equal
-
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.om_warnings import OpenMDAOWarning
 try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
@@ -444,6 +444,70 @@ class ParTestCase(unittest.TestCase):
         np.testing.assert_allclose(p['par.C2.x'], (np.arange(7,10) + 1.) * 3.)
         np.testing.assert_allclose(p['par.C1.y'], (np.arange(7) + 1.) * 4.)
         np.testing.assert_allclose(p['par.C2.y'], (np.arange(7,10) + 1.) * 9.)
+
+    def test_load_case_remote_input_src_indices(self):
+        import numpy as np
+        import openmdao.api as om
+        from openmdao.utils.assert_utils import assert_near_equal
+
+        p = om.Problem()
+
+        class CompA(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', shape=(5,))
+                self.add_output('y', shape=(5,))
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = inputs['x']
+
+        class CompB(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('y', shape=(1,))
+                self.add_output('z', shape=(1,))
+
+            def compute(self, inputs, outputs):
+                outputs['z'] = inputs['y']
+
+        p.add_recorder(om.SqliteRecorder('load_case_issue.sql'))
+        p.recording_options['record_inputs'] = True
+        p.recording_options['record_outputs'] = True
+
+        G = p.model.add_subsystem('G', om.ParallelGroup())
+
+        a = G.add_subsystem('a', CompA())
+        b = G.add_subsystem('b', CompB())
+
+        G.connect('a.y', 'b.y', src_indices=[-1])
+
+        G.nonlinear_solver = om.NonlinearBlockJac(iprint=2)
+        G.linear_solver = om.PETScKrylov(iprint=2)
+
+        p.setup()
+
+        if a in G._subsystems_myproc:
+            p.set_val('G.a.x', np.linspace(0, np.pi, 5))
+
+        p.run_model()
+
+        p.record(case_name='case_1')
+        p.cleanup()
+
+        case_1 = om.CaseReader('load_case_issue.sql').get_case('case_1')
+        assert_near_equal(case_1.get_val('G.a.y')[-1], case_1.get_val('G.b.y'))
+
+        # Populate the x input with zeros just to make sure we're changing it.
+        p.set_val('G.a.x', 0.0)
+        p.run_model()
+
+        # Try to load the case into the model. This should trigger the following warning.
+        expected_warning = "<model> <class Group>: Cannot set the value of 'G.b.y': " \
+                           "Setting the value of a remote connected input with src_indices " \
+                           "is currently not supported, you must call `run_model()` to have " \
+                           "the outputs populate their corresponding inputs."
+        with assert_warning(OpenMDAOWarning, expected_warning, ranks=0):
+            p.load_case(case_1)
 
 
 class SystemSetValTestCase(unittest.TestCase):

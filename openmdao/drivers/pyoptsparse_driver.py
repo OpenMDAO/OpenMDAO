@@ -5,7 +5,7 @@ pyoptsparse is based on pyOpt, which is an object-oriented framework for
 formulating and solving nonlinear constrained optimization problems, with
 additional MPI capability.
 """
-
+import pathlib
 import sys
 import json
 import signal
@@ -22,13 +22,13 @@ except ImportError:
 except Exception as err:
     pyoptsparse = err
 
-from openmdao.core.constants import INT_DTYPE
+from openmdao.core.constants import INT_DTYPE, _DEFAULT_REPORTS_DIR, _ReprClass
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
-import openmdao.utils.coloring as c_mod
 from openmdao.utils.class_util import WeakMethodWrapper
 from openmdao.utils.mpi import FakeComm, MPI
 from openmdao.utils.om_warnings import issue_warning, warn_deprecation
+from openmdao.utils.reports_system import get_reports_dir
 
 # what version of pyoptspare are we working with
 if pyoptsparse and hasattr(pyoptsparse, '__version__'):
@@ -270,6 +270,10 @@ class pyOptSparseDriver(Driver):
         self.options.declare('hotstart_file', types=str, default=None, allow_none=True,
                              desc='File location of a pyopt_sparse optimization history to use '
                                   'to hot start the optimization. Default is None.')
+        self.options.declare('output_dir', types=(str, _ReprClass), default=_DEFAULT_REPORTS_DIR,
+                             allow_none=True,
+                             desc='Directory location of pyopt_sparse output files.'
+                             'Default is ./reports_directory/problem_name.')
 
     @property
     def hist_file(self):
@@ -368,6 +372,7 @@ class pyOptSparseDriver(Driver):
         problem = self._problem()
         model = problem.model
         relevant = model._relevant
+
         self.pyopt_solution = None
         self._total_jac = None
         self.iter_count = 0
@@ -375,6 +380,7 @@ class pyOptSparseDriver(Driver):
         self._quantities = []
 
         optimizer = self.options['optimizer']
+
         self._fill_NANs = not respects_fail_flag[self.options['optimizer']]
 
         self._check_for_missing_objective()
@@ -402,16 +408,22 @@ class pyOptSparseDriver(Driver):
 
         # Add all design variables
         self._indep_list = indep_list = list(self._designvars)
+        self._indep_list_prom = indep_list_prom = []
+
         input_vals = self.get_design_var_values()
 
         for name, meta in self._designvars.items():
+            # translate absolute var names to promoted names for pyoptsparse
+            prom_name = model._get_prom_name(name)
+            indep_list_prom.append(prom_name)
+
             size = meta['global_size'] if meta['distributed'] else meta['size']
             if pyoptsparse_version is None or pyoptsparse_version < Version('2.6.1'):
-                opt_prob.addVarGroup(name, size, type='c',
+                opt_prob.addVarGroup(prom_name, size, type='c',
                                      value=input_vals[name],
                                      lower=meta['lower'], upper=meta['upper'])
             else:
-                opt_prob.addVarGroup(name, size, varType='c',
+                opt_prob.addVarGroup(prom_name, size, varType='c',
                                      value=input_vals[name],
                                      lower=meta['lower'], upper=meta['upper'])
 
@@ -423,7 +435,7 @@ class pyOptSparseDriver(Driver):
         # Add all objectives
         objs = self.get_objective_values()
         for name in objs:
-            opt_prob.addObj(name)
+            opt_prob.addObj(model._get_prom_name(name))
             self._quantities.append(name)
 
         cons_to_remove = set()
@@ -465,26 +477,35 @@ class pyOptSparseDriver(Driver):
                 rels = relevant[path]
                 wrt = [v for v in indep_list if self._designvars[v]['source'] in rels]
 
+            prom_name = model._get_prom_name(name)
+
             if not wrt:
-                issue_warning(f"Equality constraint '{name}' does not depend on any design "
+                issue_warning(f"Equality constraint '{prom_name}' does not depend on any design "
                               "variables and was not added to the optimization.")
                 cons_to_remove.add(name)
                 continue
 
+            # convert wrt to use promoted names
+            wrt_prom = model._prom_names_list(wrt)
+
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
-                opt_prob.addConGroup(name, size,
+                jac_prom = model._prom_names_dict(jac)
+                opt_prob.addConGroup(prom_name, size,
                                      lower=lower - _y_intercepts[name],
                                      upper=upper - _y_intercepts[name],
-                                     linear=True, wrt=wrt, jac=jac)
+                                     linear=True, wrt=wrt_prom, jac=jac_prom)
             else:
                 if name in self._res_subjacs:
                     resjac = self._res_subjacs[name]
                     jac = {n: resjac[self._designvars[n]['source']] for n in wrt}
+                    jac_prom = model._prom_names_jac(jac)
                 else:
                     jac = None
+                    jac_prom = None
 
-                opt_prob.addConGroup(name, size, lower=lower, upper=upper, wrt=wrt, jac=jac)
+                opt_prob.addConGroup(prom_name, size, lower=lower, upper=upper,
+                                     wrt=wrt_prom, jac=jac_prom)
                 self._quantities.append(name)
 
         # Add all inequality constraints
@@ -505,25 +526,34 @@ class pyOptSparseDriver(Driver):
                 rels = relevant[path]
                 wrt = [v for v in indep_list if self._designvars[v]['source'] in rels]
 
+            prom_name = model._get_prom_name(name)
+
             if not wrt:
-                issue_warning(f"Inequality constraint '{name}' does not depend on any design "
+                issue_warning(f"Inequality constraint '{prom_name}' does not depend on any design "
                               "variables and was not added to the optimization.")
                 cons_to_remove.add(name)
                 continue
 
+            # convert wrt to use promoted names
+            wrt_prom = model._prom_names_list(wrt)
+
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
-                opt_prob.addConGroup(name, size,
+                jac_prom = model._prom_names_dict(jac)
+                opt_prob.addConGroup(prom_name, size,
                                      upper=upper - _y_intercepts[name],
                                      lower=lower - _y_intercepts[name],
-                                     linear=True, wrt=wrt, jac=jac)
+                                     linear=True, wrt=wrt_prom, jac=jac_prom)
             else:
                 if name in self._res_subjacs:
                     resjac = self._res_subjacs[name]
                     jac = {n: resjac[self._designvars[n]['source']] for n in wrt}
+                    jac_prom = model._prom_names_jac(jac)
                 else:
                     jac = None
-                opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt, jac=jac)
+                    jac_prom = None
+                opt_prob.addConGroup(prom_name, size, upper=upper, lower=lower,
+                                     wrt=wrt_prom, jac=jac_prom)
                 self._quantities.append(name)
 
         for name in cons_to_remove:
@@ -540,6 +570,32 @@ class pyOptSparseDriver(Driver):
             # but raise with the original traceback.
             msg = "Optimizer %s is not available in this installation." % optimizer
             raise ImportError(msg)
+
+        # Need to tell optimizer where to put its .out files
+        if self.options['output_dir'] is None:
+            output_dir = "."
+        elif self.options['output_dir'] == _DEFAULT_REPORTS_DIR:
+            problem = self._problem()
+            default_output_dir = pathlib.Path(get_reports_dir()).joinpath(problem._name)
+            pathlib.Path(default_output_dir).mkdir(parents=True, exist_ok=True)
+            output_dir = str(default_output_dir)
+        else:
+            output_dir = self.options['output_dir']
+
+        optimizers_and_output_files = {
+            # ALPSO uses a single option `filename` to determine name of both output files
+            'ALPSO': [('filename', 'ALPSO.out')],
+            'CONMIN': [('IFILE', 'CONMIN.out')],
+            'IPOPT': [('output_file', 'IPOPT.out')],
+            'PSQP': [('IFILE', 'PSQP.out')],
+            'SLSQP': [('IFILE', 'SLSQP.out')],
+            'SNOPT': [('Print file', 'SNOPT_print.out'), ('Summary file', 'SNOPT_summary.out')]
+        }
+
+        if optimizer in optimizers_and_output_files:
+            for opt_setting_name, output_file_name in optimizers_and_output_files[optimizer]:
+                if self.opt_settings.get(opt_setting_name) is None:
+                    self.opt_settings[opt_setting_name] = f'{output_dir}/{output_file_name}'
 
         # Process any default optimizer-specific settings.
         if optimizer in DEFAULT_OPT_SETTINGS:
@@ -612,7 +668,7 @@ class pyOptSparseDriver(Driver):
         # framework is left in the right final state
         dv_dict = sol.getDVs()
         for name in indep_list:
-            self.set_design_var(name, dv_dict[name])
+            self.set_design_var(name, dv_dict[model._get_prom_name(name)])
 
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             try:
@@ -683,7 +739,7 @@ class pyOptSparseDriver(Driver):
 
         try:
             for name in self._indep_list:
-                self.set_design_var(name, dv_dict[name])
+                self.set_design_var(name, dv_dict[model._get_prom_name(name)])
 
             # print("Setting DV")
             # print(dv_dict)
@@ -692,6 +748,8 @@ class pyOptSparseDriver(Driver):
             if self._user_termination_flag:
                 func_dict = self.get_objective_values()
                 func_dict.update(self.get_constraint_values(lintype='nonlinear'))
+                # convert func_dict to use promoted names
+                func_dict = model._prom_names_dict(func_dict)
                 return func_dict, 2
 
             # Execute the model
@@ -728,6 +786,9 @@ class pyOptSparseDriver(Driver):
             for name in func_dict:
                 func_dict[name].fill(np.NAN)
 
+        # convert func_dict to use promoted names
+        func_dict = model._prom_names_dict(func_dict)
+
         # print("Functions calculated")
         # print(dv_dict)
         # print(func_dict, flush=True)
@@ -760,6 +821,7 @@ class pyOptSparseDriver(Driver):
             1 for unsuccessful function evaluation
         """
         prob = self._problem()
+        model = prob.model
         fail = 0
         sens_dict = {}
 
@@ -798,9 +860,10 @@ class pyOptSparseDriver(Driver):
                 # TODO: look into getting rid of all of these conversions!
                 new_sens = {}
                 res_subjacs = self._res_subjacs
-                for okey in func_dict:
+
+                for okey in self._quantities:
                     new_sens[okey] = newdv = {}
-                    for ikey in dv_dict:
+                    for ikey in self._designvars.keys():
                         ikey_src = self._designvars[ikey]['source']
                         if okey in res_subjacs and ikey_src in res_subjacs[okey]:
                             arr = sens_dict[okey][ikey]
@@ -820,16 +883,21 @@ class pyOptSparseDriver(Driver):
         if fail > 0:
             # We need to cobble together a sens_dict of the correct size.
             # Best we can do is return zeros or NaNs.
-            for okey, oval in func_dict.items():
+            for okey in self._quantities:
                 if okey not in sens_dict:
                     sens_dict[okey] = {}
+                oval = func_dict[model._get_prom_name(okey)]
                 osize = len(oval)
-                for ikey, ival in dv_dict.items():
+                for ikey in self._designvars.keys():
+                    ival = dv_dict[model._get_prom_name(ikey)]
                     isize = len(ival)
                     if ikey not in sens_dict[okey] or self._fill_NANs:
                         sens_dict[okey][ikey] = np.zeros((osize, isize))
                         if self._fill_NANs:
                             sens_dict[okey][ikey].fill(np.NAN)
+
+        # convert sens_dict to use promoted names
+        sens_dict = model._prom_names_jac(sens_dict)
 
         # print("Derivatives calculated")
         # print(dv_dict)

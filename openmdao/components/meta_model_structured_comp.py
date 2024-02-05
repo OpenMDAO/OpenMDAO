@@ -145,9 +145,6 @@ class MetaModelStructuredComp(ExplicitComponent):
         """
         interp_method = self.options['method']
 
-        opts = {}
-        if 'interp_options' in self.options:
-            opts = self.options['interp_options']
         for name, train_data in self.training_outputs.items():
             self.interps[name] = InterpND(method=interp_method,
                                           points=self.inputs, values=train_data,
@@ -212,7 +209,7 @@ class MetaModelStructuredComp(ExplicitComponent):
                 varname_causing_error = '.'.join((self.pathname, self.pnames[err.idx]))
                 errmsg = (f"{self.msginfo}: Error interpolating output '{out_name}' "
                           f"because input '{varname_causing_error}' was out of bounds "
-                          f"('{ err.lower}', '{err.upper}') with value '{err.value}'")
+                          f"('{err.lower}', '{err.upper}') with value '{err.value}'")
                 raise AnalysisError(errmsg, inspect.getframeinfo(inspect.currentframe()),
                                     self.msginfo)
 

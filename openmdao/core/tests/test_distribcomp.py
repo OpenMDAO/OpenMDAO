@@ -1056,8 +1056,8 @@ class TestGroupMPI(unittest.TestCase):
                                      desc="Size of input vector x.")
 
             def setup(self):
-                self.add_input('x', np.ones(self.options['size']))
-                self.add_output('y', 1.0)
+                self.add_input('x', np.ones(self.options['size']), distributed=True)
+                self.add_output('y', 1.0, distributed=True)
 
             def compute(self, inputs, outputs):
                 outputs['y'] = np.sum(inputs['x'])*2.0
@@ -1068,7 +1068,7 @@ class TestGroupMPI(unittest.TestCase):
                               promotes_outputs=['x'])
 
         # decide what parts of the array we want based on our rank
-        if self.comm.rank == 0:
+        if p.comm.rank == 0:
             idxs = [0, 1, 2]
         else:
             # use [3, -1] here rather than [3, 4] just to show that we
@@ -1083,12 +1083,12 @@ class TestGroupMPI(unittest.TestCase):
         p.run_model()
 
         # each rank holds the assigned portion of the input array
-        assert_near_equal(p['C1.x'],
+        assert_near_equal(p.get_val('C1.x', get_remote=False),
                          np.arange(3, dtype=float) if p.model.C1.comm.rank == 0 else
                          np.arange(3, 5, dtype=float))
 
         # the output in each rank is based on the local inputs
-        assert_near_equal(p['C1.y'], 6. if p.model.C1.comm.rank == 0 else 14.)
+        assert_near_equal(p.get_val('C1.y', get_remote=False), 6. if p.model.C1.comm.rank == 0 else 14.)
 
 
 if __name__ == '__main__':

@@ -81,21 +81,29 @@ class ProbRemoteTestCase(unittest.TestCase):
         par.add_subsystem('C2', om.ExecComp('y=3*x'))
         p.model.connect('indep.x', ['par.C1.x', 'par.C2.x'])
 
-        with self.assertRaisesRegex(RuntimeError,
-            "Problem .*: is_local\('indep\.x'\) was called before setup\(\) completed\."):
-            loc = p.is_local('indep.x')
+        with self.assertRaises(RuntimeError) as err:
+            p.is_local('indep.x')
+        self.assertEqual(str(err.exception),
+                         f"Problem {p._get_inst_id()}: is_local('indep.x') "
+                         "was called before setup() completed.")
 
-        with self.assertRaisesRegex(RuntimeError,
-            "Problem .*: is_local\('par\.C1'\) was called before setup\(\) completed\."):
-            loc = p.is_local('par.C1')
+        with self.assertRaises(RuntimeError) as err:
+            p.is_local('par.C1')
+        self.assertEqual(str(err.exception),
+                         f"Problem {p._get_inst_id()}: is_local('par.C1') "
+                         "was called before setup() completed.")
 
-        with self.assertRaisesRegex(RuntimeError,
-            "Problem .*: is_local\('par\.C1\.y'\) was called before setup\(\) completed\."):
-            loc = p.is_local('par.C1.y')
+        with self.assertRaises(RuntimeError) as err:
+            p.is_local('par.C1.y')
+        self.assertEqual(str(err.exception),
+                         f"Problem {p._get_inst_id()}: is_local('par.C1.y') "
+                         "was called before setup() completed.")
 
-        with self.assertRaisesRegex(RuntimeError,
-            "Problem .*: is_local\('par\.C1\.x'\) was called before setup\(\) completed\."):
-            loc = p.is_local('par.C1.x')
+        with self.assertRaises(RuntimeError) as err:
+            p.is_local('par.C1.x')
+        self.assertEqual(str(err.exception),
+                         f"Problem {p._get_inst_id()}: is_local('par.C1.x') "
+                         "was called before setup() completed.")
 
         p.setup()
         p.final_setup()

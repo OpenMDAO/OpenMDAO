@@ -247,7 +247,7 @@ class Component(System):
         # If declare partials wasn't called, call it with of='*' and wrt='*' so we'll have
         # something to color.
         if self._coloring_info['coloring'] is not None:
-            for key, meta in self._declared_partials.items():
+            for meta in self._declared_partials.values():
                 if 'method' in meta and meta['method'] is not None:
                     break
             else:
@@ -342,7 +342,8 @@ class Component(System):
         Process all partials and approximations that the user declared.
         """
         self._subjacs_info = {}
-        self._jacobian = DictionaryJacobian(system=self)
+        if not self.matrix_free:
+            self._jacobian = DictionaryJacobian(system=self)
 
         self.setup_partials()  # hook for component writers to specify sparsity patterns
 
@@ -359,12 +360,6 @@ class Component(System):
         for key, dct in self._declared_partials.items():
             of, wrt = key
             self._declare_partials(of, wrt, dct)
-
-        if self.matrix_free and self._subjacs_info:
-            issue_warning("matrix free component has declared the following "
-                          f"partials: {sorted(self._subjacs_info)}, which will allocate "
-                          "(possibly unnecessary) memory for each of those sub-jacobians.",
-                          prefix=self.msginfo, category=DerivativesWarning)
 
     def setup_partials(self):
         """
@@ -401,6 +396,8 @@ class Component(System):
         if ('*', '*') in self._declared_partials:
             return
 
+        # keep old default behavior where matrix free components are assumed to have
+        # 'dense' whole variable to whole variable partials if no partials are declared.
         if self.matrix_free and not self._declared_partials:
             return
 
@@ -1009,17 +1006,6 @@ class Component(System):
                         if dist_in:
                             offset = np.sum(sizes_in[:iproc, i])
                             end = offset + sizes_in[iproc, i]
-                        else:
-                            if src.startswith('_auto_ivc.'):
-                                nzs = np.nonzero(vout_sizes)[0]
-                                if nzs.size == 1:
-                                    # special case where we have a 'distributed' auto_ivc output
-                                    # that has a nonzero value in only one proc, so we can treat
-                                    # it like a non-distributed output. This happens in cases
-                                    # where an auto_ivc output connects to a variable that is
-                                    # remote on at least one proc.
-                                    offset = 0
-                                    end = vout_sizes[nzs[0]]
 
                     # total sizes differ and output is distributed, so can't determine mapping
                     if offset is None:
@@ -1159,6 +1145,14 @@ class Component(System):
 
         if dependent:
             meta['val'] = val
+
+            _val = val.data if issparse(val) else val
+            if np.all(_val == 0):
+                warn_deprecation(f'{self.msginfo}: d({of})/d({wrt}): Partial was declared to be '
+                                 f'exactly zero. This is inefficient and the declaration should '
+                                 f'be removed. In a future version of OpenMDAO this behavior '
+                                 f'will raise an error.')
+
             if rows is not None:
                 rows = np.array(rows, dtype=INT_DTYPE, copy=False)
                 cols = np.array(cols, dtype=INT_DTYPE, copy=False)
@@ -1441,6 +1435,7 @@ class Component(System):
         val = dct['val'] if 'val' in dct else None
         is_scalar = isscalar(val)
         dependent = dct['dependent']
+        matfree = self.matrix_free
 
         if dependent:
             if 'rows' in dct and dct['rows'] is not None:  # sparse list format
@@ -1462,7 +1457,7 @@ class Component(System):
                                          'must be a scalar or have the same shape, val: {}, '
                                          'rows/cols: {}'.format(self.msginfo, of, wrt,
                                                                 val.shape, rows.shape))
-                else:
+                elif not matfree:
                     val = np.zeros_like(rows, dtype=float)
 
                 if rows.size > 0:
@@ -1542,7 +1537,7 @@ class Component(System):
                             # distributed vars are allowed to have zero size outputs on some procs
                             cols_max = -1
 
-                if val is None:
+                if val is None and not matfree:
                     # we can only get here if rows is None  (we're not sparse list format)
                     meta['val'] = np.zeros(shape)
                 elif is_array:
@@ -1669,7 +1664,8 @@ class Component(System):
                     if not self._coloring_info['dynamic']:
                         coloring._check_config_partial(self)
                     self._update_subjac_sparsity(coloring.get_subjac_sparsity())
-                self._jacobian._restore_approx_sparsity()
+                if self._jacobian is not None:
+                    self._jacobian._restore_approx_sparsity()
 
     def _resolve_src_inds(self):
         abs2prom = self._var_abs2prom['input']
@@ -1769,7 +1765,7 @@ class Component(System):
         """
         nzresids = []
         dresids = self._dresiduals.asarray()
-        for of, start, end, _full_slice, dist_sizes in self._jac_of_iter():
+        for of, start, end, _, dist_sizes in self._jac_of_iter():
             if dist_sizes is not None:
                 if np.any(dresids[start:end]):
                     nzresids.append(of)

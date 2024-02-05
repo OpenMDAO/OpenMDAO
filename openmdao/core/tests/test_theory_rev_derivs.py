@@ -111,8 +111,8 @@ class TestTheoryDocExample(unittest.TestCase):
 
         all_dinputs = model.comm.allgather(model._dinputs.asarray())
 
-        assert_near_equal(all_dinputs[0], np.array([16.,  8.,  2.,  3.]))
-        assert_near_equal(all_dinputs[1], np.array([36., 18.,  2.,  3.]))
+        assert_near_equal(all_dinputs[0], np.array([26.,  4.,  2.,  3.]))
+        assert_near_equal(all_dinputs[1], np.array([26., 9.,  2.,  3.]))
 
 
 if __name__ == "__main__":

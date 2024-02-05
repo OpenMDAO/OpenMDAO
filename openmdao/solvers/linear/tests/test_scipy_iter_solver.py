@@ -267,6 +267,7 @@ class TestScipyKrylovFeature(unittest.TestCase):
 
         model.linear_solver = om.ScipyKrylov()
         model.linear_solver.options['maxiter'] = 3
+        model.linear_solver.options['err_on_non_converge'] = True
 
         prob.setup()
 
@@ -278,9 +279,11 @@ class TestScipyKrylovFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_near_equal(J['obj', 'z'][0][0], 0.0, .00001)
-        assert_near_equal(J['obj', 'z'][0][1], 0.0, .00001)
+        with self.assertRaises(om.AnalysisError) as cm:
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
+
+        msg = "Solver 'LN: SCIPY' on system '' failed to converge in 3 iterations."
+        self.assertEqual(str(cm.exception), msg)
 
     def test_feature_atol(self):
 

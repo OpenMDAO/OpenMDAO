@@ -22,15 +22,17 @@ class MyCompApprox(om.ImplicitComponent):
         self.declare_partials('res', ['*'], method='fd')
 
     def apply_nonlinear(self, inputs, outputs, residuals):
-        mm = inputs['mm'][0]
+        mm = inputs['mm'].item()
+        Re = outputs['Re'].item()
+        temp = outputs['temp'][0][0].item()
+
         T = 389.97
         cf = 0.01
-        temp = outputs['temp'][0][0]
         RE = 1.479301E9 * .0260239151 * (T / 1.8 + 110.4) / (T / 1.8) ** 2
         comb = 4.593153E-6 * 0.8 * (T + 198.72) / (RE * mm * T ** 1.5)
         temp_ratio = 1.0 + 0.035 * mm * mm + 0.45 * (temp / T - 1.0)
         CFL = cf / (1.0 + 3.59 * np.sqrt(cf) * temp_ratio)
-        residuals['res'][0] = outputs['Re'] - RE * mm
+        residuals['res'][0] = Re - RE * mm
         residuals['res'][1] = (1.0 / (1.0 +  comb * temp ** 3 / CFL) + temp) * 0.5 - temp
 
 
@@ -310,6 +312,62 @@ class ResidNamingTestCase(unittest.TestCase):
         totals = prob.check_totals(method='cs', out_stream=None)
         for val in totals.values():
             assert_near_equal(val['rel error'][0], 0.0, 1e-12)
+
+
+class _InputResidComp(om.ImplicitComponent):
+
+    def add_residual_from_input(self, name, **kwargs):
+        resid_name = 'resid_' + name
+
+        self.add_input(name, **kwargs)
+        self.add_residual(resid_name, **kwargs)
+        self.declare_partials(of='*', wrt='*', method='fd')
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        residuals.set_val(inputs.asarray())
+
+
+class _TestGroup(om.Group):
+
+    def setup(self):
+        self.add_subsystem('exec_com', om.ExecComp(['res_a = a - x[0]', 'res_b = b - x[1:]'],
+                                                   a={'shape': (1,)},
+                                                   b={'shape': (2,)},
+                                                   res_a={'shape': (1,)},
+                                                   res_b={'shape': (2,)},
+                                                   x={'shape':3}),
+                           promotes_inputs=['*'], promotes_outputs=['*'])
+
+        self.add_subsystem('resid_comp', _InputResidComp(),
+                           promotes_inputs=['*'], promotes_outputs=['*'])
+
+    def configure(self):
+        resid_comp = self._get_subsystem('resid_comp')
+        resid_comp.add_output('x', shape=(3,))
+        resid_comp.add_residual_from_input('res_a', shape=(1,))
+        resid_comp.add_residual_from_input('res_b', shape=(2,))
+        self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        self.linear_solver = om.DirectSolver()
+
+
+class TestAddResidualConfigure(unittest.TestCase):
+
+    def test_add_residual_configure(self):
+        p = om.Problem()
+        p.model.add_subsystem('test_group', _TestGroup())
+        p.setup()
+
+        p.set_val('test_group.a', 3.0)
+        p.set_val('test_group.b', [4.0, 5.0])
+
+        p.run_model()
+
+        a = p.get_val('test_group.a')
+        b = p.get_val('test_group.b')
+        x = p.get_val('test_group.x')
+
+        assert_near_equal(a, x[0], tolerance=1.0E-9)
+        assert_near_equal(b, x[1:], tolerance=1.0E-9)
 
 
 if __name__ == '__main__':

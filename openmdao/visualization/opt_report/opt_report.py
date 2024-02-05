@@ -130,16 +130,7 @@ def opt_report(prob, outfile=None):
 
     driver_scaling = True
 
-    # Collect data from the problem
-    abs2prom = prob.model._var_abs2prom
-
-    def get_prom_name(abs_name):
-        if abs_name in abs2prom['input']:
-            return abs2prom['input'][abs_name]
-        elif abs_name in abs2prom['output']:
-            return abs2prom['output'][abs_name]
-        else:
-            return abs_name
+    get_prom_name = prob.model._get_prom_name
 
     # Collect the entire array of array valued desvars and constraints (ignore indices)
     objs_vals = {}
@@ -490,8 +481,8 @@ def _sparkline(kind, meta, val, width=300):
         else:
             _eq_constraint_sparkline(ax, meta, val)
     except (ValueError, IndexError):
-        mpl.use(_backend)  # set it back
         plt.close()
+        mpl.use(_backend)  # set it back
         return '<span class="plot-unavailable">Plot unavailable</span>'
 
     tmpfile = io.BytesIO()
@@ -500,8 +491,8 @@ def _sparkline(kind, meta, val, width=300):
     encoded = base64.b64encode(tmpfile.getvalue()).decode('utf-8')
     html = f'<img width={width} src=\'data:image/png;base64,{encoded}\'>'
 
-    mpl.use(_backend)  # set it back
     plt.close()
+    mpl.use(_backend)  # set it back
 
     return html
 
@@ -674,6 +665,12 @@ def _constraint_plot(kind, meta, val, width=300):
     if not (np.isscalar(val) or val.shape == (1,)):
         raise ValueError("Value for the _constraint_plot function must be a "
                          f"scalar. Variable {meta['name']} is not a scalar")
+    else:
+        val = val.item()
+
+    # If lower and upper bounds are None, return an HTML snippet indicating the issue
+    if kind == 'constraint' and meta['upper'] == INF_BOUND and meta['lower'] == -INF_BOUND:
+        return '<span class="bounds-unavailable">Both lower and upper bounds are None.</span>'
 
     if kind == 'desvar' and meta['upper'] == INF_BOUND and meta['lower'] == -INF_BOUND:
         return   # nothing to plot
@@ -714,8 +711,8 @@ def _constraint_plot(kind, meta, val, width=300):
 
     html = f'<img width={width} src=\'data:image/png;base64,{encoded}\'>'
 
-    mpl.use(_backend)
     plt.close()
+    mpl.use(_backend)
 
     return html
 
@@ -810,8 +807,6 @@ def var_bounds_plot(kind, ax, value, lower, upper):
     #  - value much greater than upper
 
     # also need to handle one-sided constraints where only one of lower and upper is given
-    if kind == 'constraint' and upper == INF_BOUND and lower == -INF_BOUND:
-        raise ValueError("Upper and lower bounds cannot all be None for a constraint")
 
     # Basic plot setup
     plt.rcParams['hatch.linewidth'] = _out_of_bounds_hatch_width  # can't seem to do this any other
