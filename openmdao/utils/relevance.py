@@ -240,13 +240,15 @@ class Relevance(object):
 
             if par_fwd or par_rev:
                 self._set_seeds(par_fwd, par_rev, local=True, init=True)
-                self._setup_par_deriv_relevance(group, responses, desvars)
 
         if desvars and responses:
             self._set_all_seeds([m['source'] for m in desvars.values()],
                                 set(m['source'] for m in responses.values()))  # set removes dups
         else:
             self._active = False  # relevance will never be active
+
+        if group.comm.size > 1 and (par_fwd or par_rev):
+            self._setup_par_deriv_relevance(group, responses, desvars)
 
     def __repr__(self):
         """

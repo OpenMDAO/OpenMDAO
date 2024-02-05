@@ -148,8 +148,7 @@ class ScipyKrylov(LinearSolver):
 
         x_vec.set_val(in_arr)
         scope_out, scope_in = system._get_matvec_scope()
-        system._apply_linear(self._assembled_jac, self._rel_systems, self._mode,
-                             scope_out, scope_in)
+        system._apply_linear(self._assembled_jac, self._mode, scope_out, scope_in)
 
         # DO NOT REMOVE: frequently used for debugging
         # print('in', in_arr)
@@ -185,9 +184,8 @@ class ScipyKrylov(LinearSolver):
         mode : str
             'fwd' or 'rev'.
         rel_systems : set of str
-            Names of systems relevant to the current solve.
+            Names of systems relevant to the current solve.  Deprecated.
         """
-        self._rel_systems = rel_systems
         self._mode = mode
 
         system = self._system()

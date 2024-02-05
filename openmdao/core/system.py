@@ -4426,7 +4426,7 @@ class System(object):
             If None, all are in the scope.
         """
         with self._scaled_context_all():
-            self._apply_linear(None, _contains_all, mode, scope_out, scope_in)
+            self._apply_linear(None, mode, scope_out, scope_in)
 
     def run_solve_linear(self, mode):
         """
@@ -4494,7 +4494,7 @@ class System(object):
         """
         return True
 
-    def _apply_linear(self, jac, rel_systems, mode, scope_in=None, scope_out=None):
+    def _apply_linear(self, jac, mode, scope_in=None, scope_out=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -4502,8 +4502,6 @@ class System(object):
         ----------
         jac : Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        rel_systems : set of str
-            Set of names of relevant systems based on the current linear solve.
         mode : str
             'fwd' or 'rev'.
         scope_out : set or None
@@ -4515,7 +4513,7 @@ class System(object):
         """
         raise NotImplementedError(self.msginfo + ": _apply_linear has not been overridden")
 
-    def _solve_linear(self, mode, rel_systems, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
+    def _solve_linear(self, mode, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
@@ -4523,8 +4521,6 @@ class System(object):
         ----------
         mode : str
             'fwd' or 'rev'.
-        rel_systems : set of str
-            Set of names of relevant systems based on the current linear solve.
         scope_out : set, None, or _UNDEFINED
             Outputs relevant to possible lower level calls to _apply_linear on Components.
         scope_in : set, None, or _UNDEFINED

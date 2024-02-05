@@ -309,8 +309,8 @@ class Simple(om.ExplicitComponent):
         partials['y', 'x'] = np.ones(self.size) * 2.0
         self.ncompute_partials += 1
 
-    def _solve_linear(self, mode, rel_systems, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
-        super()._solve_linear(mode, rel_systems, scope_out, scope_in)
+    def _solve_linear(self, mode, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
+        super()._solve_linear(mode, scope_out, scope_in)
         self.nsolve_linear += 1
 
 

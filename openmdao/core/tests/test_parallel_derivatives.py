@@ -540,9 +540,9 @@ class SlowComp(om.ExplicitComponent):
     def compute_partials(self, inputs, partials):
         partials['y', 'x'] = self.mult
 
-    def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, jac, mode, scope_out=None, scope_in=None):
         time.sleep(self.delay)
-        super()._apply_linear(jac, rel_systems, mode, scope_out, scope_in)
+        super()._apply_linear(jac, mode, scope_out, scope_in)
 
 
 class PartialDependGroup(om.Group):

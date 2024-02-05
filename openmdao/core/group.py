@@ -819,46 +819,6 @@ class Group(System):
 
         return graph
 
-    def _setup_par_deriv_relevance(self, responses, desvars, mode):
-        pd_err_chk = defaultdict(dict)
-        relevant = self._relevant
-
-        if mode in ('fwd', 'auto'):
-            for desvar, response, relset in relevant.iter_seed_pair_relevance(inputs=True):
-                if desvar in desvars and relevant._graph.nodes[desvar]['local']:
-                    dvcolor = desvars[desvar]['parallel_deriv_color']
-                    if dvcolor:
-                        pd_err_chk[dvcolor][desvar] = relset
-
-        if mode in ('rev', 'auto'):
-            for desvar, response, relset in relevant.iter_seed_pair_relevance(outputs=True):
-                if response in responses and relevant._graph.nodes[response]['local']:
-                    rescolor = responses[response]['parallel_deriv_color']
-                    if rescolor:
-                        pd_err_chk[rescolor][response] = relset
-
-        # check to make sure we don't have any overlapping dependencies between vars of the
-        # same color
-        errs = {}
-        for pdcolor, dct in pd_err_chk.items():
-            for vname, relset in dct.items():
-                for n, nds in dct.items():
-                    if vname != n and relset.intersection(nds):
-                        if pdcolor not in errs:
-                            errs[pdcolor] = []
-                        errs[pdcolor].append(vname)
-
-        all_errs = self.comm.allgather(errs)
-        msg = []
-        for errdct in all_errs:
-            for color, names in errdct.items():
-                vtype = 'design variable' if mode == 'fwd' else 'response'
-                msg.append(f"Parallel derivative color '{color}' has {vtype}s "
-                           f"{sorted(names)} with overlapping dependencies on the same rank.")
-
-        if msg:
-            raise RuntimeError('\n'.join(msg))
-
     def _check_alias_overlaps(self, responses):
         """
         Check for overlapping indices in aliased responses.
@@ -3491,7 +3451,7 @@ class Group(System):
         return (self._owns_approx_jac and self._jacobian is not None) or \
             self._assembled_jac is not None or not self._linear_solver.does_recursive_applies()
 
-    def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, jac, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -3499,8 +3459,6 @@ class Group(System):
         ----------
         jac : Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        rel_systems : set of str
-            Set of names of relevant systems based on the current linear solve.
         mode : str
             'fwd' or 'rev'.
         scope_out : set or None
@@ -3568,7 +3526,7 @@ class Group(System):
 
             for s in self._relevant.system_filter(self._solver_subsystem_iter(local_only=True),
                                                   relevant=True):
-                s._apply_linear(jac, rel_systems, mode, scope_out, scope_in)
+                s._apply_linear(jac, mode, scope_out, scope_in)
 
             if mode == 'rev':
                 self._transfer('linear', mode)
@@ -3577,7 +3535,7 @@ class Group(System):
                     # zero out dvecs of irrelevant subsystems
                     s._doutputs.set_val(0.0)
 
-    def _solve_linear(self, mode, rel_systems, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
+    def _solve_linear(self, mode, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
@@ -3585,8 +3543,6 @@ class Group(System):
         ----------
         mode : str
             'fwd' or 'rev'.
-        rel_systems : set of str
-            Set of names of relevant systems based on the current linear solve.
         scope_out : set, None, or _UNDEFINED
             Outputs relevant to possible lower level calls to _apply_linear on Components.
         scope_in : set, None, or _UNDEFINED
@@ -3619,9 +3575,9 @@ class Group(System):
                 d_residuals *= -1.0
         else:
             self._linear_solver._set_matvec_scope(scope_out, scope_in)
-            self._linear_solver.solve(mode, rel_systems)
+            self._linear_solver.solve(mode, None)
 
-    def _linearize(self, jac, sub_do_ln=True, rel_systems=_contains_all):
+    def _linearize(self, jac, sub_do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
@@ -3631,9 +3587,6 @@ class Group(System):
             If None, use local jacobian, else use assembled jacobian jac.
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
-        rel_systems : set or ContainsAll
-            Set of relevant system pathnames passed in to the model during computation of total
-            derivatives.
         """
         if self._tot_jac is not None and self._owns_approx_jac:
             self._jacobian = self._tot_jac.J_dict
@@ -4734,6 +4687,52 @@ class Group(System):
                     if s._run_on_opt[opt_status]:
                         yield s
 
+    # def _solver_subsystem_iter(self, local_only=False, relevant=True):
+    #     """
+    #     Iterate over subsystems that are being optimized.
+
+    #     If called on the top level Group when the Group is under an optimizer, this will
+    #     iterate over only the subsystems required to obtain the desired objectives and constraints.
+
+    #     Parameters
+    #     ----------
+    #     local_only : bool
+    #         If True, only iterate over local subsystems.
+    #     relevant : bool
+    #         If True, yield only relevant systems.  If False, yield only irrelevant systems.
+
+    #     Yields
+    #     ------
+    #     System
+    #         A subsystem.
+    #     """
+    #     opt_status = self._problem_meta['opt_status']
+    #     if self._relevant is None:
+    #         def _chk(system):
+    #             return relevant
+    #     elif self._relevant._active and (opt_status is None or opt_status == _OptStatus.OPTIMIZING):
+    #         is_relevant = self._relevant.is_relevant_system
+    #         def _chk(system):
+    #             return relevant == is_relevant(system.pathname)
+    #     else:
+    #         def _chk(system):
+    #             return relevant
+
+    #     if opt_status is None:
+    #         # we're not under an optimizer loop, so return all subsystems
+    #         if local_only:
+    #             for s in self._subsystems_myproc:
+    #                 if _chk(s):
+    #                     yield s
+    #         else:
+    #             for s, _ in self._subsystems_allprocs.values():
+    #                 if _chk(s):
+    #                     yield s
+    #     else:
+    #         for s, _ in self._subsystems_allprocs.values():
+    #             if not local_only or s._is_local:
+    #                 if s._run_on_opt[opt_status]:
+    #                     yield s
     def _setup_iteration_lists(self):
         """
         Set up the iteration lists containing the pre, iterated, and post subsets of systems.

@@ -34,7 +34,7 @@ class LinearBlockJac(BlockLinearSolver):
                 scope_in = self._vars_union(self._scope_in, scope_in)
                 scopelist[i] = (scope_out, scope_in)
                 if subsys._iter_call_apply_linear():
-                    subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+                    subsys._apply_linear(None, mode, scope_out, scope_in)
                 else:
                     subsys._dresiduals.set_val(0.0)
 
@@ -43,7 +43,7 @@ class LinearBlockJac(BlockLinearSolver):
 
             for i, subsys in enumerate(subs):
                 scope_out, scope_in = scopelist[i]
-                subsys._solve_linear(mode, self._rel_systems, scope_out, scope_in)
+                subsys._solve_linear(mode, scope_out, scope_in)
 
         else:  # rev
             for i, subsys in enumerate(subs):
@@ -52,7 +52,7 @@ class LinearBlockJac(BlockLinearSolver):
                 scope_in = self._vars_union(self._scope_in, scope_in)
                 scopelist[i] = (scope_out, scope_in)
                 if subsys._iter_call_apply_linear():
-                    subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+                    subsys._apply_linear(None, mode, scope_out, scope_in)
                 else:
                     subsys._doutputs.set_val(0.0)
 
@@ -63,4 +63,4 @@ class LinearBlockJac(BlockLinearSolver):
 
             for i, subsys in enumerate(subs):
                 scope_out, scope_in = scopelist[i]
-                subsys._solve_linear(mode, self._rel_systems, scope_out, scope_in)
+                subsys._solve_linear(mode, scope_out, scope_in)

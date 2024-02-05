@@ -886,8 +886,6 @@ class LinearSolver(Solver):
 
     Attributes
     ----------
-    _rel_systems : set of str
-        Names of systems relevant to the current solve.
     _assembled_jac : AssembledJacobian or None
         If not None, the AssembledJacobian instance used by this solver.
     _scope_in : set or None or _UNDEFINED
@@ -900,7 +898,6 @@ class LinearSolver(Solver):
         """
         Initialize all attributes.
         """
-        self._rel_systems = None
         self._assembled_jac = None
         self._scope_out = _UNDEFINED
         self._scope_in = _UNDEFINED
@@ -975,7 +972,7 @@ class LinearSolver(Solver):
         mode : str
             'fwd' or 'rev'.
         rel_systems : set of str
-            Set of names of relevant systems based on the current linear solve.
+            Set of names of relevant systems based on the current linear solve.  Deprecated.
         """
         raise NotImplementedError("class %s does not implement solve()." % (type(self).__name__))
 
@@ -1047,8 +1044,7 @@ class LinearSolver(Solver):
         scope_out, scope_in = system._get_matvec_scope()
 
         try:
-            system._apply_linear(self._assembled_jac, self._rel_systems,
-                                 self._mode, scope_out, scope_in)
+            system._apply_linear(self._assembled_jac, self._mode, scope_out, scope_in)
         finally:
             self._recording_iter.pop()
 
@@ -1177,7 +1173,7 @@ class BlockLinearSolver(LinearSolver):
         self._recording_iter.push(('_run_apply', 0))
         try:
             scope_out, scope_in = system._get_matvec_scope()
-            system._apply_linear(self._assembled_jac, self._rel_systems, self._mode,
+            system._apply_linear(self._assembled_jac, self._mode,
                                  self._vars_union(self._scope_out, scope_out),
                                  self._vars_union(self._scope_in, scope_in))
         finally:
@@ -1249,9 +1245,8 @@ class BlockLinearSolver(LinearSolver):
         mode : str
             'fwd' or 'rev'.
         rel_systems : set of str
-            Set of names of relevant systems based on the current linear solve.
+            Set of names of relevant systems based on the current linear solve.  Deprecated.
         """
-        self._rel_systems = rel_systems
         self._mode = mode
         self._solve()
 

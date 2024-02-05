@@ -168,11 +168,7 @@ class _TotalJacInfo(object):
 
         self.simul_coloring = None
 
-        if has_custom_derivs:
-            # have to compute new relevance
-            self.relevance = get_relevance(model, of_metadata, wrt_metadata)
-        else:
-            self.relevance = problem._metadata['relevant']
+        self.relevance = get_relevance(model, of_metadata, wrt_metadata)
 
         self._check_discrete_dependence()
 
@@ -685,7 +681,7 @@ class _TotalJacInfo(object):
                 imeta['seed_vars'] = {source}
                 idx_iter_dict[name] = (imeta, self.single_index_iter)
 
-            tup = (None, cache_lin_sol, name, source)
+            tup = (cache_lin_sol, name, source)
 
             idx_map.extend([tup] * (end - start))
             start = end
@@ -713,7 +709,7 @@ class _TotalJacInfo(object):
                 all_vois = set()
 
                 for i in ilist:
-                    rel_systems, cache_lin_sol, voiname, voisrc = idx_map[i]
+                    cache_lin_sol, voiname, voisrc = idx_map[i]
                     cache |= cache_lin_sol
                     all_vois.add(voisrc)
 
@@ -1013,7 +1009,7 @@ class _TotalJacInfo(object):
         int or None
             key used for storage of cached linear solve (if active, else None).
         """
-        rel_systems, cache_lin_sol, _, _ = self.in_idx_map[mode][idx]
+        cache_lin_sol, _, _ = self.in_idx_map[mode][idx]
 
         self._zero_vecs(mode)
 
@@ -1022,9 +1018,9 @@ class _TotalJacInfo(object):
             self.input_vec[mode].set_val(self.seeds[mode][idx], loc_idx)
 
         if cache_lin_sol:
-            return rel_systems, ('linear',), (idx, mode)
+            return ('linear',), (idx, mode)
         else:
-            return rel_systems, None, None
+            return None, None
 
     def simul_coloring_input_setter(self, inds, itermeta, mode):
         """
@@ -1056,9 +1052,9 @@ class _TotalJacInfo(object):
         self.input_vec[mode].set_val(itermeta['seeds'], itermeta['local_in_idxs'])
 
         if itermeta['cache_lin_solve']:
-            return None, ('linear',), (inds[0], mode)
+            return ('linear',), (inds[0], mode)
         else:
-            return None, None, None
+            return None, None
 
     def par_deriv_input_setter(self, inds, imeta, mode):
         """
@@ -1086,16 +1082,16 @@ class _TotalJacInfo(object):
 
         for i in inds:
             if self.in_loc_idxs[mode][i] >= 0:
-                _, vnames, _ = self.single_input_setter(i, imeta, mode)
+                vnames, _ = self.single_input_setter(i, imeta, mode)
                 if vnames is not None:
                     vec_names.add(vnames[0])
 
         self.model._problem_meta['parallel_deriv_color'] = imeta['par_deriv_color']
 
         if vec_names:
-            return None, sorted(vec_names), (inds[0], mode)
+            return sorted(vec_names), (inds[0], mode)
         else:
-            return None, None, None
+            return None, None
 
     def directional_input_setter(self, inds, itermeta, mode):
         """
@@ -1119,10 +1115,6 @@ class _TotalJacInfo(object):
         None
             Not used.
         """
-        for i in inds:
-            rel_systems, _, _, _ = self.in_idx_map[mode][i]
-            break
-
         self._zero_vecs(mode)
 
         loc_idxs = self.in_loc_idxs[mode][inds]
@@ -1130,7 +1122,7 @@ class _TotalJacInfo(object):
         if loc_idxs.size > 0:
             self.input_vec[mode].set_val(self.seeds[mode][inds], loc_idxs)
 
-        return rel_systems, None, None
+        return None, None
 
     #
     # Jacobian setter functions
@@ -1388,8 +1380,7 @@ class _TotalJacInfo(object):
                         imeta, idx_iter = idx_info
                         for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
                             model._problem_meta['seed_vars'] = itermeta['seed_vars']
-                            rel_systems, _, cache_key = input_setter(inds, itermeta, mode)
-                            rel_systems = None
+                            _, cache_key = input_setter(inds, itermeta, mode)
 
                             if debug_print:
                                 if par_print and key in par_print:
@@ -1420,10 +1411,10 @@ class _TotalJacInfo(object):
                                     if (cache_key is not None and not has_lin_cons and
                                             self.mode == mode):
                                         self._restore_linear_solution(cache_key, mode)
-                                        model._solve_linear(mode, rel_systems)
+                                        model._solve_linear(mode, None)
                                         self._save_linear_solution(cache_key, mode)
                                     else:
-                                        model._solve_linear(mode, rel_systems)
+                                        model._solve_linear(mode, None)
 
                             if debug_print:
                                 print(f'Elapsed Time: {time.perf_counter() - t0} secs\n',
