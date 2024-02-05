@@ -1376,6 +1376,7 @@ class _TotalJacInfo(object):
 
                 # Main loop over columns (fwd) or rows (rev) of the jacobian
                 for mode in self.modes:
+                    fwd = mode == 'fwd'
                     for key, idx_info in self.idx_iter_dict[mode].items():
                         imeta, idx_iter = idx_info
                         for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
@@ -1402,8 +1403,13 @@ class _TotalJacInfo(object):
 
                                 t0 = time.perf_counter()
 
-                            fwd_seeds = itermeta['seed_vars'] if mode == 'fwd' else None
-                            rev_seeds = itermeta['seed_vars'] if mode == 'rev' else None
+                            if fwd:
+                                fwd_seeds = itermeta['seed_vars']
+                                rev_seeds = None
+                            else:
+                                fwd_seeds = None
+                                rev_seeds = itermeta['seed_vars']
+
                             with relevant.seeds_active(fwd_seeds=fwd_seeds, rev_seeds=rev_seeds):
                                 # restore old linear solution if cache_linear_solution was set by
                                 # the user for any input variables involved in this linear solution.
