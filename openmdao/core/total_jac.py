@@ -1417,10 +1417,10 @@ class _TotalJacInfo(object):
                                     if (cache_key is not None and not has_lin_cons and
                                             self.mode == mode):
                                         self._restore_linear_solution(cache_key, mode)
-                                        model._solve_linear(mode, None)
+                                        model._solve_linear(mode)
                                         self._save_linear_solution(cache_key, mode)
                                     else:
-                                        model._solve_linear(mode, None)
+                                        model._solve_linear(mode)
 
                             if debug_print:
                                 print(f'Elapsed Time: {time.perf_counter() - t0} secs\n',

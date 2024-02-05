@@ -36,7 +36,7 @@ from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, \
     DerivativesWarning, PromotionWarning, UnusedOptionWarning, UnitsWarning
 from openmdao.utils.general_utils import determine_adder_scaler, \
-    format_as_float_or_array, _contains_all, all_ancestors, make_set, match_prom_or_abs, \
+    format_as_float_or_array, all_ancestors, make_set, match_prom_or_abs, \
     ensure_compatible, env_truthy, make_traceback, _is_slicer_op
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -4440,7 +4440,7 @@ class System(object):
             'fwd' or 'rev'.
         """
         with self._scaled_context_all():
-            self._solve_linear(mode, _contains_all)
+            self._solve_linear(mode)
 
     def run_linearize(self, sub_do_ln=True, driver=None):
         """

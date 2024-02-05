@@ -25,7 +25,7 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len, ValueRepeater
 from openmdao.utils.general_utils import common_subpath, all_ancestors, \
-    convert_src_inds, _contains_all, shape2tuple, get_connection_owner, ensure_compatible, \
+    convert_src_inds, shape2tuple, get_connection_owner, ensure_compatible, \
     meta2src_iter, get_rev_conns
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
@@ -4687,52 +4687,6 @@ class Group(System):
                     if s._run_on_opt[opt_status]:
                         yield s
 
-    # def _solver_subsystem_iter(self, local_only=False, relevant=True):
-    #     """
-    #     Iterate over subsystems that are being optimized.
-
-    #     If called on the top level Group when the Group is under an optimizer, this will
-    #     iterate over only the subsystems required to obtain the desired objectives and constraints.
-
-    #     Parameters
-    #     ----------
-    #     local_only : bool
-    #         If True, only iterate over local subsystems.
-    #     relevant : bool
-    #         If True, yield only relevant systems.  If False, yield only irrelevant systems.
-
-    #     Yields
-    #     ------
-    #     System
-    #         A subsystem.
-    #     """
-    #     opt_status = self._problem_meta['opt_status']
-    #     if self._relevant is None:
-    #         def _chk(system):
-    #             return relevant
-    #     elif self._relevant._active and (opt_status is None or opt_status == _OptStatus.OPTIMIZING):
-    #         is_relevant = self._relevant.is_relevant_system
-    #         def _chk(system):
-    #             return relevant == is_relevant(system.pathname)
-    #     else:
-    #         def _chk(system):
-    #             return relevant
-
-    #     if opt_status is None:
-    #         # we're not under an optimizer loop, so return all subsystems
-    #         if local_only:
-    #             for s in self._subsystems_myproc:
-    #                 if _chk(s):
-    #                     yield s
-    #         else:
-    #             for s, _ in self._subsystems_allprocs.values():
-    #                 if _chk(s):
-    #                     yield s
-    #     else:
-    #         for s, _ in self._subsystems_allprocs.values():
-    #             if not local_only or s._is_local:
-    #                 if s._run_on_opt[opt_status]:
-    #                     yield s
     def _setup_iteration_lists(self):
         """
         Set up the iteration lists containing the pre, iterated, and post subsets of systems.
