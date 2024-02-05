@@ -173,7 +173,7 @@ def get_relevance(model, of, wrt):
     if key in _relevance_cache:
         return _relevance_cache[key]
 
-    _relevance_cache[key] = rel = Relevance(model, of, wrt)
+    _relevance_cache[key] = rel = Relevance(model, wrt, of)
 
     return rel
 
@@ -205,14 +205,12 @@ class Relevance(object):
         Maps direction to currently active seed variable names.
     _all_seed_vars : dict
         Maps direction to all seed variable names.
-    _local_seeds : set
-        Set of seed vars restricted to local dependencies.
     _active : bool or None
         If True, relevance is active.  If False, relevance is inactive.  If None, relevance is
         uninitialized.
     """
 
-    def __init__(self, group, responses, desvars):
+    def __init__(self, group, fwd_meta, rev_meta):
         """
         Initialize all attributes.
         """
@@ -221,34 +219,18 @@ class Relevance(object):
         self._all_vars = None  # set of all nodes in the graph (or None if not initialized)
         self._relevant_vars = {}  # maps (varname, direction) to variable set checker
         self._relevant_systems = {}  # maps (varname, direction) to relevant system sets
-        self._local_seeds = set()  # set of seed vars restricted to local dependencies
         self._active = None  # allow relevance to be turned on later
-        self._graph = self.get_relevance_graph(group, desvars, responses)
+        self._graph = self.get_relevance_graph(group, rev_meta)
 
         # seed var(s) for the current derivative operation
-        self._seed_vars = {'fwd': (), 'rev': ()}
+        self._seed_vars = {'fwd': frozenset(), 'rev': frozenset()}
         # all seed vars for the entire derivative computation
-        self._all_seed_vars = {'fwd': (), 'rev': ()}
+        self._all_seed_vars = {'fwd': frozenset(), 'rev': frozenset()}
 
-        # for any parallel deriv colored dv/responses, update the relevant sets to include vars with
-        # local only dependencies
-        if group.comm.size > 1:
-            par_fwd = [m['source'] for m in desvars.values()
-                       if m['parallel_deriv_color'] is not None]
-            par_rev = [m['source'] for m in responses.values()
-                       if m['parallel_deriv_color'] is not None]
+        self._set_all_seeds(group, fwd_meta, rev_meta)
 
-            if par_fwd or par_rev:
-                self._set_seeds(par_fwd, par_rev, local=True, init=True)
-
-        if desvars and responses:
-            self._set_all_seeds([m['source'] for m in desvars.values()],
-                                set(m['source'] for m in responses.values()))  # set removes dups
-        else:
+        if not (fwd_meta and rev_meta):
             self._active = False  # relevance will never be active
-
-        if group.comm.size > 1 and (par_fwd or par_rev):
-            self._setup_par_deriv_relevance(group, responses, desvars)
 
     def __repr__(self):
         """
@@ -285,7 +267,7 @@ class Relevance(object):
             finally:
                 self._active = save
 
-    def get_relevance_graph(self, group, desvars, responses):
+    def get_relevance_graph(self, group, responses):
         """
         Return a graph of the relevance between desvars and responses.
 
@@ -356,7 +338,7 @@ class Relevance(object):
 
     def relevant_vars(self, name, direction, inputs=True, outputs=True):
         """
-        Return a set of variables relevant to the given variable in the given direction.
+        Return a set of variables relevant to the given dv/response in the given direction.
 
         Parameters
         ----------
@@ -374,7 +356,6 @@ class Relevance(object):
         set
             Set of the relevant variables.
         """
-        self._init_relevance_set(name, direction)
         if inputs and outputs:
             return self._relevant_vars[name, direction].to_set()
         elif inputs:
@@ -487,26 +468,44 @@ class Relevance(object):
         if msg:
             raise RuntimeError('\n'.join(msg))
 
-    def _set_all_seeds(self, fwd_seeds, rev_seeds):
+    def _set_all_seeds(self, group, fwd_meta, rev_meta):
         """
         Set the full list of seeds to be used to determine relevance.
 
+        This should only be called once, at __init__ time.
+
         Parameters
         ----------
-        fwd_seeds : iter of str
-            Iterator over forward seed variable names.
-        rev_seeds : iter of str
-            Iterator over reverse seed variable names.
+        group : <Group>
+            The top level group in the system hierarchy.
+        fwd_meta : dict
+            Dictionary of metadata for forward derivatives.
+        rev_meta : dict
+            Dictionary of metadata for reverse derivatives.
         """
+        fwd_seeds = frozenset([m['source'] for m in fwd_meta.values()])
+        rev_seeds = frozenset([m['source'] for m in rev_meta.values()])
+
+        nprocs = group.comm.size
+        setup_par_derivs = False
+
+        for meta in fwd_meta.values():
+            local = nprocs > 1 and meta['parallel_deriv_color'] is not None
+            setup_par_derivs |= local
+            self._init_relevance_set(meta['source'], 'fwd', local=local)
+
+        for meta in rev_meta.values():
+            local = nprocs > 1 and meta['parallel_deriv_color'] is not None
+            setup_par_derivs |= local
+            self._init_relevance_set(meta['source'], 'rev', local=local)
+
         self._all_seed_vars['fwd'] = self._seed_vars['fwd'] = fwd_seeds
         self._all_seed_vars['rev'] = self._seed_vars['rev'] = rev_seeds
 
-        for s in fwd_seeds:
-            self._init_relevance_set(s, 'fwd')
-        for s in rev_seeds:
-            self._init_relevance_set(s, 'rev')
+        if setup_par_derivs:
+            self._setup_par_deriv_relevance(group, rev_meta, fwd_meta)
 
-    def _set_seeds(self, fwd_seeds, rev_seeds, local=False, init=False):
+    def _set_seeds(self, fwd_seeds, rev_seeds, local=False):
         """
         Set the seed(s) to determine relevance for a given variable in a given direction.
 
@@ -518,29 +517,19 @@ class Relevance(object):
             Iterator over reverse seed variable names. If None use current active seeds.
         local : bool
             If True, update relevance set if necessary to include only local variables.
-        init : bool
-            If True, initialize the relevance_set if it hasn't been initialized yet.
         """
         if fwd_seeds:
-            fwd_seeds = tuple(sorted(fwd_seeds))  # TODO: sorting may not be necessary...
+            fwd_seeds = frozenset(fwd_seeds)
         else:
             fwd_seeds = self._all_seed_vars['fwd']
 
         if rev_seeds:
-            rev_seeds = tuple(sorted(rev_seeds))
+            rev_seeds = frozenset(rev_seeds)
         else:
             rev_seeds = self._all_seed_vars['rev']
 
         self._seed_vars['fwd'] = fwd_seeds
         self._seed_vars['rev'] = rev_seeds
-
-        if init:
-            if fwd_seeds:
-                for s in fwd_seeds:
-                    self._init_relevance_set(s, 'fwd', local=local)
-            if rev_seeds:
-                for s in rev_seeds:
-                    self._init_relevance_set(s, 'rev', local=local)
 
     def reset_to_all_seeds(self):
         """
@@ -643,7 +632,7 @@ class Relevance(object):
             If True, update relevance set if necessary to include only local variables.
         """
         key = (varname, direction)
-        if key not in self._relevant_vars or (local and key not in self._local_seeds):
+        if key not in self._relevant_vars:
             assert direction in ('fwd', 'rev'), "direction must be 'fwd' or 'rev'"
 
             # first time we've seen this varname/direction pair, so we need to
@@ -661,9 +650,6 @@ class Relevance(object):
                 self._all_vars = {n for n in self._graph.nodes() if n not in allsystems}
 
             rel_vars = depnodes - self._all_systems
-
-            if local:
-                self._local_seeds.add(key)
 
             self._relevant_systems[key] = _get_set_checker(rel_systems, self._all_systems)
             self._relevant_vars[key] = _get_set_checker(rel_vars, self._all_vars)

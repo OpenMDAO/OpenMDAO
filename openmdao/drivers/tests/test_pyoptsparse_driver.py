@@ -166,6 +166,7 @@ class TestNotInstalled(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI, "MPI is required.")
+@use_tempdirs
 class TestMPIScatter(unittest.TestCase):
     N_PROCS = 2
 
