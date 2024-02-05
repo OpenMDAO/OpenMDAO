@@ -310,6 +310,12 @@ class Relevance(object):
         """
         graph = group._get_dataflow_graph()
 
+        # if doing top level FD/CS, don't update relevance graph based
+        # on missing partials because FD/CS doesn't require that partials
+        # are declared to compute derivatives
+        if group._owns_approx_jac:
+            return graph
+
         # figure out if we can remove any edges based on zero partials we find
         # in components.  By default all component connected outputs
         # are also connected to all connected inputs from the same component.

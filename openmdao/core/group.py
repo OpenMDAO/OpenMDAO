@@ -3731,11 +3731,8 @@ class Group(System):
         missing : dict
             Dictionary containing list of missing derivatives keyed by system pathname.
         """
-        # don't collect missing partials for approx groups because they don't have to declare
-        # partials, i.e. undeclared partials are not assumed to be zero.
-        if not self._owns_approx_jac:
-            for subsys in self._subsystems_myproc:
-                subsys._get_missing_partials(missing)
+        for subsys in self._subsystems_myproc:
+            subsys._get_missing_partials(missing)
 
     def _approx_subjac_keys_iter(self):
         # yields absolute keys (no aliases)
