@@ -52,17 +52,17 @@ def extract_compressed_model(filename):
     return model_data
 
 
-@use_tempdirs
+# @use_tempdirs
 def save_viewer_data(viewer_data, filename):
     """
     Save viewer data to JSON file for use in future testing.
     """
     from openmdao.utils.testing_utils import _ModelViewerDataTreeEncoder
-    with open(filename, 'w') as json_file:
+    with open(os.path.join(parent_dir, filename), 'w') as json_file:
         json.dump(viewer_data['tree'], json_file, cls=_ModelViewerDataTreeEncoder, indent=4)
 
 
-@use_tempdirs
+# @use_tempdirs
 class TestViewerData(unittest.TestCase):
 
     def check_viewer_data(self, viewer_data, filename, partials=True):
@@ -220,7 +220,7 @@ class TestViewerData(unittest.TestCase):
         Verify that the correct model structure data exists when stored as compared
         to the expected structure, using the SellarStateConnection model.
 
-        Note: Use self.save_model_data() to regenerate JSON file if needed when updating test
+        Note: Use save_viewer_data() to regenerate JSON file if needed when updating test
         """
         filename = "sellarstate.sql"
 
@@ -228,11 +228,18 @@ class TestViewerData(unittest.TestCase):
         p.driver.add_recorder(SqliteRecorder(filename))
         p.setup()
 
+        # Uncomment to update regression data
+        # save_viewer_data(_get_viewer_data(p), 'sellar_no_values.json')
+
         # there should be no values when data is generated before final_setup
         self.check_viewer_data(_get_viewer_data(p), 'sellar_no_values.json', partials=False)
 
         # there should be initial values when data is generated after final_setup
         p.final_setup()
+
+        # Uncomment to update regression data
+        # save_viewer_data(_get_viewer_data(p), 'sellar_initial_values.json')
+
         self.check_viewer_data(_get_viewer_data(p), 'sellar_initial_values.json')
 
         # recorded viewer data should match
@@ -240,6 +247,11 @@ class TestViewerData(unittest.TestCase):
 
         # there should be final values when data is generated after run_model
         p.run_model()
+
+        # Uncomment to update regression data
+        # save_viewer_data(_get_viewer_data(p), 'sellar_final_values.json')
+        # save_viewer_data(_get_viewer_data(p, values=False), 'sellar_no_values_run.json')
+
         # TODO: need to compare with tolerance for different platforms
         # self.check_viewer_data(_get_viewer_data(p), 'sellar_final_values.json')
 
