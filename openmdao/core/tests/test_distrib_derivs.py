@@ -1,6 +1,5 @@
 """ Test out some crucial linear GS tests in parallel with distributed comps."""
 
-from openmdao.jacobians.jacobian import Jacobian
 import unittest
 import itertools
 
@@ -16,6 +15,7 @@ from openmdao.utils.name_maps import rel_name2abs_name
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, \
     assert_check_totals, assert_warning
+from openmdao.utils.testing_utils import use_tempdirs
 
 try:
     from pyoptsparse import Optimization as pyoptsparse_opt
@@ -347,6 +347,7 @@ def _test_func_name(func, num, param):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@use_tempdirs
 class MPITests2(unittest.TestCase):
 
     N_PROCS = 2
@@ -1490,6 +1491,7 @@ class DistParab2(om.ExplicitComponent):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@use_tempdirs
 class MPITests3(unittest.TestCase):
 
     N_PROCS = 3
@@ -1673,6 +1675,7 @@ class MPITests3(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@use_tempdirs
 class MPITestsBug(unittest.TestCase):
 
     N_PROCS = 2
@@ -1943,6 +1946,7 @@ class MPITestsBug(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@use_tempdirs
 class MPIFeatureTests(unittest.TestCase):
 
     N_PROCS = 2
@@ -2051,6 +2055,7 @@ class MPIFeatureTests(unittest.TestCase):
         assert_near_equal(obj, 11.5015, 1e-6)
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@use_tempdirs
 class ZeroLengthInputsOutputs(unittest.TestCase):
 
     N_PROCS = 4
