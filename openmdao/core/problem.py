@@ -1022,7 +1022,7 @@ class Problem(object):
                                 # current derivative solve.
             'coloring_randgen': None,  # If total coloring is being computed, will contain a random
                                        # number generator, else None.
-            'computing_objective': False,  # True if we are currently computing the objective
+            'group_by_pre_opt_post': self.options['group_by_pre_opt_post'],  # see option
         }
 
         if _prob_setup_stack:

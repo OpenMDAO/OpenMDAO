@@ -2103,8 +2103,8 @@ class RelevanceTestCase(unittest.TestCase):
         model.add_subsystem('C2', MultComp(3.))
         model.add_subsystem('C3', MultComp(5.))
         model.add_subsystem('C4', MultComp(7.))
-        model.add_subsystem('C5', MultComp(9.))
-        model.add_subsystem('C6', MultComp(11.))
+        model.add_subsystem('C5', MultComp(.1))
+        model.add_subsystem('C6', MultComp(.01))
 
         model.connect('indeps.a', 'C1.x')
         model.connect('indeps.b', ['C1.y', 'C2.x'])
@@ -2121,6 +2121,8 @@ class RelevanceTestCase(unittest.TestCase):
         p = self._setup_relevance_problem()
         p.model.connect('C5.fxy', 'C4.y')
         p.model.connect('C6.fxy', 'C5.y')
+        p.model.nonlinear_solver = om.NonlinearBlockGS(maxiter=500)
+        p.model.linear_solver = om.LinearBlockGS(maxiter=500)
         return p
 
     def _finish_setup_and_check(self, p, expected, approx=False):
@@ -2134,14 +2136,15 @@ class RelevanceTestCase(unittest.TestCase):
         p['C6.y'] = 1.
 
         p.run_model()
-
+        
         allcomps = [getattr(p.model, f"C{i}") for i in range(1, 7)]
 
         if approx:
             for c in allcomps:
                 c._reset_counts(names=['_compute_wrapper'])
-
-        p.run_driver()
+            p.compute_totals()
+        else:
+            p.run_driver()
 
         ran_linearize = [c.name for c in allcomps if c._counts['_linearize'] > 0]
         ran_compute_partials = [c.name for c in allcomps if c._counts['_compute_partials_wrapper'] > 0]
@@ -2149,12 +2152,12 @@ class RelevanceTestCase(unittest.TestCase):
 
         if approx:
             for c in allcomps:
-                self.assertEqual(c._counts['_compute_wrapper'], expected[c.name])
+                self.assertEqual(c._counts['_compute_wrapper'], expected[c.name], f"for {c.name}")
         else:
             self.assertEqual(ran_linearize, expected)
             self.assertEqual(ran_compute_partials, expected)
             self.assertEqual(ran_solve_linear, expected)
-
+            
     def test_relevance(self):
         p = self._setup_relevance_problem()
 
@@ -2172,9 +2175,9 @@ class RelevanceTestCase(unittest.TestCase):
         p.model.add_design_var('indeps.b', lower=-50., upper=50.)
         p.model.add_objective('C6.fxy')
         p.model.add_constraint('C4.fxy', upper=1000.)
-        p.model.approx_totals()
+        p.model.approx_totals(method='cs')
 
-        self._finish_setup_and_check(p, {'C2': 7, 'C4': 7, 'C6': 7, 'C1': 4, 'C3': 4, 'C5': 4}, approx=True)
+        self._finish_setup_and_check(p, {'C2': 1, 'C4': 1, 'C6': 1, 'C1': 0, 'C3': 0, 'C5': 0}, approx=True)
 
     def test_relevance2(self):
         p = self._setup_relevance_problem()

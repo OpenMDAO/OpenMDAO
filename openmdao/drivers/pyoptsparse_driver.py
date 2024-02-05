@@ -396,7 +396,8 @@ class pyOptSparseDriver(Driver):
         model_ran = False
         if optimizer in run_required or linear_constraints:
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-                # Initial Run
+                # Initial Run - do without relevance to avoid breaking some tests that
+                # depend on the old behavior.  TODO: possibly revisit this?
                 model.run_solve_nonlinear()
                 rec.abs = 0.0
                 rec.rel = 0.0
@@ -733,7 +734,8 @@ class pyOptSparseDriver(Driver):
                 self.iter_count += 1
                 try:
                     self._in_user_function = True
-                    model.run_solve_nonlinear()
+                    with model._relevant.all_seeds_active():
+                        model.run_solve_nonlinear()
 
                 # Let the optimizer try to handle the error
                 except AnalysisError:

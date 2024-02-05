@@ -3357,9 +3357,9 @@ class Group(System):
         """
         self._transfer('nonlinear', 'fwd')
         # Apply recursion
-        with self._relevant.active(self.under_approx):
+        with self._relevant.active(self.under_approx or self._relevant._active is True):
             for subsys in self._relevant.system_filter(
-                    self._solver_subsystem_iter(local_only=True)):
+                    self._solver_subsystem_iter(local_only=True), linear=False):
                 subsys._apply_nonlinear()
 
         self.iter_count_apply += 1

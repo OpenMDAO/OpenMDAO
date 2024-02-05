@@ -186,10 +186,10 @@ class Relevance(object):
     ----------
     group : <System>
         The top level group in the system hierarchy.
-    responses : dict
-        Dictionary of response variables.  Keys don't matter.
-    desvars : dict
-        Dictionary of design variables.  Keys don't matter.
+    fwd_meta : dict
+        Dictionary of design variable metadata.  Keys don't matter.
+    rev_meta : dict
+        Dictionary of response variable metadata.  Keys don't matter.
 
     Attributes
     ----------
@@ -208,6 +208,8 @@ class Relevance(object):
     _active : bool or None
         If True, relevance is active.  If False, relevance is inactive.  If None, relevance is
         uninitialized.
+    _use_pre_opt_post : bool
+        If True, factor pre_opt_post status into relevance.
     """
 
     def __init__(self, group, fwd_meta, rev_meta):
@@ -221,6 +223,7 @@ class Relevance(object):
         self._relevant_systems = {}  # maps (varname, direction) to relevant system sets
         self._active = None  # allow relevance to be turned on later
         self._graph = self.get_relevance_graph(group, rev_meta)
+        self._use_pre_opt_post = group._problem_meta['group_by_pre_opt_post']
 
         # seed var(s) for the current derivative operation
         self._seed_vars = {'fwd': frozenset(), 'rev': frozenset()}
@@ -280,8 +283,6 @@ class Relevance(object):
         ----------
         group : <Group>
             The top level group in the system hierarchy.
-        desvars : dict
-            Dictionary of design variable metadata.
         responses : dict
             Dictionary of response variable metadata.
 
@@ -590,7 +591,7 @@ class Relevance(object):
                         return True
         return False
 
-    def system_filter(self, systems, relevant=True):
+    def system_filter(self, systems, relevant=True, linear=True):
         """
         Filter the given iterator of systems to only include those that are relevant.
 
@@ -600,6 +601,9 @@ class Relevance(object):
             Iterator over systems.
         relevant : bool
             If True, return only relevant systems.  If False, return only irrelevant systems.
+        linear : bool
+            If True, use linear relevance, which can be less conservative than nonlinear relevance
+            if group_by_pre_opt_post is True at Problem level.
 
         Yields
         ------
@@ -609,6 +613,12 @@ class Relevance(object):
         if self._active:
             for system in systems:
                 if relevant == self.is_relevant_system(system.pathname):
+                    yield system
+                # if grouping by pre_opt_post and we're doing some nonlinear operation, the
+                # 'systems' list being passed in has already been filtered by pre_opt_post status.
+                # We have to respect that status here (for nonlinear) to avoid skipping components
+                # that have the 'always_opt' option set.
+                elif relevant and not linear and self._use_pre_opt_post:
                     yield system
         elif relevant:
             yield from systems

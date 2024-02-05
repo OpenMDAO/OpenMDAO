@@ -279,6 +279,7 @@ class ScipyOptimizeDriver(Driver):
 
         # Initial Run
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
+            # do the initial run without relevance.  TODO: maybe revisit this?
             model.run_solve_nonlinear()
             self.iter_count += 1
 
@@ -593,7 +594,6 @@ class ScipyOptimizeDriver(Driver):
             Value of the objective function evaluated at the new design point.
         """
         model = self._problem().model
-        model._problem_meta['computing_objective'] = True
 
         try:
 
@@ -608,7 +608,8 @@ class ScipyOptimizeDriver(Driver):
 
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 self.iter_count += 1
-                model.run_solve_nonlinear()
+                with model._relevant.all_seeds_active():
+                    model.run_solve_nonlinear()
 
             # Get the objective function evaluations
             for obj in self.get_objective_values().values():
@@ -621,8 +622,6 @@ class ScipyOptimizeDriver(Driver):
             if self._exc_info is None:  # only record the first one
                 self._exc_info = sys.exc_info()
             return 0
-        finally:
-            model._problem_meta['computing_objective'] = False
 
         # print("Functions calculated")
         # rank = MPI.COMM_WORLD.rank if MPI else 0
