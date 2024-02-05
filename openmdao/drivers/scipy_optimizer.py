@@ -608,8 +608,10 @@ class ScipyOptimizeDriver(Driver):
 
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 self.iter_count += 1
-                with model._relevant.all_seeds_active():
-                    model.run_solve_nonlinear()
+                # TODO: turning on relevance here causes a lot of dymos tests
+                # to fail.  Need to investigate why.
+                #with model._relevant.all_seeds_active():
+                model.run_solve_nonlinear()
 
             # Get the objective function evaluations
             for obj in self.get_objective_values().values():
