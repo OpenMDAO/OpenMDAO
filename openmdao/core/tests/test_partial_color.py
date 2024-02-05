@@ -316,7 +316,7 @@ def _check_total_matrix(system, jac, expected, method):
     for of, sjacs in ofs.items():
         ofs[of] = np.hstack(sjacs)
 
-    fullJ = np.vstack(ofs.values())
+    fullJ = np.vstack(list(ofs.values()))
     np.testing.assert_allclose(fullJ, expected, rtol=_TOLS[method])
 
 
