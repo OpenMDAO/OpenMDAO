@@ -254,17 +254,17 @@
                             "desc": "",
                             "units": "None",
                             "val": [
-                                0.0,
-                                0.0
+                                5.0,
+                                2.0
                             ],
                             "val_min_indices": [
-                                0
+                                1
                             ],
-                            "val_min": 0.0,
+                            "val_min": 2.0,
                             "val_max_indices": [
                                 0
                             ],
-                            "val_max": 0.0
+                            "val_max": 5.0
                         },
                         {
                             "name": "x",
@@ -276,16 +276,16 @@
                             "desc": "",
                             "units": "None",
                             "val": [
-                                0.0
+                                1.0
                             ],
                             "val_min_indices": [
                                 0
                             ],
-                            "val_min": 0.0,
+                            "val_min": 1.0,
                             "val_max_indices": [
                                 0
                             ],
-                            "val_max": 0.0
+                            "val_max": 1.0
                         },
                         {
                             "name": "y2",
@@ -360,17 +360,17 @@
                             "desc": "",
                             "units": "None",
                             "val": [
-                                0.0,
-                                0.0
+                                5.0,
+                                2.0
                             ],
                             "val_min_indices": [
-                                0
+                                1
                             ],
-                            "val_min": 0.0,
+                            "val_min": 2.0,
                             "val_max_indices": [
                                 0
                             ],
-                            "val_max": 0.0
+                            "val_max": 5.0
                         },
                         {
                             "name": "y1",
@@ -453,16 +453,16 @@
                     "desc": "",
                     "units": "None",
                     "val": [
-                        0.0
+                        1.0
                     ],
                     "val_min_indices": [
                         0
                     ],
-                    "val_min": 0.0,
+                    "val_min": 1.0,
                     "val_max_indices": [
                         0
                     ],
-                    "val_max": 0.0
+                    "val_max": 1.0
                 },
                 {
                     "name": "y1",
@@ -474,16 +474,16 @@
                     "desc": "",
                     "units": "None",
                     "val": [
-                        0.0
+                        1.0
                     ],
                     "val_min_indices": [
                         0
                     ],
-                    "val_min": 0.0,
+                    "val_min": 1.0,
                     "val_max_indices": [
                         0
                     ],
-                    "val_max": 0.0
+                    "val_max": 1.0
                 },
                 {
                     "name": "y2",
@@ -495,16 +495,16 @@
                     "desc": "",
                     "units": "None",
                     "val": [
-                        0.0
+                        1.0
                     ],
                     "val_min_indices": [
                         0
                     ],
-                    "val_min": 0.0,
+                    "val_min": 1.0,
                     "val_max_indices": [
                         0
                     ],
-                    "val_max": 0.0
+                    "val_max": 1.0
                 },
                 {
                     "name": "z",
@@ -516,17 +516,17 @@
                     "desc": "",
                     "units": "None",
                     "val": [
-                        0.0,
-                        0.0
+                        5.0,
+                        2.0
                     ],
                     "val_min_indices": [
-                        0
+                        1
                     ],
-                    "val_min": 0.0,
+                    "val_min": 2.0,
                     "val_max_indices": [
                         0
                     ],
-                    "val_max": 0.0
+                    "val_max": 5.0
                 },
                 {
                     "name": "obj",
