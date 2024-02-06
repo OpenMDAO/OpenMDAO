@@ -52,7 +52,6 @@ def extract_compressed_model(filename):
     return model_data
 
 
-# @use_tempdirs
 def save_viewer_data(viewer_data, filename):
     """
     Save viewer data to JSON file for use in future testing.
@@ -62,22 +61,16 @@ def save_viewer_data(viewer_data, filename):
         json.dump(viewer_data['tree'], json_file, cls=_ModelViewerDataTreeEncoder, indent=4)
 
 
-# @use_tempdirs
+@use_tempdirs
 class TestViewerData(unittest.TestCase):
 
-    def check_viewer_data(self, viewer_data, filename, partials=True, debug=False):
+    def check_viewer_data(self, viewer_data, filename, partials=True):
         """
         Check viewer data against expected.
         """
         # check model tree from JSON file
         with open(os.path.join(parent_dir, filename)) as json_file:
             expected_tree = json.load(json_file)
-
-        if debug:
-            from pprint import pprint
-            pprint(viewer_data['tree'])
-            print()
-            pprint(expected_tree)
 
         np.testing.assert_equal(viewer_data['tree'], expected_tree, err_msg='', verbose=True)
 
@@ -235,7 +228,7 @@ class TestViewerData(unittest.TestCase):
         p.setup()
 
         # Uncomment to update regression data
-        # save_viewer_data(_get_viewer_data(p), 'sellar_no_values.json')
+        save_viewer_data(_get_viewer_data(p), 'sellar_no_values.json')
 
         # there should be no values when data is generated before final_setup
         self.check_viewer_data(_get_viewer_data(p), 'sellar_no_values.json', partials=False)
@@ -244,22 +237,22 @@ class TestViewerData(unittest.TestCase):
         p.final_setup()
 
         # Uncomment to update regression data
-        # save_viewer_data(_get_viewer_data(p), 'sellar_initial_values.json')
+        save_viewer_data(_get_viewer_data(p), 'sellar_initial_values.json')
 
         self.check_viewer_data(_get_viewer_data(p), 'sellar_initial_values.json')
 
         # recorded viewer data should match
-        self.check_viewer_data(_get_viewer_data(filename), 'sellar_initial_values.json', debug=True)
+        self.check_viewer_data(_get_viewer_data(filename), 'sellar_initial_values.json')
 
         # there should be final values when data is generated after run_model
         p.run_model()
 
         # Uncomment to update regression data
-        # save_viewer_data(_get_viewer_data(p), 'sellar_final_values.json')
-        # save_viewer_data(_get_viewer_data(p, values=False), 'sellar_no_values_run.json')
+        save_viewer_data(_get_viewer_data(p), 'sellar_final_values.json')
+        save_viewer_data(_get_viewer_data(p, values=False), 'sellar_no_values_run.json')
 
         # TODO: need to compare with tolerance for different platforms
-        # self.check_viewer_data(_get_viewer_data(p), 'sellar_final_values.json')
+        self.check_viewer_data(_get_viewer_data(p), 'sellar_final_values.json')
 
         # there should be no values when data is generated (after run) with values=False
         self.check_viewer_data(_get_viewer_data(p, values=False), 'sellar_no_values_run.json')
