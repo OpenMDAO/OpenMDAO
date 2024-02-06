@@ -228,7 +228,7 @@ class TestViewerData(unittest.TestCase):
         p.setup()
 
         # Uncomment to update regression data
-        save_viewer_data(_get_viewer_data(p), 'sellar_no_values.json')
+        # save_viewer_data(_get_viewer_data(p), 'sellar_no_values.json')
 
         # there should be no values when data is generated before final_setup
         self.check_viewer_data(_get_viewer_data(p), 'sellar_no_values.json', partials=False)
@@ -237,7 +237,7 @@ class TestViewerData(unittest.TestCase):
         p.final_setup()
 
         # Uncomment to update regression data
-        save_viewer_data(_get_viewer_data(p), 'sellar_initial_values.json')
+        # save_viewer_data(_get_viewer_data(p), 'sellar_initial_values.json')
 
         self.check_viewer_data(_get_viewer_data(p), 'sellar_initial_values.json')
 
@@ -248,8 +248,8 @@ class TestViewerData(unittest.TestCase):
         p.run_model()
 
         # Uncomment to update regression data
-        save_viewer_data(_get_viewer_data(p), 'sellar_final_values.json')
-        save_viewer_data(_get_viewer_data(p, values=False), 'sellar_no_values_run.json')
+        # save_viewer_data(_get_viewer_data(p), 'sellar_final_values.json')
+        # save_viewer_data(_get_viewer_data(p, values=False), 'sellar_no_values_run.json')
 
         # TODO: need to compare with tolerance for different platforms
         self.check_viewer_data(_get_viewer_data(p), 'sellar_final_values.json')
