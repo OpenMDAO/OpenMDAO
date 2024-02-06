@@ -197,6 +197,7 @@ class ScipyKrylov(LinearSolver):
 
         maxiter = self.options['maxiter']
         atol = self.options['atol']
+        rtol = self.options['rtol']
 
         if mode == 'fwd':
             x_vec = system._doutputs
@@ -217,13 +218,13 @@ class ScipyKrylov(LinearSolver):
 
         self._iter_count = 0
         if solver is gmres:
-            if Version(scipy.__version__) < Version("1.1"):
+            if Version(Version(scipy.__version__).base_version) < Version("1.12"):
                 x, info = solver(linop, b_vec.asarray(True), M=M, restart=restart,
                                  x0=x_vec_combined, maxiter=maxiter, tol=atol, atol='legacy',
                                  callback=self._monitor, callback_type='legacy')
             else:
                 x, info = solver(linop, b_vec.asarray(True), M=M, restart=restart,
-                                 x0=x_vec_combined, maxiter=maxiter, tol=atol, atol='legacy',
+                                 x0=x_vec_combined, maxiter=maxiter, atol=atol, rtol=rtol,
                                  callback=self._monitor, callback_type='legacy')
         else:
             x, info = solver(linop, b_vec.asarray(True), M=M,
