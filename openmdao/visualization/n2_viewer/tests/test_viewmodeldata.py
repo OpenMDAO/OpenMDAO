@@ -221,7 +221,7 @@ class TestViewerData(unittest.TestCase):
 
         Note: Use save_viewer_data() to regenerate JSON file if needed when updating test
         """
-        filename = "sellarstate.sql"
+        filename = "sellarstate_test_viewer_data.sql"
 
         p = om.Problem(model=SellarStateConnection(), allow_post_setup_reorder=False)
         p.driver.add_recorder(SqliteRecorder(filename))
