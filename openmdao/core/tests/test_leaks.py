@@ -44,27 +44,24 @@ class LeakTestCase(unittest.TestCase):
     def test_leaks_pyoptsparse_slsqp(self):
         lst = check_iter_leaks(4, run_opt_wrapper(om.pyOptSparseDriver, 'SLSQP'))
         if lst:
-            if lst[-1][0] >= 2:  # last iteration had new objects
-                msg = StringIO()
-                list_iter_leaks(lst, msg)
-                self.fail(msg.getvalue())
+            msg = StringIO()
+            list_iter_leaks(lst, msg)
+            self.fail(msg.getvalue())
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', 'pyoptsparse SNOPT is not installed.')
     def test_leaks_pyoptsparse_snopt(self):
         lst = check_iter_leaks(4, run_opt_wrapper(om.pyOptSparseDriver, 'SNOPT'))
         if lst:
-            if lst[-1][0] >= 2:  # last iteration had new objects
-                msg = StringIO()
-                list_iter_leaks(lst, msg)
-                self.fail(msg.getvalue())
+            msg = StringIO()
+            list_iter_leaks(lst, msg)
+            self.fail(msg.getvalue())
 
     def test_leaks_scipy_slsqp(self):
         lst = check_iter_leaks(4, run_opt_wrapper(om.ScipyOptimizeDriver, 'SLSQP'))
         if lst:
-            if lst[-1][0] >= 2:  # last iteration had new objects
-                msg = StringIO()
-                list_iter_leaks(lst, msg)
-                self.fail(msg.getvalue())
+            msg = StringIO()
+            list_iter_leaks(lst, msg)
+            self.fail(msg.getvalue())
 
 
 if __name__ == '__main__':
