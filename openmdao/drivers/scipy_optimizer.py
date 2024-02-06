@@ -610,7 +610,7 @@ class ScipyOptimizeDriver(Driver):
                 self.iter_count += 1
                 # TODO: turning on relevance here causes a lot of dymos tests
                 # to fail.  Need to investigate why.
-                #with model._relevant.all_seeds_active():
+                # with model._relevant.all_seeds_active():
                 model.run_solve_nonlinear()
 
             # Get the objective function evaluations
