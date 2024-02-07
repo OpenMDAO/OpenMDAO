@@ -82,29 +82,32 @@ class TestSolverFeatures(unittest.TestCase):
         assert_near_equal(prob.get_val('g2.y2'), 0.80, .00001)
 
     def test_nonlinear_solver_stall_detection(self):
-        prob = om.Problem()
 
-        prob.model.add_subsystem('comp', om.ExecComp('y=3*x+1'), promotes=['*'])
+        for stall_tol_type in ('rel', 'abs'):
+            with self.subTest(f'Stall detection for stall_tol_type={stall_tol_type}'):
+                prob = om.Problem()
+                prob.model.add_subsystem('comp', om.ExecComp('y=3*x+1'), promotes=['*'])
 
-        balance = prob.model.add_subsystem('balance', om.BalanceComp(), promotes=['*'])
-        balance.add_balance('x', lower=-.1, upper=10, rhs_val=0, lhs_name='y')
+                balance = prob.model.add_subsystem('balance', om.BalanceComp(), promotes=['*'])
+                balance.add_balance('x', lower=-.1, upper=10, rhs_val=0, lhs_name='y')
 
-        newton = prob.model.nonlinear_solver = om.NewtonSolver()
-        newton.options['solve_subsystems'] = True
-        newton.options['stall_limit'] = 3
-        newton.options['stall_tol'] = 1e-8
-        newton.options['maxiter'] = 100
-        newton.options['err_on_non_converge'] = True
+                newton = prob.model.nonlinear_solver = om.NewtonSolver()
+                newton.options['solve_subsystems'] = True
+                newton.options['stall_limit'] = 3
+                newton.options['stall_tol'] = 1e-8
+                newton.options['stall_tol_type'] = stall_tol_type
+                newton.options['maxiter'] = 100
+                newton.options['err_on_non_converge'] = True
 
-        prob.model.linear_solver = om.DirectSolver()
+                prob.model.linear_solver = om.DirectSolver()
 
-        prob.setup()
+                prob.setup()
 
-        with self.assertRaises(om.AnalysisError) as context:
-            prob.run_model()
+                with self.assertRaises(om.AnalysisError) as context:
+                    prob.run_model()
 
-        msg = "Solver 'NL: Newton' on system '' stalled after 4 iterations."
-        self.assertEqual(str(context.exception), msg)
+                msg = "Solver 'NL: Newton' on system '' stalled after 4 iterations."
+                self.assertEqual(str(context.exception), msg)
 
     def test_nonlinear_solver_bounds_stall_warning(self):
         prob = om.Problem()
