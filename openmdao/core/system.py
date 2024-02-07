@@ -4460,11 +4460,14 @@ class System(object):
         if self.pathname == '' and self._owns_approx_jac and driver is not None:
             self._tot_jac = _TotalJacInfo(driver._problem(), None, None, 'flat_dict', approx=True)
 
-        with self._scaled_context_all():
-            do_ln = self._linear_solver is not None and self._linear_solver._linearize_children()
-            self._linearize(self._assembled_jac, sub_do_ln=do_ln)
-            if self._linear_solver is not None and sub_do_ln:
-                self._linear_solver._linearize()
+        try:
+            with self._scaled_context_all():
+                do_ln = self._linear_solver is not None and self._linear_solver._linearize_children()
+                self._linearize(self._assembled_jac, sub_do_ln=do_ln)
+                if self._linear_solver is not None and sub_do_ln:
+                    self._linear_solver._linearize()
+        finally:
+            self._tot_jac = None
 
     def _apply_nonlinear(self):
         """

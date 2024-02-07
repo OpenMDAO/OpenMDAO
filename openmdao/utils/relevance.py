@@ -139,9 +139,6 @@ class SetChecker(object):
         return self._set.intersection(other_set)
 
 
-_relevance_cache = {}
-
-
 def get_relevance(model, of, wrt):
     """
     Return a Relevance object for the given design vars, and responses.
@@ -164,18 +161,8 @@ def get_relevance(model, of, wrt):
         # in this case, an permanantly inactive relevance object is returned
         of = {}
         wrt = {}
-        key = (frozenset(), frozenset(), id(model))
-    else:
-        key = (frozenset([m['source'] for m in of.values()]),
-               frozenset([m['source'] for m in wrt.values()]),
-               id(model))  # include model id in case we have multiple Problems in the same process
 
-    if key in _relevance_cache:
-        return _relevance_cache[key]
-
-    _relevance_cache[key] = rel = Relevance(model, wrt, of)
-
-    return rel
+    return Relevance(model, wrt, of)
 
 
 class Relevance(object):
