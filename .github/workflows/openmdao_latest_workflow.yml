@@ -3,12 +3,19 @@ name: OpenMDAO Latest
 
 on:
 
-  # Run the workflow Monday, Wednesday and Friday at 0400 UTC
+  # Run the workflow every Monday and Thursday at 0400 UTC
   schedule:
-    - cron: '0 4 * * 1,3,5'
+    - cron: '0 4 * * 1,4'
 
   # Allow running the workflow manually from the Actions tab
   workflow_dispatch:
+
+   inputs:
+      debug_enabled:
+        type: boolean
+        description: 'Run the build with tmate debugging enabled (https://github.com/marketplace/actions/debugging-with-tmate)'
+        required: false
+        default: false
 
 permissions: {}
 
@@ -70,13 +77,12 @@ jobs:
           conda-version: "*"
           channels: conda-forge
 
-      - name: Install OpenMDAO
+      - name: Install latest versions of [all] openmdao dependencies
         run: |
-          echo "============================================================="
-          echo "Upgrade conda environment to latest"
-          echo "============================================================="
-          conda upgrade -c conda-forge --all
+          source .github/scripts/install_latest_deps.sh
 
+      - name: Install pyOptSparse
+        run: |
           echo "============================================================="
           echo "Define useful functions"
           echo "============================================================="
@@ -90,76 +96,6 @@ jobs:
             local LATEST_VER=$(latest_version $1)
             echo git+$1@$LATEST_VER
           }
-
-          echo "============================================================="
-          echo "Upgrade to latest pip"
-          echo "============================================================="
-          python -m pip install --upgrade pip
-
-          echo "============================================================="
-          echo "Install latest setuptools"
-          echo "============================================================="
-          python -m pip install --upgrade --pre setuptools
-
-          echo "============================================================="
-          echo "Install latest versions of NumPy/SciPy"
-          echo "============================================================="
-          python -m pip install --upgrade --pre numpy
-          python -m pip install --upgrade --pre scipy
-
-          # remember versions so we can check them later
-          NUMPY_VER=`python -c "import numpy; print(numpy.__version__)"`
-          SCIPY_VER=`python -c "import scipy; print(scipy.__version__)"`
-          echo "NUMPY_VER=$NUMPY_VER" >> $GITHUB_ENV
-          echo "SCIPY_VER=$SCIPY_VER" >> $GITHUB_ENV
-
-          echo "============================================================="
-          echo "Install latest versions of 'docs' dependencies"
-          echo "============================================================="
-          python -m pip install --upgrade --pre matplotlib
-          python -m pip install --upgrade --pre numpydoc
-          python -m pip install --upgrade --pre jupyter-book
-          python -m pip install --upgrade --pre sphinx-sitemap
-          python -m pip install --upgrade --pre ipyparallel
-
-          echo "============================================================="
-          echo "Install latest versions of 'doe' dependencies"
-          echo "============================================================="
-          python -m pip install --upgrade --pre pyDOE3
-
-          echo "============================================================="
-          echo "Install latest versions of 'notebooks' dependencies"
-          echo "============================================================="
-          python -m pip install --upgrade --pre notebook
-          python -m pip install --upgrade --pre ipympl
-
-          echo "============================================================="
-          echo "Install latest versions of 'visualization' dependencies"
-          echo "============================================================="
-          python -m pip install --upgrade --pre bokeh
-          python -m pip install --upgrade --pre colorama
-
-          echo "============================================================="
-          echo "Install latest versions of 'test' dependencies"
-          echo "============================================================="
-          python -m pip install --upgrade --pre parameterized
-          python -m pip install --upgrade --pre numpydoc
-          python -m pip install --upgrade --pre pycodestyle
-          python -m pip install --upgrade --pre pydocstyle
-          python -m pip install --upgrade --pre testflo
-          python -m pip install --upgrade --pre websockets
-          python -m pip install --upgrade --pre aiounittest
-          echo "the latest version of playwright (1.38.0) is pinned to"
-          echo "greenlet 2.0.2 which does not build properly for python 3.12"
-          echo "https://github.com/microsoft/playwright-python/issues/2096"
-          python -m pip install --upgrade --pre playwright  || echo "Skipping playwright, no GUI testing!"
-          python -m pip install --upgrade --pre num2words
-
-          echo "============================================================="
-          echo "Install latest versions of other optional packages"
-          echo "============================================================="
-          python -m pip install --upgrade --pre pyparsing psutil objgraph pyxdsm
-          python -m pip install --upgrade --pre jax jaxlib
 
           echo "============================================================="
           echo "Install latest pyoptsparse"
@@ -176,43 +112,16 @@ jobs:
           fi
           build_pyoptsparse $BRANCH $SNOPT
 
+      - name: Install OpenMDAO
+        run: |
           echo "============================================================="
           echo "Install OpenMDAO"
           echo "============================================================="
           python -m pip install .
 
-      - name: Install PETSc
-        if: matrix.PETSc
-        run: |
-          echo "============================================================="
-          echo "Install latest PETSc"
-          echo "============================================================="
-          conda install mpi4py petsc petsc4py -q -y --freeze-installed
-
-          echo "============================================================="
-          echo "Check MPI and PETSc installation"
-          echo "============================================================="
-          export OMPI_MCA_rmaps_base_oversubscribe=1
-          echo "-----------------------"
-          echo "Quick test of mpi4py:"
-          mpirun -n 3 python -c "from mpi4py import MPI; print(f'Rank: {MPI.COMM_WORLD.rank}')"
-          echo "-----------------------"
-          echo "Quick test of petsc4py:"
-          mpirun -n 3 python -c "import numpy; from mpi4py import MPI; comm = MPI.COMM_WORLD; \
-                                 import petsc4py; petsc4py.init(); \
-                                 x = petsc4py.PETSc.Vec().createWithArray(numpy.ones(5)*comm.rank, comm=comm);  \
-                                 print(x.getArray())"
-          echo "-----------------------"
-
-          echo "============================================================="
-          echo "Export MPI-related environment variables"
-          echo "============================================================="
-          echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> $GITHUB_ENV
-          echo "Workaround for intermittent failures with OMPI https://github.com/open-mpi/ompi/issues/7393"
-          echo "TMPDIR=/tmp" >> $GITHUB_ENV
-
       - name: Display environment info
         id: env_info
+        if: always()
         continue-on-error: true
         run: |
           conda info
@@ -242,7 +151,18 @@ jobs:
 
           grep changed $GITHUB_OUTPUT || echo ""
 
-        if: always()
+      # Enable tmate debugging of manually-triggered workflows if the input option was provided
+      #
+      # To access the terminal through the web-interface:
+      #    1. Click on the web-browser link printed out in this action from the github
+      #       workflow terminal
+      #    2. Press cntrl + c in the new tab that opens up to reveal the terminal
+      #    3. To activate the conda environment run:
+      #        $ source $CONDA/etc/profile.d/conda.sh
+      #        $ conda activate test
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_enabled }}
 
       - name: Run tests
         id: run_tests
@@ -359,3 +279,20 @@ jobs:
             Deprecations were detected on `Latest` build.
             ```${{ steps.deprecations_report.outputs.summary }}```
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Fail the workflow if tests or doc build failed
+        if: steps.run_tests.outcome == 'failure' || steps.build_docs.outcome == 'failure'
+        uses: actions/github-script@v3
+        with:
+          script: |
+              let test_fail = ${{ steps.run_tests.outcome == 'failure' }};
+              let docs_fail = ${{ steps.build_docs.outcome == 'failure' }};
+              if (test_fail && docs_fail) {
+                  core.setFailed('Tests and doc build failed.');
+              }
+              else if (test_fail) {
+                  core.setFailed('Tests failed.');
+              }
+              else if (docs_fail) {
+                  core.setFailed('Doc build failed.');
+              }
