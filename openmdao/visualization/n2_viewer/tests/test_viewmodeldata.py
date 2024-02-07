@@ -88,12 +88,14 @@ class TestViewerData(unittest.TestCase):
         """
         _path = [expected_tree['name']] if path is None else path + [expected_tree['name']]
 
+        tol_check_keys = ['val', 'val_min', 'val_max']
+
         # Test that expected and tree have same keys
         self.assertSetEqual(set(expected_tree.keys()), set(tree.keys()), msg=f'Keys differ at {_path}')
 
         if 'dtype' in expected_tree and 'dtype' == 'ndarray':
             # Compare val, min_val, and max_val using tolerance
-            for key in ['val', 'min_val', 'max_val']:
+            for key in tol_check_keys:
                 if key in expected_tree:
                     expected_val = np.asarray(expected_tree[key])
                     val = np.asarray(tree[key])
@@ -107,7 +109,7 @@ class TestViewerData(unittest.TestCase):
             expected_val = expected_tree[key]
             val = tree[key]
 
-            if 'dtype' in expected_tree and key in ['val', 'min_val', 'max_val']:
+            if 'dtype' in expected_tree and key in tol_check_keys:
                 continue
             elif key == 'children':
                 continue
