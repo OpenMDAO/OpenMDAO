@@ -864,13 +864,17 @@ class Group(System):
                     missing_responses.add(output)
 
         if missing_responses:
-            msg = (f"Constraints or objectives [{', '.join(sorted(missing_responses))}] cannot"
-                   " be impacted by the design variables of the problem because no partials "
-                   "were defined for them in their parent component(s).")
-            if self._problem_meta['singular_jac_behavior'] == 'error':
-                raise RuntimeError(msg)
+            for subsys in self.system_iter(include_self=True, recurse=True, typ=Group):
+                if subsys._has_approx:
+                    break
             else:
-                issue_warning(msg, category=DerivativesWarning)
+                msg = (f"Constraints or objectives [{', '.join(sorted(missing_responses))}] cannot"
+                    " be impacted by the design variables of the problem because no partials "
+                    "were defined for them in their parent component(s).")
+                if self._problem_meta['singular_jac_behavior'] == 'error':
+                    raise RuntimeError(msg)
+                else:
+                    issue_warning(msg, category=DerivativesWarning)
 
         self._relevance_graph = graph
         return graph
