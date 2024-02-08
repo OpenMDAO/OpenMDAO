@@ -35,7 +35,7 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
 from openmdao.utils.relevance import get_relevance
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
-    PromotionWarning, MPIWarning
+    PromotionWarning, MPIWarning, DerivativesWarning
 
 # regex to check for valid names.
 import re
@@ -1024,6 +1024,17 @@ class Group(System):
         desvars = self.get_design_vars(get_sizes=False)
         responses = self._check_alias_overlaps(self.get_responses(get_sizes=False))
 
+        self._dataflow_graph = self._get_dataflow_graph()
+
+        # figure out if we can remove any edges based on zero partials we find
+        # in components.  By default all component connected outputs
+        # are also connected to all connected inputs from the same component.
+        self._missing_partials = {}
+        if not self._owns_approx_jac:  # don't check for missing partials when doing FD
+            self._get_missing_partials(self._missing_partials)
+            if self._missing_partials:
+                self._update_dataflow_graph(responses)
+
         self._problem_meta['relevant'] = get_relevance(self, responses, desvars)
 
         self._setup_vectors(self._get_root_vectors())
@@ -1041,6 +1052,35 @@ class Group(System):
         self._setup_recording()
 
         self.set_initial_values()
+
+    def _update_dataflow_graph(self, responses):
+        resps = set(meta2src_iter(responses.values()))
+
+        missing_responses = set()
+        for pathname, missing in self._missing_partials.items():
+            inputs = [n for n, _ in self._dataflow_graph.in_edges(pathname)]
+            outputs = [n for _, n in self._dataflow_graph.out_edges(pathname)]
+
+            self._dataflow_graph.remove_node(pathname)
+
+            for output in outputs:
+                found = False
+                for inp in inputs:
+                    if (output, inp) not in missing:
+                        self._dataflow_graph.add_edge(inp, output)
+                        found = True
+
+                if not found and output in resps:
+                    missing_responses.add(output)
+
+        if missing_responses:
+            msg = (f"Constraints or objectives [{', '.join(sorted(missing_responses))}] cannot"
+                    " be impacted by the design variables of the problem because no partials "
+                    "were defined for them in their parent component(s).")
+            if self._problem_meta['singular_jac_behavior'] == 'error':
+                raise RuntimeError(msg)
+            else:
+                issue_warning(msg, category=DerivativesWarning)
 
     def set_initial_values(self):
         """
