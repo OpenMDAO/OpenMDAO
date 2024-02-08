@@ -139,7 +139,7 @@ class ApproximationScheme(object):
         wrt_ranges = []
 
         # don't do anything if the coloring doesn't exist yet
-        coloring = system._coloring_info['coloring']
+        coloring = system._coloring_info.coloring
         if not isinstance(coloring, coloring_mod.Coloring):
             return
 
@@ -235,7 +235,7 @@ class ApproximationScheme(object):
         self._nruns_uncolored = 0
 
         if system._during_sparsity:
-            wrt_matches = system._coloring_info['wrt_matches']
+            wrt_matches = system._coloring_info.wrt_matches
         else:
             wrt_matches = None
 

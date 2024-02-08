@@ -597,6 +597,9 @@ class NonlinearSolver(Solver):
         self.options.declare('stall_tol', default=1e-12,
                              desc='When stall checking is enabled, the threshold below which the '
                                   'residual norm is considered unchanged.')
+        self.options.declare('stall_tol_type', default='rel', values=('abs', 'rel'),
+                             desc='Specifies whether the absolute or relative norm of the '
+                                  'residual is used for stall detection.')
         self.options.declare('restart_from_successful', types=bool, default=False,
                              desc='If True, the states are cached after a successful solve and '
                                   'used to restart the solver in the case of a failed solve.')
@@ -671,6 +674,7 @@ class NonlinearSolver(Solver):
             iprint = self.options['iprint']
             stall_limit = self.options['stall_limit']
             stall_tol = self.options['stall_tol']
+            stall_tol_type = self.options['stall_tol_type']
 
             self._mpi_print_header()
 
@@ -729,15 +733,15 @@ class NonlinearSolver(Solver):
 
                     # Check if convergence is stalled.
                     if stall_limit > 0:
-                        rel_norm = rec.rel
-                        norm_diff = np.abs(stall_norm - rel_norm)
+                        norm_for_stall = rec.rel if stall_tol_type == 'rel' else rec.abs
+                        norm_diff = np.abs(stall_norm - norm_for_stall)
                         if norm_diff <= stall_tol:
                             stall_count += 1
                             if stall_count >= stall_limit:
                                 stalled = True
                         else:
                             stall_count = 0
-                            stall_norm = rel_norm
+                            stall_norm = norm_for_stall
 
                 self._mpi_print(self._iter_count, norm, norm / norm0)
 

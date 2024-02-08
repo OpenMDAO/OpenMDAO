@@ -628,6 +628,8 @@ class pyOptSparseDriver(Driver):
         except Exception as c:
             if self._exc_info is None:
                 raise
+        finally:
+            self._total_jac = None
 
         if self._exc_info is not None:
             exc_info = self._exc_info
