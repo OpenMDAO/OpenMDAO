@@ -3,145 +3,16 @@ Class definitions for Relevance and related classes.
 """
 
 import sys
-from itertools import chain, product
 from pprint import pprint
 from contextlib import contextmanager
 from collections import defaultdict
-from openmdao.utils.general_utils import all_ancestors, meta2src_iter
-from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
+import numpy as np
+from openmdao.utils.general_utils import all_ancestors
 
 
-class SetChecker(object):
+def _get_seed_map(fwd_seeds, rev_seeds, nvars, nsystems):
     """
-    Class for checking if a given set of variables is in a relevant set of variables.
-
-    Parameters
-    ----------
-    the_set : set
-        Set of variables to check against.
-    full_set : set or None
-        Set of all variables.  Not used if _invert is False.
-    invert : bool
-        If True, the set is inverted.
-
-    Attributes
-    ----------
-    _set : set
-        Set of variables to check.
-    _full_set : set or None
-        Set of all variables.  None if _invert is False.
-    _invert : bool
-        If True, the set is inverted.
-    """
-
-    def __init__(self, the_set, full_set=None, invert=False):
-        """
-        Initialize all attributes.
-        """
-        assert not invert or full_set is not None, \
-            "full_set must be provided if invert is True"
-        self._set = the_set
-        self._full_set = full_set
-        self._invert = invert
-
-    def __contains__(self, name):
-        """
-        Return True if the given name is in the set.
-
-        Parameters
-        ----------
-        name : str
-            Name of the variable.
-
-        Returns
-        -------
-        bool
-            True if the given name is in the set.
-        """
-        if self._invert:
-            return name not in self._set
-        return name in self._set
-
-    def __iter__(self):
-        """
-        Return an iterator over the set.
-
-        Returns
-        -------
-        iter
-            Iterator over the set.
-        """
-        if self._invert:
-            for name in self._full_set:
-                if name not in self._set:
-                    yield name
-        else:
-            yield from self._set
-
-    def __repr__(self):
-        """
-        Return a string representation of the SetChecker.
-
-        Returns
-        -------
-        str
-            String representation of the SetChecker.
-        """
-        return f"SetChecker({sorted(self._set)}, invert={self._invert}"
-
-    def __len__(self):
-        """
-        Return the number of elements in the set.
-
-        Returns
-        -------
-        int
-            Number of elements in the set.
-        """
-        if self._invert:
-            return len(self._full_set) - len(self._set)
-        return len(self._set)
-
-    def to_set(self):
-        """
-        Return a set of names of relevant variables.
-
-        Returns
-        -------
-        set
-            Set of our entries.
-        """
-        if self._invert:
-            if self._set:  # check to avoid a set copy
-                return self._full_set - self._set
-            return self._full_set
-        return self._set
-
-    def intersection(self, other_set):
-        """
-        Return a new set with elements common to the set and all others.
-
-        Parameters
-        ----------
-        other_set : set
-            Other set to check against.
-
-        Returns
-        -------
-        set
-            Set of common elements.
-        """
-        if self._invert:
-            if self._set:
-                return other_set - self._set
-            return other_set
-
-        return self._set.intersection(other_set)
-
-
-def _get_seed_map(fwd_seeds, rev_seeds):
-    """
-    Return a map of fwdseed/revseed pairings to their index.
+    Return a map of fwdseed/revseed pairings to var/sys relevance arrays.
 
     Parameters
     ----------
@@ -149,24 +20,22 @@ def _get_seed_map(fwd_seeds, rev_seeds):
         Iterator over forward seed variable names.
     rev_seeds : iter of str
         Iterator over reverse seed variable names.
+    nvars : int
+        Number of variables in the graph.
+    nsystems : int
+        Number of systems in the graph.
 
     Returns
     -------
     dict
-        Dictionary mapping seed names to their direction.
+        Nested dict of the form {fwdseed: {revseed: rel_arrays}}.
     """
-    fset = frozenset(fwd_seeds)
-    rset = frozenset(rev_seeds)
-
-    pairings = []
-    for f, r in product(fset, rset):
-        pairings.append((f, r))
-    for f in fset:
-        pairings.append((f, rset))
-    for r in rset:
-        pairings.append((fset, r))
-
-    return {i: pair for i, pair in enumerate(pairings)}
+    seedmap = {}
+    for f in fwd_seeds:
+        seedmap[f] = fmap = {}
+        for r in rev_seeds:
+            fmap[r] = (np.zeros(nvars, dtype=bool), 
+                       np.zeros(nsystems, dtype=bool))
 
 
 def get_relevance(model, of, wrt):
@@ -211,13 +80,18 @@ class Relevance(object):
     Attributes
     ----------
     _graph : <nx.DirectedGraph>
-        Dependency graph.  Hybrid graph containing both variables and systems.
-    _all_vars : set or None
-        Set of all variables in the graph.  None if not initialized.
-    _relevant_vars : dict
-        Maps (varname, direction) to variable set checker.
-    _relevant_systems : dict
-        Maps (varname, direction) to relevant system sets.
+        Dependency graph.  Dataflow graph containing both variables and systems.
+    _all_vars : dict
+        dict of all variables in the graph mapped to the row index into the variable
+        relevance array.
+    _rel_var_array : ndarray
+        Bool array of shape (nvars, nseeds) where nvars is the number of variables in the graph
+        and nseeds is the number of unique seed pairs.  If _rel_var_array[i, j] is True, then
+        variable i is relevant to seed pair j.
+    _rel_sys_array : ndarray
+        Bool array of shape (nsystems, nseeds) where nsystems is the number of systems in the graph
+        and nseeds is the number of unique seed pairs.  If _rel_sys_array[i, j] is True, then
+        system i is relevant to seed pair j.
     _seed_vars : dict
         Maps direction to currently active seed variable names.
     _all_seed_vars : dict
@@ -229,25 +103,24 @@ class Relevance(object):
         If True, factor pre_opt_post status into relevance.
     """
 
-    def __init__(self, group, fwd_meta, rev_meta):
+    def __init__(self, model, fwd_meta, rev_meta):
         """
         Initialize all attributes.
         """
-        assert group.pathname == '', "Relevance can only be initialized on the top level Group."
+        assert model.pathname == '', "Relevance can only be initialized on the top level Group."
 
-        self._all_vars = None  # set of all nodes in the graph (or None if not initialized)
         self._relevant_vars = {}  # maps (varname, direction) to variable set checker
         self._relevant_systems = {}  # maps (varname, direction) to relevant system sets
         self._active = None  # allow relevance to be turned on later
-        self._graph = self.get_relevance_graph(group, rev_meta)
-        self._use_pre_opt_post = group._problem_meta['group_by_pre_opt_post']
+        self._graph = model._dataflow_graph
+        self._use_pre_opt_post = model._problem_meta['group_by_pre_opt_post']
 
         # seed var(s) for the current derivative operation
         self._seed_vars = {'fwd': frozenset(), 'rev': frozenset()}
         # all seed vars for the entire derivative computation
         self._all_seed_vars = {'fwd': frozenset(), 'rev': frozenset()}
 
-        self._set_all_seeds(group, fwd_meta, rev_meta)
+        self._set_all_seeds(model, fwd_meta, rev_meta)
 
         if not (fwd_meta and rev_meta):
             self._active = False  # relevance will never be active
@@ -262,6 +135,116 @@ class Relevance(object):
             String representation of the Relevance.
         """
         return f"Relevance({self._seed_vars}, active={self._active})"
+
+    def _intersect_arrays(self, arrmap, seeds):
+        """
+        Return the intersection of the relevance arrays for the given seeds.
+
+        Parameters
+        ----------
+        arrmap : dict
+            dict of the form {seed: (rel_var_array, rel_sys_array)}
+        seeds : iter of str
+            Iterator over seed variable names.
+
+        Returns
+        -------
+        tuple
+            Tuple of the form (var_array, sys_array) where var_array and sys_array are the
+            intersection of the relevance arrays for the given seeds.
+        """
+        for i, seed in enumerate(seeds):
+            varr, sarr = arrmap[seed]
+            if i == 0:
+                var_array = varr.copy()
+                sys_array = sarr.copy()
+            else:
+                var_array &= varr
+                sys_array &= sarr
+
+        return var_array, sys_array
+    
+    def _set_all_seeds(self, group, fwd_meta, rev_meta):
+        """
+        Set the full list of seeds to be used to determine relevance.
+
+        This should only be called once, at __init__ time.
+
+        Parameters
+        ----------
+        group : <Group>
+            The top level group in the system hierarchy.
+        fwd_meta : dict
+            Dictionary of metadata for forward derivatives.
+        rev_meta : dict
+            Dictionary of metadata for reverse derivatives.
+        """
+        fwd_seeds = frozenset([m['source'] for m in fwd_meta.values()])
+        rev_seeds = frozenset([m['source'] for m in rev_meta.values()])
+
+        self._seed_rel_dict = _get_seed_map(fwd_seeds, rev_seeds)
+
+        nprocs = group.comm.size
+        setup_par_derivs = False
+
+        # this set contains all variables and some or all components
+        # in the graph.  Components are included if all of their outputs
+        # depend on all of their inputs.
+        all_systems = _vars2systems(self._graph.nodes())
+        all_vars = {n for n in self._graph.nodes() if n not in all_systems}
+
+        # create mappings of var and system names to indices into the var/system
+        # relevance arrays.
+        self._all_systems = {n: i for i, n in enumerate(all_systems)}
+        self._all_vars = {n: i for i, n in enumerate(all_vars)}
+
+        fseed_map = {}
+        for meta in fwd_meta.values():
+            src = meta['source']
+            local = nprocs > 1 and meta['parallel_deriv_color'] is not None
+            setup_par_derivs |= local
+            depnodes = self._dependent_nodes(src, 'fwd', local=local)
+            rel_systems = _vars2systems(depnodes)
+            rel_vars = depnodes - all_systems
+            varray = np.zeros(len(all_vars), dtype=bool)
+            for rel_var in rel_vars:
+                varray[self._all_vars[rel_var]] = True
+            sarray = np.zeros(len(all_systems), dtype=bool)
+            for rel_sys in rel_systems:
+                sarray[self._all_systems[rel_sys]] = True
+            fseed_map[src] = (varray, sarray)
+
+        rseed_map = {}
+        for meta in rev_meta.values():
+            src = meta['source']
+            local = nprocs > 1 and meta['parallel_deriv_color'] is not None
+            setup_par_derivs |= local
+            depnodes = self._dependent_nodes(src, 'rev', local=local)
+            rel_systems = _vars2systems(depnodes)
+            rel_vars = depnodes - all_systems
+            varray = np.zeros(len(all_vars), dtype=bool)
+            for rel_var in rel_vars:
+                varray[self._all_vars[rel_var]] = True
+            sarray = np.zeros(len(all_systems), dtype=bool)
+            for rel_sys in rel_systems:
+                sarray[self._all_systems[rel_sys]] = True
+            rseed_map[src] = (varray, sarray)
+
+        self._seed_map = seed_map = {}
+        for fsrc, fdata in fseed_map.items():
+            for rsrc, rdata in rseed_map.items():
+                seed_map[(fsrc, rsrc)] = (fdata[0] | rdata[0], fdata[1] | rdata[1])
+
+        # now add entries for each (fseed, all_rseeds) and each (rseed, all_fseeds)
+        all_rseed_varray = 
+        for fsrc, fdata in fseed_map.items():
+            seed_map[(fsrc, 'all')] = (fdata[0], fdata[1] | np.any([rdata[1] for rdata in rseed_map.values()], axis=0))
+
+        self._all_seed_vars['fwd'] = self._seed_vars['fwd'] = fwd_seeds
+        self._all_seed_vars['rev'] = self._seed_vars['rev'] = rev_seeds
+
+        if setup_par_derivs:
+            self._setup_par_deriv_relevance(group, rev_meta, fwd_meta)
 
     @contextmanager
     def active(self, active):
@@ -286,73 +269,6 @@ class Relevance(object):
                 yield
             finally:
                 self._active = save
-
-    def get_relevance_graph(self, group, responses):
-        """
-        Return a graph of the relevance between desvars and responses.
-
-        This graph is the full hybrid graph after removal of components that don't have full
-        ('*', '*') partial derivatives declared.  When such a component is removed, its inputs and
-        outputs are connected to each other whenever there is a partial derivative declared between
-        them.
-
-        Parameters
-        ----------
-        group : <Group>
-            The top level group in the system hierarchy.
-        responses : dict
-            Dictionary of response variable metadata.
-
-        Returns
-        -------
-        DiGraph
-            Graph of the relevance between desvars and responses.
-        """
-        graph = group._get_dataflow_graph()
-
-        # if doing top level FD/CS, don't update relevance graph based
-        # on missing partials because FD/CS doesn't require that partials
-        # are declared to compute derivatives
-        if group._owns_approx_jac:
-            return graph
-
-        # figure out if we can remove any edges based on zero partials we find
-        # in components.  By default all component connected outputs
-        # are also connected to all connected inputs from the same component.
-        missing_partials = {}
-        group._get_missing_partials(missing_partials)
-
-        if missing_partials:
-            graph = graph.copy()  # we're changing the graph, so make a copy
-            resps = set(meta2src_iter(responses.values()))
-
-            missing_responses = set()
-            for pathname, missing in missing_partials.items():
-                inputs = [n for n, _ in graph.in_edges(pathname)]
-                outputs = [n for _, n in graph.out_edges(pathname)]
-
-                graph.remove_node(pathname)
-
-                for output in outputs:
-                    found = False
-                    for inp in inputs:
-                        if (output, inp) not in missing:
-                            graph.add_edge(inp, output)
-                            found = True
-
-                    if not found and output in resps:
-                        missing_responses.add(output)
-
-            if missing_responses:
-                msg = (f"Constraints or objectives [{', '.join(sorted(missing_responses))}] cannot"
-                       " be impacted by the design variables of the problem because no partials "
-                       "were defined for them in their parent component(s).")
-                if group._problem_meta['singular_jac_behavior'] == 'error':
-                    raise RuntimeError(msg)
-                else:
-                    issue_warning(msg, category=DerivativesWarning)
-
-        return graph
 
     def relevant_vars(self, name, direction, inputs=True, outputs=True):
         """
@@ -486,43 +402,6 @@ class Relevance(object):
         if msg:
             raise RuntimeError('\n'.join(msg))
 
-    def _set_all_seeds(self, group, fwd_meta, rev_meta):
-        """
-        Set the full list of seeds to be used to determine relevance.
-
-        This should only be called once, at __init__ time.
-
-        Parameters
-        ----------
-        group : <Group>
-            The top level group in the system hierarchy.
-        fwd_meta : dict
-            Dictionary of metadata for forward derivatives.
-        rev_meta : dict
-            Dictionary of metadata for reverse derivatives.
-        """
-        fwd_seeds = frozenset([m['source'] for m in fwd_meta.values()])
-        rev_seeds = frozenset([m['source'] for m in rev_meta.values()])
-
-        nprocs = group.comm.size
-        setup_par_derivs = False
-
-        for meta in fwd_meta.values():
-            local = nprocs > 1 and meta['parallel_deriv_color'] is not None
-            setup_par_derivs |= local
-            self._init_relevance_set(meta['source'], 'fwd', local=local)
-
-        for meta in rev_meta.values():
-            local = nprocs > 1 and meta['parallel_deriv_color'] is not None
-            setup_par_derivs |= local
-            self._init_relevance_set(meta['source'], 'rev', local=local)
-
-        self._all_seed_vars['fwd'] = self._seed_vars['fwd'] = fwd_seeds
-        self._all_seed_vars['rev'] = self._seed_vars['rev'] = rev_seeds
-
-        if setup_par_derivs:
-            self._setup_par_deriv_relevance(group, rev_meta, fwd_meta)
-
     def _set_seeds(self, fwd_seeds, rev_seeds, local=False):
         """
         Set the seed(s) to determine relevance for a given variable in a given direction.
@@ -572,9 +451,6 @@ class Relevance(object):
         """
         if not self._active:
             return True
-
-        assert self._seed_vars['fwd'] and self._seed_vars['rev'], \
-            "must call set_all_seeds first"
 
         for seed in self._seed_vars['fwd']:
             if name in self._relevant_vars[seed, 'fwd']:
@@ -668,13 +544,6 @@ class Relevance(object):
             depnodes = self._dependent_nodes(varname, direction, local=local)
 
             rel_systems = _vars2systems(depnodes)
-
-            # this set contains all variables and some or all components
-            # in the graph.  Components are included if all of their outputs
-            # depend on all of their inputs.
-            if self._all_vars is None:
-                self._all_systems = allsystems = _vars2systems(self._graph.nodes())
-                self._all_vars = {n for n in self._graph.nodes() if n not in allsystems}
 
             rel_vars = depnodes - self._all_systems
 
