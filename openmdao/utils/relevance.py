@@ -136,16 +136,22 @@ class Relevance(object):
         """
         return f"Relevance({self._seed_vars}, active={self._active})"
 
-    def _intersect_arrays(self, arrmap, seeds):
+    def _intersect_arrays(self, fmap, fseeds, rmap, rseeds):
         """
         Return the intersection of the relevance arrays for the given seeds.
 
         Parameters
         ----------
-        arrmap : dict
-            dict of the form {seed: (rel_var_array, rel_sys_array)}
-        seeds : iter of str
-            Iterator over seed variable names.
+        fmap : dict
+            Dict of the form {seed: (var_array, sys_array)} where var_array and sys_array are the
+            relevance arrays for the given seed.
+        fseeds : iter of str
+            Iterator over forward seed variable names.
+        rmap : dict
+            Dict of the form {seed: (var_array, sys_array)} where var_array and sys_array are the
+            relevance arrays for the given seed.
+        rseeds : iter of str
+            Iterator over reverse seed variable names.
 
         Returns
         -------
@@ -166,7 +172,11 @@ class Relevance(object):
 
     def _get_single_seeds_map(self, group, seed_meta, direction, all_systems, all_vars):
         """
-        Return the relevance arrays for each individual seed.
+        Return the relevance arrays for each individual seed for variables and systems.
+
+        The relevance arrays are boolean ndarrays of length nvars and nsystems, respectively.
+        All of the variables and systems in the graph map to an index into these arrays and
+        if the value at that index is True, then the variable or system is relevant to the seed.
 
         Parameters
         ----------
@@ -210,6 +220,28 @@ class Relevance(object):
 
         return seed_map, has_par_derivs
 
+    def _combine_relevance(self, fwd_seeds, rev_seeds):
+        """
+        Return the combined relevance arrays for the given seeds.
+
+        Parameters
+        ----------
+        fwd_seeds : iter of str
+            Iterator over forward seed variable names.
+        rev_seeds : iter of str
+            Iterator over reverse seed variable names.
+
+        Returns
+        -------
+        tuple
+            Tuple of the form (var_array, sys_array) where var_array and sys_array are the
+            combined relevance arrays for the given seeds.
+        """
+        fwd_arr, fwd_sys_arr = self._intersect_arrays(self._fseed_map, fwd_seeds)
+        rev_arr, rev_sys_arr = self._intersect_arrays(self._rseed_map, rev_seeds)
+
+        return var_array, sys_array
+
     def _set_all_seeds(self, group, fwd_meta, rev_meta):
         """
         Set the full list of seeds to be used to determine relevance.
@@ -229,9 +261,6 @@ class Relevance(object):
         rev_seeds = frozenset([m['source'] for m in rev_meta.values()])
 
         self._seed_rel_dict = _get_seed_map(fwd_seeds, rev_seeds)
-
-        nprocs = group.comm.size
-        setup_par_derivs = False
 
         # this set contains all variables and some or all components
         # in the graph.  Components are included if all of their outputs
