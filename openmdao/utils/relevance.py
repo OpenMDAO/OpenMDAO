@@ -34,7 +34,7 @@ def _get_seed_map(fwd_seeds, rev_seeds, nvars, nsystems):
     for f in fwd_seeds:
         seedmap[f] = fmap = {}
         for r in rev_seeds:
-            fmap[r] = (np.zeros(nvars, dtype=bool), 
+            fmap[r] = (np.zeros(nvars, dtype=bool),
                        np.zeros(nsystems, dtype=bool))
 
 
@@ -163,7 +163,53 @@ class Relevance(object):
                 sys_array &= sarr
 
         return var_array, sys_array
-    
+
+    def _get_single_seeds_map(self, group, seed_meta, direction, all_systems, all_vars):
+        """
+        Return the relevance arrays for each individual seed.
+
+        Parameters
+        ----------
+        group : <Group>
+            The top level group in the system hierarchy.
+        seed_meta : dict
+            Dictionary of metadata for the seeds.
+        direction : str
+            Direction of the search for relevant variables.  'fwd' or 'rev'.
+        all_systems : set
+            Set of all systems in the graph.
+        all_vars : set
+            Set of all variables in the graph.
+
+        Returns
+        -------
+        dict
+            Dict of the form {seed: (var_array, sys_array)} where var_array and sys_array are the
+            relevance arrays for the given seed.
+        bool
+            True if any of the seeds use parallel derivative coloring.
+        """
+        nprocs = group.comm.size
+        has_par_derivs = False
+        seed_map = {}
+
+        for meta in seed_meta.values():
+            src = meta['source']
+            local = nprocs > 1 and meta['parallel_deriv_color'] is not None
+            has_par_derivs |= local
+            depnodes = self._dependent_nodes(src, direction, local=local)
+            rel_systems = _vars2systems(depnodes)
+            rel_vars = depnodes - all_systems
+            varray = np.zeros(len(all_vars), dtype=bool)
+            for rel_var in rel_vars:
+                varray[self._all_vars[rel_var]] = True
+            sarray = np.zeros(len(all_systems), dtype=bool)
+            for rel_sys in rel_systems:
+                sarray[self._all_systems[rel_sys]] = True
+            seed_map[src] = (varray, sarray)
+
+        return seed_map, has_par_derivs
+
     def _set_all_seeds(self, group, fwd_meta, rev_meta):
         """
         Set the full list of seeds to be used to determine relevance.
@@ -198,52 +244,27 @@ class Relevance(object):
         self._all_systems = {n: i for i, n in enumerate(all_systems)}
         self._all_vars = {n: i for i, n in enumerate(all_vars)}
 
-        fseed_map = {}
-        for meta in fwd_meta.values():
-            src = meta['source']
-            local = nprocs > 1 and meta['parallel_deriv_color'] is not None
-            setup_par_derivs |= local
-            depnodes = self._dependent_nodes(src, 'fwd', local=local)
-            rel_systems = _vars2systems(depnodes)
-            rel_vars = depnodes - all_systems
-            varray = np.zeros(len(all_vars), dtype=bool)
-            for rel_var in rel_vars:
-                varray[self._all_vars[rel_var]] = True
-            sarray = np.zeros(len(all_systems), dtype=bool)
-            for rel_sys in rel_systems:
-                sarray[self._all_systems[rel_sys]] = True
-            fseed_map[src] = (varray, sarray)
-
-        rseed_map = {}
-        for meta in rev_meta.values():
-            src = meta['source']
-            local = nprocs > 1 and meta['parallel_deriv_color'] is not None
-            setup_par_derivs |= local
-            depnodes = self._dependent_nodes(src, 'rev', local=local)
-            rel_systems = _vars2systems(depnodes)
-            rel_vars = depnodes - all_systems
-            varray = np.zeros(len(all_vars), dtype=bool)
-            for rel_var in rel_vars:
-                varray[self._all_vars[rel_var]] = True
-            sarray = np.zeros(len(all_systems), dtype=bool)
-            for rel_sys in rel_systems:
-                sarray[self._all_systems[rel_sys]] = True
-            rseed_map[src] = (varray, sarray)
+        self._fseed_map, fhas_par_derivs = self._get_single_seeds_map(group, fwd_meta, 'fwd',
+                                                                      all_systems, all_vars)
+        self._rseed_map, rhas_par_derivs = self._get_single_seeds_map(group, rev_meta, 'rev',
+                                                                      all_systems, all_vars)
+        has_par_derivs = fhas_par_derivs or rhas_par_derivs
 
         self._seed_map = seed_map = {}
         for fsrc, fdata in fseed_map.items():
+            seed_map[fsrc] = sub = {}
             for rsrc, rdata in rseed_map.items():
-                seed_map[(fsrc, rsrc)] = (fdata[0] | rdata[0], fdata[1] | rdata[1])
+                sub[rsrc] = (fdata[0] | rdata[0], fdata[1] | rdata[1])
 
         # now add entries for each (fseed, all_rseeds) and each (rseed, all_fseeds)
-        all_rseed_varray = 
+        all_rseed_varray =
         for fsrc, fdata in fseed_map.items():
             seed_map[(fsrc, 'all')] = (fdata[0], fdata[1] | np.any([rdata[1] for rdata in rseed_map.values()], axis=0))
 
         self._all_seed_vars['fwd'] = self._seed_vars['fwd'] = fwd_seeds
         self._all_seed_vars['rev'] = self._seed_vars['rev'] = rev_seeds
 
-        if setup_par_derivs:
+        if has_par_derivs:
             self._setup_par_deriv_relevance(group, rev_meta, fwd_meta)
 
     @contextmanager
