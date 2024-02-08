@@ -1392,7 +1392,8 @@ class _TotalJacInfo(object):
                                     if key == '@simul_coloring':
                                         print(f'In mode: {mode}, Solving variable(s) using simul '
                                               'coloring:')
-                                        for local_ind in imeta['coloring']._local_indices(inds, mode):
+                                        for local_ind in imeta['coloring']._local_indices(inds,
+                                                                                          mode):
                                             print(f"   {local_ind}", flush=True)
                                     elif self.directional:
                                         print(f"In mode: {mode}.\n, Solving for directional "
