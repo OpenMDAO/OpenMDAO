@@ -295,7 +295,7 @@ class _ColoringMeta(object):
             self._coloring = None
             self._failed = False
         elif self._pct_improvement_good(coloring, msginfo):
-            self._coloring = None
+            self._coloring = coloring
             self._failed = False
         else:
             # if the improvement wasn't large enough, don't use coloring
