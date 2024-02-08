@@ -2707,18 +2707,18 @@ class Problem(object):
             # remove any existing coloring, and force dynamic coloring
             if coloring_info is None:
                 coloring_info = self.driver._coloring_info.copy()
-                coloring_info['coloring'] = None
-                coloring_info['dynamic'] = True
+                coloring_info.coloring = None
+                coloring_info.dynamic = True
 
-            if coloring_info['coloring'] is None:
-                if coloring_info['dynamic']:
+            if coloring_info.do_compute_coloring():
+                if coloring_info.dynamic:
                     do_run = run_model if run_model is not None else self._run_counter < 0
                     coloring = \
                         coloring_mod.dynamic_total_coloring(
                             self.driver, run_model=do_run,
                             fname=self.driver._get_total_coloring_fname(), of=of, wrt=wrt)
             else:
-                return coloring_info['coloring']
+                return coloring_info.coloring
 
             return coloring
 

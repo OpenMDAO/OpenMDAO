@@ -499,9 +499,9 @@ class TestColoringExplicit(unittest.TestCase):
             jac = comp._jacobian._subjacs_info
             _check_partial_matrix(comp, jac, sparsity, method)
 
-        orig = comps[0]._coloring_info['coloring']
+        orig = comps[0]._coloring_info.coloring
         for comp in comps:
-            self.assertTrue(orig is comp._coloring_info['coloring'],
+            self.assertTrue(orig is comp._coloring_info.coloring,
                             "Instance '{}' is using a different coloring".format(comp.pathname))
 
 
@@ -897,7 +897,7 @@ class TestColoring(unittest.TestCase):
         # verify we're doing a solve for each column
         self.assertEqual(6, comp._nruns - start_nruns)
 
-        self.assertEqual(comp._coloring_info['coloring'], None)
+        self.assertEqual(comp._coloring_info.coloring, None)
         self.assertEqual(comp._coloring_info['static'], None)
 
         jac = comp._jacobian._subjacs_info
@@ -944,7 +944,7 @@ class TestColoring(unittest.TestCase):
             start_nruns = comp._nruns
             comp._linearize()
             self.assertEqual(6, comp._nruns - start_nruns)
-            self.assertEqual(comp._coloring_info['coloring'], None)
+            self.assertEqual(comp._coloring_info.coloring, None)
             self.assertEqual(comp._coloring_info['static'], None)
 
             jac = comp._jacobian._subjacs_info

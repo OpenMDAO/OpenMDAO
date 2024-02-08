@@ -631,7 +631,6 @@ class pyOptSparseDriver(Driver):
         finally:
             self._total_jac = None
 
-
         if self._exc_info is not None:
             exc_info = self._exc_info
             self._exc_info = None

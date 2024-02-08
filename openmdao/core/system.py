@@ -1434,11 +1434,11 @@ class System(object):
             if a specific coloring is passed in.
         """
         if coloring_mod._force_dyn_coloring and coloring is _STD_COLORING_FNAME:
-            self._coloring_info['dynamic'] = True
+            self._coloring_info.dynamic = True
             return  # don't use static this time
 
-        self._coloring_info['static'] = coloring
-        self._coloring_info['dynamic'] = False
+        self._coloring_info.static = coloring
+        self._coloring_info.dynamic = False
 
         if coloring is not _STD_COLORING_FNAME:
             if recurse:
@@ -1519,13 +1519,13 @@ class System(object):
             options.update({k: v for k, v in approx.DEFAULT_OPTIONS.items()
                             if k in ('step', 'form')})
 
-        if self._coloring_info['static'] is None:
+        if self._coloring_info.static is None:
             options.dynamic = True
         else:
             options.dynamic = False
-            options.static = self._coloring_info['static']
+            options.static = self._coloring_info.static
 
-        options.coloring = self._coloring_info['coloring']
+        options.coloring = self._coloring_info.coloring
 
         if isinstance(wrt, str):
             options.wrt_patterns = (wrt, )
@@ -1549,7 +1549,8 @@ class System(object):
 
     def _finalize_coloring(self, coloring, info, sp_info, sparsity_time):
         # if the improvement wasn't large enough, don't use coloring
-        if not info._pct_improvement_good(coloring, self.msginfo):
+        info.set_coloring(coloring, msginfo=self.msginfo)
+        if info._failed:
             if not info.per_instance:
                 # save the class coloring for so resources won't be wasted computing
                 # a bad coloring
@@ -1561,7 +1562,7 @@ class System(object):
         sp_info['class'] = type(self).__name__
         sp_info['type'] = 'semi-total' if self._subsystems_allprocs else 'partial'
 
-        ordered_wrt_info = list(self._jac_wrt_iter(info['wrt_matches']))
+        ordered_wrt_info = list(self._jac_wrt_iter(info.wrt_matches))
         ordered_of_info = list(self._jac_of_iter())
 
         if self.pathname:
@@ -1575,8 +1576,6 @@ class System(object):
 
         coloring._meta.update(info)  # save metadata we used to create the coloring
         coloring._meta.update(sp_info)
-
-        info['coloring'] = coloring
 
         if info.show_sparsity or info.show_summary:
             print("\nColoring for '%s' (class %s)" % (self.pathname, type(self).__name__))
@@ -1618,11 +1617,11 @@ class System(object):
         """
         if recurse:
             colorings = []
-            my_coloring = self._coloring_info['coloring']
+            my_coloring = self._coloring_info.coloring
             grad_systems = self._get_gradient_nl_solver_systems()
             for s in self.system_iter(include_self=True, recurse=True):
                 if my_coloring is None or s in grad_systems:
-                    if s._coloring_info['coloring'] is not None:
+                    if s._coloring_info.coloring is not None:
                         coloring = s._compute_coloring(recurse=False, **overrides)[0]
                         colorings.append(coloring)
                         if coloring is not None:
@@ -1645,7 +1644,7 @@ class System(object):
         if info['method'] is None and self._approx_schemes:
             info['method'] = list(self._approx_schemes)[0]
 
-        if info['coloring'] is None:
+        if info.coloring is None:
             # check to see if any approx or jax derivs have been declared
             for meta in self._subjacs_info.values():
                 if 'method' in meta and meta['method']:
@@ -1670,19 +1669,19 @@ class System(object):
         if not use_jax:
             approx_scheme = self._get_approx_scheme(info['method'])
 
-        if info['coloring'] is None and info['static'] is None:
-            info['dynamic'] = True
+        if info.coloring is None and info.static is None:
+            info.dynamic = True
 
         coloring_fname = self.get_coloring_fname()
 
         # if we find a previously computed class coloring for our class, just use that
         # instead of regenerating a coloring.
         if not info.per_instance and coloring_fname in coloring_mod._CLASS_COLORINGS:
-            info['coloring'] = coloring = coloring_mod._CLASS_COLORINGS[coloring_fname]
+            info.coloring = coloring = coloring_mod._CLASS_COLORINGS[coloring_fname]
             if coloring is None:
                 print("\nClass coloring for class '{}' wasn't good enough, "
                       "so skipping for '{}'".format(type(self).__name__, self.pathname))
-                info['static'] = None
+                info.static = None
             else:
                 print("\n{} using class coloring for class '{}'".format(self.pathname,
                                                                         type(self).__name__))
@@ -1842,34 +1841,34 @@ class System(object):
             Coloring object, possible loaded from a file, or None
         """
         info = self._coloring_info
-        coloring = info['coloring']
+        coloring = info.coloring
         if coloring is not None:
             return coloring
 
-        static = info['static']
+        static = info.static
         if static is _STD_COLORING_FNAME or isinstance(static, str):
             if static is _STD_COLORING_FNAME:
                 fname = self.get_coloring_fname()
             else:
                 fname = static
             print("%s: loading coloring from file %s" % (self.msginfo, fname))
-            info['coloring'] = coloring = Coloring.load(fname)
+            info.coloring = coloring = Coloring.load(fname)
             if info.wrt_patterns != coloring._meta['wrt_patterns']:
                 raise RuntimeError("%s: Loaded coloring has different wrt_patterns (%s) than "
                                    "declared ones (%s)." %
                                    (self.msginfo, coloring._meta['wrt_patterns'],
                                     info.wrt_patterns))
-            info.update(info['coloring']._meta)
+            info.update(info.coloring._meta)
             approx = self._get_approx_scheme(info['method'])
             # force regen of approx groups during next compute_approximations
             approx._reset()
         elif isinstance(static, coloring_mod.Coloring):
-            info['coloring'] = coloring = static
+            info.coloring = coloring = static
 
         if coloring is not None:
-            info['dynamic'] = False
+            info.dynamic = False
 
-        info['static'] = coloring
+        info.static = coloring
 
         return coloring
 
@@ -1886,12 +1885,12 @@ class System(object):
         """
         coloring = self._get_static_coloring()
         if coloring is None:
-            if self._coloring_info['dynamic']:
-                self._coloring_info['coloring'] = coloring = self._compute_coloring()[0]
+            if self._coloring_info.dynamic:
+                self._coloring_info.coloring = coloring = self._compute_coloring()[0]
                 if coloring is not None:
                     self._coloring_info.update(coloring._meta)
         else:
-            if not self._coloring_info['dynamic']:
+            if not self._coloring_info.dynamic:
                 coloring._check_config_partial(self)
 
         return coloring
@@ -2852,15 +2851,15 @@ class System(object):
         list of str or ()
             List of wrt_matches for a static coloring or () if there isn't one.
         """
-        if (self._coloring_info['coloring'] is not None and
-                self._coloring_info['wrt_matches'] is None):
+        if (self._coloring_info.coloring is not None and
+                self._coloring_info.wrt_matches is None):
             self._coloring_info._update_wrt_matches(self)
 
         # if coloring has been specified, we don't want to have multiple
         # approximations for the same subjac, so don't register any new
         # approximations when the wrt matches those used in the coloring.
         if self._get_static_coloring() is not None:  # static coloring has been specified
-            return self._coloring_info['wrt_matches']
+            return self._coloring_info.wrt_matches
 
         return ()  # for dynamic coloring or no coloring
 
@@ -4462,8 +4461,8 @@ class System(object):
 
         try:
             with self._scaled_context_all():
-                do_ln = self._linear_solver is not None and self._linear_solver._linearize_children()
-                self._linearize(self._assembled_jac, sub_do_ln=do_ln)
+                self._linearize(self._assembled_jac, sub_do_ln=self._linear_solver is not None and
+                                self._linear_solver._linearize_children())
                 if self._linear_solver is not None and sub_do_ln:
                     self._linear_solver._linearize()
         finally:

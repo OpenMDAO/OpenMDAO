@@ -162,6 +162,18 @@ class _ColoringMeta(object):
         self.msginfo = msginfo  # prefix for warning/error messages
         self.perturb_size = perturb_size  # input/output perturbation during generation of sparsity
         self._coloring = None  # the coloring object
+        self._failed = False  # If True, coloring was already generated but failed
+
+    def do_compute_coloring(self):
+        """
+        Return True if coloring should be computed.
+
+        Returns
+        -------
+        bool
+            True if coloring should be computed.
+        """
+        return self.coloring is None and not self._failed
 
     def update(self, dct):
         """
@@ -279,17 +291,23 @@ class _ColoringMeta(object):
         msginfo : str
             Prefix for warning/error messages.
         """
-        if coloring is None or self._pct_improvement_good(coloring, msginfo):
-            self._coloring = coloring
+        if coloring is None:
+            self._coloring = None
+            self._failed = False
+        elif self._pct_improvement_good(coloring, msginfo):
+            self._coloring = None
+            self._failed = False
         else:
             # if the improvement wasn't large enough, don't use coloring
-            self.reset_coloring()
+            self.coloring = None
+            self._failed = True
 
     def reset_coloring(self):
         """
         Reset the coloring to None.
         """
         self._coloring = None
+        self._failed = False
 
     def _pct_improvement_good(self, coloring, msginfo=''):
         """
@@ -308,7 +326,6 @@ class _ColoringMeta(object):
             True if the percentage improvement is greater than the minimum allowed.
         """
         if coloring is None:
-            self.reset_coloring()
             return False
 
         pct = coloring._solves_info()[-1]

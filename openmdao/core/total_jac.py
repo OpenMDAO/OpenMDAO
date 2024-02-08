@@ -191,8 +191,8 @@ class _TotalJacInfo(object):
                     else:
                         coloring_meta = None
 
-                do_coloring = coloring_meta is not None and coloring_meta.coloring is None and \
-                    (coloring_meta.dynamic)
+                do_coloring = coloring_meta is not None and \
+                    coloring_meta.do_compute_coloring() and (coloring_meta.dynamic)
 
                 if do_coloring and not problem._computing_coloring:
                     run_model = coloring_meta.run_model if 'run_model' in coloring_meta else None
@@ -701,7 +701,7 @@ class _TotalJacInfo(object):
             seed -= 1.0
         elif simul_coloring and simul_color_mode is not None:
             imeta = defaultdict(bool)
-            imeta['coloring'] = simul_coloring
+            imeta.coloring = simul_coloring
             cache = False
             imeta['itermeta'] = itermeta = []
             locs = None
@@ -923,7 +923,7 @@ class _TotalJacInfo(object):
         dict or None
             Iteration metadata.
         """
-        coloring = imeta['coloring']
+        coloring = imeta.coloring
         input_setter = self.simul_coloring_input_setter
         jac_setter = self.simul_coloring_jac_setter
 
@@ -1392,7 +1392,7 @@ class _TotalJacInfo(object):
                                     if key == '@simul_coloring':
                                         print(f'In mode: {mode}, Solving variable(s) using simul '
                                               'coloring:')
-                                        for local_ind in imeta['coloring']._local_indices(inds,
+                                        for local_ind in imeta.coloring._local_indices(inds,
                                                                                           mode):
                                             print(f"   {local_ind}", flush=True)
                                     elif self.directional:
@@ -1506,7 +1506,7 @@ class _TotalJacInfo(object):
 
                     model._setup_jacobians(recurse=False)
                     model._setup_approx_derivs()
-                    if model._coloring_info['coloring'] is not None:
+                    if model._coloring_info.coloring is not None:
                         model._coloring_info._update_wrt_matches(model)
 
                 if self.directional:
