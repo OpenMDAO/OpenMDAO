@@ -550,6 +550,8 @@ class ScipyOptimizeDriver(Driver):
         except Exception as msg:
             if self._exc_info is None:
                 raise
+        finally:
+            self._total_jac = None
 
         if self._exc_info is not None:
             self._reraise()
