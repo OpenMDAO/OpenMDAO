@@ -3,7 +3,7 @@ Class definitions for Relevance and related classes.
 """
 
 import sys
-from itertools import chain
+from itertools import chain, product
 from pprint import pprint
 from contextlib import contextmanager
 from collections import defaultdict
@@ -137,6 +137,36 @@ class SetChecker(object):
             return other_set
 
         return self._set.intersection(other_set)
+
+
+def _get_seed_map(fwd_seeds, rev_seeds):
+    """
+    Return a map of fwdseed/revseed pairings to their index.
+
+    Parameters
+    ----------
+    fwd_seeds : iter of str
+        Iterator over forward seed variable names.
+    rev_seeds : iter of str
+        Iterator over reverse seed variable names.
+
+    Returns
+    -------
+    dict
+        Dictionary mapping seed names to their direction.
+    """
+    fset = frozenset(fwd_seeds)
+    rset = frozenset(rev_seeds)
+
+    pairings = []
+    for f, r in product(fset, rset):
+        pairings.append((f, r))
+    for f in fset:
+        pairings.append((f, rset))
+    for r in rset:
+        pairings.append((fset, r))
+
+    return {i: pair for i, pair in enumerate(pairings)}
 
 
 def get_relevance(model, of, wrt):
