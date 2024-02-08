@@ -869,8 +869,8 @@ class Group(System):
                     break
             else:
                 msg = (f"Constraints or objectives [{', '.join(sorted(missing_responses))}] cannot"
-                    " be impacted by the design variables of the problem because no partials "
-                    "were defined for them in their parent component(s).")
+                       " be impacted by the design variables of the problem because no partials "
+                       "were defined for them in their parent component(s).")
                 if self._problem_meta['singular_jac_behavior'] == 'error':
                     raise RuntimeError(msg)
                 else:
