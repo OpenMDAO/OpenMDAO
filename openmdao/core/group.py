@@ -865,8 +865,8 @@ class Group(System):
 
         if missing_responses:
             msg = (f"Constraints or objectives [{', '.join(sorted(missing_responses))}] cannot"
-                    " be impacted by the design variables of the problem because no partials "
-                    "were defined for them in their parent component(s).")
+                   " be impacted by the design variables of the problem because no partials "
+                   "were defined for them in their parent component(s).")
             if self._problem_meta['singular_jac_behavior'] == 'error':
                 raise RuntimeError(msg)
             else:
@@ -4026,7 +4026,7 @@ class Group(System):
 
     def _get_missing_partials(self, missing):
         """
-        Return a list of (of, wrt) tuples for which derivatives have not been declared.
+        Provide (of, wrt) tuples for which derivatives have not been declared in the system.
 
         Parameters
         ----------
