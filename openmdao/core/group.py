@@ -864,17 +864,13 @@ class Group(System):
                     missing_responses.add(output)
 
         if missing_responses:
-            for subsys in self.system_iter(include_self=True, recurse=True, typ=Group):
-                if subsys._has_approx:
-                    break
+            msg = (f"Constraints or objectives [{', '.join(sorted(missing_responses))}] cannot"
+                    " be impacted by the design variables of the problem because no partials "
+                    "were defined for them in their parent component(s).")
+            if self._problem_meta['singular_jac_behavior'] == 'error':
+                raise RuntimeError(msg)
             else:
-                msg = (f"Constraints or objectives [{', '.join(sorted(missing_responses))}] cannot"
-                       " be impacted by the design variables of the problem because no partials "
-                       "were defined for them in their parent component(s).")
-                if self._problem_meta['singular_jac_behavior'] == 'error':
-                    raise RuntimeError(msg)
-                else:
-                    issue_warning(msg, category=DerivativesWarning)
+                issue_warning(msg, category=DerivativesWarning)
 
         self._relevance_graph = graph
         return graph
@@ -4037,6 +4033,8 @@ class Group(System):
         missing : dict
             Dictionary containing list of missing derivatives keyed by system pathname.
         """
+        if self._has_approx:
+            return
         for subsys in self._subsystems_myproc:
             subsys._get_missing_partials(missing)
 
