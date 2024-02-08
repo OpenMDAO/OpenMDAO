@@ -13,6 +13,7 @@
         "debug_print": false,
         "stall_limit": 0,
         "stall_tol": 1e-12,
+        "stall_tol_type": "rel",
         "restart_from_successful": false,
         "solve_subsystems": false,
         "max_sub_solves": 10,
