@@ -4125,7 +4125,7 @@ class Group(System):
             Metadata for a subjac.
         """
         info = self._coloring_info
-        meta.coloring = True
+        meta['coloring'] = True
         for name in ('method', 'step', 'form'):
             if name in info:
                 meta[name] = info[name]
