@@ -568,15 +568,6 @@ class ScipyOptimizeDriver(Driver):
                     print('-' * 35)
 
             elif self.options['disp']:
-                with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-                    try:
-                        model.run_solve_nonlinear()
-                    except AnalysisError:
-                        model._clear_iprint()
-
-                    rec.abs = 0.0
-                    rec.rel = 0.0
-                self.iter_count += 1
                 if self._problem().comm.rank == 0:
                     print('Optimization Complete')
                     print('-' * 35)
@@ -586,6 +577,18 @@ class ScipyOptimizeDriver(Driver):
                 print('Optimization Complete (success not known)')
                 print(result.message)
                 print('-' * 35)
+
+        if not self.fail:
+            # update everything after the opt completes so even irrelevant components are updated
+            with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
+                try:
+                    model.run_solve_nonlinear()
+                except AnalysisError:
+                    model._clear_iprint()
+
+                rec.abs = 0.0
+                rec.rel = 0.0
+            self.iter_count += 1
 
         return self.fail
 
