@@ -479,7 +479,7 @@ class pyOptSparseDriver(Driver):
         eqcons = {n: m for n, m in self._cons.items() if m['equals'] is not None}
         if eqcons:
             # set equality constraints as reverse seeds to see what dvs are relevant
-            with relevant.seeds_active(rev_seeds=eqcons):
+            with relevant.seeds_active(rev_seeds=[m['source'] for m in eqcons.values()]):
                 # Add all equality constraints
                 for name, meta in eqcons.items():
                     size = meta['global_size'] if meta['distributed'] else meta['size']
@@ -508,7 +508,7 @@ class pyOptSparseDriver(Driver):
         ineqcons = {n: m for n, m in self._cons.items() if m['equals'] is None}
         if ineqcons:
             # set inequality constraints as reverse seeds to see what dvs are relevant
-            with relevant.seeds_active(rev_seeds=ineqcons):
+            with relevant.seeds_active(rev_seeds=[m['source'] for m in ineqcons.values()]):
                 # Add all inequality constraints
                 for name, meta in ineqcons.items():
                     size = meta['global_size'] if meta['distributed'] else meta['size']

@@ -6,8 +6,25 @@ import sys
 from pprint import pprint
 from contextlib import contextmanager
 from collections import defaultdict
+from enum import IntEnum
 import numpy as np
 from openmdao.utils.general_utils import all_ancestors
+
+
+class _RelType(IntEnum):
+    """
+    Class used to define different types of relevant objects.
+
+    Attributes
+    ----------
+    VAR : int
+        Variable.
+    SYS : int
+        System.
+    """
+
+    VAR = 0
+    SYS = 1
 
 
 def _get_seed_map(fwd_seeds, rev_seeds, nvars, nsystems):
@@ -70,7 +87,7 @@ class Relevance(object):
 
     Parameters
     ----------
-    group : <System>
+    model : <Group>
         The top level group in the system hierarchy.
     fwd_meta : dict
         Dictionary of design variable metadata.  Keys don't matter.
@@ -81,17 +98,12 @@ class Relevance(object):
     ----------
     _graph : <nx.DirectedGraph>
         Dependency graph.  Dataflow graph containing both variables and systems.
-    _all_vars : dict
+    _var2idx : dict
         dict of all variables in the graph mapped to the row index into the variable
         relevance array.
-    _rel_var_array : ndarray
-        Bool array of shape (nvars, nseeds) where nvars is the number of variables in the graph
-        and nseeds is the number of unique seed pairs.  If _rel_var_array[i, j] is True, then
-        variable i is relevant to seed pair j.
-    _rel_sys_array : ndarray
-        Bool array of shape (nsystems, nseeds) where nsystems is the number of systems in the graph
-        and nseeds is the number of unique seed pairs.  If _rel_sys_array[i, j] is True, then
-        system i is relevant to seed pair j.
+    _sys2idx : dict
+        dict of all systems in the graph mapped to the row index into the system
+        relevance array.
     _seed_vars : dict
         Maps direction to currently active seed variable names.
     _all_seed_vars : dict
@@ -99,6 +111,12 @@ class Relevance(object):
     _active : bool or None
         If True, relevance is active.  If False, relevance is inactive.  If None, relevance is
         uninitialized.
+    _seed_map : dict
+        Nested dict of the form {fwdseed(s): {revseed(s): (var_array, sys_array)}}.
+        Keys that contain multiple seeds are frozensets of seed names.
+    _single_seeds_map : dict
+        Dict of the form {'fwd': {seed: (var_array, sys_array)}, 'rev': ...} where each seed is a
+        key and var_array and sys_array are the relevance arrays for the given seed.
     _use_pre_opt_post : bool
         If True, factor pre_opt_post status into relevance.
     """
@@ -109,8 +127,6 @@ class Relevance(object):
         """
         assert model.pathname == '', "Relevance can only be initialized on the top level Group."
 
-        self._relevant_vars = {}  # maps (varname, direction) to variable set checker
-        self._relevant_systems = {}  # maps (varname, direction) to relevant system sets
         self._active = None  # allow relevance to be turned on later
         self._graph = model._dataflow_graph
         self._use_pre_opt_post = model._problem_meta['group_by_pre_opt_post']
@@ -135,40 +151,6 @@ class Relevance(object):
             String representation of the Relevance.
         """
         return f"Relevance({self._seed_vars}, active={self._active})"
-
-    def _intersect_arrays(self, fmap, fseeds, rmap, rseeds):
-        """
-        Return the intersection of the relevance arrays for the given seeds.
-
-        Parameters
-        ----------
-        fmap : dict
-            Dict of the form {seed: (var_array, sys_array)} where var_array and sys_array are the
-            relevance arrays for the given seed.
-        fseeds : iter of str
-            Iterator over forward seed variable names.
-        rmap : dict
-            Dict of the form {seed: (var_array, sys_array)} where var_array and sys_array are the
-            relevance arrays for the given seed.
-        rseeds : iter of str
-            Iterator over reverse seed variable names.
-
-        Returns
-        -------
-        tuple
-            Tuple of the form (var_array, sys_array) where var_array and sys_array are the
-            intersection of the relevance arrays for the given seeds.
-        """
-        for i, seed in enumerate(seeds):
-            varr, sarr = arrmap[seed]
-            if i == 0:
-                var_array = varr.copy()
-                sys_array = sarr.copy()
-            else:
-                var_array &= varr
-                sys_array &= sarr
-
-        return var_array, sys_array
 
     def _get_single_seeds_map(self, group, seed_meta, direction, all_systems, all_vars):
         """
@@ -212,22 +194,28 @@ class Relevance(object):
             rel_vars = depnodes - all_systems
             varray = np.zeros(len(all_vars), dtype=bool)
             for rel_var in rel_vars:
-                varray[self._all_vars[rel_var]] = True
+                varray[self._var2idx[rel_var]] = True
             sarray = np.zeros(len(all_systems), dtype=bool)
             for rel_sys in rel_systems:
-                sarray[self._all_systems[rel_sys]] = True
+                sarray[self._sys2idx[rel_sys]] = True
             seed_map[src] = (varray, sarray)
 
         return seed_map, has_par_derivs
 
-    def _combine_relevance(self, fwd_seeds, rev_seeds):
+    def _combine_relevance(self, fmap, fwd_seeds, rmap, rev_seeds):
         """
         Return the combined relevance arrays for the given seeds.
 
         Parameters
         ----------
+        fmap : dict
+            Dict of the form {seed: (var_array, sys_array)} where var_array and sys_array are the
+            relevance arrays for the given seed.
         fwd_seeds : iter of str
             Iterator over forward seed variable names.
+        rmap : dict
+            Dict of the form {seed: (var_array, sys_array)} where var_array and sys_array are the
+            relevance arrays for the given seed.
         rev_seeds : iter of str
             Iterator over reverse seed variable names.
 
@@ -235,12 +223,70 @@ class Relevance(object):
         -------
         tuple
             Tuple of the form (var_array, sys_array) where var_array and sys_array are the
-            combined relevance arrays for the given seeds.
+            combined relevance arrays for the given seeds.  The arrays are combined by taking the
+            union of the fwd seeds and the union of the rev seeds and intersecting the two results.
         """
-        fwd_arr, fwd_sys_arr = self._intersect_arrays(self._fseed_map, fwd_seeds)
-        rev_arr, rev_sys_arr = self._intersect_arrays(self._rseed_map, rev_seeds)
+        # get the union of the fwd relevance and the union of the rev relevance
+        var_array, sys_array = self._union_arrays(fmap, fwd_seeds)
+        rvar, rsys = self._union_arrays(rmap, rev_seeds)
+
+        # intersect the two results
+        var_array &= rvar
+        sys_array &= rsys
 
         return var_array, sys_array
+
+    def _union_arrays(self, seed_map, seeds):
+        """
+        Return the intersection of the relevance arrays for the given seeds.
+
+        Parameters
+        ----------
+        seed_map : dict
+            Dict of the form {seed: (var_array, sys_array)} where var_array and sys_array are the
+            relevance arrays for the given seed.
+        seeds : iter of str
+            Iterator over forward seed variable names.
+
+        Returns
+        -------
+        tuple
+            Tuple of the form (var_array, sys_array) where var_array and sys_array are the
+            intersection of the relevance arrays for the given seeds.
+        """
+        if not seeds:
+            return np.zeros(0, dtype=bool), np.zeros(0, dtype=bool)
+
+        for i, seed in enumerate(seeds):
+            varr, sarr = seed_map[seed]
+            if i == 0:
+                var_array = varr.copy()
+                sys_array = sarr.copy()
+            else:
+                var_array |= varr
+                sys_array |= sarr
+
+        return var_array, sys_array
+
+    def _rel_names_iter(self, rel_array, all_names):
+        """
+        Return an iterator of names from the given relevance array.
+
+        Parameters
+        ----------
+        rel_array : ndarray
+            Boolean relevance array.  True means name is relevant.
+        all_names : iter of str
+            Iterator over the full set of names from the graph, either variables or systems.
+
+        Yields
+        ------
+        str
+            Name from the given relevance array.
+        """
+        for n, rel in zip(all_names, rel_array):
+            if rel:
+                yield n
 
     def _set_all_seeds(self, group, fwd_meta, rev_meta):
         """
@@ -259,8 +305,16 @@ class Relevance(object):
         """
         fwd_seeds = frozenset([m['source'] for m in fwd_meta.values()])
         rev_seeds = frozenset([m['source'] for m in rev_meta.values()])
+        self._seed_map = seed_map = {}
 
-        self._seed_rel_dict = _get_seed_map(fwd_seeds, rev_seeds)
+        self._all_seed_vars['fwd'] = fwd_seeds
+        self._all_seed_vars['rev'] = rev_seeds
+
+        self._single_seeds_map = {'fwd': {}, 'rev': {}}
+        self._current_rel_array = (np.zeros(0, dtype=bool), np.zeros(0, dtype=bool))
+
+        if not fwd_meta or not rev_meta:
+            return
 
         # this set contains all variables and some or all components
         # in the graph.  Components are included if all of their outputs
@@ -270,31 +324,46 @@ class Relevance(object):
 
         # create mappings of var and system names to indices into the var/system
         # relevance arrays.
-        self._all_systems = {n: i for i, n in enumerate(all_systems)}
-        self._all_vars = {n: i for i, n in enumerate(all_vars)}
+        self._sys2idx = {n: i for i, n in enumerate(all_systems)}
+        self._var2idx = {n: i for i, n in enumerate(all_vars)}
 
-        self._fseed_map, fhas_par_derivs = self._get_single_seeds_map(group, fwd_meta, 'fwd',
-                                                                      all_systems, all_vars)
-        self._rseed_map, rhas_par_derivs = self._get_single_seeds_map(group, rev_meta, 'rev',
-                                                                      all_systems, all_vars)
+        # map each seed to its variable and system relevance arrays
+        self._single_seeds_map['fwd'], fhas_par_derivs = \
+            self._get_single_seeds_map(group, fwd_meta, 'fwd', all_systems, all_vars)
+        self._single_seeds_map['rev'], rhas_par_derivs = \
+            self._get_single_seeds_map(group, rev_meta, 'rev', all_systems, all_vars)
         has_par_derivs = fhas_par_derivs or rhas_par_derivs
 
-        self._seed_map = seed_map = {}
-        for fsrc, fdata in fseed_map.items():
+        for fsrc, (farr, fsysarr) in self._single_seeds_map['fwd'].items():
             seed_map[fsrc] = sub = {}
-            for rsrc, rdata in rseed_map.items():
-                sub[rsrc] = (fdata[0] | rdata[0], fdata[1] | rdata[1])
+            for rsrc, (rarr, rsysarr) in self._single_seeds_map['rev'].items():
+                sub[rsrc] = (farr & rarr, fsysarr & rsysarr)
+
+        all_fseed_varray, all_fseed_sarray = self._union_arrays(self._single_seeds_map['fwd'],
+                                                                fwd_seeds)
+        all_rseed_varray, all_rseed_sarray = self._union_arrays(self._single_seeds_map['rev'],
+                                                                rev_seeds)
 
         # now add entries for each (fseed, all_rseeds) and each (rseed, all_fseeds)
-        all_rseed_varray =
-        for fsrc, fdata in fseed_map.items():
-            seed_map[(fsrc, 'all')] = (fdata[0], fdata[1] | np.any([rdata[1] for rdata in rseed_map.values()], axis=0))
+        for fsrc, (farr, fsysarr) in self._single_seeds_map['fwd'].items():
+            arr = farr & all_rseed_varray
+            sysarr = fsysarr & all_rseed_sarray
+            seed_map[fsrc][rev_seeds] = (arr, sysarr)
 
-        self._all_seed_vars['fwd'] = self._seed_vars['fwd'] = fwd_seeds
-        self._all_seed_vars['rev'] = self._seed_vars['rev'] = rev_seeds
+        seed_map[fwd_seeds] = {}
+        for rsrc, (rarr, rsysarr) in self._single_seeds_map['rev'].items():
+            arr = rarr & all_fseed_varray
+            sysarr = rsysarr & all_fseed_sarray
+            seed_map[fwd_seeds][rsrc] = (arr, sysarr)
+
+        # now add 'full' releveance for all seeds
+        seed_map[fwd_seeds][rev_seeds] = (all_fseed_varray & all_rseed_varray,
+                                          all_fseed_sarray & all_rseed_sarray)
+
+        self._set_seeds(fwd_seeds, rev_seeds)
 
         if has_par_derivs:
-            self._setup_par_deriv_relevance(group, rev_meta, fwd_meta)
+            self._par_deriv_err_check(group, rev_meta, fwd_meta)
 
     @contextmanager
     def active(self, active):
@@ -340,12 +409,14 @@ class Relevance(object):
         set
             Set of the relevant variables.
         """
+        names = self._rel_names_iter(self._single_seeds_map[direction][name][_RelType.VAR],
+                                     self._var2idx)
         if inputs and outputs:
-            return self._relevant_vars[name, direction].to_set()
+            return set(names)
         elif inputs:
-            return self._apply_filter(self._relevant_vars[name, direction], _is_input)
+            return self._apply_filter(names, _is_input)
         elif outputs:
-            return self._apply_filter(self._relevant_vars[name, direction], _is_output)
+            return self._apply_filter(names, _is_output)
         else:
             return set()
 
@@ -372,7 +443,7 @@ class Relevance(object):
             save = {'fwd': self._seed_vars['fwd'], 'rev': self._seed_vars['rev']}
             save_active = self._active
             self._active = True
-            self.reset_to_all_seeds()
+            self._set_seeds(self._all_seed_vars['fwd'], self._all_seed_vars['rev'])
             try:
                 yield
             finally:
@@ -380,7 +451,7 @@ class Relevance(object):
                 self._active = save_active
 
     @contextmanager
-    def seeds_active(self, fwd_seeds=None, rev_seeds=None, local=False):
+    def seeds_active(self, fwd_seeds=None, rev_seeds=None):
         """
         Context manager where the specified seeds are active.
 
@@ -392,8 +463,6 @@ class Relevance(object):
             Iterator over forward seed variable names. If None use current active seeds.
         rev_seeds : iter of str or None
             Iterator over reverse seed variable names. If None use current active seeds.
-        local : bool
-            If True, include only local variables.
 
         Yields
         ------
@@ -405,85 +474,71 @@ class Relevance(object):
             save = {'fwd': self._seed_vars['fwd'], 'rev': self._seed_vars['rev']}
             save_active = self._active
             self._active = True
-            self._set_seeds(fwd_seeds, rev_seeds, local)
+            fwd_seeds = frozenset(fwd_seeds) if fwd_seeds else self._all_seed_vars['fwd']
+            rev_seeds = frozenset(rev_seeds) if rev_seeds else self._all_seed_vars['rev']
+            self._set_seeds(fwd_seeds, rev_seeds)
             try:
                 yield
             finally:
                 self._seed_vars = save
                 self._active = save_active
 
-    def _setup_par_deriv_relevance(self, group, responses, desvars):
-        pd_err_chk = defaultdict(dict)
-        mode = group._problem_meta['mode']  # 'fwd', 'rev', or 'auto'
-
-        if mode in ('fwd', 'auto'):
-            for desvar, response, relset in self.iter_seed_pair_relevance(inputs=True):
-                if desvar in desvars and self._graph.nodes[desvar]['local']:
-                    dvcolor = desvars[desvar]['parallel_deriv_color']
-                    if dvcolor:
-                        pd_err_chk[dvcolor][desvar] = relset
-
-        if mode in ('rev', 'auto'):
-            for desvar, response, relset in self.iter_seed_pair_relevance(outputs=True):
-                if response in responses and self._graph.nodes[response]['local']:
-                    rescolor = responses[response]['parallel_deriv_color']
-                    if rescolor:
-                        pd_err_chk[rescolor][response] = relset
-
-        # check to make sure we don't have any overlapping dependencies between vars of the
-        # same color
-        errs = {}
-        for pdcolor, dct in pd_err_chk.items():
-            for vname, relset in dct.items():
-                for n, nds in dct.items():
-                    if vname != n and relset.intersection(nds):
-                        if pdcolor not in errs:
-                            errs[pdcolor] = []
-                        errs[pdcolor].append(vname)
-
-        all_errs = group.comm.allgather(errs)
-        msg = []
-        for errdct in all_errs:
-            for color, names in errdct.items():
-                vtype = 'design variable' if mode == 'fwd' else 'response'
-                msg.append(f"Parallel derivative color '{color}' has {vtype}s "
-                           f"{sorted(names)} with overlapping dependencies on the same rank.")
-
-        if msg:
-            raise RuntimeError('\n'.join(msg))
-
-    def _set_seeds(self, fwd_seeds, rev_seeds, local=False):
+    def _set_seeds(self, fwd_seeds, rev_seeds):
         """
         Set the seed(s) to determine relevance for a given variable in a given direction.
 
         Parameters
         ----------
-        fwd_seeds : iter of str or None
-            Iterator over forward seed variable names. If None use current active seeds.
-        rev_seeds : iter of str or None
-            Iterator over reverse seed variable names. If None use current active seeds.
-        local : bool
-            If True, update relevance set if necessary to include only local variables.
+        fwd_seeds : frozenset
+            Set of forward seed variable names.
+        rev_seeds : frozenset
+            Set of reverse seed variable names.
         """
-        if fwd_seeds:
-            fwd_seeds = frozenset(fwd_seeds)
-        else:
-            fwd_seeds = self._all_seed_vars['fwd']
-
-        if rev_seeds:
-            rev_seeds = frozenset(rev_seeds)
-        else:
-            rev_seeds = self._all_seed_vars['rev']
-
         self._seed_vars['fwd'] = fwd_seeds
         self._seed_vars['rev'] = rev_seeds
 
-    def reset_to_all_seeds(self):
+        if fwd_seeds and rev_seeds:
+            self._current_rel_array = self._get_rel_arrays(fwd_seeds, rev_seeds)
+
+    def _get_rel_arrays(self, fwd_seeds, rev_seeds):
         """
-        Reset the seeds to the full set of seeds.
+        Return the combined relevance arrays (variable and system) for the given seeds.
+
+        If the don't exist, create them.
+
+        Parameters
+        ----------
+        fwd_seeds : str or frozenset of str
+            Iterator over forward seed variable names.
+        rev_seeds : str or frozenset of str
+            Iterator over reverse seed variable names.
+
+        Returns
+        -------
+        tuple
+            Tuple of the form (var_array, sys_array) where var_array and sys_array are the
+            combined relevance arrays for the given seeds.
         """
-        self._seed_vars['fwd'] = self._all_seed_vars['fwd']
-        self._seed_vars['rev'] = self._all_seed_vars['rev']
+        # convert frozenset to single string if necessary
+        if len(fwd_seeds) == 1:
+            fwd_key = list(fwd_seeds)[0]
+        else:
+            fwd_key = fwd_seeds
+        if len(rev_seeds) == 1:
+            rev_key = list(rev_seeds)[0]
+        else:
+            rev_key = rev_seeds
+
+        try:
+            return self._seed_map[fwd_key][rev_key]
+        except KeyError:
+            tup = self._combine_relevance(self._single_seeds_map['fwd'], fwd_seeds,
+                                          self._single_seeds_map['rev'], rev_seeds)
+            if fwd_key not in self._seed_map:
+                self._seed_map[fwd_key] = {}
+            self._seed_map[fwd_key][rev_key] = tup
+
+        return tup
 
     def is_relevant(self, name):
         """
@@ -502,13 +557,7 @@ class Relevance(object):
         if not self._active:
             return True
 
-        for seed in self._seed_vars['fwd']:
-            if name in self._relevant_vars[seed, 'fwd']:
-                for tgt in self._seed_vars['rev']:
-                    if name in self._relevant_vars[tgt, 'rev']:
-                        return True
-
-        return False
+        return self._current_rel_array[_RelType.VAR][self._var2idx[name]]
 
     def is_relevant_system(self, name):
         """
@@ -527,12 +576,7 @@ class Relevance(object):
         if not self._active:
             return True
 
-        for seed in self._seed_vars['fwd']:
-            if name in self._relevant_systems[seed, 'fwd']:
-                for tgt in self._seed_vars['rev']:
-                    if name in self._relevant_systems[tgt, 'rev']:
-                        return True
-        return False
+        return self._current_rel_array[_RelType.SYS][self._sys2idx[name]]
 
     def system_filter(self, systems, relevant=True, linear=True):
         """
@@ -565,40 +609,6 @@ class Relevance(object):
                     yield system
         elif relevant:
             yield from systems
-
-    def _init_relevance_set(self, varname, direction, local=False):
-        """
-        Return a SetChecker for variables and components for the given variable.
-
-        The SetChecker determines all relevant variables/systems found in the
-        relevance graph starting at the given variable and moving in the given
-        direction. It is determined lazily and cached for future use.
-
-        Parameters
-        ----------
-        varname : str
-            Name of the variable.
-        direction : str
-            Direction of the search for relevant variables.  'fwd' or 'rev'.
-            'fwd' will find downstream nodes, 'rev' will find upstream nodes.
-        local : bool
-            If True, update relevance set if necessary to include only local variables.
-        """
-        key = (varname, direction)
-        if key not in self._relevant_vars:
-            assert direction in ('fwd', 'rev'), "direction must be 'fwd' or 'rev'"
-
-            # first time we've seen this varname/direction pair, so we need to
-            # compute the set of relevant variables and the set of relevant systems
-            # and store them for future use.
-            depnodes = self._dependent_nodes(varname, direction, local=local)
-
-            rel_systems = _vars2systems(depnodes)
-
-            rel_vars = depnodes - self._all_systems
-
-            self._relevant_systems[key] = _get_set_checker(rel_systems, self._all_systems)
-            self._relevant_vars[key] = _get_set_checker(rel_vars, self._all_vars)
 
     def iter_seed_pair_relevance(self, fwd_seeds=None, rev_seeds=None, inputs=False, outputs=False):
         """
@@ -635,12 +645,11 @@ class Relevance(object):
             rev_seeds = [rev_seeds]
 
         for seed in fwd_seeds:
-            fwdvars = self._relevant_vars[seed, 'fwd'].to_set()
             for rseed in rev_seeds:
-                if rseed in fwdvars:
-                    inter = self._relevant_vars[rseed, 'rev'].intersection(fwdvars)
-                    if inter:
-                        yield seed, rseed, self._apply_filter(inter, filt)
+                inter = self._get_rel_arrays(seed, rseed)[_RelType.VAR]
+                if np.any(inter):
+                    inter = self._rel_names_iter(inter, self._var2idx)
+                    yield seed, rseed, self._apply_filter(inter, filt)
 
     def _apply_filter(self, names, filt):
         """
@@ -776,19 +785,45 @@ class Relevance(object):
 
         return set()
 
-    def dump(self, out_stream=sys.stdout):
-        """
-        Print out the current relevance information.
+    def _par_deriv_err_check(self, group, responses, desvars):
+        pd_err_chk = defaultdict(dict)
+        mode = group._problem_meta['mode']  # 'fwd', 'rev', or 'auto'
 
-        Parameters
-        ----------
-        out_stream : file-like or None
-            Where to send human readable output.  Defaults to sys.stdout.
-        """
-        print("Systems:", file=out_stream)
-        pprint(self._relevant_systems, stream=out_stream)
-        print("Variables:", file=out_stream)
-        pprint(self._relevant_vars, stream=out_stream)
+        if mode in ('fwd', 'auto'):
+            for desvar, response, relset in self.iter_seed_pair_relevance(inputs=True):
+                if desvar in desvars and self._graph.nodes[desvar]['local']:
+                    dvcolor = desvars[desvar]['parallel_deriv_color']
+                    if dvcolor:
+                        pd_err_chk[dvcolor][desvar] = relset
+
+        if mode in ('rev', 'auto'):
+            for desvar, response, relset in self.iter_seed_pair_relevance(outputs=True):
+                if response in responses and self._graph.nodes[response]['local']:
+                    rescolor = responses[response]['parallel_deriv_color']
+                    if rescolor:
+                        pd_err_chk[rescolor][response] = relset
+
+        # check to make sure we don't have any overlapping dependencies between vars of the
+        # same color
+        errs = {}
+        for pdcolor, dct in pd_err_chk.items():
+            for vname, relset in dct.items():
+                for n, nds in dct.items():
+                    if vname != n and relset.intersection(nds):
+                        if pdcolor not in errs:
+                            errs[pdcolor] = []
+                        errs[pdcolor].append(vname)
+
+        all_errs = group.comm.allgather(errs)
+        msg = []
+        for errdct in all_errs:
+            for color, names in errdct.items():
+                vtype = 'design variable' if mode == 'fwd' else 'response'
+                msg.append(f"Parallel derivative color '{color}' has {vtype}s "
+                           f"{sorted(names)} with overlapping dependencies on the same rank.")
+
+        if msg:
+            raise RuntimeError('\n'.join(msg))
 
 
 def _vars2systems(nameiter):
