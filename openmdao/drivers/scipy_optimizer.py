@@ -13,6 +13,7 @@ from openmdao.core.constants import INF_BOUND
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.class_util import WeakMethodWrapper
 from openmdao.utils.mpi import MPI
+from openmdao.core.analysis_error import AnalysisError
 
 # Optimizers in scipy.minimize
 _optimizers = {'Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
@@ -567,6 +568,15 @@ class ScipyOptimizeDriver(Driver):
                     print('-' * 35)
 
             elif self.options['disp']:
+                with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
+                    try:
+                        model.run_solve_nonlinear()
+                    except AnalysisError:
+                        model._clear_iprint()
+
+                    rec.abs = 0.0
+                    rec.rel = 0.0
+                self.iter_count += 1
                 if self._problem().comm.rank == 0:
                     print('Optimization Complete')
                     print('-' * 35)
@@ -610,10 +620,8 @@ class ScipyOptimizeDriver(Driver):
 
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 self.iter_count += 1
-                # TODO: turning on relevance here causes a lot of dymos tests
-                # to fail.  Need to investigate why.
-                # with model._relevant.all_seeds_active():
-                model.run_solve_nonlinear()
+                with model._relevant.all_seeds_active():
+                    model.run_solve_nonlinear()
 
             # Get the objective function evaluations
             for obj in self.get_objective_values().values():
