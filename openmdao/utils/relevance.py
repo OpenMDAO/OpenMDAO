@@ -138,6 +138,7 @@ class Relevance(object):
 
         self._set_all_seeds(model, fwd_meta, rev_meta)
 
+        print(self)
         if not (fwd_meta and rev_meta):
             self._active = False  # relevance will never be active
 
@@ -334,10 +335,12 @@ class Relevance(object):
             self._get_single_seeds_map(group, rev_meta, 'rev', all_systems, all_vars)
         has_par_derivs = fhas_par_derivs or rhas_par_derivs
 
+        # in seed_map, add keys for both fsrc and frozenset((fsrc,)) and similarly for rsrc
+        # because both forms of keys may be used depending on the context.
         for fsrc, (farr, fsysarr) in self._single_seeds_map['fwd'].items():
-            seed_map[fsrc] = sub = {}
+            seed_map[fsrc] = seed_map[frozenset((fsrc,))] = sub = {}
             for rsrc, (rarr, rsysarr) in self._single_seeds_map['rev'].items():
-                sub[rsrc] = (farr & rarr, fsysarr & rsysarr)
+                sub[rsrc] = sub[frozenset((rsrc,))] = (farr & rarr, fsysarr & rsysarr)
 
         all_fseed_varray, all_fseed_sarray = self._union_arrays(self._single_seeds_map['fwd'],
                                                                 fwd_seeds)
@@ -421,23 +424,18 @@ class Relevance(object):
             return set()
 
     @contextmanager
-    def all_seeds_active(self, active=True):
+    def all_seeds_active(self):
         """
         Context manager where all seeds are active.
 
         This assumes that the relevance object itself is active.
-
-        Parameters
-        ----------
-        active : bool
-            If True, assuming relevance is already active, activate all seeds, else do nothing.
 
         Yields
         ------
         None
         """
         # if already inactive from higher level, or 'active' parameter is False, don't change it
-        if not active or self._active is False:
+        if self._active is False:
             yield
         else:
             save = {'fwd': self._seed_vars['fwd'], 'rev': self._seed_vars['rev']}
@@ -519,24 +517,15 @@ class Relevance(object):
             Tuple of the form (var_array, sys_array) where var_array and sys_array are the
             combined relevance arrays for the given seeds.
         """
-        # convert frozenset to single string if necessary
-        if len(fwd_seeds) == 1:
-            fwd_key = list(fwd_seeds)[0]
-        else:
-            fwd_key = fwd_seeds
-        if len(rev_seeds) == 1:
-            rev_key = list(rev_seeds)[0]
-        else:
-            rev_key = rev_seeds
-
         try:
-            return self._seed_map[fwd_key][rev_key]
+            return self._seed_map[fwd_seeds][rev_seeds]
         except KeyError:
+            print(f"missing rel array for ({fwd_seeds}, {rev_seeds})")
             tup = self._combine_relevance(self._single_seeds_map['fwd'], fwd_seeds,
                                           self._single_seeds_map['rev'], rev_seeds)
-            if fwd_key not in self._seed_map:
-                self._seed_map[fwd_key] = {}
-            self._seed_map[fwd_key][rev_key] = tup
+            if fwd_seeds not in self._seed_map:
+                self._seed_map[fwd_seeds] = {}
+            self._seed_map[fwd_seeds][rev_seeds] = tup
 
         return tup
 
