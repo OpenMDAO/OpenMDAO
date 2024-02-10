@@ -267,7 +267,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(driver_cases, [
             'rank0:ScipyOptimize_SLSQP|0', 'rank0:ScipyOptimize_SLSQP|1', 'rank0:ScipyOptimize_SLSQP|2',
             'rank0:ScipyOptimize_SLSQP|3', 'rank0:ScipyOptimize_SLSQP|4', 'rank0:ScipyOptimize_SLSQP|5',
-            'rank0:ScipyOptimize_SLSQP|6'
+            'rank0:ScipyOptimize_SLSQP|6', 'rank0:ScipyOptimize_SLSQP|7'
         ])
 
         # Test to see if the access by case keys works:
@@ -2227,7 +2227,8 @@ class TestSqliteCaseReader(unittest.TestCase):
             'rank0:ScipyOptimize_SLSQP|3|root._solve_nonlinear|3|NLRunOnce|0|obj_cmp._solve_nonlinear|3',
             'rank0:ScipyOptimize_SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0|obj_cmp._solve_nonlinear|4',
             'rank0:ScipyOptimize_SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0|obj_cmp._solve_nonlinear|5',
-            'rank0:ScipyOptimize_SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0|obj_cmp._solve_nonlinear|6'
+            'rank0:ScipyOptimize_SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0|obj_cmp._solve_nonlinear|6', 
+            'rank0:ScipyOptimize_SLSQP|7|root._solve_nonlinear|7|NLRunOnce|0|obj_cmp._solve_nonlinear|7'
         ]
         self.assertEqual(len(system_cases), len(expected_cases))
         for i, coord in enumerate(system_cases):
@@ -2258,7 +2259,8 @@ class TestSqliteCaseReader(unittest.TestCase):
             'rank0:ScipyOptimize_SLSQP|3|root._solve_nonlinear|3|NLRunOnce|0',
             'rank0:ScipyOptimize_SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0',
             'rank0:ScipyOptimize_SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0',
-            'rank0:ScipyOptimize_SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0'
+            'rank0:ScipyOptimize_SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0', 
+            'rank0:ScipyOptimize_SLSQP|7|root._solve_nonlinear|7|NLRunOnce|0'
         ]
         self.assertEqual(len(root_solver_cases), len(expected_cases))
         for i, coord in enumerate(root_solver_cases):
@@ -2357,7 +2359,8 @@ class TestSqliteCaseReader(unittest.TestCase):
             'rank0:ScipyOptimize_SLSQP|3',
             'rank0:ScipyOptimize_SLSQP|4',
             'rank0:ScipyOptimize_SLSQP|5',
-            'rank0:ScipyOptimize_SLSQP|6'
+            'rank0:ScipyOptimize_SLSQP|6', 
+            'rank0:ScipyOptimize_SLSQP|7'
         ]
         # check that there are multiple iterations and they have the expected coordinates
         self.assertTrue(len(driver_cases), len(expected_cases))
@@ -3257,7 +3260,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         cr = om.CaseReader('cases.sql')
 
         # Get derivatives associated with the last iteration.
-        derivs = cr.get_case(-1).derivatives
+        derivs = cr.get_case(-2).derivatives
 
         # check that derivatives have been recorded.
         self.assertEqual(set(derivs.keys()), set([
@@ -3725,7 +3728,7 @@ class TestPromAbsDict(unittest.TestCase):
         cr = om.CaseReader("cases.sql")
 
         driver_cases = cr.list_cases('driver', out_stream=None)
-        driver_case = cr.get_case(driver_cases[-1])
+        driver_case = cr.get_case(driver_cases[-2])
 
         dvs = driver_case.get_design_vars()
         derivs = driver_case.derivatives
