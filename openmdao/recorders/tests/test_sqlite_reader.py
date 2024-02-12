@@ -2227,7 +2227,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             'rank0:ScipyOptimize_SLSQP|3|root._solve_nonlinear|3|NLRunOnce|0|obj_cmp._solve_nonlinear|3',
             'rank0:ScipyOptimize_SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0|obj_cmp._solve_nonlinear|4',
             'rank0:ScipyOptimize_SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0|obj_cmp._solve_nonlinear|5',
-            'rank0:ScipyOptimize_SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0|obj_cmp._solve_nonlinear|6', 
+            'rank0:ScipyOptimize_SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0|obj_cmp._solve_nonlinear|6',
             'rank0:ScipyOptimize_SLSQP|7|root._solve_nonlinear|7|NLRunOnce|0|obj_cmp._solve_nonlinear|7'
         ]
         self.assertEqual(len(system_cases), len(expected_cases))
@@ -2259,7 +2259,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             'rank0:ScipyOptimize_SLSQP|3|root._solve_nonlinear|3|NLRunOnce|0',
             'rank0:ScipyOptimize_SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0',
             'rank0:ScipyOptimize_SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0',
-            'rank0:ScipyOptimize_SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0', 
+            'rank0:ScipyOptimize_SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0',
             'rank0:ScipyOptimize_SLSQP|7|root._solve_nonlinear|7|NLRunOnce|0'
         ]
         self.assertEqual(len(root_solver_cases), len(expected_cases))
@@ -2359,7 +2359,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             'rank0:ScipyOptimize_SLSQP|3',
             'rank0:ScipyOptimize_SLSQP|4',
             'rank0:ScipyOptimize_SLSQP|5',
-            'rank0:ScipyOptimize_SLSQP|6', 
+            'rank0:ScipyOptimize_SLSQP|6',
             'rank0:ScipyOptimize_SLSQP|7'
         ]
         # check that there are multiple iterations and they have the expected coordinates
@@ -3260,7 +3260,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         cr = om.CaseReader('cases.sql')
 
         # Get derivatives associated with the last iteration.
-        derivs = cr.get_case(-2).derivatives
+        derivs = cr.get_case(-1).derivatives
 
         # check that derivatives have been recorded.
         self.assertEqual(set(derivs.keys()), set([

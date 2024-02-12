@@ -74,6 +74,8 @@ class CrossProductComp(ExplicitComponent):
                             [0, 1, 0, 0, -1, 0],
                             [-1, 0, 1, 0, 0, 0]], dtype=float)
 
+        self._minus_k = -self._k
+
     def add_product(self, c_name, a_name='a', b_name='b',
                     c_units=None, a_units=None, b_units=None,
                     vec_size=1):
@@ -169,11 +171,8 @@ class CrossProductComp(ExplicitComponent):
         for i in range(vec_size):
             col_idxs = np.concatenate((col_idxs, M + i * 3))
 
-        self.declare_partials(of=c_name, wrt=a_name,
-                              rows=row_idxs, cols=col_idxs, val=0)
-
-        self.declare_partials(of=c_name, wrt=b_name,
-                              rows=row_idxs, cols=col_idxs, val=0)
+        self.declare_partials(of=c_name, wrt=a_name, rows=row_idxs, cols=col_idxs)
+        self.declare_partials(of=c_name, wrt=b_name, rows=row_idxs, cols=col_idxs)
 
     def compute(self, inputs, outputs):
         """
@@ -208,6 +207,6 @@ class CrossProductComp(ExplicitComponent):
 
             # Use the following for sparse partials
             partials[product['c_name'], product['a_name']] = \
-                np.einsum('...j,ji->...i', b, self._k * -1).ravel()
+                np.einsum('...j,ji->...i', b, self._minus_k).ravel()
             partials[product['c_name'], product['b_name']] = \
                 np.einsum('...j,ji->...i', a, self._k).ravel()

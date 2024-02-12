@@ -554,6 +554,7 @@ class ScipyOptimizeDriver(Driver):
             if self._exc_info is None:
                 raise
         finally:
+            total_jac = self._total_jac  # used later if this is the final iter
             self._total_jac = None
 
         if self._exc_info is not None:
@@ -594,6 +595,14 @@ class ScipyOptimizeDriver(Driver):
 
                 rec.abs = 0.0
                 rec.rel = 0.0
+
+            if self.recording_options['record_derivatives']:
+                try:
+                    self._total_jac = total_jac # temporarily restore this to get deriv recording
+                    self.record_derivatives()
+                finally:
+                    self._total_jac = None
+
             self.iter_count += 1
 
         return self.fail
