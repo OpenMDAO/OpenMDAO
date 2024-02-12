@@ -4727,28 +4727,24 @@ class Group(System):
                     if s._run_on_opt[opt_status]:
                         yield s
 
-    def _get_relevance_modifiers(self, grad_groups, always_opt):
+    def _get_relevance_modifiers(self, grad_groups, always_opt_comps):
         """
-        Return the relevance modifiers for the given groups.
+        Collect information from the model that will modify the relevance graph of the model.
 
         Parameters
         ----------
         grad_groups : set
-            Set of names of groups having nonlinear solvers that use gradients.
-        always_opt : set
-            Set of components that have the 'always_opt' option set to True.
-
-        Returns
-        -------
-        tuple (set, set)
-            Set of group pathnames and a set of component pathnames.
+            Set of groups having nonlinear solvers that use gradients.
+        always_opt_comps : set
+            Set of components that are to be included in every iteration of the optimization,
+            even if they aren't relevant in terms of data flow.
         """
         for s in self._subsystems_myproc:
             if isinstance(s, Group):
                 if s.nonlinear_solver is not None and s.nonlinear_solver.supports['gradients']:
                     grad_groups.add(s.pathname)
             elif s.options['always_opt']:
-                always_opt.add(s.pathname)
+                always_opt_comps.add(s.pathname)
 
     def _setup_iteration_lists(self):
         """
