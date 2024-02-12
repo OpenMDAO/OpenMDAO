@@ -1038,11 +1038,18 @@ class Driver(object):
 
         totals = total_jac.compute_totals()
 
-        if self._rec_mgr._recorders and self.recording_options['record_derivatives']:
-            metadata = create_local_meta(self._get_name())
-            total_jac.record_derivatives(self, metadata)
+        if self.recording_options['record_derivatives']:
+            self.record_derivatives()
 
         return totals
+
+    def record_derivatives(self):
+        """
+        Record the current total jacobian.
+        """
+        if self._total_jac is not None and self._rec_mgr._recorders:
+            metadata = create_local_meta(self._get_name())
+            self._total_jac.record_derivatives(self, metadata)
 
     def record_iteration(self):
         """
