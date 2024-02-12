@@ -264,7 +264,7 @@ def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
 
     left_column_width = len(row)
     have_array_values = []  # keep track of which values are arrays
-    np_precision =  np.get_printoptions()['precision']
+    np_precision = np.get_printoptions()['precision']
 
     for column_name in column_names:
         row += column_spacing * ' '
