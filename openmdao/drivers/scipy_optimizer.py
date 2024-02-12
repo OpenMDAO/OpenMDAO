@@ -598,7 +598,7 @@ class ScipyOptimizeDriver(Driver):
 
             if self.recording_options['record_derivatives']:
                 try:
-                    self._total_jac = total_jac # temporarily restore this to get deriv recording
+                    self._total_jac = total_jac  # temporarily restore this to get deriv recording
                     self.record_derivatives()
                 finally:
                     self._total_jac = None
