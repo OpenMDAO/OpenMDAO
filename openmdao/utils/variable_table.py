@@ -5,6 +5,7 @@ import sys
 import pprint
 
 from io import TextIOBase
+from numbers import Number
 
 import numpy as np
 
@@ -125,16 +126,12 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     for column_name in column_names:
         column_widths[column_name] = len(column_name)  # has to be able to display name!
 
-    np_precision = np.get_printoptions()['precision']
-
     for name in var_list:
         for column_name in column_names:
             column_value = var_dict[name][column_name]
             if isinstance(column_value, np.ndarray) and column_value.size > 1:
                 out = '|{}|'.format(str(np.linalg.norm(column_value)))
             else:
-                if isinstance(column_value, float):
-                    column_value = np.round(column_value, np_precision)
                 out = str(column_value)
             column_widths[column_name] = max(column_widths[column_name], len(str(out)))
 
@@ -267,18 +264,18 @@ def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
 
     left_column_width = len(row)
     have_array_values = []  # keep track of which values are arrays
-    print_options = np.get_printoptions()
-    np_precision = print_options['precision']
+    np_precision =  np.get_printoptions()['precision']
+
     for column_name in column_names:
         row += column_spacing * ' '
         cell = var_dict[column_name]
-        if isinstance(cell, np.ndarray) and \
-                cell.size > 1:
+        isarr = isinstance(cell, np.ndarray)
+        if isarr and cell.size > 1:
             have_array_values.append(column_name)
             norm = np.linalg.norm(cell)
             out = '|{}|'.format(str(np.round(norm, np_precision)))
         else:
-            if isinstance(cell, float):
+            if isarr or isinstance(cell, Number):
                 out = str(np.round(cell, np_precision))
             else:
                 out = str(cell)
