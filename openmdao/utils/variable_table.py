@@ -125,12 +125,16 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     for column_name in column_names:
         column_widths[column_name] = len(column_name)  # has to be able to display name!
 
+    np_precision = np.get_printoptions()['precision']
+
     for name in var_list:
         for column_name in column_names:
             column_value = var_dict[name][column_name]
             if isinstance(column_value, np.ndarray) and column_value.size > 1:
                 out = '|{}|'.format(str(np.linalg.norm(column_value)))
             else:
+                if isinstance(column_value, float):
+                    column_value = np.round(column_value, np_precision)
                 out = str(column_value)
             column_widths[column_name] = max(column_widths[column_name], len(str(out)))
 
