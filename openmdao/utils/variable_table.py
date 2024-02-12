@@ -113,12 +113,12 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     #    Need to look through all the possible varnames to find the max width
     max_varname_len = len('varname')
     if hierarchical:
-        for name, outs in var_dict.items():
+        for name in var_dict:
             for i, name_part in enumerate(name[rel_idx:].split('.')):
                 total_len = i * indent_inc + len(name_part)
                 max_varname_len = max(max_varname_len, total_len)
     else:
-        for name, outs in var_dict.items():
+        for name in var_dict:
             max_varname_len = max(max_varname_len, len(name[rel_idx:]))
 
     # Determine the column widths of the data fields by finding the max width for all rows
@@ -267,14 +267,17 @@ def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
     np_precision = print_options['precision']
     for column_name in column_names:
         row += column_spacing * ' '
-
-        if isinstance(var_dict[column_name], np.ndarray) and \
-                var_dict[column_name].size > 1:
+        cell = var_dict[column_name]
+        if isinstance(cell, np.ndarray) and \
+                cell.size > 1:
             have_array_values.append(column_name)
-            norm = np.linalg.norm(var_dict[column_name])
+            norm = np.linalg.norm(cell)
             out = '|{}|'.format(str(np.round(norm, np_precision)))
         else:
-            out = str(var_dict[column_name])
+            if isinstance(cell, float):
+                out = str(np.round(cell, np_precision))
+            else:
+                out = str(cell)
         row += '{:{align}{width}}'.format(out, align=align,
                                           width=column_widths[column_name])
     out_stream.write(row + '\n')
