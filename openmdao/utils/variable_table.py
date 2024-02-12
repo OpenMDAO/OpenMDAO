@@ -275,7 +275,9 @@ def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
             norm = np.linalg.norm(cell)
             out = '|{}|'.format(str(np.round(norm, np_precision)))
         else:
-            if isarr or isinstance(cell, Number):
+            if isarr:
+                out = f"[{cell.flat[0]:.{np_precision}g}]"
+            elif isinstance(cell, Number):
                 out = f"{cell:.{np_precision}g}"
             else:
                 out = str(cell)
