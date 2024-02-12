@@ -4727,6 +4727,29 @@ class Group(System):
                     if s._run_on_opt[opt_status]:
                         yield s
 
+    def _get_relevance_modifiers(self, grad_groups, always_opt):
+        """
+        Return the relevance modifiers for the given groups.
+
+        Parameters
+        ----------
+        grad_groups : set
+            Set of names of groups having nonlinear solvers that use gradients.
+        always_opt : set
+            Set of components that have the 'always_opt' option set to True.
+
+        Returns
+        -------
+        tuple (set, set)
+            Set of group pathnames and a set of component pathnames.
+        """
+        for s in self._subsystems_myproc:
+            if isinstance(s, Group):
+                if s.nonlinear_solver is not None and s.nonlinear_solver.supports['gradients']:
+                    grad_groups.add(s.pathname)
+            elif s.options['always_opt']:
+                always_opt.add(s.pathname)
+
     def _setup_iteration_lists(self):
         """
         Set up the iteration lists containing the pre, iterated, and post subsets of systems.
@@ -4746,7 +4769,7 @@ class Group(System):
 
         # keep track of Groups with nonlinear solvers that use gradients (like Newton). These groups
         # and all systems they contain must be grouped together into the same iteration list.
-        grad_groups = []
+        grad_groups = set()
         always_opt = set()
         for s in self.system_iter(recurse=True, include_self=True):
             if isinstance(s, Group):
@@ -4824,14 +4847,16 @@ class Group(System):
             for dv in dvs:
                 graph.add_edge(res, dv)
 
-        # loop 'always_opt' components into a response to force them to be in the opt SCC.
+        # loop 'always_opt' components into all responses to force them to be relevant during
+        # optimization.
         for opt_sys in always_opt:
-            graph.add_edge(opt_sys, response0)
-            graph.add_edge(response0, opt_sys)
+            for response in responses:
+                graph.add_edge(opt_sys, response)
+                graph.add_edge(response, opt_sys)
 
-        if self.comm.size > 1:
-            grad_groups = self.comm.allgather(grad_groups)
-            grad_groups = {g for grp in grad_groups for g in grp}
+        # if self.comm.size > 1:
+        #     grad_groups = self.comm.allgather(grad_groups)
+        #     grad_groups = {g for grp in grad_groups for g in grp}
 
         if grad_groups:
             remaining = set(grad_groups)

@@ -161,3 +161,19 @@ class ParallelGroup(Group):
                         seen.add(sysname)
         else:
             super()._get_missing_partials(missing)
+
+    def _get_relevance_modifiers(self, grad_groups, always_opt_comp):
+        if self.comm.size > 1:
+            gg = set()
+            aoc = set()
+            super()._get_relevance_modifiers(gg, aoc)
+            if self._gather_full_data():
+                gathered = self.comm.allgather((gg, aoc))
+            else:
+                gathered = self.comm.allgather((set(), set()))
+
+            for g, a in gathered:
+                grad_groups.update(g)
+                always_opt_comp.update(a)
+        else:
+            super()._get_relevance_modifiers(grad_groups, always_opt_comp)
