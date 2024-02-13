@@ -11,6 +11,7 @@ from scipy.optimize import minimize
 
 from openmdao.core.constants import INF_BOUND
 from openmdao.core.driver import Driver, RecordingDebugging
+from openmdao.core.group import Group
 from openmdao.utils.class_util import WeakMethodWrapper
 from openmdao.utils.mpi import MPI
 
@@ -719,6 +720,9 @@ class ScipyOptimizeDriver(Driver):
         ndarray
             Gradient of objective with respect to input array.
         """
+        prob = self._problem()
+        model = prob.model
+
         try:
             grad = self._compute_totals(of=self._obj_and_nlcons, wrt=self._dvlist,
                                         return_format=self._total_jac_format)
@@ -726,9 +730,13 @@ class ScipyOptimizeDriver(Driver):
 
             # First time through, check for zero row/col.
             if self._check_jac and self._total_jac is not None:
-                raise_error = self.options['singular_jac_behavior'] == 'error'
-                self._total_jac.check_total_jac(raise_error=raise_error,
-                                                tol=self.options['singular_jac_tol'])
+                for subsys in model.system_iter(include_self=True, recurse=True, typ=Group):
+                    if subsys._has_approx:
+                        break
+                else:
+                    raise_error = self.options['singular_jac_behavior'] == 'error'
+                    self._total_jac.check_total_jac(raise_error=raise_error,
+                                                    tol=self.options['singular_jac_tol'])
                 self._check_jac = False
 
         except Exception as msg:
