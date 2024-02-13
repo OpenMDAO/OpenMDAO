@@ -319,7 +319,7 @@ class TestSemiTotalsNumCalls(unittest.TestCase):
 
         self.assertEqual(geom_and_aero.geom._counter, 4)
 
-    def test_check_relevlance_approx_totals(self):
+    def test_check_relevance_approx_totals(self):
 
             size = 10
             rho = 1.17573
