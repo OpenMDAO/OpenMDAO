@@ -3724,13 +3724,15 @@ class Group(System):
 
     def _get_missing_partials(self, missing):
         """
-        Return a list of (of, wrt) tuples for which derivatives have not been declared.
+        Provide (of, wrt) tuples for which derivatives have not been declared in the system.
 
         Parameters
         ----------
         missing : dict
             Dictionary containing list of missing derivatives keyed by system pathname.
         """
+        if self._has_approx:
+            return
         for subsys in self._subsystems_myproc:
             subsys._get_missing_partials(missing)
 
