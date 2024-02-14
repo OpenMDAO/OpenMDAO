@@ -5,7 +5,6 @@ import sys
 import pprint
 
 from io import TextIOBase
-from numbers import Number
 
 import numpy as np
 
@@ -264,23 +263,18 @@ def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
 
     left_column_width = len(row)
     have_array_values = []  # keep track of which values are arrays
-    np_precision = np.get_printoptions()['precision']
-
+    print_options = np.get_printoptions()
+    np_precision = print_options['precision']
     for column_name in column_names:
         row += column_spacing * ' '
-        cell = var_dict[column_name]
-        isarr = isinstance(cell, np.ndarray)
-        if isarr and cell.size > 1:
+
+        if isinstance(var_dict[column_name], np.ndarray) and \
+                var_dict[column_name].size > 1:
             have_array_values.append(column_name)
-            norm = np.linalg.norm(cell)
+            norm = np.linalg.norm(var_dict[column_name])
             out = '|{}|'.format(str(np.round(norm, np_precision)))
         else:
-            if isarr:
-                out = f"[{cell.flat[0]:.{np_precision}g}]"
-            elif isinstance(cell, Number):
-                out = f"{cell:.{np_precision}g}"
-            else:
-                out = str(cell)
+            out = str(var_dict[column_name])
         row += '{:{align}{width}}'.format(out, align=align,
                                           width=column_widths[column_name])
     out_stream.write(row + '\n')

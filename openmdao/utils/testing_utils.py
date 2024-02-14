@@ -395,7 +395,7 @@ def snum_iter(s):
         yield (s[end:], False)
 
 
-def snumdiff(s1, s2, atol=1e-6, rtol=1e-6):
+def snum_equal(s1, s2, atol=1e-6, rtol=1e-6):
     """
     Compare two strings, and if they contain numbers, compare the numbers subject to tolerance.
 
@@ -495,4 +495,3 @@ def numstreq(s1, s2, atol=1e-6, rtol=1e-6):
 
     # use atol
     return abs(n1 - n2) <= atol
-

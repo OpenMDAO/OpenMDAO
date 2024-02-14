@@ -1,7 +1,7 @@
 import unittest
 import re
 
-from openmdao.utils.testing_utils import use_tempdirs, MissingImports, snumdiff, \
+from openmdao.utils.testing_utils import use_tempdirs, MissingImports, snum_equal, \
     rel_num_diff, num_rgx, snum_iter
 
 
@@ -174,40 +174,40 @@ class TestRelNumDiff(unittest.TestCase):
         self.assertEqual(rel_num_diff(-5.0, 5.0), 2.0)
 
 
-class TestSNumDiff(unittest.TestCase):
+class TestSNumEqual(unittest.TestCase):
 
-    def test_snumdiff_no_numbers(self):
+    def test_snum_equal_no_numbers(self):
         # Test with strings that do not contain numbers
-        self.assertTrue(snumdiff("abc", "abc"))
-        self.assertFalse(snumdiff("abc", "def"))
+        self.assertTrue(snum_equal("abc", "abc"))
+        self.assertFalse(snum_equal("abc", "def"))
 
-    def test_snumdiff_with_numbers(self):
+    def test_snum_equal_with_numbers(self):
         # Test with strings that contain numbers
-        self.assertTrue(snumdiff("abc123", "abc123"))
-        self.assertFalse(snumdiff("abc123", "abc456"))
+        self.assertTrue(snum_equal("abc123", "abc123"))
+        self.assertFalse(snum_equal("abc123", "abc456"))
 
-    def test_snumdiff_with_numbers_within_tolerance(self):
+    def test_snum_equal_with_numbers_within_tolerance(self):
         # Test with strings that contain numbers within the tolerance
-        self.assertTrue(snumdiff("abc123.000001", "abc123.000002", atol=1e-6))
-        self.assertTrue(snumdiff("abc123.000001", "abc123.000002", rtol=1e-6))
+        self.assertTrue(snum_equal("abc123.000001", "abc123.000002", atol=1e-6))
+        self.assertTrue(snum_equal("abc123.000001", "abc123.000002", rtol=1e-6))
 
-    def test_snumdiff_with_numbers_outside_tolerance(self):
+    def test_snum_equal_with_numbers_outside_tolerance(self):
         # Test with strings that contain numbers outside the tolerance
-        self.assertFalse(snumdiff("abc123.0001", "abc123.0002", atol=1e-6))
-        self.assertFalse(snumdiff("abc123.0001", "abc123.0002", rtol=1e-6))
+        self.assertFalse(snum_equal("abc123.0001", "abc123.0002", atol=1e-6))
+        self.assertFalse(snum_equal("abc123.0001", "abc123.0002", rtol=1e-6))
 
-    def test_snumdiff_with_multiple_numbers(self):
+    def test_snum_equal_with_multiple_numbers(self):
         # Test with strings that contain multiple numbers
-        self.assertTrue(snumdiff("abc123def456", "abc123def456"))
-        self.assertFalse(snumdiff("abc123def456", "abc123def789"))
+        self.assertTrue(snum_equal("abc123def456", "abc123def456"))
+        self.assertFalse(snum_equal("abc123def456", "abc123def789"))
 
-    def test_snumdiff_with_multiple_numbers_within_tolerance(self):
+    def test_snum_equal_with_multiple_numbers_within_tolerance(self):
         # Test with strings that contain multiple numbers within the tolerance
-        self.assertTrue(snumdiff("abc123.000001def456.000001", "abc123.000002def456.000002", atol=1e-6))
-        self.assertTrue(snumdiff("abc123.000001def456.000001", "abc123.000002def456.000002", rtol=1e-6))
+        self.assertTrue(snum_equal("abc123.000001def456.000001", "abc123.000002def456.000002", atol=1e-6))
+        self.assertTrue(snum_equal("abc123.000001def456.000001", "abc123.000002def456.000002", rtol=1e-6))
 
-    def test_snumdiff_with_multiple_numbers_outside_tolerance(self):
+    def test_snum_equal_with_multiple_numbers_outside_tolerance(self):
         # Test with strings that contain multiple numbers outside the tolerance
-        self.assertFalse(snumdiff("abc123.0001def456.0001", "abc123.0002def456.0002", atol=1e-6))
-        self.assertFalse(snumdiff("abc123.0001def456.0001", "abc123.0002def456.0002", rtol=1e-6))
+        self.assertFalse(snum_equal("abc123.0001def456.0001", "abc123.0002def456.0002", atol=1e-6))
+        self.assertFalse(snum_equal("abc123.0001def456.0001", "abc123.0002def456.0002", rtol=1e-6))
 

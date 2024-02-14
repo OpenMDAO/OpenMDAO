@@ -28,7 +28,7 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
 from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import \
     MultipointBeamGroup
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_equal_numstrings
 from openmdao.utils.general_utils import set_pyoptsparse_opt, determine_adder_scaler, printoptions
 from openmdao.utils.general_utils import remove_whitespace
 from openmdao.utils.testing_utils import use_tempdirs
@@ -1077,16 +1077,13 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check that output from the Case method matches output from the System method
         # the system for the case should be properly identified as 'd1'
-        stream = StringIO()
-        d1.list_outputs(prom_name=True, desc=True, out_stream=stream)
-        expected = stream.getvalue().split('\n')
+        listout_stream = StringIO()
+        d1.list_outputs(prom_name=True, desc=True, out_stream=listout_stream)
 
-        stream = StringIO()
-        case.list_outputs(prom_name=True, desc=True, out_stream=stream)
-        text = stream.getvalue().split('\n')
+        case_stream = StringIO()
+        case.list_outputs(prom_name=True, desc=True, out_stream=case_stream)
 
-        for i, line in enumerate(expected):
-            self.assertEqual(text[i], line)
+        assert_equal_numstrings(listout_stream.getvalue(), case_stream.getvalue())
 
     def test_list_residuals_tol(self):
 
@@ -1233,16 +1230,13 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check that output from the Case method matches output from the System method
         # the system for the case should be properly identified as 'd1'
-        stream = StringIO()
-        d1.list_inputs(prom_name=True, desc=True, out_stream=stream)
-        expected = stream.getvalue().split('\n')
+        stream1 = StringIO()
+        d1.list_inputs(prom_name=True, desc=True, out_stream=stream1)
 
-        stream = StringIO()
-        case.list_inputs(prom_name=True, desc=True, out_stream=stream)
-        text = stream.getvalue().split('\n')
+        stream2 = StringIO()
+        case.list_inputs(prom_name=True, desc=True, out_stream=stream2)
 
-        for i, line in enumerate(expected):
-            self.assertEqual(text[i], line)
+        assert_equal_numstrings(stream1.getvalue(), stream2.getvalue())
 
     def test_list_inputs_outputs_solver_case(self):
         prob = SellarProblem(SellarDerivativesGrouped)
@@ -1261,27 +1255,17 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check that output from the Case methods match output from the System methods
         # the system for the solver case should be properly identified as 'mda'
-        stream = StringIO()
-        mda.list_inputs(prom_name=True, out_stream=stream)
-        expected = stream.getvalue().split('\n')
+        stream1 = StringIO()
+        stream2 = StringIO()
+        mda.list_inputs(prom_name=True, out_stream=stream1)
+        case.list_inputs(prom_name=True, out_stream=stream2)
+        assert_equal_numstrings(stream1.getvalue(), stream2.getvalue())
 
-        stream = StringIO()
-        case.list_inputs(prom_name=True, out_stream=stream)
-        text = stream.getvalue().split('\n')
-
-        for i, line in enumerate(expected):
-            self.assertEqual(text[i], line)
-
-        stream = StringIO()
-        mda.list_outputs(prom_name=True, out_stream=stream)
-        expected = stream.getvalue().split('\n')
-
-        stream = StringIO()
-        case.list_outputs(prom_name=True, out_stream=stream)
-        text = stream.getvalue().split('\n')
-
-        for i, line in enumerate(expected):
-            self.assertEqual(text[i], line)
+        stream1 = StringIO()
+        stream2 = StringIO()
+        mda.list_outputs(prom_name=True, out_stream=stream1)
+        case.list_outputs(prom_name=True, out_stream=stream2)
+        assert_equal_numstrings(stream1.getvalue(), stream2.getvalue())
 
     def test_list_inputs_outputs_indep_desvar(self):
         prob = SellarProblem(SellarDerivativesGrouped)
@@ -2322,16 +2306,13 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check that output from the Case method matches output from the System method
         # the system for the case should be properly identified as 'd1'
-        stream = StringIO()
-        prob.model.mda.list_inputs(prom_name=True, out_stream=stream)
-        expected = stream.getvalue().split('\n')
+        stream1 = StringIO()
+        prob.model.mda.list_inputs(prom_name=True, out_stream=stream1)
 
-        stream = StringIO()
-        case.list_inputs(prom_name=True, out_stream=stream)
-        text = stream.getvalue().split('\n')
+        stream2 = StringIO()
+        case.list_inputs(prom_name=True, out_stream=stream2)
 
-        for i, line in enumerate(expected):
-            self.assertEqual(text[i], line)
+        assert_equal_numstrings(stream1.getvalue(), stream2.getvalue())
 
         for key in expected_inputs_abs:
             np.testing.assert_almost_equal(case.inputs[key], prob[key])
@@ -3728,7 +3709,7 @@ class TestPromAbsDict(unittest.TestCase):
         cr = om.CaseReader("cases.sql")
 
         driver_cases = cr.list_cases('driver', out_stream=None)
-        driver_case = cr.get_case(driver_cases[-2])
+        driver_case = cr.get_case(driver_cases[-1])
 
         dvs = driver_case.get_design_vars()
         derivs = driver_case.derivatives
