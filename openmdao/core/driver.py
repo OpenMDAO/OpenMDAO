@@ -8,6 +8,7 @@ import weakref
 
 import numpy as np
 
+from openmdao.core.group import Group
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import INT_DTYPE, _SetupStatus
 from openmdao.recorders.recording_manager import RecordingManager
@@ -949,6 +950,13 @@ class Driver(object):
             return
 
         problem = self._problem()
+
+        # Do not perform this check if any subgroup uses approximated partials.
+        # This causes the relevance graph to be invalid.
+        for system in problem.model.system_iter(include_self=True, recurse=True, typ=Group):
+            if system._has_approx:
+                return
+
         relevant = problem.model._relevant
         fwd = problem._mode == 'fwd'
 

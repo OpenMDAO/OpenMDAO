@@ -25,6 +25,7 @@ except Exception as err:
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_REPORTS_DIR, _ReprClass
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
+from openmdao.core.group import Group
 from openmdao.utils.class_util import WeakMethodWrapper
 from openmdao.utils.mpi import FakeComm, MPI
 from openmdao.utils.om_warnings import issue_warning, warn_deprecation
@@ -838,9 +839,13 @@ class pyOptSparseDriver(Driver):
 
                 # First time through, check for zero row/col.
                 if self._check_jac and self._total_jac is not None:
-                    raise_error = self.options['singular_jac_behavior'] == 'error'
-                    self._total_jac.check_total_jac(raise_error=raise_error,
-                                                    tol=self.options['singular_jac_tol'])
+                    for subsys in model.system_iter(include_self=True, recurse=True, typ=Group):
+                        if subsys._has_approx:
+                            break
+                    else:
+                        raise_error = self.options['singular_jac_behavior'] == 'error'
+                        self._total_jac.check_total_jac(raise_error=raise_error,
+                                                        tol=self.options['singular_jac_tol'])
                     self._check_jac = False
 
             # Let the optimizer try to handle the error

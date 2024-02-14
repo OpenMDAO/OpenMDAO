@@ -386,7 +386,7 @@ class Component(System):
 
     def _get_missing_partials(self, missing):
         """
-        Return a list of (of, wrt) tuples for which derivatives have not been declared.
+        Provide (of, wrt) tuples for which derivatives have not been declared in the component.
 
         Parameters
         ----------
