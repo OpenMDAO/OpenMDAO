@@ -2191,10 +2191,7 @@ class Problem(object):
                         row[col_name] = vname
 
                 elif col_name == 'val':
-                    if isinstance(vals[name], float):
-                        row[col_name] = np.round(vals[name], np_precision)
-                    else:
-                        row[col_name] = vals[name]
+                    row[col_name] = vals[name]
                 elif col_name == 'min':
                     min_val = min(vals[name])
                     # Rounding to match float precision to numpy precision

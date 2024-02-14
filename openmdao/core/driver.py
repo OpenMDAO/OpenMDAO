@@ -8,6 +8,7 @@ import weakref
 
 import numpy as np
 
+from openmdao.core.group import Group
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import INT_DTYPE, _SetupStatus
 from openmdao.recorders.recording_manager import RecordingManager
@@ -953,6 +954,14 @@ class Driver(object):
         # relevance not relevant if not using derivatives
         if not self.supports['gradients']:
             return
+
+        problem = self._problem()
+
+        # Do not perform this check if any subgroup uses approximated partials.
+        # This causes the relevance graph to be invalid.
+        for system in problem.model.system_iter(include_self=True, recurse=True, typ=Group):
+            if system._has_approx:
+                return
 
         bad_cons = [n for n in self.get_constraints_without_dv() if n not in self._designvars]
         if bad_cons:

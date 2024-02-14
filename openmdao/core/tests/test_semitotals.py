@@ -199,6 +199,7 @@ class FakeGeomComp(om.ExplicitComponent):
 
     def initialize(self):
         self.options.declare("n", types=int)
+        self.options.declare('declare_partials', types=(bool,), default=True)
 
     def setup(self):
         n = self.options["n"]
@@ -206,7 +207,8 @@ class FakeGeomComp(om.ExplicitComponent):
         self.add_input("feather", val=0.0, units="deg")
         self.add_output("x", val=np.zeros(n), units="m")
 
-        self.declare_partials("*", "*", method="fd")
+        if self.options['declare_partials']:
+            self.declare_partials("*", "*", method="fd")
 
         self._counter = 0
 
@@ -222,6 +224,7 @@ class FakeAeroComp(om.ExplicitComponent):
 
     def initialize(self):
         self.options.declare("n", types=int)
+        self.options.declare('declare_partials', types=(bool,), default=True)
 
     def setup(self):
         n = self.options["n"]
@@ -232,7 +235,8 @@ class FakeAeroComp(om.ExplicitComponent):
         self.add_output("CT", val=0.5)
         self.add_output("CP", val=0.5)
 
-        self.declare_partials("*", "*", method="fd")
+        if self.options['declare_partials']:
+            self.declare_partials("*", "*", method="fd")
 
         self._counter = 0
 
@@ -251,15 +255,19 @@ class GeometryAndAero2(om.Group):
         self.options.declare("n", types=int)
         self.options.declare("rho", types=float)
         self.options.declare("vinf", types=float)
+        self.options.declare('declare_partials', types=(bool,), default=True)
 
     def setup(self):
         n = self.options["n"]
+        dp = self.options['declare_partials']
 
         comp = self.add_subsystem("init_geom", om.IndepVarComp(), promotes_outputs=["x0"])
         comp.add_output("x0", val=np.arange(n) + 1.0, units="m")
 
-        self.add_subsystem("geom", FakeGeomComp(n=n), promotes_inputs=["x0", "feather"], promotes_outputs=["x"])
-        self.add_subsystem("aero", FakeAeroComp(n=n), promotes_inputs=["x", "omega"], promotes_outputs=["CT", "CP"])
+        self.add_subsystem("geom", FakeGeomComp(n=n, declare_partials=dp),
+                           promotes_inputs=["x0", "feather"], promotes_outputs=["x"])
+        self.add_subsystem("aero", FakeAeroComp(n=n, declare_partials=dp),
+                           promotes_inputs=["x", "omega"], promotes_outputs=["CT", "CP"])
 
     def reset_count(self):
         self.geom._counter = 0
@@ -311,3 +319,45 @@ class TestSemiTotalsNumCalls(unittest.TestCase):
 
         self.assertEqual(geom_and_aero.geom._counter, 3)
         self.assertEqual(geom_and_aero.aero._counter, 4)
+
+    def test_check_relevance_approx_totals(self):
+
+            size = 10
+            rho = 1.17573
+            minf = 0.111078231621482
+            speedofsound = 344.5760217432
+            vinf = minf*speedofsound
+
+            prob = om.Problem()
+            prob.driver = om.ScipyOptimizeDriver()
+            prob.driver.options["optimizer"] = "SLSQP"
+
+            omega = 7199.759242*2*np.pi/60
+            ivc = prob.model.add_subsystem("ivc", om.IndepVarComp(), promotes_outputs=["*"])
+            ivc.add_output("feather", val=0.0, units="deg")
+            ivc.add_output("omega", val=omega, units="rad/s")
+
+            geom_and_aero = prob.model.add_subsystem('geom_and_aero',
+                                                    GeometryAndAero2(n=size, rho=rho, vinf=vinf, declare_partials=False),
+                                                    promotes_inputs=["feather", "omega"],
+                                                    promotes_outputs=["CT", "CP"])
+            geom_and_aero.approx_totals(step=step, step_calc="abs", method="fd", form="forward")
+
+            prob.model.add_design_var("feather", lower=-5.0, upper=25.0, units="deg", ref=1.0)
+            prob.model.add_design_var("omega", lower=3000*2*np.pi/60, upper=7500*2*np.pi/60, units="rad/s", ref=1.0)
+            prob.model.add_objective("CP", ref=1e0)
+            prob.model.add_constraint("CT", lower=0.0)
+
+            prob.setup(force_alloc_complex=False)
+
+            omega = (6245.096992023524*2*np.pi/60) + step
+            feather = 0.6362159381168669
+            prob.set_val("omega", omega, units="rad/s")
+            prob.set_val("feather", feather, units="deg")
+            fail = prob.run_driver()
+
+            self.assertEqual(fail, False)
+
+
+if __name__ == '__main__':
+    unittest.main()
