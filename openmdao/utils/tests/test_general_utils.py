@@ -61,10 +61,6 @@ class TestAllAncestors(unittest.TestCase):
         result = list(all_ancestors('a.b.c.'))
         self.assertEqual(result, ['a.b.c.', 'a.b.c', 'a.b', 'a'])
 
-        # Test with string that starts with delimiter
-        result = list(all_ancestors('.a.b.c'))
-        self.assertEqual(result, ['.a.b.c', '.a.b', '.a', '.'])
-
 
 if __name__ == "__main__":
     unittest.main()

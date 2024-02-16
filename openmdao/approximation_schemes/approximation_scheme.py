@@ -519,16 +519,16 @@ class ApproximationScheme(object):
 
                 if fd_count % num_par_fd == system._par_fd_id:
                     # run the finite difference
-                    seeds = wrt if directional else (wrt,)
-                    with system._relevant.seeds_active(fwd_seeds=seeds):
-                        if total:
+                    if total:
+                        seeds = wrt if directional else (wrt,)
+                        with system._relevant.seeds_active(fwd_seeds=seeds):
                             result = self._run_point(system, vec_ind_info,
                                                      app_data, results_array, total_or_semi,
                                                      jcol_idxs)
-                        else:
-                            result = self._run_point(system, vec_ind_info,
-                                                     app_data, results_array, total_or_semi,
-                                                     jcol_idxs)
+                    else:
+                        result = self._run_point(system, vec_ind_info,
+                                                 app_data, results_array, total_or_semi,
+                                                 jcol_idxs)
 
                     result = self._transform_result(result)
 

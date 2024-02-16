@@ -65,25 +65,14 @@ class ImplicitComponent(Component):
         super().__init__(**kwargs)
         self._has_solve_nl = _UNDEFINED
 
-    def has_guess(self):
-        """
-        Return True if this component has a guess_nonlinear method.
-
-        Returns
-        -------
-        bool
-            True if this component has a guess_nonlinear method.
-        """
-        if self._has_guess is None:
-            self._has_guess = overrides_method('guess_nonlinear', self, ImplicitComponent)
-        return self._has_guess
-
     def _configure(self):
         """
         Configure this system to assign children settings.
 
         Also tag component if it provides a guess_nonlinear.
         """
+        self._has_guess = overrides_method('guess_nonlinear', self, ImplicitComponent)
+
         if self._has_solve_nl is _UNDEFINED:
             self._has_solve_nl = overrides_method('solve_nonlinear', self, ImplicitComponent)
 
@@ -164,7 +153,7 @@ class ImplicitComponent(Component):
         """
         Provide initial guess for states.
         """
-        if self.has_guess():
+        if self._has_guess:
             self._apply_nonlinear()
             complex_step = self._inputs._under_complex_step
 

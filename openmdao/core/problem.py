@@ -722,7 +722,7 @@ class Problem(object):
 
             model._clear_iprint()
 
-            driver._run()
+            return driver._run()
             # if driver.supports['optimization']:
             #     if model._pre_components:
             #         with model._relevant.activate_nonlinear('@pre'):
@@ -1070,12 +1070,6 @@ class Problem(object):
 
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             self.model._final_setup(self)
-
-        # if self.options['group_by_pre_opt_post']:
-        #     if not self.driver.supports['optimization']:
-        #         issue_warning(f"In Problem '{self._name}, the 'group_by_pre_opt_post' option is "
-        #                       "True but the driver doesn't support optimization so the option will "
-        #                       "be ignored.")
 
         # If set_solver_print is called after an initial run, in a multi-run scenario,
         #  this part of _final_setup still needs to happen so that change takes effect

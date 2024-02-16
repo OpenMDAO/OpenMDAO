@@ -12,50 +12,6 @@ from openmdao.utils.general_utils import all_ancestors
 from openmdao.utils.array_utils import array_hash
 
 
-# class _RelType(IntEnum):
-#     """
-#     Class used to define different types of relevant objects.
-
-#     Attributes
-#     ----------
-#     VAR : int
-#         Variable.
-#     SYS : int
-#         System.
-#     """
-
-#     VAR = 0
-#     SYS = 1
-
-
-# def _get_seed_map(fwd_seeds, rev_seeds, nvars, nsystems):
-#     """
-#     Return a map of fwdseed/revseed pairings to var/sys relevance arrays.
-
-#     Parameters
-#     ----------
-#     fwd_seeds : iter of str
-#         Iterator over forward seed variable names.
-#     rev_seeds : iter of str
-#         Iterator over reverse seed variable names.
-#     nvars : int
-#         Number of variables in the graph.
-#     nsystems : int
-#         Number of systems in the graph.
-
-#     Returns
-#     -------
-#     dict
-#         Nested dict of the form {fwdseed: {revseed: rel_arrays}}.
-#     """
-#     seedmap = {}
-#     for f in fwd_seeds:
-#         seedmap[f] = fmap = {}
-#         for r in rev_seeds:
-#             fmap[r] = (np.zeros(nvars, dtype=bool),
-#                        np.zeros(nsystems, dtype=bool))
-
-
 def get_relevance(model, of, wrt):
     """
     Return a Relevance object for the given design vars, and responses.
@@ -112,14 +68,26 @@ class Relevance(object):
     _active : bool or None
         If True, relevance is active.  If False, relevance is inactive.  If None, relevance is
         uninitialized.
-    _seed_map : dict
-        Nested dict of the form {fwdseed(s): {revseed(s): (var_array, sys_array)}}.
+    _seed_var_map : dict
+        Nested dict of the form {fwdseed(s): {revseed(s): var_array, ...}}.
         Keys that contain multiple seeds are frozensets of seed names.
-    _single_seeds_map : dict
-        Dict of the form {'fwd': {seed: (var_array, sys_array)}, 'rev': ...} where each seed is a
-        key and var_array and sys_array are the relevance arrays for the given seed.
-    _use_pre_opt_post : bool
-        If True, factor pre_opt_post status into relevance.
+    _seed_sys_map : dict
+        Nested dict of the form {fwdseed(s): {revseed(s): sys_array, ...}}.
+        Keys that contain multiple seeds are frozensets of seed names.
+    _single_seed2relvars : dict
+        Dict of the form {'fwd': {seed: var_array}, 'rev': ...} where each seed is a
+        key and var_array is the variable relevance array for the given seed.
+    _single_seed2relsys : dict
+        Dict of the form {'fwd': {seed: sys_array}, 'rev': ...} where each seed is a
+        key and var_array is the system relevance array for the given seed.
+    _nonlinear_sets : dict
+        Dict of the form {'@pre': pre_rel_array, '@iter': iter_rel_array, '@post': post_rel_array}.
+    _current_rel_varray : ndarray
+        Array representing the combined variable relevance arrays for the currently active seeds.
+    _current_rel_sarray : ndarray
+        Array representing the combined system relevance arrays for the currently active seeds.
+    _rel_array_cache : dict
+        Cache of relevance arrays stored by array hash.
     """
 
     def __init__(self, model, fwd_meta, rev_meta):
@@ -130,9 +98,7 @@ class Relevance(object):
 
         self._active = None  # allow relevance to be turned on later
         self._graph = model._dataflow_graph
-        self._use_pre_opt_post = model._problem_meta['group_by_pre_opt_post']
-        self._rel_array_hash = {}
-        self._active_nl_set = None
+        self._rel_array_cache = {}
 
         # seed var(s) for the current derivative operation
         self._seed_vars = {'fwd': frozenset(), 'rev': frozenset()}
@@ -233,7 +199,7 @@ class Relevance(object):
             rel_vars = depnodes - all_systems
 
             yield (src, local, self._names2rel_array(rel_vars, all_vars, self._var2idx),
-                               self._names2rel_array(rel_systems, all_systems, self._sys2idx))
+                   self._names2rel_array(rel_systems, all_systems, self._sys2idx))
 
     def _names2rel_array(self, names, all_names, names2inds):
         """
@@ -273,10 +239,10 @@ class Relevance(object):
             Cached array if it exists, otherwise the input array.
         """
         hash = array_hash(arr)
-        if hash in self._rel_array_hash:
-            return self._rel_array_hash[hash]
+        if hash in self._rel_array_cache:
+            return self._rel_array_cache[hash]
         else:
-            self._rel_array_hash[hash] = arr
+            self._rel_array_cache[hash] = arr
 
         return arr
 
@@ -591,7 +557,6 @@ class Relevance(object):
             save_active = self._active
             self._active = True
             self._current_rel_sarray = self._nonlinear_sets[name]
-            self._active_nl_set = name
 
             try:
                 yield

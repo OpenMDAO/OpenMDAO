@@ -458,7 +458,7 @@ class TestPrePostIter(unittest.TestCase):
                                   force=['pre1'], mode='fwd')
         prob.run_driver()
 
-        self.assertEqual(prob.model._pre_components, {'_auto_ivc'})
+        self.assertEqual(prob.model._pre_components, set())
         self.assertEqual(prob.model._post_components, {'G2.post1', 'G2.post2'})
 
         self.assertEqual(prob.model.G1.pre1.num_nl_solves, 3)

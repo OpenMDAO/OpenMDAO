@@ -236,20 +236,6 @@ class BalanceComp(ImplicitComponent):
             deriv = mult * _scale_factor
             jacobian[name, lhs_name] = deriv.flatten()
 
-    def has_guess(self):
-        """
-        Return True if this component has a method to set its initial guess.
-
-        Returns
-        -------
-        bool
-            True if this component has a method named 'guess_nonlinear'.
-        """
-        return True
-        if self._has_guess is None:
-            self._has_guess = self.options['guess_func'] is not None
-        return self._has_guess
-
     def guess_nonlinear(self, inputs, outputs, residuals):
         """
         Provide initial guess for states.

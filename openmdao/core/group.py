@@ -36,6 +36,7 @@ from openmdao.utils.indexer import indexer, Indexer
 from openmdao.utils.relevance import get_relevance
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     PromotionWarning, MPIWarning, DerivativesWarning
+from openmdao.utils.class_util import overrides_method
 
 # regex to check for valid names.
 import re
@@ -487,22 +488,6 @@ class Group(System):
 
         return scale_factors
 
-    def has_guess(self):
-        """
-        Return True if this group has any subsystem with a 'guess_nonlinear' method.
-
-        Returns
-        -------
-        bool
-            True if this group has any subsystem with a 'guess_nonlinear' method.
-        """
-        if self._has_guess is None:
-            self._has_guess = False
-            for subsys in self._subsystems_myproc:
-                self._has_guess |= subsys.has_guess()
-
-        return self._has_guess
-
     def _configure(self):
         """
         Configure our model recursively to assign any children settings.
@@ -516,10 +501,13 @@ class Group(System):
             self._group_inputs[n] = lst.copy()
 
         self.matrix_free = False
+        self._has_guess = overrides_method('guess_nonlinear', self, Group)
+
         for subsys in self._sorted_sys_iter():
             subsys._configure()
             subsys._setup_var_data()
 
+            self._has_guess |= subsys._has_guess
             self._has_bounds |= subsys._has_bounds
             self.matrix_free |= subsys.matrix_free
 
@@ -3420,7 +3408,7 @@ class Group(System):
         """
         self._transfer('nonlinear', 'fwd')
         # Apply recursion
-        for subsys in self._relevant.filter(self._subgroups_myproc):
+        for subsys in self._relevant.filter(self._subsystems_myproc):
             subsys._apply_nonlinear()
 
         self.iter_count_apply += 1
@@ -3447,7 +3435,7 @@ class Group(System):
                 # TODO: could gather 'has_guess' information during setup and be able to
                 # skip transfer for subs that don't have guesses...
                 self._transfer('nonlinear', 'fwd', sname)
-                if sub._is_local and sub.has_guess():
+                if sub._is_local and sub._has_guess:
                     sub._guess_nonlinear()
 
             # call our own guess_nonlinear method, after the recursion is done to
@@ -3462,7 +3450,7 @@ class Group(System):
             try:
                 if self._discrete_inputs or self._discrete_outputs:
                     self.guess_nonlinear(self._inputs, self._outputs, self._residuals,
-                                        self._discrete_inputs, self._discrete_outputs)
+                                         self._discrete_inputs, self._discrete_outputs)
                 else:
                     self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
             finally:
@@ -4898,18 +4886,22 @@ class Group(System):
         else:
             auto_dvs = set(auto_dvs)
             rev_conns = get_rev_conns(self._conn_global_abs_in2out)
-            in_pre = False
-            for vname in auto_ivc._var_abs2prom['output']:
-                if vname not in auto_dvs:
-                    for tgt in rev_conns[vname]:
-                        tgtcomp = tgt.rpartition('.')[0]
-                        if tgtcomp in pre:
-                            in_pre = True
+            if '_auto_ivc' not in pre:
+                in_pre = False
+                for vname in auto_ivc._var_abs2prom['output']:
+                    if vname not in auto_dvs:
+                        for tgt in rev_conns[vname]:
+                            tgtcomp = tgt.rpartition('.')[0]
+                            if tgtcomp in pre:
+                                in_pre = True
+                                break
+                        if in_pre:
                             break
-            if in_pre:
-                pre.add('_auto_ivc')
-            elif '_auto_ivc' not in iterated and auto_ivc._var_abs2prom['output']:
-                post.add('_auto_ivc')
+                if in_pre:
+                    pre.add('_auto_ivc')
+
+            if len(pre) == 1 and '_auto_ivc' in pre:
+                pre.discard('_auto_ivc')
 
         self._pre_components = pre - groups_added
         self._post_components = post - groups_added

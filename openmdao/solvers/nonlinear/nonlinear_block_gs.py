@@ -103,7 +103,7 @@ class NonlinearBlockGS(NonlinearSolver):
 
         # Execute guess_nonlinear if specified and
         # we have not restarted from a saved point
-        if not self._restarted and system.has_guess():
+        if not self._restarted and system._has_guess:
             system._guess_nonlinear()
 
         return super()._iter_initialize()
