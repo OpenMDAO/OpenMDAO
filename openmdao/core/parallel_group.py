@@ -21,6 +21,23 @@ class ParallelGroup(Group):
         super().__init__(**kwargs)
         self._mpi_proc_allocator.parallel = True
 
+    def has_guess(self):
+        """
+        Return True if any subsystem has a non-empty guess_nonlinear.
+
+        Returns
+        -------
+        bool
+            True if any subsystem has a non-empty guess_nonlinear.
+        """
+        if self._has_guess is None:
+            if self.comm.size > 1:
+                self._has_guess = any(self.comm.allgather(super().has_guess()))
+            else:
+                self._has_guess = super().has_guess()
+
+        return self._has_guess
+
     def _configure(self):
         """
         Configure our model recursively to assign any children settings.
@@ -28,8 +45,6 @@ class ParallelGroup(Group):
         Highest system's settings take precedence.
         """
         super()._configure()
-        if self.comm.size > 1:
-            self._has_guess = any(self.comm.allgather(self._has_guess))
 
     def _get_sys_promotion_tree(self, tree):
         tree = super()._get_sys_promotion_tree(tree)

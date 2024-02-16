@@ -341,8 +341,8 @@ class System(object):
         Indicates derivative direction for the model, either 'fwd' or 'rev'.
     _scope_cache : dict
         Cache for variables in the scope of various mat-vec products.
-    _has_guess : bool
-        True if this system has or contains a system with a `guess_nonlinear` method defined.
+    _has_guess : bool or None
+        True if this system can compute a guess.
     _has_output_scaling : bool
         True if this system has output scaling.
     _has_output_adder : bool
@@ -1738,7 +1738,8 @@ class System(object):
                     self._outputs.set_val(starting_outputs +
                                           out_offsets * np.random.random(out_offsets.size))
                 if is_total:
-                    self._solve_nonlinear()
+                    with self._relevant.activate_nonlinear('@iter'):
+                        self._solve_nonlinear()
                 else:
                     self._apply_nonlinear()
 
@@ -2891,17 +2892,9 @@ class System(object):
                 for sub in s.system_iter(recurse=True, typ=typ):
                     yield sub
 
-    def _solver_subsystem_iter(self, local_only=True, relevant=None):
+    def _all_subsystem_iter(self):
         """
         Do nothing.
-
-        Parameters
-        ----------
-        local_only : bool
-            If True, only iterate over local subsystems.
-        relevant : bool or None
-            If True, only return relevant subsystems. If False, only return
-            irrelevant subsystems. If None, return all subsystems.
 
         Returns
         -------
@@ -4397,6 +4390,17 @@ class System(object):
                         var_list.append(var_name)
 
         return var_list
+
+    def has_guess(self):
+        """
+        Return True if this system has a guess for its states.
+
+        Returns
+        -------
+        bool
+            True if this system has a guess for its states.
+        """
+        return False
 
     def run_solve_nonlinear(self):
         """

@@ -569,6 +569,37 @@ class Driver(object):
         self._filtered_vars_to_record = self._get_vars_to_record()
         self._rec_mgr.startup(self, self._problem().comm)
 
+    def _run(self):
+        """
+        Execute this driver.
+
+        This calls the run() method, which should be overriden by the subclass.
+
+        Returns
+        -------
+        bool
+            Failure flag; True if failed to converge, False is successful.
+        """
+        model = self._problem().model
+
+        if self.supports['optimization']:
+            if model._pre_components:
+                with model._relevant.activate_nonlinear('@pre'):
+                    model.run_solve_nonlinear()
+
+            with SaveOptResult(self):
+                with model._relevant.activate_nonlinear('@iter'):
+                    result = self.run()
+
+            if model._post_components:
+                with model._relevant.activate_nonlinear('@post'):
+                    model.run_solve_nonlinear()
+
+            return result
+        else:
+            with SaveOptResult(self):
+                return self.run()
+
     def _get_voi_val(self, name, meta, remote_vois, driver_scaling=True,
                      get_remote=True, rank=None):
         """

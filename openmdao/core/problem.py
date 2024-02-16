@@ -666,9 +666,6 @@ class Problem(object):
         finally:
             self._recording_iter.prefix = old_prefix
 
-    def _set_opt_status(self, status):
-        self._metadata['opt_status'] = status
-
     def run_driver(self, case_prefix=None, reset_iter_counts=True):
         """
         Run the driver on the model.
@@ -725,27 +722,26 @@ class Problem(object):
 
             model._clear_iprint()
 
-            if self.options['group_by_pre_opt_post'] and driver.supports['optimization']:
-                if model._run_on_opt[_OptStatus.PRE]:
-                    self._set_opt_status(_OptStatus.PRE)
-                    model.run_solve_nonlinear()
+            driver._run()
+            # if driver.supports['optimization']:
+            #     if model._pre_components:
+            #         with model._relevant.activate_nonlinear('@pre'):
+            #             model.run_solve_nonlinear()
 
-                with SaveOptResult(driver):
-                    self._set_opt_status(_OptStatus.OPTIMIZING)
-                    result = driver.run()
+            #     with SaveOptResult(driver):
+            #         result = driver.run()
 
-                if model._run_on_opt[_OptStatus.POST]:
-                    self._set_opt_status(_OptStatus.POST)
-                    model.run_solve_nonlinear()
+            #     if model._post_components:
+            #         with model._relevant.activate_nonlinear('@post'):
+            #             model.run_solve_nonlinear()
 
-                return result
-            else:
-                with SaveOptResult(driver):
-                    return driver.run()
+            #     return result
+            # else:
+            #     with SaveOptResult(driver):
+            #         return driver.run()
 
         finally:
             self._recording_iter.prefix = old_prefix
-            self._set_opt_status(None)
 
     def compute_jacvec_product(self, of, wrt, mode, seed):
         """
@@ -1011,7 +1007,6 @@ class Problem(object):
             'reports_dir': self.get_reports_dir(),  # directory where reports will be written
             'saved_errors': [],  # store setup errors here until after final_setup
             'checking': False,  # True if check_totals or check_partials is running
-            'opt_status': None,  # Tells Systems if they are in an optimization loop
             'model_options': self.model_options,  # A dict of options passed to all systems in tree
             'allow_post_setup_reorder': self.options['allow_post_setup_reorder'],  # see option
             'singular_jac_behavior': 'warn',  # How to handle singular jac conditions
@@ -1074,15 +1069,13 @@ class Problem(object):
         self._metadata['mode'] = mode
 
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-            self.model._final_setup(self.comm, self._orig_mode)
+            self.model._final_setup(self)
 
-        if self.options['group_by_pre_opt_post']:
-            if self.driver.supports['optimization']:
-                self.model._setup_iteration_lists()
-            else:
-                issue_warning(f"In Problem '{self._name}, the 'group_by_pre_opt_post' option is "
-                              "True but the driver doesn't support optimization so the option will "
-                              "be ignored.")
+        # if self.options['group_by_pre_opt_post']:
+        #     if not self.driver.supports['optimization']:
+        #         issue_warning(f"In Problem '{self._name}, the 'group_by_pre_opt_post' option is "
+        #                       "True but the driver doesn't support optimization so the option will "
+        #                       "be ignored.")
 
         # If set_solver_print is called after an initial run, in a multi-run scenario,
         #  this part of _final_setup still needs to happen so that change takes effect
@@ -2608,21 +2601,17 @@ class Problem(object):
         else:
             out = open(outfile, 'w')
 
-        if not self.options['group_by_pre_opt_post']:
-            print("\nThe 'group_by_pre_opt_post' option is False, so all components will be "
-                  "included in the optimization loop.", file=out)
-
         model = self.model
         if model._pre_components:
             print("\nPre-optimization components:", file=out)
-            for name in model._pre_components:
+            for name in sorted(model._pre_components):
                 print(f"    {name}", file=out)
         else:
             print("\nPre-optimization components: []", file=out)
 
         if model._post_components:
             print("\nPost-optimization components:", file=out)
-            for name in model._post_components:
+            for name in sorted(model._post_components):
                 print(f"    {name}", file=out)
         else:
             print("\nPost-optimization components: []", file=out)

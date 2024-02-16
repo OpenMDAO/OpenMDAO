@@ -339,9 +339,9 @@ def all_ancestors(pathname, delim='.'):
     ------
     str
     """
-    parts = pathname.split(delim)
-    for i in range(len(parts), 0, -1):
-        yield delim.join(parts[:i])
+    while pathname:
+        yield pathname
+        pathname, _ = pathname.rpartition(delim)
 
 
 def find_matches(pattern, var_list):

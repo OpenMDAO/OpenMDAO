@@ -12,7 +12,7 @@ import numpy as np
 import networkx as nx
 
 from openmdao.core.configinfo import _ConfigInfo
-from openmdao.core.system import System, collect_errors, _OptStatus
+from openmdao.core.system import System, collect_errors
 from openmdao.core.component import Component, _DictValues
 from openmdao.core.constants import _UNDEFINED, INT_DTYPE, _SetupStatus
 from openmdao.vectors.vector import _full_slice
@@ -26,7 +26,7 @@ from openmdao.utils.array_utils import array_connection_compatible, _flatten_src
     shape_to_len, ValueRepeater
 from openmdao.utils.general_utils import common_subpath, all_ancestors, \
     convert_src_inds, shape2tuple, get_connection_owner, ensure_compatible, \
-    meta2src_iter, get_rev_conns
+    meta2src_iter, get_rev_conns, _contains_all
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
 from openmdao.utils.graph_utils import get_sccs_topo, get_out_of_order_nodes
@@ -182,10 +182,10 @@ class Group(System):
         List of Auto IVC warnings to be raised later.
     _shapes_graph : nx.Graph
         Dynamic shape dependency graph, or None.
-    _pre_components : list of str or None
-        Sorted list of pathnames of components that are executed prior to the optimization loop.
-    _post_components : list of str or None
-        Sorted list of pathnames of components that are executed after the optimization loop.
+    _pre_components : set of str or None
+        Set pathnames of components that are executed prior to the optimization loop.
+    _post_components : set of str or None
+        Set pathnames of components that are executed after the optimization loop.
     _fd_rev_xfer_correction_dist : dict
         If this group is using finite difference to compute derivatives,
         this is the set of inputs that are upstream of a distributed response
@@ -487,6 +487,22 @@ class Group(System):
 
         return scale_factors
 
+    def has_guess(self):
+        """
+        Return True if this group has any subsystem with a 'guess_nonlinear' method.
+
+        Returns
+        -------
+        bool
+            True if this group has any subsystem with a 'guess_nonlinear' method.
+        """
+        if self._has_guess is None:
+            self._has_guess = False
+            for subsys in self._subsystems_myproc:
+                self._has_guess |= subsys.has_guess()
+
+        return self._has_guess
+
     def _configure(self):
         """
         Configure our model recursively to assign any children settings.
@@ -504,7 +520,6 @@ class Group(System):
             subsys._configure()
             subsys._setup_var_data()
 
-            self._has_guess |= subsys._has_guess
             self._has_bounds |= subsys._has_bounds
             self.matrix_free |= subsys.matrix_free
 
@@ -1002,7 +1017,7 @@ class Group(System):
 
         return sarr, tarr, tsize, has_dist_data
 
-    def _final_setup(self, comm, mode):
+    def _final_setup(self, problem):
         """
         Perform final setup for this system and its descendant systems.
 
@@ -1010,10 +1025,8 @@ class Group(System):
 
         Parameters
         ----------
-        comm : MPI.Comm or <FakeComm> or None
-            The global communicator.
-        mode : str
-            Derivative direction, either 'fwd', 'rev', or 'auto'.
+        problem : <Problem>
+            The Problem containing the model.
         """
         if self._use_derivatives:
             # must call this before vector setup because it determines if we need to alloc commplex
@@ -1023,6 +1036,8 @@ class Group(System):
 
         desvars = self.get_design_vars(get_sizes=False)
         responses = self._check_alias_overlaps(self.get_responses(get_sizes=False))
+
+        self._setup_iteration_lists(desvars, responses)
 
         self._dataflow_graph = self._get_dataflow_graph()
 
@@ -1054,6 +1069,14 @@ class Group(System):
         self.set_initial_values()
 
     def _update_dataflow_graph(self, responses):
+        """
+        Update the dataflow graph based on missing partials.
+
+        Parameters
+        ----------
+        responses : dict
+            Dictionary of response metadata.
+        """
         resps = set(meta2src_iter(responses.values()))
 
         missing_responses = set()
@@ -3397,10 +3420,8 @@ class Group(System):
         """
         self._transfer('nonlinear', 'fwd')
         # Apply recursion
-        with self._relevant.active(self.under_approx or self._relevant._active is True):
-            for subsys in self._relevant.system_filter(
-                    self._solver_subsystem_iter(local_only=True), linear=False):
-                subsys._apply_nonlinear()
+        for subsys in self._relevant.filter(self._subgroups_myproc):
+            subsys._apply_nonlinear()
 
         self.iter_count_apply += 1
 
@@ -3426,30 +3447,30 @@ class Group(System):
                 # TODO: could gather 'has_guess' information during setup and be able to
                 # skip transfer for subs that don't have guesses...
                 self._transfer('nonlinear', 'fwd', sname)
-                if sub._is_local and sub._has_guess:
+                if sub._is_local and sub.has_guess():
                     sub._guess_nonlinear()
 
-        # call our own guess_nonlinear method, after the recursion is done to
-        # all the lower level systems and the data transfers have happened
-        complex_step = self._inputs._under_complex_step
-
-        if complex_step:
-            self._inputs.set_complex_step_mode(False)
-            self._residuals.set_complex_step_mode(False)
-            self._outputs.set_complex_step_mode(False)
-
-        try:
-            if self._discrete_inputs or self._discrete_outputs:
-                self.guess_nonlinear(self._inputs, self._outputs, self._residuals,
-                                     self._discrete_inputs, self._discrete_outputs)
-            else:
-                self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
-        finally:
+            # call our own guess_nonlinear method, after the recursion is done to
+            # all the lower level systems and the data transfers have happened
+            complex_step = self._inputs._under_complex_step
 
             if complex_step:
-                self._inputs.set_complex_step_mode(True)
-                self._residuals.set_complex_step_mode(True)
-                self._outputs.set_complex_step_mode(True)
+                self._inputs.set_complex_step_mode(False)
+                self._residuals.set_complex_step_mode(False)
+                self._outputs.set_complex_step_mode(False)
+
+            try:
+                if self._discrete_inputs or self._discrete_outputs:
+                    self.guess_nonlinear(self._inputs, self._outputs, self._residuals,
+                                        self._discrete_inputs, self._discrete_outputs)
+                else:
+                    self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
+            finally:
+
+                if complex_step:
+                    self._inputs.set_complex_step_mode(True)
+                    self._residuals.set_complex_step_mode(True)
+                    self._outputs.set_complex_step_mode(True)
 
     def guess_nonlinear(self, inputs, outputs, residuals,
                         discrete_inputs=None, discrete_outputs=None):
@@ -3559,19 +3580,16 @@ class Group(System):
         else:
             if mode == 'fwd':
                 self._transfer('linear', mode)
-                for s in self._relevant.system_filter(self._solver_subsystem_iter(local_only=True),
-                                                      relevant=False):
+                for s in self._relevant.filter(self._subsystems_myproc, relevant=False):
                     # zero out dvecs of irrelevant subsystems
                     s._dresiduals.set_val(0.0)
 
-            for s in self._relevant.system_filter(self._solver_subsystem_iter(local_only=True),
-                                                  relevant=True):
+            for s in self._relevant.filter(self._subsystems_myproc, relevant=True):
                 s._apply_linear(jac, mode, scope_out, scope_in)
 
             if mode == 'rev':
                 self._transfer('linear', mode)
-                for s in self._relevant.system_filter(self._solver_subsystem_iter(local_only=True),
-                                                      relevant=False):
+                for s in self._relevant.filter(self._subsystems_myproc, relevant=False):
                     # zero out dvecs of irrelevant subsystems
                     s._doutputs.set_val(0.0)
 
@@ -3655,9 +3673,7 @@ class Group(System):
 
             relevant = self._relevant
             with relevant.active(self.linear_solver.use_relevance()):
-                subs = list(
-                    relevant.system_filter(self._solver_subsystem_iter(local_only=True),
-                                           relevant=True))
+                subs = list(relevant.filter(self._subsystems_myproc, relevant=True))
 
                 # Only linearize subsystems if we aren't approximating the derivs at this level.
                 for subsys in subs:
@@ -4158,9 +4174,10 @@ class Group(System):
         graph = nx.DiGraph()
 
         if comps_only:
-            # add all systems as nodes in the graph so they'll be there even if
-            # unconnected.
-            graph.add_nodes_from(self._ordered_comp_name_iter())
+            # add all compoenents as nodes in the graph so they'll be there even if unconnected.
+            comps = set(v.rpartition('.')[0] for v in chain(self._var_allprocs_abs2prom['output'],
+                                                            self._var_allprocs_abs2prom['input']))
+            graph.add_nodes_from(comps)
 
             edge_data = defaultdict(lambda: defaultdict(list))
             for in_abs, src_abs in self._conn_global_abs_in2out.items():
@@ -4177,25 +4194,19 @@ class Group(System):
                 for (src_sys, tgt_sys), data in edge_data.items():
                     graph.add_edge(src_sys, tgt_sys, conns=data)
         else:
-            systems = [s.name for s in self._subsystems_myproc]
-
-            if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
-                newsys = set()
-                for slist in self.comm.allgather(systems):
-                    newsys.update(slist)
-                systems = newsys
-
-            # add all systems as nodes in the graph so they'll be there even if
-            # unconnected.
-            graph.add_nodes_from(systems)
-
             glen = self.pathname.count('.') + 1 if self.pathname else 0
+            var2sys = {v: v.split('.', glen + 1)[glen]
+                       for v in chain(self._var_allprocs_abs2prom['output'],
+                                      self._var_allprocs_abs2prom['input'])}
+
+            # add all systems as nodes in the graph so they'll be there even if unconnected.
+            graph.add_nodes_from(var2sys.values())
+
             for in_abs, src_abs in self._conn_global_abs_in2out.items():
-                if src_abs is not None:
-                    src_sys = src_abs.split('.')[glen]
-                    tgt_sys = in_abs.split('.')[glen]
-                    if src_sys != tgt_sys:
-                        graph.add_edge(src_sys, tgt_sys)
+                src_sys = var2sys[src_abs]
+                tgt_sys = var2sys[in_abs]
+                if src_sys != tgt_sys:
+                    graph.add_edge(src_sys, tgt_sys)
 
         return graph
 
@@ -4697,37 +4708,17 @@ class Group(System):
         else:
             yield from self._subsystems_allprocs
 
-    def _solver_subsystem_iter(self, local_only=False):
+    def _all_subsystem_iter(self):
         """
-        Iterate over subsystems that are being optimized.
-
-        If called on the top level Group when the Group is under an optimizer, this will
-        iterate over only the subsystems required to obtain the desired objectives and constraints.
-
-        Parameters
-        ----------
-        local_only : bool
-            If True, only iterate over local subsystems.
+        Iterate over all subsystems, local and nonlocal.
 
         Yields
         ------
         System
             A subsystem.
         """
-        opt_status = self._problem_meta['opt_status']
-
-        if opt_status is None:
-            # we're not under an optimizer loop, so return all subsystems
-            if local_only:
-                yield from self._subsystems_myproc
-            else:
-                for s, _ in self._subsystems_allprocs.values():
-                    yield s
-        else:
-            for s, _ in self._subsystems_allprocs.values():
-                if not local_only or s._is_local:
-                    if s._run_on_opt[opt_status]:
-                        yield s
+        for s, _ in self._subsystems_allprocs.values():
+            yield s
 
     def _get_relevance_modifiers(self, grad_groups, always_opt_comps):
         """
@@ -4750,19 +4741,35 @@ class Group(System):
             elif s.options['always_opt']:
                 always_opt_comps.add(s.pathname)
 
-    def _setup_iteration_lists(self):
+    # TODO: move this into relevance.py
+    def _setup_iteration_lists(self, designvars, responses):
         """
         Set up the iteration lists containing the pre, iterated, and post subsets of systems.
 
         This should only be called on the top level Group.
+
+        Parameters
+        ----------
+        designvars : dict
+            A dict of all design variables from the model.
+        responses : dict
+            A dict of all responses from the model.
+
+        Returns
+        -------
+        tuple of sets
+            A tuple of three sets, the first containing the pre-setup systems, the second
+            containing the systems that are iterated over, and the third containing the post-setup
+            systems.
         """
         assert self.pathname == '', "call setup_iteration_lists on the top level Group only!"
 
-        designvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
-        responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
+        self._pre_components = set()
+        self._post_components = set()
+        self._iterated_components = _contains_all
 
         if not designvars or not responses:
-            return
+            return (set(), None, set())
 
         # keep track of Groups with nonlinear solvers that use gradients (like Newton). These groups
         # and all systems they contain must be grouped together into the same iteration list.
@@ -4773,76 +4780,56 @@ class Group(System):
         if '' in grad_groups:
             issue_warning("The top level group has a nonlinear solver that computes gradients, so "
                           "the entire model will be included in the optimization iteration.")
-            return
-
-        graph = self._get_dataflow_graph()
-
-        # now add design vars and responses to the graph
-        for dv in meta2src_iter(designvars.values()):
-            if dv not in graph:
-                graph.add_node(dv, type_='output')
-                graph.add_edge(dv.rpartition('.')[0], dv)
-
-        resps = set(meta2src_iter(responses.values()))
-        for res in resps:
-            if res not in graph:
-                graph.add_node(res, type_='output')
-                graph.add_edge(res.rpartition('.')[0], res)
+            return (set(), None, set())
 
         dvs = [meta['source'] for meta in designvars.values()]
-        dv0 = dvs[0]
-        dvs = set(dvs)
         responses = [meta['source'] for meta in responses.values()]
         responses = set(responses)  # get rid of dups due to aliases
 
-        # we don't want _auto_ivc dependency to force all subsystems to be iterated, so split
-        # the _auto_ivc node into two nodes, one for design vars and one for everything else.
-        if '_auto_ivc' in graph:
-            graph.add_node('_auto_ivc_other')
-            # we're modifying the graph, so have to save existing auto_ivc edges before iterating
-            edges = list(graph.edges('_auto_ivc'))
-            for _, autoivc_var in edges:
-                if autoivc_var not in dvs:
-                    new_autoivc_var = autoivc_var.replace('_auto_ivc', '_auto_ivc_other')
-                    graph.add_node(new_autoivc_var, type_='output')
-                    graph.add_edge('_auto_ivc_other', new_autoivc_var)
-                    for _, inp in graph.edges(autoivc_var):
-                        graph.add_edge(new_autoivc_var, inp)
-                    graph.remove_node(autoivc_var)
+        graph = self.compute_sys_graph(comps_only=True, add_edge_info=False)
 
-        # add 'reverse' connections from inputs and outputs to their component if it exists in order
-        # to keep component and its vars in the same SCC. Also, for any 'always_opt' components,
-        # loop them into a response to force them to be in the opt SCC.
-        edges_to_add = []
-        for src, tgt in graph.edges():
-            varsrc = 'type_' in graph.nodes[src]
-            vartgt = 'type_' in graph.nodes[tgt]
-            if varsrc and not vartgt:  # tgt is a system
-                edges_to_add.append((tgt, src))  # connect from system back to var
-            elif vartgt and not varsrc:  # src is a system
-                edges_to_add.append((tgt, src))  # connect from var back to system
+        auto_dvs = [dv for dv in dvs if dv.startswith('_auto_ivc.')]
+        dv0 = auto_dvs[0] if auto_dvs else dvs[0].rpartition('.')[0]
 
-        graph.add_edges_from(edges_to_add)
+        if auto_dvs:
+            rev_conns = get_rev_conns(self._conn_global_abs_in2out)
+
+            # add nodes for any auto_ivc vars that are dvs and connect to downstream component(s)
+            for dv in auto_dvs:
+                graph.add_node(dv, type_='output')
+                inps = rev_conns.get(dv, ())
+                for inp in inps:
+                    inpcomp = inp.rpartition('.')[0]
+                    graph.add_edge(dv, inpcomp)
 
         # One way to determine the contents of the pre/opt/post sets is to add edges from the
-        # response variables to the design variables (there are already edges,
-        # directly or indirectly, from the design variables to the response variables)
-        # and then find the strongly connected components of the resulting graph.  get_sccs_topo
-        # returns the strongly connected components in topological order, so we can use it to give
-        # us pre, iterated, and post subsets of the systems.
+        # response variables to the design variables and vice versa, then find the strongly
+        # connected components of the resulting graph.  get_sccs_topo returns the strongly
+        # connected components in topological order, so we can use it to give us pre, iterated,
+        # and post subsets of the systems.
 
-        # add edges between response vars and design vars to form a strongly
-        # connected component for all systems involved in the optimization iteration.
+        # add edges between response comps and design vars/comps to form a strongly
+        # connected component for all nodes involved in the optimization iteration.
         for res in responses:
+            resnode = res.rpartition('.')[0]
             for dv in dvs:
-                graph.add_edge(res, dv)
+                dvnode = dv.rpartition('.')[0]
+                if dvnode == '_auto_ivc':
+                    # var node exists in graph so connect it to resnode
+                    dvnode = dv  # use var name not comp name
+
+                graph.add_edge(resnode, dvnode)
+                graph.add_edge(dvnode, resnode)
 
         # loop 'always_opt' components into all responses to force them to be relevant during
         # optimization.
         for opt_sys in always_opt:
             for response in responses:
-                graph.add_edge(opt_sys, response)
-                graph.add_edge(response, opt_sys)
+                rescomp = response.rpartition('.')[0]
+                graph.add_edge(opt_sys, rescomp)
+                graph.add_edge(rescomp, opt_sys)
+
+        groups_added = set()
 
         if grad_groups:
             remaining = set(grad_groups)
@@ -4863,12 +4850,15 @@ class Group(System):
             # treated as 'atomic' within the graph, so that if they contain
             # any dv or response systems, or if their children are connected to
             # both dv *and* response systems, then all systems within them will
-            # be included in the 'opt' set.
+            # be included in the 'opt' set.  Note that this step adds some group nodes
+            # to the graph where before it only contained component nodes and auto_ivc
+            # var nodes.
             toadd = []
             for grp in remaining:
                 prefix = grp + '.'
                 for node in graph:
                     if node.startswith(prefix):
+                        groups_added.add(grp)
                         toadd.append((grp, node))
                         toadd.append((node, grp))
 
@@ -4892,57 +4882,38 @@ class Group(System):
                     if 'type_' in graph.nodes[s]:
                         s = s.rpartition('.')[0]
                     if s not in iterated:
-                        iterated.update(all_ancestors(s))
+                        iterated.add(s)
                 addto = post
             else:
                 for s in strong_con:
                     if 'type_' in graph.nodes[s]:
                         s = s.rpartition('.')[0]
                     if s not in addto:
-                        addto.update(all_ancestors(s))
+                        addto.add(s)
 
-        # change _auto_ivc_other back to _auto_ivc.
-        for iterset in (pre, iterated, post):
-            if '_auto_ivc_other' in iterset:
-                iterset.discard('_auto_ivc_other')
-                if iterset:
-                    iterset.add('_auto_ivc')
+        try:
+            auto_ivc = self._auto_ivc
+        except AttributeError:
+            pass  # not auto_ivcs
+        else:
+            auto_dvs = set(auto_dvs)
+            rev_conns = get_rev_conns(self._conn_global_abs_in2out)
+            in_pre = False
+            for vname in auto_ivc._var_abs2prom['output']:
+                if vname not in auto_dvs:
+                    for tgt in rev_conns[vname]:
+                        tgtcomp = tgt.rpartition('.')[0]
+                        if tgtcomp in pre:
+                            in_pre = True
+                            break
+            if in_pre:
+                pre.add('_auto_ivc')
+            elif '_auto_ivc' not in iterated and auto_ivc._var_abs2prom['output']:
+                post.add('_auto_ivc')
 
-        # remove _auto_ivc from pre and post if it's in iterated
-        if '_auto_ivc' in iterated:
-            pre.discard('_auto_ivc')
-            post.discard('_auto_ivc')
-        elif '_auto_ivc' in pre:
-            post.discard('_auto_ivc')
-
-        if pre:
-            self._run_on_opt[_OptStatus.PRE] = True
-        if post:
-            self._run_on_opt[_OptStatus.POST] = True
-
-        groups = set()
-        for s in self.system_iter(recurse=True):
-            isgroup = isinstance(s, Group)
-            if isgroup:
-                groups.add(s.pathname)
-            if s.pathname in iterated:
-                s._run_on_opt[_OptStatus.OPTIMIZING] = True
-            else:
-                # set OPTIMIZING to False because its default value is True
-                s._run_on_opt[_OptStatus.OPTIMIZING] = False
-
-            # groups can be in multiple iteration lists, but components can
-            # only be in one (with _auto_ivc being the exception), so we have to
-            # check for that here.
-            if s.pathname in pre and (isgroup or s.pathname not in iterated or
-                                      s.pathname == '_auto_ivc'):
-                s._run_on_opt[_OptStatus.PRE] = True
-            if s.pathname in post and (isgroup or s.pathname not in iterated or
-                                       s.pathname == '_auto_ivc'):
-                s._run_on_opt[_OptStatus.POST] = True
-
-        self._pre_components = sorted(pre - groups)
-        self._post_components = sorted(post - groups)
+        self._pre_components = pre - groups_added
+        self._post_components = post - groups_added
+        self._iterated_components = iterated - groups_added
 
     @property
     def model_options(self):

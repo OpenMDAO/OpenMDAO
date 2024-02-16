@@ -103,7 +103,7 @@ class NonlinearBlockGS(NonlinearSolver):
 
         # Execute guess_nonlinear if specified and
         # we have not restarted from a saved point
-        if not self._restarted:
+        if not self._restarted and system.has_guess():
             system._guess_nonlinear()
 
         return super()._iter_initialize()
@@ -213,35 +213,33 @@ class NonlinearBlockGS(NonlinearSolver):
         maxiter = self.options['maxiter']
         itercount = self._iter_count
 
-        with system._relevant.active(system.under_approx):
-            if (maxiter < 2 and itercount < 1) or self.options['use_apply_nonlinear']:
+        if (maxiter < 2 and itercount < 1) or self.options['use_apply_nonlinear']:
 
-                # This option runs apply_nonlinear to calculate the residuals, and thus ends up
-                # executing ExplicitComponents twice per iteration.
+            # This option runs apply_nonlinear to calculate the residuals, and thus ends up
+            # executing ExplicitComponents twice per iteration.
 
-                self._recording_iter.push(('_run_apply', 0))
-                try:
-                    system._apply_nonlinear()
-                finally:
-                    self._recording_iter.pop()
+            self._recording_iter.push(('_run_apply', 0))
+            try:
+                system._apply_nonlinear()
+            finally:
+                self._recording_iter.pop()
 
-            elif itercount < 1:
-                # Run instead of calling apply, so that we don't "waste" the extra run. This also
-                # further increments the iteration counter.
-                self._iter_count += 1
-                outputs = system._outputs
-                residuals = system._residuals
+        elif itercount < 1:
+            # Run instead of calling apply, so that we don't "waste" the extra run. This also
+            # further increments the iteration counter.
+            self._iter_count += 1
+            outputs = system._outputs
+            residuals = system._residuals
 
-                with system._unscaled_context(outputs=[outputs]):
-                    outputs_n = outputs.asarray(copy=True)
+            with system._unscaled_context(outputs=[outputs]):
+                outputs_n = outputs.asarray(copy=True)
 
-                self._solver_info.append_subsolver()
-                for subsys in system._relevant.system_filter(
-                        system._solver_subsystem_iter(local_only=False), linear=False):
-                    system._transfer('nonlinear', 'fwd', subsys.name)
-                    if subsys._is_local:
-                        subsys._solve_nonlinear()
+            self._solver_info.append_subsolver()
+            for subsys in system._relevant.filter(system._all_subsystem_iter()):
+                system._transfer('nonlinear', 'fwd', subsys.name)
+                if subsys._is_local:
+                    subsys._solve_nonlinear()
 
-                self._solver_info.pop()
-                with system._unscaled_context(residuals=[residuals], outputs=[outputs]):
-                    residuals.set_val(outputs.asarray() - outputs_n)
+            self._solver_info.pop()
+            with system._unscaled_context(residuals=[residuals], outputs=[outputs]):
+                residuals.set_val(outputs.asarray() - outputs_n)

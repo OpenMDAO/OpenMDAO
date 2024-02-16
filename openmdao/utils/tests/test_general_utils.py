@@ -1,6 +1,6 @@
 import unittest
 
-from openmdao.utils.general_utils import remove_whitespace, common_subpath
+from openmdao.utils.general_utils import remove_whitespace, common_subpath, all_ancestors
 
 import re
 import sys
@@ -36,6 +36,35 @@ class TestGeneralUtils(unittest.TestCase):
 
         for plist, ans in plists:
             self.assertEqual(common_subpath(plist), ans)
+
+
+class TestAllAncestors(unittest.TestCase):
+
+    def test_all_ancestors(self):
+        # Test with default delimiter
+        result = list(all_ancestors('a.b.c'))
+        self.assertEqual(result, ['a.b.c', 'a.b', 'a'])
+
+        # Test with custom delimiter
+        result = list(all_ancestors('a/b/c', '/'))
+        self.assertEqual(result, ['a/b/c', 'a/b', 'a'])
+
+        # Test with no delimiter in string
+        result = list(all_ancestors('abc'))
+        self.assertEqual(result, ['abc'])
+
+        # Test with empty string
+        result = list(all_ancestors(''))
+        self.assertEqual(result, [])
+
+        # Test with string that ends with delimiter
+        result = list(all_ancestors('a.b.c.'))
+        self.assertEqual(result, ['a.b.c.', 'a.b.c', 'a.b', 'a'])
+
+        # Test with string that starts with delimiter
+        result = list(all_ancestors('.a.b.c'))
+        self.assertEqual(result, ['.a.b.c', '.a.b', '.a', '.'])
+
 
 if __name__ == "__main__":
     unittest.main()

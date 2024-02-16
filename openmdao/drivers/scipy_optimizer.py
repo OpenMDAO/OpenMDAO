@@ -285,8 +285,8 @@ class ScipyOptimizeDriver(Driver):
 
         # Initial Run
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-            # do the initial run without relevance.  TODO: maybe revisit this?
-            model.run_solve_nonlinear()
+            with model._relevant.activate_nonlinear('@iter'):
+                model.run_solve_nonlinear()
             self.iter_count += 1
 
         self._con_cache = self.get_constraint_values()
@@ -582,29 +582,29 @@ class ScipyOptimizeDriver(Driver):
                 print(result.message)
                 print('-' * 35)
 
-        if not self.fail:
-            # restore design vars from last objective evaluation
-            # if self._desvar_array_cache is not None:
-            #     self._update_design_vars(result.x)
+        # if not self.fail:
+        #     # restore design vars from last objective evaluation
+        #     # if self._desvar_array_cache is not None:
+        #     #     self._update_design_vars(result.x)
 
-            # update everything after the opt completes so even irrelevant components are updated
-            with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-                try:
-                    model.run_solve_nonlinear()
-                except AnalysisError:
-                    model._clear_iprint()
+        #     # update everything after the opt completes so even irrelevant components are updated
+        #     with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
+        #         try:
+        #             model.run_solve_nonlinear()
+        #         except AnalysisError:
+        #             model._clear_iprint()
 
-                rec.abs = 0.0
-                rec.rel = 0.0
+        #         rec.abs = 0.0
+        #         rec.rel = 0.0
 
-            if self.recording_options['record_derivatives']:
-                try:
-                    self._total_jac = total_jac  # temporarily restore this to get deriv recording
-                    self.record_derivatives()
-                finally:
-                    self._total_jac = None
+        #     if self.recording_options['record_derivatives']:
+        #         try:
+        #             self._total_jac = total_jac  # temporarily restore this to get deriv recording
+        #             self.record_derivatives()
+        #         finally:
+        #             self._total_jac = None
 
-            self.iter_count += 1
+        #     self.iter_count += 1
 
         return self.fail
 
@@ -656,7 +656,7 @@ class ScipyOptimizeDriver(Driver):
 
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 self.iter_count += 1
-                with model._relevant.all_seeds_active():
+                with model._relevant.activate_nonlinear('@iter'):
                     model.run_solve_nonlinear()
 
             # Get the objective function evaluations

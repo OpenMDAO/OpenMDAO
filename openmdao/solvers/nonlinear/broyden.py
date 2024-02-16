@@ -308,7 +308,7 @@ class BroydenSolver(NonlinearSolver):
 
         # Execute guess_nonlinear if specified and
         # we have not restarted from a saved point
-        if not self._restarted:
+        if not self._restarted and system.has_guess():
             system._guess_nonlinear()
 
         # When under a complex step from higher in the hierarchy, sometimes the step is too small

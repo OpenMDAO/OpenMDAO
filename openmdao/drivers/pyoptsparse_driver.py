@@ -737,7 +737,7 @@ class pyOptSparseDriver(Driver):
                 self.iter_count += 1
                 try:
                     self._in_user_function = True
-                    with model._relevant.all_seeds_active():
+                    with model._relevant.activate_nonlinear('@iter'):
                         model.run_solve_nonlinear()
 
                 # Let the optimizer try to handle the error

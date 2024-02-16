@@ -378,13 +378,13 @@ class ApproximationScheme(object):
 
             if fd_count % num_par_fd == system._par_fd_id:
                 # run the finite difference
-                if total:
-                    with system._relevant.seeds_active(fwd_seeds=seed_vars):
+                with system._relevant.seeds_active(fwd_seeds=seed_vars):
+                    if total:
                         result = self._run_point(system, vec_ind_list, data, results_array,
                                                  total_or_semi)
-                else:
-                    result = self._run_point(system, vec_ind_list, data, results_array,
-                                             total_or_semi)
+                    else:
+                        result = self._run_point(system, vec_ind_list, data, results_array,
+                                                 total_or_semi)
 
                 if par_fd_w_serial_model or not use_parallel_fd:
                     result = self._transform_result(result)
@@ -519,16 +519,16 @@ class ApproximationScheme(object):
 
                 if fd_count % num_par_fd == system._par_fd_id:
                     # run the finite difference
-                    if total:
-                        seeds = wrt if directional else (wrt,)
-                        with system._relevant.seeds_active(fwd_seeds=seeds):
+                    seeds = wrt if directional else (wrt,)
+                    with system._relevant.seeds_active(fwd_seeds=seeds):
+                        if total:
                             result = self._run_point(system, vec_ind_info,
                                                      app_data, results_array, total_or_semi,
                                                      jcol_idxs)
-                    else:
-                        result = self._run_point(system, vec_ind_info,
-                                                 app_data, results_array, total_or_semi,
-                                                 jcol_idxs)
+                        else:
+                            result = self._run_point(system, vec_ind_info,
+                                                     app_data, results_array, total_or_semi,
+                                                     jcol_idxs)
 
                     result = self._transform_result(result)
 
