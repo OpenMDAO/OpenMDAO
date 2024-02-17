@@ -7,8 +7,10 @@ from collections import defaultdict
 
 import numpy as np
 
-from openmdao.utils.general_utils import all_ancestors, _contains_all
+from openmdao.utils.general_utils import all_ancestors, _contains_all, get_rev_conns
+from openmdao.utils.graph_utils import get_sccs_topo
 from openmdao.utils.array_utils import array_hash
+from openmdao.utils.om_warnings import issue_warning
 
 
 def get_relevance(model, of, wrt):
@@ -110,6 +112,8 @@ class Relevance(object):
 
         self._current_rel_varray = None
         self._current_rel_sarray = None
+
+        self._setup_nonlinear_relevance(model, fwd_meta, rev_meta)
 
         if model._pre_components or model._post_components:
             self._setup_nonlinear_sets(model)
@@ -921,6 +925,174 @@ class Relevance(object):
 
         if msg:
             raise RuntimeError('\n'.join(msg))
+
+    def _setup_nonlinear_relevance(self, model, designvars, responses):
+        """
+        Set up the iteration lists containing the pre, iterated, and post subsets of systems.
+
+        This should only be called on the top level Group.
+
+        Parameters
+        ----------
+        designvars : dict
+            A dict of all design variables from the model.
+        responses : dict
+            A dict of all responses from the model.
+        """
+        if model._pre_components is not None:
+            return
+
+        model._pre_components = set()
+        model._post_components = set()
+        model._iterated_components = _contains_all
+
+        if not designvars or not responses:
+            return
+
+        # keep track of Groups with nonlinear solvers that use gradients (like Newton) and certain
+        # linear solvers like DirectSolver. These groups and all systems they contain must be
+        # grouped together into the same iteration list.
+        grad_groups = set()
+        always_opt = set()
+        model._get_relevance_modifiers(grad_groups, always_opt)
+
+        if '' in grad_groups:
+            issue_warning("The top level group has a nonlinear solver that computes gradients, so "
+                          "the entire model will be included in the optimization iteration.")
+            return
+
+        dvs = [meta['source'] for meta in designvars.values()]
+        responses = [meta['source'] for meta in responses.values()]
+        responses = set(responses)  # get rid of dups due to aliases
+
+        graph = model.compute_sys_graph(comps_only=True, add_edge_info=False)
+
+        auto_dvs = [dv for dv in dvs if dv.startswith('_auto_ivc.')]
+        dv0 = auto_dvs[0] if auto_dvs else dvs[0].rpartition('.')[0]
+
+        if auto_dvs:
+            rev_conns = get_rev_conns(model._conn_global_abs_in2out)
+
+            # add nodes for any auto_ivc vars that are dvs and connect to downstream component(s)
+            for dv in auto_dvs:
+                graph.add_node(dv, type_='output')
+                inps = rev_conns.get(dv, ())
+                for inp in inps:
+                    inpcomp = inp.rpartition('.')[0]
+                    graph.add_edge(dv, inpcomp)
+
+        # One way to determine the contents of the pre/opt/post sets is to add edges from the
+        # response variables to the design variables and vice versa, then find the strongly
+        # connected components of the resulting graph.  get_sccs_topo returns the strongly
+        # connected components in topological order, so we can use it to give us pre, iterated,
+        # and post subsets of the systems.
+
+        # add edges between response comps and design vars/comps to form a strongly
+        # connected component for all nodes involved in the optimization iteration.
+        for res in responses:
+            resnode = res.rpartition('.')[0]
+            for dv in dvs:
+                dvnode = dv.rpartition('.')[0]
+                if dvnode == '_auto_ivc':
+                    # var node exists in graph so connect it to resnode
+                    dvnode = dv  # use var name not comp name
+
+                graph.add_edge(resnode, dvnode)
+                graph.add_edge(dvnode, resnode)
+
+        # loop 'always_opt' components into all responses to force them to be relevant during
+        # optimization.
+        for opt_sys in always_opt:
+            for response in responses:
+                rescomp = response.rpartition('.')[0]
+                graph.add_edge(opt_sys, rescomp)
+                graph.add_edge(rescomp, opt_sys)
+
+        groups_added = set()
+
+        if grad_groups:
+            remaining = set(grad_groups)
+            for name in sorted(grad_groups, key=lambda x: x.count('.')):
+                prefix = name + '.'
+                match = {n for n in remaining if n.startswith(prefix)}
+                remaining -= match
+
+            gradlist = '\n'.join(sorted(remaining))
+            issue_warning("The following groups have a nonlinear solver that computes gradients "
+                          f"and will be treated as atomic for the purposes of determining "
+                          f"which systems are included in the optimization iteration: "
+                          f"\n{gradlist}\n")
+
+            # remaining groups are not contained within a higher level nl solver
+            # using gradient group, so make new connections to/from them to
+            # all systems that they contain.  This will force them to be
+            # treated as 'atomic' within the graph, so that if they contain
+            # any dv or response systems, or if their children are connected to
+            # both dv *and* response systems, then all systems within them will
+            # be included in the 'opt' set.  Note that this step adds some group nodes
+            # to the graph where before it only contained component nodes and auto_ivc
+            # var nodes.
+            toadd = []
+            for grp in remaining:
+                prefix = grp + '.'
+                for node in graph:
+                    if node.startswith(prefix):
+                        groups_added.add(grp)
+                        toadd.append((grp, node))
+                        toadd.append((node, grp))
+
+            graph.add_edges_from(toadd)
+
+        # this gives us the strongly connected components in topological order
+        sccs = get_sccs_topo(graph)
+
+        pre = addto = set()
+        post = set()
+        iterated = set()
+        for strong_con in sccs:
+            # because the sccs are in topological order and all design vars and
+            # responses are in the iteration set, we know that until we
+            # see a design var (or response), we're in the pre-opt set.  Once we
+            # see a design var (or response), we're in the iterated set.  Once
+            # we see an scc without a design var (or response), we're in the
+            # post-opt set.
+            if dv0 in strong_con:
+                for s in strong_con:
+                    if 'type_' in graph.nodes[s]:
+                        s = s.rpartition('.')[0]
+                    if s not in iterated:
+                        iterated.add(s)
+                addto = post
+            else:
+                for s in strong_con:
+                    if 'type_' in graph.nodes[s]:
+                        s = s.rpartition('.')[0]
+                    if s not in addto:
+                        addto.add(s)
+
+        auto_ivc = model._auto_ivc
+        auto_dvs = set(auto_dvs)
+        rev_conns = get_rev_conns(model._conn_global_abs_in2out)
+        if '_auto_ivc' not in pre:
+            in_pre = False
+            for vname in auto_ivc._var_abs2prom['output']:
+                if vname not in auto_dvs:
+                    for tgt in rev_conns[vname]:
+                        tgtcomp = tgt.rpartition('.')[0]
+                        if tgtcomp in pre:
+                            in_pre = True
+                            break
+                    if in_pre:
+                        break
+            if in_pre:
+                pre.add('_auto_ivc')
+
+        if len(pre) == 1 and '_auto_ivc' in pre:
+            pre.discard('_auto_ivc')
+
+        model._pre_components = pre - groups_added
+        model._post_components = post - groups_added
+        model._iterated_components = iterated - groups_added
 
 
 def _vars2systems(nameiter):

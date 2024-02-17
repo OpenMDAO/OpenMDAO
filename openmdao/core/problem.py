@@ -723,23 +723,6 @@ class Problem(object):
             model._clear_iprint()
 
             return driver._run()
-            # if driver.supports['optimization']:
-            #     if model._pre_components:
-            #         with model._relevant.activate_nonlinear('@pre'):
-            #             model.run_solve_nonlinear()
-
-            #     with SaveOptResult(driver):
-            #         result = driver.run()
-
-            #     if model._post_components:
-            #         with model._relevant.activate_nonlinear('@post'):
-            #             model.run_solve_nonlinear()
-
-            #     return result
-            # else:
-            #     with SaveOptResult(driver):
-            #         return driver.run()
-
         finally:
             self._recording_iter.prefix = old_prefix
 
