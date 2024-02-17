@@ -2,13 +2,12 @@
 Class definitions for Relevance and related classes.
 """
 
-# import sys
-# from pprint import pprint
 from contextlib import contextmanager
 from collections import defaultdict
-# from enum import IntEnum
+
 import numpy as np
-from openmdao.utils.general_utils import all_ancestors
+
+from openmdao.utils.general_utils import all_ancestors, _contains_all
 from openmdao.utils.array_utils import array_hash
 
 
@@ -32,6 +31,8 @@ def get_relevance(model, of, wrt):
     """
     if not model._use_derivatives or (not of and not wrt):
         # in this case, a permanently inactive relevance object is returned
+        # (so the contents of 'of' and 'wrt' don't matter). Make them empty to avoid
+        # unnecessary setup.
         of = {}
         wrt = {}
 
@@ -138,19 +139,31 @@ class Relevance(object):
         model : <Group>
             The top level group in the system hierarchy.
         """
-        pre_systems = {''}
+        pre_systems = set()
         for compname in model._pre_components:
             pre_systems.update(all_ancestors(compname))
-        post_systems = {''}
+        if pre_systems:
+            pre_systems.add('')  # include top level group
+
+        post_systems = set()
         for compname in model._post_components:
             post_systems.update(all_ancestors(compname))
-        iter_systems = {''}
-        for compname in model._iterated_components:
-            iter_systems.update(all_ancestors(compname))
+        if post_systems:
+            post_systems.add('')
 
         pre_array = self._names2rel_array(pre_systems, self._all_systems, self._sys2idx)
         post_array = self._names2rel_array(post_systems, self._all_systems, self._sys2idx)
-        iter_array = self._names2rel_array(iter_systems, self._all_systems, self._sys2idx)
+
+        if model._iterated_components is _contains_all:
+            iter_array = np.ones(len(self._all_systems), dtype=bool)
+        else:
+            iter_systems = set()
+            for compname in model._iterated_components:
+                iter_systems.update(all_ancestors(compname))
+            if iter_systems:
+                iter_systems.add('')
+
+            iter_array = self._names2rel_array(iter_systems, self._all_systems, self._sys2idx)
 
         self._nonlinear_sets = {'@pre': pre_array, '@iter': iter_array, '@post': post_array}
 
@@ -364,8 +377,18 @@ class Relevance(object):
         # this set contains all variables and some or all components
         # in the graph.  Components are included if all of their outputs
         # depend on all of their inputs.
-        self._all_systems = all_systems = _vars2systems(self._graph.nodes())
-        all_vars = {n for n in self._graph.nodes() if n not in all_systems}
+        all_vars = set()
+        all_systems = {''}
+        for node, data in self._graph.nodes(data=True):
+            if 'type_' in data:
+                all_vars.add(node)
+                sysname = node.rpartition('.')[0]
+                if sysname not in all_systems:
+                    all_systems.update(all_ancestors(sysname))
+            elif node not in all_systems:
+                all_systems.update(all_ancestors(node))
+
+        self._all_systems = all_systems
 
         # create mappings of var and system names to indices into the var/system
         # relevance arrays.
@@ -923,36 +946,6 @@ def _vars2systems(nameiter):
             systems.update(all_ancestors(sysname))
 
     return systems
-
-
-# def _get_set_checker(relset, allset):
-#     """
-#     Return a SetChecker for the given sets.
-
-#     The SetChecker will be inverted if that will use less memory than a non-inverted checker.
-
-#     Parameters
-#     ----------
-#     relset : set
-#         Set of relevant items.
-#     allset : set
-#         Set of all items.
-
-#     Returns
-#     -------
-#     SetChecker, InverseSetChecker
-#         Set checker for the given sets.
-#     """
-#     if len(allset) == len(relset):
-#         return SetChecker(set(), allset, invert=True)
-
-#     nrel = len(relset)
-
-#     # store whichever type of checker will use the least memory
-#     if nrel < (len(allset) - nrel):
-#         return SetChecker(relset)
-#     else:
-#         return SetChecker(allset - relset, allset, invert=True)
 
 
 def _get_io_filter(inputs, outputs):

@@ -22,6 +22,7 @@ from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
+from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len, ValueRepeater
 from openmdao.utils.general_utils import common_subpath, all_ancestors, \
@@ -793,6 +794,20 @@ class Group(System):
 
         graph = nx.DiGraph()
         comp_seen = set()
+
+        # locate any components that don't have any inputs or outputs and add them to the graph
+        for subsys in self.system_iter(recurse=True, typ=Component):
+            if not subsys._var_abs2meta['input'] and not subsys._var_abs2meta['output']:
+                graph.add_node(subsys.pathname, local=True)
+                comp_seen.add(subsys.pathname)
+
+        if self.comm.size > 1:
+            allemptycomps = self.comm.allgather(comp_seen)
+            for compset in allemptycomps:
+                for comp in compset:
+                    if comp not in comp_seen:
+                        graph.add_node(comp, local=False)
+                        comp_seen.add(comp)
 
         for direction in ('input', 'output'):
             isout = direction == 'output'
@@ -4722,6 +4737,8 @@ class Group(System):
         """
         if self.nonlinear_solver is not None and self.nonlinear_solver.supports['gradients']:
             grad_groups.add(self.pathname)
+        elif self.linear_solver is not None and isinstance(self.linear_solver, DirectSolver):
+            grad_groups.add(self.pathname)
 
         for s in self._subsystems_myproc:
             if isinstance(s, Group):
@@ -4759,8 +4776,9 @@ class Group(System):
         if not designvars or not responses:
             return (set(), None, set())
 
-        # keep track of Groups with nonlinear solvers that use gradients (like Newton). These groups
-        # and all systems they contain must be grouped together into the same iteration list.
+        # keep track of Groups with nonlinear solvers that use gradients (like Newton) and certain
+        # linear solvers like DirectSolver. These groups and all systems they contain must be
+        # grouped together into the same iteration list.
         grad_groups = set()
         always_opt = set()
         self._get_relevance_modifiers(grad_groups, always_opt)

@@ -1359,18 +1359,19 @@ class _TotalJacInfo(object):
 
             with self._relevance_context():
                 relevant = self.relevance
-                with relevant.all_seeds_active():
-                    try:
-                        ln_solver = model._linear_solver
-                        with model._scaled_context_all():
-                            model._linearize(model._assembled_jac,
-                                             sub_do_ln=ln_solver._linearize_children())
-                        if ln_solver._assembled_jac is not None and \
-                                ln_solver._assembled_jac._under_complex_step:
-                            model.linear_solver._assembled_jac._update(model)
-                        ln_solver._linearize()
-                    finally:
-                        model._tot_jac = None
+                with relevant.active(model.linear_solver.use_relevance()):
+                    with relevant.all_seeds_active():
+                        try:
+                            ln_solver = model._linear_solver
+                            with model._scaled_context_all():
+                                model._linearize(model._assembled_jac,
+                                                 sub_do_ln=ln_solver._linearize_children())
+                            if ln_solver._assembled_jac is not None and \
+                                    ln_solver._assembled_jac._under_complex_step:
+                                model.linear_solver._assembled_jac._update(model)
+                            ln_solver._linearize()
+                        finally:
+                            model._tot_jac = None
 
                 self.J[:] = 0.0
 
