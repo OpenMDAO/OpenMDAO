@@ -1091,6 +1091,55 @@ class TestGroupMPI(unittest.TestCase):
         assert_near_equal(p.get_val('C1.y', get_remote=False), 6. if p.model.C1.comm.rank == 0 else 14.)
 
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestDistribCheckMPI(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_distrib_conn_check(self):
+        class Serial2Distributed(om.ExplicitComponent):
+            def setup(self):
+                self.add_input("serial_in", shape=3)
+
+                if self.comm.rank == 0:
+                    self.add_output("dist_out", shape=3, distributed=True)
+                else:
+                    self.add_output("dist_out", shape=0, distributed=True)
+
+            def compute(self, inputs, outputs):
+                if self.comm.rank == 0:
+                    outputs["dist_out"] = inputs["serial_in"]
+
+        class DistributedSum(om.ExplicitComponent):
+            def setup(self):
+                self.add_output("sum", shape=1)
+
+            def compute(self, inputs, outputs):
+                outputs["sum"] = self.comm.bcast(sum(inputs["dist_in"]), root=0)
+
+        class SumGroup(om.Group):
+            def setup(self):
+                self.add_subsystem("s2d", Serial2Distributed(), promotes_inputs=[("serial_in", "in")])
+                self.add_subsystem("sum", DistributedSum(), promotes_outputs=["sum"])
+                self.sum.add_input("dist_in", shape_by_conn=True, distributed=True)
+                self.connect("s2d.dist_out", "sum.dist_in")
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem("ivc", om.IndepVarComp("x", [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]))
+        parallel = model.add_subsystem('parallel', om.ParallelGroup())
+        parallel.add_subsystem('sum1', SumGroup())
+        parallel.add_subsystem('sum2', SumGroup())
+
+        model.connect("ivc.x", "parallel.sum1.in", src_indices=om.slicer[:3])
+        model.connect("ivc.x", "parallel.sum2.in", src_indices=om.slicer[3:])
+
+        prob.setup()
+        prob.run_model()
+
+        assert_near_equal(prob.get_val("parallel.sum1.sum", get_remote=True), 3.0)
+        assert_near_equal(prob.get_val("parallel.sum2.sum", get_remote=True), 12.0)
+
 if __name__ == '__main__':
     from openmdao.utils.mpi import mpirun_tests
     mpirun_tests()
