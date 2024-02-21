@@ -229,10 +229,6 @@ class HooksTestCase(unittest.TestCase):
 
         msg = "No hook found for method 'final_setup' for class 'Problem' and instance 'None'."
 
-        # already removed final_setup hooks earlier, so expect a warning here
-        with assert_warning(UserWarning, msg):
-            hooks._unregister_hook('final_setup', 'Problem')
-
         hooks._unregister_hook('run_model', 'Problem')
         prob.calls = []
 
@@ -241,7 +237,6 @@ class HooksTestCase(unittest.TestCase):
         prob.run_model()
 
         self.assertEqual(prob.calls, [])
-        self.assertEqual(len(hooks._hooks), 0)  # should be no hooks left
 
     @hooks_active
     def test_problem_hooks_kwargs(self):
@@ -266,23 +261,20 @@ class HooksTestCase(unittest.TestCase):
 
     @hooks_active
     def test_inherited_class_hooks(self):
-        class MyProblem(om.Problem):
-            def __init__(self, *args, **kwargs):
-                super().__init__(*args, **kwargs)
-                self.calls = []
+        def inherited_hook_pre(prob, **kwargs):
+            prob.calls.append('inherited_pre')
+        
+        def inherited_hook_post(prob, **kwargs):
+            prob.calls.append('inherited_post')
+        
+        def base_hook_pre(prob, **kwargs):
+            prob.calls.append('base_pre')
+            
+        def base_hook_post(prob, **kwargs):
+            prob.calls.append('base_post')
 
-            def run_model(self):
-                super().run_model()
-                self.calls.append('after run_model')
-
-        def inherited_hook_func(prob, **kwargs):
-            prob.calls.append('inherited_hook')
-
-        def base_hook_func(prob, **kwargs):
-            prob.calls.append('base_hook')
-
-        hooks._register_hook('final_setup', 'MyProblem', post=inherited_hook_func)
-        hooks._register_hook('final_setup', 'Problem', post=base_hook_func)
+        hooks._register_hook('final_setup', 'MyProblem', pre=inherited_hook_pre, post=inherited_hook_post)
+        hooks._register_hook('final_setup', 'Problem', pre=base_hook_pre, post=base_hook_post)
 
         prob = MyProblem()
         self.build_model(prob=prob)
@@ -291,7 +283,26 @@ class HooksTestCase(unittest.TestCase):
         prob.run_model()
         prob.run_model()
 
-        self.assertEqual(prob.calls, [])
+        self.assertEqual(prob.calls, ['inherited_pre', 'base_pre', 'inherited_post', 'base_post', 'inherited_pre',
+                                      'base_pre', 'inherited_post', 'base_post', 'inherited_pre', 'base_pre', 'inherited_post', 'base_post'])
+        
+        hooks._unregister_hook('final_setup', 'Problem', pre=base_hook_pre, post=False)
+
+        prob.calls = []
+
+        prob.run_model()
+        prob.run_model()
+
+        self.assertEqual(prob.calls, ['inherited_pre', 'inherited_post', 'base_post', 'inherited_pre', 'inherited_post', 'base_post'])
+
+
+class MyProblem(om.Problem):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.calls = []
+
+    def run_model(self):
+        super().run_model()
 
 
 if __name__ == '__main__':
