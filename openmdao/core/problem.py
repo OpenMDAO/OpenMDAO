@@ -1402,7 +1402,7 @@ class Problem(object):
                                 # Matrix Vector Product
                                 self._metadata['checking'] = True
                                 try:
-                                    comp._apply_linear(None, _contains_all, mode)
+                                    comp.run_apply_linear(mode)
                                 finally:
                                     self._metadata['checking'] = False
 
