@@ -270,9 +270,9 @@ def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=
     imeta[fname].append((pre_hook, post_hook))
 
 
-def _remove_hook(to_remove, hook):
+def _deactivate_hook(to_remove, hook):
     """
-    Remove a hook function.
+    Deactivate a hook function.
 
     Parameters
     ----------
@@ -294,25 +294,23 @@ def _unregister_hook(fname, class_name, inst_id=None, pre=True, post=True):
     """
     Unregister a hook function.
 
-    By default, both pre and post hooks will be removed if they are present. To avoid
+    By default, both pre and post hooks will be deactivated if they are present. To avoid
     removal of pre or post, you must set the pre or post arg to False.
 
     Parameters
     ----------
     fname : str
-        The name of the function where the pre and/or post hook will be removed.
+        The name of the function where the pre and/or post hook will be deactivated.
     class_name : str
-        The name of the class owning the method where the hook will be removed.
+        The name of the class owning the method where the hook will be deactivated.
     inst_id : str, optional
-        The name of the instance owning the method where the hook will be removed.
+        The name of the instance owning the method where the hook will be deactivated.
     pre : bool or function, (True)
-        If True, hooks that run before the named function runs will be removed. If a
-        function then that function, if found, will be removed from the pre list, else
-        an exception will be raised.
+        If True, hooks that run before the named function runs will be deactivated. If pre is a
+        function, then that function will have its hook(s) deactivated.
     post : bool or function, (True)
-        If True, hooks that run after the named function runs will be removed. If a
-        function then that function, if found, will be removed from the post list, else
-        an exception will be raised.
+        If True, hooks that run after the named function runs will be deactivated. If post is a
+        function, then that function will have its hook(s) deactivated.
     """
     try:
         classhooks = _hooks[class_name]
@@ -324,8 +322,8 @@ def _unregister_hook(fname, class_name, inst_id=None, pre=True, post=True):
             continue
         if fname in hookdict:
             for pre_hook, post_hook in hookdict[fname]:
-                _remove_hook(pre, pre_hook)
-                _remove_hook(post, post_hook)
+                _deactivate_hook(pre, pre_hook)
+                _deactivate_hook(post, post_hook)
         else:
             warnings.warn(f"No hook found for method '{fname}' for class '{class_name}' and "
                           f"instance '{inst_id}'.")
