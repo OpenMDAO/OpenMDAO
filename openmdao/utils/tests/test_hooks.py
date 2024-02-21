@@ -29,8 +29,9 @@ class HooksTestCase(unittest.TestCase):
     def setUp(self):
         openmdao.core.problem._clear_problem_names()  # need to reset these to simulate separate runs
 
-    def build_model(self, name='problem1'):
-        prob = om.Problem(name=name)
+    def build_model(self, name='problem1', prob=None):
+        if prob is None:
+            prob = om.Problem(name=name)
         prob.calls = []
         model = prob.model
 
@@ -75,8 +76,8 @@ class HooksTestCase(unittest.TestCase):
 
     @hooks_active
     def test_multiwrap(self):
-        pre_final = make_hook('pre_final')
         post_final = make_hook('post_final')
+        pre_final = make_hook('pre_final')
         hooks._register_hook('final_setup', 'Problem', pre=pre_final, post=post_final)
         hooks._register_hook('final_setup', 'Problem', pre=make_hook('pre_final2'), post=make_hook('post_final2'))
 
@@ -262,6 +263,35 @@ class HooksTestCase(unittest.TestCase):
 
         self.assertEqual(prob['comp.x'], x0)
         self.assertEqual(prob['comp.y'], y0)
+
+    @hooks_active
+    def test_inherited_class_hooks(self):
+        class MyProblem(om.Problem):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.calls = []
+
+            def run_model(self):
+                super().run_model()
+                self.calls.append('after run_model')
+
+        def inherited_hook_func(prob, **kwargs):
+            prob.calls.append('inherited_hook')
+
+        def base_hook_func(prob, **kwargs):
+            prob.calls.append('base_hook')
+
+        hooks._register_hook('final_setup', 'MyProblem', post=inherited_hook_func)
+        hooks._register_hook('final_setup', 'Problem', post=base_hook_func)
+
+        prob = MyProblem()
+        self.build_model(prob=prob)
+
+        prob.run_model()
+        prob.run_model()
+        prob.run_model()
+
+        self.assertEqual(prob.calls, [])
 
 
 if __name__ == '__main__':
