@@ -84,7 +84,7 @@ class Relevance(object):
         Dict of the form {'fwd': {seed: sys_array}, 'rev': ...} where each seed is a
         key and var_array is the system relevance array for the given seed.
     _nonlinear_sets : dict
-        Dict of the form {'@pre': pre_rel_array, '@iter': iter_rel_array, '@post': post_rel_array}.
+        Dict of the form {'pre': pre_rel_array, 'iter': iter_rel_array, 'post': post_rel_array}.
     _current_rel_varray : ndarray
         Array representing the combined variable relevance arrays for the currently active seeds.
     _current_rel_sarray : ndarray
@@ -169,7 +169,7 @@ class Relevance(object):
 
             iter_array = self._names2rel_array(iter_systems, self._all_systems, self._sys2idx)
 
-        self._nonlinear_sets = {'@pre': pre_array, '@iter': iter_array, '@post': post_array}
+        self._nonlinear_sets = {'pre': pre_array, 'iter': iter_array, 'post': post_array}
 
     def _single_seed_array_iter(self, group, seed_meta, direction, all_systems, all_vars):
         """
@@ -555,8 +555,8 @@ class Relevance(object):
             save = {'fwd': self._seed_vars['fwd'], 'rev': self._seed_vars['rev']}
             save_active = self._active
             self._active = True
-            fwd_seeds = frozenset(fwd_seeds) if fwd_seeds else self._all_seed_vars['fwd']
-            rev_seeds = frozenset(rev_seeds) if rev_seeds else self._all_seed_vars['rev']
+            fwd_seeds = self._all_seed_vars['fwd'] if fwd_seeds is None else frozenset(fwd_seeds)
+            rev_seeds = self._all_seed_vars['rev'] if rev_seeds is None else frozenset(rev_seeds)
             self._set_seeds(fwd_seeds, rev_seeds)
             try:
                 yield
@@ -565,20 +565,22 @@ class Relevance(object):
                 self._active = save_active
 
     @contextmanager
-    def activate_nonlinear(self, name):
+    def activate_nonlinear(self, name, active=True):
         """
-        Context manager for activating a subset of systems using '@pre' or '@post'.
+        Context manager for activating a subset of systems using 'pre' or 'post'.
 
         Parameters
         ----------
         name : str
             Name of the set to activate.
+        active : bool
+            If False, relevance is temporarily deactivated.
 
         Yields
         ------
         None
         """
-        if self._active is False or name not in self._nonlinear_sets:
+        if not active or self._active is False or name not in self._nonlinear_sets:
             yield
         else:
             save_active = self._active
@@ -934,11 +936,14 @@ class Relevance(object):
 
         Parameters
         ----------
+        model : <Group>
+            The top level group in the system hierarchy.
         designvars : dict
             A dict of all design variables from the model.
         responses : dict
             A dict of all responses from the model.
         """
+        # don't redo this if it's already been done
         if model._pre_components is not None:
             return
 
@@ -946,7 +951,7 @@ class Relevance(object):
         model._post_components = set()
         model._iterated_components = _contains_all
 
-        if not designvars or not responses:
+        if not designvars or not responses or not model._problem_meta['group_by_pre_opt_post']:
             return
 
         # keep track of Groups with nonlinear solvers that use gradients (like Newton) and certain
@@ -1032,16 +1037,16 @@ class Relevance(object):
             # be included in the 'opt' set.  Note that this step adds some group nodes
             # to the graph where before it only contained component nodes and auto_ivc
             # var nodes.
-            toadd = []
+            edges_to_add = []
             for grp in remaining:
                 prefix = grp + '.'
                 for node in graph:
                     if node.startswith(prefix):
                         groups_added.add(grp)
-                        toadd.append((grp, node))
-                        toadd.append((node, grp))
+                        edges_to_add.append((grp, node))
+                        edges_to_add.append((node, grp))
 
-            graph.add_edges_from(toadd)
+            graph.add_edges_from(edges_to_add)
 
         # this gives us the strongly connected components in topological order
         sccs = get_sccs_topo(graph)
@@ -1052,9 +1057,9 @@ class Relevance(object):
         for strong_con in sccs:
             # because the sccs are in topological order and all design vars and
             # responses are in the iteration set, we know that until we
-            # see a design var (or response), we're in the pre-opt set.  Once we
-            # see a design var (or response), we're in the iterated set.  Once
-            # we see an scc without a design var (or response), we're in the
+            # see a design var or response, we're in the pre-opt set.  Once we
+            # see a design var or response, we're in the iterated set.  Once
+            # we see an scc without a design var or response, we're in the
             # post-opt set.
             if dv0 in strong_con:
                 for s in strong_con:
@@ -1087,6 +1092,7 @@ class Relevance(object):
             if in_pre:
                 pre.add('_auto_ivc')
 
+        # if 'pre' contains nothing but _auto_ivc, then just make it empty
         if len(pre) == 1 and '_auto_ivc' in pre:
             pre.discard('_auto_ivc')
 

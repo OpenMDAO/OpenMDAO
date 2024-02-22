@@ -185,6 +185,8 @@ class pyOptSparseDriver(Driver):
         Specifies sparsity of sub-jacobians of the total jacobian.
     _user_termination_flag : bool
         This is set to True when the user sends a signal to terminate the job.
+    _model_ran : bool
+        This is set to True after the full model has been run at least once.
     """
 
     def __init__(self, **kwargs):
@@ -237,6 +239,7 @@ class pyOptSparseDriver(Driver):
         self._exc_info = None
         self._total_jac_format = 'dict'
         self._total_jac_sparsity = None
+        self._model_ran = False
 
         self.cite = CITATIONS
 
@@ -336,6 +339,7 @@ class pyOptSparseDriver(Driver):
                                ' but the selected optimizer ({0}) does not support'
                                ' multiple objectives.'.format(self.options['optimizer']))
 
+        self._model_ran = False
         self._setup_tot_jac_sparsity()
 
     def get_driver_objective_calls(self):
@@ -379,7 +383,6 @@ class pyOptSparseDriver(Driver):
         self.pyopt_solution = None
         self._total_jac = None
         self.iter_count = 0
-        fwd = problem._mode == 'fwd'
         self._quantities = []
 
         optimizer = self.options['optimizer']
@@ -397,14 +400,13 @@ class pyOptSparseDriver(Driver):
         model_ran = False
         if optimizer in run_required or linear_constraints:
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-                # Initial Run - do without relevance to avoid breaking some tests that
-                # depend on the old behavior.  TODO: possibly revisit this?
                 model.run_solve_nonlinear()
                 rec.abs = 0.0
                 rec.rel = 0.0
                 model_ran = True
             self.iter_count += 1
 
+        self._model_ran = model_ran
         self._coloring_info.run_model = not model_ran
 
         comm = None if isinstance(problem.comm, FakeComm) else problem.comm
@@ -737,8 +739,11 @@ class pyOptSparseDriver(Driver):
                 self.iter_count += 1
                 try:
                     self._in_user_function = True
-                    with model._relevant.activate_nonlinear('@iter'):
+                    # deactivate the relevance if we haven't run the full model yet, so that
+                    # the full model will run at least once.
+                    with model._relevant.activate_nonlinear('iter', active=self._model_ran):
                         model.run_solve_nonlinear()
+                        self._model_ran = True
 
                 # Let the optimizer try to handle the error
                 except AnalysisError:

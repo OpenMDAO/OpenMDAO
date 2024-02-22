@@ -185,9 +185,14 @@ class Group(System):
     _shapes_graph : nx.Graph
         Dynamic shape dependency graph, or None.
     _pre_components : set of str or None
-        Set pathnames of components that are executed prior to the optimization loop.
+        Set of pathnames of components that are executed prior to the optimization loop.  Empty
+        unless the 'group_by_pre_opt_post' option is True in the Problem.
     _post_components : set of str or None
-        Set pathnames of components that are executed after the optimization loop.
+        Set of pathnames of components that are executed after the optimization loop.  Empty
+        unless the 'group_by_pre_opt_post' option is True in the Problem.
+    _iterated_components : set of str or ContainsAll
+        Set of pathnames of components that are executed in the optimization loop if
+        'group_by_pre_opt_post' is True in the Problem.
     _fd_rev_xfer_correction_dist : dict
         If this group is using finite difference to compute derivatives,
         this is the set of inputs that are upstream of a distributed response
@@ -726,6 +731,9 @@ class Group(System):
         self.comm = comm
         self._mode = mode
 
+        self._pre_components = None
+        self._post_components = None
+
         # Besides setting up the processors, this method also builds the model hierarchy.
         self._setup_procs(self.pathname, comm, mode, self._problem_meta)
 
@@ -899,12 +907,6 @@ class Group(System):
                 raise RuntimeError(f"{self.msginfo}: Indices for aliases {matching_aliases} are "
                                    f"overlapping constraint/objective '{src}'.")
 
-        # if aliases:
-        #     # now remove alias entries from the response dict because we don't need them in the
-        #     # relevance calculation. This response dict is used only for relevance and is *not*
-        #     # used by the driver.
-        #     responses = {m['source']: m for m in responses.values() if not m['alias']}
-
         return responses
 
     def _get_var_offsets(self):
@@ -1021,16 +1023,11 @@ class Group(System):
 
         return sarr, tarr, tsize, has_dist_data
 
-    def _final_setup(self, problem):
+    def _final_setup(self):
         """
         Perform final setup for this system and its descendant systems.
 
         This part of setup is called automatically at the start of run_model or run_driver.
-
-        Parameters
-        ----------
-        problem : <Problem>
-            The Problem containing the model.
         """
         if self._use_derivatives:
             # must call this before vector setup because it determines if we need to alloc commplex
@@ -3675,7 +3672,7 @@ class Group(System):
 
             relevant = self._relevant
             with relevant.active(self.linear_solver.use_relevance()):
-                subs = list(relevant.filter(self._subsystems_myproc, relevant=True))
+                subs = list(relevant.filter(self._subsystems_myproc))
 
                 # Only linearize subsystems if we aren't approximating the derivs at this level.
                 for subsys in subs:

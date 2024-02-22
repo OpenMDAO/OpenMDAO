@@ -121,9 +121,9 @@ class Component(System):
                                   'apply_linear, apply_nonlinear, and compute_jacvec_product '
                                   'only on rank 0 and broadcast the results to the other ranks.')
         self.options.declare('always_opt', types=bool, default=False,
-                             desc='If True, force this component to be included in the optimization'
-                                  ' loop even if it is not relevant to the design variables and '
-                                  'responses.')
+                             desc='If True, force nonlinear operations on this component to be '
+                                  'included in the optimization loop even if this component is not '
+                                  'relevant to the design variables and responses.')
 
     def _check_matfree_deprecation(self):
         # check for mixed distributed variables

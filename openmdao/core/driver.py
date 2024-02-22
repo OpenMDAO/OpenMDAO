@@ -580,19 +580,20 @@ class Driver(object):
         bool
             Failure flag; True if failed to converge, False is successful.
         """
-        model = self._problem().model
+        problem = self._problem()
+        model = problem.model
 
-        if self.supports['optimization']:
+        if self.supports['optimization'] and problem.options['group_by_pre_opt_post']:
             if model._pre_components:
-                with model._relevant.activate_nonlinear('@pre'):
+                with model._relevant.activate_nonlinear('pre'):
                     model.run_solve_nonlinear()
 
             with SaveOptResult(self):
-                with model._relevant.activate_nonlinear('@iter'):
+                with model._relevant.activate_nonlinear('iter'):
                     result = self.run()
 
             if model._post_components:
-                with model._relevant.activate_nonlinear('@post'):
+                with model._relevant.activate_nonlinear('post'):
                     model.run_solve_nonlinear()
 
             return result
