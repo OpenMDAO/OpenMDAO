@@ -2134,13 +2134,13 @@ class System(object):
                           "were specified."
                     raise RuntimeError(msg.format(self.msginfo, name, var_units, units))
 
-                factor, offset = unit_conversion(var_units, units)
-                base_adder, base_scaler = determine_adder_scaler(None, None,
-                                                                 meta['adder'],
-                                                                 meta['scaler'])
+                unit_scaler, unit_adder = unit_conversion(var_units, units)
+                declared_adder, declared_scaler = determine_adder_scaler(None, None,
+                                                                         meta['adder'],
+                                                                         meta['scaler'])
 
-                meta['total_adder'] = offset + base_adder / factor
-                meta['total_scaler'] = base_scaler * factor
+                meta['total_adder'] = unit_adder + declared_adder / unit_scaler
+                meta['total_scaler'] = declared_scaler * unit_scaler
 
             if meta['total_scaler'] is not None:
                 has_scaling = True
@@ -2178,13 +2178,13 @@ class System(object):
                     raise RuntimeError(msg.format(self.msginfo, type_dict[meta['type']],
                                                   name, src_units, units))
 
-                factor, offset = unit_conversion(src_units, units)
-                base_adder, base_scaler = determine_adder_scaler(None, None,
+                unit_scaler, unit_adder = unit_conversion(src_units, units)
+                declared_adder, declared_scaler = determine_adder_scaler(None, None,
                                                                  meta['adder'],
                                                                  meta['scaler'])
 
-                meta['total_scaler'] = base_scaler * factor
-                meta['total_adder'] = offset + base_adder / factor
+                meta['total_scaler'] = declared_scaler * unit_scaler
+                meta['total_adder'] = unit_adder + declared_adder / unit_scaler
 
             if meta['total_scaler'] is not None:
                 has_scaling = True
