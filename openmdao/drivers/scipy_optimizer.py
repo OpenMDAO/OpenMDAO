@@ -285,7 +285,6 @@ class ScipyOptimizeDriver(Driver):
 
         # Initial Run
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-            # do the initial run without relevance.  TODO: maybe revisit this?
             model.run_solve_nonlinear()
             self.iter_count += 1
 
