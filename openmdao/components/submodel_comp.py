@@ -305,7 +305,7 @@ class SubmodelComp(ExplicitComponent):
         # NOTE to be looked at later. Trying to get variables from subsystems has been causing
         # issues and is a goal for a future version
         #
-        # driver_vars = p.list_problem_vars(out_stream=None,
+        # driver_vars = p.list_driver_vars(out_stream=None,
         #                                   desvar_opts = ['lower', 'upper', 'ref', 'ref0',
         #                                                  'indices', 'adder', 'scaler',
         #                                                  'parallel_deriv_color',
