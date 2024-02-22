@@ -4818,7 +4818,7 @@ class System(object):
             if s._nonlinear_solver:
                 nl = s._nonlinear_solver
                 nl._iter_count = 0
-                if hasattr(nl, 'linesearch') and nl.linesearch:
+                if nl.linesearch:
                     nl.linesearch._iter_count = 0
 
     def get_reports_dir(self):
