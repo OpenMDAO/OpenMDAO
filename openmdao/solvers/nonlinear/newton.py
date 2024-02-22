@@ -41,7 +41,8 @@ class NewtonSolver(NonlinearSolver):
         self.linear_solver = None
 
         # Slot for linesearch
-        self.linesearch = BoundsEnforceLS()
+        self.supports['linesearch'] = True
+        self._linesearch = BoundsEnforceLS()
 
     def _declare_options(self):
         """

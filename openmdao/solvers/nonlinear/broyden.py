@@ -76,7 +76,8 @@ class BroydenSolver(NonlinearSolver):
         self.linear_solver = None
 
         # Slot for linesearch
-        self.linesearch = BoundsEnforceLS()
+        self.supports['linesearch'] = True
+        self._linesearch = BoundsEnforceLS()
 
         self.cite = CITATION
 
