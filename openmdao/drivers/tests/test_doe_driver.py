@@ -1642,7 +1642,7 @@ class TestDOEDriverListVars(unittest.TestCase):
         self.assertIn('f_xy  59   0', output)
 
         expected_warning = 'Method `list_problem_vars` has been ' \
-                           'renamed `list_driver_vars`.Please update ' \
+                           'renamed `list_driver_vars`.\nPlease update ' \
                            'your code to use list_driver_vars to avoid ' \
                            'this warning.'
 
