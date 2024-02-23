@@ -533,7 +533,7 @@ class System(object):
 
         self._filtered_vars_to_record = {}
         self._owning_rank = None
-        self._coloring_info = coloring_mod._Partial_ColoringMeta()
+        self._coloring_info = coloring_mod.Partial_ColoringMeta()
         self._first_call_to_linearize = True  # will check in first call to _linearize
         self._tot_jac = None
         self._saved_errors = None if env_truthy('OPENMDAO_FAIL_FAST') else []
@@ -1506,7 +1506,7 @@ class System(object):
         self._has_approx = True
 
         # start with defaults
-        options = coloring_mod._Partial_ColoringMeta()
+        options = coloring_mod.Partial_ColoringMeta()
 
         if method != 'jax':
             approx = self._get_approx_scheme(method)

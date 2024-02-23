@@ -750,8 +750,7 @@ class Group(System):
 
         self._setup_var_data()
 
-        # have to do this again because we are passed the point in
-        # _setup_var_data when this happens
+        # have to do this again because we are passed the point in _setup_var_data when this happens
         self._has_output_scaling = False
         self._has_output_adder = False
         self._has_resid_scaling = False

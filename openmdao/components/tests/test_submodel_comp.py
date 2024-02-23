@@ -373,7 +373,7 @@ class TestSubmodelComp(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             p.setup(force_alloc_complex=True)
 
-        msg = 'Variable psi not found in model'
+        msg = "'psi' is not an independent variable in the submodel."
         self.assertEqual(str(ctx.exception), msg)
 
     def test_multiple_setups(self):
@@ -412,7 +412,8 @@ class TestSubmodelComp(unittest.TestCase):
         assert_near_equal(p.get_val('y'), 31)
 
     def test_multiple_submodel_setups(self):
-        model = om.Group()
+        top = om.Problem()
+        model = top.model
         model.add_subsystem('supComp', om.ExecComp('y = 3*x + 4'),
                             promotes_inputs=['x'], promotes_outputs=['y'])
 
@@ -427,8 +428,10 @@ class TestSubmodelComp(unittest.TestCase):
         comp.add_input('z')
         comp.add_output('x')
 
-        comp.setup()
-        comp.setup()
+        top.setup()
+        top.setup()
+        top.final_setup()
+        top.run_model()
 
     def test_add_io_meta_override(self):
         p = om.Problem()

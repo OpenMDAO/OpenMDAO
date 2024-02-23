@@ -110,7 +110,7 @@ _COLORING_VERSION = '1.0'
 _CLASS_COLORINGS = {}
 
 
-class _ColoringMeta(object):
+class ColoringMeta(object):
     """
     Container for all metadata relevant to a coloring.
 
@@ -349,7 +349,7 @@ class _ColoringMeta(object):
         return type(self)(**dict(self))
 
 
-class _Partial_ColoringMeta(_ColoringMeta):
+class Partial_ColoringMeta(ColoringMeta):
     """
     Container for all metadata relevant to a partial coloring.
 
@@ -375,7 +375,7 @@ class _Partial_ColoringMeta(_ColoringMeta):
     """
 
     _meta_names = {'wrt_patterns', 'per_instance', 'method', 'form', 'step'}
-    _meta_names.update(_ColoringMeta._meta_names)
+    _meta_names.update(ColoringMeta._meta_names)
 
     def __init__(self, wrt_patterns=('*',), method='fd', form=None, step=None, per_instance=True,
                  perturb_size=1e-9, num_full_jacs=3, tol=1e-25, orders=None, min_improve_pct=5.,
@@ -891,7 +891,7 @@ class Coloring(object):
             System being colored.
         """
         # check the contents (vars and sizes) of the input and output vectors of system
-        info = _Partial_ColoringMeta(wrt_patterns=self._meta.get('wrt_patterns', ('*',)))
+        info = Partial_ColoringMeta(wrt_patterns=self._meta.get('wrt_patterns', ('*',)))
         info._update_wrt_matches(system)
         if system.pathname:
             # for partial and semi-total derivs, convert to promoted names
@@ -2384,11 +2384,12 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
     driver = prob.driver
     driver._con_subjacs = {}
 
-    if setup and not prob._computing_coloring:
-        prob.setup(mode=prob._mode)
+    if not prob._computing_coloring:
+        if setup:
+            prob.setup(mode=prob._mode)
 
-    if run_model and not prob._computing_coloring:
-        prob.run_model(reset_iter_counts=False)
+        if run_model:
+            prob.run_model(reset_iter_counts=False)
 
     if of is None or wrt is None:
         driver_wrt = list(_src_name_iter(driver._designvars))
@@ -2435,66 +2436,6 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
     fullJ = None
 
     return coo_matrix((np.ones(nzrows.size, dtype=bool), (nzrows, nzcols)), shape=shape), spmeta
-
-
-def _get_desvar_info(driver, names=None):
-    if names is None:
-        vnames = []
-        sizes = []
-        for meta in driver._designvars.values():
-            vnames.append(meta['source'])
-            sizes.append(meta['size'])
-        return vnames, sizes
-
-    namesdict = {n: None for n in names}
-
-    model = driver._problem().model
-    abs2meta_out = model._var_allprocs_abs2meta['output']
-
-    for dv, meta in driver._designvars.items():
-        if dv in namesdict:
-            namesdict[dv] = meta['size']
-        elif meta['name'] in namesdict:
-            namesdict[meta['name']] = meta['size']
-        elif meta['source'] in namesdict:
-            namesdict[meta['source']] = meta['size']
-
-    for n, size in namesdict.items():
-        if size is None:
-            namesdict[n] = abs2meta_out[model.get_source(n)]['global_size']
-
-    return names, list(namesdict.values())
-
-
-def _get_response_info(driver, names=None):
-    responses = driver._responses
-    if names is None:
-        vnames = driver._get_ordered_nl_responses()
-        return vnames, [responses[n]['size'] for n in vnames]
-
-    model = driver._problem().model
-    abs2meta_out = model._var_allprocs_abs2meta['output']
-
-    namesdict = {n: None for n in names}
-
-    for res, meta in responses.items():
-        if res in namesdict:
-            namesdict[res] = meta['size']
-        elif meta['name'] in namesdict:
-            namesdict[meta['name']] = meta['size']
-        elif meta['source'] in namesdict:
-            namesdict[meta['source']] = meta['size']
-
-    prom2abs = model._var_allprocs_prom2abs_list['output']
-
-    for n, size in namesdict.items():
-        if size is None:
-            if n in prom2abs:
-                namesdict[n] = abs2meta_out[prom2abs[n][0]]['global_size']
-            else:
-                namesdict[n] = abs2meta_out[n]['global_size']
-
-    return names, list(namesdict.values())
 
 
 def _compute_coloring(J, mode):
@@ -2623,9 +2564,6 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
 
     ofs, wrts, _ = problem.model._get_totals_metadata(driver, of, wrt)
 
-    of_sizes = [m['size'] for m in ofs.values()]
-    wrt_sizes = [m['size'] for m in wrts.values()]
-
     model = problem.model
 
     if mode is None:
@@ -2659,9 +2597,9 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
         coloring = _compute_coloring(J, mode)
         if coloring is not None:
             coloring._row_vars = list(ofs)
-            coloring._row_var_sizes = of_sizes
+            coloring._row_var_sizes = [m['size'] for m in ofs.values()]
             coloring._col_vars = list(wrts)
-            coloring._col_var_sizes = wrt_sizes
+            coloring._col_var_sizes = [m['size'] for m in wrts.values()]
 
             # save metadata we used to create the coloring
             coloring._meta.update(sparsity_info)

@@ -532,8 +532,8 @@ class Component(System):
                 raise TypeError('%s: The units argument should be a str or None.' % self.msginfo)
             units = simplify_unit(units, msginfo=self.msginfo)
 
-        if tags is not None and not isinstance(tags, (str, list)):
-            raise TypeError('The tags argument should be a str or list')
+        if tags is not None and not isinstance(tags, (str, list, set)):
+            raise TypeError('The tags argument should be a str, set, or list')
 
         if copy_shape and compute_shape:
             raise ValueError(f"{self.msginfo}: Only one of 'copy_shape' or 'compute_shape' can "

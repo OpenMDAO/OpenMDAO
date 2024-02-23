@@ -174,7 +174,7 @@ class Driver(object):
         self.iter_count = 0
         self.cite = ""
 
-        self._coloring_info = coloring_mod._ColoringMeta()
+        self._coloring_info = coloring_mod.ColoringMeta()
 
         self._total_jac_format = 'flat_dict'
         self._con_subjacs = {}

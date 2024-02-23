@@ -1015,8 +1015,9 @@ class Problem(object):
         finally:
             _prob_setup_stack.pop()
 
-        # set static mode back to True in all systems in this Problem
-        self._metadata['static_mode'] = True
+            # whenever we're outside of model._setup, static mode should be True so that anything
+            # added outside of _setup will persist.
+            self._metadata['static_mode'] = True
 
         # Cache all args for final setup.
         self._check = check
