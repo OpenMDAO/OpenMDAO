@@ -73,7 +73,7 @@ generator.  You can install everything needed for development by running:
 
 ## OpenMDAO Versions
 
-**OpenMDAO 3.x.y** represents the current, supported version. It requires Python 3.7
+**OpenMDAO 3.x.y** represents the current, supported version. It requires Python 3.8
 or later and is maintained [here][4]. To upgrade to the latest release, run:
 
     pip install --upgrade openmdao
