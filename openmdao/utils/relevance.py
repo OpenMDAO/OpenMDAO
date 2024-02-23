@@ -161,13 +161,14 @@ class Relevance(object):
         if model._iterated_components is _contains_all:
             iter_array = np.ones(len(self._all_systems), dtype=bool)
         else:
-            iter_systems = set()
-            for compname in model._iterated_components:
-                iter_systems.update(all_ancestors(compname))
-            if iter_systems:
-                iter_systems.add('')
+            # iter_systems = set()
+            # for compname in model._iterated_components:
+            #     iter_systems.update(all_ancestors(compname))
+            # if iter_systems:
+            #     iter_systems.add('')
 
-            iter_array = self._names2rel_array(iter_systems, self._all_systems, self._sys2idx)
+            # iter_array = self._names2rel_array(iter_systems, self._all_systems, self._sys2idx)
+            iter_array = ~(pre_array | post_array)
 
         self._nonlinear_sets = {'pre': pre_array, 'iter': iter_array, 'post': post_array}
 
@@ -325,7 +326,7 @@ class Relevance(object):
 
         return array
 
-    def _rel_names_iter(self, rel_array, all_names):
+    def _rel_names_iter(self, rel_array, all_names, relevant=True):
         """
         Return an iterator of names from the given relevance array.
 
@@ -335,6 +336,8 @@ class Relevance(object):
             Boolean relevance array.  True means name is relevant.
         all_names : iter of str
             Iterator over the full set of names from the graph, either variables or systems.
+        relevant : bool
+            If True, return only relevant names.  If False, return only irrelevant names.
 
         Yields
         ------
@@ -342,7 +345,7 @@ class Relevance(object):
             Name from the given relevance array.
         """
         for n, rel in zip(all_names, rel_array):
-            if rel:
+            if rel == relevant:
                 yield n
 
     def _set_all_seeds(self, group, fwd_meta, rev_meta):
@@ -1100,6 +1103,29 @@ class Relevance(object):
         model._post_components = post - groups_added
         model._iterated_components = iterated - groups_added
 
+    def list_relevance(self, relevant=True, type='system'):
+        """
+        Return a list of relevant variables and systems for the given seeds.
+
+        Parameters
+        ----------
+        relevant : bool
+            If True, return only relevant variables and systems.  If False, return only irrelevant
+            variables and systems.
+        type : str
+            If 'system', return only system names.  If 'var', return only variable names.
+
+        Returns
+        -------
+        list of str
+            List of (ir)relevant variables or systems.
+        """
+        if type == 'system':
+            it = self._rel_names_iter(self._current_rel_sarray, self._sys2idx, relevant)
+        else:
+            it = self._rel_names_iter(self._current_rel_varray, self._var2idx, relevant)
+
+        return list(it)
 
 def _vars2systems(nameiter):
     """
