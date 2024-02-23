@@ -46,7 +46,7 @@ class BroydenSolver(NonlinearSolver):
         Most recent Jacobian matrix.
     linear_solver : LinearSolver
         Linear solver to use for calculating inverse Jacobian.
-    linesearch : NonlinearSolver
+    _linesearch : NonlinearSolver
         Line search algorithm. Default is None for no line search.
     size : int
         Total length of the states being solved.

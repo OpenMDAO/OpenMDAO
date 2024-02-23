@@ -596,6 +596,14 @@ class NonlinearSolver(Solver):
 
     @property
     def linesearch(self):
+        """
+        Get the linesearch solver associated with this solver.
+
+        Returns
+        -------
+        NonlinearSolver or None
+            The linesearch associated with this solver, or None if it does not support one.
+        """
         if not self.supports['linesearch']:
             return None
         else:
@@ -701,9 +709,8 @@ class NonlinearSolver(Solver):
                 force_one_iteration = False
 
             with Recording(type(self).__name__, self._iter_count, self) as rec:
-
-                if stall_count == 3 and self.linesearch is not None and \
-                    not self.linesearch.options['print_bound_enforce']:
+                ls = self.linesearch
+                if stall_count == 3 and ls and ls.options['print_bound_enforce']:
 
                     self.linesearch.options['print_bound_enforce'] = True
 
