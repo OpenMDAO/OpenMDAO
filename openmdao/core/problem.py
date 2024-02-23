@@ -1197,11 +1197,12 @@ class Problem(object):
         excludes = [excludes] if isinstance(excludes, str) else excludes
 
         comps = []
-        under_CI = env_truthy('OPENMDAO_CHECK_ALL_PARTIALS')
+
+        # OPENMDAO_CHECK_ALL_PARTIALS overrides _no_check_partials (used for testing)
+        force_check_partials = env_truthy('OPENMDAO_CHECK_ALL_PARTIALS')
 
         for comp in model.system_iter(typ=Component, include_self=True):
-            # if we're under CI, do all of the partials, ignoring _no_check_partials
-            if comp._no_check_partials and not under_CI:
+            if comp._no_check_partials and not force_check_partials:
                 continue
 
             # skip any Component with no outputs
@@ -1389,7 +1390,7 @@ class Problem(object):
                                 # Matrix Vector Product
                                 self._metadata['checking'] = True
                                 try:
-                                    comp._apply_linear(None, _contains_all, mode)
+                                    comp.run_apply_linear(mode)
                                 finally:
                                     self._metadata['checking'] = False
 
