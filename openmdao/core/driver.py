@@ -943,7 +943,7 @@ class Driver(object):
         relevant = self._problem().model._relevant
         with relevant.all_seeds_active():
             return [name for name, meta in self._cons.items()
-                    if not relevant.is_relevant(meta['source'])]
+                    if not relevant.is_globally_relevant(meta['source'])]
 
     def check_relevance(self):
         """

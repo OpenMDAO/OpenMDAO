@@ -554,6 +554,37 @@ class Relevance(object):
 
         return False
 
+    def is_globally_relevant(self, name):
+        """
+        Return True if the given variable is globally relevant.
+
+        This only differs from is_relevant if the variable is a parallel derivative colored seed.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
+
+        Returns
+        -------
+        bool
+            True if the given variable is relevant.
+        """
+        if self.is_relevant(name):
+            return True
+
+        for seed in self._all_seed_vars['fwd']:
+            gl = ('@global_' + name, 'fwd')
+            foundpar_deriv = gl in self._relevant_vars and name in self._relevant_vars[gl]
+            if foundpar_deriv or name in self._relevant_vars[seed, 'fwd']:
+                for tgt in self._all_seed_vars['rev']:
+                    gl = ('@global_' + tgt, 'rev')
+                    foundpar_deriv = gl in self._relevant_vars and name in self._relevant_vars[gl]
+                    if foundpar_deriv or name in self._relevant_vars[tgt, 'rev']:
+                        return True
+
+        return False
+
     def is_relevant_system(self, name):
         """
         Return True if the given named system is relevant.
@@ -650,6 +681,14 @@ class Relevance(object):
 
             self._relevant_systems[key] = _get_set_checker(rel_systems, self._all_systems)
             self._relevant_vars[key] = _get_set_checker(rel_vars, self._all_vars)
+
+            # need to also get a 'global' set checker for parallel deriv colored seeds to use
+            # when checking that all constraints can be impacted by the design variables.
+            if local:
+                depnodes = self._dependent_nodes(varname, direction, local=False)
+                rel_vars = depnodes - self._all_systems
+                self._relevant_vars['@global_' + varname, direction] = \
+                    _get_set_checker(rel_vars, self._all_vars)
 
     def iter_seed_pair_relevance(self, fwd_seeds=None, rev_seeds=None, inputs=False, outputs=False):
         """
