@@ -710,7 +710,7 @@ class NonlinearSolver(Solver):
 
             with Recording(type(self).__name__, self._iter_count, self) as rec:
                 ls = self.linesearch
-                if stall_count == 3 and ls and ls.options['print_bound_enforce']:
+                if stall_count == 3 and ls and not ls.options['print_bound_enforce']:
 
                     self.linesearch.options['print_bound_enforce'] = True
 
