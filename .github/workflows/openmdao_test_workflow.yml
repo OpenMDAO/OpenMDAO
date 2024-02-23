@@ -75,8 +75,8 @@ jobs:
           # test oldest supported versions
           - NAME: Ubuntu Oldest
             OS: ubuntu-latest
-            PY: '3.7'
-            NUMPY: '1.21'
+            PY: '3.8'
+            NUMPY: '1.22'
             SCIPY: '1.7'
             OPENMPI: '4.0'
             MPI4PY: '3.0'
