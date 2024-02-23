@@ -25,7 +25,7 @@ class NewtonSolver(NonlinearSolver):
     linear_solver : LinearSolver
         Linear solver to use to find the Newton search direction. The default
         is the parent system's linear solver.
-    linesearch : NonlinearSolver
+    _linesearch : NonlinearSolver
         Line search algorithm. Default is None for no line search.
     """
 
@@ -41,7 +41,8 @@ class NewtonSolver(NonlinearSolver):
         self.linear_solver = None
 
         # Slot for linesearch
-        self.linesearch = BoundsEnforceLS()
+        self.supports['linesearch'] = True
+        self._linesearch = BoundsEnforceLS()
 
     def _declare_options(self):
         """

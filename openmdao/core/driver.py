@@ -433,7 +433,7 @@ class Driver(object):
         Check for design variable values that exceed their bounds.
 
         This method's behavior is controlled by the OPENMDAO_INVALID_DESVAR environment variable,
-        which may take on values 'ignore', 'error', 'warn'.
+        which may take on values 'ignore', 'raise'', 'warn'.
         - 'ignore' : Proceed without checking desvar bounds.
         - 'warn' : Issue a warning if one or more desvar values exceed bounds.
         - 'raise' : Raise an exception if one or more desvar values exceed bounds.

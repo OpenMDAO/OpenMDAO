@@ -827,20 +827,16 @@ class NonlinearSolver(Solver):
         Perform a Gauss-Seidel iteration over this Solver's subsystems.
         """
         system = self._system()
-        # if _relevant._active is True, relevance has been turned on by _objfunc in the driver
-        # so we want it to stay active even if not under approx
-        with system._relevant.active(system.under_approx or system._relevant._active is True):
-            for subsys in system._relevant.system_filter(
-                    system._solver_subsystem_iter(local_only=False), linear=False):
-                system._transfer('nonlinear', 'fwd', subsys.name)
+        for subsys in system._relevant.filter(system._all_subsystem_iter()):
+            system._transfer('nonlinear', 'fwd', subsys.name)
 
-                if subsys._is_local:
-                    try:
-                        subsys._solve_nonlinear()
-                    except AnalysisError as err:
-                        if 'reraise_child_analysiserror' not in self.options or \
-                                self.options['reraise_child_analysiserror']:
-                            raise err
+            if subsys._is_local:
+                try:
+                    subsys._solve_nonlinear()
+                except AnalysisError as err:
+                    if 'reraise_child_analysiserror' not in self.options or \
+                            self.options['reraise_child_analysiserror']:
+                        raise err
 
     def _solve_with_cache_check(self):
         """
@@ -1254,6 +1250,7 @@ class BlockLinearSolver(LinearSolver):
             Set of names of relevant systems based on the current linear solve.  Deprecated.
         """
         self._mode = mode
-        self._solve()
-
-        self._scope_out = self._scope_in = _UNDEFINED  # reset after solve is done
+        try:
+            self._solve()
+        finally:
+            self._scope_out = self._scope_in = _UNDEFINED  # reset after solve is done
