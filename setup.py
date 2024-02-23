@@ -26,8 +26,8 @@ optional_dependencies = {
         'pyDOE3'
     ],
     'jax': [
-        'jax>=0.4.0; python_version>="3.8"',
-        'jaxlib>=0.4.0; python_version>="3.8"'
+        'jax>=0.4.0',
+        'jaxlib>=0.4.0'
     ],
     'notebooks': [
         'notebook',
@@ -74,7 +74,7 @@ setup(
         'Operating System :: Microsoft :: Windows',
         'Topic :: Scientific/Engineering',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: Implementation :: CPython',
     ],
     keywords='optimization multidisciplinary multi-disciplinary analysis',
@@ -185,7 +185,7 @@ setup(
         ],
         'openmdao': ['*/tests/*.py', '*/*/tests/*.py', '*/*/*/tests/*.py']
     },
-    python_requires=">=3.7",
+    python_requires=">=3.8",
     install_requires=[
         'networkx>=2.0',
         'numpy',

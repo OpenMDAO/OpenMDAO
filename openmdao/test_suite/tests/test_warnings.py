@@ -143,7 +143,6 @@ class TestWarnings(unittest.TestCase):
 
         with warnings.catch_warnings():
             warnings.filterwarnings('error', category=om.OpenMDAOWarning)
-            warnings.filterwarnings("ignore", r'.*OpenMDAO support for Python version .* will end soon.*')
 
             with self.assertRaises(Exception) as e:
                 p.setup()
