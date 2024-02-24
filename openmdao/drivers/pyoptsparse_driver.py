@@ -470,7 +470,7 @@ class pyOptSparseDriver(Driver):
         # # compute dynamic simul deriv coloring
         problem.get_total_coloring(self._coloring_info, run_model=not model_ran)
 
-        bad_cons = self.get_constraints_without_dv()
+        bad_cons = model._relevant._no_dv_responses
         if bad_cons:
             issue_warning(f"Equality constraint(s) {sorted(bad_cons)} do not depend on any design "
                           "variables and were not added to the optimization.")

@@ -261,6 +261,8 @@ class SubmodelComp(ExplicitComponent):
             if _is_glob(var):
                 found = False
                 for match in pattern_filter(var, prom2abs_out):
+                    if match.startswith('_auto_ivc.'):
+                        continue
                     self.submodel_outputs[match] = (match.replace('.', ':'), kwargs.copy())
                     found = True
                 if not found:
