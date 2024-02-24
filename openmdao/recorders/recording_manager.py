@@ -156,7 +156,7 @@ def _get_all_requesters(problem):
         nl = system._nonlinear_solver
         if nl:
             yield nl
-            if hasattr(nl, 'linesearch') and nl.linesearch:
+            if nl.linesearch:
                 yield nl.linesearch
 
 
@@ -231,7 +231,7 @@ def record_model_options(problem, run_number):
             nl = system._nonlinear_solver
             if nl:
                 recorder.record_metadata_solver(nl, run_number)
-                if hasattr(nl, 'linesearch') and nl.linesearch:
+                if nl.linesearch:
                     recorder.record_metadata_solver(nl.linesearch, run_number)
 
             ln = system._linear_solver

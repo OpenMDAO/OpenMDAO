@@ -91,6 +91,8 @@ class Relevance(object):
         Array representing the combined system relevance arrays for the currently active seeds.
     _rel_array_cache : dict
         Cache of relevance arrays stored by array hash.
+    _no_dv_responses : list
+        List of responses that have no relevant design variables.
     """
 
     def __init__(self, model, fwd_meta, rev_meta):
@@ -102,6 +104,7 @@ class Relevance(object):
         self._active = None  # allow relevance to be turned on later
         self._graph = model._dataflow_graph
         self._rel_array_cache = {}
+        self._no_dv_responses = []
 
         # seed var(s) for the current derivative operation
         self._seed_vars = {'fwd': frozenset(), 'rev': frozenset()}
@@ -405,14 +408,15 @@ class Relevance(object):
         meta = {'fwd': fwd_meta, 'rev': rev_meta}
 
         # map each seed to its variable and system relevance arrays
-        has_par_derivs = False
+        has_par_derivs = {}
         for io in ('fwd', 'rev'):
             for seed, local, var_array, sys_array in self._single_seed_array_iter(group, meta[io],
                                                                                   io, all_systems,
                                                                                   all_vars):
                 self._single_seed2relvars[io][seed] = self._get_cached_array(var_array)
                 self._single_seed2relsys[io][seed] = self._get_cached_array(sys_array)
-                has_par_derivs |= local
+                if local:
+                    has_par_derivs[seed] = io
 
         # in seed_map, add keys for both fsrc and frozenset((fsrc,)) and similarly for rsrc
         # because both forms of keys may be used depending on the context.
@@ -454,6 +458,30 @@ class Relevance(object):
 
         if has_par_derivs:
             self._par_deriv_err_check(group, rev_meta, fwd_meta)
+
+        farrs = {}
+        rarrs = {}
+        for fsrc, farr in self._single_seed2relvars['fwd'].items():
+            if fsrc in has_par_derivs:
+                direction = has_par_derivs[fsrc]
+                depnodes = self._dependent_nodes(fsrc, direction, local=False)
+                rel_vars = depnodes - all_systems
+                farr = self._names2rel_array(rel_vars, all_vars, self._var2idx)
+            farrs[fsrc] = farr
+
+        for rsrc, rarr in self._single_seed2relvars['rev'].items():
+            if rsrc in has_par_derivs:
+                direction = has_par_derivs[rsrc]
+                depnodes = self._dependent_nodes(rsrc, direction, local=False)
+                rel_vars = depnodes - all_systems
+                rarr = self._names2rel_array(rel_vars, all_vars, self._var2idx)
+            rarrs[rsrc] = rarr
+
+        allfarrs = self._union_arrays(farrs, fwd_seeds)
+        self._no_dv_responses = []
+        for rsrc, rarr in rarrs.items():
+            if not (allfarrs & rarr)[self._var2idx[rsrc]]:
+                self._no_dv_responses.append(rsrc)
 
     @contextmanager
     def active(self, active):

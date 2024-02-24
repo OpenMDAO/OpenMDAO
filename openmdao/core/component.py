@@ -202,10 +202,6 @@ class Component(System):
             self._has_distrib_vars = self._has_distrib_outputs = False
 
         for meta in self._static_var_rel2meta.values():
-            # variable isn't distributed if we're only running on 1 proc
-            if nprocs == 1 and 'distributed' in meta and meta['distributed']:
-                meta['distributed'] = False
-
             # reset shape if any dynamic shape parameters are set in case this is a resetup
             # NOTE: this is necessary because we allow variables to be added in __init__.
             if 'shape_by_conn' in meta and (meta['shape_by_conn'] or

@@ -433,7 +433,7 @@ class Driver(object):
         Check for design variable values that exceed their bounds.
 
         This method's behavior is controlled by the OPENMDAO_INVALID_DESVAR environment variable,
-        which may take on values 'ignore', 'error', 'warn'.
+        which may take on values 'ignore', 'raise'', 'warn'.
         - 'ignore' : Proceed without checking desvar bounds.
         - 'warn' : Issue a warning if one or more desvar values exceed bounds.
         - 'raise' : Raise an exception if one or more desvar values exceed bounds.
@@ -963,20 +963,6 @@ class Driver(object):
         """
         return 'FAIL' if self.fail else 'SUCCESS'
 
-    def get_constraints_without_dv(self):
-        """
-        Return a list of constraint names that don't depend on any design variables.
-
-        Returns
-        -------
-        list of str
-            Names of constraints that don't depend on any design variables.
-        """
-        relevant = self._problem().model._relevant
-        with relevant.all_seeds_active():
-            return [name for name, meta in self._cons.items()
-                    if not relevant.is_relevant(meta['source'])]
-
     def check_relevance(self):
         """
         Check if there are constraints that don't depend on any design vars.
@@ -995,7 +981,8 @@ class Driver(object):
             if system._has_approx:
                 return
 
-        bad_cons = [n for n in self.get_constraints_without_dv() if n not in self._designvars]
+        bad_cons = [n for n in self._problem().model._relevant._no_dv_responses
+                    if n not in self._designvars]
         if bad_cons:
             # Note: There is a hack in ScipyOptimizeDriver for older versions of COBYLA that
             #       implements bounds on design variables by adding them as constraints.

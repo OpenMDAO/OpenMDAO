@@ -198,6 +198,7 @@ class Solver(object):
         self.supports = OptionsDictionary(parent_name=self.msginfo)
         self.supports.declare('gradients', types=bool, default=False)
         self.supports.declare('implicit_components', types=bool, default=False)
+        self.supports.declare('linesearch', types=bool, default=False)
 
         self._declare_options()
         self.options.update(kwargs)
@@ -604,6 +605,27 @@ class NonlinearSolver(Solver):
                              desc='If True, the states are cached after a successful solve and '
                                   'used to restart the solver in the case of a failed solve.')
 
+    @property
+    def linesearch(self):
+        """
+        Get the linesearch solver associated with this solver.
+
+        Returns
+        -------
+        NonlinearSolver or None
+            The linesearch associated with this solver, or None if it does not support one.
+        """
+        if not self.supports['linesearch']:
+            return None
+        else:
+            return self._linesearch
+
+    @linesearch.setter
+    def linesearch(self, ls):
+        if not self.supports['linesearch']:
+            raise AttributeError(f'{self.msginfo}: This solver does not support a linesearch.')
+        self._linesearch = ls
+
     def _setup_solvers(self, system, depth):
         """
         Assign system instance, set depth, and optionally perform setup.
@@ -699,8 +721,8 @@ class NonlinearSolver(Solver):
                     force_one_iteration = False
 
                 with Recording(type(self).__name__, self._iter_count, self) as rec:
-
-                    if stall_count == 3 and not self.linesearch.options['print_bound_enforce']:
+                    ls = self.linesearch
+                    if stall_count == 3 and ls and not ls.options['print_bound_enforce']:
 
                         self.linesearch.options['print_bound_enforce'] = True
 

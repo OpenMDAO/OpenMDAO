@@ -1,6 +1,7 @@
 import sys
 import subprocess
 from packaging.version import Version
+from warnings import warn
 
 
 def get_tag_info():
@@ -17,7 +18,8 @@ def get_tag_info():
     version_tags = cmd_out.split()
 
     if not version_tags:
-        raise Exception('No tags found in repository')
+        warn('No tags found in repository')
+        return None, None
 
     # use sort to put the versions list in order from lowest to highest
     version_tags.sort(key=Version)
@@ -58,7 +60,7 @@ def get_doc_version():
 
     current_commit = get_commit_info()
 
-    if current_commit == release_commit:
+    if release_tag is not None and current_commit == release_commit:
         return release_tag, 1
     else:
         return current_commit, 0
