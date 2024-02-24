@@ -573,15 +573,15 @@ class Relevance(object):
         if self.is_relevant(name):
             return True
 
-        for seed in self._all_seed_vars['fwd']:
-            gl = ('@global_' + name, 'fwd')
-            foundpar_deriv = gl in self._relevant_vars and name in self._relevant_vars[gl]
-            if foundpar_deriv or name in self._relevant_vars[seed, 'fwd']:
-                for tgt in self._all_seed_vars['rev']:
-                    gl = ('@global_' + tgt, 'rev')
-                    foundpar_deriv = gl in self._relevant_vars and name in self._relevant_vars[gl]
-                    if foundpar_deriv or name in self._relevant_vars[tgt, 'rev']:
-                        return True
+        # for seed in self._all_seed_vars['fwd']:
+        #     gl = ('@global_' + name, 'fwd')
+        #     foundpar_deriv = gl in self._relevant_vars and name in self._relevant_vars[gl]
+        #     if foundpar_deriv or name in self._relevant_vars[seed, 'fwd']:
+        #         for tgt in self._all_seed_vars['rev']:
+        #             gl = ('@global_' + tgt, 'rev')
+        #             foundpar_deriv = gl in self._relevant_vars and name in self._relevant_vars[gl]
+        #             if foundpar_deriv or name in self._relevant_vars[tgt, 'rev']:
+        #                 return True
 
         return False
 
@@ -609,7 +609,7 @@ class Relevance(object):
                         return True
         return False
 
-    def system_filter(self, systems, relevant=True, linear=True):
+    def filter(self, systems, relevant=True, linear=True):
         """
         Filter the given iterator of systems to only include those that are relevant.
 
@@ -684,11 +684,11 @@ class Relevance(object):
 
             # need to also get a 'global' set checker for parallel deriv colored seeds to use
             # when checking that all constraints can be impacted by the design variables.
-            if local:
-                depnodes = self._dependent_nodes(varname, direction, local=False)
-                rel_vars = depnodes - self._all_systems
-                self._relevant_vars['@global_' + varname, direction] = \
-                    _get_set_checker(rel_vars, self._all_vars)
+            # if local:
+            #     depnodes = self._dependent_nodes(varname, direction, local=False)
+            #     rel_vars = depnodes - self._all_systems
+            #     self._relevant_vars['@global_' + varname, direction] = \
+            #         _get_set_checker(rel_vars, self._all_vars)
 
     def iter_seed_pair_relevance(self, fwd_seeds=None, rev_seeds=None, inputs=False, outputs=False):
         """

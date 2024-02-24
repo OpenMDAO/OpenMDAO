@@ -3358,7 +3358,7 @@ class Group(System):
         self._transfer('nonlinear', 'fwd')
         # Apply recursion
         with self._relevant.active(self.under_approx or self._relevant._active is True):
-            for subsys in self._relevant.system_filter(
+            for subsys in self._relevant.filter(
                     self._solver_subsystem_iter(local_only=True), linear=False):
                 subsys._apply_nonlinear()
 
@@ -3519,19 +3519,19 @@ class Group(System):
         else:
             if mode == 'fwd':
                 self._transfer('linear', mode)
-                for s in self._relevant.system_filter(self._solver_subsystem_iter(local_only=True),
-                                                      relevant=False):
+                for s in self._relevant.filter(self._solver_subsystem_iter(local_only=True),
+                                               relevant=False):
                     # zero out dvecs of irrelevant subsystems
                     s._dresiduals.set_val(0.0)
 
-            for s in self._relevant.system_filter(self._solver_subsystem_iter(local_only=True),
-                                                  relevant=True):
+            for s in self._relevant.filter(self._solver_subsystem_iter(local_only=True),
+                                           relevant=True):
                 s._apply_linear(jac, mode, scope_out, scope_in)
 
             if mode == 'rev':
                 self._transfer('linear', mode)
-                for s in self._relevant.system_filter(self._solver_subsystem_iter(local_only=True),
-                                                      relevant=False):
+                for s in self._relevant.filter(self._solver_subsystem_iter(local_only=True),
+                                               relevant=False):
                     # zero out dvecs of irrelevant subsystems
                     s._doutputs.set_val(0.0)
 
@@ -3616,8 +3616,7 @@ class Group(System):
             relevant = self._relevant
             with relevant.active(self.linear_solver.use_relevance()):
                 subs = list(
-                    relevant.system_filter(self._solver_subsystem_iter(local_only=True),
-                                           relevant=True))
+                    relevant.filter(self._solver_subsystem_iter(local_only=True), relevant=True))
 
                 # Only linearize subsystems if we aren't approximating the derivs at this level.
                 for subsys in subs:
