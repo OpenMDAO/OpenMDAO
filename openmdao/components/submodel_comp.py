@@ -82,8 +82,8 @@ class SubmodelComp(ExplicitComponent):
         Mapping of inner promoted output names to outer output names and kwargs that is populated
         outside of setup. These must be bookkept separately from submodel outputs added during setup
         because setup can be called multiple times and the submodel outputs dict is reset each time.
-    _coloring : Coloring or None
-        If not None, this is the coloring computed for the submodel.
+    _coloring_info : ColoringMeta
+        The coloring information for the submodel.
     """
 
     def __init__(self, problem, inputs=None, outputs=None, reports=False, **kwargs):
@@ -96,7 +96,7 @@ class SubmodelComp(ExplicitComponent):
             clear_reports(problem)
 
         self._subprob = problem
-        self._coloring = None
+        self._coloring_info = ColoringMeta()
 
         self._submodel_inputs = {}
         self._submodel_outputs = {}
@@ -107,6 +107,14 @@ class SubmodelComp(ExplicitComponent):
         self._static_submodel_outputs = {
             name: (out_name, {}) for name, out_name in _io_namecheck_iter(outputs, 'output')
         }
+
+    def _declare_options(self):
+        """
+        Declare options.
+        """
+        super()._declare_options()
+        self.options.declare('do_coloring', types=bool, default=True,
+                             desc='If True, attempt to compute a total coloring for the submodel.')
 
     def _add_static_input(self, inner_prom_name_or_pattern, outer_name=None, **kwargs):
         if outer_name is None and not _is_glob(inner_prom_name_or_pattern):
@@ -236,96 +244,111 @@ class SubmodelComp(ExplicitComponent):
         abs2meta_local = p.model._var_abs2meta['output']
         prom2abs_in = p.model._var_allprocs_prom2abs_list['input']
         prom2abs_out = p.model._var_allprocs_prom2abs_list['output']
+        abs2prom_out = p.model._var_allprocs_abs2prom['output']
 
+        # store indep vars by promoted name, excluding _auto_ivc vars because later we'll
+        # add the inputs connected to _auto_ivc vars as indep vars (because that's how the user
+        # would expect them to be named)
         self.indep_vars = {}
+        for src, meta in abs2meta.items():
+            if src.startswith('_auto_ivc.'):
+                continue
+            prom = abs2prom_out[src]
+            if prom not in self.indep_vars and 'openmdao:indep_var' in meta['tags']:
+                if src in abs2meta_local:
+                    meta = abs2meta_local[src]  # get local metadata if we have it
+                self.indep_vars[prom] = meta
+
+        # add any inputs connected to _auto_ivc vars as indep vars
         for prom in prom2abs_in:
             src = p.model.get_source(prom)
-            if 'openmdao:indep_var' in abs2meta[src]['tags']:
-                if src in abs2meta_local:
-                    meta = abs2meta_local[src]
-                else:
-                    meta = abs2meta[src]
-                self.indep_vars[prom] = meta
-                self.indep_vars[src] = meta
+            if not src.startswith('_auto_ivc.'):
+                continue
+            if src in abs2meta_local:
+                meta = abs2meta_local[src]  # get local metadata if we have it
+            else:
+                meta = abs2meta[src]
+            self.indep_vars[prom] = meta
 
         self._submodel_inputs = {}
         self._submodel_outputs = {}
 
-        for var, (out_name, kwargs) in self._static_submodel_inputs.items():
-            if _is_glob(var):
+        for inner_prom, (out_name, kwargs) in self._static_submodel_inputs.items():
+            if _is_glob(inner_prom):
                 found = False
-                for match in pattern_filter(var, self.indep_vars):
+                for match in pattern_filter(inner_prom, self.indep_vars):
                     self._submodel_inputs[match] = (match.replace('.', ':'), kwargs.copy())
                     found = True
                 if not found:
-                    raise NameError(f"Pattern '{var}' doesn't match any independent variables in "
-                                    "the submodel.")
-            elif var in self.indep_vars:
+                    raise NameError(f"Pattern '{inner_prom}' doesn't match any independent "
+                                    "variables in the submodel.")
+            elif inner_prom in self.indep_vars:
                 if out_name is None:
-                    out_name = var.replace('.', ':')
-                self._submodel_inputs[var] = (out_name, kwargs.copy())
+                    out_name = inner_prom.replace('.', ':')
+                self._submodel_inputs[inner_prom] = (out_name, kwargs.copy())
             else:
-                raise NameError(f"'{var}' is not an independent variable in the submodel.")
+                raise NameError(f"'{inner_prom}' is not an independent variable in the submodel.")
 
-        for var, (out_name, kwargs) in self._static_submodel_outputs.items():
-            if _is_glob(var):
+        for inner_prom, (out_name, kwargs) in self._static_submodel_outputs.items():
+            if _is_glob(inner_prom):
                 found = False
-                for match in pattern_filter(var, prom2abs_out):
+                for match in pattern_filter(inner_prom, prom2abs_out):
                     if match.startswith('_auto_ivc.'):
                         continue
                     self._submodel_outputs[match] = (match.replace('.', ':'), kwargs.copy())
                     found = True
                 if not found:
-                    raise NameError(f"Pattern '{var}' doesn't match any outputs in the submodel.")
-            elif var in prom2abs_out:
+                    raise NameError(f"Pattern '{inner_prom}' doesn't match any outputs in the "
+                                    "submodel.")
+            elif inner_prom in prom2abs_out:
                 if out_name is None:
-                    out_name = var.replace('.', ':')
-                self._submodel_outputs[var] = (out_name, kwargs.copy())
+                    out_name = inner_prom.replace('.', ':')
+                self._submodel_outputs[inner_prom] = (out_name, kwargs.copy())
             else:
-                raise NameError(f"'{var}' is not an output in the submodel.")
+                raise NameError(f"'{inner_prom}' is not an output in the submodel.")
 
         # NOTE outer_name is what the outer problem knows the variable to be
         # it won't always be the same name as the prom name in the inner variable because
         # the inner prom name could contain '.'s and the outer name, which is the name relative
         # to this component, cannot contain '.'s.
-        for prom_name, (outer_name, kwargs) in sorted(self._submodel_inputs.items(),
-                                                      key=lambda x: x[0]):
+        for inner_prom, (outer_name, kwargs) in sorted(self._submodel_inputs.items(),
+                                                       key=lambda x: x[0]):
             if outer_name in self._static_var_rel2meta or outer_name in self._var_rel2meta:
                 raise RuntimeError("this shouldn't happen")
             try:
-                meta = self.indep_vars[prom_name]
+                meta = self.indep_vars[inner_prom]
             except KeyError:
-                raise KeyError(f"Independent variable '{prom_name}' not found in model")
+                raise KeyError(f"Independent variable '{inner_prom}' not found in model")
 
             final_kwargs = {n: v for n, v in meta.items() if n in _allowed_add_input_args}
             final_kwargs.update(kwargs)
             if out_name is None:
-                out_name = var.replace('.', ':')
+                out_name = inner_prom.replace('.', ':')
             super().add_input(outer_name, **final_kwargs)
             if 'val' in kwargs:  # val in kwargs overrides internal value
-                self._subprob.set_val(prom_name, kwargs['val'])
+                self._subprob.set_val(inner_prom, kwargs['val'])
 
-        for prom_name, (outer_name, kwargs) in sorted(self._submodel_outputs.items(),
-                                                      key=lambda x: x[0]):
+        for inner_prom, (outer_name, kwargs) in sorted(self._submodel_outputs.items(),
+                                                       key=lambda x: x[0]):
             if outer_name in self._static_var_rel2meta or outer_name in self._var_rel2meta:
                 raise RuntimeError("this shouldn't happen")
 
             try:
                 # look for metadata locally first, then use allprocs data if we have to
-                meta = abs2meta_local[prom2abs_out[prom_name][0]]
+                meta = abs2meta_local[prom2abs_out[inner_prom][0]]
             except KeyError:
                 try:
-                    meta = abs2meta[prom2abs_out[prom_name][0]]
+                    meta = abs2meta[prom2abs_out[inner_prom][0]]
                 except KeyError:
-                    raise KeyError(f"Output '{prom_name}' not found in model")
+                    raise KeyError(f"Output '{inner_prom}' not found in model")
 
             final_kwargs = {n: v for n, v in meta.items() if n in _allowed_add_output_args}
             final_kwargs.update(kwargs)
             if out_name is None:
-                out_name = var.replace('.', ':')
+                out_name = inner_prom.replace('.', ':')
             super().add_output(outer_name, **final_kwargs)
             if 'val' in kwargs:  # val in kwargs overrides internal value
-                self._subprob.set_val(prom_name, kwargs['val'])
+                self._subprob.set_val(inner_prom, kwargs['val'])
 
     def setup_partials(self):
         """
@@ -341,15 +364,20 @@ class SubmodelComp(ExplicitComponent):
         ofs = list(self._submodel_outputs)
         wrts = list(self._submodel_inputs)
 
-        coloring_info = ColoringMeta()
-        coloring_info.coloring = compute_total_coloring(p, of=ofs, wrt=wrts, run_model=True)
-        if coloring_info.coloring is not None:
-            self._coloring = coloring_info.coloring
+        coloring_info = self._coloring_info
 
-        if self._coloring is None:
+        if self.options['do_coloring']:
+            coloring_info.set_coloring(compute_total_coloring(p, of=ofs, wrt=wrts, run_model=True),
+                                       msginfo=self.msginfo)
+
+        coloring = coloring_info.coloring
+
+        if coloring is None:
+            # TODO: use dep graph in submodel to compute dependencies between ofs and wrts to have
+            # a better guess at sparsity
             self.declare_partials(of='*', wrt='*')
         else:
-            for of, wrt, nzrows, nzcols, _, _, _, _ in self._coloring._subjac_sparsity_iter():
+            for of, wrt, nzrows, nzcols, _, _, _, _ in coloring._subjac_sparsity_iter():
                 self.declare_partials(of=of, wrt=wrt, rows=nzrows, cols=nzcols)
 
     def _set_complex_step_mode(self, active):
@@ -399,16 +427,18 @@ class SubmodelComp(ExplicitComponent):
         if self._totjacinfo is None:
             self._totjacinfo = _TotalJacInfo(p, self._submodel_outputs, self._submodel_inputs,
                                              return_format='flat_dict',
-                                             approx=p.model._owns_approx_jac, use_coloring=True)
+                                             approx=p.model._owns_approx_jac,
+                                             coloring_meta=self._coloring_info)
         tots = self._totjacinfo.compute_totals()
+        coloring = self._coloring_info.coloring
 
-        if self._coloring is None:
+        if coloring is None:
             for (tot_output, tot_input), tot in tots.items():
                 input_outer_name = self._submodel_inputs[tot_input][0]
                 output_outer_name = self._submodel_outputs[tot_output][0]
                 partials[output_outer_name, input_outer_name] = tot
         else:
-            for of, wrt, nzrows, nzcols, _, _, _, _ in self._coloring._subjac_sparsity_iter():
+            for of, wrt, nzrows, nzcols, _, _, _, _ in coloring._subjac_sparsity_iter():
                 partials[of, wrt] = tots[of, wrt][nzrows, nzcols].ravel()
 
     # TODO:

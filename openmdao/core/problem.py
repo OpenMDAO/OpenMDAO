@@ -1952,9 +1952,18 @@ class Problem(object):
             with multi_proc_exception_check(self.comm):
                 self.final_setup()
 
+        if use_coloring is False:
+            coloring_meta = None
+        elif use_coloring is True:
+            coloring_meta = self.driver._coloring_info.copy()
+            coloring_meta.reset_coloring()
+            coloring_meta.dynamic = True
+        else:
+            coloring_meta = self.driver._coloring_info
+
         total_info = _TotalJacInfo(self, of, wrt, return_format, approx=self.model._owns_approx_jac,
                                    driver_scaling=driver_scaling, get_remote=get_remote,
-                                   debug_print=debug_print, use_coloring=use_coloring)
+                                   debug_print=debug_print, coloring_meta=coloring_meta)
         return total_info.compute_totals()
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):

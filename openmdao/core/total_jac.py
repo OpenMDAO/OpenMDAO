@@ -91,7 +91,7 @@ class _TotalJacInfo(object):
 
     def __init__(self, problem, of, wrt, return_format, approx=False,
                  debug_print=False, driver_scaling=True, get_remote=True, directional=False,
-                 use_coloring=None):
+                 coloring_meta=None):
         """
         Initialize object.
 
@@ -117,9 +117,9 @@ class _TotalJacInfo(object):
             Whether to get remote variables if using MPI.
         directional : bool
             If True, perform a single directional derivative.
-        use_coloring : bool or None
-            If True, use coloring to compute total derivatives.  If False, do not.  If None, use
-            driver coloring if it exists.
+        coloring_meta : ColoringMeta or None
+            If None, use driver coloring if it exists.  Otherwise, either use or generate a new
+            coloring based on the state of the coloring_meta object.
         """
         driver = problem.driver
         self.model = model = problem.model
@@ -189,23 +189,15 @@ class _TotalJacInfo(object):
         else:
             if not has_lin_cons:
                 if (orig_of is None and orig_wrt is None) or not has_custom_derivs:
-                    if use_coloring is False:
-                        coloring_meta = None
-                    else:
-                        # just use coloring and desvars/responses from driver
+                    # we're using driver ofs/wrts
+                    if coloring_meta is None:
                         coloring_meta = driver._coloring_info
-                else:
-                    if use_coloring:
-                        coloring_meta = driver._coloring_info.copy()
-                        coloring_meta.coloring = None
-                        coloring_meta.dynamic = True
-                    else:
-                        coloring_meta = None
 
                 do_coloring = coloring_meta is not None and \
-                    coloring_meta.do_compute_coloring() and (coloring_meta.dynamic)
+                    coloring_meta.do_compute_coloring() and (coloring_meta.dynamic) \
+                    and not problem._computing_coloring
 
-                if do_coloring and not problem._computing_coloring:
+                if do_coloring:
                     run_model = coloring_meta.run_model if 'run_model' in coloring_meta else None
 
                     coloring_meta.coloring = problem.get_total_coloring(coloring_meta,

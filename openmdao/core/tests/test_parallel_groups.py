@@ -10,6 +10,7 @@ import numpy as np
 import openmdao.api as om
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import set_pyoptsparse_opt
+from openmdao.utils.testing_utils import use_tempdirs
 
 try:
     from parameterized import parameterized
@@ -353,6 +354,7 @@ class TestParallelGroupsMPI2(TestParallelGroups):
                 self.fail("Didn't find '%s' in info messages." % msg)
 
 
+@use_tempdirs
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestDistDriverVars(unittest.TestCase):
 

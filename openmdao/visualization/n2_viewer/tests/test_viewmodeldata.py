@@ -432,7 +432,7 @@ class TestViewerData(unittest.TestCase):
             # create top-level problem
             p = om.Problem(name='top')
             p.model.add_subsystem('submodelcomp',
-                                  om.SubmodelComp(problem=subprob, inputs=['*'], outputs=['*']),
+                                  om.SubmodelComp(problem=subprob, inputs=['*'], outputs=['*'], do_coloring=False),
                                   promotes=['*'])
             p.model.add_subsystem('supercomp',
                                   om.ExecComp('z = 3 * y'),
@@ -478,7 +478,7 @@ class TestViewerData(unittest.TestCase):
             # create top-level problem
             p = om.Problem(name='top')
             p.model.add_subsystem('submodelcomp',
-                                om.SubmodelComp(problem=subprob, inputs=['*'], outputs=['*']),
+                                om.SubmodelComp(problem=subprob, inputs=['*'], outputs=['*'], do_coloring=False),
                                 promotes=['*'])
             p.model.add_subsystem('supercomp',
                                 om.ExecComp('z = 3 * y'),
