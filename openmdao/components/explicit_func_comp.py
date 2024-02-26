@@ -56,6 +56,8 @@ class ExplicitFuncComp(ExplicitComponent):
         If not None, call this function when computing partials.
     _tangents : tuple
         Tuple of parts of the tangent matrix cached for jax derivative computation.
+    _tangent_direction : str
+        Direction of the last tangent computation.
     """
 
     def __init__(self, compute, compute_partials=None, **kwargs):
@@ -79,6 +81,7 @@ class ExplicitFuncComp(ExplicitComponent):
             self._compute_jax = omf.jax_decorate(self._compute._f)
 
         self._tangents = None
+        self._tangent_direction = None
 
         self._compute_partials = compute_partials
         if self.options['use_jax'] and self.options['use_jit']:
@@ -141,6 +144,10 @@ class ExplicitFuncComp(ExplicitComponent):
             Flag indicating if the children should call linearize on their linear solvers.
         """
         if self.options['use_jax']:
+            if self._mode != self._tangent_direction:
+                # force recomputation of coloring and tangents
+                self._first_call_to_linearize = True
+                self._tangents = None
             self._check_first_linearize()
             self._jax_linearize()
         else:
@@ -232,6 +239,7 @@ class ExplicitFuncComp(ExplicitComponent):
         """
         if self._tangents is None:
             self._tangents = _get_tangents(vals, direction, coloring, argnums)
+            self._tangent_direction = direction
         return self._tangents
 
     def compute(self, inputs, outputs):

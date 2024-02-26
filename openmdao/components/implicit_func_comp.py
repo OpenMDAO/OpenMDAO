@@ -62,6 +62,8 @@ class ImplicitFuncComp(ImplicitComponent):
         Some state information to compute in _linearize_func and pass to _solve_linear_func
     _tangents : tuple
         Tuple of parts of the tangent matrix cached for jax derivative computation.
+    _tangent_direction : str
+        Direction of the last tangent computation.
     _jac2func_inds : ndarray
         Translation array from jacobian indices to function array indices.
     """
@@ -78,6 +80,7 @@ class ImplicitFuncComp(ImplicitComponent):
         self._linearize_func = linearize
         self._linearize_info = None
         self._tangents = None
+        self._tangent_direction = None
         self._jac2func_inds = None
 
         if solve_nonlinear:
@@ -215,6 +218,10 @@ class ImplicitFuncComp(ImplicitComponent):
             Flag indicating if the children should call linearize on their linear solvers.
         """
         if self.options['use_jax']:
+            if self._mode != self._tangent_direction:
+                # force recomputation of coloring and tangents
+                self._first_call_to_linearize = True
+                self._tangents = None
             self._check_first_linearize()
             self._jax_linearize()
             if (jac is None or jac is self._assembled_jac) and self._assembled_jac is not None:
@@ -461,6 +468,7 @@ class ImplicitFuncComp(ImplicitComponent):
         """
         if self._tangents is None:
             self._tangents = _get_tangents(vals, direction, coloring, argnums, trans)
+            self._tangent_direction = direction
         return self._tangents
 
     def _compute_coloring(self, recurse=False, **overrides):

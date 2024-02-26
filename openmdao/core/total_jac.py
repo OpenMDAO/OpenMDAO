@@ -148,8 +148,17 @@ class _TotalJacInfo(object):
         ofsize = sum(meta['global_size'] for meta in of_metadata.values())
         wrtsize = sum(meta['global_size'] for meta in wrt_metadata.values())
 
+        for meta in of_metadata.values():
+            if 'linear' in meta and meta['linear']:
+                has_lin_cons = True
+                break
+        else:
+            has_lin_cons = False
+
         if self._orig_mode == 'auto':
-            if ofsize >= wrtsize:
+            if has_lin_cons:
+                self.mode = model._mode
+            elif ofsize >= wrtsize:
                 self.mode = 'fwd'
             else:
                 self.mode = 'rev'
@@ -163,13 +172,6 @@ class _TotalJacInfo(object):
         self._dist_driver_vars = driver._dist_driver_vars
 
         all_abs2meta_out = model._var_allprocs_abs2meta['output']
-
-        for meta in of_metadata.values():
-            if 'linear' in meta and meta['linear']:
-                has_lin_cons = True
-                break
-        else:
-            has_lin_cons = False
 
         if not driver.supports['linear_constraints']:
             has_lin_cons = False
