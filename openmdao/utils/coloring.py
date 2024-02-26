@@ -114,6 +114,31 @@ class ColoringMeta(object):
     """
     Container for all metadata relevant to a coloring.
 
+    Parameters
+    ----------
+    num_full_jacs : int
+        Number of full jacobians to generate while computing sparsity.
+    tol : float
+        Use this tolerance to determine what's a zero when determining sparsity.
+    orders : int or None
+        Number of orders += around 'tol' for the tolerance sweep when determining sparsity.  If
+        None, no tolerance sweep will be performed and whatever 'tol' is specified will be used.
+    min_improve_pct : float
+        Don't use coloring unless at least min_improve_pct percentage decrease in number of solves.
+    show_summary : bool
+        If True, print a short summary of the coloring. Defaults to True.
+    show_sparsity : bool
+        If True, show a plot of the sparsity. Defaults to False.
+    dynamic : bool
+        True if dynamic coloring is being used.
+    static : Coloring, str, or None
+        If a Coloring object, just use that.  If a filename, load the coloring from that file.
+        If None, do not attempt to use a static coloring.
+    perturb_size : float
+        Size of input/output perturbation during generation of sparsity.
+    msginfo : str
+        Prefix for warning/error messages.
+
     Attributes
     ----------
     num_full_jacs : int
@@ -140,6 +165,8 @@ class ColoringMeta(object):
         Prefix for warning/error messages.
     _coloring : Coloring or None
         The coloring object.
+    _failed : bool
+        If True, coloring was already generated but failed.
     """
 
     _meta_names = {'num_full_jacs', 'tol', 'orders', 'min_improve_pct', 'show_summary',
@@ -151,18 +178,18 @@ class ColoringMeta(object):
         """
         Initialize data structures.
         """
-        self.num_full_jacs = num_full_jacs  # number of jacobians to generate to compute sparsity
-        self.tol = tol  # use this tolerance to determine what's a zero when determining sparsity
-        self.orders = orders  # num orders += around 'tol' for the tolerance sweep (or None)
-        self.min_improve_pct = min_improve_pct  # drop coloring if pct improvement less than this
-        self.show_summary = show_summary  # if True, print a short summary of the coloring
-        self.show_sparsity = show_sparsity  # if True, show a plot of the sparsity
-        self.dynamic = dynamic  # True if dynamic coloring is being used
-        self.static = static  # a filename, or a Coloring object if use_fixed_coloring was called
-        self.msginfo = msginfo  # prefix for warning/error messages
-        self.perturb_size = perturb_size  # input/output perturbation during generation of sparsity
-        self._coloring = None  # the coloring object
-        self._failed = False  # If True, coloring was already generated but failed
+        self.num_full_jacs = num_full_jacs
+        self.tol = tol
+        self.orders = orders
+        self.min_improve_pct = min_improve_pct
+        self.show_summary = show_summary
+        self.show_sparsity = show_sparsity
+        self.dynamic = dynamic
+        self.static = static
+        self.msginfo = msginfo
+        self.perturb_size = perturb_size
+        self._coloring = None
+        self._failed = False
 
     def do_compute_coloring(self):
         """
@@ -353,7 +380,7 @@ class Partial_ColoringMeta(ColoringMeta):
     """
     Container for all metadata relevant to a partial coloring.
 
-    Attributes
+    Parameters
     ----------
     wrt_patterns : list/tuple of str or str
         Patterns used to match wrt variables.
@@ -367,7 +394,41 @@ class Partial_ColoringMeta(ColoringMeta):
         Assume each instance can have a different coloring, so coloring will not be saved as
         a class coloring.
     perturb_size : float
-        Size of input/output perturbation during generation of sparsity for fd/cs.
+        Size of input/output perturbation during generation of sparsity.
+    num_full_jacs : int
+        Number of full jacobians to generate while computing sparsity.
+    tol : float
+        Use this tolerance to determine what's a zero when determining sparsity.
+    orders : int or None
+        Number of orders += around 'tol' for the tolerance sweep when determining sparsity.  If
+        None, no tolerance sweep will be performed and whatever 'tol' is specified will be used.
+    min_improve_pct : float
+        Don't use coloring unless at least min_improve_pct percentage decrease in number of solves.
+    show_summary : bool
+        If True, print a short summary of the coloring. Defaults to True.
+    show_sparsity : bool
+        If True, show a plot of the sparsity. Defaults to False.
+    dynamic : bool
+        True if dynamic coloring is being used.
+    static : Coloring, str, or None
+        If a Coloring object, just use that.  If a filename, load the coloring from that file.
+        If None, do not attempt to use a static coloring.
+    msginfo : str
+        Prefix for warning/error messages.
+
+    Attributes
+    ----------
+    wrt_patterns : list/tuple of str or str
+        Patterns used to match wrt variables.
+    method : str
+        Finite differencing method ('fd' or 'cs').
+    form : str
+        Form of the derivatives ('forward', 'backward', or 'central').  Only used if method is 'fd'.
+    step : float
+        Step size for 'fd', or 'cs'.
+    per_instance : bool
+        Assume each instance can have a different coloring, so coloring will not be saved as
+        a class coloring.
     fname : str or None
         Filename where coloring is stored.
     wrt_matches : set of str or None
@@ -379,27 +440,27 @@ class Partial_ColoringMeta(ColoringMeta):
 
     def __init__(self, wrt_patterns=('*',), method='fd', form=None, step=None, per_instance=True,
                  perturb_size=1e-9, num_full_jacs=3, tol=1e-25, orders=None, min_improve_pct=5.,
-                 show_summary=True, show_sparsity=False, dynamic=False, static=None):
+                 show_summary=True, show_sparsity=False, dynamic=False, static=None, msginfo=''):
         """
         Initialize data structures.
         """
         super().__init__(num_full_jacs=num_full_jacs, tol=tol, orders=orders,
                          min_improve_pct=min_improve_pct, show_summary=show_summary,
                          show_sparsity=show_sparsity, dynamic=dynamic, static=static,
-                         perturb_size=perturb_size)
+                         perturb_size=perturb_size, msginfo=msginfo)
         if wrt_patterns is None:
             wrt_patterns = ()
         elif isinstance(wrt_patterns, str):
             wrt_patterns = (wrt_patterns,)
         else:
             wrt_patterns = tuple(wrt_patterns)
-        self.wrt_patterns = wrt_patterns  # patterns used to match wrt variables
-        self.method = method  # finite differencing method ('fd' or 'cs')
-        self.form = form  # form of the derivatives ('forward', 'backward', or 'central')
-        self.step = step  # step size for finite difference or complex step
-        self.per_instance = per_instance  # assume each instance can have a different coloring
-        self.fname = None  # filename where coloring is stored
-        self.wrt_matches = None  # where matched wrt names are stored
+        self.wrt_patterns = wrt_patterns
+        self.method = method
+        self.form = form
+        self.step = step
+        self.per_instance = per_instance
+        self.fname = None
+        self.wrt_matches = None
 
     @property
     def wrt_patterns(self):

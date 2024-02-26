@@ -70,9 +70,9 @@ class SubmodelComp(ExplicitComponent):
     ----------
     _subprob : <Problem>
         Instantiated problem used to run the model.
-    submodel_inputs : dict
+    _submodel_inputs : dict
         Mapping of inner promoted input names to outer input names and kwargs.
-    submodel_outputs : dict
+    _submodel_outputs : dict
         Mapping of inner promoted output names to outer output names and kwargs.
     _static_submodel_inputs : dict
         Mapping of inner promoted input names to outer input names and kwargs that is populated
@@ -82,6 +82,8 @@ class SubmodelComp(ExplicitComponent):
         Mapping of inner promoted output names to outer output names and kwargs that is populated
         outside of setup. These must be bookkept separately from submodel outputs added during setup
         because setup can be called multiple times and the submodel outputs dict is reset each time.
+    _coloring : Coloring or None
+        If not None, this is the coloring computed for the submodel.
     """
 
     def __init__(self, problem, inputs=None, outputs=None, reports=False, **kwargs):
@@ -94,10 +96,10 @@ class SubmodelComp(ExplicitComponent):
             clear_reports(problem)
 
         self._subprob = problem
-        self.coloring = None
+        self._coloring = None
 
-        self.submodel_inputs = {}
-        self.submodel_outputs = {}
+        self._submodel_inputs = {}
+        self._submodel_outputs = {}
 
         self._static_submodel_inputs = {
             name: (out_name, {}) for name, out_name in _io_namecheck_iter(inputs, 'input')
@@ -153,7 +155,7 @@ class SubmodelComp(ExplicitComponent):
         if outer_name is None:
             outer_name = prom_in.replace('.', ':')
 
-        self.submodel_inputs[prom_in] = (outer_name, kwargs)
+        self._submodel_inputs[prom_in] = (outer_name, kwargs)
 
         if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
             raise Exception('Cannot call add_input after configure.')
@@ -197,7 +199,7 @@ class SubmodelComp(ExplicitComponent):
         if outer_name is None:
             outer_name = prom_out.replace('.', ':')
 
-        self.submodel_outputs[prom_out] = (outer_name, kwargs)
+        self._submodel_outputs[prom_out] = (outer_name, kwargs)
 
         if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
             raise Exception('Cannot call add_output after configure.')
@@ -246,14 +248,14 @@ class SubmodelComp(ExplicitComponent):
                 self.indep_vars[prom] = meta
                 self.indep_vars[src] = meta
 
-        self.submodel_inputs = {}
-        self.submodel_outputs = {}
+        self._submodel_inputs = {}
+        self._submodel_outputs = {}
 
         for var, (out_name, kwargs) in self._static_submodel_inputs.items():
             if _is_glob(var):
                 found = False
                 for match in pattern_filter(var, self.indep_vars):
-                    self.submodel_inputs[match] = (match.replace('.', ':'), kwargs.copy())
+                    self._submodel_inputs[match] = (match.replace('.', ':'), kwargs.copy())
                     found = True
                 if not found:
                     raise NameError(f"Pattern '{var}' doesn't match any independent variables in "
@@ -261,7 +263,7 @@ class SubmodelComp(ExplicitComponent):
             elif var in self.indep_vars:
                 if out_name is None:
                     out_name = var.replace('.', ':')
-                self.submodel_inputs[var] = (out_name, kwargs.copy())
+                self._submodel_inputs[var] = (out_name, kwargs.copy())
             else:
                 raise NameError(f"'{var}' is not an independent variable in the submodel.")
 
@@ -271,14 +273,14 @@ class SubmodelComp(ExplicitComponent):
                 for match in pattern_filter(var, prom2abs_out):
                     if match.startswith('_auto_ivc.'):
                         continue
-                    self.submodel_outputs[match] = (match.replace('.', ':'), kwargs.copy())
+                    self._submodel_outputs[match] = (match.replace('.', ':'), kwargs.copy())
                     found = True
                 if not found:
                     raise NameError(f"Pattern '{var}' doesn't match any outputs in the submodel.")
             elif var in prom2abs_out:
                 if out_name is None:
                     out_name = var.replace('.', ':')
-                self.submodel_outputs[var] = (out_name, kwargs.copy())
+                self._submodel_outputs[var] = (out_name, kwargs.copy())
             else:
                 raise NameError(f"'{var}' is not an output in the submodel.")
 
@@ -286,7 +288,7 @@ class SubmodelComp(ExplicitComponent):
         # it won't always be the same name as the prom name in the inner variable because
         # the inner prom name could contain '.'s and the outer name, which is the name relative
         # to this component, cannot contain '.'s.
-        for prom_name, (outer_name, kwargs) in sorted(self.submodel_inputs.items(),
+        for prom_name, (outer_name, kwargs) in sorted(self._submodel_inputs.items(),
                                                       key=lambda x: x[0]):
             if outer_name in self._static_var_rel2meta or outer_name in self._var_rel2meta:
                 raise RuntimeError("this shouldn't happen")
@@ -303,7 +305,7 @@ class SubmodelComp(ExplicitComponent):
             if 'val' in kwargs:  # val in kwargs overrides internal value
                 self._subprob.set_val(prom_name, kwargs['val'])
 
-        for prom_name, (outer_name, kwargs) in sorted(self.submodel_outputs.items(),
+        for prom_name, (outer_name, kwargs) in sorted(self._submodel_outputs.items(),
                                                       key=lambda x: x[0]):
             if outer_name in self._static_var_rel2meta or outer_name in self._var_rel2meta:
                 raise RuntimeError("this shouldn't happen")
@@ -326,6 +328,9 @@ class SubmodelComp(ExplicitComponent):
                 self._subprob.set_val(prom_name, kwargs['val'])
 
     def setup_partials(self):
+        """
+        Compute a coloring and declare partials based on the coloring.
+        """
         p = self._subprob
         inputs = self._var_rel_names['input']
         outputs = self._var_rel_names['output']
@@ -333,18 +338,18 @@ class SubmodelComp(ExplicitComponent):
         if len(inputs) == 0 or len(outputs) == 0:
             return
 
-        ofs = list(self.submodel_outputs)
-        wrts = list(self.submodel_inputs)
+        ofs = list(self._submodel_outputs)
+        wrts = list(self._submodel_inputs)
 
         coloring_info = ColoringMeta()
         coloring_info.coloring = compute_total_coloring(p, of=ofs, wrt=wrts, run_model=True)
         if coloring_info.coloring is not None:
-            self.coloring = coloring_info.coloring
+            self._coloring = coloring_info.coloring
 
-        if self.coloring is None:
+        if self._coloring is None:
             self.declare_partials(of='*', wrt='*')
         else:
-            for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():
+            for of, wrt, nzrows, nzcols, _, _, _, _ in self._coloring._subjac_sparsity_iter():
                 self.declare_partials(of=of, wrt=wrt, rows=nzrows, cols=nzcols)
 
     def _set_complex_step_mode(self, active):
@@ -363,16 +368,16 @@ class SubmodelComp(ExplicitComponent):
             Unscaled, dimensional output variables read via outputs[key].
         """
         p = self._subprob
-        for prom_name, (outer_name, _) in self.submodel_inputs.items():
+        for prom_name, (outer_name, _) in self._submodel_inputs.items():
             p.set_val(prom_name, inputs[outer_name])
 
         # set initial output vals
-        for prom_name, (outer_name, _) in self.submodel_outputs.items():
+        for prom_name, (outer_name, _) in self._submodel_outputs.items():
             p.set_val(prom_name, outputs[outer_name])
 
         p.run_model()
 
-        for prom_name, (outer_name, _) in self.submodel_outputs.items():
+        for prom_name, (outer_name, _) in self._submodel_outputs.items():
             outputs[outer_name] = p.get_val(prom_name)
 
     def compute_partials(self, inputs, partials):
@@ -388,24 +393,23 @@ class SubmodelComp(ExplicitComponent):
         """
         p = self._subprob
 
-        for prom_name, (outer_name, _) in self.submodel_inputs.items():
+        for prom_name, (outer_name, _) in self._submodel_inputs.items():
             p.set_val(prom_name, inputs[outer_name])
 
         if self._totjacinfo is None:
-            self._totjacinfo = _TotalJacInfo(p, self.submodel_outputs, self.submodel_inputs,
+            self._totjacinfo = _TotalJacInfo(p, self._submodel_outputs, self._submodel_inputs,
                                              return_format='flat_dict',
                                              approx=p.model._owns_approx_jac, use_coloring=True)
         tots = self._totjacinfo.compute_totals()
 
-        if self.coloring is None:
+        if self._coloring is None:
             for (tot_output, tot_input), tot in tots.items():
-                input_outer_name = self.submodel_inputs[tot_input][0]
-                output_outer_name = self.submodel_outputs[tot_output][0]
+                input_outer_name = self._submodel_inputs[tot_input][0]
+                output_outer_name = self._submodel_outputs[tot_output][0]
                 partials[output_outer_name, input_outer_name] = tot
         else:
-            for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():
+            for of, wrt, nzrows, nzcols, _, _, _, _ in self._coloring._subjac_sparsity_iter():
                 partials[of, wrt] = tots[of, wrt][nzrows, nzcols].ravel()
-
 
     # TODO:
     # def _transfer_to_sub(self):

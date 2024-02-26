@@ -447,6 +447,14 @@ class TestViewerData(unittest.TestCase):
             om.n2(p, title='N2 for Problem', outfile='N2problem.html', show_browser=DEBUG_BROWSER)
             problem_data = extract_compressed_model('N2problem.html')
 
+            # in this particular case, the value of subcomp.y will differ between this case and the
+            # later script based case because in the script case, the hook function triggers after final_setup of the
+            # subproblem, while in this case, the n2 is generated after final_setup of the
+            # top problem, and during that final_setup (in _setup_partials of the submodelcomp), the
+            # subproblem is executed, which sets the value of subcomp.y to 3.0 instead of 1.0.
+            # So here we'll reset the value of subcomp.y to 1.0 so that we can
+            # compare two data dictionaries using assertDictEqual.
+            subprob.set_val('y', 1.0)
             om.n2(subprob, title='N2 for SubProblem', outfile='N2subprob.html', show_browser=DEBUG_BROWSER)
             subprob_data = extract_compressed_model('N2subprob.html')
 
@@ -506,13 +514,6 @@ class TestViewerData(unittest.TestCase):
             subprob_data['design_vars'] = {}
             subprob_data['responses'] = {}
 
-            from pprint import pformat
-            d1 = pformat(subprob_data)
-            d2 = pformat(n2_sub_data)
-            with open('/Users/banaylor/dev/OpenMDAO/d1.out', 'w') as f:
-                print(d1, file=f)
-            with open('/Users/banaylor/dev/OpenMDAO/d2.out', 'w') as f:
-                print(d2, file=f)
             self.assertDictEqual(subprob_data, n2_sub_data)
 
         # check that it works correctly regardless of whether the report system is active or not

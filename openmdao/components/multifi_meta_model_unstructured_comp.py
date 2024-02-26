@@ -130,7 +130,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         """
         self._input_sizes = list(self._static_input_sizes)
 
-        super()._setup_procs(pathname, comm, mode, prob_meta)
+        super()._setup_procs(pathname, comm, prob_meta)
 
     def add_input(self, name, val=1.0, **kwargs):
         """
