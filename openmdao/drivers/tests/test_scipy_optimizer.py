@@ -42,6 +42,7 @@ class Rosenbrock(om.ExplicitComponent):
     def setup(self):
         self.add_input('x', np.ones(rosenbrock_size))
         self.add_output('f', 0.0)
+        self.declare_partials('f', 'x', method='fd', form='central', step=1e-4)
 
     def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
         x = inputs['x']
@@ -2172,7 +2173,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         p = om.Problem()
 
-        exec = om.ExecComp(['y = x**2',
+        exec = om.ExecComp(['y = x**2 + x*a',
                             'z = a + x**2'],
                             a={'shape': (1,)},
                             y={'shape': (101,)},

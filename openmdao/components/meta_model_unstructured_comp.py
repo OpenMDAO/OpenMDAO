@@ -73,7 +73,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         self._no_check_partials = True
 
-    def _setup_procs(self, pathname, comm, mode, prob_meta):
+    def _setup_procs(self, pathname, comm, prob_meta):
         """
         Execute first phase of the setup process.
 
@@ -85,9 +85,6 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
-        mode : str
-            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
-            reverse (adjoint).
         prob_meta : dict
             Problem level options.
         """
@@ -98,7 +95,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         self._surrogate_output_names.extend(self._static_surrogate_output_names)
         self._input_size = self._static_input_size
 
-        super()._setup_procs(pathname, comm, mode, prob_meta)
+        super()._setup_procs(pathname, comm, prob_meta)
 
     def initialize(self):
         """

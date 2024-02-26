@@ -41,6 +41,23 @@ def get_relevance(model, of, wrt):
     return Relevance(model, wrt, of)
 
 
+def _to_seed(names):
+    """
+    Return the seed from the given iter of names.
+
+    Parameters
+    ----------
+    names : iter of str
+        Iterator over names.
+
+    Returns
+    -------
+    tuple
+        Key tuple for the given names.
+    """
+    return tuple(sorted(names))
+
+
 class Relevance(object):
     """
     Class that computes relevance based on a data flow graph.
@@ -73,10 +90,10 @@ class Relevance(object):
         uninitialized.
     _seed_var_map : dict
         Nested dict of the form {fwdseed(s): {revseed(s): var_array, ...}}.
-        Keys that contain multiple seeds are frozensets of seed names.
+        Keys that contain multiple seeds are sorted tuples of seed names.
     _seed_sys_map : dict
         Nested dict of the form {fwdseed(s): {revseed(s): sys_array, ...}}.
-        Keys that contain multiple seeds are frozensets of seed names.
+        Keys that contain multiple seeds are sorted tuples of seed names.
     _single_seed2relvars : dict
         Dict of the form {'fwd': {seed: var_array}, 'rev': ...} where each seed is a
         key and var_array is the variable relevance array for the given seed.
@@ -107,9 +124,9 @@ class Relevance(object):
         self._no_dv_responses = []
 
         # seed var(s) for the current derivative operation
-        self._seed_vars = {'fwd': frozenset(), 'rev': frozenset()}
+        self._seed_vars = {'fwd': (), 'rev': ()}
         # all seed vars for the entire derivative computation
-        self._all_seed_vars = {'fwd': frozenset(), 'rev': frozenset()}
+        self._all_seed_vars = {'fwd': (), 'rev': ()}
 
         self._set_all_seeds(model, fwd_meta, rev_meta)
 
@@ -158,24 +175,23 @@ class Relevance(object):
         if post_systems:
             post_systems.add('')
 
-        pre_array = self._names2rel_array(pre_systems, self._all_systems, self._sys2idx)
-        post_array = self._names2rel_array(post_systems, self._all_systems, self._sys2idx)
+        pre_array = self._names2rel_array(pre_systems, self._sys2idx)
+        post_array = self._names2rel_array(post_systems, self._sys2idx)
 
         if model._iterated_components is _contains_all:
             iter_array = np.ones(len(self._all_systems), dtype=bool)
         else:
-            # iter_systems = set()
-            # for compname in model._iterated_components:
-            #     iter_systems.update(all_ancestors(compname))
-            # if iter_systems:
-            #     iter_systems.add('')
+            iter_systems = set()
+            for compname in model._iterated_components:
+                iter_systems.update(all_ancestors(compname))
+            if iter_systems:
+                iter_systems.add('')
 
-            # iter_array = self._names2rel_array(iter_systems, self._all_systems, self._sys2idx)
-            iter_array = ~(pre_array | post_array)
+            iter_array = self._names2rel_array(iter_systems, self._sys2idx)
 
         self._nonlinear_sets = {'pre': pre_array, 'iter': iter_array, 'post': post_array}
 
-    def _single_seed_array_iter(self, group, seed_meta, direction, all_systems, all_vars):
+    def _single_seed_array_iter(self, group, seed_meta, direction, all_systems):
         """
         Yield the relevance arrays for each individual seed for variables and systems.
 
@@ -193,8 +209,6 @@ class Relevance(object):
             Direction of the search for relevant variables.  'fwd' or 'rev'.
         all_systems : set
             Set of all systems in the graph.
-        all_vars : set
-            Set of all variables in the graph.
 
         Yields
         ------
@@ -219,10 +233,10 @@ class Relevance(object):
             rel_systems = _vars2systems(depnodes)
             rel_vars = depnodes - all_systems
 
-            yield (src, local, self._names2rel_array(rel_vars, all_vars, self._var2idx),
-                   self._names2rel_array(rel_systems, all_systems, self._sys2idx))
+            yield (src, local, self._names2rel_array(rel_vars, self._var2idx),
+                   self._names2rel_array(rel_systems, self._sys2idx))
 
-    def _names2rel_array(self, names, all_names, names2inds):
+    def _names2rel_array(self, names, names2inds):
         """
         Return a relevance array for the given names.
 
@@ -230,8 +244,6 @@ class Relevance(object):
         ----------
         names : iter of str
             Iterator over names.
-        all_names : iter of str
-            Iterator over the full set of names from the graph, either variables or systems.
         names2inds : dict
             Dict of the form {name: index} where index is the index into the relevance array.
 
@@ -240,7 +252,7 @@ class Relevance(object):
         ndarray
             Boolean relevance array.  True means name is relevant.
         """
-        rel_array = np.zeros(len(all_names), dtype=bool)
+        rel_array = np.zeros(len(names2inds), dtype=bool)
         rel_array[[names2inds[n] for n in names]] = True
 
         return self._get_cached_array(rel_array)
@@ -366,8 +378,8 @@ class Relevance(object):
         rev_meta : dict
             Dictionary of metadata for reverse derivatives.
         """
-        fwd_seeds = frozenset([m['source'] for m in fwd_meta.values()])
-        rev_seeds = frozenset([m['source'] for m in rev_meta.values()])
+        fwd_seeds = _to_seed([m['source'] for m in fwd_meta.values()])
+        rev_seeds = _to_seed([m['source'] for m in rev_meta.values()])
 
         self._seed_var_map = seed_var_map = {}
         self._seed_sys_map = seed_sys_map = {}
@@ -399,6 +411,7 @@ class Relevance(object):
                 all_systems.update(all_ancestors(node))
 
         self._all_systems = all_systems
+        all_vars = sorted(all_vars)
 
         # create mappings of var and system names to indices into the var/system
         # relevance arrays.
@@ -411,23 +424,22 @@ class Relevance(object):
         has_par_derivs = {}
         for io in ('fwd', 'rev'):
             for seed, local, var_array, sys_array in self._single_seed_array_iter(group, meta[io],
-                                                                                  io, all_systems,
-                                                                                  all_vars):
+                                                                                  io, all_systems):
                 self._single_seed2relvars[io][seed] = self._get_cached_array(var_array)
                 self._single_seed2relsys[io][seed] = self._get_cached_array(sys_array)
                 if local:
                     has_par_derivs[seed] = io
 
-        # in seed_map, add keys for both fsrc and frozenset((fsrc,)) and similarly for rsrc
+        # in seed_map, add keys for both fsrc and _to_seed((fsrc,)) and similarly for rsrc
         # because both forms of keys may be used depending on the context.
         for fseed, fvarr in self._single_seed2relvars['fwd'].items():
             fsarr = self._single_seed2relsys['fwd'][fseed]
-            seed_var_map[fseed] = seed_var_map[frozenset((fseed,))] = vsub = {}
-            seed_sys_map[fseed] = seed_sys_map[frozenset((fseed,))] = ssub = {}
+            seed_var_map[fseed] = seed_var_map[_to_seed((fseed,))] = vsub = {}
+            seed_sys_map[fseed] = seed_sys_map[_to_seed((fseed,))] = ssub = {}
             for rsrc, rvarr in self._single_seed2relvars['rev'].items():
                 rsysarr = self._single_seed2relsys['rev'][rsrc]
-                vsub[rsrc] = vsub[frozenset((rsrc,))] = self._get_cached_array(fvarr & rvarr)
-                ssub[rsrc] = ssub[frozenset((rsrc,))] = self._get_cached_array(fsarr & rsysarr)
+                vsub[rsrc] = vsub[_to_seed((rsrc,))] = self._get_cached_array(fvarr & rvarr)
+                ssub[rsrc] = ssub[_to_seed((rsrc,))] = self._get_cached_array(fsarr & rsysarr)
 
         all_fseed_varray = self._union_arrays(self._single_seed2relvars['fwd'], fwd_seeds)
         all_fseed_sarray = self._union_arrays(self._single_seed2relsys['fwd'], fwd_seeds)
@@ -466,7 +478,7 @@ class Relevance(object):
                 direction = has_par_derivs[fsrc]
                 depnodes = self._dependent_nodes(fsrc, direction, local=False)
                 rel_vars = depnodes - all_systems
-                farr = self._names2rel_array(rel_vars, all_vars, self._var2idx)
+                farr = self._names2rel_array(rel_vars, self._var2idx)
             farrs[fsrc] = farr
 
         for rsrc, rarr in self._single_seed2relvars['rev'].items():
@@ -474,7 +486,7 @@ class Relevance(object):
                 direction = has_par_derivs[rsrc]
                 depnodes = self._dependent_nodes(rsrc, direction, local=False)
                 rel_vars = depnodes - all_systems
-                rarr = self._names2rel_array(rel_vars, all_vars, self._var2idx)
+                rarr = self._names2rel_array(rel_vars, self._var2idx)
             rarrs[rsrc] = rarr
 
         allfarrs = self._union_arrays(farrs, fwd_seeds)
@@ -586,8 +598,8 @@ class Relevance(object):
             save = {'fwd': self._seed_vars['fwd'], 'rev': self._seed_vars['rev']}
             save_active = self._active
             self._active = True
-            fwd_seeds = self._all_seed_vars['fwd'] if fwd_seeds is None else frozenset(fwd_seeds)
-            rev_seeds = self._all_seed_vars['rev'] if rev_seeds is None else frozenset(rev_seeds)
+            fwd_seeds = self._all_seed_vars['fwd'] if fwd_seeds is None else fwd_seeds
+            rev_seeds = self._all_seed_vars['rev'] if rev_seeds is None else rev_seeds
             self._set_seeds(fwd_seeds, rev_seeds)
             try:
                 yield
@@ -634,6 +646,18 @@ class Relevance(object):
         rev_seeds : frozenset
             Set of reverse seed variable names.
         """
+        try:
+            sub = self._seed_sys_map[fwd_seeds]
+        except Exception:
+            sub = None
+            fwd_seeds = _to_seed(fwd_seeds)
+            rev_seeds = _to_seed(rev_seeds)
+        else:
+            try:
+                sub[rev_seeds]
+            except Exception:
+                rev_seeds = _to_seed(rev_seeds)
+
         self._seed_vars['fwd'] = fwd_seeds
         self._seed_vars['rev'] = rev_seeds
 
@@ -658,9 +682,9 @@ class Relevance(object):
         single_seed2rel : dict
             Dict of the form {'fwd': {seed: rel_array}, 'rev': ...} where each seed is a key and
             rel_array is the relevance array for the given seed.
-        fwd_seeds : str or frozenset of str
+        fwd_seeds : str or sorted tuple of str
             Iterator over forward seed variable names.
-        rev_seeds : str or frozenset of str
+        rev_seeds : str or sorted tuple of str
             Iterator over reverse seed variable names.
 
         Returns
@@ -1154,6 +1178,7 @@ class Relevance(object):
             it = self._rel_names_iter(self._current_rel_varray, self._var2idx, relevant)
 
         return list(it)
+
 
 def _vars2systems(nameiter):
     """

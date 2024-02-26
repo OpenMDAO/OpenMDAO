@@ -918,6 +918,8 @@ class TestCheckRelevance(unittest.TestCase):
 
         # add constraint that does not depend on a design var
         prob.model.add_constraint('bad', equals=-15.0)
+        
+        prob.driver.options['singular_jac_behavior'] = 'error'
 
         prob.setup()
 
@@ -926,7 +928,7 @@ class TestCheckRelevance(unittest.TestCase):
         with self.assertRaises(RuntimeError) as err:
             prob.run_driver()
 
-        self.assertTrue("Constraint(s) ['bad'] do not depend on any design variables."
+        self.assertTrue("constraint(s) ['bad'] do not depend on any design variables."
                         in str(err.exception))
 
 

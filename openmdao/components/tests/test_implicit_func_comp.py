@@ -141,7 +141,7 @@ class TestImplicitFuncComp(unittest.TestCase):
                 .add_output('R_y1', resid='r_R_y1')
                 .add_output('R_y2', resid='r_R_y1')
                 .declare_partials('y1', 'y1')
-                .declare_partials('y2', ['z', 'y1', 'y2'])
+                .declare_partials('y2', ['z', 'y1', 'y2', 'x'])
                 .declare_partials('R_y1', ['R_y1', 'x', 'z', 'y1', 'y2'])
                 .declare_partials('R_y2', ['R_y2','z', 'y1', 'y2']))
 

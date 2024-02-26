@@ -786,7 +786,7 @@ class ScipyOptimizeDriver(Driver):
                                                     tol=self.options['singular_jac_tol'])
                 self._check_jac = False
 
-        except Exception as msg:
+        except Exception:
             if self._exc_info is None:  # only record the first one
                 self._exc_info = sys.exc_info()
             return np.array([[]])

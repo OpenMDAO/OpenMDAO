@@ -533,7 +533,7 @@ class Group(System):
         super()._reset_setup_vars()
         self._setup_procs_finished = False
 
-    def _setup_procs(self, pathname, comm, mode, prob_meta):
+    def _setup_procs(self, pathname, comm, prob_meta):
         """
         Execute first phase of the setup process.
 
@@ -546,13 +546,10 @@ class Group(System):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
-        mode : str
-            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
-            reverse (adjoint). Default is 'rev'.
         prob_meta : dict
             Problem level metadata.
         """
-        super()._setup_procs(pathname, comm, mode, prob_meta)
+        super()._setup_procs(pathname, comm, prob_meta)
 
         nproc = comm.size
 
@@ -637,7 +634,7 @@ class Group(System):
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
-            subsys._setup_procs(subsys.pathname, sub_comm, mode, prob_meta)
+            subsys._setup_procs(subsys.pathname, sub_comm, prob_meta)
 
         # build a list of local subgroups to speed up later loops
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
@@ -704,7 +701,7 @@ class Group(System):
         else:
             return self._list_states()
 
-    def _setup(self, comm, mode, prob_meta):
+    def _setup(self, comm, prob_meta):
         """
         Perform setup for this system and its descendant systems.
 
@@ -714,8 +711,6 @@ class Group(System):
         ----------
         comm : MPI.Comm or <FakeComm> or None
             The global communicator.
-        mode : str
-            Derivative direction, either 'fwd', or 'rev', or 'auto'
         prob_meta : dict
             Problem level metadata dictionary.
         """
@@ -729,13 +724,12 @@ class Group(System):
 
         self.pathname = ''
         self.comm = comm
-        self._mode = mode
 
         self._pre_components = None
         self._post_components = None
 
         # Besides setting up the processors, this method also builds the model hierarchy.
-        self._setup_procs(self.pathname, comm, mode, self._problem_meta)
+        self._setup_procs(self.pathname, comm, self._problem_meta)
 
         prob_meta['config_info'] = _ConfigInfo()
 
@@ -771,7 +765,7 @@ class Group(System):
         self._setup_global_connections()
         self._setup_dynamic_shapes()
 
-        self._top_level_post_connections(mode)
+        self._top_level_post_connections()
 
         self._setup_var_sizes()
 
@@ -1227,12 +1221,12 @@ class Group(System):
 
         return prom2abs
 
-    def _top_level_post_connections(self, mode):
+    def _top_level_post_connections(self):
         # this is called on the top level group after all connections are known
         self._problem_meta['vars_to_gather'] = self._vars_to_gather
 
         self._resolve_group_input_defaults()
-        self._setup_auto_ivcs(mode)
+        self._setup_auto_ivcs()
         self._problem_meta['prom2abs'] = self._get_all_promotes()
         self._check_prom_masking()
         self._check_order()
@@ -4370,7 +4364,7 @@ class Group(System):
 
         return info
 
-    def _setup_auto_ivcs(self, mode):
+    def _setup_auto_ivcs(self):
         # only happens at top level
         from openmdao.core.indepvarcomp import _AutoIndepVarComp
 
@@ -4508,7 +4502,7 @@ class Group(System):
         if not prom2auto:
             return auto_ivc
 
-        auto_ivc._setup_procs(auto_ivc.pathname, self.comm, mode, self._problem_meta)
+        auto_ivc._setup_procs(auto_ivc.pathname, self.comm, self._problem_meta)
         auto_ivc._configure()
         auto_ivc._configure_check()
         auto_ivc._setup_var_data()

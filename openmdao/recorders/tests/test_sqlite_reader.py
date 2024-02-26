@@ -236,6 +236,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce,
                                                        linear_solver=om.ScipyKrylov,
                                                        mda_nonlinear_solver=om.NonlinearBlockGS)
+        prob.options['group_by_pre_opt_post'] = True
 
         driver = prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=False)
 
@@ -2140,6 +2141,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce,
                                                        linear_solver=om.ScipyKrylov,
                                                        mda_nonlinear_solver=om.NonlinearBlockGS)
+        prob.options['group_by_pre_opt_post'] = True
         prob.setup(mode='rev')
 
         driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)

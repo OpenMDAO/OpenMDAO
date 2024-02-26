@@ -444,12 +444,10 @@ class TestViewerData(unittest.TestCase):
             p.final_setup()
 
             # extract viewer data from N2 for problem and subproblem
-            om.n2(p, title='N2 for Problem', outfile='N2problem.html',
-                  show_browser=DEBUG_BROWSER)
+            om.n2(p, title='N2 for Problem', outfile='N2problem.html', show_browser=DEBUG_BROWSER)
             problem_data = extract_compressed_model('N2problem.html')
 
-            om.n2(subprob, title='N2 for SubProblem', outfile='N2subprob.html',
-                  show_browser=DEBUG_BROWSER)
+            om.n2(subprob, title='N2 for SubProblem', outfile='N2subprob.html', show_browser=DEBUG_BROWSER)
             subprob_data = extract_compressed_model('N2subprob.html')
 
             # check problem data generated from recording against data generated from problem
@@ -492,7 +490,7 @@ class TestViewerData(unittest.TestCase):
                 f.write(src)
 
             # check problem data generated from script against data generated from problem
-            check_call("openmdao n2 submodel_script.py -o N2_top.html"
+            check_call("openmdao n2 submodel_script.py -o N2_top.html --problem=top"
                        f"{' --no_browser' if not DEBUG_BROWSER else ''}")
             n2_top_data = extract_compressed_model('N2_top.html')
 
@@ -508,6 +506,13 @@ class TestViewerData(unittest.TestCase):
             subprob_data['design_vars'] = {}
             subprob_data['responses'] = {}
 
+            from pprint import pformat
+            d1 = pformat(subprob_data)
+            d2 = pformat(n2_sub_data)
+            with open('/Users/banaylor/dev/OpenMDAO/d1.out', 'w') as f:
+                print(d1, file=f)
+            with open('/Users/banaylor/dev/OpenMDAO/d2.out', 'w') as f:
+                print(d2, file=f)
             self.assertDictEqual(subprob_data, n2_sub_data)
 
         # check that it works correctly regardless of whether the report system is active or not
@@ -572,6 +577,7 @@ class TestN2(unittest.TestCase):
 
         p = om.Problem(model=SellarStateConnection())
         p.driver.add_recorder(SqliteRecorder(sql_filename))
+
         p.setup()
         p.final_setup()
         p.cleanup()

@@ -282,8 +282,6 @@ class Problem(object):
 
         self.comm = comm
 
-        self._mode = None  # mode is assigned in setup()
-
         self._metadata = None
         self._run_counter = -1
         self._rec_mgr = RecordingManager()
@@ -439,6 +437,20 @@ class Problem(object):
         if self._name is None:
             return type(self).__name__
         return f'{type(self).__name__} {self._name}'
+
+    @property
+    def _mode(self):
+        """
+        Return the derivative mode.
+
+        Returns
+        -------
+        str
+            Derivative mode, 'fwd' or 'rev'.
+        """
+        if self._metadata is None:
+            return None
+        return self._metadata['mode']
 
     def _get_inst_id(self):
         return self._name
@@ -935,7 +947,7 @@ class Problem(object):
             msg = f"{self.msginfo}: Unsupported mode: '{mode}'. Use either 'fwd' or 'rev'."
             raise ValueError(msg)
 
-        self._mode = self._orig_mode = mode
+        self._orig_mode = mode
 
         model_comm = self.driver._setup_comm(comm)
 
@@ -966,6 +978,7 @@ class Problem(object):
                                               # src data for inputs)
             'has_par_deriv_color': False,  # True if any dvs/responses have parallel deriv colors
             'mode': mode,  # mode (derivative direction) set by the user.  'auto' by default
+            'orig_mode': mode,  # mode (derivative direction) set by the user.  'auto' by default
             'abs_in2prom_info': {},  # map of abs input name to list of length = sys tree height
                                      # down to var location, to allow quick resolution of local
                                      # src_shape/src_indices due to promotes.  For example,
@@ -998,7 +1011,7 @@ class Problem(object):
 
         _prob_setup_stack.append(self)
         try:
-            model._setup(model_comm, mode, self._metadata)
+            model._setup(model_comm, self._metadata)
         finally:
             _prob_setup_stack.pop()
 
@@ -1033,7 +1046,6 @@ class Problem(object):
         # update mode if it's been set to 'auto'
         if self._orig_mode == 'auto':
             mode = 'rev' if response_size < desvar_size else 'fwd'
-            self._mode = mode
         else:
             mode = self._orig_mode
 

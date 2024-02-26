@@ -225,6 +225,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
     def test_recorder_setup_timing(self):
         prob = ParaboloidProblem(driver=om.ScipyOptimizeDriver(disp=False))
+        prob.options['group_by_pre_opt_post'] = True
         prob.setup()
 
         # no problem adding recorder after setup()
@@ -1651,6 +1652,7 @@ class TestSqliteRecorder(unittest.TestCase):
                                                        linear_solver=om.ScipyKrylov,
                                                        mda_linear_solver=om.ScipyKrylov,
                                                        mda_nonlinear_solver=om.NonlinearBlockGS)
+        prob.options['group_by_pre_opt_post'] = True
         prob.setup(mode='rev')
 
         driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
@@ -1978,6 +1980,7 @@ class TestSqliteRecorder(unittest.TestCase):
         driver.recording_options['record_inputs'] = False
         driver.recording_options['includes'] = ['y2']
         driver.add_recorder(self.recorder)
+        prob.options['group_by_pre_opt_post'] = True
 
         prob.setup()
 
@@ -2857,6 +2860,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         driver = prob.driver = om.ScipyOptimizeDriver()
         driver.options['optimizer'] = 'SLSQP'
         driver.options['tol'] = 1e-9
+        prob.options['group_by_pre_opt_post'] = True
 
         driver.recording_options['record_desvars'] = True
         driver.recording_options['record_objectives'] = True
@@ -3096,6 +3100,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         # setup the optimization
         driver = prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
+        prob.options['group_by_pre_opt_post'] = True
 
         # Create a recorder variable
         recorder = om.SqliteRecorder('cases.sql')
@@ -3568,6 +3573,8 @@ class TestFeatureAdvancedExample(unittest.TestCase):
 
         # Attach recorder to the driver
         prob.driver.add_recorder(recorder)
+        
+        prob.options['group_by_pre_opt_post'] = True
 
         # To attach a recorder to a subsystem or solver, you need to call `setup`
         # first so that the model hierarchy has been generated
@@ -3680,6 +3687,7 @@ class TestFeatureBasicRecording(unittest.TestCase):
         model.add_constraint('con2', upper=0.0)
 
         prob.driver = om.ScipyOptimizeDriver(disp=False)
+        prob.options['group_by_pre_opt_post'] = True
 
         # create a case recorder
         recorder = om.SqliteRecorder('cases.sql')

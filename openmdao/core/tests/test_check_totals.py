@@ -1127,10 +1127,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
         prob.run_model()
 
-        totals = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs', out_stream=None)
-
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 3e-8)
+        chk = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs', out_stream=None)
+        assert_check_totals(chk, atol=3e-8, rtol=3e-8)
 
     def test_cs_around_broyden_top_sparse(self):
         prob = om.Problem()
@@ -1142,10 +1140,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
         prob.run_model()
 
-        totals = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs', out_stream=None)
-
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 7e-8)
+        chk = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs', out_stream=None)
+        assert_check_totals(chk, atol=7e-8, rtol=7e-8)
 
     def test_check_totals_on_approx_model(self):
         prob = om.Problem()
@@ -1159,12 +1155,10 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.model.linear_solver = om.DirectSolver()
         prob.run_model()
 
-        totals = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs',
+        chk = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs',
                                    step = 1e-39, # needs to be different than arrox_totals or error
                                    out_stream=None)
-
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 3e-8)
+        assert_check_totals(chk, atol=3e-8, rtol=3e-8)
 
     def test_cs_error_allocate(self):
         prob = om.Problem()

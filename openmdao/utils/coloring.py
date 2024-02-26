@@ -2386,7 +2386,7 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
 
     if not prob._computing_coloring:
         if setup:
-            prob.setup(mode=prob._mode)
+            prob.setup(mode=prob._orig_mode)
 
         if run_model:
             prob.run_model(reset_iter_counts=False)
@@ -2567,10 +2567,11 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
     model = problem.model
 
     if mode is None:
-        if model._approx_schemes:
-            mode = 'fwd'
-        else:
-            mode = problem._orig_mode
+        # if model._approx_schemes:
+        #     mode = 'fwd'
+        # else:
+        mode = problem._orig_mode
+
     if mode != problem._orig_mode and mode != problem._mode:
         raise RuntimeError("given mode (%s) does not agree with Problem mode (%s)" %
                            (mode, problem._mode))

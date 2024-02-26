@@ -125,7 +125,7 @@ class _TotalJacInfo(object):
         self.model = model = problem.model
 
         self.comm = problem.comm
-        self.mode = problem._mode
+        self._orig_mode = problem._orig_mode
         self.has_scaling = driver._has_scaling and driver_scaling
         self.return_format = return_format
         self.lin_sol_cache = {}
@@ -144,6 +144,17 @@ class _TotalJacInfo(object):
                                "was called.")
 
         of_metadata, wrt_metadata, has_custom_derivs = model._get_totals_metadata(driver, of, wrt)
+
+        ofsize = sum(meta['global_size'] for meta in of_metadata.values())
+        wrtsize = sum(meta['global_size'] for meta in wrt_metadata.values())
+
+        if self._orig_mode == 'auto':
+            if ofsize >= wrtsize:
+                self.mode = 'fwd'
+            else:
+                self.mode = 'rev'
+        else:
+            self.mode = self._orig_mode
 
         self.input_meta = {'fwd': wrt_metadata, 'rev': of_metadata}
         self.output_meta = {'fwd': of_metadata, 'rev': wrt_metadata}
@@ -1357,7 +1368,7 @@ class _TotalJacInfo(object):
             # Linearize Model
             model._tot_jac = self
 
-            with self._relevance_context():
+            with self._totjac_context():
                 relevant = self.relevance
                 with relevant.active(model.linear_solver.use_relevance()):
                     with relevant.all_seeds_active():
@@ -1483,7 +1494,7 @@ class _TotalJacInfo(object):
 
         t0 = time.perf_counter()
 
-        with self._relevance_context():
+        with self._totjac_context():
             model._tot_jac = self
             try:
                 if self.initialize:
@@ -1554,7 +1565,8 @@ class _TotalJacInfo(object):
         meta : dict
             Variable metadata.
         jac_arr : ndarray
-            Row or column of jacobian being checked for zero entries.
+            Row or column of jacobian being checked for zero entries. Note that in this
+            array, zero entries are True and nonzero ones are False.
 
         Returns
         -------
@@ -1562,11 +1574,9 @@ class _TotalJacInfo(object):
             Index array of zero entries.
         """
         inds = meta['indices']   # these must be indices into the flattened var
-        jac_slice = meta['jac_slice']
-        source = meta['source']
         shname = 'global_shape' if self.get_remote else 'shape'
-        shape = self.model._var_allprocs_abs2meta['output'][source][shname]
-        vslice = jac_arr[jac_slice]
+        shape = self.model._var_allprocs_abs2meta['output'][meta['source']][shname]
+        vslice = jac_arr[meta['jac_slice']]
 
         if inds is None:
             zero_idxs = np.atleast_1d(vslice.reshape(shape)).nonzero()
@@ -1599,7 +1609,7 @@ class _TotalJacInfo(object):
 
         # Check for zero rows, which correspond to constraints unaffected by any design vars.
         col = np.ones(self.J.shape[0], dtype=bool)
-        col[nzrows] = False  # False in this case means nonzero
+        col[nzrows] = False  # False here means nonzero
         if np.any(col):  # there's at least 1 row that's zero across all columns
             zero_rows = []
             for n, meta in self.output_meta['fwd'].items():
@@ -1836,17 +1846,20 @@ class _TotalJacInfo(object):
         return newJ, slices
 
     @contextmanager
-    def _relevance_context(self):
+    def _totjac_context(self):
         """
         Context manager to set current relevance for the Problem.
         """
         old_relevance = self.model._problem_meta['relevant']
+        old_mode = self.model._problem_meta['mode']
         self.model._problem_meta['relevant'] = self.relevance
+        self.model._problem_meta['mode'] = self.mode
 
         try:
             yield
         finally:
             self.model._problem_meta['relevant'] = old_relevance
+            self.model._problem_meta['mode'] = old_mode
 
 
 def _fix_pdc_lengths(idx_iter_dict):

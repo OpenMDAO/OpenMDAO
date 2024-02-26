@@ -8,7 +8,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.constants import INT_DTYPE
 import openmdao.func_api as omf
 from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore, _add_options, \
-    jac_forward, jac_reverse, jacvec_prod, _get_tangents
+    jac_forward, jac_reverse, _get_tangents
 from openmdao.utils.array_utils import shape_to_len
 
 try:

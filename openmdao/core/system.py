@@ -504,8 +504,6 @@ class System(object):
         self._static_design_vars = {}
         self._static_responses = {}
 
-        self._mode = None
-
         self._scope_cache = {}
 
         self._num_par_fd = num_par_fd
@@ -2012,7 +2010,7 @@ class System(object):
         self._design_vars.update(self._static_design_vars)
         self._responses.update(self._static_responses)
 
-    def _setup_procs(self, pathname, comm, mode, prob_meta):
+    def _setup_procs(self, pathname, comm, prob_meta):
         """
         Execute first phase of the setup process.
 
@@ -2027,14 +2025,13 @@ class System(object):
             MPI communicator object.
         mode : str
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
-            reverse (adjoint). Default is 'rev'.
+            reverse (adjoint). Deprecated.
         prob_meta : dict
             Problem level options.
         """
         self._reset_setup_vars()
 
         self.pathname = pathname
-        self._mode = mode
         self._set_problem_meta(prob_meta)
         self.load_model_options()
 
@@ -2776,6 +2773,30 @@ class System(object):
         True if outside of setup.
         """
         return self._problem_meta is None or self._problem_meta['static_mode']
+
+    @property
+    def _mode(self):
+        """
+        Return the current system mode.
+
+        Returns
+        -------
+        str
+            The current system mode, 'fwd' or 'rev'.
+        """
+        return self._problem_meta['mode']
+
+    @property
+    def _orig_mode(self):
+        """
+        Return the user specified system mode.
+
+        Returns
+        -------
+        str
+            The system mode specified during setup, 'fwd', 'rev', or 'auto'.
+        """
+        return self._problem_meta['orig_mode']
 
     def _set_solver_print(self, level=2, depth=1e99, type_='all'):
         """

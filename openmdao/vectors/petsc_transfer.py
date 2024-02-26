@@ -67,7 +67,7 @@ else:
             group : <Group>
                 Parent group.
             """
-            rev = group._mode != 'fwd'
+            rev = group._orig_mode != 'fwd'
 
             group._transfers = {
                 'fwd': PETScTransfer._setup_transfers_fwd(group)

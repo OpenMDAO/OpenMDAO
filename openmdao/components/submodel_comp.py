@@ -2,6 +2,7 @@
 
 from openmdao.core.constants import _SetupStatus, INF_BOUND
 from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.utils.general_utils import pattern_filter
 from openmdao.utils.reports_system import clear_reports
 from openmdao.utils.mpi import MPI, FakeComm
@@ -207,6 +208,7 @@ class SubmodelComp(ExplicitComponent):
         """
         Perform some final setup and checks.
         """
+        self._totjacinfo = None
         p = self._subprob
 
         # make sure comm is correct or at least reasonable.  In cases
@@ -229,6 +231,7 @@ class SubmodelComp(ExplicitComponent):
         p.final_setup()
 
         abs2meta = p.model._var_allprocs_abs2meta['output']
+        abs2meta_local = p.model._var_abs2meta['output']
         prom2abs_in = p.model._var_allprocs_prom2abs_list['input']
         prom2abs_out = p.model._var_allprocs_prom2abs_list['output']
 
@@ -236,7 +239,12 @@ class SubmodelComp(ExplicitComponent):
         for prom in prom2abs_in:
             src = p.model.get_source(prom)
             if 'openmdao:indep_var' in abs2meta[src]['tags']:
-                self.indep_vars[prom] = (src, abs2meta[src])
+                if src in abs2meta_local:
+                    meta = abs2meta_local[src]
+                else:
+                    meta = abs2meta[src]
+                self.indep_vars[prom] = meta
+                self.indep_vars[src] = meta
 
         self.submodel_inputs = {}
         self.submodel_outputs = {}
@@ -283,7 +291,7 @@ class SubmodelComp(ExplicitComponent):
             if outer_name in self._static_var_rel2meta or outer_name in self._var_rel2meta:
                 raise RuntimeError("this shouldn't happen")
             try:
-                src, meta = self.indep_vars[prom_name]
+                meta = self.indep_vars[prom_name]
             except KeyError:
                 raise KeyError(f"Independent variable '{prom_name}' not found in model")
 
@@ -292,6 +300,8 @@ class SubmodelComp(ExplicitComponent):
             if out_name is None:
                 out_name = var.replace('.', ':')
             super().add_input(outer_name, **final_kwargs)
+            if 'val' in kwargs:  # val in kwargs overrides internal value
+                self._subprob.set_val(prom_name, kwargs['val'])
 
         for prom_name, (outer_name, kwargs) in sorted(self.submodel_outputs.items(),
                                                       key=lambda x: x[0]):
@@ -299,15 +309,21 @@ class SubmodelComp(ExplicitComponent):
                 raise RuntimeError("this shouldn't happen")
 
             try:
-                meta = abs2meta[prom2abs_out[prom_name][0]]
+                # look for metadata locally first, then use allprocs data if we have to
+                meta = abs2meta_local[prom2abs_out[prom_name][0]]
             except KeyError:
-                raise KeyError(f"Output '{prom_name}' not found in model")
+                try:
+                    meta = abs2meta[prom2abs_out[prom_name][0]]
+                except KeyError:
+                    raise KeyError(f"Output '{prom_name}' not found in model")
 
             final_kwargs = {n: v for n, v in meta.items() if n in _allowed_add_output_args}
             final_kwargs.update(kwargs)
             if out_name is None:
                 out_name = var.replace('.', ':')
             super().add_output(outer_name, **final_kwargs)
+            if 'val' in kwargs:  # val in kwargs overrides internal value
+                self._subprob.set_val(prom_name, kwargs['val'])
 
     def setup_partials(self):
         p = self._subprob
@@ -317,13 +333,11 @@ class SubmodelComp(ExplicitComponent):
         if len(inputs) == 0 or len(outputs) == 0:
             return
 
-        p.run_model()
-
         ofs = list(self.submodel_outputs)
         wrts = list(self.submodel_inputs)
 
         coloring_info = ColoringMeta()
-        coloring_info.coloring = compute_total_coloring(p, of=ofs, wrt=wrts)
+        coloring_info.coloring = compute_total_coloring(p, of=ofs, wrt=wrts, run_model=True)
         if coloring_info.coloring is not None:
             self.coloring = coloring_info.coloring
 
@@ -349,7 +363,6 @@ class SubmodelComp(ExplicitComponent):
             Unscaled, dimensional output variables read via outputs[key].
         """
         p = self._subprob
-
         for prom_name, (outer_name, _) in self.submodel_inputs.items():
             p.set_val(prom_name, inputs[outer_name])
 
@@ -378,10 +391,11 @@ class SubmodelComp(ExplicitComponent):
         for prom_name, (outer_name, _) in self.submodel_inputs.items():
             p.set_val(prom_name, inputs[outer_name])
 
-        wrt = list(self.submodel_inputs.keys())
-        of = list(self.submodel_outputs.keys())
-
-        tots = p.compute_totals(wrt=wrt, of=of)
+        if self._totjacinfo is None:
+            self._totjacinfo = _TotalJacInfo(p, self.submodel_outputs, self.submodel_inputs,
+                                             return_format='flat_dict',
+                                             approx=p.model._owns_approx_jac, use_coloring=True)
+        tots = self._totjacinfo.compute_totals()
 
         if self.coloring is None:
             for (tot_output, tot_input), tot in tots.items():
@@ -394,8 +408,8 @@ class SubmodelComp(ExplicitComponent):
 
 
     # TODO:
-    # def _transfer_to_sub_inputs(self):
+    # def _transfer_to_sub(self):
     #    pass
 
-    # def _transfer_from_sub_outputs(self):
+    # def _transfer_from_sub(self):
     #    pass

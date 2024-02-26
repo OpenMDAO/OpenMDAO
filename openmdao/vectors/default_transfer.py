@@ -133,7 +133,7 @@ class DefaultTransfer(Transfer):
             Parent group.
         """
         iproc = group.comm.rank
-        rev = group._mode == 'rev' or group._mode == 'auto'
+        rev = group._orig_mode != 'fwd'
 
         abs2meta = group._var_abs2meta
 

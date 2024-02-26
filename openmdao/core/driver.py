@@ -973,6 +973,13 @@ class Driver(object):
         if not self.supports['gradients']:
             return
 
+        if 'singular_jac_behavior' in self.options:
+            singular_behavior = self.options['singular_jac_behavior']
+            if singular_behavior == 'ignore':
+                return
+        else:
+            singular_behavior = 'warn'
+
         problem = self._problem()
 
         # Do not perform this check if any subgroup uses approximated partials.
@@ -981,14 +988,26 @@ class Driver(object):
             if system._has_approx:
                 return
 
-        bad_cons = [n for n in self._problem().model._relevant._no_dv_responses
-                    if n not in self._designvars]
-        if bad_cons:
+        bad = {n for n in self._problem().model._relevant._no_dv_responses
+               if n not in self._designvars}
+        if bad:
+            bad_conns = [m['name'] for m in self._cons.values() if m['source'] in bad]
+            bad_objs = [m['name'] for m in self._objs.values() if m['source'] in bad]
+            badmsg = []
+            if bad_conns:
+                badmsg.append(f"constraint(s) {bad_conns}")
+            if bad_objs:
+                badmsg.append(f"objective(s) {bad_objs}")
+            bad = ' and '.join(badmsg)
             # Note: There is a hack in ScipyOptimizeDriver for older versions of COBYLA that
             #       implements bounds on design variables by adding them as constraints.
             #       These design variables as constraints will not appear in the wrt list.
-            raise RuntimeError(f"{self.msginfo}: Constraint(s) {bad_cons} do not depend on any "
-                               "design variables. Please check your problem formulation.")
+            msg = f"{self.msginfo}: {bad} do not depend on any " \
+                  "design variables. Please check your problem formulation."
+            if singular_behavior == 'error':
+                raise RuntimeError(msg)
+            else:
+                issue_warning(msg, category=DriverWarning)
 
     def run(self):
         """
