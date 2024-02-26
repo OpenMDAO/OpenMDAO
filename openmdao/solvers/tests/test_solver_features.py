@@ -219,6 +219,33 @@ class TestSolverFeatures(unittest.TestCase):
 
         prob.run_model()
 
+    def test_linesearch_property(self):
+        import openmdao.api as om
+
+        ns = om.NewtonSolver()
+        bs = om.BroydenSolver()
+        nlbgs = om.NonlinearBlockGS()
+        nlbj = om.NonlinearBlockJac()
+
+        for solver in [ns, bs, nlbgs, nlbj]:
+            with self.subTest(msg=solver.msginfo):
+                if solver in (ns, bs):
+                    self.assertIsInstance(solver.linesearch, om.BoundsEnforceLS)
+                else:
+                    self.assertIsNone(solver.linesearch)
+
+                new_ls = om.ArmijoGoldsteinLS()
+
+                if solver in (nlbgs, nlbj):
+                    with self.assertRaises(AttributeError) as e:
+                        solver.linesearch = new_ls
+                    expected = (f'{solver.msginfo}: This solver does not '
+                                'support a linesearch.')
+                    self.assertEqual(expected, str(e.exception))
+                else:
+                    solver.linesearch = new_ls
+                    self.assertIs(solver.linesearch, new_ls)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2134,13 +2134,28 @@ class System(object):
                           "were specified."
                     raise RuntimeError(msg.format(self.msginfo, name, var_units, units))
 
-                factor, offset = unit_conversion(var_units, units)
-                base_adder, base_scaler = determine_adder_scaler(None, None,
-                                                                 meta['adder'],
-                                                                 meta['scaler'])
+                # Derivation of the total scaler and total adder for design variables:
+                # Given based design variable value y
+                # First we apply the desired unit conversion
+                # y_in_desired_units = unit_scaler * (y + unit_adder)
+                # Then we apply the user-declared scaling
+                # y_opt = declared_scaler * (y_in_desired_units + declared_adder)
+                # Thus
+                # y_opt = declared_scaler * (unit_scaler * (y + unit_adder) + declared_adder)
+                # And collecting terms
+                # y_opt = [declared_scaler * unit_scaler]
+                #         * (y + unit_adder + declared_adder/unit_scaler)
+                # So the total_scaler and total_adder for the optimizer are:
+                # total_scaler = declared_scaler * unit_scaler
+                # total_adder = unit_adder + declared_adder / unit_scaler
 
-                meta['total_adder'] = offset + base_adder / factor
-                meta['total_scaler'] = base_scaler * factor
+                unit_scaler, unit_adder = unit_conversion(var_units, units)
+                declared_adder, declared_scaler = determine_adder_scaler(None, None,
+                                                                         meta['adder'],
+                                                                         meta['scaler'])
+
+                meta['total_adder'] = unit_adder + declared_adder / unit_scaler
+                meta['total_scaler'] = declared_scaler * unit_scaler
 
             if meta['total_scaler'] is not None:
                 has_scaling = True
@@ -2178,13 +2193,12 @@ class System(object):
                     raise RuntimeError(msg.format(self.msginfo, type_dict[meta['type']],
                                                   name, src_units, units))
 
-                factor, offset = unit_conversion(src_units, units)
-                base_adder, base_scaler = determine_adder_scaler(None, None,
-                                                                 meta['adder'],
-                                                                 meta['scaler'])
+                unit_scaler, unit_adder = unit_conversion(src_units, units)
+                declared_adder, declared_scaler =\
+                    determine_adder_scaler(None, None, meta['adder'], meta['scaler'])
 
-                meta['total_scaler'] = base_scaler * factor
-                meta['total_adder'] = offset + base_adder / factor
+                meta['total_scaler'] = declared_scaler * unit_scaler
+                meta['total_adder'] = unit_adder + declared_adder / unit_scaler
 
             if meta['total_scaler'] is not None:
                 has_scaling = True
@@ -4818,7 +4832,7 @@ class System(object):
             if s._nonlinear_solver:
                 nl = s._nonlinear_solver
                 nl._iter_count = 0
-                if hasattr(nl, 'linesearch') and nl.linesearch:
+                if nl.linesearch:
                     nl.linesearch._iter_count = 0
 
     def get_reports_dir(self):
