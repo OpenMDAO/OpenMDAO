@@ -582,27 +582,6 @@ class ScipyOptimizeDriver(Driver):
                 print(result.message)
                 print('-' * 35)
 
-        if not self.fail and not prob.options['group_by_pre_opt_post']:
-            # update all systems after the opt completes so even irrelevant components
-            # get updated
-            with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-                try:
-                    model.run_solve_nonlinear()
-                except AnalysisError:
-                    model._clear_iprint()
-
-                rec.abs = 0.0
-                rec.rel = 0.0
-
-            if self.recording_options['record_derivatives']:
-                try:
-                    self._total_jac = total_jac  # temporarily restore this to get deriv recording
-                    self.record_derivatives()
-                finally:
-                    self._total_jac = None
-
-            self.iter_count += 1
-
         return self.fail
 
     def _update_design_vars(self, x_new):
