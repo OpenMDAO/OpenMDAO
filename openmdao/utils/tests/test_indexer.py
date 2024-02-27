@@ -3,9 +3,7 @@ import unittest
 import numpy as np
 from numpy.testing import assert_equal
 
-import openmdao.api as om
-from openmdao.utils.indexer import indexer
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.indexer import indexer, combine_ranges
 
 
 class IndexerTestCase(unittest.TestCase):
@@ -457,6 +455,35 @@ class IndexerMultiDimTestCase(unittest.TestCase):
         assert_equal(ind.as_array(flat=False), np.array([1,3,5,4,22, -4, 11, 3]))
         assert_equal(ind.indexed_src_shape, (8,))
         assert_equal(ind.min_src_dim, 1)
+
+
+class TestCombineRanges(unittest.TestCase):
+
+    def test_empty(self):
+        ranges = []
+        result = combine_ranges(ranges)
+        self.assertEqual(result, [])
+
+    def test_single_range(self):
+        ranges = [(1, 5)]
+        result = combine_ranges(ranges)
+        self.assertEqual(result, [(1, 5)])
+
+    def test_contig_ranges(self):
+        ranges = [(1, 5), (5, 10), (10, 15)]
+        result = combine_ranges(ranges)
+        self.assertEqual(result, [(1, 15)])
+
+    def test_non_overlapping_ranges(self):
+        ranges = [(1, 5), (6, 10), (11, 15)]
+        result = combine_ranges(ranges)
+        self.assertEqual(result, [(1, 5), (6, 10), (11, 15)])
+
+    def test_mixed_ranges(self):
+        ranges = [(1, 5), (5, 10), (11, 15)]
+        result = combine_ranges(ranges)
+        self.assertEqual(result, [(1, 10), (11, 15)])
+
 
 
 if __name__ == '__main__':

@@ -313,8 +313,6 @@ class SubmodelComp(ExplicitComponent):
         # to this component, cannot contain '.'s.
         for inner_prom, (outer_name, kwargs) in sorted(self._submodel_inputs.items(),
                                                        key=lambda x: x[0]):
-            if outer_name in self._static_var_rel2meta or outer_name in self._var_rel2meta:
-                raise RuntimeError("this shouldn't happen")
             try:
                 meta = self.indep_vars[inner_prom]
             except KeyError:
@@ -330,9 +328,6 @@ class SubmodelComp(ExplicitComponent):
 
         for inner_prom, (outer_name, kwargs) in sorted(self._submodel_outputs.items(),
                                                        key=lambda x: x[0]):
-            if outer_name in self._static_var_rel2meta or outer_name in self._var_rel2meta:
-                raise RuntimeError("this shouldn't happen")
-
             try:
                 # look for metadata locally first, then use allprocs data if we have to
                 meta = abs2meta_local[prom2abs_out[inner_prom][0]]

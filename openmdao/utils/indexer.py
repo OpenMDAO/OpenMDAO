@@ -54,6 +54,133 @@ def _truncate(s):
     return s
 
 
+def size_map2range_map(size_map):
+    """
+    Convert a size map to a range map.
+
+    Parameters
+    ----------
+    size_map : dict
+        Mapping of variable names to their sizes.
+
+    Returns
+    -------
+    dict
+        Mapping of variable names to their ranges.
+    """
+    ranges = {}
+    start = 0
+    for name, size in size_map.items():
+        ranges[name] = (start, start + size)
+        start += size
+    return ranges
+
+
+def create_array_index_mapping(src_range_map, tgt_range_map, src_tgt_map):
+    """
+    Create indexing that maps a set of variables from one array to another.
+
+    Parameters
+    ----------
+    src_range_map : dict
+        Mapping of variable names to their ranges in the source array.
+    tgt_range_map : dict
+        Mapping of variable names to their ranges in the target array.
+    src_tgt_map : dict
+        Mapping of variable names in the source array to variable names in the target array.
+
+    Returns
+    -------
+    Indexer
+        The src indexer.
+    Indexer
+        The tgt indexer.
+    """
+    matching_ranges = []
+    total_size = 0
+
+    for src, tgt in src_tgt_map.items():
+        src_range = src_range_map[src]
+        tgt_range = tgt_range_map[tgt]
+
+        src_size = src_range[1] - src_range[0]
+
+        # make sure the ranges are the same size
+        if src_size != tgt_range[1] - tgt_range[0]:
+            raise ValueError(f"Size mismatch between source and target ranges. Source '{src}' is "
+                             f"size {src_size}, but target '{tgt}' is size "
+                             f"{tgt_range[1] - tgt_range[0]}.")
+
+        total_size += src_size
+        matching_ranges.append((src, src_range, tgt, tgt_range))
+
+    # sort the src_range, tgt_range pairs by the start of the src_range to increase the chance of
+    # having contiguous ranges in the source array and thereby increasing the chance of using
+    # slices to get src views rather than index arrays which make a copy.
+    matching_ranges = sorted(matching_ranges, key=lambda x: x[1][0])
+
+    src_ranges = [r[1] for r in matching_ranges]
+    tgt_ranges = [r[3] for r in matching_ranges]
+
+    return ranges2indexer(src_ranges), ranges2indexer(tgt_ranges)
+
+
+def combine_ranges(ranges):
+    """
+    Combine a list of (start, end) tuples into the smallest possible list of contiguous ranges.
+
+    The ranges are assumed to be non-overlapping and in ascending order.
+
+    Parameters
+    ----------
+    ranges : list
+        List of (start, end) tuples.
+
+    Returns
+    -------
+    list of tuples
+        List of combined ranges.
+    """
+    rnglist = []
+    if not ranges:
+        return rnglist
+
+    cstart, cend = ranges[0]
+    for start, end in ranges[1:]:
+        if start == cend:
+            cend = end
+        else:
+            rnglist.append((cstart, cend))
+            cstart, cend = start, end
+
+    rnglist.append((cstart, cend))
+
+    return rnglist
+
+
+def ranges2indexer(ranges):
+    """
+    Convert a list of ranges to an indexer.
+
+    Parameters
+    ----------
+    ranges : list
+        List of (start, end) tuples.
+
+    Returns
+    -------
+    Indexer
+        Indexer object.
+    """
+    ranges = combine_ranges(ranges)
+    if len(ranges) == 1:
+        idx = slice(ranges[0][0], ranges[0][1])
+    else:
+        idx = np.concatenate([np.arange(start, end) for start, end in ranges])
+
+    return indexer(idx, src_shape=ranges[-1][1], flat_src=True)
+
+
 class Indexer(object):
     """
     Abstract indexing class.
