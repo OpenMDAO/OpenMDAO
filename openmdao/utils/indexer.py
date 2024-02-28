@@ -97,7 +97,6 @@ def create_array_index_mapping(src_range_map, tgt_range_map, src_tgt_map):
         The tgt indexer.
     """
     matching_ranges = []
-    total_size = 0
 
     for src, tgt in src_tgt_map.items():
         src_range = src_range_map[src]
@@ -111,7 +110,6 @@ def create_array_index_mapping(src_range_map, tgt_range_map, src_tgt_map):
                              f"size {src_size}, but target '{tgt}' is size "
                              f"{tgt_range[1] - tgt_range[0]}.")
 
-        total_size += src_size
         matching_ranges.append((src, src_range, tgt, tgt_range))
 
     # sort the src_range, tgt_range pairs by the start of the src_range to increase the chance of
@@ -178,7 +176,7 @@ def ranges2indexer(ranges):
     else:
         idx = np.concatenate([np.arange(start, end) for start, end in ranges])
 
-    return indexer(idx, src_shape=ranges[-1][1], flat_src=True)
+    return indexer(idx, src_shape=(ranges[-1][1],), flat_src=True)
 
 
 class Indexer(object):

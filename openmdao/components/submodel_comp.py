@@ -8,6 +8,7 @@ from openmdao.utils.reports_system import clear_reports
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.coloring import compute_total_coloring, ColoringMeta
 from openmdao.utils.om_warnings import warn_deprecation
+from openmdao.utils.indexer import create_array_index_mapping
 
 
 def _is_glob(name):
@@ -84,6 +85,10 @@ class SubmodelComp(ExplicitComponent):
         because setup can be called multiple times and the submodel outputs dict is reset each time.
     _coloring_info : ColoringMeta
         The coloring information for the submodel.
+    _input_xfer_idxs : tuple of ndarray (outer_idxs, inner_idxs)
+        Tuple of arrays that map parts of our input array to the ourpur array of the submodel.
+    _output_xfer_idxs : tuple of ndarray (outer_idxs, inner_idxs)
+        Tuple of arrays that map parts of our output array to the output array of the submodel.
     """
 
     def __init__(self, problem, inputs=None, outputs=None, reports=False, **kwargs):
@@ -100,6 +105,8 @@ class SubmodelComp(ExplicitComponent):
 
         self._submodel_inputs = {}
         self._submodel_outputs = {}
+        self._input_xfer_idxs = None
+        self._output_xfer_idxs = None
 
         self._static_submodel_inputs = {
             name: (out_name, {}) for name, out_name in _io_namecheck_iter(inputs, 'input')
@@ -257,7 +264,7 @@ class SubmodelComp(ExplicitComponent):
             if prom not in self.indep_vars and 'openmdao:indep_var' in meta['tags']:
                 if src in abs2meta_local:
                     meta = abs2meta_local[src]  # get local metadata if we have it
-                self.indep_vars[prom] = meta
+                self.indep_vars[prom] = (src, meta)
 
         # add any inputs connected to _auto_ivc vars as indep vars
         for prom in prom2abs_in:
@@ -268,7 +275,7 @@ class SubmodelComp(ExplicitComponent):
                 meta = abs2meta_local[src]  # get local metadata if we have it
             else:
                 meta = abs2meta[src]
-            self.indep_vars[prom] = meta
+            self.indep_vars[prom] = (src, meta)
 
         self._submodel_inputs = {}
         self._submodel_outputs = {}
@@ -314,7 +321,7 @@ class SubmodelComp(ExplicitComponent):
         for inner_prom, (outer_name, kwargs) in sorted(self._submodel_inputs.items(),
                                                        key=lambda x: x[0]):
             try:
-                meta = self.indep_vars[inner_prom]
+                _, meta = self.indep_vars[inner_prom]
             except KeyError:
                 raise KeyError(f"Independent variable '{inner_prom}' not found in model")
 
@@ -359,6 +366,8 @@ class SubmodelComp(ExplicitComponent):
         ofs = list(self._submodel_outputs)
         wrts = list(self._submodel_inputs)
 
+        self._setup_transfer_idxs()
+
         coloring_info = self._coloring_info
 
         if self.options['do_coloring']:
@@ -391,17 +400,18 @@ class SubmodelComp(ExplicitComponent):
             Unscaled, dimensional output variables read via outputs[key].
         """
         p = self._subprob
-        for prom_name, (outer_name, _) in self._submodel_inputs.items():
-            p.set_val(prom_name, inputs[outer_name])
 
-        # set initial output vals
-        for prom_name, (outer_name, _) in self._submodel_outputs.items():
-            p.set_val(prom_name, outputs[outer_name])
+        # set our inputs and outputs into the submodel
+        outer_idxs, inner_idxs = self._input_xfer_idxs
+        p.model._outputs.set_val(self._inputs.asarray(), idxs=inner_idxs())
+
+        outer_idxs, inner_idxs = self._output_xfer_idxs
+        p.model._outputs.set_val(self._outputs.asarray(), idxs=inner_idxs())
 
         p.run_model()
 
-        for prom_name, (outer_name, _) in self._submodel_outputs.items():
-            outputs[outer_name] = p.get_val(prom_name)
+        # collect outputs from the submodel
+        self._outputs.set_val(p.model._outputs.asarray()[inner_idxs()])
 
     def compute_partials(self, inputs, partials):
         """
@@ -416,8 +426,8 @@ class SubmodelComp(ExplicitComponent):
         """
         p = self._subprob
 
-        for prom_name, (outer_name, _) in self._submodel_inputs.items():
-            p.set_val(prom_name, inputs[outer_name])
+        # we don't need to set our inputs into the submodel here because we've already done it
+        # in compute.
 
         if self._totjacinfo is None:
             self._totjacinfo = _TotalJacInfo(p, self._submodel_outputs, self._submodel_inputs,
@@ -436,9 +446,48 @@ class SubmodelComp(ExplicitComponent):
             for of, wrt, nzrows, nzcols, _, _, _, _ in coloring._subjac_sparsity_iter():
                 partials[of, wrt] = tots[of, wrt][nzrows, nzcols].ravel()
 
-    # TODO:
-    # def _transfer_to_sub(self):
-    #    pass
+    def _setup_transfer_idxs(self):
+        """
+        Set up the transfer indices for input and output variables.
 
-    # def _transfer_from_sub(self):
-    #    pass
+        These map parts of our input and output arrays to the input and output arrays of the
+        submodel.
+        """
+        abs2meta = self._subprob.model._var_allprocs_abs2meta['output']
+        prom2abs = self._subprob.model._var_allprocs_prom2abs_list['output']
+
+        inp_maps = ({}, {})
+        inp_name_map = {}
+        full_inner_map = {}
+
+        start = 0
+        for abs_name, meta in abs2meta.items():
+            size = meta['size']
+            full_inner_map[abs_name] = (start, start + size)
+            start += size
+
+        start = 0
+        for inner_prom, (outer_name, _) in self._submodel_inputs.items():
+            src, meta = self.indep_vars[inner_prom]
+            size = meta['size']
+            rng = (start, start + size)
+            inp_maps[0][outer_name] = rng
+            inp_maps[1][inner_prom] = full_inner_map[src]
+            inp_name_map[outer_name] = inner_prom
+            start += size
+
+        out_maps = ({}, {})
+        out_name_map = {}
+        start = 0
+
+        for inner_prom, (outer_name, _) in self._submodel_outputs.items():
+            src = prom2abs[inner_prom][0]
+            size = abs2meta[src]['size']
+            rng = (start, start + size)
+            out_maps[0][outer_name] = rng
+            out_maps[1][inner_prom] = full_inner_map[src]
+            out_name_map[outer_name] = inner_prom
+            start += size
+
+        self._input_xfer_idxs = create_array_index_mapping(inp_maps[0], inp_maps[1], inp_name_map)
+        self._output_xfer_idxs = create_array_index_mapping(out_maps[0], out_maps[1], out_name_map)
