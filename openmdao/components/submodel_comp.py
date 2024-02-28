@@ -8,7 +8,7 @@ from openmdao.utils.reports_system import clear_reports
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.coloring import compute_total_coloring, ColoringMeta
 from openmdao.utils.om_warnings import warn_deprecation
-from openmdao.utils.indexer import create_array_index_mapping
+from openmdao.utils.indexer import ranges2indexer
 
 
 def _is_glob(name):
@@ -85,10 +85,10 @@ class SubmodelComp(ExplicitComponent):
         because setup can be called multiple times and the submodel outputs dict is reset each time.
     _coloring_info : ColoringMeta
         The coloring information for the submodel.
-    _input_xfer_idxs : tuple of ndarray (outer_idxs, inner_idxs)
-        Tuple of arrays that map parts of our input array to the ourpur array of the submodel.
-    _output_xfer_idxs : tuple of ndarray (outer_idxs, inner_idxs)
-        Tuple of arrays that map parts of our output array to the output array of the submodel.
+    _input_xfer_idxs : ndarray
+        Index array that maps our input array into parts of the output array of the submodel.
+    _output_xfer_idxs : ndarray
+        Index array that maps our output array into parts of the output array of the submodel.
     """
 
     def __init__(self, problem, inputs=None, outputs=None, reports=False, **kwargs):
@@ -402,10 +402,10 @@ class SubmodelComp(ExplicitComponent):
         p = self._subprob
 
         # set our inputs and outputs into the submodel
-        outer_idxs, inner_idxs = self._input_xfer_idxs
+        inner_idxs = self._input_xfer_idxs
         p.model._outputs.set_val(self._inputs.asarray(), idxs=inner_idxs())
 
-        outer_idxs, inner_idxs = self._output_xfer_idxs
+        inner_idxs = self._output_xfer_idxs
         p.model._outputs.set_val(self._outputs.asarray(), idxs=inner_idxs())
 
         p.run_model()
@@ -456,38 +456,24 @@ class SubmodelComp(ExplicitComponent):
         abs2meta = self._subprob.model._var_allprocs_abs2meta['output']
         prom2abs = self._subprob.model._var_allprocs_prom2abs_list['output']
 
-        inp_maps = ({}, {})
-        inp_name_map = {}
-        full_inner_map = {}
+        inp_ranges = []
+        out_ranges = []
 
+        full_inner_map = {}
         start = 0
         for abs_name, meta in abs2meta.items():
             size = meta['size']
             full_inner_map[abs_name] = (start, start + size)
             start += size
 
-        start = 0
-        for inner_prom, (outer_name, _) in self._submodel_inputs.items():
-            src, meta = self.indep_vars[inner_prom]
-            size = meta['size']
-            rng = (start, start + size)
-            inp_maps[0][outer_name] = rng
-            inp_maps[1][inner_prom] = full_inner_map[src]
-            inp_name_map[outer_name] = inner_prom
-            start += size
+        # get ranges for subodel outputs corresponding to our inputs
+        for inner_prom in self._submodel_inputs:
+            src, _ = self.indep_vars[inner_prom]
+            inp_ranges.append(full_inner_map[src])
 
-        out_maps = ({}, {})
-        out_name_map = {}
-        start = 0
+        # get ranges for submodel outputs corresponding to our outputs
+        for inner_prom in self._submodel_outputs:
+            out_ranges.append(full_inner_map[prom2abs[inner_prom][0]])
 
-        for inner_prom, (outer_name, _) in self._submodel_outputs.items():
-            src = prom2abs[inner_prom][0]
-            size = abs2meta[src]['size']
-            rng = (start, start + size)
-            out_maps[0][outer_name] = rng
-            out_maps[1][inner_prom] = full_inner_map[src]
-            out_name_map[outer_name] = inner_prom
-            start += size
-
-        self._input_xfer_idxs = create_array_index_mapping(inp_maps[0], inp_maps[1], inp_name_map)
-        self._output_xfer_idxs = create_array_index_mapping(out_maps[0], out_maps[1], out_name_map)
+        self._input_xfer_idxs = ranges2indexer(inp_ranges)
+        self._output_xfer_idxs = ranges2indexer(out_ranges)
