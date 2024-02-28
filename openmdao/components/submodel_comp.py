@@ -9,6 +9,7 @@ from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.coloring import compute_total_coloring, ColoringMeta
 from openmdao.utils.om_warnings import warn_deprecation
 from openmdao.utils.indexer import ranges2indexer
+from openmdao.utils.iter_utils import size2range_iter, meta2item_iter
 
 
 def _is_glob(name):
@@ -456,22 +457,18 @@ class SubmodelComp(ExplicitComponent):
         abs2meta = self._subprob.model._var_allprocs_abs2meta['output']
         prom2abs = self._subprob.model._var_allprocs_prom2abs_list['output']
 
-        inp_ranges = []
-        out_ranges = []
-
-        full_inner_map = {}
-        start = 0
-        for abs_name, meta in abs2meta.items():
-            size = meta['size']
-            full_inner_map[abs_name] = (start, start + size)
-            start += size
+        full_inner_map = {
+            name: rng for name, rng in size2range_iter(meta2item_iter(abs2meta.items(), 'size'))
+        }
 
         # get ranges for subodel outputs corresponding to our inputs
+        inp_ranges = []
         for inner_prom in self._submodel_inputs:
             src, _ = self.indep_vars[inner_prom]
             inp_ranges.append(full_inner_map[src])
 
         # get ranges for submodel outputs corresponding to our outputs
+        out_ranges = []
         for inner_prom in self._submodel_outputs:
             out_ranges.append(full_inner_map[prom2abs[inner_prom][0]])
 

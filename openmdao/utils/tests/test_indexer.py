@@ -485,6 +485,5 @@ class TestCombineRanges(unittest.TestCase):
         self.assertEqual(result, [(1, 10), (11, 15)])
 
 
-
 if __name__ == '__main__':
     unittest.main()

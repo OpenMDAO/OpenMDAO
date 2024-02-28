@@ -10,7 +10,7 @@ from openmdao.utils.array_utils import _global2local_offsets
 from openmdao.utils.mpi import MPI
 
 
-def _fill(arr, indices_list):
+def _fill(arr, indices_iter):
     """
     Fill the given array with the given list of indices.
 
@@ -18,11 +18,11 @@ def _fill(arr, indices_list):
     ----------
     arr : ndarray
         Array to be filled.
-    indices_list : list of int ndarrays or ranges
-        List of ranges/indices to be placed into arr.
+    indices_iter : iterator of int ndarrays or ranges
+        Iterator of ranges/indices to be placed into arr.
     """
     start = end = 0
-    for inds in indices_list:
+    for inds in indices_iter:
         end += len(inds)
         arr[start:end] = inds
         start = end

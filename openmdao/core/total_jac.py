@@ -856,7 +856,7 @@ class _TotalJacInfo(object):
         get_remote = self.get_remote
         has_dist = False
 
-        for voi, meta in vois.items():
+        for meta in vois.values():
             if not get_remote and meta['remote']:
                 continue
 
