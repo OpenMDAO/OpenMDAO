@@ -3197,6 +3197,9 @@ class Group(System):
             raise TypeError(f"{self.msginfo}: Subsystem '{name}' should be a System instance, but "
                             f"an instance of type {type(subsys).__name__} was found.")
 
+        if subsys is self:
+            raise RuntimeError(f"{self.msginfo}: System '{name}' can't be added to itself.")
+
         if proc_group is not None and not isinstance(proc_group, str):
             raise TypeError(f"{self.msginfo}: proc_group must be a str or None, but is of type "
                             f"'{type(proc_group).__name__}'.")

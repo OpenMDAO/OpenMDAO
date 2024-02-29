@@ -13,52 +13,105 @@ except ImportError:
     PETScVector = None
 
 
+def build_submodelcomp1(promote=True, **kwargs):
+    subprob1 = om.Problem()
+    submodel1 = subprob1.model.add_subsystem('submodel1', om.Group())
+    submodel1.add_subsystem('sub1_ivc_r', om.IndepVarComp('r', 1.),
+                            promotes_outputs=['r'])
+    submodel1.add_subsystem('sub1_ivc_theta', om.IndepVarComp('theta', pi),
+                            promotes_outputs=['theta'])
+    if promote:
+        promotes = ['*']
+    else:
+        promotes = ()
+    submodel1.add_subsystem('subComp1', om.ExecComp('x = r*cos(theta)'), promotes=promotes)
+    subprob1.model.promotes('submodel1', any=['*'])
+    return om.SubmodelComp(problem=subprob1, **kwargs)
+
+
+def build_submodelcomp2(promote=True, **kwargs):
+    subprob2 = om.Problem()
+    submodel2 = subprob2.model.add_subsystem('submodel2', om.Group())
+    submodel2.add_subsystem('sub2_ivc_r', om.IndepVarComp('r', 2),
+                            promotes_outputs=['r'])
+    submodel2.add_subsystem('sub2_ivc_theta', om.IndepVarComp('theta', pi/2),
+                            promotes_outputs=['theta'])
+    if promote:
+        promotes = ['*']
+    else:
+        promotes = ()
+    submodel2.add_subsystem('subComp2', om.ExecComp('y = r*sin(theta)'), promotes=promotes)
+    subprob2.model.promotes('submodel2', any=['*'])
+    return om.SubmodelComp(problem=subprob2, **kwargs)
+
+
+def setup_model_v_submodel(model, inputs=None, outputs=None, driver=None,
+                           pre_final_inits=None, inits=None):
+    if inputs is None or outputs is None:
+        inputs = model.get_design_vars()
+
+    if outputs is None:
+        outputs = model.get_responses()
+
+    if pre_final_inits is None:
+        pre_final_inits = {}
+
+    if inits is None:
+        inits = {}
+
+    p = om.Problem(model=model)
+    if driver is not None:
+        p.driver = driver
+    p.setup()
+
+    for name, value in pre_final_inits.items():
+        p.set_val(name, value)
+
+    p.final_setup()
+
+    for name, value in inits.items():
+        p.set_val(name, value)
+
+    p.run_model()
+
+    p_with_submodel = om.Problem()
+    if driver is not None:
+        p_with_submodel.driver = driver
+    submodelcomp = om.SubmodelComp(problem=om.Problem(model=model), inputs=inputs, outputs=outputs)
+    p_with_submodel.model.add_subsystem('submodelcomp', submodelcomp, promotes=['*'])
+    p_with_submodel.setup()
+
+    for name, value in pre_final_inits.items():
+        p_with_submodel.set_val(name, value)
+
+    p_with_submodel.final_setup()
+
+    for name, value in inits.items():
+        p_with_submodel.set_val(name, value)
+
+    p_with_submodel.run_model()
+
+    return p, p_with_submodel
+
+
 class TestSubmodelComp(unittest.TestCase):
     def test_submodel_comp(self):
         p = om.Problem()
+        supmodel = om.Group()
+        supmodel.add_subsystem('supComp', om.ExecComp('z = x**2 + y'),
+                               promotes_inputs=['x', 'y'],
+                               promotes_outputs=['z'])
 
-        model = om.Group()
-        model.add_subsystem('supComp', om.ExecComp('z = x**2 + y'),
-                            promotes_inputs=['x', 'y'],
-                            promotes_outputs=['z'])
+        p.model.add_subsystem('sub1', build_submodelcomp1(inputs=['r', 'theta'], outputs=['x']),
+                              promotes_inputs=['r','theta'],
+                              promotes_outputs=['x'])
 
-        submodel1 = om.Group()
-        submodel1.add_subsystem('sub1_ivc_r', om.IndepVarComp('r', 1.),
-                                promotes_outputs=['r'])
-        submodel1.add_subsystem('sub1_ivc_theta', om.IndepVarComp('theta', pi),
-                                promotes_outputs=['theta'])
-        submodel1.add_subsystem('subComp1', om.ExecComp('x = r*cos(theta)'),
-                                promotes_inputs=['r', 'theta'],
-                                promotes_outputs=['x'])
+        p.model.add_subsystem('sub2', build_submodelcomp2(inputs=['r', 'theta'], outputs=['y']),
+                              promotes_inputs=['r','theta'],
+                              promotes_outputs=['y'])
 
-        submodel2 = om.Group()
-        submodel2.add_subsystem('sub2_ivc_r', om.IndepVarComp('r', 2),
-                                promotes_outputs=['r'])
-        submodel2.add_subsystem('sub2_ivc_theta', om.IndepVarComp('theta', pi/2),
-                                promotes_outputs=['theta'])
-        submodel2.add_subsystem('subComp2', om.ExecComp('y = r*sin(theta)'),
-                                promotes_inputs=['r', 'theta'],
-                                promotes_outputs=['y'])
-
-        subprob1 = om.Problem()
-        subprob1.model.add_subsystem('submodel1', submodel1)
-        subprob1.model.promotes('submodel1', any=['*'])
-
-        subprob2 = om.Problem()
-        subprob2.model.add_subsystem('submodel2', submodel2)
-        subprob2.model.promotes('submodel2', any=['*'])
-
-        subcomp1 = om.SubmodelComp(problem=subprob1,
-                                   inputs=['r', 'theta'], outputs=['x'])
-        subcomp2 = om.SubmodelComp(problem=subprob2,
-                                   inputs=['r', 'theta'], outputs=['y'])
-
-        p.model.add_subsystem('sub1', subcomp1, promotes_inputs=['r','theta'],
-                                    promotes_outputs=['x'])
-        p.model.add_subsystem('sub2', subcomp2, promotes_inputs=['r','theta'],
-                                    promotes_outputs=['y'])
-        p.model.add_subsystem('supModel', model, promotes_inputs=['x','y'],
-                                    promotes_outputs=['z'])
+        p.model.add_subsystem('supModel', supmodel, promotes_inputs=['x','y'],
+                              promotes_outputs=['z'])
 
         p.model.set_input_defaults('r', 1)
         p.model.set_input_defaults('theta', pi)
@@ -66,7 +119,7 @@ class TestSubmodelComp(unittest.TestCase):
         p.setup(force_alloc_complex=True)
 
         p.run_model()
-        cpd = p.check_partials(method='cs', out_stream=None)
+        assert_check_partials(p.check_partials(method='cs', out_stream=None))
 
         assert_near_equal(p.get_val('z'), 1.0)
 
@@ -78,44 +131,14 @@ class TestSubmodelComp(unittest.TestCase):
                             promotes_inputs=['x', 'y'],
                             promotes_outputs=['z'])
 
-        submodel1 = om.Group()
-        submodel1.add_subsystem('sub1_ivc_r', om.IndepVarComp('r', 1.),
-                                promotes_outputs=['r'])
-        submodel1.add_subsystem('sub1_ivc_theta', om.IndepVarComp('theta', pi),
-                                promotes_outputs=['theta'])
-        submodel1.add_subsystem('subComp1', om.ExecComp('x = r*cos(theta)'),
-                                promotes_inputs=['r', 'theta'],
-                                promotes_outputs=['x'])
-
-        submodel2 = om.Group()
-        submodel2.add_subsystem('sub2_ivc_r', om.IndepVarComp('r', 2),
-                                promotes_outputs=['r'])
-        submodel2.add_subsystem('sub2_ivc_theta', om.IndepVarComp('theta', pi/2),
-                                promotes_outputs=['theta'])
-        submodel2.add_subsystem('subComp2', om.ExecComp('y = r*sin(theta)'),
-                                promotes_inputs=['r', 'theta'],
-                                promotes_outputs=['y'])
-
-        subprob1 = om.Problem()
-        subprob1.model.add_subsystem('submodel1', submodel1)
-        subprob2 = om.Problem()
-        subprob2.model.add_subsystem('submodel2', submodel2)
-
-        subcomp1 = om.SubmodelComp(problem=subprob1)
-        subcomp2 = om.SubmodelComp(problem=subprob2)
-
-        p.model.add_subsystem('sub1', subcomp1)
-        p.model.add_subsystem('sub2', subcomp2)
-        p.model.add_subsystem('supModel', model, promotes_inputs=['x','y'],
-                                    promotes_outputs=['z'])
+        p.model.add_subsystem('sub1', build_submodelcomp1())
+        p.model.add_subsystem('sub2', build_submodelcomp2())
+        p.model.add_subsystem('supModel', model, promotes_inputs=['x','y'], promotes_outputs=['z'])
 
         p.setup(force_alloc_complex=True)
 
         with self.assertRaises(Exception) as ctx:
             p.set_val('r', 1)
-            p.set_val('theta', pi)
-
-            p.run_model()
 
         msg = '\'<model> <class Group>: Variable "r" not found.\''
         self.assertTrue(str(ctx.exception).startswith(msg))
@@ -223,27 +246,8 @@ class TestSubmodelComp(unittest.TestCase):
                             promotes_inputs=['x', 'y'],
                             promotes_outputs=['z'])
 
-        submodel1 = om.Group()
-        submodel1.add_subsystem('sub1_ivc_r', om.IndepVarComp('r', 1.),
-                                promotes_outputs=['r'])
-        submodel1.add_subsystem('sub1_ivc_theta', om.IndepVarComp('theta', pi),
-                                promotes_outputs=['theta'])
-        submodel1.add_subsystem('subComp1', om.ExecComp('x = r*cos(theta)'))
-
-        submodel2 = om.Group()
-        submodel2.add_subsystem('sub2_ivc_r', om.IndepVarComp('r', 2),
-                                promotes_outputs=['r'])
-        submodel2.add_subsystem('sub2_ivc_theta', om.IndepVarComp('theta', pi/2),
-                                promotes_outputs=['theta'])
-        submodel2.add_subsystem('subComp2', om.ExecComp('y = r*sin(theta)'))
-
-        subprob1 = om.Problem()
-        subprob1.model.add_subsystem('submodel1', submodel1, promotes=['*'])
-        subprob2 = om.Problem()
-        subprob2.model.add_subsystem('submodel2', submodel2, promotes=['*'])
-
-        comp1 = om.SubmodelComp(problem=subprob1)
-        comp2 = om.SubmodelComp(problem=subprob2)
+        comp1 = build_submodelcomp1(promote=False)
+        comp2 = build_submodelcomp2(promote=False)
 
         comp1.add_input('subComp1.r', name='r')
         comp1.add_input('subComp1.theta', name='theta')
@@ -337,31 +341,8 @@ class TestSubmodelComp(unittest.TestCase):
                             promotes_inputs=['x', 'y'],
                             promotes_outputs=['z'])
 
-        submodel1 = om.Group()
-        submodel1.add_subsystem('sub1_ivc_r', om.IndepVarComp('r', 1.),
-                                promotes_outputs=['r'])
-        submodel1.add_subsystem('sub1_ivc_theta', om.IndepVarComp('theta', pi),
-                                promotes_outputs=['theta'])
-        submodel1.add_subsystem('subComp1', om.ExecComp('x = r*cos(theta)'),
-                                promotes_inputs=['r', 'theta'],
-                                promotes_outputs=['x'])
-
-        submodel2 = om.Group()
-        submodel2.add_subsystem('sub2_ivc_r', om.IndepVarComp('r', 2),
-                                promotes_outputs=['r'])
-        submodel2.add_subsystem('sub2_ivc_theta', om.IndepVarComp('theta', pi/2),
-                                promotes_outputs=['theta'])
-        submodel2.add_subsystem('subComp2', om.ExecComp('y = r*sin(theta)'),
-                                promotes_inputs=['r', 'theta'],
-                                promotes_outputs=['y'])
-
-        subprob1 = om.Problem()
-        subprob1.model.add_subsystem('submodel1', submodel1, promotes=['*'])
-        subprob2 = om.Problem()
-        subprob2.model.add_subsystem('submodel2', submodel2, promotes=['*'])
-
-        comp1 = om.SubmodelComp(problem=subprob1)
-        comp2 = om.SubmodelComp(problem=subprob2)
+        comp1 = build_submodelcomp1()
+        comp2 = build_submodelcomp2()
 
         comp1.add_input('psi')
 
@@ -508,6 +489,28 @@ class TestSubmodelCompMPI(unittest.TestCase):
                                                       inputs=['p1.x1', 'p2.x2'], outputs=['comp3.y']))
 
         p.setup(force_alloc_complex=True)
+        p.run_model()
+        cpd = p.check_partials(method='cs', out_stream=None)
+        assert_check_partials(cpd)
+
+
+class TestSubmodelFanInFanOut(unittest.TestCase):
+    def test_submodel_fan_in_fan_out(self):
+        p = om.Problem()
+        model = p.model
+
+        G1 = model.add_subsystem('G1', om.Group(), promotes=['*'])
+
+        G1.add_subsystem('subFanIn', om.SubmodelComp(problem=om.Problem(model=FanIn()),
+                                                     inputs=['p1.x1', 'p2.x2'],
+                                                     outputs=['comp3.y']))
+        G1.add_subsystem('subFanOut', om.SubmodelComp(problem=om.Problem(model=FanOut()),
+                                                      inputs=['p.x'],
+                                                      outputs=['comp2.y', 'comp3.y']))
+        G1.connect('subFanIn.comp3:y', 'subFanOut.p:x')
+
+        p.setup(force_alloc_complex=True)
+
         p.run_model()
         cpd = p.check_partials(method='cs', out_stream=None)
         assert_check_partials(cpd)

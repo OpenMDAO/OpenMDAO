@@ -1,4 +1,5 @@
 """Define the SubmodelComp class for evaluating OpenMDAO systems within components."""
+from collections import defaultdict, Counter
 
 from openmdao.core.constants import _SetupStatus, INF_BOUND
 from openmdao.core.explicitcomponent import ExplicitComponent
@@ -16,9 +17,9 @@ def _is_glob(name):
     return '*' in name or '?' in name or '[' in name
 
 
-def _check_wild_name(name, out_name):
-    if out_name is not None and _is_glob(name):
-        raise NameError(f"Can't specify outer_name '{out_name}' when inner_name '{name}' has "
+def _check_wild_name(name, outer_name):
+    if outer_name is not None and _is_glob(name):
+        raise NameError(f"Can't specify outer_name '{outer_name}' when inner_name '{name}' has "
                         "wildcards.")
 
 
@@ -110,10 +111,10 @@ class SubmodelComp(ExplicitComponent):
         self._output_xfer_idxs = None
 
         self._static_submodel_inputs = {
-            name: (out_name, {}) for name, out_name in _io_namecheck_iter(inputs, 'input')
+            name: (outer_name, {}) for name, outer_name in _io_namecheck_iter(inputs, 'input')
         }
         self._static_submodel_outputs = {
-            name: (out_name, {}) for name, out_name in _io_namecheck_iter(outputs, 'output')
+            name: (outer_name, {}) for name, outer_name in _io_namecheck_iter(outputs, 'output')
         }
 
     def _declare_options(self):
@@ -125,14 +126,26 @@ class SubmodelComp(ExplicitComponent):
                              desc='If True, attempt to compute a total coloring for the submodel.')
 
     def _add_static_input(self, inner_prom_name_or_pattern, outer_name=None, **kwargs):
-        if outer_name is None and not _is_glob(inner_prom_name_or_pattern):
-            outer_name = inner_prom_name_or_pattern.replace('.', ':')
         self._static_submodel_inputs[inner_prom_name_or_pattern] = (outer_name, kwargs)
 
     def _add_static_output(self, inner_prom_name_or_pattern, outer_name=None, **kwargs):
-        if outer_name is None and not _is_glob(inner_prom_name_or_pattern):
-            outer_name = inner_prom_name_or_pattern.replace('.', ':')
         self._static_submodel_outputs[inner_prom_name_or_pattern] = (outer_name, kwargs)
+
+    def _make_valid_name(self, name):
+        """
+        Make an internal, potentially dotted name into a valid component variable name.
+
+        Parameters
+        ----------
+        name : str
+            The name to convert.
+
+        Returns
+        -------
+        str
+            The converted name.
+        """
+        return name.replace('.', ':')
 
     def add_input(self, prom_in, outer_name=None, name=None, **kwargs):
         """
@@ -169,7 +182,7 @@ class SubmodelComp(ExplicitComponent):
         # submodel immediately.
 
         if outer_name is None:
-            outer_name = prom_in.replace('.', ':')
+            outer_name = self._make_valid_name(prom_in)
 
         self._submodel_inputs[prom_in] = (outer_name, kwargs)
 
@@ -213,7 +226,7 @@ class SubmodelComp(ExplicitComponent):
         # submodel immediately.
 
         if outer_name is None:
-            outer_name = prom_out.replace('.', ':')
+            outer_name = self._make_valid_name(prom_out)
 
         self._submodel_outputs[prom_out] = (outer_name, kwargs)
 
@@ -281,44 +294,36 @@ class SubmodelComp(ExplicitComponent):
         self._submodel_inputs = {}
         self._submodel_outputs = {}
 
-        for inner_prom, (out_name, kwargs) in self._static_submodel_inputs.items():
+        for inner_prom, (outer_name, kwargs) in self._static_submodel_inputs.items():
             if _is_glob(inner_prom):
                 found = False
                 for match in pattern_filter(inner_prom, self.indep_vars):
-                    self._submodel_inputs[match] = (match.replace('.', ':'), kwargs.copy())
+                    self._submodel_inputs[match] = (match, kwargs.copy())
                     found = True
                 if not found:
                     raise NameError(f"Pattern '{inner_prom}' doesn't match any independent "
                                     "variables in the submodel.")
             elif inner_prom in self.indep_vars:
-                if out_name is None:
-                    out_name = inner_prom.replace('.', ':')
-                self._submodel_inputs[inner_prom] = (out_name, kwargs.copy())
+                self._submodel_inputs[inner_prom] = (outer_name, kwargs.copy())
             else:
                 raise NameError(f"'{inner_prom}' is not an independent variable in the submodel.")
 
-        for inner_prom, (out_name, kwargs) in self._static_submodel_outputs.items():
+        for inner_prom, (outer_name, kwargs) in self._static_submodel_outputs.items():
             if _is_glob(inner_prom):
                 found = False
                 for match in pattern_filter(inner_prom, prom2abs_out):
                     if match.startswith('_auto_ivc.'):
                         continue
-                    self._submodel_outputs[match] = (match.replace('.', ':'), kwargs.copy())
+                    self._submodel_outputs[match] = (match, kwargs.copy())
                     found = True
                 if not found:
                     raise NameError(f"Pattern '{inner_prom}' doesn't match any outputs in the "
                                     "submodel.")
             elif inner_prom in prom2abs_out:
-                if out_name is None:
-                    out_name = inner_prom.replace('.', ':')
-                self._submodel_outputs[inner_prom] = (out_name, kwargs.copy())
+                self._submodel_outputs[inner_prom] = (outer_name, kwargs.copy())
             else:
                 raise NameError(f"'{inner_prom}' is not an output in the submodel.")
 
-        # NOTE outer_name is what the outer problem knows the variable to be
-        # it won't always be the same name as the prom name in the inner variable because
-        # the inner prom name could contain '.'s and the outer name, which is the name relative
-        # to this component, cannot contain '.'s.
         for inner_prom, (outer_name, kwargs) in sorted(self._submodel_inputs.items(),
                                                        key=lambda x: x[0]):
             try:
@@ -328,8 +333,12 @@ class SubmodelComp(ExplicitComponent):
 
             final_kwargs = {n: v for n, v in meta.items() if n in _allowed_add_input_args}
             final_kwargs.update(kwargs)
-            if out_name is None:
-                out_name = inner_prom.replace('.', ':')
+            if outer_name is None:
+                outer_name = inner_prom
+
+            outer_name = self._make_valid_name(outer_name)
+            self._submodel_inputs[inner_prom] = (outer_name, kwargs)  # in case outer_name was None
+
             super().add_input(outer_name, **final_kwargs)
             if 'val' in kwargs:  # val in kwargs overrides internal value
                 self._subprob.set_val(inner_prom, kwargs['val'])
@@ -347,8 +356,12 @@ class SubmodelComp(ExplicitComponent):
 
             final_kwargs = {n: v for n, v in meta.items() if n in _allowed_add_output_args}
             final_kwargs.update(kwargs)
-            if out_name is None:
-                out_name = inner_prom.replace('.', ':')
+            if outer_name is None:
+                outer_name = inner_prom
+
+            outer_name = self._make_valid_name(outer_name)
+            self._submodel_outputs[inner_prom] = (outer_name, kwargs)  # in case outer_name was None
+
             super().add_output(outer_name, **final_kwargs)
             if 'val' in kwargs:  # val in kwargs overrides internal value
                 self._subprob.set_val(inner_prom, kwargs['val'])

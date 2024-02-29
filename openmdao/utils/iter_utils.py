@@ -1,5 +1,6 @@
-
-
+"""
+Various utilities for working with iterators.
+"""
 
 def meta2item_iter(metaiter, item):
     """
@@ -21,6 +22,29 @@ def meta2item_iter(metaiter, item):
         yield name, meta[item]
 
 
+def meta2items_iter(metaiter, items):
+    """
+    Convert a metadata iterator to an iterator over [name, meta[item0], meta[item1], ...].
+
+    Parameters
+    ----------
+    metaiter : iter of (name, meta)
+        Iterator over variable names and their metadata dicts.
+    items : list of str
+        The items to extract from the metadata.
+
+    Yields
+    ------
+    list
+        [name, meta[item0], meta[item1], ...] for each variable.
+    """
+    for name, meta in metaiter:
+        toyield = [name]
+        for item in items:
+            toyield.append(meta[item])
+        yield toyield
+
+
 def size2range_iter(size_iter):
     """
     Convert a size iterator to a range iterator.
@@ -39,5 +63,3 @@ def size2range_iter(size_iter):
     for name, size in size_iter:
         yield name, (start, start + size)
         start += size
-
-
