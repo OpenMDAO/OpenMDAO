@@ -527,7 +527,7 @@ class TestDriver(unittest.TestCase):
         strout = StringIO()
         sys.stdout = strout
         try:
-            prob.list_problem_vars(desvar_opts=['units'], objs_opts=['units'], cons_opts=['units'])
+            prob.list_driver_vars(desvar_opts=['units'], objs_opts=['units'], cons_opts=['units'])
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
@@ -636,7 +636,7 @@ class TestDriver(unittest.TestCase):
         strout = StringIO()
         sys.stdout = strout
         try:
-            prob.list_problem_vars(desvar_opts=['units'], objs_opts=['units'], cons_opts=['units'])
+            prob.list_driver_vars(desvar_opts=['units'], objs_opts=['units'], cons_opts=['units'])
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
