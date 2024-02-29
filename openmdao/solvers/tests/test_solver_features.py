@@ -246,6 +246,24 @@ class TestSolverFeatures(unittest.TestCase):
                     solver.linesearch = new_ls
                     self.assertIs(solver.linesearch, new_ls)
 
+    def test_solver_broken_weakref(self):
+
+        prob = om.Problem()
+        sys = prob.model.add_subsystem('sellar', SellarDerivatives())
+
+        sys.nonlinear_solver =om.NewtonSolver(solve_subsystems=False)
+
+        # Simulate Broken Weakref
+        solver = sys.nonlinear_solver
+        solver._system = lambda: None
+
+        # Setup should still run with broken ref
+        prob.setup()
+
+        # Message info should still be readible
+        info = solver.msginfo
+        assert info == type(solver).__name__
+
 
 if __name__ == "__main__":
     unittest.main()
