@@ -76,7 +76,7 @@ class ImplicitComponent(Component):
         if self._has_solve_nl is _UNDEFINED:
             self._has_solve_nl = overrides_method('solve_nonlinear', self, ImplicitComponent)
 
-        if self.matrix_free is _UNDEFINED:
+        if self.matrix_free == _UNDEFINED:
             self.matrix_free = overrides_method('apply_linear', self, ImplicitComponent)
 
         if self.matrix_free:

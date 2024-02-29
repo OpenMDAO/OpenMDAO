@@ -15,8 +15,7 @@ try:
     import jax
     from jax import jit
     import jax.numpy as jnp
-    from jax.config import config
-    config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
+    jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
 except Exception:
     _, err, tb = sys.exc_info()
     if not isinstance(err, ImportError):

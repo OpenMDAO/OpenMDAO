@@ -1667,7 +1667,7 @@ class TestProblem(unittest.TestCase):
             hooks._unregister_hook('final_setup', class_name='Problem')
             hooks.use_hooks = False
 
-    def test_list_problem_vars(self):
+    def test_list_driver_vars(self):
         model = SellarDerivatives()
         model.nonlinear_solver = om.NonlinearBlockGS()
 
@@ -1706,7 +1706,7 @@ class TestProblem(unittest.TestCase):
         strout = StringIO()
         sys.stdout = strout
         try:
-            prob.list_problem_vars(show_promoted_name=False)
+            prob.list_driver_vars(show_promoted_name=False)
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
@@ -1719,7 +1719,7 @@ class TestProblem(unittest.TestCase):
         strout = StringIO()
         sys.stdout = strout
         try:
-            prob.list_problem_vars(
+            prob.list_driver_vars(
                 desvar_opts=['lower', 'upper', 'ref', 'ref0',
                              'indices', 'adder', 'scaler',
                              'parallel_deriv_color',
@@ -1749,7 +1749,7 @@ class TestProblem(unittest.TestCase):
         strout = StringIO()
         sys.stdout = strout
         try:
-            l = prob.list_problem_vars(print_arrays=True,
+            l = prob.list_driver_vars(print_arrays=True,
                                        desvar_opts=['lower', 'upper', 'ref', 'ref0',
                                                     'indices', 'adder', 'scaler',
                                                     'parallel_deriv_color',
@@ -1823,11 +1823,11 @@ class TestProblem(unittest.TestCase):
 
         prob.setup()
 
-        msg = f"Problem {prob._get_inst_id()}: Problem.list_problem_vars() cannot be called " \
+        msg = f"Problem {prob._get_inst_id()}: Problem.list_driver_vars() cannot be called " \
               "before `Problem.run_model()`, `Problem.run_driver()`, or `Problem.final_setup()`."
 
         with self.assertRaises(RuntimeError) as err:
-            prob.list_problem_vars()
+            prob.list_driver_vars()
         self.assertEqual(str(err.exception), msg)
 
     def test_list_problem_w_multi_constraints(self):
@@ -1860,7 +1860,7 @@ class TestProblem(unittest.TestCase):
         strout = StringIO()
         sys.stdout = strout
         try:
-            p.list_problem_vars()
+            p.list_driver_vars()
         finally:
             sys.stdout = stdout
 
@@ -1960,7 +1960,7 @@ class TestProblem(unittest.TestCase):
         sys.stdout = strout
 
         try:
-            prob.list_problem_vars()
+            prob.list_driver_vars()
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
@@ -1975,7 +1975,7 @@ class TestProblem(unittest.TestCase):
         sys.stdout = strout
 
         try:
-            prob.list_problem_vars(driver_scaling=False)
+            prob.list_driver_vars(driver_scaling=False)
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
@@ -1984,7 +1984,7 @@ class TestProblem(unittest.TestCase):
         self.assertTrue('-20.' in output[14]) # con
         self.assertTrue('3.18' in output[21]) # obj
 
-    def test_feature_list_problem_vars(self):
+    def test_feature_list_driver_vars(self):
 
         prob = om.Problem(model=SellarDerivatives())
         model = prob.model
@@ -2003,7 +2003,7 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        prob.list_problem_vars(print_arrays=True,
+        prob.list_driver_vars(print_arrays=True,
                                desvar_opts=['lower', 'upper', 'ref', 'ref0',
                                             'indices', 'adder', 'scaler',
                                             'parallel_deriv_color'],

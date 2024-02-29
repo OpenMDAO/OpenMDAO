@@ -14,8 +14,7 @@ from openmdao.utils.array_utils import shape_to_len
 try:
     import jax
     from jax import jit, jacfwd, jacrev
-    from jax.config import config
-    config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
+    jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
 except Exception:
     _, err, tb = sys.exc_info()
     if not isinstance(err, ImportError):

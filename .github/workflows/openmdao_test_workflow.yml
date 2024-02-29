@@ -60,7 +60,6 @@ jobs:
             # PAROPT: true
             # SNOPT: '7.7'
             OPTIONAL: '[all]'
-            JAX: '0.4.14'
             TESTS: true
 
           # test minimal install
@@ -96,7 +95,6 @@ jobs:
             PYOPTSPARSE: 'v2.10.1'
             SNOPT: '7.7'
             OPTIONAL: '[all]'
-            JAX: '0.4.14'
             BUILD_DOCS: true
 
     runs-on: ${{ matrix.OS }}
@@ -154,14 +152,6 @@ jobs:
           echo "Install OpenMDAO"
           echo "============================================================="
           python -m pip install .${{ matrix.OPTIONAL }}
-
-      - name: Install jax
-        if: matrix.JAX
-        run: |
-          echo "============================================================="
-          echo "Install jax"
-          echo "============================================================="
-          python -m pip install jaxlib=='${{ matrix.JAX }}' jax=='${{ matrix.JAX }}'
 
       - name: Install PETSc
         if: matrix.PETSc
