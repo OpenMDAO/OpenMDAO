@@ -689,7 +689,7 @@ class NonlinearSolver(Solver):
         """
         system = self._system()
 
-        with system._relevant.active(self.use_relevance()):
+        with system._relevance.active(self.use_relevance()):
             maxiter = self.options['maxiter']
             atol = self.options['atol']
             rtol = self.options['rtol']
@@ -849,7 +849,7 @@ class NonlinearSolver(Solver):
         Perform a Gauss-Seidel iteration over this Solver's subsystems.
         """
         system = self._system()
-        for subsys in system._relevant.filter(system._all_subsystem_iter()):
+        for subsys in system._relevance.filter(system._all_subsystem_iter()):
             system._transfer('nonlinear', 'fwd', subsys.name)
 
             if subsys._is_local:
@@ -1009,7 +1009,7 @@ class LinearSolver(Solver):
         rtol = self.options['rtol']
         iprint = self.options['iprint']
 
-        with self._system()._relevant.active(self.use_relevance()):
+        with self._system()._relevance.active(self.use_relevance()):
             self._mpi_print_header()
 
             self._iter_count = 0

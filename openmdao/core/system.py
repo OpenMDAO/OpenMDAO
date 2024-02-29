@@ -334,9 +334,6 @@ class System(object):
         will not set the matrix_free flag correctly for Component instances having a matrix vector
         product function that is added dynamically (not declared as part of the class) and in that
         case the matrix_free flag must be set manually to True.
-    _relevant : dict
-        Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
-        and dependent systems.
     _mode : str
         Indicates derivative direction for the model, either 'fwd' or 'rev'.
     _scope_cache : dict
@@ -1730,7 +1727,7 @@ class System(object):
                     self._outputs.set_val(starting_outputs +
                                           out_offsets * np.random.random(out_offsets.size))
                 if is_total:
-                    with self._relevant.activate_nonlinear('iter'):
+                    with self._relevance.activate_nonlinear('iter'):
                         self._solve_nonlinear()
                 else:
                     self._apply_nonlinear()
@@ -2756,8 +2753,8 @@ class System(object):
         return self._problem_meta['recording_iter']
 
     @property
-    def _relevant(self):
-        return self._problem_meta['relevant']
+    def _relevance(self):
+        return self._problem_meta['relevance']
 
     @property
     def _static_mode(self):

@@ -97,7 +97,7 @@ class LinearBlockGS(BlockLinearSolver):
             d_n = d_out_vec.asarray(copy=True)
             delta_d_n = d_out_vec.asarray(copy=True)
 
-        relevance = system._relevant
+        relevance = system._relevance
 
         if mode == 'fwd':
             parent_offset = system._dresiduals._root_offset

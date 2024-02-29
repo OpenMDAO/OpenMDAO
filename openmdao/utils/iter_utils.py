@@ -2,6 +2,7 @@
 Various utilities for working with iterators.
 """
 
+
 def meta2item_iter(metaiter, item):
     """
     Convert a metadata iterator to an iterator over (name, <item>).

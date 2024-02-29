@@ -13,6 +13,13 @@ from openmdao.utils.array_utils import array_hash
 from openmdao.utils.om_warnings import issue_warning
 
 
+# Cache of Relevance objects stored by model id and seed keys.
+_relevance_cache = {}
+
+# Cache of relevance arrays stored by array hash.
+_rel_array_cache = {}
+
+
 def get_relevance(model, of, wrt):
     """
     Return a Relevance object for the given design vars, and responses.
@@ -31,6 +38,8 @@ def get_relevance(model, of, wrt):
     Relevance
         Relevance object.
     """
+    global _relevance_cache
+
     if not model._use_derivatives or (not of and not wrt):
         # in this case, a permanently inactive relevance object is returned
         # (so the contents of 'of' and 'wrt' don't matter). Make them empty to avoid
@@ -38,7 +47,38 @@ def get_relevance(model, of, wrt):
         of = {}
         wrt = {}
 
-    return Relevance(model, wrt, of)
+    key = (id(model), tuple(sorted(wrt)), tuple(sorted(of)))
+    if key in _relevance_cache:
+        return _relevance_cache[key]
+
+    relevance = Relevance(model, wrt, of)
+    _relevance_cache[key] = relevance
+    return relevance
+
+
+def _get_cached_array(arr):
+    """
+    Return the cached array if it exists, otherwise return the input array after caching it.
+
+    Parameters
+    ----------
+    arr : ndarray
+        Array to be cached.
+
+    Returns
+    -------
+    ndarray
+        Cached array if it exists, otherwise the input array.
+    """
+    global _rel_array_cache
+
+    hash = array_hash(arr)
+    if hash in _rel_array_cache:
+        return _rel_array_cache[hash]
+    else:
+        _rel_array_cache[hash] = arr
+
+    return arr
 
 
 def _to_seed(names):
@@ -61,6 +101,18 @@ def _to_seed(names):
 class Relevance(object):
     """
     Class that computes relevance based on a data flow graph.
+
+    It determines current relevance based on the current set of forward and reverse seed variables.
+    Initial relevance is determined by starting at a given seed and traversing the data flow graph
+    in the specified direction to find all relevant variables and systems.  That information is
+    then represented in a boolean array where True means the variable or system is relevant to the
+    seed.  Relevance with respect to groups of seeds, for example, one forward seed vs. all reverse
+    seeds, the boolean relevance arrays for the individual seeds are combined by taking the union
+    of the fwd seed arrays and the union of the rev seed arrays and intersecting the two results.
+
+    The full set of fwd and rev seeds must be set at initialization time.  At any point after that,
+    the set of active seeds can be changed using the set_seeds method, but those seeds must be
+    subsets of the full set of seeds.
 
     Parameters
     ----------
@@ -135,13 +187,18 @@ class Relevance(object):
 
         self._setup_nonlinear_relevance(model, fwd_meta, rev_meta)
 
+        # _pre_components and _post_components will be empty unless the user has set the
+        # 'group_by_pre_opt_post' option to True in the Problem.
         if model._pre_components or model._post_components:
             self._setup_nonlinear_sets(model)
         else:
             self._nonlinear_sets = {}
 
+        # setting _active to False here will permanantly disable relevance checking for this
+        # relevance object.  The only way to *temporarily* disable relevance is to use the
+        # active() context manager.
         if not (fwd_meta and rev_meta):
-            self._active = False  # relevance will never be active
+            self._active = False
 
     def __repr__(self):
         """
@@ -255,29 +312,7 @@ class Relevance(object):
         rel_array = np.zeros(len(names2inds), dtype=bool)
         rel_array[[names2inds[n] for n in names]] = True
 
-        return self._get_cached_array(rel_array)
-
-    def _get_cached_array(self, arr):
-        """
-        Return the cached array if it exists, otherwise return the input array after caching it.
-
-        Parameters
-        ----------
-        arr : ndarray
-            Array to be cached.
-
-        Returns
-        -------
-        ndarray
-            Cached array if it exists, otherwise the input array.
-        """
-        hash = array_hash(arr)
-        if hash in self._rel_array_cache:
-            return self._rel_array_cache[hash]
-        else:
-            self._rel_array_cache[hash] = arr
-
-        return arr
+        return _get_cached_array(rel_array)
 
     def _combine_relevance(self, fmap, fwd_seeds, rmap, rev_seeds):
         """
@@ -310,7 +345,7 @@ class Relevance(object):
         # intersect the two results
         farray &= rarray
 
-        return self._get_cached_array(farray)
+        return _get_cached_array(farray)
 
     def _union_arrays(self, seed_map, seeds):
         """
@@ -425,8 +460,8 @@ class Relevance(object):
         for io in ('fwd', 'rev'):
             for seed, local, var_array, sys_array in self._single_seed_array_iter(group, meta[io],
                                                                                   io, all_systems):
-                self._single_seed2relvars[io][seed] = self._get_cached_array(var_array)
-                self._single_seed2relsys[io][seed] = self._get_cached_array(sys_array)
+                self._single_seed2relvars[io][seed] = _get_cached_array(var_array)
+                self._single_seed2relsys[io][seed] = _get_cached_array(sys_array)
                 if local:
                     has_par_derivs[seed] = io
 
@@ -438,8 +473,8 @@ class Relevance(object):
             seed_sys_map[fseed] = seed_sys_map[_to_seed((fseed,))] = ssub = {}
             for rsrc, rvarr in self._single_seed2relvars['rev'].items():
                 rsysarr = self._single_seed2relsys['rev'][rsrc]
-                vsub[rsrc] = vsub[_to_seed((rsrc,))] = self._get_cached_array(fvarr & rvarr)
-                ssub[rsrc] = ssub[_to_seed((rsrc,))] = self._get_cached_array(fsarr & rsysarr)
+                vsub[rsrc] = vsub[_to_seed((rsrc,))] = _get_cached_array(fvarr & rvarr)
+                ssub[rsrc] = ssub[_to_seed((rsrc,))] = _get_cached_array(fsarr & rsysarr)
 
         all_fseed_varray = self._union_arrays(self._single_seed2relvars['fwd'], fwd_seeds)
         all_fseed_sarray = self._union_arrays(self._single_seed2relsys['fwd'], fwd_seeds)
@@ -450,21 +485,19 @@ class Relevance(object):
         # now add entries for each (fseed, all_rseeds) and each (all_fseeds, rseed)
         for fsrc, farr in self._single_seed2relvars['fwd'].items():
             fsysarr = self._single_seed2relsys['fwd'][fsrc]
-            seed_var_map[fsrc][rev_seeds] = self._get_cached_array(farr & all_rseed_varray)
-            seed_sys_map[fsrc][rev_seeds] = self._get_cached_array(fsysarr & all_rseed_sarray)
+            seed_var_map[fsrc][rev_seeds] = _get_cached_array(farr & all_rseed_varray)
+            seed_sys_map[fsrc][rev_seeds] = _get_cached_array(fsysarr & all_rseed_sarray)
 
         seed_var_map[fwd_seeds] = {}
         seed_sys_map[fwd_seeds] = {}
         for rsrc, rarr in self._single_seed2relvars['rev'].items():
             rsysarr = self._single_seed2relsys['rev'][rsrc]
-            seed_var_map[fwd_seeds][rsrc] = self._get_cached_array(rarr & all_fseed_varray)
-            seed_sys_map[fwd_seeds][rsrc] = self._get_cached_array(rsysarr & all_fseed_sarray)
+            seed_var_map[fwd_seeds][rsrc] = _get_cached_array(rarr & all_fseed_varray)
+            seed_sys_map[fwd_seeds][rsrc] = _get_cached_array(rsysarr & all_fseed_sarray)
 
         # now add 'full' releveance for all seeds
-        seed_var_map[fwd_seeds][rev_seeds] = self._get_cached_array(all_fseed_varray &
-                                                                    all_rseed_varray)
-        seed_sys_map[fwd_seeds][rev_seeds] = self._get_cached_array(all_fseed_sarray &
-                                                                    all_rseed_sarray)
+        seed_var_map[fwd_seeds][rev_seeds] = _get_cached_array(all_fseed_varray & all_rseed_varray)
+        seed_sys_map[fwd_seeds][rev_seeds] = _get_cached_array(all_fseed_sarray & all_rseed_sarray)
 
         self._set_seeds(fwd_seeds, rev_seeds)
 
@@ -498,7 +531,11 @@ class Relevance(object):
     @contextmanager
     def active(self, active):
         """
-        Context manager for activating/deactivating relevance.
+        Context manager for temporarily deactivating relevance.
+
+        Note that if this relevance object is already inactive, this context manager will have no
+        effect, i.e., calling this with active=True will not activate an inactive relevance object,
+        but calling it with active=False will deactivate an active relevance object.
 
         Parameters
         ----------
@@ -554,7 +591,7 @@ class Relevance(object):
         """
         Context manager where all seeds are active.
 
-        This assumes that the relevance object itself is active.
+        If _active is False, this will have no effect.
 
         Yields
         ------
@@ -579,7 +616,7 @@ class Relevance(object):
         """
         Context manager where the specified seeds are active.
 
-        This assumes that the relevance object itself is active.
+        If _active is False, this will have no effect.
 
         Parameters
         ----------
@@ -610,7 +647,7 @@ class Relevance(object):
     @contextmanager
     def activate_nonlinear(self, name, active=True):
         """
-        Context manager for activating a subset of systems using 'pre' or 'post'.
+        Context manager for activating a subset of systems using 'pre', 'post', or 'iter'.
 
         Parameters
         ----------

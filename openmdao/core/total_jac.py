@@ -1363,9 +1363,9 @@ class _TotalJacInfo(object):
             model._tot_jac = self
 
             with self._totjac_context():
-                relevant = self.relevance
-                with relevant.active(model.linear_solver.use_relevance()):
-                    with relevant.all_seeds_active():
+                relevance = self.relevance
+                with relevance.active(model.linear_solver.use_relevance()):
+                    with relevance.all_seeds_active():
                         try:
                             ln_solver = model._linear_solver
                             with model._scaled_context_all():
@@ -1416,7 +1416,7 @@ class _TotalJacInfo(object):
                                 fwd_seeds = None
                                 rev_seeds = itermeta['seed_vars']
 
-                            with relevant.seeds_active(fwd_seeds=fwd_seeds, rev_seeds=rev_seeds):
+                            with relevance.seeds_active(fwd_seeds=fwd_seeds, rev_seeds=rev_seeds):
                                 # restore old linear solution if cache_linear_solution was set by
                                 # the user for any input variables involved in this linear solution.
                                 with model._scaled_context_all():
@@ -1844,15 +1844,15 @@ class _TotalJacInfo(object):
         """
         Context manager to set current relevance for the Problem.
         """
-        old_relevance = self.model._problem_meta['relevant']
+        old_relevance = self.model._problem_meta['relevance']
         old_mode = self.model._problem_meta['mode']
-        self.model._problem_meta['relevant'] = self.relevance
+        self.model._problem_meta['relevance'] = self.relevance
         self.model._problem_meta['mode'] = self.mode
 
         try:
             yield
         finally:
-            self.model._problem_meta['relevant'] = old_relevance
+            self.model._problem_meta['relevance'] = old_relevance
             self.model._problem_meta['mode'] = old_mode
 
 

@@ -494,26 +494,36 @@ class TestSubmodelCompMPI(unittest.TestCase):
         assert_check_partials(cpd)
 
 
-class TestSubmodelFanInFanOut(unittest.TestCase):
-    def test_submodel_fan_in_fan_out(self):
+class IncompleteRelevanceGroup(om.Group):
+    def setup(self):
+        self.add_subsystem('C1', om.ExecComp('y = 1.5*x'))
+        self.add_subsystem('C2', om.ExecComp('y = 3.0*x'))
+        self.add_subsystem('C3', om.ExecComp('y = 2.75*x'))
+        self.add_subsystem('C4', om.ExecComp('y = 4.25*x1 - 0.75*x2'))
+        self.add_subsystem('C5', om.ExecComp('y = 5.0*x'))
+        self.connect('C1.y', ['C3.x', 'C4.x1'])
+        self.connect('C2.y', ['C4.x2', 'C5.x'])
+
+
+class TestSubmodelIncompleteRelevance(unittest.TestCase):
+    def test_submodel_incomplete_relevance(self):
         p = om.Problem()
         model = p.model
 
-        G1 = model.add_subsystem('G1', om.Group(), promotes=['*'])
 
-        G1.add_subsystem('subFanIn', om.SubmodelComp(problem=om.Problem(model=FanIn()),
-                                                     inputs=['p1.x1', 'p2.x2'],
-                                                     outputs=['comp3.y']))
-        G1.add_subsystem('subFanOut', om.SubmodelComp(problem=om.Problem(model=FanOut()),
-                                                      inputs=['p.x'],
-                                                      outputs=['comp2.y', 'comp3.y']))
-        G1.connect('subFanIn.comp3:y', 'subFanOut.p:x')
+        model.add_subsystem('sub', om.SubmodelComp(problem=om.Problem(model=IncompleteRelevanceGroup()),
+                                                    inputs=['C1.x', 'C2.x'], outputs=['C3.y', 'C4.y', 'C5.y']))
 
         p.setup(force_alloc_complex=True)
-
         p.run_model()
-        cpd = p.check_partials(method='cs', out_stream=None)
-        assert_check_partials(cpd)
+
+        check = p.check_partials(method='cs', show_only_incorrect=True)#, out_stream=None)
+        assert_check_partials(check)
+
+        check = p.check_totals(of=['sub.C3:y', 'sub.C4:y', 'sub.C5:y'],
+                              wrt=['sub.C1:x', 'sub.C2:x'], show_only_incorrect=True)#, out_stream=None)
+        assert_check_totals(check)
+
 
 
 if __name__ == '__main__':

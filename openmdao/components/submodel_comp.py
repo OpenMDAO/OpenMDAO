@@ -11,6 +11,7 @@ from openmdao.utils.coloring import compute_total_coloring, ColoringMeta
 from openmdao.utils.om_warnings import warn_deprecation
 from openmdao.utils.indexer import ranges2indexer
 from openmdao.utils.iter_utils import size2range_iter, meta2item_iter
+from openmdao.utils.relevance import get_relevance
 
 
 def _is_glob(name):
@@ -91,6 +92,8 @@ class SubmodelComp(ExplicitComponent):
         Index array that maps our input array into parts of the output array of the submodel.
     _output_xfer_idxs : ndarray
         Index array that maps our output array into parts of the output array of the submodel.
+    _zero_partials : set
+        Set of (output, input) pairs that should have zero partials.
     """
 
     def __init__(self, problem, inputs=None, outputs=None, reports=False, **kwargs):
@@ -109,6 +112,7 @@ class SubmodelComp(ExplicitComponent):
         self._submodel_outputs = {}
         self._input_xfer_idxs = None
         self._output_xfer_idxs = None
+        self._zero_partials = set()
 
         self._static_submodel_inputs = {
             name: (outer_name, {}) for name, outer_name in _io_namecheck_iter(inputs, 'input')
@@ -379,6 +383,7 @@ class SubmodelComp(ExplicitComponent):
 
         ofs = list(self._submodel_outputs)
         wrts = list(self._submodel_inputs)
+        of_metadata, wrt_metadata, _ = p.model._get_totals_metadata(p.driver, ofs, wrts)
 
         self._setup_transfer_idxs()
 
@@ -391,9 +396,18 @@ class SubmodelComp(ExplicitComponent):
         coloring = coloring_info.coloring
 
         if coloring is None:
-            # TODO: use dep graph in submodel to compute dependencies between ofs and wrts to have
-            # a better guess at sparsity
-            self.declare_partials(of='*', wrt='*')
+            ofs = [m['source'] for m in of_metadata.values()]
+            relevance = get_relevance(p.model, of_metadata, wrt_metadata)
+            for wrt, wrt_meta in wrt_metadata.items():
+                outer_wrt = self._submodel_inputs[wrt][0]
+                wrtsrc = wrt_meta['source']
+                with relevance.seeds_active((wrtsrc,), ofs):
+                    for of, of_meta in of_metadata.items():
+                        outer_of = self._submodel_outputs[of][0]
+                        if relevance.is_relevant(of_meta['source']):
+                            self.declare_partials(of=outer_of, wrt=outer_wrt)
+                        else:
+                            self._zero_partials.add((outer_of, outer_wrt))
         else:
             for of, wrt, nzrows, nzcols, _, _, _, _ in coloring._subjac_sparsity_iter():
                 self.declare_partials(of=of, wrt=wrt, rows=nzrows, cols=nzcols)
@@ -455,7 +469,8 @@ class SubmodelComp(ExplicitComponent):
             for (tot_output, tot_input), tot in tots.items():
                 input_outer_name = self._submodel_inputs[tot_input][0]
                 output_outer_name = self._submodel_outputs[tot_output][0]
-                partials[output_outer_name, input_outer_name] = tot
+                if (output_outer_name, input_outer_name) not in self._zero_partials:
+                    partials[output_outer_name, input_outer_name] = tot
         else:
             for of, wrt, nzrows, nzcols, _, _, _, _ in coloring._subjac_sparsity_iter():
                 partials[of, wrt] = tots[of, wrt][nzrows, nzcols].ravel()

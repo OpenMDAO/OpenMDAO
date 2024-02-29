@@ -1042,7 +1042,7 @@ class Group(System):
             if self._missing_partials:
                 self._update_dataflow_graph(responses)
 
-        self._problem_meta['relevant'] = get_relevance(self, responses, desvars)
+        self._problem_meta['relevance'] = get_relevance(self, responses, desvars)
 
         self._setup_vectors(self._get_root_vectors())
 
@@ -3415,7 +3415,7 @@ class Group(System):
         """
         self._transfer('nonlinear', 'fwd')
         # Apply recursion
-        for subsys in self._relevant.filter(self._subsystems_myproc):
+        for subsys in self._relevance.filter(self._subsystems_myproc):
             subsys._apply_nonlinear()
 
         self.iter_count_apply += 1
@@ -3575,16 +3575,16 @@ class Group(System):
         else:
             if mode == 'fwd':
                 self._transfer('linear', mode)
-                for s in self._relevant.filter(self._subsystems_myproc, relevant=False):
+                for s in self._relevance.filter(self._subsystems_myproc, relevant=False):
                     # zero out dvecs of irrelevant subsystems
                     s._dresiduals.set_val(0.0)
 
-            for s in self._relevant.filter(self._subsystems_myproc, relevant=True):
+            for s in self._relevance.filter(self._subsystems_myproc, relevant=True):
                 s._apply_linear(jac, mode, scope_out, scope_in)
 
             if mode == 'rev':
                 self._transfer('linear', mode)
-                for s in self._relevant.filter(self._subsystems_myproc, relevant=False):
+                for s in self._relevance.filter(self._subsystems_myproc, relevant=False):
                     # zero out dvecs of irrelevant subsystems
                     s._doutputs.set_val(0.0)
 
@@ -3666,9 +3666,9 @@ class Group(System):
             if self._assembled_jac is not None:
                 jac = self._assembled_jac
 
-            relevant = self._relevant
-            with relevant.active(self.linear_solver.use_relevance()):
-                subs = list(relevant.filter(self._subsystems_myproc))
+            relevance = self._relevance
+            with relevance.active(self.linear_solver.use_relevance()):
+                subs = list(relevance.filter(self._subsystems_myproc))
 
                 # Only linearize subsystems if we aren't approximating the derivs at this level.
                 for subsys in subs:
@@ -4042,8 +4042,8 @@ class Group(System):
                 if np.count_nonzero(sout[sin == 0]) > 0 and np.count_nonzero(sin[sout == 0]) > 0:
                     # we have of and wrt that exist on different procs. Now see if they're relevant
                     # to each other
-                    for _, _, rel in self._relevant.iter_seed_pair_relevance(inputs=True,
-                                                                             outputs=True):
+                    for _, _, rel in self._relevance.iter_seed_pair_relevance(inputs=True,
+                                                                              outputs=True):
                         if left in rel and right in rel:
                             self._cross_keys.add(key)
                             break

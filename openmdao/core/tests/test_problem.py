@@ -1354,7 +1354,7 @@ class TestProblem(unittest.TestCase):
         p.setup(check=False, mode='rev')
         p.final_setup()
 
-        relevant = model._relevant
+        relevant = model._relevance
 
         indep1_ins = {'C8.b', 'G2.C5.a', 'G1.C1.a'}
         indep1_outs = {'C8.y', 'G1.C1.z', 'G2.C5.x', 'indep1.x'}
@@ -2136,7 +2136,7 @@ class RelevanceTestCase(unittest.TestCase):
         p['C6.y'] = 1.
 
         p.run_model()
-        
+
         allcomps = [getattr(p.model, f"C{i}") for i in range(1, 7)]
 
         if approx:
@@ -2157,7 +2157,7 @@ class RelevanceTestCase(unittest.TestCase):
             self.assertEqual(ran_linearize, expected)
             self.assertEqual(ran_compute_partials, expected)
             self.assertEqual(ran_solve_linear, expected)
-            
+
     def test_relevance(self):
         p = self._setup_relevance_problem()
 

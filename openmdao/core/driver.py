@@ -585,15 +585,15 @@ class Driver(object):
 
         if self.supports['optimization'] and problem.options['group_by_pre_opt_post']:
             if model._pre_components:
-                with model._relevant.activate_nonlinear('pre'):
+                with model._relevance.activate_nonlinear('pre'):
                     model.run_solve_nonlinear()
 
             with SaveOptResult(self):
-                with model._relevant.activate_nonlinear('iter'):
+                with model._relevance.activate_nonlinear('iter'):
                     result = self.run()
 
             if model._post_components:
-                with model._relevant.activate_nonlinear('post'):
+                with model._relevance.activate_nonlinear('post'):
                     model.run_solve_nonlinear()
 
             return result
@@ -988,7 +988,7 @@ class Driver(object):
             if system._has_approx:
                 return
 
-        bad = {n for n in self._problem().model._relevant._no_dv_responses
+        bad = {n for n in self._problem().model._relevance._no_dv_responses
                if n not in self._designvars}
         if bad:
             bad_conns = [m['name'] for m in self._cons.values() if m['source'] in bad]
