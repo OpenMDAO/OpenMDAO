@@ -121,7 +121,7 @@ from openmdao.utils.jax_utils import register_jax_component
 
 # Reports System
 from openmdao.utils.reports_system import register_report, unregister_report, get_reports_dir, \
-    list_reports, clear_reports
+    list_reports, clear_reports, set_reports_dir
 
 import os
 

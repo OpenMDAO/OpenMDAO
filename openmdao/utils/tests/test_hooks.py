@@ -29,8 +29,9 @@ class HooksTestCase(unittest.TestCase):
     def setUp(self):
         openmdao.core.problem._clear_problem_names()  # need to reset these to simulate separate runs
 
-    def build_model(self, name='problem1'):
-        prob = om.Problem(name=name)
+    def build_model(self, name='problem1', prob=None):
+        if prob is None:
+            prob = om.Problem(name=name)
         prob.calls = []
         model = prob.model
 
@@ -75,8 +76,8 @@ class HooksTestCase(unittest.TestCase):
 
     @hooks_active
     def test_multiwrap(self):
-        pre_final = make_hook('pre_final')
         post_final = make_hook('post_final')
+        pre_final = make_hook('pre_final')
         hooks._register_hook('final_setup', 'Problem', pre=pre_final, post=post_final)
         hooks._register_hook('final_setup', 'Problem', pre=make_hook('pre_final2'), post=make_hook('post_final2'))
 
@@ -228,10 +229,6 @@ class HooksTestCase(unittest.TestCase):
 
         msg = "No hook found for method 'final_setup' for class 'Problem' and instance 'None'."
 
-        # already removed final_setup hooks earlier, so expect a warning here
-        with assert_warning(UserWarning, msg):
-            hooks._unregister_hook('final_setup', 'Problem')
-
         hooks._unregister_hook('run_model', 'Problem')
         prob.calls = []
 
@@ -240,7 +237,6 @@ class HooksTestCase(unittest.TestCase):
         prob.run_model()
 
         self.assertEqual(prob.calls, [])
-        self.assertEqual(len(hooks._hooks), 0)  # should be no hooks left
 
     @hooks_active
     def test_problem_hooks_kwargs(self):
@@ -262,6 +258,51 @@ class HooksTestCase(unittest.TestCase):
 
         self.assertEqual(prob['comp.x'], x0)
         self.assertEqual(prob['comp.y'], y0)
+
+    @hooks_active
+    def test_inherited_class_hooks(self):
+        def inherited_hook_pre(prob, **kwargs):
+            prob.calls.append('inherited_pre')
+        
+        def inherited_hook_post(prob, **kwargs):
+            prob.calls.append('inherited_post')
+        
+        def base_hook_pre(prob, **kwargs):
+            prob.calls.append('base_pre')
+            
+        def base_hook_post(prob, **kwargs):
+            prob.calls.append('base_post')
+
+        hooks._register_hook('final_setup', 'MyProblem', pre=inherited_hook_pre, post=inherited_hook_post)
+        hooks._register_hook('final_setup', 'Problem', pre=base_hook_pre, post=base_hook_post)
+
+        prob = MyProblem()
+        self.build_model(prob=prob)
+
+        prob.run_model()
+        prob.run_model()
+        prob.run_model()
+
+        self.assertEqual(prob.calls, ['inherited_pre', 'base_pre', 'inherited_post', 'base_post', 'inherited_pre',
+                                      'base_pre', 'inherited_post', 'base_post', 'inherited_pre', 'base_pre', 'inherited_post', 'base_post'])
+        
+        hooks._unregister_hook('final_setup', 'Problem', pre=base_hook_pre, post=False)
+
+        prob.calls = []
+
+        prob.run_model()
+        prob.run_model()
+
+        self.assertEqual(prob.calls, ['inherited_pre', 'inherited_post', 'base_post', 'inherited_pre', 'inherited_post', 'base_post'])
+
+
+class MyProblem(om.Problem):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.calls = []
+
+    def run_model(self):
+        super().run_model()
 
 
 if __name__ == '__main__':

@@ -2,10 +2,10 @@
 Functions for handling runtime function hooks.
 """
 
-from functools import wraps
-import inspect
-import warnings
 import sys
+import warnings
+import weakref
+from inspect import getmro
 
 from openmdao.utils.om_warnings import issue_warning
 
@@ -19,6 +19,9 @@ from openmdao.utils.om_warnings import issue_warning
 # 'fname'.
 _hooks = {}
 
+# use this to keep hook ordering consistent across multiple calls to register_hook
+_hook_counter = 0
+
 # global switch that turns hook machinery on/off. Need it on in general for the default
 # reporting system
 use_hooks = True
@@ -26,8 +29,128 @@ use_hooks = True
 
 def _reset_all_hooks():
     global _hooks
-
     _hooks = {}
+
+
+class _HookMeta(object):
+    def __init__(self, class_name, inst_id, hook, ncalls=None, exit=False, **kwargs):
+        global _hook_counter
+        self._stamp = _hook_counter
+        _hook_counter += 1
+
+        self.class_name = class_name
+        self.inst_id = inst_id
+        self.hook = hook
+        self.ncalls = ncalls
+        self.exit = exit
+        self.kwargs = kwargs
+        self.children = []  # if we're a 'None' inst_id hook, keep track of our child hooks
+
+    def __repr__(self):
+        return f"<_HookMeta {self.class_name} {self.inst_id} {self.hook} {self.ncalls} "\
+               f"{self.exit} {self.kwargs}>"
+
+    def __call__(self, inst):
+        if self.ncalls is None:
+            self.hook(inst, **self.kwargs)
+            if self.exit:
+                sys.exit()
+        else:
+            if self.ncalls > 0:
+                self.ncalls -= 1
+                self.hook(inst, **self.kwargs)
+                if self.exit:
+                    sys.exit()
+
+    def copy(self):
+        hm = _HookMeta(self.class_name, self.inst_id, self.hook, self.ncalls,
+                       self.exit, **self.kwargs)
+        # keep the same stamp so that the order of hooks doesn't change
+        hm._stamp = self._stamp
+        if self.inst_id is None:
+            self.children.append(hm)
+
+        return hm
+
+    def deactivate(self):
+        self.ncalls = 0
+        for child in self.children:
+            child.deactivate()
+
+
+class _HookDecorator(object):
+    def __init__(self, inst, func, hooks):
+        self.__name__ = func.__name__
+        self.__doc__ = func.__doc__
+
+        self.inst = weakref.ref(inst)
+        self.func = func
+        self.pre_hooks = []
+        self.post_hooks = []
+        self.add_hooks(hooks)
+
+    def add_hooks(self, hooks):
+        """
+        Add additional pre and/or post hooks to this method.
+
+        Parameters
+        ----------
+        hooks : list
+            List of hook data.
+        """
+        # copy any hooks with inst_id of None so we can modify them without modifying the original
+        for prehook, posthook in hooks:
+            if prehook is not None:
+                if prehook.inst_id is None:
+                    prehook = prehook.copy()
+                self.pre_hooks.append(prehook)
+            if posthook is not None:
+                if posthook.inst_id is None:
+                    posthook = posthook.copy()
+                self.post_hooks.append(posthook)
+
+        # put the hooks in order by stamp
+        self.pre_hooks = sorted(self.pre_hooks, key=lambda x: x._stamp)
+        self.post_hooks = sorted(self.post_hooks, key=lambda x: x._stamp)
+
+    def _run_hooks(self, hooks):
+        """
+        Run the given list of hooks.
+
+        Parameters
+        ----------
+        hooks : list
+            List of hook data.
+        inst : object
+            Object instance to pass to hook functions.
+        """
+        inst = self.inst()
+        if inst is None:
+            return
+
+        for hook in hooks:
+            hook(inst)
+
+    def __call__(self, *args, **kwargs):
+        """
+        Run the function with any pre and post hooks.
+
+        Parameters
+        ----------
+        *args : list
+            Positional arguments.
+        **kwargs : dict
+            Keyword arguments.
+
+        Returns
+        -------
+        object
+            The return value of the function.
+        """
+        self._run_hooks(self.pre_hooks)
+        ret = self.func(*args, **kwargs)
+        self._run_hooks(self.post_hooks)
+        return ret
 
 
 def _setup_hooks(obj):
@@ -47,157 +170,53 @@ def _setup_hooks(obj):
     # valid pathname.
     if use_hooks:
 
-        classes = inspect.getmro(obj.__class__)
-        for c in classes:
-            if c.__name__ in _hooks:
-                classmeta = _hooks[c.__name__]
-                break
-        else:
-            return
-
         # any object where we register hooks must define the '_get_inst_id' method.
         ident = obj._get_inst_id()
 
-        instmetas = []
+        if ident is None:
+            raise RuntimeError(f"Object {obj} must define a '_get_inst_id' method that returns "
+                               "a unique identifier for the object.")
 
-        if ident in classmeta:
-            instmetas.append(classmeta[ident])
+        all_hooks = {}
 
-        # ident of None applies to all instances of a class
-        if ident is not None and None in classmeta:
-            instmetas.append(classmeta[None])
+        for c in getmro(obj.__class__):
+            if c.__qualname__ in _hooks:
+                classmeta = _hooks[c.__qualname__]
 
-        if not instmetas:
-            return
+                if ident in classmeta:
+                    instmeta = classmeta[ident]
+                    for funcname, hooklist in instmeta.items():
+                        method = getattr(obj, funcname, None)
+                        if method is not None and callable(method):
+                            if funcname not in all_hooks:
+                                all_hooks[funcname] = []
+                            all_hooks[funcname].extend(hooklist)
 
-        for instmeta in instmetas:
-            for funcname, fmeta in instmeta.items():
-                method = getattr(obj, funcname, None)
-                # We don't need to combine pre/post hook data for inst and None hooks here
-                # because it has already been done earlier (in register_hook/_get_hook_list_iters).
-                if method is not None and not hasattr(method, '_hashook_'):
-                    setattr(obj, funcname, _hook_decorator(method, obj, fmeta))
+                if None in classmeta:
+                    instmeta = classmeta[None]
+                    for funcname, hooklist in instmeta.items():
+                        method = getattr(obj, funcname, None)
+                        if method is not None and callable(method):
+                            if funcname not in all_hooks:
+                                all_hooks[funcname] = []
+                            all_hooks[funcname].extend(hooklist)
 
-
-def _run_hooks(hooks, inst):
-    """
-    Run the given list of hooks.
-
-    Parameters
-    ----------
-    hooks : list
-        List of hook data.
-    inst : object
-        Object instance to pass to hook functions.
-    """
-    for hookmeta in hooks:
-        hook, ncalls, ex, kwargs, _ = hookmeta
-        if ncalls is None:
-            hook(inst, **kwargs)
-            if ex:
-                sys.exit()
-        else:
-            inst_id = inst._get_inst_id()
-            if inst_id not in ncalls:
-                # must have been registered with 'None', meaning all instances, so get initial value
-                # for this instance
-                ncalls[inst_id] = ncalls[None]
-
-            if ncalls[inst_id] > 0:
-                ncalls[inst_id] -= 1
-                hook(inst, **kwargs)
-                if ex:
-                    sys.exit()
-
-
-def _hook_decorator(f, inst, hookmeta):
-    """
-    Wrap a method with pre and/or post hook checks.
-
-    Parameters
-    ----------
-    f : method
-        The method being wrapped.
-    inst : object
-        The instance that owns the method.
-    hookmeta : dict
-        A dict with information about the hooks.
-    """
-    pre_hooks, post_hooks = hookmeta
-
-    # args and kwargs are arguments to the method that is being wrapped
-    def execute_hooks(*args, **kwargs):
-        _run_hooks(pre_hooks, inst)
-        ret = f(*args, **kwargs)
-        _run_hooks(post_hooks, inst)
-        return ret
-
-    execute_hooks._hashook_ = f  # to prevent multiple decoration of same function
-
-    return wraps(f)(execute_hooks)
-
-
-def _get_hook_list_iters(class_name, inst_id, fname):
-    """
-    Retrieve the pre and post hook list iterators for the given class, instance, and function name.
-
-    They are iterators of lists because under some circumstances, e.g., when adding a 'None'
-    hook after non-None instance hooks were already added, the 'None' hook will need to be added
-    to *all* of the existing non-None instance hook lists.
-
-    Parameters
-    ----------
-    class_name : str
-        The name of the class owning the method where the hook will be applied.
-    inst_id : str, optional
-        The name of the instance owning the method where the hook will be applied.
-    fname : str
-        The name of the function where the pre and/or post hook will be applied.
-
-    Yields
-    ------
-    tuple of (list, list)
-        Pre and post hook lists.
-    """
-    global _hooks
-    if class_name in _hooks:
-        cmeta = _hooks[class_name]
-    else:
-        _hooks[class_name] = cmeta = {}
-
-    if inst_id in cmeta:
-        imeta = cmeta[inst_id]
-    else:
-        cmeta[inst_id] = imeta = {}
-
-    if fname not in imeta:
-        # check for any existing None hooks because we need to add those first
-        nonehooks = None
-        if None in cmeta:
-            nonemeta = cmeta[None]
-            if fname in nonemeta:
-                nonehooks = nonemeta[fname]
-
-        if nonehooks is None:
-            imeta[fname] = ([], [])
-        else:
-            imeta[fname] = ([h.copy() for h in nonehooks[0]], [h.copy() for h in nonehooks[1]])
-
-    if inst_id is None:
-        # special case where we have to add the None hook to all existing non-None hook lists
-        # that match the fname
-        for n, meta in cmeta.items():
-            if fname in meta:
-                yield meta[fname]
-        return
-
-    yield imeta[fname]
+        for funcname, hooks in all_hooks.items():
+            method = getattr(obj, funcname)
+            if isinstance(method, _HookDecorator):
+                method.add_hooks(hooks)
+            else:
+                setattr(obj, funcname, _HookDecorator(obj, method, hooks))
 
 
 def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=None, exit=False,
                    **kwargs):
     """
     Register a hook function.
+
+    Note that the 'class_name' arg should be the __qualname__ of the class, so for a nested class,
+    the name would include the names of any containing classes as well, with each class name
+    separated by a '.'.
 
     Parameters
     ----------
@@ -223,101 +242,88 @@ def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=
     if pre is None and post is None:
         raise RuntimeError("In _register_hook you must specify pre or post.")
 
-    for pre_hooks, post_hooks in _get_hook_list_iters(class_name, inst_id, fname):
-        if pre is not None and (ncalls is None or ncalls > 0):
-            ncallsdict = {inst_id: ncalls} if ncalls is not None else ncalls
-            pre_hooks.append([pre, ncallsdict, exit and post is None, kwargs, inst_id])
-        if post is not None and (ncalls is None or ncalls > 0):
-            ncallsdict = {inst_id: ncalls} if ncalls is not None else ncalls
-            post_hooks.append([post, ncallsdict, exit, kwargs, inst_id])
+    global _hooks
+    if class_name in _hooks:
+        cmeta = _hooks[class_name]
+    else:
+        _hooks[class_name] = cmeta = {}
+
+    if inst_id in cmeta:
+        imeta = cmeta[inst_id]
+    else:
+        cmeta[inst_id] = imeta = {}
+
+    if fname not in imeta:
+        imeta[fname] = []
+
+    if pre is None:
+        pre_hook = None
+    else:
+        pre_exit = exit if post is None else False
+        pre_hook = _HookMeta(class_name, inst_id, pre, ncalls, pre_exit, **kwargs)
+
+    if post is None:
+        post_hook = None
+    else:
+        post_hook = _HookMeta(class_name, inst_id, post, ncalls, exit, **kwargs)
+
+    imeta[fname].append((pre_hook, post_hook))
 
 
-def _remove_hook(to_remove, hooks, class_name, fname, hook_loc, inst_id):
+def _deactivate_hook(to_remove, hook):
     """
-    Remove a hook function.
+    Deactivate a hook function.
 
     Parameters
     ----------
     to_remove : bool or function
         If True, all hook functions in 'hooks' will be removed.  If a function, any function
         in 'hooks' that matches will be removed.
-    hooks : list
-        List of (hook_func, ncalls, exit, kwargs, inst_id) tuples.
-    class_name : str
-        The name of the class owning the method where the hook will be removed.
-    fname : str
-        The name of the function where the hooks are located.
-    hook_loc : str
-        Either 'pre' or 'post', indicating the hooks run before or after respectively the
-        function specified by fname.
-    inst_id : str or None
-        The name of the instance owning the method where the hook will be applied.
+    hook : _HookMeta or None
+        Hook metadata object.
     """
-    if to_remove and hooks:
+    if to_remove and hook is not None:
         if to_remove is True:
-            hooks[:] = []
-        else:
-            for hook in hooks:
-                p, _, _, _, iid = hook
-                if p is to_remove and iid == inst_id:
-                    hooks.remove(hook)
-                    break
-            else:
-                issue_warning(f"Couldn't find the given '{hook_loc}' function in the "
-                              f"{hook_loc} hooks for {class_name}.{fname}.")
+            hook.deactivate()
+        else:  # to_remove is a hook function
+            if to_remove is hook.hook:
+                hook.deactivate()
 
 
 def _unregister_hook(fname, class_name, inst_id=None, pre=True, post=True):
     """
     Unregister a hook function.
 
-    By default, both pre and post hooks will be removed if they are present. To avoid
+    By default, both pre and post hooks will be deactivated if they are present. To avoid
     removal of pre or post, you must set the pre or post arg to False.
 
     Parameters
     ----------
     fname : str
-        The name of the function where the pre and/or post hook will be removed.
+        The name of the function where the pre and/or post hook will be deactivated.
     class_name : str
-        The name of the class owning the method where the hook will be removed.
+        The name of the class owning the method where the hook will be deactivated.
     inst_id : str, optional
-        The name of the instance owning the method where the hook will be removed.
+        The name of the instance owning the method where the hook will be deactivated.
     pre : bool or function, (True)
-        If True, hooks that run before the named function runs will be removed. If a
-        function then that function, if found, will be removed from the pre list, else
-        an exception will be raised.
+        If True, hooks that run before the named function runs will be deactivated. If pre is a
+        function, then that function will have its hook(s) deactivated.
     post : bool or function, (True)
-        If True, hooks that run after the named function runs will be removed. If a
-        function then that function, if found, will be removed from the post list, else
-        an exception will be raised.
+        If True, hooks that run after the named function runs will be deactivated. If post is a
+        function, then that function will have its hook(s) deactivated.
     """
     try:
         classhooks = _hooks[class_name]
     except KeyError:
         return
 
-    todel = []
     for instkey, hookdict in classhooks.items():
         if not (inst_id is None or instkey == inst_id):
             continue
         if fname in hookdict:
-            pre_hooks, post_hooks = hookdict[fname]
-            _remove_hook(pre, pre_hooks, class_name, fname, 'pre', inst_id)
-            _remove_hook(post, post_hooks, class_name, fname, 'post', inst_id)
-
-            if not (pre_hooks or post_hooks):
-                del hookdict[fname]
-                if not hookdict:  # we just removed the last hook entry for this inst
-                    todel.append(inst_id)
+            for pre_hook, post_hook in hookdict[fname]:
+                _deactivate_hook(pre, pre_hook)
+                _deactivate_hook(post, post_hook)
         else:
             warnings.warn(f"No hook found for method '{fname}' for class '{class_name}' and "
                           f"instance '{inst_id}'.")
-
-    if todel:
-        for name in todel:
-            try:
-                del classhooks[name]
-            except KeyError:
-                pass
-        if not classhooks:  # removed last entry for this class
-            del _hooks[class_name]
