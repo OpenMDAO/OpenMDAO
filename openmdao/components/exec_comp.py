@@ -678,7 +678,7 @@ class ExecComp(ExplicitComponent):
                 if not self._has_distrib_vars and (sum(sizes['input'][rank]) > 1 and
                                                    sum(sizes['output'][rank]) > 1):
                     if not self._coloring_declared:
-                        super().declare_coloring(wrt=('*', ), method='cs')
+                        super().declare_coloring(wrt=('*', ), method='cs', show_summary=False)
                         self._coloring_info.dynamic = True
                         self._manual_decl_partials = False  # this gets reset in declare_partials
                         self._declared_partials_patterns = {}
@@ -859,7 +859,8 @@ class ExecComp(ExplicitComponent):
                          perturb_size=_DEFAULT_COLORING_META['perturb_size'],
                          min_improve_pct=_DEFAULT_COLORING_META['min_improve_pct'],
                          show_summary=_DEFAULT_COLORING_META['show_summary'],
-                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity']):
+                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity'],
+                         show_sparsity_txt=False):
         """
         Set options for deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -895,10 +896,12 @@ class ExecComp(ExplicitComponent):
             If True, display summary information after generating coloring.
         show_sparsity : bool
             If True, display sparsity with coloring info after generating coloring.
+        show_sparsity_txt : bool
+            If True, display sparsity as text after generating coloring.
         """
         super().declare_coloring(wrt, method, form, step, per_instance, num_full_jacs,
                                  tol, orders, perturb_size, min_improve_pct,
-                                 show_summary, show_sparsity)
+                                 show_summary, show_sparsity, show_sparsity_txt)
         self._coloring_declared = True
         self._manual_decl_partials = True
 

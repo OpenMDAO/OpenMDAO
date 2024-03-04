@@ -138,9 +138,10 @@ class ApproximationScheme(object):
         self._colored_approx_groups = []
         wrt_ranges = []
 
-        # don't do anything if the coloring doesn't exist yet
+        # don't do anything if the coloring doesn't exist yet, or if there is no
+        # forward coloring
         coloring = system._coloring_info.coloring
-        if not isinstance(coloring, coloring_mod.Coloring):
+        if not isinstance(coloring, coloring_mod.Coloring) or coloring._fwd is None:
             return
 
         wrt_matches = system._coloring_info._update_wrt_matches(system)
@@ -379,12 +380,8 @@ class ApproximationScheme(object):
             if fd_count % num_par_fd == system._par_fd_id:
                 # run the finite difference
                 with system._relevance.seeds_active(fwd_seeds=seed_vars):
-                    if total:
-                        result = self._run_point(system, vec_ind_list, data, results_array,
-                                                 total_or_semi)
-                    else:
-                        result = self._run_point(system, vec_ind_list, data, results_array,
-                                                 total_or_semi)
+                    result = self._run_point(system, vec_ind_list, data, results_array,
+                                             total_or_semi)
 
                 if par_fd_w_serial_model or not use_parallel_fd:
                     result = self._transform_result(result)

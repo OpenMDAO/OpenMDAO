@@ -1908,7 +1908,7 @@ class Problem(object):
 
     def compute_totals(self, of=None, wrt=None, return_format='flat_dict', debug_print=False,
                        driver_scaling=False, use_abs_names=False, get_remote=True,
-                       use_coloring=None):
+                       coloring_info=None):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1934,10 +1934,9 @@ class Problem(object):
             This is deprecated and has no effect.
         get_remote : bool
             If True, the default, the full distributed total jacobian will be retrieved.
-        use_coloring : bool or None
-            If True, use coloring to compute total derivatives.  If False, do not.  If None, only
-            compute coloring if the Driver has declared coloring. This is only used if user supplies
-            of and wrt args.  Otherwise, coloring is completely determined by the driver.
+        coloring_info : ColoringMeta, None, or False
+            If False, do no coloring.  If None, use driver coloring.  Otherwise use the coloring
+            found in the provided coloring_info object, if it exists.
 
         Returns
         -------
@@ -1952,18 +1951,9 @@ class Problem(object):
             with multi_proc_exception_check(self.comm):
                 self.final_setup()
 
-        if use_coloring is False:
-            coloring_meta = None
-        elif use_coloring is True:
-            coloring_meta = self.driver._coloring_info.copy()
-            coloring_meta.reset_coloring()
-            coloring_meta.dynamic = True
-        else:
-            coloring_meta = self.driver._coloring_info
-
         total_info = _TotalJacInfo(self, of, wrt, return_format, approx=self.model._owns_approx_jac,
                                    driver_scaling=driver_scaling, get_remote=get_remote,
-                                   debug_print=debug_print, coloring_meta=coloring_meta)
+                                   debug_print=debug_print, coloring_info=coloring_info)
         return total_info.compute_totals()
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):

@@ -86,7 +86,7 @@ class SubmodelComp(ExplicitComponent):
         Mapping of inner promoted output names to outer output names and kwargs that is populated
         outside of setup. These must be bookkept separately from submodel outputs added during setup
         because setup can be called multiple times and the submodel outputs dict is reset each time.
-    _coloring_info : ColoringMeta
+    _sub_coloring_info : ColoringMeta
         The coloring information for the submodel.
     _input_xfer_idxs : ndarray
         Index array that maps our input array into parts of the output array of the submodel.
@@ -106,7 +106,7 @@ class SubmodelComp(ExplicitComponent):
             clear_reports(problem)
 
         self._subprob = problem
-        self._coloring_info = ColoringMeta()
+        self._sub_coloring_info = ColoringMeta()
 
         self._submodel_inputs = {}
         self._submodel_outputs = {}
@@ -134,6 +134,12 @@ class SubmodelComp(ExplicitComponent):
 
     def _add_static_output(self, inner_prom_name_or_pattern, outer_name=None, **kwargs):
         self._static_submodel_outputs[inner_prom_name_or_pattern] = (outer_name, kwargs)
+
+    def _to_outer_output(self, inner_name):
+        return self._submodel_outputs[inner_name][0]
+
+    def _to_outer_input(self, inner_name):
+        return self._submodel_inputs[inner_name][0]
 
     def _make_valid_name(self, name):
         """
@@ -383,38 +389,65 @@ class SubmodelComp(ExplicitComponent):
 
         ofs = list(self._submodel_outputs)
         wrts = list(self._submodel_inputs)
-        of_metadata, wrt_metadata, _ = p.model._get_totals_metadata(p.driver, ofs, wrts)
+        of_metadata, wrt_metadata, _ = p.model._get_totals_metadata(driver=False, of=ofs, wrt=wrts)
 
-        self._setup_transfer_idxs()
+        self._setup_transfer_idxs(of_metadata, wrt_metadata)
 
-        coloring_info = self._coloring_info
+        self._sub_coloring_info = coloring_info = ColoringMeta()
+        coloring_info.show_sparsity_txt = True
 
         if self.options['do_coloring']:
-            coloring_info.set_coloring(compute_total_coloring(p, of=ofs, wrt=wrts, run_model=True),
+            coloring_info.set_coloring(compute_total_coloring(p, of=ofs, wrt=wrts, run_model=True,
+                                                              driver=False),
                                        msginfo=self.msginfo)
+
+            coloring_info.display()
+
+        # save the _TotJacInfo object so we can use it in future calls to compute_partials
+        self._totjacinfo = _TotalJacInfo(p, of=self._submodel_outputs, wrt=self._submodel_inputs,
+                                         return_format='flat_dict',
+                                         approx=p.model._owns_approx_jac,
+                                         coloring_info=coloring_info,
+                                         driver=False)
 
         coloring = coloring_info.coloring
 
         if coloring is None:
+            # only declare partials where of and wrt are relevant to each other
             ofs = [m['source'] for m in of_metadata.values()]
             relevance = get_relevance(p.model, of_metadata, wrt_metadata)
             for wrt, wrt_meta in wrt_metadata.items():
-                outer_wrt = self._submodel_inputs[wrt][0]
+                outer_wrt = self._to_outer_input(wrt)
                 wrtsrc = wrt_meta['source']
                 with relevance.seeds_active((wrtsrc,), ofs):
                     for of, of_meta in of_metadata.items():
-                        outer_of = self._submodel_outputs[of][0]
+                        outer_of = self._to_outer_output(of)
                         if relevance.is_relevant(of_meta['source']):
                             self.declare_partials(of=outer_of, wrt=outer_wrt)
                         else:
                             self._zero_partials.add((outer_of, outer_wrt))
         else:
+            # get a coloring with outer names for rows and cols to be used as the partial
+            # coloring for this component
+            row_map = {of: self._to_outer_output(of) for of in coloring._row_vars}
+            col_map = {wrt: self._to_outer_input(wrt) for wrt in coloring._col_vars}
+            self._coloring_info.coloring = coloring.get_renamed_copy(row_map, col_map)
+            # prevent config check that will fail due to name changes
+            self._coloring_info.dynamic = True
+
             for of, wrt, nzrows, nzcols, _, _, _, _ in coloring._subjac_sparsity_iter():
-                self.declare_partials(of=of, wrt=wrt, rows=nzrows, cols=nzcols)
+                self.declare_partials(of=self._to_outer_output(of),
+                                      wrt=self._to_outer_input(wrt),
+                                      rows=nzrows, cols=nzcols)
 
     def _set_complex_step_mode(self, active):
         super()._set_complex_step_mode(active)
         self._subprob.set_complex_step_mode(active)
+
+    def _update_subjac_sparsity(self, sparsity):
+        # do nothing here because if the submodel has a coloring, we've already declared the
+        # partials based on that coloring and they already have the correct sparsity pattern.
+        pass
 
     def compute(self, inputs, outputs):
         """
@@ -430,16 +463,15 @@ class SubmodelComp(ExplicitComponent):
         p = self._subprob
 
         # set our inputs and outputs into the submodel
-        inner_idxs = self._input_xfer_idxs
-        p.model._outputs.set_val(self._inputs.asarray(), idxs=inner_idxs())
+        p.model._outputs.set_val(self._inputs.asarray(), idxs=self._input_xfer_idxs())
 
-        inner_idxs = self._output_xfer_idxs
-        p.model._outputs.set_val(self._outputs.asarray(), idxs=inner_idxs())
+        inner_idxs = self._output_xfer_idxs()
+        p.model._outputs.set_val(self._outputs.asarray(), idxs=inner_idxs)
 
         p.run_model()
 
         # collect outputs from the submodel
-        self._outputs.set_val(p.model._outputs.asarray()[inner_idxs()])
+        self._outputs.set_val(p.model._outputs.asarray()[inner_idxs])
 
     def compute_partials(self, inputs, partials):
         """
@@ -457,25 +489,20 @@ class SubmodelComp(ExplicitComponent):
         # we don't need to set our inputs into the submodel here because we've already done it
         # in compute.
 
-        if self._totjacinfo is None:
-            self._totjacinfo = _TotalJacInfo(p, self._submodel_outputs, self._submodel_inputs,
-                                             return_format='flat_dict',
-                                             approx=p.model._owns_approx_jac,
-                                             coloring_meta=self._coloring_info)
         tots = self._totjacinfo.compute_totals()
-        coloring = self._coloring_info.coloring
+        coloring = self._sub_coloring_info.coloring
 
         if coloring is None:
-            for (tot_output, tot_input), tot in tots.items():
-                input_outer_name = self._submodel_inputs[tot_input][0]
-                output_outer_name = self._submodel_outputs[tot_output][0]
-                if (output_outer_name, input_outer_name) not in self._zero_partials:
-                    partials[output_outer_name, input_outer_name] = tot
+            for (of, wrt), tot in tots.items():
+                key = (self._to_outer_output(of), self._to_outer_input(wrt))
+                if key not in self._zero_partials:
+                    partials[key] = tot
         else:
             for of, wrt, nzrows, nzcols, _, _, _, _ in coloring._subjac_sparsity_iter():
-                partials[of, wrt] = tots[of, wrt][nzrows, nzcols].ravel()
+                partials[(self._to_outer_output(of), self._to_outer_input(wrt))] = \
+                    tots[of, wrt][nzrows, nzcols].ravel()
 
-    def _setup_transfer_idxs(self):
+    def _setup_transfer_idxs(self, of_metadata, wrt_metadata):
         """
         Set up the transfer indices for input and output variables.
 
@@ -485,9 +512,11 @@ class SubmodelComp(ExplicitComponent):
         abs2meta = self._subprob.model._var_allprocs_abs2meta['output']
         prom2abs = self._subprob.model._var_allprocs_prom2abs_list['output']
 
-        full_inner_map = {
-            name: rng for name, rng in size2range_iter(meta2item_iter(abs2meta.items(), 'size'))
-        }
+        full_inner_map = {}
+        for name, rng in size2range_iter(meta2item_iter(abs2meta.items(), 'size')):
+            full_inner_map[name] = rng
+
+        full_shape = (rng[1],) if full_inner_map else (0,)
 
         # get ranges for subodel outputs corresponding to our inputs
         inp_ranges = []
@@ -500,5 +529,5 @@ class SubmodelComp(ExplicitComponent):
         for inner_prom in self._submodel_outputs:
             out_ranges.append(full_inner_map[prom2abs[inner_prom][0]])
 
-        self._input_xfer_idxs = ranges2indexer(inp_ranges)
-        self._output_xfer_idxs = ranges2indexer(out_ranges)
+        self._input_xfer_idxs = ranges2indexer(inp_ranges, src_shape=full_shape)
+        self._output_xfer_idxs = ranges2indexer(out_ranges, src_shape=full_shape)

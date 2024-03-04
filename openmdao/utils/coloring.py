@@ -129,6 +129,8 @@ class ColoringMeta(object):
         If True, print a short summary of the coloring. Defaults to True.
     show_sparsity : bool
         If True, show a plot of the sparsity. Defaults to False.
+    show_sparsity_txt : bool
+        If True, show a text summary of the sparsity. Defaults to False.
     dynamic : bool
         True if dynamic coloring is being used.
     static : Coloring, str, or None
@@ -154,6 +156,8 @@ class ColoringMeta(object):
         If True, print a short summary of the coloring. Defaults to True.
     show_sparsity : bool
         If True, show a plot of the sparsity. Defaults to False.
+    show_sparsity_txt : bool
+        If True, show a text summary of the sparsity. Defaults to False.
     dynamic : bool
         True if dynamic coloring is being used.
     static : Coloring, str, or None
@@ -167,14 +171,16 @@ class ColoringMeta(object):
         The coloring object.
     _failed : bool
         If True, coloring was already generated but failed.
+    _approx : bool
+        If True, this is an approx coloring.
     """
 
     _meta_names = {'num_full_jacs', 'tol', 'orders', 'min_improve_pct', 'show_summary',
                    'show_sparsity', 'dynamic', 'perturb_size'}
 
     def __init__(self, num_full_jacs=3, tol=1e-25, orders=None, min_improve_pct=5.,
-                 show_summary=True, show_sparsity=False, dynamic=False, static=None,
-                 perturb_size=1e-9, msginfo=''):
+                 show_summary=True, show_sparsity=False, show_sparsity_txt=False,
+                 dynamic=False, static=None, perturb_size=1e-9, msginfo=''):
         """
         Initialize data structures.
         """
@@ -184,12 +190,14 @@ class ColoringMeta(object):
         self.min_improve_pct = min_improve_pct
         self.show_summary = show_summary
         self.show_sparsity = show_sparsity
+        self.show_sparsity_txt = show_sparsity_txt
         self.dynamic = dynamic
         self.static = static
         self.msginfo = msginfo
         self.perturb_size = perturb_size
         self._coloring = None
         self._failed = False
+        self._approx = False
 
     def do_compute_coloring(self):
         """
@@ -214,6 +222,20 @@ class ColoringMeta(object):
         for name, val in dct.items():
             if name in self._meta_names:
                 setattr(self, name, val)
+
+    def display(self):
+        """
+        Display information about the coloring.
+        """
+        if self.coloring is None:
+            print("No coloring was computed successfully.")
+        else:
+            if self.show_sparsity_txt:
+                self.coloring.display_txt(html=False, summary=False)
+            if self.show_summary:
+                self.coloring.summary()
+            if self.show_sparsity:
+                self.coloring.display_bokeh(output_file=None, show=True)
 
     def __iter__(self):
         """
@@ -408,6 +430,8 @@ class Partial_ColoringMeta(ColoringMeta):
         If True, print a short summary of the coloring. Defaults to True.
     show_sparsity : bool
         If True, show a plot of the sparsity. Defaults to False.
+    show_sparsity_txt : bool
+        If True, show a text summary of the sparsity. Defaults to False.
     dynamic : bool
         True if dynamic coloring is being used.
     static : Coloring, str, or None
@@ -440,14 +464,15 @@ class Partial_ColoringMeta(ColoringMeta):
 
     def __init__(self, wrt_patterns=('*',), method='fd', form=None, step=None, per_instance=True,
                  perturb_size=1e-9, num_full_jacs=3, tol=1e-25, orders=None, min_improve_pct=5.,
-                 show_summary=True, show_sparsity=False, dynamic=False, static=None, msginfo=''):
+                 show_summary=True, show_sparsity=False, show_sparsity_txt=False, dynamic=False,
+                 static=None, msginfo=''):
         """
         Initialize data structures.
         """
         super().__init__(num_full_jacs=num_full_jacs, tol=tol, orders=orders,
                          min_improve_pct=min_improve_pct, show_summary=show_summary,
-                         show_sparsity=show_sparsity, dynamic=dynamic, static=static,
-                         perturb_size=perturb_size, msginfo=msginfo)
+                         show_sparsity=show_sparsity, show_sparsity_txt=show_sparsity_txt,
+                         dynamic=dynamic, static=static, perturb_size=perturb_size, msginfo=msginfo)
         if wrt_patterns is None:
             wrt_patterns = ()
         elif isinstance(wrt_patterns, str):
@@ -461,6 +486,7 @@ class Partial_ColoringMeta(ColoringMeta):
         self.per_instance = per_instance
         self.fname = None
         self.wrt_matches = None
+        self._approx = True
 
     @property
     def wrt_patterns(self):
@@ -630,6 +656,34 @@ class Coloring(object):
         self._local_array = {'fwd': None, 'rev': None}
 
         self._abs2prom = None
+
+    def get_renamed_copy(self, row_translate, col_translate):
+        """
+        Return a new Coloring object with the variables renamed.
+
+        Parameters
+        ----------
+        row_translate : dict
+            Dictionary mapping old row names to new row names.
+        col_translate : dict
+            Dictionary mapping old column names to new column names.
+
+        Returns
+        -------
+        Coloring
+            New Coloring object with the variables renamed.
+        """
+        row_vars = [row_translate[v] for v in self._row_vars]
+        col_vars = [col_translate[v] for v in self._col_vars]
+        c = Coloring(self.sparsity, row_vars, self._row_var_sizes, col_vars, self._col_var_sizes)
+        c._fwd = self._fwd
+        c._rev = self._rev
+        c._meta = self._meta.copy()
+        c._names_array = self._names_array
+        c._local_array = self._local_array
+        c._abs2prom = self._abs2prom
+
+        return c
 
     def color_iter(self, direction):
         """
@@ -1458,10 +1512,10 @@ class Coloring(object):
             source_name = pathlib.Path(source).absolute()
         elif isinstance(source, Coloring):
             coloring = source
-            source_name = ''
+            source_name = coloring._meta['source']
         elif hasattr(source, '_coloring_info'):
             coloring = source._coloring_info.coloring
-            source_name = source._problem()._name
+            source_name = source._problem()._metadata['pathname']
         else:
             raise ValueError(f'display_bokeh was expecting the source to be a valid coloring file '
                              f'or an instance of driver but instead got f{type(source)}')
@@ -1657,7 +1711,20 @@ class Coloring(object):
         if show:
             bokeh.io.show(report_layout)
 
-    def get_dense_sparsity(self, dtype=bool):
+    @property
+    def sparsity(self):
+        """
+        Return the sparsity matrix as a COO sparse matrix.
+
+        Returns
+        -------
+        coo_matrix
+            The sparsity matrix.
+        """
+        return coo_matrix((np.ones(len(self._nzrows), dtype=np.uint8),
+                           (self._nzrows, self._nzcols)), shape=self._shape)
+
+    def get_dense_sparsity(self, dtype=np.uint8):
         """
         Return a dense array representing the full sparsity.
 
@@ -1672,7 +1739,7 @@ class Coloring(object):
             Dense sparsity matrix.
         """
         J = np.zeros(self._shape, dtype=dtype)
-        J[self._nzrows, self._nzcols] = True
+        J[self._nzrows, self._nzcols] = dtype(1)
         return J
 
     def _jac2subjac_sparsity(self):
@@ -2404,7 +2471,7 @@ def _compute_total_coloring_context(problem):
 def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
                             tol=_DEF_COMP_SPARSITY_ARGS['tol'],
                             orders=_DEF_COMP_SPARSITY_ARGS['orders'], setup=False, run_model=False,
-                            of=None, wrt=None):
+                            of=None, wrt=None, driver=None):
     """
     Return a boolean version of the total jacobian.
 
@@ -2435,6 +2502,10 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
         Names of response variables.
     wrt : iter of str or None
         Names of design variables.
+    driver : Driver, None, or False
+        The driver that will be used to compute the total jacobian.  If None, the driver
+        from the problem will be used.  If False, compute_totals will be called directly
+        on the problem.
 
     Returns
     -------
@@ -2442,8 +2513,9 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
         A boolean composite of 'num_full_jacs' total jacobians.
     """
     # clear out any old simul coloring info
-    driver = prob.driver
-    driver._con_subjacs = {}
+    if driver is None:
+        driver = prob.driver
+        driver._con_subjacs = {}
 
     if not prob._computing_coloring:
         if setup:
@@ -2453,26 +2525,25 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
             prob.run_model(reset_iter_counts=False)
 
     if of is None or wrt is None:
-        driver_wrt = list(_src_name_iter(driver._designvars))
-        driver_of = driver._get_ordered_nl_responses()
-        if not driver_wrt or not driver_of:
+        if driver:
+            wrt = driver_wrt = list(_src_name_iter(driver._designvars))
+            of = driver_of = driver._get_ordered_nl_responses()
+
+        if not driver or not driver_wrt or not driver_of:
             raise RuntimeError("When computing total jacobian sparsity, either 'of' and 'wrt' "
                                "must be provided or design_vars/constraints/objective must be "
                                "added to the driver.")
-        wrt = driver_wrt
-        of = driver_of
-        use_driver = True
-    else:
-        use_driver = False
+    use_driver = bool(driver)
 
     with _compute_total_coloring_context(prob):
         start_time = time.perf_counter()
         fullJ = None
         for i in range(num_full_jacs):
             if use_driver:
-                Jabs = prob.driver._compute_totals(of=of, wrt=wrt, return_format='array')
+                Jabs = driver._compute_totals(of=of, wrt=wrt, return_format='array')
             else:
-                Jabs = prob.compute_totals(of=of, wrt=wrt, return_format='array')
+                Jabs = prob.compute_totals(of=of, wrt=wrt, return_format='array',
+                                           coloring_info=False)
             if fullJ is None:
                 fullJ = np.abs(Jabs)
             else:
@@ -2488,8 +2559,8 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
     spmeta['sparsity_time'] = elapsed
     spmeta['type'] = 'total'
 
-    print("Full total jacobian was computed %d times, taking %f seconds." % (num_full_jacs,
-                                                                             elapsed))
+    print(f"Full total jacobian for problem '{prob._metadata['pathname']}' was computed "
+          f"{num_full_jacs} times, taking {elapsed} seconds.")
     print("Total jacobian shape:", fullJ.shape, "\n")
 
     nzrows, nzcols = np.nonzero(fullJ > spmeta['good_tol'])
@@ -2589,7 +2660,8 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
                            num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
                            tol=_DEF_COMP_SPARSITY_ARGS['tol'],
                            orders=_DEF_COMP_SPARSITY_ARGS['orders'],
-                           setup=False, run_model=False, fname=None):
+                           setup=False, run_model=False, fname=None,
+                           driver=None):
     """
     Compute simultaneous derivative colorings for the total jacobian of the given problem.
 
@@ -2615,22 +2687,23 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
         If True, run run_model before calling compute_totals.
     fname : filename or None
         File where output coloring info will be written. If None, no info will be written.
+    driver : <Driver>, None, or False
+        The driver associated with the coloring.  If None, use problem.driver.  If False, no
+        driver will be used.
 
     Returns
     -------
     Coloring
         See docstring for Coloring class.
     """
-    driver = problem.driver
+    if driver is None:
+        driver = problem.driver
 
     ofs, wrts, _ = problem.model._get_totals_metadata(driver, of, wrt)
 
     model = problem.model
 
     if mode is None:
-        # if model._approx_schemes:
-        #     mode = 'fwd'
-        # else:
         mode = problem._orig_mode
 
     if mode != problem._orig_mode and mode != problem._mode:
@@ -2638,7 +2711,7 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
                            (mode, problem._mode))
 
     if model._approx_schemes:  # need to use total approx coloring
-        if len(ofs) != len(driver._responses):
+        if driver and len(ofs) != len(driver._responses):
             raise NotImplementedError("Currently there is no support for approx coloring when "
                                       "linear constraint derivatives are computed separately "
                                       "from nonlinear ones.")
@@ -2655,7 +2728,8 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
     else:
         J, sparsity_info = _get_total_jac_sparsity(problem, num_full_jacs=num_full_jacs, tol=tol,
                                                    orders=orders, setup=setup,
-                                                   run_model=run_model, of=ofs, wrt=wrts)
+                                                   run_model=run_model, of=ofs, wrt=wrts,
+                                                   driver=driver)
         coloring = _compute_coloring(J, mode)
         if coloring is not None:
             coloring._row_vars = list(ofs)
@@ -2682,7 +2756,8 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
                 abs_in = _convert_auto_ivc_to_conn_name(conns, abs_out)
                 abs2prom['output'][abs_out] = abs2prom['input'][abs_in]
 
-    driver._total_jac = None
+    if driver:
+        driver._total_jac = None
 
     # if we're running under MPI, make sure the coloring object is identical on all ranks
     # by broadcasting rank 0's coloring to the other ranks.
@@ -2694,7 +2769,7 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
 
     if coloring is not None:
         coloring._meta['timestamp'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        coloring._meta['source'] = problem._name
+        coloring._meta['source'] = problem._metadata['pathname']
 
     return coloring
 
@@ -2741,13 +2816,8 @@ def dynamic_total_coloring(driver, run_model=True, fname=None, of=None, wrt=None
 
     driver._coloring_info.coloring = coloring
 
-    if driver._coloring_info.coloring is not None:
-        if not problem.model._approx_schemes:  # avoid double display
-            if driver._coloring_info.show_sparsity:
-                coloring.display_txt(summary=False)
-            if driver._coloring_info.show_summary:
-                coloring.summary()
-
+    if coloring is not None:
+        driver._coloring_info.display()
         driver._setup_tot_jac_sparsity(coloring)
 
     return coloring
@@ -2820,27 +2890,23 @@ def _total_coloring_cmd(options, user_args):
             else:
                 outfile = os.path.join(prob.options['coloring_dir'], 'total_coloring.pkl')
 
-            coloring_info = prob.driver._coloring_info
-            if options.tolerance is None:
-                options.tolerance = coloring_info.tol
-            if options.orders is None:
-                options.orders = coloring_info.orders
-            if options.num_jacs is None:
-                options.num_jacs = coloring_info.num_full_jacs
+            coloring_info = prob.driver._coloring_info.copy()
+            if options.tolerance is not None:
+                coloring_info.tol = options.tolerance
+            if options.orders is not None:
+                coloring_info.orders = options.orders
+            if options.num_jacs is not None:
+                coloring_info.num_full_jacs = options.num_jacs
 
             with profiling('coloring_profile.out') if options.profile else do_nothing_context():
                 coloring = compute_total_coloring(prob,
-                                                  num_full_jacs=options.num_jacs,
-                                                  tol=options.tolerance,
-                                                  orders=options.orders,
+                                                  num_full_jacs=coloring_info.num_full_jacs,
+                                                  tol=coloring_info.tol,
+                                                  orders=coloring_info.orders,
                                                   setup=False, run_model=True, fname=outfile)
 
             if coloring is not None:
-                if options.show_sparsity_text:
-                    coloring.display_txt(html=False, summary=False)
-                if options.show_sparsity:
-                    coloring.display_bokeh(output_file=None, show=True)
-                coloring.summary()
+                coloring_info.display()
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
 

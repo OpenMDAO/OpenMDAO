@@ -4968,11 +4968,11 @@ class Group(System):
                         for rkey, rmeta in resps.items():
                             if rkey in out:
                                 tdict = {'con': 'constraint', 'obj': 'objective'}
-                                rpath = rmeta['alias_path']
+                                rpath = rmeta['parent']
                                 rname = '.'.join((rpath, rmeta['name'])) if rpath else rkey
                                 rtype = tdict[rmeta['type']]
                                 ometa = sub_out[rkey]
-                                opath = ometa['alias_path']
+                                opath = ometa['parent']
                                 oname = '.'.join((opath, ometa['name'])) if opath else ometa['name']
                                 otype = tdict[ometa['type']]
                                 raise NameError(f"The same response alias, '{rkey}' was declared"
@@ -5007,11 +5007,11 @@ class Group(System):
                         for rkey, rmeta in resps.items():
                             if rkey in out:
                                 tdict = {'con': 'constraint', 'obj': 'objective'}
-                                rpath = rmeta['alias_path']
+                                rpath = rmeta['parent']
                                 rname = '.'.join((rpath, rmeta['name'])) if rpath else rkey
                                 rtype = tdict[rmeta['type']]
                                 ometa = out[rkey]
-                                opath = ometa['alias_path']
+                                opath = ometa['parent']
                                 oname = '.'.join((opath, ometa['name'])) if opath else ometa['name']
                                 otype = tdict[ometa['type']]
                                 raise NameError(f"The same response alias, '{rkey}' was declared"
@@ -5026,12 +5026,16 @@ class Group(System):
         if isinstance(wrt, str):
             wrt = [wrt]
 
-        if driver is None:
+        if not driver:
             if of is None or wrt is None:
                 raise RuntimeError("driver must be specified if of and wrt variables are not "
                                    "provided.")
 
-            return self._active_desvars(wrt), self._active_responses(of), True
+            if driver is False:  # force to not use any existing desvar or response metadata
+                return self._active_responses(of, responses=False), \
+                    self._active_desvars(wrt, designvars=False), True
+
+            return self._active_responses(of), self._active_desvars(wrt), True
 
         has_custom_derivs = False
         list_wrt = list(wrt) if wrt is not None else []
@@ -5056,7 +5060,8 @@ class Group(System):
         else:
             of_src_names = [m['source'] for n, m in driver._responses.items()
                             if n in driver_ordered_nl_resp_names]
-            if list(of) != driver_ordered_nl_resp_names and list(of) != of_src_names:
+            of = list(of)
+            if of != driver_ordered_nl_resp_names and of != of_src_names:
                 has_custom_derivs = True
 
         return self._active_responses(of, driver._responses), \
@@ -5074,8 +5079,9 @@ class Group(System):
         ----------
         user_dv_names : iter of str
             Iterator of user facing design variable names.
-        designvars : dict
-            Dictionary of design variables.  If None, get_design_vars will be called.
+        designvars : dict, None, or False
+            Dictionary of design variables.  If None, get_design_vars will be called. If False,
+            no design vars will be used.
 
         Returns
         -------
@@ -5085,16 +5091,17 @@ class Group(System):
         # do this to keep ordering the same as in the user list
         active_dvs = {n: None for n in user_dv_names}
 
-        if not designvars:
+        if designvars is None:
             designvars = self.get_design_vars(recurse=True, get_sizes=True, use_prom_ivc=True)
 
-        for name, meta in designvars.items():
-            if name in active_dvs:
-                active_dvs[name] = meta.copy()
-            elif meta['name'] in active_dvs:
-                active_dvs[meta['name']] = meta.copy()
-            elif meta['source'] in active_dvs:
-                active_dvs[meta['source']] = meta.copy()
+        if designvars:  # use any matching metadata from existing design vars
+            for name, meta in designvars.items():
+                if name in active_dvs:
+                    active_dvs[name] = meta.copy()
+                elif meta['name'] in active_dvs:
+                    active_dvs[meta['name']] = meta.copy()
+                elif meta['source'] in active_dvs:
+                    active_dvs[meta['source']] = meta.copy()
 
         prom2abs_in = self._var_allprocs_prom2abs_list['input']
 
@@ -5131,8 +5138,9 @@ class Group(System):
         ----------
         user_response_names : iter of str
             Iterator of user facing response names.  Aliases are allowed.
-        responses : dict
-            Dictionary of responses.  If None, get_responses will be called.
+        responses : dict, None, or False.
+            Dictionary of responses.  If None, get_responses will be called. If False,
+            no responses will be used.
 
         Returns
         -------
@@ -5142,12 +5150,13 @@ class Group(System):
         # do this to keep ordering the same as in the user list
         active_resps = {n: None for n in user_response_names}
 
-        if not responses:
+        if responses is None:
             responses = self.get_responses(recurse=True, get_sizes=True, use_prom_ivc=True)
 
-        for name, meta in responses.items():
-            if name in active_resps:
-                active_resps[name] = meta.copy()
+        if responses:
+            for name, meta in responses.items():
+                if name in active_resps:
+                    active_resps[name] = meta.copy()
 
         for name, meta in active_resps.items():
             if meta is None:

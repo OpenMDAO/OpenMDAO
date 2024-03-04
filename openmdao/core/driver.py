@@ -1057,7 +1057,6 @@ class Driver(object):
             Derivatives in form requested by 'return_format'.
         """
         problem = self._problem()
-        total_jac = self._total_jac
         debug_print = 'totals' in self.options['debug_print'] and (not MPI or
                                                                    problem.comm.rank == 0)
 
@@ -1066,7 +1065,7 @@ class Driver(object):
             print(header)
             print(len(header) * '-' + '\n')
 
-        if total_jac is None:
+        if self._total_jac is None:
             total_jac = _TotalJacInfo(problem, of, wrt, return_format,
                                       approx=problem.model._owns_approx_jac,
                                       debug_print=debug_print,
@@ -1079,6 +1078,8 @@ class Driver(object):
                     self._total_jac_linear = total_jac
             else:
                 self._total_jac = total_jac
+        else:
+            total_jac = self._total_jac
 
         totals = total_jac.compute_totals()
 
@@ -1141,7 +1142,8 @@ class Driver(object):
                          perturb_size=coloring_mod._DEF_COMP_SPARSITY_ARGS['perturb_size'],
                          min_improve_pct=coloring_mod._DEF_COMP_SPARSITY_ARGS['min_improve_pct'],
                          show_summary=coloring_mod._DEF_COMP_SPARSITY_ARGS['show_summary'],
-                         show_sparsity=coloring_mod._DEF_COMP_SPARSITY_ARGS['show_sparsity']):
+                         show_sparsity=coloring_mod._DEF_COMP_SPARSITY_ARGS['show_sparsity'],
+                         show_sparsity_txt=False):
         """
         Set options for total deriv coloring.
 
@@ -1162,6 +1164,8 @@ class Driver(object):
             If True, display summary information after generating coloring.
         show_sparsity : bool
             If True, display sparsity with coloring info after generating coloring.
+        show_sparsity_txt : bool
+            If True, display sparsity as text after generating coloring.
         """
         self._coloring_info.coloring = None
         self._coloring_info.num_full_jacs = num_full_jacs
@@ -1175,6 +1179,7 @@ class Driver(object):
             self._coloring_info.dynamic = False
         self._coloring_info.show_summary = show_summary
         self._coloring_info.show_sparsity = show_sparsity
+        self._coloring_info.show_sparsity_txt = show_sparsity_txt
 
     def use_fixed_coloring(self, coloring=coloring_mod._STD_COLORING_FNAME):
         """

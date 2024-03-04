@@ -1457,7 +1457,8 @@ class System(object):
                          perturb_size=_DEFAULT_COLORING_META['perturb_size'],
                          min_improve_pct=_DEFAULT_COLORING_META['min_improve_pct'],
                          show_summary=_DEFAULT_COLORING_META['show_summary'],
-                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity']):
+                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity'],
+                         show_sparsity_txt=False):
         """
         Set options for deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -1492,7 +1493,9 @@ class System(object):
         show_summary : bool
             If True, display summary information after generating coloring.
         show_sparsity : bool
-            If True, display sparsity with coloring info after generating coloring.
+            If True, plot sparsity with coloring info after generating coloring.
+        show_sparsity_txt : bool
+            If True, display sparsity as text after generating coloring.
         """
         if method not in ('fd', 'cs', 'jax'):
             raise RuntimeError(
@@ -1529,6 +1532,7 @@ class System(object):
         options.min_improve_pct = min_improve_pct
         options.show_summary = show_summary
         options.show_sparsity = show_sparsity
+        options.show_sparsity_txt = show_sparsity_txt
         if form is not None:
             options.form = form
         if step is not None:
@@ -1566,13 +1570,10 @@ class System(object):
         coloring._meta.update(info)  # save metadata we used to create the coloring
         coloring._meta.update(sp_info)
 
-        if info.show_sparsity or info.show_summary:
+        if info.show_sparsity or info.show_sparsity_txt or info.show_summary:
             print("\nColoring for '%s' (class %s)" % (self.pathname, type(self).__name__))
 
-        if info.show_sparsity:
-            coloring.display_txt(summary=False)
-        if info.show_summary:
-            coloring.summary()
+        info.display()
 
         self._save_coloring(coloring)
 
@@ -3588,7 +3589,7 @@ class System(object):
                 path = prom2abs_out[prom][0] if prom in prom2abs_out else prom
                 raise RuntimeError(f"{self.msginfo}: Constraint alias '{alias}' on '{path}'"
                                    " is the same name as an existing variable.")
-            meta['alias_path'] = self.pathname
+        meta['parent'] = self.pathname
 
         if prom in prom2abs_out:  # promoted output
             src_name = prom2abs_out[prom][0]

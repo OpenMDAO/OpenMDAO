@@ -1,5 +1,5 @@
 import unittest
-from numpy import pi
+import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.mpi import MPI
@@ -18,7 +18,7 @@ def build_submodelcomp1(promote=True, **kwargs):
     submodel1 = subprob1.model.add_subsystem('submodel1', om.Group())
     submodel1.add_subsystem('sub1_ivc_r', om.IndepVarComp('r', 1.),
                             promotes_outputs=['r'])
-    submodel1.add_subsystem('sub1_ivc_theta', om.IndepVarComp('theta', pi),
+    submodel1.add_subsystem('sub1_ivc_theta', om.IndepVarComp('theta', np.pi),
                             promotes_outputs=['theta'])
     if promote:
         promotes = ['*']
@@ -34,7 +34,7 @@ def build_submodelcomp2(promote=True, **kwargs):
     submodel2 = subprob2.model.add_subsystem('submodel2', om.Group())
     submodel2.add_subsystem('sub2_ivc_r', om.IndepVarComp('r', 2),
                             promotes_outputs=['r'])
-    submodel2.add_subsystem('sub2_ivc_theta', om.IndepVarComp('theta', pi/2),
+    submodel2.add_subsystem('sub2_ivc_theta', om.IndepVarComp('theta', np.pi/2),
                             promotes_outputs=['theta'])
     if promote:
         promotes = ['*']
@@ -114,7 +114,7 @@ class TestSubmodelComp(unittest.TestCase):
                               promotes_outputs=['z'])
 
         p.model.set_input_defaults('r', 1)
-        p.model.set_input_defaults('theta', pi)
+        p.model.set_input_defaults('theta', np.pi)
 
         p.setup(force_alloc_complex=True)
 
@@ -265,7 +265,7 @@ class TestSubmodelComp(unittest.TestCase):
                                     promotes_outputs=['z'])
 
         p.model.set_input_defaults('r', 1)
-        p.model.set_input_defaults('theta', pi)
+        p.model.set_input_defaults('theta', np.pi)
 
         p.setup(force_alloc_complex=True)
 
@@ -326,7 +326,7 @@ class TestSubmodelComp(unittest.TestCase):
         p.setup(force_alloc_complex=True)
 
         p.set_val('r', 1)
-        p.set_val('theta', pi)
+        p.set_val('theta', np.pi)
 
         p.run_model()
         cpd = p.check_partials(method='cs', out_stream=None)
@@ -495,35 +495,127 @@ class TestSubmodelCompMPI(unittest.TestCase):
 
 
 class IncompleteRelevanceGroup(om.Group):
+    def __init__(self, size, **kwargs):
+        super().__init__(**kwargs)
+        self.size = size
+
     def setup(self):
-        self.add_subsystem('C1', om.ExecComp('y = 1.5*x'))
-        self.add_subsystem('C2', om.ExecComp('y = 3.0*x'))
-        self.add_subsystem('C3', om.ExecComp('y = 2.75*x'))
-        self.add_subsystem('C4', om.ExecComp('y = 4.25*x1 - 0.75*x2'))
-        self.add_subsystem('C5', om.ExecComp('y = 5.0*x'))
+        size = self.size
+        self.add_subsystem('C1', om.ExecComp('y = 1.5*x', shape=size))
+        self.add_subsystem('C2', om.ExecComp('y = 3.0*x', shape=size*2+1))
+        self.add_subsystem('C3', om.ExecComp('y = 2.75*x', shape=size))
+        self.add_subsystem('C4', om.ExecComp('y = 4.25*x1 - 0.75*x2', shape=size))
+        self.add_subsystem('C5', om.ExecComp('y = sum(x)/sum(x**2)', x=np.ones(size*2+1), y=0.0))
         self.connect('C1.y', ['C3.x', 'C4.x1'])
-        self.connect('C2.y', ['C4.x2', 'C5.x'])
+        self.connect('C2.y', 'C4.x2', src_indices=list(range(size)))
+        self.connect('C2.y', 'C5.x')
 
 
-class TestSubmodelIncompleteRelevance(unittest.TestCase):
-    def test_submodel_incomplete_relevance(self):
+class TestSubmodelColoring(unittest.TestCase):
+    def test_submodel_inner_coloring(self):
+        # this one has coloring within the submodelcomp
+
         p = om.Problem()
         model = p.model
 
 
-        model.add_subsystem('sub', om.SubmodelComp(problem=om.Problem(model=IncompleteRelevanceGroup()),
+        model.add_subsystem('sub', om.SubmodelComp(problem=om.Problem(model=IncompleteRelevanceGroup(3)),
                                                     inputs=['C1.x', 'C2.x'], outputs=['C3.y', 'C4.y', 'C5.y']))
 
         p.setup(force_alloc_complex=True)
         p.run_model()
 
-        check = p.check_partials(method='cs', show_only_incorrect=True)#, out_stream=None)
+        check = p.check_partials(method='cs', show_only_incorrect=True)
         assert_check_partials(check)
 
         check = p.check_totals(of=['sub.C3:y', 'sub.C4:y', 'sub.C5:y'],
-                              wrt=['sub.C1:x', 'sub.C2:x'], show_only_incorrect=True)#, out_stream=None)
+                               wrt=['sub.C1:x', 'sub.C2:x'], show_only_incorrect=True)
         assert_check_totals(check)
 
+    def test_submodel_inner_outer_coloring(self):
+        # this one has coloring within the submodelcomp and the outer problem driver
+
+        p = om.Problem()
+        model = p.model
+
+
+        model.add_subsystem('sub', om.SubmodelComp(problem=om.Problem(model=IncompleteRelevanceGroup(3)),
+                                                    inputs=['C1.x', 'C2.x'], outputs=['C3.y', 'C4.y', 'C5.y']))
+
+        p.driver = om.ScipyOptimizeDriver(optimizer='SLSQP')
+        p.driver.declare_coloring(show_summary=True, show_sparsity_txt=True)
+
+        p.model.add_design_var('sub.C1:x')
+        p.model.add_design_var('sub.C2:x')
+
+        p.model.add_objective('sub.C5:y', index=0)
+        p.model.add_constraint('sub.C4:y', lower=-1)
+        p.model.add_constraint('sub.C3:y', upper=99)
+
+        p.setup(force_alloc_complex=True)
+        p.run_driver()
+
+        check = p.check_partials(method='cs', show_only_incorrect=True)
+        assert_check_partials(check)
+
+        check = p.check_totals(of=['sub.C3:y', 'sub.C4:y', 'sub.C5:y'],
+                               wrt=['sub.C1:x', 'sub.C2:x'], show_only_incorrect=True)
+        assert_check_totals(check)
+
+
+class TestSubmodelColoringMultiSubmodelComps(unittest.TestCase):
+
+    def setUp(self):
+        from openmdao.utils.general_utils import set_pyoptsparse_opt
+
+        OPT, _ = set_pyoptsparse_opt('SLSQP')
+        if OPT is None:
+            raise unittest.SkipTest("pyoptsparse is not installed")
+
+    def test_multiple_submodels_inner_outer_coloring(self):
+        # this one has coloring within the submodelcomp and the outer problem driver
+
+        p = om.Problem()
+
+        model = p.model
+
+        par = model.add_subsystem('par', om.ParallelGroup(), promotes=['*'])
+
+        par.add_subsystem('sub1', om.SubmodelComp(problem=om.Problem(model=IncompleteRelevanceGroup(3)),
+                                                  inputs=['C1.x', 'C2.x'], outputs=['C3.y', 'C4.y', 'C5.y']))
+        par.add_subsystem('sub2', om.SubmodelComp(problem=om.Problem(model=IncompleteRelevanceGroup(3)),
+                                                  inputs=['C1.x', 'C2.x'], outputs=['C3.y', 'C4.y', 'C5.y']))
+
+        p.driver = om.ScipyOptimizeDriver(optimizer='SLSQP')
+        p.driver.declare_coloring(show_summary=True, show_sparsity_txt=True)
+
+        p.model.add_design_var('sub1.C1:x')
+        p.model.add_design_var('sub1.C2:x')
+        p.model.add_design_var('sub2.C1:x')
+        p.model.add_design_var('sub2.C2:x')
+
+        p.model.add_objective('sub1.C5:y', index=0)
+        p.model.add_constraint('sub2.C5:y', lower=-1)
+        p.model.add_constraint('sub1.C4:y', lower=-1)
+        p.model.add_constraint('sub1.C3:y', upper=99)
+        p.model.add_constraint('sub2.C4:y', lower=-1)
+        p.model.add_constraint('sub2.C3:y', upper=99)
+
+        p.setup(force_alloc_complex=True)
+        p.run_driver()
+
+        check = p.check_partials(method='cs', show_only_incorrect=True)
+        assert_check_partials(check)
+
+        check = p.check_totals(of=['sub1.C3:y', 'sub1.C4:y', 'sub1.C5:y',
+                                      'sub2.C3:y', 'sub2.C4:y', 'sub2.C5:y'],
+                                 wrt=['sub1.C1:x', 'sub1.C2:x', 'sub2.C1:x', 'sub2.C2:x'], show_only_incorrect=True)
+        assert_check_totals(check)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestSubmodelColoringMultiSubmodelCompsMPI(TestSubmodelColoringMultiSubmodelComps):
+    N_PROCS = 2
 
 
 if __name__ == '__main__':

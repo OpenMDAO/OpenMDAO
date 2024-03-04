@@ -87,7 +87,7 @@ def combine_ranges(ranges):
     return rnglist
 
 
-def ranges2indexer(ranges):
+def ranges2indexer(ranges, src_shape=None):
     """
     Convert a list of ranges to an indexer.
 
@@ -95,6 +95,8 @@ def ranges2indexer(ranges):
     ----------
     ranges : list
         List of (start, end) tuples.
+    src_shape : tuple or None
+        The shape of the source array.
 
     Returns
     -------
@@ -107,7 +109,10 @@ def ranges2indexer(ranges):
     else:
         idx = np.concatenate([np.arange(start, end) for start, end in ranges])
 
-    return indexer(idx, src_shape=(ranges[-1][1],), flat_src=True)
+    if src_shape is None:
+        src_shape = (ranges[-1][1] - ranges[0][0],)
+
+    return indexer(idx, src_shape=src_shape, flat_src=True)
 
 
 class Indexer(object):
