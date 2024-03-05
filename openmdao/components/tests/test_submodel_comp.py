@@ -562,7 +562,6 @@ class TestSubmodelColoring(unittest.TestCase):
                                wrt=['sub.C1:x', 'sub.C2:x'], show_only_incorrect=True)
         assert_check_totals(check)
 
-
 class TestSubmodelColoringMultiSubmodelComps(unittest.TestCase):
 
     def setUp(self):
@@ -616,6 +615,41 @@ class TestSubmodelColoringMultiSubmodelComps(unittest.TestCase):
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestSubmodelColoringMultiSubmodelCompsMPI(TestSubmodelColoringMultiSubmodelComps):
     N_PROCS = 2
+
+
+class TestSubmodelOpt(unittest.TestCase):
+    def test_submodel_with_opt(self):
+        sub_prob = om.Problem()
+
+        # modify paraboloid eqn with parameter "a" that will be constant during internal opt
+        sub_prob.model.add_subsystem("paraboloid", om.ExecComp("f = (x-3)**2 + x*y + (y+4)**2 + a"))
+
+        sub_prob.driver = om.ScipyOptimizeDriver(optimizer="SLSQP")
+
+        sub_prob.model.add_design_var("paraboloid.x", lower=-50, upper=50)
+        sub_prob.model.add_design_var("paraboloid.y", lower=-50, upper=50)
+        sub_prob.model.add_objective("paraboloid.f")
+
+        top_prob = om.Problem()
+        submodel = om.SubmodelComp(problem=sub_prob, inputs=[("paraboloid.a", "a")], outputs=[("paraboloid.f", "g")],
+                                   do_coloring=False)
+        top_prob.model.add_subsystem("submodel", submodel, promotes=["*"])
+        top_prob.setup()
+        top_prob.set_val("a", val=-3)
+
+        top_prob.run_model()
+
+        assert_near_equal(sub_prob.get_val("paraboloid.f"), -27.33333307, tolerance=1e-8)
+        assert_near_equal(sub_prob.get_val("paraboloid.x"), 6.66712855, tolerance=1e-8)
+        assert_near_equal(sub_prob.get_val("paraboloid.y"), -7.33324946, tolerance=1e-8)
+
+        # now test that we're not allowed to compute derivatives of a SubmodelComp if it has an optimizer
+        with self.assertRaises(Exception) as cm:
+            top_prob.compute_totals(of=['g'], wrt=['a'])
+
+        self.assertEqual(cm.exception.args[0],
+                         "'submodel' <class SubmodelComp>: Error calling compute_partials(), Can't compute partial "
+                         "derivatives of a SubmodelComp with an internal optimizer.")
 
 
 if __name__ == '__main__':

@@ -381,17 +381,19 @@ class SubmodelComp(ExplicitComponent):
         Compute a coloring and declare partials based on the coloring.
         """
         p = self._subprob
+        self._do_opt = p.driver.supports['gradients']
+
         inputs = self._var_rel_names['input']
         outputs = self._var_rel_names['output']
 
-        if len(inputs) == 0 or len(outputs) == 0:
-            return
-
         ofs = list(self._submodel_outputs)
         wrts = list(self._submodel_inputs)
-        of_metadata, wrt_metadata, _ = p.model._get_totals_metadata(driver=False, of=ofs, wrt=wrts)
+        of_metadata, wrt_metadata, _ = p.model._get_totals_metadata(driver=p.driver, of=ofs, wrt=wrts)
 
         self._setup_transfer_idxs(of_metadata, wrt_metadata)
+
+        if len(inputs) == 0 or len(outputs) == 0:
+            return
 
         self._sub_coloring_info = coloring_info = ColoringMeta()
         coloring_info.show_sparsity_txt = True
@@ -468,7 +470,10 @@ class SubmodelComp(ExplicitComponent):
         inner_idxs = self._output_xfer_idxs()
         p.model._outputs.set_val(self._outputs.asarray(), idxs=inner_idxs)
 
-        p.run_model()
+        if self._do_opt:
+            p.run_driver()
+        else:
+            p.run_model()
 
         # collect outputs from the submodel
         self._outputs.set_val(p.model._outputs.asarray()[inner_idxs])
@@ -484,6 +489,10 @@ class SubmodelComp(ExplicitComponent):
         partials : Jacobian
             Sub-jac components written to partials[output_name, input_name].
         """
+        if self._do_opt:
+            raise RuntimeError("Can't compute partial derivatives of a SubmodelComp with "
+                               "an internal optimizer.")
+
         p = self._subprob
 
         # we don't need to set our inputs into the submodel here because we've already done it

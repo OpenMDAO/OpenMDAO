@@ -106,6 +106,8 @@ def ranges2indexer(ranges, src_shape=None):
     ranges = combine_ranges(ranges)
     if len(ranges) == 1:
         idx = slice(ranges[0][0], ranges[0][1])
+    elif len(ranges) == 0:
+        idx = slice(0, 0)
     else:
         idx = np.concatenate([np.arange(start, end) for start, end in ranges])
 
