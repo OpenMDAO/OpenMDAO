@@ -217,7 +217,11 @@ class Solver(object):
         str
             Info to prepend to messages.
         """
+        # Default initialization
         if self._system is None:
+            return type(self).__name__
+        # Following Dead Weakref
+        elif self._system() is None:
             return type(self).__name__
         return f"{type(self).__name__} in {self._system().msginfo}"
 
@@ -307,8 +311,13 @@ class Solver(object):
         depth : int
             depth of the current system (already incremented).
         """
+        # Default initialization
         if self._system is None:
             self._system = weakref.ref(system)
+        # Following Dead Weakref
+        elif self._system() is None:
+            self._system = weakref.ref(system)
+        # Assignment Mismatch
         elif self._system != weakref.ref(system):
             raise RuntimeError(f"{type(self).__name__} has already been assigned to "
                                f"{self._system().msginfo} and cannot also be assigned to "

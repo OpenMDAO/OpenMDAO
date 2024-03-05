@@ -196,9 +196,6 @@ class Driver(object):
 
         self._has_scaling = False
 
-        # Want to allow the setting of hooks on Drivers
-        _setup_hooks(self)
-
     def _get_inst_id(self):
         if self._problem is None:
             return None

@@ -2044,8 +2044,69 @@ class Problem(object):
             Name, size, val, and other requested parameters of design variables, constraints,
             and objectives.
         """
+        warn_deprecation(msg='Method `list_problem_vars` has been renamed `list_driver_vars`.\n'
+                         'Please update your code to use list_driver_vars to avoid this warning.')
+        self.list_driver_vars(show_promoted_name=show_promoted_name,
+                              print_arrays=print_arrays,
+                              driver_scaling=driver_scaling,
+                              desvar_opts=desvar_opts,
+                              cons_opts=cons_opts,
+                              objs_opts=objs_opts,
+                              out_stream=out_stream)
+
+    def list_driver_vars(self,
+                         show_promoted_name=True,
+                         print_arrays=False,
+                         driver_scaling=True,
+                         desvar_opts=[],
+                         cons_opts=[],
+                         objs_opts=[],
+                         out_stream=_DEFAULT_OUT_STREAM
+                         ):
+        """
+        Print all design variables and responses (objectives and constraints).
+
+        Parameters
+        ----------
+        show_promoted_name : bool
+            If True, then show the promoted names of the variables.
+        print_arrays : bool, optional
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format is affected
+            by the values set with numpy.set_printoptions.
+            Default is False.
+        driver_scaling : bool, optional
+            When True, return values that are scaled according to either the adder and scaler or
+            the ref and ref0 values that were specified when add_design_var, add_objective, and
+            add_constraint were called on the model. Default is True.
+        desvar_opts : list of str
+            List of optional columns to be displayed in the desvars table.
+            Allowed values are:
+            ['lower', 'upper', 'ref', 'ref0', 'indices', 'adder', 'scaler', 'parallel_deriv_color',
+            'cache_linear_solution', 'units', 'min', 'max'].
+        cons_opts : list of str
+            List of optional columns to be displayed in the cons table.
+            Allowed values are:
+            ['lower', 'upper', 'equals', 'ref', 'ref0', 'indices', 'adder', 'scaler',
+            'linear', 'parallel_deriv_color', 'cache_linear_solution', 'units', 'min', 'max'].
+        objs_opts : list of str
+            List of optional columns to be displayed in the objs table.
+            Allowed values are:
+            ['ref', 'ref0', 'indices', 'adder', 'scaler', 'units',
+            'parallel_deriv_color', 'cache_linear_solution'].
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+
+        Returns
+        -------
+        dict
+            Name, size, val, and other requested parameters of design variables, constraints,
+            and objectives.
+        """
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-            raise RuntimeError(f"{self.msginfo}: Problem.list_problem_vars() cannot be called "
+            raise RuntimeError(f"{self.msginfo}: Problem.list_driver_vars() cannot be called "
                                "before `Problem.run_model()`, `Problem.run_driver()`, or "
                                "`Problem.final_setup()`.")
 

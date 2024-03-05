@@ -1290,8 +1290,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_near_equal(totals['a3', 'widths']['abs error'][0], 0.0, 1e-6)
         assert_near_equal(totals['a4', 'widths']['abs error'][0], 0.0, 1e-6)
 
-        l = prob.list_problem_vars(show_promoted_name=True, print_arrays=False,
-                                   cons_opts=['indices', 'alias'])
+        l = prob.list_driver_vars(show_promoted_name=True, print_arrays=False,
+                                  cons_opts=['indices', 'alias'])
 
         # Rev mode
 
