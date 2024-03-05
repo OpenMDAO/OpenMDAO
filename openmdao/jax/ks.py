@@ -9,7 +9,7 @@ try:
     jax.config.update("jax_enable_x64", True)
 except (ImportError, ModuleNotFoundError):
     jax = None
-    from ..utils.jax_utils import jit_stub as jit
+    from openmdao.utils.jax_utils import jit_stub as jit
 
 CITATIONS = """
 @conference {Martins:2005:SOU,
