@@ -388,7 +388,8 @@ class SubmodelComp(ExplicitComponent):
 
         ofs = list(self._submodel_outputs)
         wrts = list(self._submodel_inputs)
-        of_metadata, wrt_metadata, _ = p.model._get_totals_metadata(driver=p.driver, of=ofs, wrt=wrts)
+        of_metadata, wrt_metadata, _ = p.model._get_totals_metadata(driver=p.driver,
+                                                                    of=ofs, wrt=wrts)
 
         self._setup_transfer_idxs(of_metadata, wrt_metadata)
 
