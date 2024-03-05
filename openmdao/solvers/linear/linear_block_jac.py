@@ -21,8 +21,8 @@ class LinearBlockJac(BlockLinearSolver):
         system = self._system()
         mode = self._mode
 
-        subs = [s for s in system._solver_subsystem_iter(local_only=True)
-                if self._rel_systems is None or s.pathname in self._rel_systems]
+        subs = [s for s in
+                system._relevant.filter(system._solver_subsystem_iter(local_only=True))]
         scopelist = [None] * len(subs)
 
         if mode == 'fwd':
@@ -34,7 +34,7 @@ class LinearBlockJac(BlockLinearSolver):
                 scope_in = self._vars_union(self._scope_in, scope_in)
                 scopelist[i] = (scope_out, scope_in)
                 if subsys._iter_call_apply_linear():
-                    subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+                    subsys._apply_linear(None, mode, scope_out, scope_in)
                 else:
                     subsys._dresiduals.set_val(0.0)
 
@@ -43,7 +43,7 @@ class LinearBlockJac(BlockLinearSolver):
 
             for i, subsys in enumerate(subs):
                 scope_out, scope_in = scopelist[i]
-                subsys._solve_linear(mode, self._rel_systems, scope_out, scope_in)
+                subsys._solve_linear(mode, scope_out, scope_in)
 
         else:  # rev
             for i, subsys in enumerate(subs):
@@ -52,7 +52,7 @@ class LinearBlockJac(BlockLinearSolver):
                 scope_in = self._vars_union(self._scope_in, scope_in)
                 scopelist[i] = (scope_out, scope_in)
                 if subsys._iter_call_apply_linear():
-                    subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+                    subsys._apply_linear(None, mode, scope_out, scope_in)
                 else:
                     subsys._doutputs.set_val(0.0)
 
@@ -63,4 +63,4 @@ class LinearBlockJac(BlockLinearSolver):
 
             for i, subsys in enumerate(subs):
                 scope_out, scope_in = scopelist[i]
-                subsys._solve_linear(mode, self._rel_systems, scope_out, scope_in)
+                subsys._solve_linear(mode, scope_out, scope_in)

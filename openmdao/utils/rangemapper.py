@@ -109,6 +109,22 @@ class RangeMapper(object):
         """
         raise NotImplementedError("__getitem__ method must be implemented by subclass.")
 
+    def inds2keys(self, inds):
+        """
+        Find the set of keys corresponding to the given indices.
+
+        Parameters
+        ----------
+        inds : iter of int
+            The array indices.
+
+        Returns
+        -------
+        set of object
+            The set of keys corresponding to the given indices.
+        """
+        return {self[idx] for idx in inds}
+
     def dump(self):
         """
         Dump the contents of the mapper to stdout.
@@ -161,14 +177,6 @@ class RangeTreeNode(RangeMapper):
         Return a string representation of the RangeTreeNode.
         """
         return f"RangeTreeNode({self.key}, ({self.start}:{self.stop}))"
-
-
-def _size_of_ranges(ranges):
-    size = 0
-    for _, start, stop in ranges:
-        size += stop - start
-
-    return size
 
 
 class RangeTree(RangeMapper):

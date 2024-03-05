@@ -678,6 +678,88 @@ def get_random_arr(shape, comm=None, generator=None):
     return arr
 
 
+class ValueRepeater(object):
+    """
+    An iterable over a single value that repeats a given number of times.
+
+    Parameters
+    ----------
+    val : object
+        The value to be repeated.
+    size : int
+        The number of times to repeat the value.
+
+    Attributes
+    ----------
+    val : object
+        The value to be repeated.
+    size : int
+        The number of times to repeat the value.
+
+    Yields
+    ------
+    object
+        The value.
+    """
+
+    def __init__(self, val, size):
+        """
+        Initialize all attributes.
+        """
+        self.val = val
+        self.size = size
+
+    def __iter__(self):
+        """
+        Return an iterator over the value.
+
+        Yields
+        ------
+        object
+            The value.
+        """
+        for i in range(self.size):
+            yield self.val
+
+    def __len__(self):
+        """
+        Return the size of the value.
+
+        Returns
+        -------
+        int
+            The size of the value.
+        """
+        return self.size
+
+    def __contains__(self, item):
+        """
+        Return True if the given item is equal to the value.
+
+        Parameters
+        ----------
+        item : object
+            The item to be checked for containment.
+        """
+        return item == self.val
+
+    def __getitem__(self, idx):
+        """
+        Return the value.
+
+        Parameters
+        ----------
+        idx : int
+            The index of the value to be returned.
+        """
+        i = idx
+        if idx < 0:
+            idx += self.size
+        if idx >= self.size:
+            raise IndexError(f"index {i} is out of bounds for size {self.size}")
+        return self.val
+
+
 def convert_nans_in_nested_list(val_as_list):
     """
     Given a list, possibly nested, replace any numpy.nan values with the string "nan".

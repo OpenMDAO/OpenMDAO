@@ -28,7 +28,7 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
 from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import \
     MultipointBeamGroup
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_equal_numstrings
 from openmdao.utils.general_utils import set_pyoptsparse_opt, determine_adder_scaler, printoptions
 from openmdao.utils.general_utils import remove_whitespace
 from openmdao.utils.testing_utils import use_tempdirs
@@ -267,7 +267,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(driver_cases, [
             'rank0:ScipyOptimize_SLSQP|0', 'rank0:ScipyOptimize_SLSQP|1', 'rank0:ScipyOptimize_SLSQP|2',
             'rank0:ScipyOptimize_SLSQP|3', 'rank0:ScipyOptimize_SLSQP|4', 'rank0:ScipyOptimize_SLSQP|5',
-            'rank0:ScipyOptimize_SLSQP|6'
+            'rank0:ScipyOptimize_SLSQP|6', 'rank0:ScipyOptimize_SLSQP|7'
         ])
 
         # Test to see if the access by case keys works:
@@ -1077,16 +1077,13 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check that output from the Case method matches output from the System method
         # the system for the case should be properly identified as 'd1'
-        stream = StringIO()
-        d1.list_outputs(prom_name=True, desc=True, out_stream=stream)
-        expected = stream.getvalue().split('\n')
+        listout_stream = StringIO()
+        d1.list_outputs(prom_name=True, desc=True, out_stream=listout_stream)
 
-        stream = StringIO()
-        case.list_outputs(prom_name=True, desc=True, out_stream=stream)
-        text = stream.getvalue().split('\n')
+        case_stream = StringIO()
+        case.list_outputs(prom_name=True, desc=True, out_stream=case_stream)
 
-        for i, line in enumerate(expected):
-            self.assertEqual(text[i], line)
+        assert_equal_numstrings(listout_stream.getvalue(), case_stream.getvalue())
 
     def test_list_residuals_tol(self):
 
@@ -1233,16 +1230,13 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check that output from the Case method matches output from the System method
         # the system for the case should be properly identified as 'd1'
-        stream = StringIO()
-        d1.list_inputs(prom_name=True, desc=True, out_stream=stream)
-        expected = stream.getvalue().split('\n')
+        stream1 = StringIO()
+        d1.list_inputs(prom_name=True, desc=True, out_stream=stream1)
 
-        stream = StringIO()
-        case.list_inputs(prom_name=True, desc=True, out_stream=stream)
-        text = stream.getvalue().split('\n')
+        stream2 = StringIO()
+        case.list_inputs(prom_name=True, desc=True, out_stream=stream2)
 
-        for i, line in enumerate(expected):
-            self.assertEqual(text[i], line)
+        assert_equal_numstrings(stream1.getvalue(), stream2.getvalue())
 
     def test_list_inputs_outputs_solver_case(self):
         prob = SellarProblem(SellarDerivativesGrouped)
@@ -1261,27 +1255,17 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check that output from the Case methods match output from the System methods
         # the system for the solver case should be properly identified as 'mda'
-        stream = StringIO()
-        mda.list_inputs(prom_name=True, out_stream=stream)
-        expected = stream.getvalue().split('\n')
+        stream1 = StringIO()
+        stream2 = StringIO()
+        mda.list_inputs(prom_name=True, out_stream=stream1)
+        case.list_inputs(prom_name=True, out_stream=stream2)
+        assert_equal_numstrings(stream1.getvalue(), stream2.getvalue())
 
-        stream = StringIO()
-        case.list_inputs(prom_name=True, out_stream=stream)
-        text = stream.getvalue().split('\n')
-
-        for i, line in enumerate(expected):
-            self.assertEqual(text[i], line)
-
-        stream = StringIO()
-        mda.list_outputs(prom_name=True, out_stream=stream)
-        expected = stream.getvalue().split('\n')
-
-        stream = StringIO()
-        case.list_outputs(prom_name=True, out_stream=stream)
-        text = stream.getvalue().split('\n')
-
-        for i, line in enumerate(expected):
-            self.assertEqual(text[i], line)
+        stream1 = StringIO()
+        stream2 = StringIO()
+        mda.list_outputs(prom_name=True, out_stream=stream1)
+        case.list_outputs(prom_name=True, out_stream=stream2)
+        assert_equal_numstrings(stream1.getvalue(), stream2.getvalue())
 
     def test_list_inputs_outputs_indep_desvar(self):
         prob = SellarProblem(SellarDerivativesGrouped)
@@ -2227,7 +2211,8 @@ class TestSqliteCaseReader(unittest.TestCase):
             'rank0:ScipyOptimize_SLSQP|3|root._solve_nonlinear|3|NLRunOnce|0|obj_cmp._solve_nonlinear|3',
             'rank0:ScipyOptimize_SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0|obj_cmp._solve_nonlinear|4',
             'rank0:ScipyOptimize_SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0|obj_cmp._solve_nonlinear|5',
-            'rank0:ScipyOptimize_SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0|obj_cmp._solve_nonlinear|6'
+            'rank0:ScipyOptimize_SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0|obj_cmp._solve_nonlinear|6',
+            'rank0:ScipyOptimize_SLSQP|7|root._solve_nonlinear|7|NLRunOnce|0|obj_cmp._solve_nonlinear|7'
         ]
         self.assertEqual(len(system_cases), len(expected_cases))
         for i, coord in enumerate(system_cases):
@@ -2258,7 +2243,8 @@ class TestSqliteCaseReader(unittest.TestCase):
             'rank0:ScipyOptimize_SLSQP|3|root._solve_nonlinear|3|NLRunOnce|0',
             'rank0:ScipyOptimize_SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0',
             'rank0:ScipyOptimize_SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0',
-            'rank0:ScipyOptimize_SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0'
+            'rank0:ScipyOptimize_SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0',
+            'rank0:ScipyOptimize_SLSQP|7|root._solve_nonlinear|7|NLRunOnce|0'
         ]
         self.assertEqual(len(root_solver_cases), len(expected_cases))
         for i, coord in enumerate(root_solver_cases):
@@ -2320,16 +2306,13 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check that output from the Case method matches output from the System method
         # the system for the case should be properly identified as 'd1'
-        stream = StringIO()
-        prob.model.mda.list_inputs(prom_name=True, out_stream=stream)
-        expected = stream.getvalue().split('\n')
+        stream1 = StringIO()
+        prob.model.mda.list_inputs(prom_name=True, out_stream=stream1)
 
-        stream = StringIO()
-        case.list_inputs(prom_name=True, out_stream=stream)
-        text = stream.getvalue().split('\n')
+        stream2 = StringIO()
+        case.list_inputs(prom_name=True, out_stream=stream2)
 
-        for i, line in enumerate(expected):
-            self.assertEqual(text[i], line)
+        assert_equal_numstrings(stream1.getvalue(), stream2.getvalue())
 
         for key in expected_inputs_abs:
             np.testing.assert_almost_equal(case.inputs[key], prob[key])
@@ -2357,7 +2340,8 @@ class TestSqliteCaseReader(unittest.TestCase):
             'rank0:ScipyOptimize_SLSQP|3',
             'rank0:ScipyOptimize_SLSQP|4',
             'rank0:ScipyOptimize_SLSQP|5',
-            'rank0:ScipyOptimize_SLSQP|6'
+            'rank0:ScipyOptimize_SLSQP|6',
+            'rank0:ScipyOptimize_SLSQP|7'
         ]
         # check that there are multiple iterations and they have the expected coordinates
         self.assertTrue(len(driver_cases), len(expected_cases))
@@ -2757,10 +2741,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         c1 = cr.get_case('c1')
 
         J = prob.compute_totals()
-        np.testing.assert_almost_equal(c1.derivatives[('f(xy)', 'x,1')], J[('comp.f(xy)', 'p1.x,1')])
-        np.testing.assert_almost_equal(c1.derivatives[('f(xy)', 'y:2')], J[('comp.f(xy)', 'p2.y:2')])
-        np.testing.assert_almost_equal(c1.derivatives[('c', 'x,1')], J[('con.c', 'p1.x,1')])
-        np.testing.assert_almost_equal(c1.derivatives[('c', 'y:2')], J[('con.c', 'p2.y:2')])
+        np.testing.assert_almost_equal(c1.derivatives[('f(xy)', 'x,1')], J[('f(xy)', 'x,1')])
+        np.testing.assert_almost_equal(c1.derivatives[('f(xy)', 'y:2')], J[('f(xy)', 'y:2')])
+        np.testing.assert_almost_equal(c1.derivatives[('c', 'x,1')], J[('c', 'x,1')])
+        np.testing.assert_almost_equal(c1.derivatives[('c', 'y:2')], J[('c', 'y:2')])
 
     def test_comma_comp(self):
         class CommaComp(om.ExplicitComponent):

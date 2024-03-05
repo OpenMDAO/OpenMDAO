@@ -367,7 +367,7 @@ class ExplicitComponent(Component):
             if dochk:
                 self._check_consistent_serial_dinputs(nzdresids)
 
-    def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, jac, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -375,8 +375,6 @@ class ExplicitComponent(Component):
         ----------
         jac : Jacobian or None
             If None, use local jacobian, else use jac.
-        rel_systems : set of str
-            Set of names of relevant systems based on the current linear solve.
         mode : str
             'fwd' or 'rev'.
         scope_out : set or None
@@ -436,7 +434,7 @@ class ExplicitComponent(Component):
                 finally:
                     d_inputs.read_only = d_residuals.read_only = False
 
-    def _solve_linear(self, mode, rel_systems, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
+    def _solve_linear(self, mode, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
@@ -444,8 +442,6 @@ class ExplicitComponent(Component):
         ----------
         mode : str
             'fwd' or 'rev'.
-        rel_systems : set of str
-            Set of names of relevant systems based on the current linear solve.
         scope_out : set, None, or _UNDEFINED
             Outputs relevant to possible lower level calls to _apply_linear on Components.
         scope_in : set, None, or _UNDEFINED

@@ -14,6 +14,7 @@ from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.core.group import Group
 from openmdao.utils.class_util import WeakMethodWrapper
 from openmdao.utils.mpi import MPI
+from openmdao.core.analysis_error import AnalysisError
 
 # Optimizers in scipy.minimize
 _optimizers = {'Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
@@ -117,6 +118,8 @@ class ScipyOptimizeDriver(Driver):
         Copy of _designvars.
     _lincongrad_cache : np.ndarray
         Pre-calculated gradients of linear constraints.
+    _desvar_array_cache : np.ndarray
+        Cached array for setting design variables.
     """
 
     def __init__(self, **kwargs):
@@ -150,6 +153,7 @@ class ScipyOptimizeDriver(Driver):
         self._obj_and_nlcons = None
         self._dvlist = None
         self._lincongrad_cache = None
+        self._desvar_array_cache = None
         self.fail = False
         self.iter_count = 0
         self._check_jac = False
@@ -230,6 +234,7 @@ class ScipyOptimizeDriver(Driver):
                     self._cons[name] = meta.copy()
                     self._cons[name]['equals'] = None
                     self._cons[name]['linear'] = True
+                    self._cons[name]['alias'] = None
 
     def get_driver_objective_calls(self):
         """
@@ -273,6 +278,7 @@ class ScipyOptimizeDriver(Driver):
         model = problem.model
         self.iter_count = 0
         self._total_jac = None
+        self._desvar_array_cache = None
 
         self._check_for_missing_objective()
         self._check_for_invalid_desvar_values()
@@ -457,7 +463,7 @@ class ScipyOptimizeDriver(Driver):
             hess = None
 
         # compute dynamic simul deriv coloring if option is set
-        coloring = self._get_coloring(run_model=False)
+        problem.get_total_coloring(self._coloring_info, run_model=False)
 
         # optimize
         try:
@@ -519,9 +525,7 @@ class ScipyOptimizeDriver(Driver):
                 from scipy.optimize import differential_evolution
                 # There is no "options" param, so "opt_settings" can be used to set the (many)
                 # keyword arguments
-                result = differential_evolution(self._objfunc,
-                                                bounds=bounds,
-                                                **self.opt_settings)
+                result = differential_evolution(self._objfunc, bounds=bounds, **self.opt_settings)
             elif opt == 'shgo':
                 from scipy.optimize import shgo
                 kwargs = dict()
@@ -549,6 +553,9 @@ class ScipyOptimizeDriver(Driver):
         except Exception as msg:
             if self._exc_info is None:
                 raise
+        finally:
+            total_jac = self._total_jac  # used later if this is the final iter
+            self._total_jac = None
 
         if self._exc_info is not None:
             self._reraise()
@@ -574,7 +581,46 @@ class ScipyOptimizeDriver(Driver):
                 print(result.message)
                 print('-' * 35)
 
+        if not self.fail:
+            # restore design vars from last objective evaluation
+            # if self._desvar_array_cache is not None:
+            #     self._update_design_vars(result.x)
+
+            # update everything after the opt completes so even irrelevant components are updated
+            with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
+                try:
+                    model.run_solve_nonlinear()
+                except AnalysisError:
+                    model._clear_iprint()
+
+                rec.abs = 0.0
+                rec.rel = 0.0
+
+            if self.recording_options['record_derivatives']:
+                try:
+                    self._total_jac = total_jac  # temporarily restore this to get deriv recording
+                    self.record_derivatives()
+                finally:
+                    self._total_jac = None
+
+            self.iter_count += 1
+
         return self.fail
+
+    def _update_design_vars(self, x_new):
+        """
+        Update the design variables in the model.
+
+        Parameters
+        ----------
+        x_new : ndarray
+            Array containing input values at new design point.
+        """
+        i = 0
+        for name, meta in self._designvars.items():
+            size = meta['size']
+            self.set_design_var(name, x_new[i:i + size])
+            i += size
 
     def _objfunc(self, x_new):
         """
@@ -597,17 +643,20 @@ class ScipyOptimizeDriver(Driver):
         try:
 
             # Pass in new inputs
-            i = 0
             if MPI:
                 model.comm.Bcast(x_new, root=0)
-            for name, meta in self._designvars.items():
-                size = meta['size']
-                self.set_design_var(name, x_new[i:i + size])
-                i += size
+
+            if self._desvar_array_cache is None:
+                self._desvar_array_cache = np.empty(x_new.shape, dtype=x_new.dtype)
+
+            self._desvar_array_cache[:] = x_new
+
+            self._update_design_vars(x_new)
 
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 self.iter_count += 1
-                model.run_solve_nonlinear()
+                with model._relevant.all_seeds_active():
+                    model.run_solve_nonlinear()
 
             # Get the objective function evaluations
             for obj in self.get_objective_values().values():

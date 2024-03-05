@@ -259,21 +259,21 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                     rows = np.tile(rows, vec_size) + repeat * n_of
                     cols = np.tile(cols, vec_size) + repeat * n_wrt
 
-                    dct = {
+                    pattern_meta = {
                         'rows': rows,
                         'cols': cols,
                         'dependent': True,
                     }
-                    self._declare_partials(of=of, wrt=wrt, dct=dct)
+                    self._resolve_partials_patterns(of=of, wrt=wrt, pattern_meta=pattern_meta)
         else:
-            dct = {
+            pattern_meta = {
                 'val': None,
                 'dependent': True,
             }
             # Dense specification of partials for non-vectorized models.
-            self._declare_partials(of=tuple([name[0] for name in self._surrogate_output_names]),
-                                   wrt=tuple([name[0] for name in self._surrogate_input_names]),
-                                   dct=dct)
+            self._resolve_partials_patterns(of=tuple([n[0] for n in self._surrogate_output_names]),
+                                            wrt=tuple([n[0] for n in self._surrogate_input_names]),
+                                            pattern_meta=pattern_meta)
 
         # Support for user declaring fd partials in a child class and assigning new defaults.
         # We want a warning for all partials that were not explicitly declared.

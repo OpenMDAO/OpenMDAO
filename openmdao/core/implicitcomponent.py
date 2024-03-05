@@ -214,7 +214,7 @@ class ImplicitComponent(Component):
             if dochk:
                 self._check_consistent_serial_dinputs(nzdresids)
 
-    def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, jac, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -222,8 +222,6 @@ class ImplicitComponent(Component):
         ----------
         jac : Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        rel_systems : set of str
-            Set of names of relevant systems based on the current linear solve.
         mode : str
             Either 'fwd' or 'rev'.
         scope_out : set or None
@@ -264,7 +262,7 @@ class ImplicitComponent(Component):
                 finally:
                     d_inputs.read_only = d_outputs.read_only = d_residuals.read_only = False
 
-    def _solve_linear(self, mode, rel_systems, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
+    def _solve_linear(self, mode, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
@@ -272,8 +270,6 @@ class ImplicitComponent(Component):
         ----------
         mode : str
             'fwd' or 'rev'.
-        rel_systems : set of str
-            Set of names of relevant systems based on the current linear solve.
         scope_out : set, None, or _UNDEFINED
             Outputs relevant to possible lower level calls to _apply_linear on Components.
         scope_in : set, None, or _UNDEFINED
@@ -281,7 +277,7 @@ class ImplicitComponent(Component):
         """
         if self._linear_solver is not None:
             self._linear_solver._set_matvec_scope(scope_out, scope_in)
-            self._linear_solver.solve(mode, rel_systems)
+            self._linear_solver.solve(mode, None)
 
         else:
             d_outputs = self._doutputs
@@ -490,7 +486,7 @@ class ImplicitComponent(Component):
             self._dresiduals_wrapper = self._dresiduals
             self._jac_wrapper = self._jacobian
 
-    def _declare_partials(self, of, wrt, dct):
+    def _resolve_partials_patterns(self, of, wrt, pattern_meta):
         """
         Store subjacobian metadata for later use.
 
@@ -503,7 +499,7 @@ class ImplicitComponent(Component):
             The names of the variables that derivatives are taken with respect to.
             This can contain the name of any input or output variable.
             May also contain glob patterns.
-        dct : dict
+        pattern_meta : dict
             Metadata dict specifying shape, and/or approx properties.
         """
         if self._declared_residuals:
@@ -524,13 +520,13 @@ class ImplicitComponent(Component):
                         rmap[resid] = []
 
                     oslc, rslc = _get_overlap_slices(ostart, oend, rstart, rend)
-                    rmap[resid].append((oname[plen:], wrt, dct, oslc, rslc))
+                    rmap[resid].append((oname[plen:], wrt, pattern_meta, oslc, rslc))
 
             for resid, lst in self._resid2out_subjac_map.items():
-                for oname, wrt, dct, _, _ in lst:
-                    super()._declare_partials(oname, wrt, dct)
+                for oname, wrt, patmeta, _, _ in lst:
+                    super()._resolve_partials_patterns(oname, wrt, patmeta)
         else:
-            super()._declare_partials(of, wrt, dct)
+            super()._resolve_partials_patterns(of, wrt, pattern_meta)
 
     def _check_res_vs_out_meta(self, resid, output):
         """
@@ -585,7 +581,7 @@ class ImplicitComponent(Component):
         Returns
         -------
         tuple(list, list)
-            'of' and 'wrt' variable lists.
+            'of' and 'wrt' variable lists (promoted names).
         """
         of = list(self._var_allprocs_prom2abs_list['output'])
         wrt = list(self._var_allprocs_prom2abs_list['input'])

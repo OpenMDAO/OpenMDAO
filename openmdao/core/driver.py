@@ -15,7 +15,7 @@ from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.hooks import _setup_hooks
 from openmdao.utils.record_util import create_local_meta, check_path, has_match
-from openmdao.utils.general_utils import _src_name_iter, _src_or_alias_name
+from openmdao.utils.general_utils import _src_name_iter
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
@@ -23,7 +23,6 @@ from openmdao.utils.array_utils import sizes2offsets
 from openmdao.vectors.vector import _full_slice, _flat_full_indexer
 from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, DriverWarning
-import openmdao.utils.coloring as c_mod
 
 
 class Driver(object):
@@ -57,8 +56,8 @@ class Driver(object):
     _designvars_discrete : list
         List of design variables that are discrete.
     _dist_driver_vars : dict
-        Dict of constraints that are distributed outputs. Key is abs variable name, values are
-        (local indices, local sizes).
+        Dict of constraints that are distributed outputs. Key is a 'user' variable name,
+        typically promoted name or an alias. Values are (local indices, local sizes).
     _cons : dict
         Contains all constraint info.
     _objs : dict
@@ -78,12 +77,10 @@ class Driver(object):
         Object that manages all recorders added to this driver.
     _coloring_info : dict
         Metadata pertaining to total coloring.
-    _total_jac_sparsity : dict, str, or None
-        Specifies sparsity of sub-jacobians of the total jacobian. Only used by pyOptSparseDriver.
     _total_jac_format : str
         Specifies the format of the total jacobian. Allowed values are 'flat_dict', 'dict', and
         'array'.
-    _res_subjacs : dict
+    _con_subjacs : dict
         Dict of sparse subjacobians for use with certain optimizers, e.g. pyOptSparseDriver.
         Keyed by sources and aliases.
     _total_jac : _TotalJacInfo or None
@@ -177,11 +174,10 @@ class Driver(object):
         self.iter_count = 0
         self.cite = ""
 
-        self._coloring_info = coloring_mod._get_coloring_meta()
+        self._coloring_info = coloring_mod._ColoringMeta()
 
-        self._total_jac_sparsity = None
         self._total_jac_format = 'flat_dict'
-        self._res_subjacs = {}
+        self._con_subjacs = {}
         self._total_jac = None
         self._total_jac_linear = None
 
@@ -308,6 +304,8 @@ class Driver(object):
                 # For Auto-ivcs, we need to check the distributed metadata on the target instead.
                 if meta['source'].startswith('_auto_ivc.'):
                     for abs_name in model._var_allprocs_prom2abs_list['input'][dv]:
+                        # we can use abs name to check for discrete vars here because
+                        # relative names are absolute names at the model level.
                         if abs_name in discrete_in:
                             # Discrete vars aren't distributed.
                             break
@@ -354,11 +352,10 @@ class Driver(object):
 
             # Loop over all VOIs.
             for vname, voimeta in chain(self._responses.items(), self._designvars.items()):
-                # vname may be a abs output, promoted input, or an alias
+                # vname may be a promoted name or an alias
 
                 indices = voimeta['indices']
                 vsrc = voimeta['source']
-                drv_name = _src_or_alias_name(voimeta)
 
                 meta = abs2meta_out[vsrc]
                 i = abs2idx[vsrc]
@@ -384,11 +381,10 @@ class Driver(object):
                                 distrib_indices = dist_inds
 
                         ind = indexer(local_indices, src_shape=(tot_size,), flat_src=True)
-                        dist_dict[drv_name] = (ind, true_sizes, distrib_indices)
+                        dist_dict[vname] = (ind, true_sizes, distrib_indices)
                     else:
-                        dist_dict[drv_name] = (_flat_full_indexer, dist_sizes,
-                                               slice(offsets[rank],
-                                                     offsets[rank] + dist_sizes[rank]))
+                        dist_dict[vname] = (_flat_full_indexer, dist_sizes,
+                                            slice(offsets[rank], offsets[rank] + dist_sizes[rank]))
 
                 else:
                     owner = owning_ranks[vsrc]
@@ -407,16 +403,19 @@ class Driver(object):
         # set up simultaneous deriv coloring
         if coloring_mod._use_total_sparsity:
             # reset the coloring
-            if self._coloring_info['dynamic'] or self._coloring_info['static'] is not None:
-                self._coloring_info['coloring'] = None
+            if self._coloring_info.dynamic or self._coloring_info.static is not None:
+                self._coloring_info.coloring = None
 
             coloring = self._get_static_coloring()
             if coloring is not None and self.supports['simultaneous_derivatives']:
                 if model._owns_approx_jac:
                     coloring._check_config_partial(model)
                 else:
-                    coloring._check_config_total(self)
-                self._setup_simul_coloring()
+                    coloring._check_config_total(self, model)
+
+                if not problem.model._use_derivatives:
+                    issue_warning("Derivatives are turned off.  Skipping simul deriv coloring.",
+                                  category=DerivativesWarning)
 
     def _check_for_missing_objective(self):
         """
@@ -605,19 +604,15 @@ class Driver(object):
         comm = model.comm
         get = model._outputs._abs_get_val
         indices = meta['indices']
-
         src_name = meta['source']
 
-        # If there's an alias, use that for driver related stuff
-        drv_name = _src_or_alias_name(meta)
-
         if MPI:
-            distributed = comm.size > 0 and drv_name in self._dist_driver_vars
+            distributed = comm.size > 0 and name in self._dist_driver_vars
         else:
             distributed = False
 
-        if drv_name in remote_vois:
-            owner, size = remote_vois[drv_name]
+        if name in remote_vois:
+            owner, size = remote_vois[name]
             # if var is distributed or only gathering to one rank
             # TODO - support distributed var under a parallel group.
             if owner is None or rank is not None:
@@ -640,7 +635,7 @@ class Driver(object):
 
         elif distributed:
             local_val = model.get_val(src_name, get_remote=False, flat=True)
-            local_indices, sizes, _ = self._dist_driver_vars[drv_name]
+            local_indices, sizes, _ = self._dist_driver_vars[name]
             if local_indices is not _full_slice:
                 local_val = local_val[local_indices()]
 
@@ -731,9 +726,9 @@ class Driver(object):
         dict
            Dictionary containing values of each design variable.
         """
-        return {n: self._get_voi_val(n, dv, self._remote_dvs, get_remote=get_remote,
+        return {n: self._get_voi_val(n, dvmeta, self._remote_dvs, get_remote=get_remote,
                                      driver_scaling=driver_scaling)
-                for n, dv in self._designvars.items()}
+                for n, dvmeta in self._designvars.items()}
 
     def set_design_var(self, name, value, set_remote=True):
         """
@@ -755,9 +750,6 @@ class Driver(object):
         meta = self._designvars[name]
 
         src_name = meta['source']
-
-        # If there's an alias, use that for driver related stuff
-        drv_name = _src_or_alias_name(meta)
 
         # if the value is not local, don't set the value
         if (src_name in self._remote_dvs and
@@ -782,8 +774,8 @@ class Driver(object):
 
         elif problem.model._outputs._contains_abs(src_name):
             desvar = problem.model._outputs._abs_get_val(src_name)
-            if drv_name in self._dist_driver_vars:
-                loc_idxs, _, dist_idxs = self._dist_driver_vars[drv_name]
+            if name in self._dist_driver_vars:
+                loc_idxs, _, dist_idxs = self._dist_driver_vars[name]
                 loc_idxs = loc_idxs()  # don't use indexer here
             else:
                 loc_idxs = meta['indices']
@@ -908,14 +900,14 @@ class Driver(object):
         self._cons = cons = {}
 
         # driver _responses are keyed by either the alias or the promoted name
+        response_size = 0
         self._responses = resps = model.get_responses(recurse=True, use_prom_ivc=True)
         for name, data in resps.items():
             if data['type'] == 'con':
                 cons[name] = data
             else:
                 objs[name] = data
-
-        response_size = sum(resps[n]['global_size'] for n in self._get_ordered_nl_responses())
+            response_size += data['global_size']
 
         # Gather up the information for design vars. _designvars are keyed by the promoted name
         self._designvars = designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
@@ -936,6 +928,20 @@ class Driver(object):
         """
         return 'FAIL' if self.fail else 'SUCCESS'
 
+    def get_constraints_without_dv(self):
+        """
+        Return a list of constraint names that don't depend on any design variables.
+
+        Returns
+        -------
+        list of str
+            Names of constraints that don't depend on any design variables.
+        """
+        relevant = self._problem().model._relevant
+        with relevant.all_seeds_active():
+            return [name for name, meta in self._cons.items()
+                    if not relevant.is_globally_relevant(meta['source'])]
+
     def check_relevance(self):
         """
         Check if there are constraints that don't depend on any design vars.
@@ -954,30 +960,13 @@ class Driver(object):
             if system._has_approx:
                 return
 
-        relevant = problem.model._relevant
-        fwd = problem._mode == 'fwd'
-
-        des_vars = self._designvars
-        constraints = self._cons
-
-        indep_list = list(des_vars)
-
-        for name, meta in constraints.items():
-
-            path = meta['source']
-
-            if fwd:
-                wrt = [v for v in indep_list if path in relevant[des_vars[v]['source']]]
-            else:
-                rels = relevant[path]
-                wrt = [v for v in indep_list if des_vars[v]['source'] in rels]
-
+        bad_cons = [n for n in self.get_constraints_without_dv() if n not in self._designvars]
+        if bad_cons:
             # Note: There is a hack in ScipyOptimizeDriver for older versions of COBYLA that
             #       implements bounds on design variables by adding them as constraints.
             #       These design variables as constraints will not appear in the wrt list.
-            if not wrt and name not in indep_list:
-                raise RuntimeError(f"{self.msginfo}: Constraint '{name}' does not depend on any "
-                                   "design variables. Please check your problem formulation.")
+            raise RuntimeError(f"{self.msginfo}: Constraint(s) {bad_cons} do not depend on any "
+                               "design variables. Please check your problem formulation.")
 
     def run(self):
         """
@@ -1002,8 +991,7 @@ class Driver(object):
     def _recording_iter(self):
         return self._problem()._metadata['recording_iter']
 
-    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict',
-                        use_abs_names=True, driver_scaling=True):
+    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', driver_scaling=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1021,8 +1009,6 @@ class Driver(object):
             Format to return the derivatives. Default is a 'flat_dict', which
             returns them in a dictionary whose keys are tuples of form (of, wrt). For
             the scipy optimizer, 'array' is also supported.
-        use_abs_names : bool
-            Set to True when passing in absolute names to skip some translation steps.
         driver_scaling : bool
             If True (default), scale derivative values by the quantities specified when the desvars
             and responses were added. If False, leave them unscaled.
@@ -1042,54 +1028,34 @@ class Driver(object):
             print(header)
             print(len(header) * '-' + '\n')
 
-        if problem.model._owns_approx_jac:
-            self._recording_iter.push(('_compute_totals_approx', 0))
+        if total_jac is None:
+            total_jac = _TotalJacInfo(problem, of, wrt, return_format,
+                                      approx=problem.model._owns_approx_jac,
+                                      debug_print=debug_print,
+                                      driver_scaling=driver_scaling)
 
-            try:
-                if total_jac is None:
-                    total_jac = _TotalJacInfo(problem, of, wrt, use_abs_names,
-                                              return_format, approx=True, debug_print=debug_print,
-                                              driver_scaling=driver_scaling)
+            if total_jac.has_lin_cons:
+                # if we're doing a scaling report, cache the linear total jacobian so we
+                # don't have to recreate it
+                if problem._has_active_report('scaling'):
+                    self._total_jac_linear = total_jac
+            else:
+                self._total_jac = total_jac
 
-                    if total_jac.has_lin_cons:
-                        # if we're doing a scaling report, cache the linear total jacobian so we
-                        # don't have to recreate it
-                        if problem._has_active_report('scaling'):
-                            self._total_jac_linear = total_jac
-                    else:
-                        self._total_jac = total_jac
+        totals = total_jac.compute_totals()
 
-                    totals = total_jac.compute_totals_approx(initialize=True)
-                else:
-                    totals = total_jac.compute_totals_approx()
-            finally:
-                self._recording_iter.pop()
-
-        else:
-            if total_jac is None:
-                total_jac = _TotalJacInfo(problem, of, wrt, use_abs_names, return_format,
-                                          debug_print=debug_print, driver_scaling=driver_scaling)
-
-                if total_jac.has_lin_cons:
-                    # if we're doing a scaling report, cache the linear total jacobian so we
-                    # don't have to recreate it
-                    if problem._has_active_report('scaling'):
-                        self._total_jac_linear = total_jac
-                else:
-                    self._total_jac = total_jac
-
-            self._recording_iter.push(('_compute_totals', 0))
-
-            try:
-                totals = total_jac.compute_totals()
-            finally:
-                self._recording_iter.pop()
-
-        if self._rec_mgr._recorders and self.recording_options['record_derivatives']:
-            metadata = create_local_meta(self._get_name())
-            total_jac.record_derivatives(self, metadata)
+        if self.recording_options['record_derivatives']:
+            self.record_derivatives()
 
         return totals
+
+    def record_derivatives(self):
+        """
+        Record the current total jacobian.
+        """
+        if self._total_jac is not None and self._rec_mgr._recorders:
+            metadata = create_local_meta(self._get_name())
+            self._total_jac.record_derivatives(self, metadata)
 
     def record_iteration(self):
         """
@@ -1159,18 +1125,18 @@ class Driver(object):
         show_sparsity : bool
             If True, display sparsity with coloring info after generating coloring.
         """
-        self._coloring_info['num_full_jacs'] = num_full_jacs
-        self._coloring_info['tol'] = tol
-        self._coloring_info['orders'] = orders
-        self._coloring_info['perturb_size'] = perturb_size
-        self._coloring_info['min_improve_pct'] = min_improve_pct
-        if self._coloring_info['static'] is None:
-            self._coloring_info['dynamic'] = True
+        self._coloring_info.coloring = None
+        self._coloring_info.num_full_jacs = num_full_jacs
+        self._coloring_info.tol = tol
+        self._coloring_info.orders = orders
+        self._coloring_info.perturb_size = perturb_size
+        self._coloring_info.min_improve_pct = min_improve_pct
+        if self._coloring_info.static is None:
+            self._coloring_info.dynamic = True
         else:
-            self._coloring_info['dynamic'] = False
-        self._coloring_info['coloring'] = None
-        self._coloring_info['show_summary'] = show_summary
-        self._coloring_info['show_sparsity'] = show_sparsity
+            self._coloring_info.dynamic = False
+        self._coloring_info.show_summary = show_summary
+        self._coloring_info.show_sparsity = show_sparsity
 
     def use_fixed_coloring(self, coloring=coloring_mod._STD_COLORING_FNAME):
         """
@@ -1178,20 +1144,20 @@ class Driver(object):
 
         Parameters
         ----------
-        coloring : str
-            A coloring filename.  If no arg is passed, filename will be determined
-            automatically.
+        coloring : str or Coloring
+            A coloring filename or a Coloring object.  If no arg is passed, filename will be
+            determined automatically.
         """
         if self.supports['simultaneous_derivatives']:
             if coloring_mod._force_dyn_coloring and coloring is coloring_mod._STD_COLORING_FNAME:
                 # force the generation of a dynamic coloring this time
-                self._coloring_info['dynamic'] = True
-                self._coloring_info['static'] = None
+                self._coloring_info.dynamic = True
+                self._coloring_info.static = None
             else:
-                self._coloring_info['static'] = coloring
-                self._coloring_info['dynamic'] = False
+                self._coloring_info.static = coloring
+                self._coloring_info.dynamic = False
 
-            self._coloring_info['coloring'] = None
+            self._coloring_info.coloring = None
         else:
             raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %
                                self._get_name())
@@ -1220,59 +1186,44 @@ class Driver(object):
         Coloring or None
             The pre-existing or loaded Coloring, or None
         """
+        coloring = None
         info = self._coloring_info
-        static = info['static']
+        static = info.static
 
         if isinstance(static, coloring_mod.Coloring):
             coloring = static
-            info['coloring'] = coloring
+            info.coloring = coloring
         else:
-            coloring = info['coloring']
+            coloring = info.coloring
 
-        if coloring is not None:
-            return coloring
+            if coloring is None and (static is coloring_mod._STD_COLORING_FNAME or
+                                     isinstance(static, str)):
+                if static is coloring_mod._STD_COLORING_FNAME:
+                    fname = self._get_total_coloring_fname()
+                else:
+                    fname = static
 
-        if static is coloring_mod._STD_COLORING_FNAME or isinstance(static, str):
-            if static is coloring_mod._STD_COLORING_FNAME:
-                fname = self._get_total_coloring_fname()
-            else:
-                fname = static
-            print("loading total coloring from file %s" % fname)
-            coloring = info['coloring'] = coloring_mod.Coloring.load(fname)
-            info.update(coloring._meta)
-            return coloring
+                print("loading total coloring from file %s" % fname)
+                coloring = info.coloring = coloring_mod.Coloring.load(fname)
+                info.update(coloring._meta)
+
+        if coloring is not None and info.static is not None:
+            problem = self._problem()
+            if coloring._rev and problem._orig_mode not in ('rev', 'auto'):
+                revcol = coloring._rev[0][0]
+                if revcol:
+                    raise RuntimeError("Simultaneous coloring does reverse solves but mode has "
+                                       f"been set to '{problem._orig_mode}'")
+            if coloring._fwd and problem._orig_mode not in ('fwd', 'auto'):
+                fwdcol = coloring._fwd[0][0]
+                if fwdcol:
+                    raise RuntimeError("Simultaneous coloring does forward solves but mode has "
+                                       f"been set to '{problem._orig_mode}'")
+
+        return coloring
 
     def _get_total_coloring_fname(self):
         return os.path.join(self._problem().options['coloring_dir'], 'total_coloring.pkl')
-
-    def _setup_simul_coloring(self):
-        """
-        Set up metadata for coloring of total derivative solution.
-
-        If set_coloring was called with a filename, load the coloring file.
-        """
-        # command line simul_coloring uses this env var to turn pre-existing coloring off
-        if not coloring_mod._use_total_sparsity:
-            return
-
-        problem = self._problem()
-        if not problem.model._use_derivatives:
-            issue_warning("Derivatives are turned off.  Skipping simul deriv coloring.",
-                          category=DerivativesWarning)
-            return
-
-        total_coloring = self._get_static_coloring()
-
-        if total_coloring._rev and problem._orig_mode not in ('rev', 'auto'):
-            revcol = total_coloring._rev[0][0]
-            if revcol:
-                raise RuntimeError("Simultaneous coloring does reverse solves but mode has "
-                                   "been set to '%s'" % problem._orig_mode)
-        if total_coloring._fwd and problem._orig_mode not in ('fwd', 'auto'):
-            fwdcol = total_coloring._fwd[0][0]
-            if fwdcol:
-                raise RuntimeError("Simultaneous coloring does forward solves but mode has "
-                                   "been set to '%s'" % problem._orig_mode)
 
     def scaling_report(self, outfile='driver_scaling_report.html', title=None, show_browser=True,
                        jac=True):
@@ -1401,30 +1352,24 @@ class Driver(object):
         ----------
         run_model : bool or None
             If False, don't run model, else use problem _run_counter to decide.
+            This is ignored if the coloring has already been computed.
 
         Returns
         -------
         Coloring or None
             Coloring object, possible loaded from a file or dynamically generated, or None
         """
-        if c_mod._use_total_sparsity:
-            coloring = None
-            if self._coloring_info['coloring'] is None and self._coloring_info['dynamic']:
-                coloring = c_mod.dynamic_total_coloring(self, run_model=run_model,
-                                                        fname=self._get_total_coloring_fname())
+        if coloring_mod._use_total_sparsity:
+            if run_model and self._coloring_info.coloring is not None:
+                issue_warning("The 'run_model' argument is ignored because the coloring has "
+                              "already been computed.")
+            if self._coloring_info.dynamic:
+                if self._coloring_info.do_compute_coloring():
+                    self._coloring_info.coloring = \
+                        coloring_mod.dynamic_total_coloring(self, run_model=run_model,
+                                                            fname=self._get_total_coloring_fname())
 
-            if coloring is not None:
-                # if the improvement wasn't large enough, don't use coloring
-                pct = coloring._solves_info()[-1]
-                info = self._coloring_info
-                if info['min_improve_pct'] > pct:
-                    info['coloring'] = info['static'] = None
-                    msg = f"Coloring was deactivated.  Improvement of {pct:.1f}% was less " \
-                          f"than min allowed ({info['min_improve_pct']:.1f}%)."
-                    issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
-                    self._coloring_info['coloring'] = coloring = None
-
-            return coloring
+            return self._coloring_info.coloring
 
 
 class SaveOptResult(object):

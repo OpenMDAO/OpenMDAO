@@ -152,7 +152,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        prob.driver._compute_totals(of=['parab.f_xy'], wrt=['px.x'], use_abs_names=True)
+        prob.driver._compute_totals(of=['parab.f_xy'], wrt=['px.x'])
 
         # 1. run_model; 2. step x
         self.assertEqual(model.parab.count, 2)
@@ -275,9 +275,14 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.linear_solver = om.ScipyKrylov()
         model.approx_totals()
 
+        model.add_design_var('p1.x1')
+        model.add_design_var('p2.x2')
+        model.add_constraint('comp.y1')
+        model.add_constraint('comp.y2')
+        
         prob.setup()
         prob.run_model()
-        model.run_linearize()
+        model.run_linearize(driver=prob.driver)
 
         Jfd = model._jacobian
         assert_near_equal(Jfd['comp.y1', 'p1.x1'], comp.JJ[0:2, 0:2], 1e-6)
@@ -726,11 +731,11 @@ class TestGroupFiniteDifference(unittest.TestCase):
         p.run_model()
         # Formerly a KeyError
         derivs = p.check_totals(compact_print=True, out_stream=None)
-        assert_near_equal(0.0, derivs['indeps.y', 'indeps.x']['abs error'][0])
+        assert_near_equal(0.0, derivs['y', 'x']['abs error'][1])
 
         # Coverage
         derivs = p.driver._compute_totals(return_format='dict')
-        assert_near_equal(np.zeros((1, 10)), derivs['indeps.y']['indeps.x'])
+        assert_near_equal(np.zeros((1, 10)), derivs['y']['x'])
 
     def test_opt_with_linear_constraint(self):
         # Test for a bug where we weren't re-initializing things in-between computing totals on
@@ -1074,9 +1079,14 @@ class TestGroupComplexStep(unittest.TestCase):
         model.linear_solver = om.ScipyKrylov()
         model.approx_totals(method='cs')
 
+        model.add_design_var('p1.x1')
+        model.add_design_var('p2.x2')
+        model.add_constraint('comp.y1')
+        model.add_constraint('comp.y2')
+        
         prob.setup()
         prob.run_model()
-        model.run_linearize()
+        model.run_linearize(driver=prob.driver)
 
         Jfd = model._jacobian
         assert_near_equal(Jfd['comp.y1', 'p1.x1'], comp.JJ[0:2, 0:2], 1e-6)

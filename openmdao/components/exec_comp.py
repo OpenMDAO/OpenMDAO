@@ -220,8 +220,8 @@ class ExecComp(ExplicitComponent):
         super().__init__(**options)
 
         # change default coloring values
-        self._coloring_info['method'] = 'cs'
-        self._coloring_info['num_full_jacs'] = 2
+        self._coloring_info.method = 'cs'
+        self._coloring_info.num_full_jacs = 2
 
         # if complex step is used for derivatives, this is the stepsize
         self.complex_stepsize = 1.e-40
@@ -678,13 +678,13 @@ class ExecComp(ExplicitComponent):
                 if not self._has_distrib_vars and (sum(sizes['input'][rank]) > 1 and
                                                    sum(sizes['output'][rank]) > 1):
                     if not self._coloring_declared:
-                        super().declare_coloring(wrt=None, method='cs')
-                        self._coloring_info['dynamic'] = True
+                        super().declare_coloring(wrt=('*', ), method='cs')
+                        self._coloring_info.dynamic = True
                         self._manual_decl_partials = False  # this gets reset in declare_partials
-                        self._declared_partials = defaultdict(dict)
+                        self._declared_partials_patterns = {}
                 else:
                     self.options['do_coloring'] = False
-                    self._coloring_info['dynamic'] = False
+                    self._coloring_info.dynamic = False
 
             meta = self._var_rel2meta
             decl_partials = super().declare_partials
@@ -934,9 +934,7 @@ class ExecComp(ExplicitComponent):
             return super()._compute_coloring(recurse=recurse, **overrides)
 
         info = self._coloring_info
-        info.update(**overrides)
-        if isinstance(info['wrt_patterns'], str):
-            info['wrt_patterns'] = [info['wrt_patterns']]
+        info.update(overrides)
 
         if not self._coloring_declared and info['method'] is None:
             info['method'] = 'cs'
@@ -946,11 +944,10 @@ class ExecComp(ExplicitComponent):
                                "and/or coloring are not declared manually using declare_partials "
                                "or declare_coloring.")
 
-        if info['coloring'] is None and info['static'] is None:
+        if info.coloring is None and info.static is None:
             info['dynamic'] = True
 
         # match everything
-        info['wrt_matches_rel'] = None
         info['wrt_matches'] = None
 
         sparsity_start_time = time.perf_counter()
@@ -1028,7 +1025,7 @@ class ExecComp(ExplicitComponent):
         out_slices = self._out_slices
         in_slices = self._in_slices
 
-        for icols, nzrowlists in self._coloring_info['coloring'].color_nonzero_iter('fwd'):
+        for icols, nzrowlists in self._coloring_info.coloring.color_nonzero_iter('fwd'):
             # set a complex input value
             inarr[icols] += step
 
@@ -1039,11 +1036,11 @@ class ExecComp(ExplicitComponent):
 
             for icol, rows in zip(icols, nzrowlists):
                 scratch[rows] = imag_oar[rows]
-                inp = idx2name[icol]
-                loc_i = icol - in_slices[inp].start
+                input_name = idx2name[icol]
+                loc_i = icol - in_slices[input_name].start
                 for u in out_names:
-                    key = (u, inp)
-                    if key in self._declared_partials:
+                    key = (u, input_name)
+                    if key in partials:
                         # set the column in the Jacobian entry
                         part = scratch[out_slices[u]]
                         partials[key][:, loc_i] = part
@@ -1071,7 +1068,7 @@ class ExecComp(ExplicitComponent):
                                "level system is using complex step unless you manually call "
                                "declare_partials and/or declare_coloring on this ExecComp.")
 
-        if self._coloring_info['coloring'] is not None:
+        if self._coloring_info.coloring is not None:
             self._compute_colored_partials(partials)
             return
 
@@ -1096,7 +1093,7 @@ class ExecComp(ExplicitComponent):
                 self._exec()
 
                 for u in out_names:
-                    if (u, inp) in self._declared_partials:
+                    if (u, inp) in partials:
                         partials[u, inp] = imag(vdict[u] * inv_stepsize).flat
 
                 # restore old input value
@@ -1110,7 +1107,7 @@ class ExecComp(ExplicitComponent):
                     self._exec()
 
                     for u in out_names:
-                        if (u, inp) in self._declared_partials:
+                        if (u, inp) in partials:
                             # set the column in the Jacobian entry
                             partials[u, inp][:, i] = imag(vdict[u] * inv_stepsize).flat
 

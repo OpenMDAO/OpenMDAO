@@ -92,11 +92,11 @@ class COOMatrix(Matrix):
                 jac_type = ndarray
 
                 if src_indices is None:
-                    colrange = np.arange(col_offset, col_offset + shape[1], dtype=INT_DTYPE)
+                    colrange = range(col_offset, col_offset + shape[1])
                 else:
                     colrange = src_indices.shaped_array()
+                ncols = len(colrange)
 
-                ncols = colrange.size
                 subrows = rows[start:end]
                 subcols = cols[start:end]
 

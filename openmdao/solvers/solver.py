@@ -380,7 +380,7 @@ class Solver(object):
 
     def _mpi_print(self, iteration, abs_res, rel_res):
         """
-        Print residuals from an iteration.
+        Print residuals from an iteration if iprint == 2.
 
         Parameters
         ----------
@@ -548,6 +548,17 @@ class Solver(object):
         """
         return self._system().get_reports_dir()
 
+    def use_relevance(self):
+        """
+        Return True if relevance is should be active.
+
+        Returns
+        -------
+        bool
+            True if relevance is should be active.
+        """
+        return True
+
 
 class NonlinearSolver(Solver):
     """
@@ -685,84 +696,85 @@ class NonlinearSolver(Solver):
         """
         Run the iterative solver.
         """
-        maxiter = self.options['maxiter']
-        atol = self.options['atol']
-        rtol = self.options['rtol']
-        iprint = self.options['iprint']
-        stall_limit = self.options['stall_limit']
-        stall_tol = self.options['stall_tol']
-        stall_tol_type = self.options['stall_tol_type']
-
-        self._mpi_print_header()
-
-        self._iter_count = 0
-        norm0, norm = self._iter_initialize()
-
-        self._norm0 = norm0
-
-        self._mpi_print(self._iter_count, norm, norm / norm0)
-
         system = self._system()
 
-        stalled = False
-        stall_count = 0
-        if stall_limit > 0:
-            stall_norm = norm0
+        with system._relevant.active(self.use_relevance()):
+            maxiter = self.options['maxiter']
+            atol = self.options['atol']
+            rtol = self.options['rtol']
+            iprint = self.options['iprint']
+            stall_limit = self.options['stall_limit']
+            stall_tol = self.options['stall_tol']
+            stall_tol_type = self.options['stall_tol_type']
 
-        force_one_iteration = system.under_complex_step
+            self._mpi_print_header()
 
-        while ((self._iter_count < maxiter and norm > atol and norm / norm0 > rtol and
-               not stalled) or force_one_iteration):
+            self._iter_count = 0
+            norm0, norm = self._iter_initialize()
 
-            if system.under_complex_step:
-                force_one_iteration = False
-
-            with Recording(type(self).__name__, self._iter_count, self) as rec:
-                ls = self.linesearch
-                if stall_count == 3 and ls and not ls.options['print_bound_enforce']:
-
-                    self.linesearch.options['print_bound_enforce'] = True
-
-                    if self._system().pathname:
-                        pathname = f"{self._system().pathname}."
-                    else:
-                        pathname = ""
-
-                    msg = (f"Your model has stalled three times and may be violating the bounds. "
-                           f"In the future, turn on print_bound_enforce in your solver options "
-                           f"here: \n{pathname}nonlinear_solver.linesearch.options"
-                           f"['print_bound_enforce']=True. "
-                           f"\nThe bound(s) being violated now are:\n")
-                    issue_warning(msg, category=SolverWarning)
-
-                    self._single_iteration()
-                    self.linesearch.options['print_bound_enforce'] = False
-                else:
-                    self._single_iteration()
-
-                self._iter_count += 1
-                self._run_apply()
-                norm = self._iter_get_norm()
-
-                # Save the norm values in the context manager so they can also be recorded.
-                rec.abs = norm
-                if norm0 == 0:
-                    norm0 = 1
-                rec.rel = norm / norm0
-
-                # Check if convergence is stalled.
-                if stall_limit > 0:
-                    norm_for_stall = rec.rel if stall_tol_type == 'rel' else rec.abs
-                    norm_diff = np.abs(stall_norm - norm_for_stall)
-                    if norm_diff <= stall_tol:
-                        stall_count += 1
-                        if stall_count >= stall_limit:
-                            stalled = True
-                    else:
-                        stall_count = 0
-                        stall_norm = norm_for_stall
+            self._norm0 = norm0
 
             self._mpi_print(self._iter_count, norm, norm / norm0)
+
+            stalled = False
+            stall_count = 0
+            if stall_limit > 0:
+                stall_norm = norm0
+
+            force_one_iteration = system.under_complex_step
+
+            while ((self._iter_count < maxiter and norm > atol and norm / norm0 > rtol and
+                    not stalled) or force_one_iteration):
+
+                if system.under_complex_step:
+                    force_one_iteration = False
+
+                with Recording(type(self).__name__, self._iter_count, self) as rec:
+                    ls = self.linesearch
+                    if stall_count == 3 and ls and not ls.options['print_bound_enforce']:
+
+                        self.linesearch.options['print_bound_enforce'] = True
+
+                        if self._system().pathname:
+                            pathname = f"{self._system().pathname}."
+                        else:
+                            pathname = ""
+
+                        msg = ("Your model has stalled three times and may be violating the bounds."
+                               " In the future, turn on print_bound_enforce in your solver options "
+                               f"here: \n{pathname}nonlinear_solver.linesearch.options"
+                               "['print_bound_enforce']=True. \nThe bound(s) being violated now "
+                               "are:\n")
+                        issue_warning(msg, category=SolverWarning)
+
+                        self._single_iteration()
+                        self.linesearch.options['print_bound_enforce'] = False
+                    else:
+                        self._single_iteration()
+
+                    self._iter_count += 1
+                    self._run_apply()
+                    norm = self._iter_get_norm()
+
+                    # Save the norm values in the context manager so they can also be recorded.
+                    rec.abs = norm
+                    if norm0 == 0:
+                        norm0 = 1
+                    rec.rel = norm / norm0
+
+                    # Check if convergence is stalled.
+                    if stall_limit > 0:
+                        norm_for_stall = rec.rel if stall_tol_type == 'rel' else rec.abs
+                        norm_diff = np.abs(stall_norm - norm_for_stall)
+                        if norm_diff <= stall_tol:
+                            stall_count += 1
+                            if stall_count >= stall_limit:
+                                stalled = True
+                        else:
+                            stall_count = 0
+                            stall_norm = norm_for_stall
+
+                self._mpi_print(self._iter_count, norm, norm / norm0)
 
         # flag for the print statements. we only print on root if USE_PROC_FILES is not set to True
         print_flag = system.comm.rank == 0 or os.environ.get('USE_PROC_FILES')
@@ -846,7 +858,7 @@ class NonlinearSolver(Solver):
         Perform a Gauss-Seidel iteration over this Solver's subsystems.
         """
         system = self._system()
-        for subsys in system._solver_subsystem_iter(local_only=False):
+        for subsys in system._relevant.filter(system._solver_subsystem_iter(), linear=False):
             system._transfer('nonlinear', 'fwd', subsys.name)
 
             if subsys._is_local:
@@ -907,8 +919,6 @@ class LinearSolver(Solver):
 
     Attributes
     ----------
-    _rel_systems : set of str
-        Names of systems relevant to the current solve.
     _assembled_jac : AssembledJacobian or None
         If not None, the AssembledJacobian instance used by this solver.
     _scope_in : set or None or _UNDEFINED
@@ -921,7 +931,6 @@ class LinearSolver(Solver):
         """
         Initialize all attributes.
         """
-        self._rel_systems = None
         self._assembled_jac = None
         self._scope_out = _UNDEFINED
         self._scope_in = _UNDEFINED
@@ -996,7 +1005,7 @@ class LinearSolver(Solver):
         mode : str
             'fwd' or 'rev'.
         rel_systems : set of str
-            Set of names of relevant systems based on the current linear solve.
+            Set of names of relevant systems based on the current linear solve.  Deprecated.
         """
         raise NotImplementedError("class %s does not implement solve()." % (type(self).__name__))
 
@@ -1009,32 +1018,33 @@ class LinearSolver(Solver):
         rtol = self.options['rtol']
         iprint = self.options['iprint']
 
-        self._mpi_print_header()
+        with self._system()._relevant.active(self.use_relevance()):
+            self._mpi_print_header()
 
-        self._iter_count = 0
-        norm0, norm = self._iter_initialize()
+            self._iter_count = 0
+            norm0, norm = self._iter_initialize()
 
-        self._norm0 = norm0
+            self._norm0 = norm0
 
-        system = self._system()
-
-        self._mpi_print(self._iter_count, norm, norm / norm0)
-
-        while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol:
-
-            with Recording(type(self).__name__, self._iter_count, self) as rec:
-                self._single_iteration()
-                self._iter_count += 1
-                self._run_apply()
-                norm = self._iter_get_norm()
-
-                # Save the norm values in the context manager so they can also be recorded.
-                rec.abs = norm
-                if norm0 == 0:
-                    norm0 = 1
-                rec.rel = norm / norm0
+            system = self._system()
 
             self._mpi_print(self._iter_count, norm, norm / norm0)
+
+            while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol:
+
+                with Recording(type(self).__name__, self._iter_count, self) as rec:
+                    self._single_iteration()
+                    self._iter_count += 1
+                    self._run_apply()
+                    norm = self._iter_get_norm()
+
+                    # Save the norm values in the context manager so they can also be recorded.
+                    rec.abs = norm
+                    if norm0 == 0:
+                        norm0 = 1
+                    rec.rel = norm / norm0
+
+                self._mpi_print(self._iter_count, norm, norm / norm0)
 
         # flag for the print statements. we only print on root if USE_PROC_FILES is not set to True
         print_flag = system.comm.rank == 0 or os.environ.get('USE_PROC_FILES')
@@ -1067,8 +1077,7 @@ class LinearSolver(Solver):
         scope_out, scope_in = system._get_matvec_scope()
 
         try:
-            system._apply_linear(self._assembled_jac, self._rel_systems,
-                                 self._mode, scope_out, scope_in)
+            system._apply_linear(self._assembled_jac, self._mode, scope_out, scope_in)
         finally:
             self._recording_iter.pop()
 
@@ -1197,7 +1206,7 @@ class BlockLinearSolver(LinearSolver):
         self._recording_iter.push(('_run_apply', 0))
         try:
             scope_out, scope_in = system._get_matvec_scope()
-            system._apply_linear(self._assembled_jac, self._rel_systems, self._mode,
+            system._apply_linear(self._assembled_jac, self._mode,
                                  self._vars_union(self._scope_out, scope_out),
                                  self._vars_union(self._scope_in, scope_in))
         finally:
@@ -1269,10 +1278,10 @@ class BlockLinearSolver(LinearSolver):
         mode : str
             'fwd' or 'rev'.
         rel_systems : set of str
-            Set of names of relevant systems based on the current linear solve.
+            Set of names of relevant systems based on the current linear solve.  Deprecated.
         """
-        self._rel_systems = rel_systems
         self._mode = mode
-        self._solve()
-
-        self._scope_out = self._scope_in = _UNDEFINED  # reset after solve is done
+        try:
+            self._solve()
+        finally:
+            self._scope_out = self._scope_in = _UNDEFINED  # reset after solve is done

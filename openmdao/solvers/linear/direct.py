@@ -226,6 +226,17 @@ class DirectSolver(LinearSolver):
         """
         return False
 
+    def use_relevance(self):
+        """
+        Return True if relevance is should be active.
+
+        Returns
+        -------
+        bool
+            True if relevance is should be active.
+        """
+        return False
+
     def _build_mtx(self):
         """
         Assemble a Jacobian matrix by matrix-vector-product with columns of identity.
@@ -248,17 +259,18 @@ class DirectSolver(LinearSolver):
         mtx = np.empty((nmtx, nmtx), dtype=b_data.dtype)
         scope_out, scope_in = system._get_matvec_scope()
 
-        # Assemble the Jacobian by running the identity matrix through apply_linear
-        for i, seed in enumerate(identity_column_iter(seed)):
-            # set value of x vector to provided value
-            xvec.set_val(seed)
+        # temporarily disable relevance to avoid creating a singular matrix
+        with system._relevant.active(False):
+            # Assemble the Jacobian by running the identity matrix through apply_linear
+            for i, seed in enumerate(identity_column_iter(seed)):
+                # set value of x vector to provided value
+                xvec.set_val(seed)
 
-            # apply linear
-            system._apply_linear(self._assembled_jac, self._rel_systems, 'fwd',
-                                 scope_out, scope_in)
+                # apply linear
+                system._apply_linear(self._assembled_jac, 'fwd', scope_out, scope_in)
 
-            # put new value in out_vec
-            mtx[:, i] = bvec.asarray()
+                # put new value in out_vec
+                mtx[:, i] = bvec.asarray()
 
         # Restore the backed-up vectors
         bvec.set_val(b_data)
@@ -417,7 +429,7 @@ class DirectSolver(LinearSolver):
         mode : str
             'fwd' or 'rev'.
         rel_systems : set of str
-            Names of systems relevant to the current solve.
+            Names of systems relevant to the current solve.  Deprecated.
         """
         system = self._system()
 

@@ -2,7 +2,6 @@
 Class definition for SqliteRecorder, which provides dictionary backed by SQLite.
 """
 
-from copy import deepcopy
 from io import BytesIO
 
 import os
@@ -290,7 +289,7 @@ class SqliteRecorder(CaseRecorder):
             for prop in self._abs2meta[name]:
                 self._abs2meta[name][prop] = make_serializable(self._abs2meta[name][prop])
 
-    def _cleanup_var_settings(self, var_settings):
+    def _make_var_setting_serializable(self, var_settings):
         """
         Convert all var_settings variable properties to a form that can be dumped as JSON.
 
@@ -304,11 +303,13 @@ class SqliteRecorder(CaseRecorder):
         var_settings : dict
             Dictionary mapping absolute variable names to var settings that are JSON compatible.
         """
-        # otherwise we trample on values that are used elsewhere
-        var_settings = deepcopy(var_settings)
-        for name in var_settings:
-            for prop in var_settings[name]:
-                var_settings[name][prop] = make_serializable(var_settings[name][prop])
+        # var_settings is already a copy at the outer level, so we just have to copy the
+        # inner dicts to prevent modifying the original designvars, objectives, and constraints.
+        for name, meta in var_settings.items():
+            meta = meta.copy()
+            for prop, val in meta.items():
+                meta[prop] = make_serializable(val)
+            var_settings[name] = meta
         return var_settings
 
     def startup(self, recording_requester, comm=None):
@@ -364,10 +365,10 @@ class SqliteRecorder(CaseRecorder):
         if self.connection:
 
             if driver is not None:
-                desvars = driver._designvars.copy()
-                responses = driver._responses.copy()
-                constraints = driver._cons.copy()
-                objectives = driver._objs.copy()
+                desvars = driver._designvars
+                responses = driver._responses
+                constraints = driver._cons
+                objectives = driver._objs
 
             inputs = list(system.abs_name_iter('input', local=False, discrete=True))
             outputs = list(system.abs_name_iter('output', local=False, discrete=True))
@@ -395,18 +396,22 @@ class SqliteRecorder(CaseRecorder):
             disc_meta_in = system._var_allprocs_discrete['input']
             disc_meta_out = system._var_allprocs_discrete['output']
 
-            full_var_set = [(outputs, 'output'),
+            all_var_info = [(outputs, 'output'),
                             (desvars, 'desvar'), (responses, 'response'),
                             (objectives, 'objective'), (constraints, 'constraint')]
 
-            for var_set, var_type in full_var_set:
-                for name in var_set:
+            for varinfo, var_type in all_var_info:
+                if var_type != 'output':
+                    varinfo = varinfo.items()
+
+                for data in varinfo:
 
                     # Design variables, constraints and objectives can be requested by input name.
                     if var_type != 'output':
-                        srcname = var_set[name]['source']
+                        name, vmeta = data
+                        srcname = vmeta['source']
                     else:
-                        srcname = name
+                        srcname = name = data
 
                     if srcname not in self._abs2meta:
                         if srcname in real_meta_out:
@@ -449,11 +454,13 @@ class SqliteRecorder(CaseRecorder):
             conns = zlib.compress(json.dumps(
                 system._problem_meta['model_ref']()._conn_global_abs_in2out).encode('ascii'))
 
+            # TODO: seems like we could clobber the var_settings for a desvar in cases where a
+            # desvar is also a constraint... Make a test case and fix if needed.
             var_settings = {}
             var_settings.update(desvars)
             var_settings.update(objectives)
             var_settings.update(constraints)
-            var_settings = self._cleanup_var_settings(var_settings)
+            var_settings = self._make_var_setting_serializable(var_settings)
             var_settings['execution_order'] = var_order
             var_settings_json = zlib.compress(
                 json.dumps(var_settings, default=default_noraise).encode('ascii'))

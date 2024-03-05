@@ -123,7 +123,7 @@ class DefaultTransfer(Transfer):
     """
 
     @staticmethod
-    def _setup_transfers(group, desvars, responses):
+    def _setup_transfers(group):
         """
         Compute all transfers that are owned by our parent group.
 
@@ -131,16 +131,9 @@ class DefaultTransfer(Transfer):
         ----------
         group : <Group>
             Parent group.
-        desvars : dict
-            Dictionary of all design variable metadata. Keyed by absolute source name or alias.
-        responses : dict
-            Dictionary of all response variable metadata. Keyed by absolute source name or alias.
         """
         iproc = group.comm.rank
         rev = group._mode == 'rev' or group._mode == 'auto'
-
-        for subsys in group._subgroups_myproc:
-            subsys._setup_transfers(desvars, responses)
 
         abs2meta = group._var_abs2meta
 

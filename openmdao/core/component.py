@@ -20,7 +20,7 @@ from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    find_matches, make_set, convert_src_inds, inconsistent_across_procs
+    find_matches, make_set, inconsistent_across_procs
 from openmdao.utils.indexer import Indexer, indexer
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
@@ -79,8 +79,9 @@ class Component(System):
         determine the list of absolute names.
     _static_var_rel_names : dict
         Static version of above - stores names of variables added outside of setup.
-    _declared_partials : dict
-        Cached storage of user-declared partials.
+    _declared_partials_patterns : dict
+        Dictionary of declared partials patterns.  Each key is a tuple of the form
+        (of, wrt) where of and wrt may be glob patterns.
     _declared_partial_checks : list
         Cached storage of user-declared check partial options.
     _no_check_partials : bool
@@ -101,7 +102,7 @@ class Component(System):
         self._static_var_rel_names = {'input': [], 'output': []}
         self._static_var_rel2meta = {}
 
-        self._declared_partials = defaultdict(dict)
+        self._declared_partials_patterns = {}
         self._declared_partial_checks = []
         self._no_check_partials = False
         self._has_distrib_outputs = False
@@ -242,12 +243,12 @@ class Component(System):
         # Check here if declare_coloring was called during setup but declare_partials wasn't.
         # If declare partials wasn't called, call it with of='*' and wrt='*' so we'll have
         # something to color.
-        if self._coloring_info['coloring'] is not None:
-            for meta in self._declared_partials.values():
+        if self._coloring_info.coloring is not None:
+            for meta in self._declared_partials_patterns.values():
                 if 'method' in meta and meta['method'] is not None:
                     break
             else:
-                method = self._coloring_info['method']
+                method = self._coloring_info.method
                 issue_warning("declare_coloring or use_fixed_coloring was called but no approx"
                               " partials were declared.  Declaring all partials as approximated "
                               f"using default metadata and method='{method}'.", prefix=self.msginfo,
@@ -353,9 +354,9 @@ class Component(System):
                                                                 self._approx_schemes):
             raise RuntimeError("%s: num_par_fd is > 1 but no FD is active." % self.msginfo)
 
-        for key, dct in self._declared_partials.items():
+        for key, pattern_meta in self._declared_partials_patterns.items():
             of, wrt = key
-            self._declare_partials(of, wrt, dct)
+            self._resolve_partials_patterns(of, wrt, pattern_meta)
 
     def setup_partials(self):
         """
@@ -373,12 +374,10 @@ class Component(System):
 
         Yields
         ------
-        (key, meta) : (key, dict)
-            key: a tuple of the form (of, wrt)
-            meta: a dict containing the partial metadata
+        key : tuple (of, wrt)
+            Subjacobian key.
         """
-        for key, meta in self._subjacs_info.items():
-            yield key, meta
+        yield from self._subjacs_info.keys()
 
     def _get_missing_partials(self, missing):
         """
@@ -389,15 +388,16 @@ class Component(System):
         missing : dict
             Dictionary containing set of missing derivatives keyed by system pathname.
         """
-        if ('*', '*') in self._declared_partials:
+        if ('*', '*') in self._declared_partials_patterns or \
+                (('*',), ('*',)) in self._declared_partials_patterns:
             return
 
         # keep old default behavior where matrix free components are assumed to have
         # 'dense' whole variable to whole variable partials if no partials are declared.
-        if self.matrix_free and not self._declared_partials:
+        if self.matrix_free and not self._declared_partials_patterns:
             return
 
-        keyset = {key for key, _ in self._declared_partials_iter()}
+        keyset = self._subjacs_info
         mset = set()
         for of in self._var_allprocs_abs2meta['output']:
             for wrt in self._var_allprocs_abs2meta['input']:
@@ -436,39 +436,15 @@ class Component(System):
                 if self._num_par_fd > 1:
                     raise RuntimeError(f"{self.msginfo}: Can't set 'run_root_only' option when "
                                        "using parallel FD.")
-                if self._problem_meta['using_par_deriv_color']:
+                if self._problem_meta['has_par_deriv_color']:
                     raise RuntimeError(f"{self.msginfo}: Can't set 'run_root_only' option when "
                                        "using parallel_deriv_color.")
                 return True
         return False
 
-    def _update_wrt_matches(self, info):
-        """
-        Determine the list of wrt variables that match the wildcard(s) given in declare_coloring.
-
-        Parameters
-        ----------
-        info : dict
-            Coloring metadata dict.
-        """
-        _, allwrt = self._get_partials_varlists()
-        wrt_patterns = info['wrt_patterns']
-        if wrt_patterns is None or '*' in wrt_patterns:
-            info['wrt_matches_rel'] = None
-            info['wrt_matches'] = None
-            return
-
-        matches_rel = set()
-        for w in wrt_patterns:
-            matches_rel.update(find_matches(w, allwrt))
-
-        # error if nothing matched
-        if not matches_rel:
-            raise ValueError("{}: Invalid 'wrt' variable(s) specified for colored approx partial "
-                             "options: {}.".format(self.msginfo, wrt_patterns))
-
-        info['wrt_matches_rel'] = matches_rel
-        info['wrt_matches'] = [rel_name2abs_name(self, n) for n in matches_rel]
+    def _promoted_wrt_iter(self):
+        _, wrts = self._get_partials_varlists()
+        yield from wrts
 
     def _update_subjac_sparsity(self, sparsity):
         """
@@ -1071,10 +1047,10 @@ class Component(System):
 
         Parameters
         ----------
-        of : str or list of str
+        of : str or iter of str
             The name of the residual(s) that derivatives are being computed for.
             May also contain a glob pattern.
-        wrt : str or list of str
+        wrt : str or iter of str
             The name of the variables that derivatives are taken with respect to.
             This can contain the name of any input or output variable.
             May also contain a glob pattern.
@@ -1125,13 +1101,20 @@ class Component(System):
             msg = '{}: d({})/d({}): method "{}" is not supported, method must be one of {}'
             raise ValueError(msg.format(self.msginfo, of, wrt, method, sorted(_supported_methods)))
 
-        # lists aren't hashable so convert to tuples
-        if isinstance(of, list):
-            of = tuple(of)
-        if isinstance(wrt, list):
-            wrt = tuple(wrt)
+        if not isinstance(of, (str, Iterable)):
+            raise ValueError(f"{self.msginfo}: in declare_partials, the 'of' arg must be a string "
+                             f"or an iter of strings, but got {of}.")
+        if not isinstance(wrt, (str, Iterable)):
+            raise ValueError(f"{self.msginfo}: in declare_partials, the 'wrt' arg must be a "
+                             f"string or an iter of strings, but got {wrt}.")
 
-        meta = self._declared_partials[of, wrt]
+        of = of if isinstance(of, str) else tuple(of)
+        wrt = wrt if isinstance(wrt, str) else tuple(wrt)
+
+        key = (of, wrt)
+        if key not in self._declared_partials_patterns:
+            self._declared_partials_patterns[key] = {}
+        meta = self._declared_partials_patterns[key]
         meta['dependent'] = dependent
 
         # If only one of rows/cols is specified
@@ -1412,9 +1395,9 @@ class Component(System):
 
         return opts
 
-    def _declare_partials(self, of, wrt, dct):
+    def _resolve_partials_patterns(self, of, wrt, pattern_meta):
         """
-        Store subjacobian metadata for later use.
+        Store subjacobian metadata for specific of, wrt pairs after resolving glob patterns.
 
         Parameters
         ----------
@@ -1425,18 +1408,19 @@ class Component(System):
             The names of the variables that derivatives are taken with respect to.
             This can contain the name of any input or output variable.
             May also contain glob patterns.
-        dct : dict
-            Metadata dict specifying shape, and/or approx properties.
+        pattern_meta : dict
+            Metadata dict specifying shape, and/or approx properties, keyed by (of, wrt) as
+            described above.
         """
-        val = dct['val'] if 'val' in dct else None
+        val = pattern_meta['val'] if 'val' in pattern_meta else None
         is_scalar = isscalar(val)
-        dependent = dct['dependent']
+        dependent = pattern_meta['dependent']
         matfree = self.matrix_free
 
         if dependent:
-            if 'rows' in dct and dct['rows'] is not None:  # sparse list format
-                rows = dct['rows']
-                cols = dct['cols']
+            if 'rows' in pattern_meta and pattern_meta['rows'] is not None:  # sparse list format
+                rows = pattern_meta['rows']
+                cols = pattern_meta['cols']
 
                 if is_scalar:
                     val = np.full(rows.size, val, dtype=float)
@@ -1474,8 +1458,8 @@ class Component(System):
         abs2meta_out = self._var_abs2meta['output']
 
         is_array = isinstance(val, ndarray)
-        patmeta = dict(dct)
-        patmeta_not_none = {k: v for k, v in dct.items() if v is not None}
+        patmeta = dict(pattern_meta)
+        patmeta_not_none = {k: v for k, v in pattern_meta.items() if v is not None}
 
         for of_bundle, wrt_bundle in product(*pattern_matches):
             of_pattern, of_matches = of_bundle
@@ -1559,17 +1543,16 @@ class Component(System):
 
     def _find_partial_matches(self, of_pattern, wrt_pattern, use_resname=False):
         """
-        Find all partial derivative matches from of and wrt.
+        Find all partial derivative matches from of_pattern and wrt_pattern.
 
         Parameters
         ----------
         of_pattern : str or list of str
-            The relative name of the residual(s) that derivatives are being computed for.
-            May also contain a glob pattern.
+            The relative name(s) of the residual(s) that derivatives are being computed for.
+            May also contain glob patterns.
         wrt_pattern : str or list of str
-            The relative name of the variables that derivatives are taken with respect to.
-            This can contain the name of any input or output variable.
-            May also contain a glob pattern.
+            The relative name(s) of the variable(s) that derivatives are taken with respect to.
+            Each name can refer to an input or an output variable. May also contain glob patterns.
         use_resname : bool
             If True, use residual names for 'of' patterns.
 
@@ -1580,9 +1563,10 @@ class Component(System):
             where of_matches is a list of tuples (pattern, matches) and wrt_matches is a list of
             tuples (pattern, output_matches, input_matches).
         """
+        ofs, wrts = self._get_partials_varlists(use_resname=use_resname)
+
         of_list = [of_pattern] if isinstance(of_pattern, str) else of_pattern
         wrt_list = [wrt_pattern] if isinstance(wrt_pattern, str) else wrt_pattern
-        ofs, wrts = self._get_partials_varlists(use_resname=use_resname)
 
         of_pattern_matches = [(pattern, find_matches(pattern, ofs)) for pattern in of_list]
         wrt_pattern_matches = [(pattern, find_matches(pattern, wrts)) for pattern in wrt_list]
@@ -1657,8 +1641,6 @@ class Component(System):
             if coloring_mod._use_partial_sparsity:
                 coloring = self._get_coloring()
                 if coloring is not None:
-                    if not self._coloring_info['dynamic']:
-                        coloring._check_config_partial(self)
                     self._update_subjac_sparsity(coloring.get_subjac_sparsity())
                 if self._jacobian is not None:
                     self._jacobian._restore_approx_sparsity()
@@ -1720,7 +1702,7 @@ class Component(System):
         if self._serial_idxs is None:
             ranges = defaultdict(list)
             output_len = 0 if self.is_explicit() else len(self._outputs)
-            for name, offset, end, vec, slc, dist_sizes in self._jac_wrt_iter():
+            for _, offset, end, vec, slc, dist_sizes in self._jac_wrt_iter():
                 if dist_sizes is None:  # not distributed
                     if offset != end:
                         if vec is self._outputs:

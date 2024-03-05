@@ -214,10 +214,10 @@ class TestSqliteRecorder(unittest.TestCase):
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
         expected_derivs = {
-            "comp.f_xy!p1.x": np.array([[0.50120438]]),
-            "comp.f_xy!p2.y": np.array([[-0.49879562]]),
-            "con.c!p1.x": np.array([[-1.0]]),
-            "con.c!p2.y": np.array([[1.0]])
+            "f_xy!x": np.array([[0.50120438]]),
+            "f_xy!y": np.array([[-0.49879562]]),
+            "c!x": np.array([[-1.0]]),
+            "c!y": np.array([[1.0]])
         }
 
         expected_data = ((coordinate, (t0, t1), expected_derivs),)
@@ -275,6 +275,7 @@ class TestSqliteRecorder(unittest.TestCase):
             'rank0:ScipyOptimize_SLSQP|1',
             'rank0:ScipyOptimize_SLSQP|2',
             'rank0:ScipyOptimize_SLSQP|3',
+            'rank0:ScipyOptimize_SLSQP|4',
             'rank0:',                         # after adding second recorder
             # second recorder will have the following cases
             'rank0:',                         # after second final_setup()
@@ -282,6 +283,7 @@ class TestSqliteRecorder(unittest.TestCase):
             'rank0:ScipyOptimize_SLSQP|1',
             'rank0:ScipyOptimize_SLSQP|2',
             'rank0:ScipyOptimize_SLSQP|3',
+            'rank0:ScipyOptimize_SLSQP|4',
             'rank0:'                          # after second run_driver
         ]
 
@@ -291,7 +293,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         cr = om.CaseReader('cases2.sql')
         for i, case_id in enumerate(cr.list_cases(out_stream=None)):
-            self.assertEqual(case_id, expected[i+6])
+            self.assertEqual(case_id, expected[i+7])
 
     def test_database_not_initialized(self):
         prob = ParaboloidProblem(driver=om.ScipyOptimizeDriver(disp=False))
@@ -400,10 +402,10 @@ class TestSqliteRecorder(unittest.TestCase):
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
         expected_derivs = {
-            "comp.f_xy!p1.x": np.array([[0.50120438]]),
-            "comp.f_xy!p2.y": np.array([[-0.49879562]]),
-            "con.c!p1.x": np.array([[-1.0]]),
-            "con.c!p2.y": np.array([[1.0]])
+            "f_xy!x": np.array([[0.50120438]]),
+            "f_xy!y": np.array([[-0.49879562]]),
+            "c!x": np.array([[-1.0]]),
+            "c!y": np.array([[1.0]])
         }
 
         expected_data = ((coordinate, (t0, t1), expected_derivs),)
@@ -660,10 +662,10 @@ class TestSqliteRecorder(unittest.TestCase):
         assertDriverIterDataRecorded(self, expected_data, self.eps, prefix='Run2')
 
         expected_derivs = {
-            "comp.f_xy!p1.x": np.array([[0.50120438]]),
-            "comp.f_xy!p2.y": np.array([[-0.49879562]]),
-            "con.c!p1.x": np.array([[-1.0]]),
-            "con.c!p2.y": np.array([[1.0]])
+            "f_xy!x": np.array([[0.50120438]]),
+            "f_xy!y": np.array([[-0.49879562]]),
+            "c!x": np.array([[-1.0]]),
+            "c!y": np.array([[1.0]])
         }
 
         expected_data = (
@@ -1686,7 +1688,7 @@ class TestSqliteRecorder(unittest.TestCase):
         #
         # Driver recording test
         #
-        coordinate = [0, 'ScipyOptimize_SLSQP', (6, )]
+        coordinate = [0, 'ScipyOptimize_SLSQP', (7, )]
 
         expected_desvars = {
             "z": prob['z'],
@@ -1986,7 +1988,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         # Driver recording test
-        coordinate = [0, 'ScipyOptimize_SLSQP', (6, )]
+        coordinate = [0, 'ScipyOptimize_SLSQP', (7, )]
 
         expected_desvars = {
             "z": prob['z'],
@@ -2594,10 +2596,10 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         expected_derivs = {
-            "comp.f_xy!p1.x": np.array([[0.5]]),
-            "comp.f_xy!p2.y": np.array([[-0.5]]),
-            "con.c!p1.x": np.array([[-1.0]]),
-            "con.c!p2.y": np.array([[1.0]])
+            "f_xy!x": np.array([[0.5]]),
+            "f_xy!y": np.array([[-0.5]]),
+            "c!x": np.array([[-1.0]]),
+            "c!y": np.array([[1.0]])
         }
 
         expected_data = ((case_name, (t0, t1), expected_derivs),)
@@ -3121,7 +3123,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         # get_val can convert your result's units if desired
         const_K = case.get_val("con1", units='K')
 
-        assert_near_equal(const, -1.68550507e-10, 1e-3)
+        assert_near_equal(const, -1.69116721e-10, 1e-3)
         assert_near_equal(const_K, 273.15, 1e-3)
 
         # list_outputs will list your model's outputs and return a list of them too
@@ -3135,7 +3137,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         assert_near_equal(objectives['obj'], 3.18339395, 1e-4)
         assert_near_equal(design_vars['x'], 0., 1e-4)
-        assert_near_equal(constraints['con1'], -1.68550507e-10, 1e-4)
+        assert_near_equal(constraints['con1'], -1.69116721e-10, 1e-4)
 
     def test_feature_driver_recording_options(self):
 
@@ -3592,7 +3594,7 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         system_cases = cr.list_cases('root.obj_cmp')
 
         # Number of cases recorded for 'obj_cmp'
-        self.assertEqual(f"Number of cases: {len(system_cases)}", "Number of cases: 14")
+        self.assertEqual(len(system_cases), 15)
 
         # Get the keys of all the inputs to the objective function
         case = cr.get_case(system_cases[0])
@@ -3600,7 +3602,7 @@ class TestFeatureAdvancedExample(unittest.TestCase):
 
         assert_near_equal([case['y1'].item() for case in cr.get_cases('root.obj_cmp')],
                           [25.6, 25.6, 8.33, 4.17, 3.30, 3.18, 3.16,
-                           3.16, 3.16, 3.16, 3.16, 3.16, 3.16, 3.16],
+                           3.16, 3.16, 3.16, 3.16, 3.16, 3.16, 3.16, 3.16],
                           tolerance=1e-1)
 
     def test_feature_solver_recorder(self):
@@ -3635,7 +3637,7 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         assert_near_equal(objectives['obj'], 3.18339395, 1e-8)
         assert_near_equal(design_vars['x'], 0., 1e-8)
         assert_near_equal(design_vars['z'], [1.97763888, 1.25035459e-15], 1e-8)
-        assert_near_equal(constraints['con1'], -1.68550507e-10, 1e-8)
+        assert_near_equal(constraints['con1'], -1.69116721e-10, 1e-8)
         assert_near_equal(constraints['con2'], -20.24472223, 1e-8)
 
     def test_feature_problem_recorder(self):
@@ -3709,7 +3711,7 @@ class TestFeatureBasicRecording(unittest.TestCase):
         # get a list of cases that were recorded by the driver
         driver_cases = cr.list_cases('driver')
 
-        self.assertEqual(len(driver_cases), 11)
+        self.assertEqual(len(driver_cases), 12)
 
         # get the first driver case and inspect the variables of interest
         case = cr.get_case(driver_cases[0])

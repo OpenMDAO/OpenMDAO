@@ -161,7 +161,7 @@ class ParDerivTestCase(unittest.TestCase):
         if not prob.comm.rank:
             self.assertTrue('Solving color: par_dv (x1, x2)' in output)
             self.assertTrue('In mode: fwd.' in output)
-            self.assertTrue("('p.x3', [2])" in output)
+            self.assertTrue("('x3', [2])" in output)
 
     def test_fan_out_parallel_sets_rev(self):
 
@@ -540,9 +540,9 @@ class SlowComp(om.ExplicitComponent):
     def compute_partials(self, inputs, partials):
         partials['y', 'x'] = self.mult
 
-    def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, jac, mode, scope_out=None, scope_in=None):
         time.sleep(self.delay)
-        super()._apply_linear(jac, rel_systems, mode, scope_out, scope_in)
+        super()._apply_linear(jac, mode, scope_out, scope_in)
 
 
 class PartialDependGroup(om.Group):
@@ -784,10 +784,10 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         prob.setup(mode='rev', force_alloc_complex=True)
         prob.run_model()
         data = prob.check_totals(method='cs', out_stream=None)
-        assert_near_equal(data[('pg.dc1.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc2.y2', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc2.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc3.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc1.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc2.y2', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc2.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc3.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
 
         comm = MPI.COMM_WORLD
         # should only need one jacvec product per linear solve
@@ -814,10 +814,10 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         prob.setup(mode='rev', force_alloc_complex=True)
         prob.run_model()
         data = prob.check_totals(method='cs', out_stream=None)
-        assert_near_equal(data[('pg.dc1.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc2.y2', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc2.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc3.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc1.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc2.y2', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc2.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc3.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
 
         # should only need one jacvec product per linear solve
         comm = MPI.COMM_WORLD
@@ -845,8 +845,7 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.final_setup()
         self.assertEqual(str(ctx.exception),
-           "<model> <class Group>: response 'pg.dc2.y' has overlapping dependencies on the "
-           "same rank with other responses in parallel_deriv_color 'a'.")
+           "Parallel derivative color 'a' has responses ['pg.dc2.y', 'pg.dc2.y2'] with overlapping dependencies on the same rank.")
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

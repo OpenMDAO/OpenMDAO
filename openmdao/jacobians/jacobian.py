@@ -333,62 +333,6 @@ class Jacobian(object):
             self._col2name_ind[start:end] = i
             start = end
 
-        # for total derivs, we can have sub-indices making some subjacs smaller
-        if system.pathname == '':
-            for key, meta in system._subjacs_info.items():
-                nrows, ncols = meta['shape']
-                if key[0] in system._owns_approx_of_idx:
-                    ridxs = system._owns_approx_of_idx[key[0]]
-                    if len(ridxs) == nrows:
-                        ridxs = _full_slice  # value was already changed
-                    else:
-                        ridxs = ridxs.shaped_array()
-                else:
-                    ridxs = _full_slice
-                if key[1] in system._owns_approx_wrt_idx:
-                    cidxs = system._owns_approx_wrt_idx[key[1]]
-                    if len(cidxs) == ncols:
-                        cidxs = _full_slice  # value was already changed
-                    else:
-                        cidxs = cidxs.shaped_array()
-                else:
-                    cidxs = _full_slice
-
-                if ridxs is not _full_slice or cidxs is not _full_slice:
-                    # replace our local subjac with a smaller one but don't
-                    # change the subjac belonging to the system (which has values
-                    # shared with other systems)
-                    if self._subjacs_info is system._subjacs_info:
-                        self._subjacs_info = system._subjacs_info.copy()
-                    meta = self._subjacs_info[key] = meta.copy()
-                    val = meta['val']
-
-                    if ridxs is not _full_slice:
-                        nrows = len(ridxs)
-                    if cidxs is not _full_slice:
-                        ncols = len(cidxs)
-
-                    if meta['rows'] is None:  # dense
-                        val = val[ridxs, :]
-                        val = val[:, cidxs]
-                        meta['val'] = val
-                    else:  # sparse
-                        sprows = meta['rows']
-                        spcols = meta['cols']
-                        if ridxs is not _full_slice:
-                            sprows, mask = sparse_subinds(sprows, ridxs)
-                            spcols = spcols[mask]
-                            val = val[mask]
-                        if cidxs is not _full_slice:
-                            spcols, mask = sparse_subinds(spcols, cidxs)
-                            sprows = sprows[mask]
-                            val = val[mask]
-                        meta['rows'] = sprows
-                        meta['cols'] = spcols
-                        meta['val'] = val
-
-                    meta['shape'] = (nrows, ncols)
-
     def set_col(self, system, icol, column):
         """
         Set a column of the jacobian.

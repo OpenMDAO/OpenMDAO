@@ -300,8 +300,7 @@ class PETScKrylov(LinearSolver):
 
         # apply linear
         scope_out, scope_in = system._get_matvec_scope()
-        system._apply_linear(self._assembled_jac, self._rel_systems, self._mode,
-                             scope_out, scope_in)
+        system._apply_linear(self._assembled_jac, self._mode, scope_out, scope_in)
 
         # stuff resulting value of b vector into result for KSP
         result.array[:] = b_vec.asarray()
@@ -336,9 +335,8 @@ class PETScKrylov(LinearSolver):
         mode : str
             Derivative mode, can be 'fwd' or 'rev'.
         rel_systems : set of str
-            Names of systems relevant to the current solve.
+            Names of systems relevant to the current solve.  Deprecated.
         """
-        self._rel_systems = rel_systems
         self._mode = mode
 
         system = self._system()

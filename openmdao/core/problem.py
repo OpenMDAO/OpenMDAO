@@ -25,7 +25,7 @@ from openmdao.core.driver import Driver, record_iteration, SaveOptResult
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.system import System, _OptStatus
 from openmdao.core.group import Group
-from openmdao.core.total_jac import _TotalJacInfo, _contains_all
+from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.approximation_schemes.complex_step import ComplexStep
@@ -49,7 +49,7 @@ from openmdao.utils.array_utils import scatter_dist_to_local
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
     clear_reports, get_reports_dir, _load_report_plugins
-from openmdao.utils.general_utils import _contains_all, pad_name, LocalRangeIterable, \
+from openmdao.utils.general_utils import pad_name, LocalRangeIterable, \
     _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
@@ -139,7 +139,8 @@ class Problem(object):
     driver : <Driver> or None
         The driver for the problem. If not specified, a simple "Run Once" driver will be used.
     comm : MPI.Comm or <FakeComm> or None
-        The global communicator.
+        The MPI communicator for this Problem. If not specified, comm will be MPI.COMM_WORLD if
+        MPI is active, else it will be None.
     name : str
         Problem name. Can be used to specify a Problem instance when multiple Problems
         exist.
@@ -202,6 +203,8 @@ class Problem(object):
         The number of times run_driver or run_model has been called.
     _warned : bool
         Bool to check if `value` deprecation warning has occured yet
+    _computing_coloring : bool
+        When True, we are computing coloring.
     """
 
     def __init__(self, model=None, driver=None, comm=None, name=None, reports=_UNDEFINED,
@@ -219,6 +222,7 @@ class Problem(object):
 
         self.cite = CITATION
         self._warned = False
+        self._computing_coloring = False
 
         # Set the Problem name so that it can be referenced from command line tools (e.g. check)
         # that accept a Problem argument, and to name the corresponding reports subdirectory.
@@ -981,7 +985,7 @@ class Problem(object):
             'setup_status': _SetupStatus.PRE_SETUP,
             'model_ref': weakref.ref(model),  # ref to the model (needed to get out-of-scope
                                               # src data for inputs)
-            'using_par_deriv_color': False,  # True if parallel derivative coloring is being used
+            'has_par_deriv_color': False,  # True if any dvs/responses have parallel deriv colors
             'mode': mode,  # mode (derivative direction) set by the user.  'auto' by default
             'abs_in2prom_info': {},  # map of abs input name to list of length = sys tree height
                                      # down to var location, to allow quick resolution of local
@@ -999,12 +1003,13 @@ class Problem(object):
             'allow_post_setup_reorder': self.options['allow_post_setup_reorder'],  # see option
             'singular_jac_behavior': 'warn',  # How to handle singular jac conditions
             'parallel_deriv_color': None,  # None unless derivatives involving a parallel deriv
-                                           # colored dv/response are currently being computed
+                                           # colored dv/response are currently being computed.
             'seed_vars': None,  # set of names of seed variables. Seed variables are those that
                                 # have their derivative value set to 1.0 at the beginning of the
                                 # current derivative solve.
             'coloring_randgen': None,  # If total coloring is being computed, will contain a random
                                        # number generator, else None.
+            'group_by_pre_opt_post': self.options['group_by_pre_opt_post'],  # see option
         }
 
         if _prob_setup_stack:
@@ -1053,6 +1058,8 @@ class Problem(object):
         else:
             mode = self._orig_mode
 
+        self._metadata['mode'] = mode
+
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             self.model._final_setup(self.comm, self._orig_mode)
 
@@ -1072,20 +1079,17 @@ class Problem(object):
 
         driver._setup_driver(self)
 
-        info = driver._coloring_info
-        coloring = info['coloring']
-        if coloring is None and info['static'] is not None:
-            coloring = driver._get_static_coloring()
-
-        if coloring and coloring_mod._use_total_sparsity:
-            # if we're using simultaneous total derivatives then our effective size is less
-            # than the full size
-            if coloring._fwd and coloring._rev:
-                pass  # we're doing both!
-            elif mode == 'fwd' and coloring._fwd:
-                desvar_size = coloring.total_solves()
-            elif mode == 'rev' and coloring._rev:
-                response_size = coloring.total_solves()
+        if coloring_mod._use_total_sparsity:
+            coloring = driver._coloring_info.coloring
+            if coloring is not None:
+                # if we're using simultaneous total derivatives then our effective size is less
+                # than the full size
+                if coloring._fwd and coloring._rev:
+                    pass  # we're doing both!
+                elif mode == 'fwd' and coloring._fwd:
+                    desvar_size = coloring.total_solves()
+                elif mode == 'rev' and coloring._rev:
+                    response_size = coloring.total_solves()
 
         if ((mode == 'fwd' and desvar_size > response_size) or
                 (mode == 'rev' and response_size > desvar_size)):
@@ -1232,7 +1236,7 @@ class Problem(object):
         for comp in comps:
             local_opts = comp._get_check_partial_options()
 
-            for key, meta in comp._declared_partials.items():
+            for keypats, meta in comp._declared_partials_patterns.items():
 
                 # Get the complete set of options, including defaults
                 #    for the computing of the derivs for this component
@@ -1248,9 +1252,8 @@ class Problem(object):
                 # For each of the partials, check to see if the
                 #   check partials options are different than the options used to compute
                 #   the partials
-                pattern_matches = comp._find_partial_matches(*key)
-                wrt_vars = pattern_matches[1]
-                for wrt_var in wrt_vars:
+                wrt_bundle = comp._find_partial_matches(*keypats)[1]
+                for wrt_var in wrt_bundle:
                     _, vars = wrt_var
                     for var in vars:
                         # we now have individual vars like 'x'
@@ -1761,38 +1764,34 @@ class Problem(object):
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
         if wrt is None:
-            wrt = list(self.driver._designvars)
-            if not wrt:
+            if not self.driver._designvars:
                 raise RuntimeError("Driver is not providing any design variables "
                                    "for compute_totals.")
 
         lcons = []
         if of is None:
-            of = list(self.driver._objs)
-            of.extend(self.driver._cons)
-            if not of:
+            if not self.driver._responses:
                 raise RuntimeError("Driver is not providing any response variables "
                                    "for compute_totals.")
             lcons = [n for n, meta in self.driver._cons.items()
                      if ('linear' in meta and meta['linear'])]
+            if lcons:
+                # if driver has linear constraints, construct a full list of driver responses
+                # in order to avoid using any driver coloring that won't include the linear
+                # constraints. (The driver coloring would only be used if the supplied of and
+                # wrt lists were None or identical to the driver's lists.)
+                of = list(self.driver._responses)
 
         # Calculate Total Derivatives
-        if model._owns_approx_jac:
-            # Support this, even though it is a bit silly (though you could compare fd with cs.)
-            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
-                                       approx=True, driver_scaling=driver_scaling,
-                                       directional=directional)
-            Jcalc = total_info.compute_totals_approx(initialize=True)
-            Jcalc_name = 'J_fwd'
-        else:
-            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
-                                       driver_scaling=driver_scaling, directional=directional)
-            self._metadata['checking'] = True
-            try:
-                Jcalc = total_info.compute_totals()
-            finally:
-                self._metadata['checking'] = False
-            Jcalc_name = f"J_{total_info.mode}"
+        total_info = _TotalJacInfo(self, of, wrt, return_format='flat_dict',
+                                   approx=model._owns_approx_jac,
+                                   driver_scaling=driver_scaling, directional=directional)
+        self._metadata['checking'] = True
+        try:
+            Jcalc = total_info.compute_totals()
+        finally:
+            self._metadata['checking'] = False
+        Jcalc_name = f"J_{total_info.mode}"
 
         if step is None:
             if method == 'cs':
@@ -1831,7 +1830,7 @@ class Problem(object):
 
             model.approx_totals(method=method, step=step, form=form,
                                 step_calc=step_calc if method == 'fd' else None)
-            fd_tot_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
+            fd_tot_info = _TotalJacInfo(self, of, wrt, return_format='flat_dict',
                                         approx=True, driver_scaling=driver_scaling,
                                         directional=directional)
             if directional:
@@ -1840,10 +1839,9 @@ class Problem(object):
                 Jcalc, Jcalc_slices = total_info._get_as_directional()
 
             if show_progress:
-                Jfd = fd_tot_info.compute_totals_approx(initialize=True,
-                                                        progress_out_stream=out_stream)
+                Jfd = fd_tot_info.compute_totals(progress_out_stream=out_stream)
             else:
-                Jfd = fd_tot_info.compute_totals_approx(initialize=True)
+                Jfd = fd_tot_info.compute_totals()
 
             if directional:
                 Jfd, Jfd_slices = fd_tot_info._get_as_directional(total_info.mode)
@@ -1916,9 +1914,6 @@ class Problem(object):
                 if of in resp and resp[of]['indices'] is not None:
                     data[''][key]['indices'] = resp[of]['indices'].indexed_src_size
 
-        if out_stream == _DEFAULT_OUT_STREAM:
-            out_stream = sys.stdout
-
         _assemble_derivative_data(data, rel_err_tol, abs_err_tol, out_stream, compact_print,
                                   [model], {'': fd_args}, totals=total_info, lcons=lcons,
                                   show_only_incorrect=show_only_incorrect, sort=sort)
@@ -1929,7 +1924,8 @@ class Problem(object):
         return data['']
 
     def compute_totals(self, of=None, wrt=None, return_format='flat_dict', debug_print=False,
-                       driver_scaling=False, use_abs_names=False, get_remote=True):
+                       driver_scaling=False, use_abs_names=False, get_remote=True,
+                       use_coloring=None):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1952,41 +1948,31 @@ class Problem(object):
             or the ref and ref0 values that were specified when add_design_var, add_objective, and
             add_constraint were called on the model. Default is False, which is unscaled.
         use_abs_names : bool
-            Set to True when passing in absolute names to skip some translation steps.
+            This is deprecated and has no effect.
         get_remote : bool
             If True, the default, the full distributed total jacobian will be retrieved.
+        use_coloring : bool or None
+            If True, use coloring to compute total derivatives.  If False, do not.  If None, only
+            compute coloring if the Driver has declared coloring. This is only used if user supplies
+            of and wrt args.  Otherwise, coloring is completely determined by the driver.
 
         Returns
         -------
         object
             Derivatives in form requested by 'return_format'.
         """
+        if use_abs_names:
+            warn_deprecation("The use_abs_names argument to compute_totals is deprecated and has "
+                             "no effect.")
+
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             with multi_proc_exception_check(self.comm):
                 self.final_setup()
 
-        if wrt is None:
-            wrt = list(self.driver._designvars)
-            if not wrt:
-                raise RuntimeError("Driver is not providing any design variables "
-                                   "for compute_totals.")
-
-        if of is None:
-            of = list(self.driver._objs)
-            of.extend(self.driver._cons)
-            if not of:
-                raise RuntimeError("Driver is not providing any response variables "
-                                   "for compute_totals.")
-
-        if self.model._owns_approx_jac:
-            total_info = _TotalJacInfo(self, of, wrt, use_abs_names, return_format,
-                                       approx=True, driver_scaling=driver_scaling)
-            return total_info.compute_totals_approx(initialize=True)
-        else:
-            total_info = _TotalJacInfo(self, of, wrt, use_abs_names, return_format,
-                                       debug_print=debug_print, driver_scaling=driver_scaling,
-                                       get_remote=get_remote)
-            return total_info.compute_totals()
+        total_info = _TotalJacInfo(self, of, wrt, return_format, approx=self.model._owns_approx_jac,
+                                   driver_scaling=driver_scaling, get_remote=get_remote,
+                                   debug_print=debug_print, use_coloring=use_coloring)
+        return total_info.compute_totals()
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
@@ -2566,30 +2552,33 @@ class Problem(object):
             raise RuntimeError("list_indep_vars requires that final_setup has been "
                                "run for the Problem.")
 
-        desvar_prom_names = model.get_design_vars(recurse=True,
-                                                  use_prom_ivc=True,
-                                                  get_sizes=False).keys()
+        design_vars = model.get_design_vars(recurse=True,
+                                            use_prom_ivc=True,
+                                            get_sizes=False)
 
         problem_indep_vars = []
         indep_var_names = set()
 
-        default_col_names = ['name', 'units', 'val']
-        col_names = default_col_names + ([] if options is None else options)
+        col_names = ['name', 'units', 'val']
+        if options is not None:
+            col_names.extend(options)
 
         abs2meta = model._var_allprocs_abs2meta['output']
-        prom2abs = self.model._var_allprocs_prom2abs_list['input']
 
-        prom2src = {prom: model.get_source(prom) for prom in prom2abs.keys()
-                    if 'openmdao:indep_var' in abs2meta[model.get_source(prom)]['tags']}
+        prom2src = {}
+        for prom in self.model._var_allprocs_prom2abs_list['input']:
+            src = model.get_source(prom)
+            if 'openmdao:indep_var' in abs2meta[src]['tags']:
+                prom2src[prom] = src
 
         for prom, src in prom2src.items():
             name = prom if src.startswith('_auto_ivc.') else src
-            meta = abs2meta[src]
-            meta = {key: val for key, val in meta.items() if key in col_names}
-            meta['val'] = self.get_val(prom)
 
-            if (include_design_vars or name not in desvar_prom_names) \
+            if (include_design_vars or name not in design_vars) \
                     and name not in indep_var_names:
+                meta = abs2meta[src]
+                meta = {key: meta[key] for key in col_names if key in meta}
+                meta['val'] = self.get_val(prom)
                 problem_indep_vars.append((name, meta))
                 indep_var_names.add(name)
 
@@ -2737,6 +2726,50 @@ class Problem(object):
                             seen.add(msg)
 
         return unique_errors
+
+    def get_total_coloring(self, coloring_info=None, of=None, wrt=None, run_model=None):
+        """
+        Get the total coloring.
+
+        If necessary, dynamically generate it.
+
+        Parameters
+        ----------
+        coloring_info : dict
+            Coloring metadata dict.
+        of : list of str or None
+            List of response names.
+        wrt : list of str or None
+            List of design variable names.
+        run_model : bool or None
+            If False, don't run model.  If None, use problem._run_counter to determine if model
+            should be run.
+
+        Returns
+        -------
+        Coloring or None
+            Coloring object, possibly dynamically generated, or None.
+        """
+        if coloring_mod._use_total_sparsity:
+            coloring = None
+            # if no coloring_info is supplied, copy the coloring_info from the driver but
+            # remove any existing coloring, and force dynamic coloring
+            if coloring_info is None:
+                coloring_info = self.driver._coloring_info.copy()
+                coloring_info.coloring = None
+                coloring_info.dynamic = True
+
+            if coloring_info.do_compute_coloring():
+                if coloring_info.dynamic:
+                    do_run = run_model if run_model is not None else self._run_counter < 0
+                    coloring = \
+                        coloring_mod.dynamic_total_coloring(
+                            self.driver, run_model=do_run,
+                            fname=self.driver._get_total_coloring_fname(), of=of, wrt=wrt)
+            else:
+                return coloring_info.coloring
+
+            return coloring
 
 
 _ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])

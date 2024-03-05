@@ -16,6 +16,7 @@ from openmdao.jacobians.jacobian import Jacobian
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.devtools.memory import check_iter_leaks, list_iter_leaks
+from openmdao.utils.testing_utils import use_tempdirs
 
 try:
     import objgraph
@@ -34,6 +35,7 @@ def run_opt_wrapper(driver_class, optimizer):
 
 
 @unittest.skipUnless(objgraph is not None, "Test requires objgraph to be installed. (pip install objgraph).")
+@use_tempdirs
 class LeakTestCase(unittest.TestCase):
 
     ISOLATED = True
@@ -42,27 +44,24 @@ class LeakTestCase(unittest.TestCase):
     def test_leaks_pyoptsparse_slsqp(self):
         lst = check_iter_leaks(4, run_opt_wrapper(om.pyOptSparseDriver, 'SLSQP'))
         if lst:
-            if lst[-1][0] >= 2:  # last iteration had new objects
-                msg = StringIO()
-                list_iter_leaks(lst, msg)
-                self.fail(msg.getvalue())
+            msg = StringIO()
+            list_iter_leaks(lst, msg)
+            self.fail(msg.getvalue())
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', 'pyoptsparse SNOPT is not installed.')
     def test_leaks_pyoptsparse_snopt(self):
         lst = check_iter_leaks(4, run_opt_wrapper(om.pyOptSparseDriver, 'SNOPT'))
         if lst:
-            if lst[-1][0] >= 2:  # last iteration had new objects
-                msg = StringIO()
-                list_iter_leaks(lst, msg)
-                self.fail(msg.getvalue())
+            msg = StringIO()
+            list_iter_leaks(lst, msg)
+            self.fail(msg.getvalue())
 
     def test_leaks_scipy_slsqp(self):
         lst = check_iter_leaks(4, run_opt_wrapper(om.ScipyOptimizeDriver, 'SLSQP'))
         if lst:
-            if lst[-1][0] >= 2:  # last iteration had new objects
-                msg = StringIO()
-                list_iter_leaks(lst, msg)
-                self.fail(msg.getvalue())
+            msg = StringIO()
+            list_iter_leaks(lst, msg)
+            self.fail(msg.getvalue())
 
 
 if __name__ == '__main__':
