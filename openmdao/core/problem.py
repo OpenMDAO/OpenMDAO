@@ -1935,8 +1935,8 @@ class Problem(object):
         get_remote : bool
             If True, the default, the full distributed total jacobian will be retrieved.
         coloring_info : ColoringMeta, None, or False
-            If False, do no coloring.  If None, use driver coloring.  Otherwise use the coloring
-            found in the provided coloring_info object, if it exists.
+            If False, do no coloring.  If None, use driver coloring info to compute the coloring.
+            Otherwise use the given coloring info object to provide the coloring, if it exists.
 
         Returns
         -------

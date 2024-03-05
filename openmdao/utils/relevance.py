@@ -105,10 +105,11 @@ class Relevance(object):
     It determines current relevance based on the current set of forward and reverse seed variables.
     Initial relevance is determined by starting at a given seed and traversing the data flow graph
     in the specified direction to find all relevant variables and systems.  That information is
-    then represented in a boolean array where True means the variable or system is relevant to the
+    then represented as a boolean array where True means the variable or system is relevant to the
     seed.  Relevance with respect to groups of seeds, for example, one forward seed vs. all reverse
-    seeds, the boolean relevance arrays for the individual seeds are combined by taking the union
-    of the fwd seed arrays and the union of the rev seed arrays and intersecting the two results.
+    seeds, is determined by combining the boolean relevance arrays for the individual seeds in the
+    following manner:  (fwd_array1 | fwd_array2 | ...) & (rev_array1 | rev_array2 | ...). In other
+    words, the union of the fwd arrays is intersected with the union of the rev arrays.
 
     The full set of fwd and rev seeds must be set at initialization time.  At any point after that,
     the set of active seeds can be changed using the set_seeds method, but those seeds must be
@@ -155,9 +156,9 @@ class Relevance(object):
     _nonlinear_sets : dict
         Dict of the form {'pre': pre_rel_array, 'iter': iter_rel_array, 'post': post_rel_array}.
     _current_rel_varray : ndarray
-        Array representing the combined variable relevance arrays for the currently active seeds.
+        Array representing the variable relevance for the currently active seeds.
     _current_rel_sarray : ndarray
-        Array representing the combined system relevance arrays for the currently active seeds.
+        Array representing the system relevance for the currently active seeds.
     _rel_array_cache : dict
         Cache of relevance arrays stored by array hash.
     _no_dv_responses : list
@@ -250,7 +251,7 @@ class Relevance(object):
 
     def _single_seed_array_iter(self, group, seed_meta, direction, all_systems):
         """
-        Yield the relevance arrays for each individual seed for variables and systems.
+        Yield the relevance arrays for each individual seed and direction for variables and systems.
 
         The relevance arrays are boolean ndarrays of length nvars and nsystems, respectively.
         All of the variables and systems in the graph map to an index into these arrays and
@@ -349,7 +350,7 @@ class Relevance(object):
 
     def _union_arrays(self, seed_map, seeds):
         """
-        Return the intersection of the relevance arrays for the given seeds.
+        Return the union of the relevance arrays for the given seeds.
 
         Parameters
         ----------
@@ -362,7 +363,7 @@ class Relevance(object):
         Returns
         -------
         ndarray
-            The array representing the intersection of the relevance arrays for the given seeds.
+            The array representing the union of the relevance arrays for the given seeds.
         """
         if not seeds:
             return np.zeros(0, dtype=bool)

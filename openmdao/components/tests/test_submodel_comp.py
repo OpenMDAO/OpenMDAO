@@ -45,55 +45,6 @@ def build_submodelcomp2(promote=True, **kwargs):
     return om.SubmodelComp(problem=subprob2, **kwargs)
 
 
-def setup_model_v_submodel(model, inputs=None, outputs=None, driver=None,
-                           pre_final_inits=None, inits=None):
-    if inputs is None or outputs is None:
-        inputs = model.get_design_vars()
-
-    if outputs is None:
-        outputs = model.get_responses()
-
-    if pre_final_inits is None:
-        pre_final_inits = {}
-
-    if inits is None:
-        inits = {}
-
-    p = om.Problem(model=model)
-    if driver is not None:
-        p.driver = driver
-    p.setup()
-
-    for name, value in pre_final_inits.items():
-        p.set_val(name, value)
-
-    p.final_setup()
-
-    for name, value in inits.items():
-        p.set_val(name, value)
-
-    p.run_model()
-
-    p_with_submodel = om.Problem()
-    if driver is not None:
-        p_with_submodel.driver = driver
-    submodelcomp = om.SubmodelComp(problem=om.Problem(model=model), inputs=inputs, outputs=outputs)
-    p_with_submodel.model.add_subsystem('submodelcomp', submodelcomp, promotes=['*'])
-    p_with_submodel.setup()
-
-    for name, value in pre_final_inits.items():
-        p_with_submodel.set_val(name, value)
-
-    p_with_submodel.final_setup()
-
-    for name, value in inits.items():
-        p_with_submodel.set_val(name, value)
-
-    p_with_submodel.run_model()
-
-    return p, p_with_submodel
-
-
 class TestSubmodelComp(unittest.TestCase):
     def test_submodel_comp(self):
         p = om.Problem()
