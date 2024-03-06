@@ -527,7 +527,7 @@ def jac_diff(jac1, jac2, tol=1e-30):
     return diff, (missing1, missing2)
 
 
-def display_jac_diff(jac1, jac2):
+def display_jac_diff(jac1, jac2, tol=1e-30):
     """
     Display the differences between two jacobians.
 
@@ -539,8 +539,10 @@ def display_jac_diff(jac1, jac2):
     jac2 : str or dict-like
         Second jacobian to compare.  If a string, it is assumed to be a filename containing a
         pickled jacobian.  If not, it is assumed to be the jacobian itself, or a dict of subjacs.
+    tol : float
+        Tolerance for considering two subjacs to be equal.
     """
-    diff, (missing1, missing2) = jac_diff(jac1, jac2)
+    diff, (missing1, missing2) = jac_diff(jac1, jac2, tol)
 
     max_dense_size = 100
 
