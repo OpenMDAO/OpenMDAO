@@ -2,18 +2,21 @@
 import json
 import functools
 import builtins
-from itertools import zip_longest
 import os
 import re
+import pickle
+from itertools import zip_longest
 from contextlib import contextmanager
-from openmdao.utils.general_utils import env_truthy, env_none
+
+import numpy as np
+from scipy.sparse import coo_matrix
 
 try:
     from parameterized import parameterized
 except ImportError:
     parameterized = None
 
-import numpy as np
+from openmdao.utils.general_utils import env_truthy, env_none
 
 
 def _new_setup(self):
@@ -456,3 +459,112 @@ def rel_num_diff(n1, n2):
         return 0. if n2 == 0. else 1.0
     else:
         return abs(n2 - n1) / abs(n1)
+
+
+def save_jac(jac, fname):
+    """
+    Save a jacobian to a file.
+
+    Parameters
+    ----------
+    jac : dict
+        The jacobian to save. Keys should be (of, wrt) tuples.
+    fname : str
+        Name of the file to save the jacobian to.
+    """
+    with open(fname, 'wb') as f:
+        pickle.dump(jac, f)
+
+
+def jac_diff(jac1, jac2, tol=1e-30):
+    """
+    Return the difference between two jacobians.
+
+    Parameters
+    ----------
+    jac1 : str or dict-like
+        First jacobian to compare.  If a string, it is assumed to be a filename containing a
+        pickled jacobian.  If not, it is assumed to be the jacobian itself, or a dict of subjacs.
+    jac2 : str or dict-like
+        Second jacobian to compare.  If a string, it is assumed to be a filename containing a
+        pickled jacobian.  If not, it is assumed to be the jacobian itself, or a dict of subjacs.
+    tol : float
+        Tolerance for considering two subjacs to be equal.
+
+    Returns
+    -------
+    dict
+        Dictionary containing the differences between each subjac in the two jacobians.  If the
+        matching subjacs do not have the same shape, the shape of each is returned instead of the
+        difference.
+    tuple
+        Tuple containing the keys for missing subjacs in jac1 and jac2, e.g., (missing1, missing2).
+    """
+    if isinstance(jac1, str):
+        with open(jac1, 'rb') as f:
+            jac1 = pickle.load(f)
+    if isinstance(jac2, str):
+        with open(jac2, 'rb') as f:
+            jac2 = pickle.load(f)
+
+    missing1 = set(jac2) - set(jac1)
+    missing2 = set(jac1) - set(jac2)
+
+    diff = {}
+    for key in set(jac1) & set(jac2):
+        if key not in jac1:
+            diff[key] = np.abs(jac2[key])
+        elif key not in jac2:
+            diff[key] = np.abs(jac1[key])
+        else:
+            if jac2[key].shape != jac1[key].shape:
+                diff[key] = (jac1[key].shape, jac2[key].shape)
+            else:
+                adiff = np.abs(jac2[key] - jac1[key])
+                if np.any(adiff > tol):
+                    diff[key] = adiff
+
+    return diff, (missing1, missing2)
+
+
+def display_jac_diff(jac1, jac2):
+    """
+    Display the differences between two jacobians.
+
+    Parameters
+    ----------
+    jac1 : str or dict-like
+        First jacobian to compare.  If a string, it is assumed to be a filename containing a
+        pickled jacobian.  If not, it is assumed to be the jacobian itself, or a dict of subjacs.
+    jac2 : str or dict-like
+        Second jacobian to compare.  If a string, it is assumed to be a filename containing a
+        pickled jacobian.  If not, it is assumed to be the jacobian itself, or a dict of subjacs.
+    """
+    diff, (missing1, missing2) = jac_diff(jac1, jac2)
+
+    max_dense_size = 100
+
+    if diff:
+        print("Differences in sub-jacobians:")
+        for key, val in diff.items():
+            print(f"{key[0]} wrt {key[1]}:")
+            if isinstance(val, tuple):
+                shape1, shape2 = val
+                print(f"  shape1: {shape1}, shape2: {shape2}")
+            else:
+                if val.size > max_dense_size:
+                    mat = coo_matrix(val)
+                    for r, c, v in zip(mat.row, mat.col, mat.data):
+                        print(f"  [{r}, {c}] = {v}")
+                else:
+                    with np.printoptions(threshold=100, linewidth=999):
+                        print(val)
+    else:
+        print("No differences in Jacobians.")
+
+    if missing1 or missing2:
+        print("Missing subjacs:")
+        if missing1:
+            print("  in jac1:", missing1)
+        if missing2:
+            print("  in jac2:", missing2)
