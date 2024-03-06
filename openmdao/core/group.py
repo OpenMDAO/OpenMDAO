@@ -1093,6 +1093,16 @@ class Group(System):
 
         vectypes = ('nonlinear', 'linear') if self._use_derivatives else ('nonlinear',)
 
+        # If any proc's local systems need a complex vector, then all procs need it.
+        if self.comm.size > 1:
+            all_nl_alloc_complex = self.comm.allgather(nl_alloc_complex)
+            if np.any(all_nl_alloc_complex):
+                nl_alloc_complex = True
+
+            all_ln_alloc_complex = self.comm.allgather(ln_alloc_complex)
+            if np.any(all_ln_alloc_complex):
+                ln_alloc_complex = True
+
         for vec_name in vectypes:
             if vec_name == 'nonlinear':
                 alloc_complex = nl_alloc_complex
