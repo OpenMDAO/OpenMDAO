@@ -582,15 +582,15 @@ class Driver(object):
 
         if self.supports['optimization'] and problem.options['group_by_pre_opt_post']:
             if model._pre_components:
-                with model._relevance.activate_nonlinear('pre'):
+                with model._relevance.nonlinear_active('pre'):
                     model.run_solve_nonlinear()
 
             with SaveOptResult(self):
-                with model._relevance.activate_nonlinear('iter'):
+                with model._relevance.nonlinear_active('iter'):
                     result = self.run()
 
             if model._post_components:
-                with model._relevance.activate_nonlinear('post'):
+                with model._relevance.nonlinear_active('post'):
                     model.run_solve_nonlinear()
 
             return result

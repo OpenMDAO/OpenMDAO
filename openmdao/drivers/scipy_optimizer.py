@@ -285,7 +285,7 @@ class ScipyOptimizeDriver(Driver):
 
         # Initial Run
         with RecordingDebugging(self._get_name(), self.iter_count, self):
-            with model._relevance.activate_nonlinear('iter'):
+            with model._relevance.nonlinear_active('iter'):
                 model.run_solve_nonlinear()
             self.iter_count += 1
 
@@ -632,7 +632,7 @@ class ScipyOptimizeDriver(Driver):
 
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 self.iter_count += 1
-                with model._relevance.activate_nonlinear('iter'):
+                with model._relevance.nonlinear_active('iter'):
                     model.run_solve_nonlinear()
 
             # Get the objective function evaluations

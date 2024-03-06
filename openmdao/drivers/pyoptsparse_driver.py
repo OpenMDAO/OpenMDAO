@@ -743,7 +743,7 @@ class pyOptSparseDriver(Driver):
                     self._in_user_function = True
                     # deactivate the relevance if we haven't run the full model yet, so that
                     # the full model will run at least once.
-                    with model._relevance.activate_nonlinear('iter', active=self._model_ran):
+                    with model._relevance.nonlinear_active('iter', active=self._model_ran):
                         model.run_solve_nonlinear()
                         self._model_ran = True
 

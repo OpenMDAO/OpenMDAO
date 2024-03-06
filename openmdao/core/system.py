@@ -1728,7 +1728,7 @@ class System(object):
                     self._outputs.set_val(starting_outputs +
                                           out_offsets * np.random.random(out_offsets.size))
                 if is_total:
-                    with self._relevance.activate_nonlinear('iter'):
+                    with self._relevance.nonlinear_active('iter'):
                         self._solve_nonlinear()
                 else:
                     self._apply_nonlinear()

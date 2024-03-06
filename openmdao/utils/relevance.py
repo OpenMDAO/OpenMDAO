@@ -538,6 +538,10 @@ class Relevance(object):
         effect, i.e., calling this with active=True will not activate an inactive relevance object,
         but calling it with active=False will deactivate an active relevance object.
 
+        The only way to activate an otherwise inactive relevance object is to use the
+        all_seeds_active, seeds_active, or nonlinear_active context managers and this will only
+        work if _active is None or True.
+
         Parameters
         ----------
         active : bool
@@ -547,7 +551,7 @@ class Relevance(object):
         ------
         None
         """
-        if self._active is False:  # if already inactive from higher level, don't change it
+        if not self._active:  # if already inactive from higher level, don't change it
             yield
         else:
             save = self._active
@@ -646,7 +650,7 @@ class Relevance(object):
                 self._active = save_active
 
     @contextmanager
-    def activate_nonlinear(self, name, active=True):
+    def nonlinear_active(self, name, active=True):
         """
         Context manager for activating a subset of systems using 'pre', 'post', or 'iter'.
 
