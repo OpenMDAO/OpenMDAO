@@ -228,14 +228,15 @@ class ColoringMeta(object):
         Display information about the coloring.
         """
         if self.coloring is None:
-            print("No coloring was computed successfully.")
+            if self.show_summary or self.show_sparsity or self.show_sparsity_txt:
+                print("No coloring was computed successfully.")
         else:
             if self.show_sparsity_txt:
                 self.coloring.display_txt(html=False, summary=False)
             if self.show_summary:
                 self.coloring.summary()
             if self.show_sparsity:
-                self.coloring.display_bokeh(output_file=None, show=True)
+                self.coloring.display_bokeh()
 
     def __iter__(self):
         """

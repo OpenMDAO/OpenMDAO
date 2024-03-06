@@ -547,7 +547,7 @@ class Relevance(object):
         ------
         None
         """
-        if not self._active:  # if already inactive from higher level, don't change it
+        if self._active is False:  # if already inactive from higher level, don't change it
             yield
         else:
             save = self._active
