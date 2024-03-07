@@ -378,7 +378,7 @@ class ImplicitComponent(Component):
 
     def add_residual(self, name, shape=(), units=None, desc='', ref=None):
         """
-        Add an residual variable to the component.
+        Add a residual variable to the component.
 
         Note that the total size of the residual vector must match the total size of
         the outputs vector for this component.
