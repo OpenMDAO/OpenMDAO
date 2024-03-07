@@ -833,7 +833,7 @@ class TestExecComp(unittest.TestCase):
         model.add_subsystem('comp', comp)
         p.setup()
 
-        self.assertEquals(len(comp._declared_partials_patterns), 0)
+        self.assertEqual(len(comp._declared_partials_patterns), 0)
 
         # run with has_diag_partials=True
         p = om.Problem()
