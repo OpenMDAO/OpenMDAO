@@ -476,7 +476,7 @@ def save_jac(jac, fname):
         pickle.dump(jac, f)
 
 
-def jac_diff(jac1, jac2, tol=1e-30):
+def jac_diff(jac1, jac2, tol=1e-10):
     """
     Return the difference between two jacobians.
 
@@ -527,7 +527,7 @@ def jac_diff(jac1, jac2, tol=1e-30):
     return diff, (missing1, missing2)
 
 
-def display_jac_diff(jac1, jac2, tol=1e-30):
+def display_jac_diff(jac1, jac2, tol=1e-10):
     """
     Display the differences between two jacobians.
 

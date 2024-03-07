@@ -2534,7 +2534,9 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
             raise RuntimeError("When computing total jacobian sparsity, either 'of' and 'wrt' "
                                "must be provided or design_vars/constraints/objective must be "
                                "added to the driver.")
-    use_driver = bool(driver)
+        use_driver = True
+    else:
+        use_driver = False
 
     with _compute_total_coloring_context(prob):
         start_time = time.perf_counter()
