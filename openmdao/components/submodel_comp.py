@@ -157,7 +157,7 @@ class SubmodelComp(ExplicitComponent):
         """
         return name.replace('.', ':')
 
-    def add_input(self, prom_in, outer_name=None, name=None, **kwargs):
+    def add_input(self, prom_in, name=None, **kwargs):
         """
         Add input to model before or after setup.
 
@@ -165,23 +165,14 @@ class SubmodelComp(ExplicitComponent):
         ----------
         prom_in : str
             Promoted inner name of input.
-        outer_name : str or None
-            Outer name of input to be added. If none, it will default to prom_in after replacing
-            any '.'s with ':'s.
         name : str or None
-            Deprecated. Use outer_name instead.
+            Name of input relative to this component. If none, it will default to prom_in after
+            replacing any '.'s with ':'s.
         **kwargs : named args
             All remaining named args that can become options for `add_input`.
         """
-        if name is not None:
-            warn_deprecation("The 'name' argument is deprecated and has been replaced by "
-                             "'outer_name'.")
-            if outer_name is not None:
-                raise ValueError("Can't specify both 'name' and 'outer_name'.")
-            outer_name = name
-
         if self._static_mode:
-            self._add_static_input(prom_in, outer_name, **kwargs)
+            self._add_static_input(prom_in, name, **kwargs)
             return
 
         if _is_glob(prom_in):
@@ -191,17 +182,17 @@ class SubmodelComp(ExplicitComponent):
         # if we get here, our internal setup() is complete, so we can add the input to the
         # submodel immediately.
 
-        if outer_name is None:
-            outer_name = self._make_valid_name(prom_in)
+        if name is None:
+            name = self._make_valid_name(prom_in)
 
-        self._submodel_inputs[prom_in] = (outer_name, kwargs)
+        self._submodel_inputs[prom_in] = (name, kwargs)
 
         if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
             raise Exception('Cannot call add_input after configure.')
 
-        super().add_input(outer_name, **kwargs)
+        super().add_input(name, **kwargs)
 
-    def add_output(self, prom_out, outer_name=None, name=None, **kwargs):
+    def add_output(self, prom_out, name=None, **kwargs):
         """
         Add output to model before or after setup.
 
@@ -209,23 +200,14 @@ class SubmodelComp(ExplicitComponent):
         ----------
         prom_out : str
             Promoted name of the inner output.
-        outer_name : str or None
-            Outer name of output to be added. If none, it will default to prom_out after replacing
-            any '.'s with ':'s.
         name : str or None
-            Deprecated. Use outer_name instead.
+            Name of output relative to this component. If none, it will default to prom_out after
+            replacing any '.'s with ':'s.
         **kwargs : named args
             All remaining named args that can become options for `add_output`.
         """
-        if name is not None:
-            warn_deprecation("The 'name' argument is deprecated and has been replaced by "
-                             "'outer_name'.")
-            if outer_name is not None:
-                raise ValueError("Can't specify both 'name' and 'outer_name'.")
-            outer_name = name
-
         if self._static_mode:
-            self._add_static_output(prom_out, outer_name, **kwargs)
+            self._add_static_output(prom_out, name, **kwargs)
             return
 
         if _is_glob(prom_out):
@@ -235,15 +217,15 @@ class SubmodelComp(ExplicitComponent):
         # if we get here, our internal setup() is complete, so we can add the output to the
         # submodel immediately.
 
-        if outer_name is None:
-            outer_name = self._make_valid_name(prom_out)
+        if name is None:
+            name = self._make_valid_name(prom_out)
 
-        self._submodel_outputs[prom_out] = (outer_name, kwargs)
+        self._submodel_outputs[prom_out] = (name, kwargs)
 
         if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
             raise Exception('Cannot call add_output after configure.')
 
-        super().add_output(outer_name, **kwargs)
+        super().add_output(name, **kwargs)
 
     def setup(self):
         """
