@@ -2,7 +2,6 @@
 Various graph related utilities.
 """
 import networkx as nx
-from fnmatch import fnmatchcase
 
 
 def get_sccs_topo(graph):

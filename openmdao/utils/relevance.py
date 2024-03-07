@@ -737,7 +737,7 @@ class Relevance(object):
         try:
             return seed_map[fwd_seeds][rev_seeds]
         except KeyError:
-            # print(f"missing rel array for ({fwd_seeds}, {rev_seeds})")
+            # don't have a relevance array for this seed combo, so create it
             relarr = self._combine_relevance(single_seed2rel['fwd'], fwd_seeds,
                                              single_seed2rel['rev'], rev_seeds)
             if fwd_seeds not in seed_map:

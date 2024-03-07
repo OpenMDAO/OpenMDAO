@@ -2287,7 +2287,7 @@ class TestPyoptSparse(unittest.TestCase):
     def test_constraint_alias(self):
         p = om.Problem()
 
-        p.model.add_subsystem('exec', om.ExecComp(['y = x**2 - a',
+        p.model.add_subsystem('exec', om.ExecComp(['y = x**2',
                                                    'z = a + x**2'],
                                                   a={'shape': (1,)},
                                                   y={'shape': (101,)},

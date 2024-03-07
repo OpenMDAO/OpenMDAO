@@ -2017,9 +2017,6 @@ class System(object):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
-        mode : str
-            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
-            reverse (adjoint). Deprecated.
         prob_meta : dict
             Problem level options.
         """
