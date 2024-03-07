@@ -1457,8 +1457,7 @@ class System(object):
                          perturb_size=_DEFAULT_COLORING_META['perturb_size'],
                          min_improve_pct=_DEFAULT_COLORING_META['min_improve_pct'],
                          show_summary=_DEFAULT_COLORING_META['show_summary'],
-                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity'],
-                         show_sparsity_txt=False):
+                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity']):
         """
         Set options for deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -1494,8 +1493,6 @@ class System(object):
             If True, display summary information after generating coloring.
         show_sparsity : bool
             If True, plot sparsity with coloring info after generating coloring.
-        show_sparsity_txt : bool
-            If True, display sparsity as text after generating coloring.
         """
         if method not in ('fd', 'cs', 'jax'):
             raise RuntimeError(
@@ -1532,7 +1529,6 @@ class System(object):
         options.min_improve_pct = min_improve_pct
         options.show_summary = show_summary
         options.show_sparsity = show_sparsity
-        options.show_sparsity_txt = show_sparsity_txt
         if form is not None:
             options.form = form
         if step is not None:
@@ -1570,7 +1566,7 @@ class System(object):
         coloring._meta.update(info)  # save metadata we used to create the coloring
         coloring._meta.update(sp_info)
 
-        if info.show_sparsity or info.show_sparsity_txt or info.show_summary:
+        if info.show_sparsity or info.show_summary:
             print("\nColoring for '%s' (class %s)" % (self.pathname, type(self).__name__))
 
         info.display()

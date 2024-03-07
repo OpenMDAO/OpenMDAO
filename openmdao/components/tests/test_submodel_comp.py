@@ -494,7 +494,7 @@ class TestSubmodelColoring(unittest.TestCase):
                                                     inputs=['C1.x', 'C2.x'], outputs=['C3.y', 'C4.y', 'C5.y']))
 
         p.driver = om.ScipyOptimizeDriver(optimizer='SLSQP')
-        p.driver.declare_coloring(show_summary=True, show_sparsity_txt=True)
+        p.driver.declare_coloring(show_summary=True)
 
         p.model.add_design_var('sub.C1:x')
         p.model.add_design_var('sub.C2:x')
@@ -537,7 +537,7 @@ class TestSubmodelColoringMultiSubmodelComps(unittest.TestCase):
                                                   inputs=['C1.x', 'C2.x'], outputs=['C3.y', 'C4.y', 'C5.y']))
 
         p.driver = om.ScipyOptimizeDriver(optimizer='SLSQP')
-        p.driver.declare_coloring(show_summary=True, show_sparsity_txt=True)
+        p.driver.declare_coloring(show_summary=True)
 
         p.model.add_design_var('sub1.C1:x')
         p.model.add_design_var('sub1.C2:x')

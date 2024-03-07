@@ -98,6 +98,8 @@ _DEF_COMP_SPARSITY_ARGS = {
     'min_improve_pct': 5.,   # don't use coloring unless at least 5% decrease in number of solves
     'show_summary': True,    # if True, print a short summary of the coloring
     'show_sparsity': False,  # if True, show a plot of the sparsity
+    'use_scaling': False,    # if True, use driver scaling when computing sparsity
+                             # (total coloring only)
 }
 
 _COLORING_VERSION = '1.0'
@@ -129,8 +131,6 @@ class ColoringMeta(object):
         If True, print a short summary of the coloring. Defaults to True.
     show_sparsity : bool
         If True, show a plot of the sparsity. Defaults to False.
-    show_sparsity_txt : bool
-        If True, show a text summary of the sparsity. Defaults to False.
     dynamic : bool
         True if dynamic coloring is being used.
     static : Coloring, str, or None
@@ -138,6 +138,8 @@ class ColoringMeta(object):
         If None, do not attempt to use a static coloring.
     perturb_size : float
         Size of input/output perturbation during generation of sparsity.
+    use_scaling : bool
+        If True, use driver scaling when computing sparsity.
     msginfo : str
         Prefix for warning/error messages.
 
@@ -156,8 +158,6 @@ class ColoringMeta(object):
         If True, print a short summary of the coloring. Defaults to True.
     show_sparsity : bool
         If True, show a plot of the sparsity. Defaults to False.
-    show_sparsity_txt : bool
-        If True, show a text summary of the sparsity. Defaults to False.
     dynamic : bool
         True if dynamic coloring is being used.
     static : Coloring, str, or None
@@ -165,6 +165,8 @@ class ColoringMeta(object):
         If None, do not attempt to use a static coloring.
     perturb_size : float
         Size of input/output perturbation during generation of sparsity.
+    use_scaling : bool
+        If True, use driver scaling when computing sparsity.
     msginfo : str
         Prefix for warning/error messages.
     _coloring : Coloring or None
@@ -176,11 +178,11 @@ class ColoringMeta(object):
     """
 
     _meta_names = {'num_full_jacs', 'tol', 'orders', 'min_improve_pct', 'show_summary',
-                   'show_sparsity', 'dynamic', 'perturb_size'}
+                   'show_sparsity', 'dynamic', 'perturb_size', 'use_scaling', 'msginfo'}
 
     def __init__(self, num_full_jacs=3, tol=1e-25, orders=None, min_improve_pct=5.,
-                 show_summary=True, show_sparsity=False, show_sparsity_txt=False,
-                 dynamic=False, static=None, perturb_size=1e-9, msginfo=''):
+                 show_summary=True, show_sparsity=False, dynamic=False, static=None,
+                 perturb_size=1e-9, use_scaling=False, msginfo=''):
         """
         Initialize data structures.
         """
@@ -190,11 +192,11 @@ class ColoringMeta(object):
         self.min_improve_pct = min_improve_pct
         self.show_summary = show_summary
         self.show_sparsity = show_sparsity
-        self.show_sparsity_txt = show_sparsity_txt
         self.dynamic = dynamic
         self.static = static
-        self.msginfo = msginfo
         self.perturb_size = perturb_size
+        self.use_scaling = use_scaling
+        self.msginfo = msginfo
         self._coloring = None
         self._failed = False
         self._approx = False
@@ -228,11 +230,9 @@ class ColoringMeta(object):
         Display information about the coloring.
         """
         if self.coloring is None:
-            if self.show_summary or self.show_sparsity or self.show_sparsity_txt:
+            if self.show_summary or self.show_sparsity:
                 print("No coloring was computed successfully.")
         else:
-            if self.show_sparsity_txt:
-                self.coloring.display_txt(html=False, summary=False)
             if self.show_summary:
                 self.coloring.summary()
             if self.show_sparsity:
@@ -431,8 +431,6 @@ class Partial_ColoringMeta(ColoringMeta):
         If True, print a short summary of the coloring. Defaults to True.
     show_sparsity : bool
         If True, show a plot of the sparsity. Defaults to False.
-    show_sparsity_txt : bool
-        If True, show a text summary of the sparsity. Defaults to False.
     dynamic : bool
         True if dynamic coloring is being used.
     static : Coloring, str, or None
@@ -465,15 +463,14 @@ class Partial_ColoringMeta(ColoringMeta):
 
     def __init__(self, wrt_patterns=('*',), method='fd', form=None, step=None, per_instance=True,
                  perturb_size=1e-9, num_full_jacs=3, tol=1e-25, orders=None, min_improve_pct=5.,
-                 show_summary=True, show_sparsity=False, show_sparsity_txt=False, dynamic=False,
-                 static=None, msginfo=''):
+                 show_summary=True, show_sparsity=False, dynamic=False, static=None, msginfo=''):
         """
         Initialize data structures.
         """
         super().__init__(num_full_jacs=num_full_jacs, tol=tol, orders=orders,
                          min_improve_pct=min_improve_pct, show_summary=show_summary,
-                         show_sparsity=show_sparsity, show_sparsity_txt=show_sparsity_txt,
-                         dynamic=dynamic, static=static, perturb_size=perturb_size, msginfo=msginfo)
+                         show_sparsity=show_sparsity, dynamic=dynamic, static=static,
+                         perturb_size=perturb_size, msginfo=msginfo)
         if wrt_patterns is None:
             wrt_patterns = ()
         elif isinstance(wrt_patterns, str):
@@ -2534,9 +2531,8 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
             raise RuntimeError("When computing total jacobian sparsity, either 'of' and 'wrt' "
                                "must be provided or design_vars/constraints/objective must be "
                                "added to the driver.")
-        use_driver = True
-    else:
-        use_driver = False
+
+    use_driver = driver and driver._coloring_info.use_scaling
 
     with _compute_total_coloring_context(prob):
         start_time = time.perf_counter()
@@ -2722,6 +2718,8 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
         if model._coloring_info.coloring is None:
             kwargs = {n: v for n, v in model._coloring_info
                       if n in _DEF_COMP_SPARSITY_ARGS and v is not None}
+            if 'use_scaling' in kwargs:
+                del kwargs['use_scaling']
             kwargs['method'] = list(model._approx_schemes)[0]
             model.declare_coloring(**kwargs)
         if run_model:
@@ -2815,7 +2813,8 @@ def dynamic_total_coloring(driver, run_model=True, fname=None, of=None, wrt=None
     orders = driver._coloring_info.get('orders', _DEF_COMP_SPARSITY_ARGS['orders'])
 
     coloring = compute_total_coloring(problem, of=of, wrt=wrt, num_full_jacs=num_full_jacs, tol=tol,
-                                      orders=orders, setup=False, run_model=run_model, fname=fname)
+                                      orders=orders, setup=False, run_model=run_model, fname=fname,
+                                      driver=driver)
 
     driver._coloring_info.coloring = coloring
 
@@ -2906,7 +2905,8 @@ def _total_coloring_cmd(options, user_args):
                                                   num_full_jacs=coloring_info.num_full_jacs,
                                                   tol=coloring_info.tol,
                                                   orders=coloring_info.orders,
-                                                  setup=False, run_model=True, fname=outfile)
+                                                  setup=False, run_model=True, fname=outfile,
+                                                  driver=prob.driver)
 
             if coloring is not None:
                 coloring_info.display()

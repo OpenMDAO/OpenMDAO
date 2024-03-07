@@ -397,7 +397,6 @@ class SubmodelComp(ExplicitComponent):
             return
 
         self._sub_coloring_info = coloring_info = ColoringMeta()
-        coloring_info.show_sparsity_txt = True
 
         if self.options['do_coloring']:
             coloring_info.set_coloring(compute_total_coloring(p, of=ofs, wrt=wrts, run_model=True,
