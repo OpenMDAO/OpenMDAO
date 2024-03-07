@@ -491,8 +491,10 @@ class Relevance(object):
             seed_sys_map[fwd_seeds][rsrc] = self._get_cached_array(rsysarr & all_fseed_sarray)
 
         # now add 'full' releveance for all seeds
-        seed_var_map[fwd_seeds][rev_seeds] = self._get_cached_array(all_fseed_varray & all_rseed_varray)
-        seed_sys_map[fwd_seeds][rev_seeds] = self._get_cached_array(all_fseed_sarray & all_rseed_sarray)
+        seed_var_map[fwd_seeds][rev_seeds] = self._get_cached_array(all_fseed_varray &
+                                                                    all_rseed_varray)
+        seed_sys_map[fwd_seeds][rev_seeds] = self._get_cached_array(all_fseed_sarray &
+                                                                    all_rseed_sarray)
 
         self._set_seeds(fwd_seeds, rev_seeds)
 
