@@ -13,10 +13,6 @@ from openmdao.utils.array_utils import array_hash
 from openmdao.utils.om_warnings import issue_warning
 
 
-# Cache of relevance arrays stored by array hash.
-_rel_array_cache = {}
-
-
 def get_relevance(model, of, wrt):
     """
     Return a Relevance object for the given design vars, and responses.
@@ -42,32 +38,14 @@ def get_relevance(model, of, wrt):
         of = {}
         wrt = {}
 
-    return Relevance(model, wrt, of)
+    key = (id(model), tuple(sorted(wrt)), tuple(sorted(of)))
+    cache = model._problem_meta['relevance_cache']
+    if key in cache:
+        return cache[key]
 
-
-def _get_cached_array(arr):
-    """
-    Return the cached array if it exists, otherwise return the input array after caching it.
-
-    Parameters
-    ----------
-    arr : ndarray
-        Array to be cached.
-
-    Returns
-    -------
-    ndarray
-        Cached array if it exists, otherwise the input array.
-    """
-    global _rel_array_cache
-
-    hash = array_hash(arr)
-    if hash in _rel_array_cache:
-        return _rel_array_cache[hash]
-    else:
-        _rel_array_cache[hash] = arr
-
-    return arr
+    relevance = Relevance(model, wrt, of, model._problem_meta['rel_array_cache'])
+    cache[key] = relevance
+    return relevance
 
 
 def _to_seed(names):
@@ -112,6 +90,8 @@ class Relevance(object):
         Dictionary of design variable metadata.  Keys don't matter.
     rev_meta : dict
         Dictionary of response variable metadata.  Keys don't matter.
+    rel_array_cache : dict
+        Cache of relevance arrays stored by array hash.
 
     Attributes
     ----------
@@ -152,15 +132,18 @@ class Relevance(object):
         Cache of relevance arrays stored by array hash.
     _no_dv_responses : list
         List of responses that have no relevant design variables.
+    _rel_array_cache : dict
+        Cache of relevance arrays stored by array hash.
     """
 
-    def __init__(self, model, fwd_meta, rev_meta):
+    def __init__(self, model, fwd_meta, rev_meta, rel_array_cache):
         """
         Initialize all attributes.
         """
         assert model.pathname == '', "Relevance can only be initialized on the top level Group."
 
         self._active = None  # allow relevance to be turned on later
+        self._rel_array_cache = rel_array_cache
         self._graph = model._dataflow_graph
         self._rel_array_cache = {}
         self._no_dv_responses = []
@@ -200,6 +183,28 @@ class Relevance(object):
             String representation of the Relevance.
         """
         return f"Relevance({self._seed_vars}, active={self._active})"
+
+    def _get_cached_array(self, arr):
+        """
+        Return the cached array if it exists, otherwise return the input array after caching it.
+
+        Parameters
+        ----------
+        arr : ndarray
+            Array to be cached.
+
+        Returns
+        -------
+        ndarray
+            Cached array if it exists, otherwise the input array.
+        """
+        hash = array_hash(arr)
+        if hash in self._rel_array_cache:
+            return self._rel_array_cache[hash]
+        else:
+            self._rel_array_cache[hash] = arr
+
+        return arr
 
     def _setup_nonlinear_sets(self, model):
         """
@@ -302,7 +307,7 @@ class Relevance(object):
         rel_array = np.zeros(len(names2inds), dtype=bool)
         rel_array[[names2inds[n] for n in names]] = True
 
-        return _get_cached_array(rel_array)
+        return self._get_cached_array(rel_array)
 
     def _combine_relevance(self, fmap, fwd_seeds, rmap, rev_seeds):
         """
@@ -335,7 +340,7 @@ class Relevance(object):
         # intersect the two results
         farray &= rarray
 
-        return _get_cached_array(farray)
+        return self._get_cached_array(farray)
 
     def _union_arrays(self, seed_map, seeds):
         """
@@ -450,8 +455,8 @@ class Relevance(object):
         for io in ('fwd', 'rev'):
             for seed, local, var_array, sys_array in self._single_seed_array_iter(group, meta[io],
                                                                                   io, all_systems):
-                self._single_seed2relvars[io][seed] = _get_cached_array(var_array)
-                self._single_seed2relsys[io][seed] = _get_cached_array(sys_array)
+                self._single_seed2relvars[io][seed] = self._get_cached_array(var_array)
+                self._single_seed2relsys[io][seed] = self._get_cached_array(sys_array)
                 if local:
                     has_par_derivs[seed] = io
 
@@ -463,8 +468,8 @@ class Relevance(object):
             seed_sys_map[fseed] = seed_sys_map[_to_seed((fseed,))] = ssub = {}
             for rsrc, rvarr in self._single_seed2relvars['rev'].items():
                 rsysarr = self._single_seed2relsys['rev'][rsrc]
-                vsub[rsrc] = vsub[_to_seed((rsrc,))] = _get_cached_array(fvarr & rvarr)
-                ssub[rsrc] = ssub[_to_seed((rsrc,))] = _get_cached_array(fsarr & rsysarr)
+                vsub[rsrc] = vsub[_to_seed((rsrc,))] = self._get_cached_array(fvarr & rvarr)
+                ssub[rsrc] = ssub[_to_seed((rsrc,))] = self._get_cached_array(fsarr & rsysarr)
 
         all_fseed_varray = self._union_arrays(self._single_seed2relvars['fwd'], fwd_seeds)
         all_fseed_sarray = self._union_arrays(self._single_seed2relsys['fwd'], fwd_seeds)
@@ -475,19 +480,19 @@ class Relevance(object):
         # now add entries for each (fseed, all_rseeds) and each (all_fseeds, rseed)
         for fsrc, farr in self._single_seed2relvars['fwd'].items():
             fsysarr = self._single_seed2relsys['fwd'][fsrc]
-            seed_var_map[fsrc][rev_seeds] = _get_cached_array(farr & all_rseed_varray)
-            seed_sys_map[fsrc][rev_seeds] = _get_cached_array(fsysarr & all_rseed_sarray)
+            seed_var_map[fsrc][rev_seeds] = self._get_cached_array(farr & all_rseed_varray)
+            seed_sys_map[fsrc][rev_seeds] = self._get_cached_array(fsysarr & all_rseed_sarray)
 
         seed_var_map[fwd_seeds] = {}
         seed_sys_map[fwd_seeds] = {}
         for rsrc, rarr in self._single_seed2relvars['rev'].items():
             rsysarr = self._single_seed2relsys['rev'][rsrc]
-            seed_var_map[fwd_seeds][rsrc] = _get_cached_array(rarr & all_fseed_varray)
-            seed_sys_map[fwd_seeds][rsrc] = _get_cached_array(rsysarr & all_fseed_sarray)
+            seed_var_map[fwd_seeds][rsrc] = self._get_cached_array(rarr & all_fseed_varray)
+            seed_sys_map[fwd_seeds][rsrc] = self._get_cached_array(rsysarr & all_fseed_sarray)
 
         # now add 'full' releveance for all seeds
-        seed_var_map[fwd_seeds][rev_seeds] = _get_cached_array(all_fseed_varray & all_rseed_varray)
-        seed_sys_map[fwd_seeds][rev_seeds] = _get_cached_array(all_fseed_sarray & all_rseed_sarray)
+        seed_var_map[fwd_seeds][rev_seeds] = self._get_cached_array(all_fseed_varray & all_rseed_varray)
+        seed_sys_map[fwd_seeds][rev_seeds] = self._get_cached_array(all_fseed_sarray & all_rseed_sarray)
 
         self._set_seeds(fwd_seeds, rev_seeds)
 
