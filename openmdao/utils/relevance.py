@@ -13,9 +13,6 @@ from openmdao.utils.array_utils import array_hash
 from openmdao.utils.om_warnings import issue_warning
 
 
-# Cache of Relevance objects stored by model id and seed keys.
-_relevance_cache = {}
-
 # Cache of relevance arrays stored by array hash.
 _rel_array_cache = {}
 
@@ -38,8 +35,6 @@ def get_relevance(model, of, wrt):
     Relevance
         Relevance object.
     """
-    global _relevance_cache
-
     if not model._use_derivatives or (not of and not wrt):
         # in this case, a permanently inactive relevance object is returned
         # (so the contents of 'of' and 'wrt' don't matter). Make them empty to avoid
@@ -47,13 +42,7 @@ def get_relevance(model, of, wrt):
         of = {}
         wrt = {}
 
-    key = (id(model), tuple(sorted(wrt)), tuple(sorted(of)))
-    if key in _relevance_cache:
-        return _relevance_cache[key]
-
-    relevance = Relevance(model, wrt, of)
-    _relevance_cache[key] = relevance
-    return relevance
+    return Relevance(model, wrt, of)
 
 
 def _get_cached_array(arr):
@@ -669,6 +658,7 @@ class Relevance(object):
             yield
         else:
             save_active = self._active
+            save_relarray = self._current_rel_sarray
             self._active = True
             self._current_rel_sarray = self._nonlinear_sets[name]
 
@@ -676,6 +666,7 @@ class Relevance(object):
                 yield
             finally:
                 self._active = save_active
+                self._current_rel_sarray = save_relarray
 
     def _set_seeds(self, fwd_seeds, rev_seeds):
         """
