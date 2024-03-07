@@ -191,6 +191,49 @@ class ParDerivTestCase(unittest.TestCase):
         # the seeds for the constraints are now back to -1 instead of -.5
         assert_near_equal(norm_val, 6.557438524302, 1e-6)
 
+    def test_ln_nl_complex_alloc_bug(self):
+        # This verifies a fix for an MPI hang when allocating the vectors. If one proc
+        # needs a complex vector, then they all do.
+
+        class ImpComp(om.ImplicitComponent):
+
+            def setup(self):
+                self.add_input('x', 3.0)
+                self.add_output('y', 4.0)
+
+                self. declare_partials('y', 'x', method='cs')
+                self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+                self.linear_solver = om.DirectSolver()
+
+            def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs=None,
+                                discrete_outputs=None):
+                pass
+
+        class Sub1(om.Group):
+
+            def setup(self):
+                self.add_subsystem('imp', ImpComp())
+
+        class Sub2(om.Group):
+
+            def setup(self):
+                self.add_subsystem('exp', om.ExecComp('y = x'))
+
+        class Par(om.ParallelGroup):
+
+            def setup(self):
+                self.add_subsystem('sub1', Sub1())
+                self.add_subsystem('sub2', Sub2())
+
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('par', Par())
+
+        prob.setup()
+
+        # Hangs on this step before bug fix.
+        prob.final_setup()
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class DecoupledTestCase(unittest.TestCase):
