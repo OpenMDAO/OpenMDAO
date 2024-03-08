@@ -770,7 +770,7 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(model._post_components, {'G3.C5'})
 
 
-# @use_tempdirs
+@use_tempdirs
 @unittest.skipUnless(pyoptsparse, "pyoptsparse is required.")
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class PrePostMPITestCase(unittest.TestCase):
@@ -778,8 +778,7 @@ class PrePostMPITestCase(unittest.TestCase):
 
     def test_newton_on_one_rank(self):
         prob = setup_problem(do_pre_post_opt=True, mode='fwd', parallel=True, group=True)
-        #from openmdao.devtools.debug import trace_dump
-        #trace_dump()
+
         prob.run_driver()
 
 
