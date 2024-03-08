@@ -460,10 +460,13 @@ def trace_dump(fname='trace_dump', skip=(), flush=True):
         s = str(arg)
         if 'mpi4py' in s or 'petsc4py' in s:
             c = arg.__self__.__class__
-            print('   ' * len(stack), typestr, "%s.%s.%s" %
-                    (c.__module__, c.__name__, arg.__name__),
-                    "%s:%d" % (frame.f_code.co_filename, frame.f_code.co_firstlineno),
-                    file=outfile, flush=True)
+            if stack:
+                pname = f"(scope: {stack[-1][0]})"
+            else:
+                pname = ''
+            print('   ' * len(stack), typestr, f"{c.__module__}.{c.__name__}.{arg.__name__}",
+                  f"{frame.f_code.co_filename}:{frame.f_code.co_firstlineno} {pname}",
+                  file=outfile, flush=True)
 
 
     def _mpi_trace_callback(frame, event, arg):
@@ -485,7 +488,7 @@ def trace_dump(fname='trace_dump', skip=(), flush=True):
                 if pname is not None:
                     if not stack or pname != stack[-1][0]:
                         stack.append([pname, 1])
-                        print('   ' * len(stack), commsize, pname, file=outfile, flush=flush)
+                        print('   ' * len(stack), commsize, f"(scope: {pname})", file=outfile, flush=flush)
                     else:
                         stack[-1][1] += 1
                 print('   ' * len(stack), '-->', frame.f_code.co_name, "%s:%d" %

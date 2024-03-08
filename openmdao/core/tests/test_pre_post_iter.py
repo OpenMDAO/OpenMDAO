@@ -7,6 +7,7 @@ from openmdao.test_suite.components.exec_comp_for_test import ExecComp4Test
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
+from openmdao.drivers.pyoptsparse_driver import pyoptsparse
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -56,6 +57,7 @@ def setup_problem(do_pre_post_opt, mode, use_ivc=False, coloring=False, size=3, 
     if parallel:
         par = model.add_subsystem('par', om.ParallelGroup(), promotes=['*'])
         par.nonlinear_solver = om.NonlinearBlockJac()
+        par.linear_solver = om.LinearBlockJac()
         parent = par
     else:
         parent = model
@@ -742,11 +744,11 @@ class TestPrePostIter(unittest.TestCase):
         G2 = model.add_subsystem('G2', om.Group(), promotes=['*'])
         G3 = model.add_subsystem('G3', om.Group(), promotes=['*'])
 
-        C1 = G1.add_subsystem('C1', MissingPartialsComp())
-        C2 = G1.add_subsystem('C2', MissingPartialsComp())
-        C3 = G1.add_subsystem('C3', MissingPartialsComp())
-        C4 = G2.add_subsystem('C4', MissingPartialsComp())
-        C5 = G3.add_subsystem('C5', MissingPartialsComp())
+        G1.add_subsystem('C1', MissingPartialsComp())
+        G1.add_subsystem('C2', MissingPartialsComp())
+        G1.add_subsystem('C3', MissingPartialsComp())
+        G2.add_subsystem('C4', MissingPartialsComp())
+        G3.add_subsystem('C5', MissingPartialsComp())
 
         model.connect('C1.y', 'C2.a')
         model.connect('C1.z', 'C4.a')
@@ -766,20 +768,18 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(model._pre_components, {'_auto_ivc', 'G1.C1', 'G1.C2'})
         self.assertEqual(model._iterated_components, {'G1.C3', 'G2.C4', '_auto_ivc'})
         self.assertEqual(model._post_components, {'G3.C5'})
-        #self.assertEqual(C1, [True, False, False])
-        #self.assertEqual(C2, [True, False, False])
-        #self.assertEqual(C3, [False, True, False])
-        #self.assertEqual(C4, [False, True, False])
-        #self.assertEqual(C5, [False, False, True])
 
 
+# @use_tempdirs
+@unittest.skipUnless(pyoptsparse, "pyoptsparse is required.")
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class PrePostMPITestCase(unittest.TestCase):
     N_PROCS = 2
 
     def test_newton_on_one_rank(self):
         prob = setup_problem(do_pre_post_opt=True, mode='fwd', parallel=True, group=True)
-
+        #from openmdao.devtools.debug import trace_dump
+        #trace_dump()
         prob.run_driver()
 
 

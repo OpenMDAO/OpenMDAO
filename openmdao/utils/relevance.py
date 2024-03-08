@@ -1042,12 +1042,12 @@ class Relevance(object):
         if model._pre_components is not None:
             return
 
+        if not designvars or not responses or not model._problem_meta['group_by_pre_opt_post']:
+            return
+
         model._pre_components = set()
         model._post_components = set()
         model._iterated_components = _contains_all
-
-        if not designvars or not responses or not model._problem_meta['group_by_pre_opt_post']:
-            return
 
         # keep track of Groups with nonlinear solvers that use gradients (like Newton) and certain
         # linear solvers like DirectSolver. These groups and all systems they contain must be
@@ -1194,6 +1194,14 @@ class Relevance(object):
         model._pre_components = pre - groups_added
         model._post_components = post - groups_added
         model._iterated_components = iterated - groups_added
+
+        # it's possible that some components could be in pre on some ranks and post in others
+        # if they are not connected in any way to any components in the iterated set, so we
+        # need to pick a rank and bcast the final pre and post sets to all ranks to ensure
+        # consistency.
+        if model.comm.size > 1:
+            model._pre_components = model.comm.bcast(model._pre_components, root=0)
+            model._post_components = model.comm.bcast(model._post_components, root=0)
 
     def list_relevance(self, relevant=True, type='system'):
         """
