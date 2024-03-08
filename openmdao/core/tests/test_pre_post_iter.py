@@ -39,8 +39,11 @@ def setup_problem(do_pre_post_opt, mode, use_ivc=False, coloring=False, size=3, 
     prob = om.Problem()
     prob.options['group_by_pre_opt_post'] = do_pre_post_opt
 
-    prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False)
-    prob.set_solver_print(level=0)
+    if parallel:
+        prob.driver = om.pyOptSparseDriver(optimizer='SLSQP')
+    else:
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False)
+        prob.set_solver_print(level=0)
 
     model = prob.model
 
