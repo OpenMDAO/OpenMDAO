@@ -1,6 +1,6 @@
 """Define the ImplicitComponent class."""
 
-from collections import defaultdict
+from scipy.sparse import coo_matrix
 import numpy as np
 
 from openmdao.core.component import Component, _allowed_types
@@ -509,6 +509,7 @@ class ImplicitComponent(Component):
 
             plen = len(self.pathname) + 1
             rmap = self._resid2out_subjac_map
+            omap = {}
             for _, resids in resbundle:
                 if not resids:
                     continue
@@ -520,10 +521,49 @@ class ImplicitComponent(Component):
                         rmap[resid] = []
 
                     oslc, rslc = _get_overlap_slices(ostart, oend, rstart, rend)
-                    rmap[resid].append((oname[plen:], wrt, pattern_meta, oslc, rslc))
+                    outname = oname[plen:]
+                    rmap[resid].append((outname, wrt, pattern_meta, oslc, rslc))
+                    if outname not in omap:
+                        omap[oname] = []
+                    omap[oname].append((oslc, pattern_meta, rslc))
 
-            for resid, lst in self._resid2out_subjac_map.items():
-                for oname, wrt, patmeta, _, _ in lst:
+            for oname, lst in omap.items():
+                newmeta = {}
+                ometa = self._var_abs2meta['output'][oname]
+                has_rows = False
+                for oslc, rmeta, rslc in lst:
+                    if 'rows' in rmeta and rmeta['rows'] is not None:
+                        has_rows = True
+                    newmeta.update(rmeta)
+
+                if has_rows:
+                    # if any of the resid subjacs had rows, we need the output subjac to be sparse
+                    rows = []
+                    cols = []
+                    data = []
+                    for oslc, rmeta, rslc in lst:
+                        if 'rows' in rmeta and rmeta['rows'] is not None:
+                            r, c, d = _get_sparse_slice(rmeta, oslc, rslc)
+                            rows.append(r)
+                            cols.append(c)
+                            data.append(d)
+                        else:
+                            raise RuntimeError("No support currently for sparse and dense resid "
+                                               "subjacs that overlap the same output.")
+                    rows = np.concatenate(rows)
+                    cols = np.concatenate(cols)
+                    data = np.concatenate(data)
+
+                    newmeta['rows'] = rows
+                    newmeta['cols'] = cols
+                    newmeta['value'] = data
+
+                else:
+                    if 'val' in newmeta:
+                        del newmeta['val']
+
+            for resid, lst in rmap.items():
+                for oname, wrt, patmeta, oslc, rslc in lst:
                     super()._resolve_partials_patterns(oname, wrt, patmeta)
         else:
             super()._resolve_partials_patterns(of, wrt, pattern_meta)
@@ -892,7 +932,7 @@ class _JacobianWrapper(object):
         res, wrt = key
 
         if len(self._dct) == 1:
-            of, slc, _ = self._dct[res]
+            of, _, _, slc, _ = self._dct[res]
             return self._jac[(of, wrt)][slc]
 
         return np.vstack([self._jac[(of, wrt)][slc] for of, _, _, slc, _ in self._dct[res]])
@@ -905,6 +945,7 @@ class _JacobianWrapper(object):
                 v = val[resslc]
             else:
                 v = val
+
             if outslc is _full_slice:
                 self._jac[of, wrt] = v
             else:
@@ -918,3 +959,17 @@ class _JacobianWrapper(object):
 
     def __setattr__(self, name, val):
         setattr(self._jac, name, val)
+
+
+def _get_sparse_slice(meta, oslc, rslc):
+    r = np.asarray(meta['rows'], dtype=int)
+    c = np.asarray(meta['cols'], dtype=int)
+    d = np.asarray(meta['value'], dtype=float)
+    mask = np.logical_and(r >= rslc.start, r < rslc.stop)
+    return r[mask] - rslc.start + oslc.start, c[mask], d[mask]
+
+
+def _get_dense_slice_from_sparse(meta, oslc, rslc):
+    r, c, d = _get_sparse_slice(meta, oslc, rslc)
+    coo = coo_matrix((d, (r, c)), shape=(rslc.stop - rslc.start, meta['shape'][1]))
+    return coo.toarray()
