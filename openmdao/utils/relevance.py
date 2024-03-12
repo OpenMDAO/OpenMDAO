@@ -274,12 +274,10 @@ class Relevance(object):
             Boolean relevance array for the systems.
         """
         nprocs = group.comm.size
-        has_par_derivs = False
 
         for meta in seed_meta.values():
             src = meta['source']
             local = nprocs > 1 and meta['parallel_deriv_color'] is not None
-            has_par_derivs |= local
             depnodes = self._dependent_nodes(src, direction, local=local)
 
             rel_systems = _vars2systems(depnodes)
@@ -330,46 +328,19 @@ class Relevance(object):
         -------
         ndarray
             Array representing the combined relevance arrays for the given seeds.
-            The arrays are combined by taking the union of the fwd seeds and the union of the
-            rev seeds and intersecting the two results.
+            The arrays are combined by taking the intersection of the relevance arrays for
+            each fwd_seed/rev_seed pair and taking the union of each of those results.
         """
-        # get the union of the fwd relevance and the union of the rev relevance
-        farray = self._union_arrays(fmap, fwd_seeds)
-        rarray = self._union_arrays(rmap, rev_seeds)
+        combined = None
+        for fseed in fwd_seeds:
+            farr = fmap[fseed]
+            for rseed in rev_seeds:
+                if combined is None:
+                    combined = farr & rmap[rseed]
+                else:
+                    combined |= (farr & rmap[rseed])
 
-        # intersect the two results
-        farray &= rarray
-
-        return self._get_cached_array(farray)
-
-    def _union_arrays(self, seed_map, seeds):
-        """
-        Return the union of the relevance arrays for the given seeds.
-
-        Parameters
-        ----------
-        seed_map : dict
-            Dict of the form {seed: rel_array} where rel_array is the relevance array for the
-            given seed.
-        seeds : iter of str
-            Iterator over forward seed variable names.
-
-        Returns
-        -------
-        ndarray
-            The array representing the union of the relevance arrays for the given seeds.
-        """
-        if not seeds:
-            return np.zeros(0, dtype=bool)
-
-        for i, seed in enumerate(seeds):
-            arr = seed_map[seed]
-            if i == 0:
-                array = arr.copy()
-            else:
-                array |= arr
-
-        return array
+        return np.zeros(0, dtype=bool) if combined is None else self._get_cached_array(combined)
 
     def _rel_names_iter(self, rel_array, all_names, relevant=True):
         """
@@ -460,47 +431,50 @@ class Relevance(object):
                 if local:
                     has_par_derivs[seed] = io
 
-        # in seed_map, add keys for both fsrc and _to_seed((fsrc,)) and similarly for rsrc
+        # in seed_map, add keys for both fseed and (fseed,) and similarly for rseed
         # because both forms of keys may be used depending on the context.
         for fseed, fvarr in self._single_seed2relvars['fwd'].items():
             fsarr = self._single_seed2relsys['fwd'][fseed]
-            seed_var_map[fseed] = seed_var_map[_to_seed((fseed,))] = vsub = {}
-            seed_sys_map[fseed] = seed_sys_map[_to_seed((fseed,))] = ssub = {}
-            for rsrc, rvarr in self._single_seed2relvars['rev'].items():
-                rsysarr = self._single_seed2relsys['rev'][rsrc]
-                vsub[rsrc] = vsub[_to_seed((rsrc,))] = self._get_cached_array(fvarr & rvarr)
-                ssub[rsrc] = ssub[_to_seed((rsrc,))] = self._get_cached_array(fsarr & rsysarr)
-
-        all_fseed_varray = self._union_arrays(self._single_seed2relvars['fwd'], fwd_seeds)
-        all_fseed_sarray = self._union_arrays(self._single_seed2relsys['fwd'], fwd_seeds)
-
-        all_rseed_varray = self._union_arrays(self._single_seed2relvars['rev'], rev_seeds)
-        all_rseed_sarray = self._union_arrays(self._single_seed2relsys['rev'], rev_seeds)
+            seed_var_map[fseed] = seed_var_map[(fseed,)] = vsub = {}
+            seed_sys_map[fseed] = seed_sys_map[(fseed,)] = ssub = {}
+            for rseed, rvarr in self._single_seed2relvars['rev'].items():
+                rsysarr = self._single_seed2relsys['rev'][rseed]
+                vsub[rseed] = vsub[(rseed,)] = self._get_cached_array(fvarr & rvarr)
+                ssub[rseed] = ssub[(rseed,)] = self._get_cached_array(fsarr & rsysarr)
 
         # now add entries for each (fseed, all_rseeds) and each (all_fseeds, rseed)
         for fsrc, farr in self._single_seed2relvars['fwd'].items():
-            fsysarr = self._single_seed2relsys['fwd'][fsrc]
-            seed_var_map[fsrc][rev_seeds] = self._get_cached_array(farr & all_rseed_varray)
-            seed_sys_map[fsrc][rev_seeds] = self._get_cached_array(fsysarr & all_rseed_sarray)
+            seed_var_map[fsrc][rev_seeds] = \
+                self._combine_relevance(self._single_seed2relvars['fwd'], [fsrc],
+                                        self._single_seed2relvars['rev'], rev_seeds)
+            seed_sys_map[fsrc][rev_seeds] = \
+                self._combine_relevance(self._single_seed2relsys['fwd'], [fsrc],
+                                        self._single_seed2relsys['rev'], rev_seeds)
 
         seed_var_map[fwd_seeds] = {}
         seed_sys_map[fwd_seeds] = {}
         for rsrc, rarr in self._single_seed2relvars['rev'].items():
-            rsysarr = self._single_seed2relsys['rev'][rsrc]
-            seed_var_map[fwd_seeds][rsrc] = self._get_cached_array(rarr & all_fseed_varray)
-            seed_sys_map[fwd_seeds][rsrc] = self._get_cached_array(rsysarr & all_fseed_sarray)
+            seed_var_map[fwd_seeds][rsrc] = \
+                self._combine_relevance(self._single_seed2relvars['fwd'], fwd_seeds,
+                                        self._single_seed2relvars['rev'], [rsrc])
+            seed_sys_map[fwd_seeds][rsrc] = \
+                self._combine_relevance(self._single_seed2relsys['fwd'], fwd_seeds,
+                                        self._single_seed2relsys['rev'], [rsrc])
 
         # now add 'full' releveance for all seeds
-        seed_var_map[fwd_seeds][rev_seeds] = self._get_cached_array(all_fseed_varray &
-                                                                    all_rseed_varray)
-        seed_sys_map[fwd_seeds][rev_seeds] = self._get_cached_array(all_fseed_sarray &
-                                                                    all_rseed_sarray)
+        seed_var_map[fwd_seeds][rev_seeds] = \
+            self._combine_relevance(self._single_seed2relvars['fwd'], fwd_seeds,
+                                    self._single_seed2relvars['rev'], rev_seeds)
+        seed_sys_map[fwd_seeds][rev_seeds] = \
+            self._combine_relevance(self._single_seed2relsys['fwd'], fwd_seeds,
+                                    self._single_seed2relsys['rev'], rev_seeds)
 
         self._set_seeds(fwd_seeds, rev_seeds)
 
         if has_par_derivs:
             self._par_deriv_err_check(group, rev_meta, fwd_meta)
 
+        # compute 'non-local' relevance for all parrallel deriv colored seeds
         farrs = {}
         rarrs = {}
         for fsrc, farr in self._single_seed2relvars['fwd'].items():
@@ -519,11 +493,13 @@ class Relevance(object):
                 rarr = self._names2rel_array(rel_vars, self._var2idx)
             rarrs[rsrc] = rarr
 
-        allfarrs = self._union_arrays(farrs, fwd_seeds)
-        self._no_dv_responses = []
-        for rsrc, rarr in rarrs.items():
-            if not (allfarrs & rarr)[self._var2idx[rsrc]]:
-                self._no_dv_responses.append(rsrc)
+        found = set()
+        for fsrc, farr in farrs.items():
+            for rsrc, rarr in rarrs.items():
+                if (farr & rarr)[self._var2idx[fsrc]]:
+                    found.add(rsrc)
+
+        self._no_dv_responses = [rsrc for rsrc in rarrs if rsrc not in found]
 
     @contextmanager
     def active(self, active):
