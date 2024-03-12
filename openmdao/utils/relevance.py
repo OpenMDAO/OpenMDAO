@@ -278,7 +278,14 @@ class Relevance(object):
         for meta in seed_meta.values():
             src = meta['source']
             local = nprocs > 1 and meta['parallel_deriv_color'] is not None
-            depnodes = self._dependent_nodes(src, direction, local=local)
+            if local:
+                if src in group._var_abs2meta['output']:  # src is local
+                    depnodes = self._dependent_nodes(src, direction, local=local)
+                    group.comm.bcast(depnodes, root=group._owning_rank[src])
+                else:
+                    depnodes = group.comm.bcast(None, root=group._owning_rank[src])
+            else:
+                depnodes = self._dependent_nodes(src, direction, local=local)
 
             rel_systems = _vars2systems(depnodes)
             rel_vars = depnodes - all_systems
@@ -416,8 +423,8 @@ class Relevance(object):
 
         # create mappings of var and system names to indices into the var/system
         # relevance arrays.
-        self._sys2idx = {n: i for i, n in enumerate(all_systems)}
-        self._var2idx = {n: i for i, n in enumerate(all_vars)}
+        self._sys2idx = {n: i for i, n in enumerate(sorted(all_systems))}
+        self._var2idx = {n: i for i, n in enumerate(sorted(all_vars))}
 
         meta = {'fwd': fwd_meta, 'rev': rev_meta}
 
@@ -461,7 +468,7 @@ class Relevance(object):
                 self._combine_relevance(self._single_seed2relsys['fwd'], fwd_seeds,
                                         self._single_seed2relsys['rev'], [rsrc])
 
-        # now add 'full' releveance for all seeds
+        # now add 'full' relevance for all seeds
         seed_var_map[fwd_seeds][rev_seeds] = \
             self._combine_relevance(self._single_seed2relvars['fwd'], fwd_seeds,
                                     self._single_seed2relvars['rev'], rev_seeds)
@@ -474,32 +481,14 @@ class Relevance(object):
         if has_par_derivs:
             self._par_deriv_err_check(group, rev_meta, fwd_meta)
 
-        # compute 'non-local' relevance for all parrallel deriv colored seeds
-        farrs = {}
-        rarrs = {}
-        for fsrc, farr in self._single_seed2relvars['fwd'].items():
-            if fsrc in has_par_derivs:
-                direction = has_par_derivs[fsrc]
-                depnodes = self._dependent_nodes(fsrc, direction, local=False)
-                rel_vars = depnodes - all_systems
-                farr = self._names2rel_array(rel_vars, self._var2idx)
-            farrs[fsrc] = farr
-
-        for rsrc, rarr in self._single_seed2relvars['rev'].items():
-            if rsrc in has_par_derivs:
-                direction = has_par_derivs[rsrc]
-                depnodes = self._dependent_nodes(rsrc, direction, local=False)
-                rel_vars = depnodes - all_systems
-                rarr = self._names2rel_array(rel_vars, self._var2idx)
-            rarrs[rsrc] = rarr
-
         found = set()
-        for fsrc, farr in farrs.items():
-            for rsrc, rarr in rarrs.items():
+        for fsrc, farr in self._single_seed2relvars['fwd'].items():
+            for rsrc, rarr in self._single_seed2relvars['rev'].items():
                 if (farr & rarr)[self._var2idx[fsrc]]:
                     found.add(rsrc)
 
-        self._no_dv_responses = [rsrc for rsrc in rarrs if rsrc not in found]
+        self._no_dv_responses = \
+            [rsrc for rsrc in self._single_seed2relvars['rev'] if rsrc not in found]
 
     @contextmanager
     def active(self, active):
@@ -1246,3 +1235,17 @@ def _is_input(node):
 
 def _is_output(node):
     return node['type_'] == 'output'
+
+
+def _dump_seed_map(seed_map):
+    """
+    Print the contents of the given seed_map for debugging.
+
+    Parameters
+    ----------
+    seed_map : dict
+        Dict of the form {fwdseed: {revseed: rel_arrays}}.
+    """
+    for fseed, relmap in seed_map.items():
+        for rseed, relarr in relmap.items():
+            print(f'({fseed}, {rseed}) {np.asarray(relarr, dtype=np.uint8)}')
