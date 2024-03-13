@@ -1326,7 +1326,10 @@ class TabulatorJSBuilder(TableBuilder):
         'filter',
         'header_align',
         'sorter',
-        'formatter'
+        'formatter',
+        'formatterParams',
+        'labelField',
+        'target',
     })
 
     def __init__(self, rows, html_id='tabul-table', title='', filter=True, sort=True, center=False,
