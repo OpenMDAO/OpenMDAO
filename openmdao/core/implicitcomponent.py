@@ -9,7 +9,7 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.array_utils import shape_to_len
-from openmdao.utils.general_utils import format_as_float_or_array
+from openmdao.utils.general_utils import format_as_float_or_array, find_matches
 from openmdao.utils.units import simplify_unit
 
 
@@ -504,8 +504,9 @@ class ImplicitComponent(Component):
         """
         if self._declared_residuals:
             # if we have renamed resids, remap them to use output naming
-
-            resbundle = self._find_partial_matches(of, wrt, use_resname=True)[0]
+            ofs, _ = self._get_partials_varlists(use_resname=True)
+            of_list = [of] if isinstance(of, str) else of
+            resbundle = [(pattern, find_matches(pattern, ofs)) for pattern in of_list]
 
             plen = len(self.pathname) + 1
             rmap = self._resid2out_subjac_map
@@ -520,21 +521,27 @@ class ImplicitComponent(Component):
                     if resid not in rmap:
                         rmap[resid] = []
 
+                    pattern_meta = pattern_meta.copy()
                     oslc, rslc = _get_overlap_slices(ostart, oend, rstart, rend)
                     outname = oname[plen:]
                     rmap[resid].append((outname, wrt, pattern_meta, oslc, rslc))
                     if outname not in omap:
-                        omap[oname] = []
-                    omap[oname].append((oslc, pattern_meta, rslc))
+                        omap[outname] = []
+                    omap[outname].append([oslc, pattern_meta, rslc])
 
             for oname, lst in omap.items():
                 newmeta = {}
-                ometa = self._var_abs2meta['output'][oname]
                 has_rows = False
                 for oslc, rmeta, rslc in lst:
                     if 'rows' in rmeta and rmeta['rows'] is not None:
                         has_rows = True
                     newmeta.update(rmeta)
+                    
+                # now update the first metadata entry for use later
+                meta = lst[0][1]
+                meta.update(newmeta)
+                if 'val' in meta:
+                    del meta['val']
 
                 if has_rows:
                     # if any of the resid subjacs had rows, we need the output subjac to be sparse
@@ -556,7 +563,7 @@ class ImplicitComponent(Component):
 
                     newmeta['rows'] = rows
                     newmeta['cols'] = cols
-                    newmeta['value'] = data
+                    newmeta['val'] = data
 
                 else:
                     if 'val' in newmeta:
@@ -564,7 +571,7 @@ class ImplicitComponent(Component):
 
             for resid, lst in rmap.items():
                 for oname, wrt, patmeta, oslc, rslc in lst:
-                    super()._resolve_partials_patterns(oname, wrt, patmeta)
+                    super()._resolve_partials_patterns(oname, wrt, omap[oname][0][1])
         else:
             super()._resolve_partials_patterns(of, wrt, pattern_meta)
 
@@ -844,17 +851,17 @@ def _get_overlap_slices(ostart, oend, rstart, rend):
     minend = min(oend, rend)
     start = max(rstart - ostart, 0)
     stop = minend - ostart
-    if start == 0 and stop == (oend - ostart):
-        oslc = _full_slice
-    else:
-        oslc = slice(start, stop)
+    #if start == 0 and stop == (oend - ostart):
+        #oslc = _full_slice
+    #else:
+    oslc = slice(start, stop)
 
     start = max(ostart - rstart, 0)
     stop = minend - rstart
-    if start == 0 and stop == (rend - rstart):
-        return oslc, _full_slice
-    else:
-        return oslc, slice(start, stop)
+    #if start == 0 and stop == (rend - rstart):
+        #return oslc, _full_slice
+    #else:
+    return oslc, slice(start, stop)
 
 
 def _overlap_range_iter(meta_dict1, meta_dict2, names1=None, names2=None):
@@ -964,7 +971,11 @@ class _JacobianWrapper(object):
 def _get_sparse_slice(meta, oslc, rslc):
     r = np.asarray(meta['rows'], dtype=int)
     c = np.asarray(meta['cols'], dtype=int)
-    d = np.asarray(meta['value'], dtype=float)
+    if 'val' in meta:
+        d = np.asarray(meta['val'], dtype=float)
+    else:
+        d = np.zeros(r.size, dtype=float)
+
     mask = np.logical_and(r >= rslc.start, r < rslc.stop)
     return r[mask] - rslc.start + oslc.start, c[mask], d[mask]
 
