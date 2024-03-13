@@ -537,7 +537,7 @@ _command_map = {
     'dist_conns': (_dist_conns_setup_parser, _dist_conns_cmd,
                    'Display connection information for variables across multiple MPI processes.'),
     'find_repos': (_find_repos_setup_parser, _find_repos_exec,
-                     'Find repos on github having openmdao topics.'),
+                   'Find repos on github having openmdao topics.'),
     'iprof': (_iprof_setup_parser, _iprof_exec,
               'Profile calls to particular object instances.'),
     'iprof_totals': (_iprof_totals_setup_parser, _iprof_totals_exec,
