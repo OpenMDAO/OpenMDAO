@@ -11,6 +11,8 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.general_utils import format_as_float_or_array, find_matches
 from openmdao.utils.units import simplify_unit
+from openmdao.utils.rangemapper import RangeMapper
+from openmdao.utils.om_warnings import issue_warning
 
 
 def _get_slice_shape_dict(name_shape_iter):
@@ -376,7 +378,7 @@ class ImplicitComponent(Component):
 
         return metadata
 
-    def add_residual(self, name, shape=(), units=None, desc='', ref=None):
+    def add_residual(self, name, shape=(1,), units=None, desc='', ref=None):
         """
         Add a residual variable to the component.
 
@@ -429,9 +431,7 @@ class ImplicitComponent(Component):
                                     'float, list, tuple, ndarray or Iterable')
 
                 it = np.atleast_1d(ref)
-                if shape is None:
-                    shape = it.shape
-                elif it.shape != shape:
+                if it.shape != shape:
                     raise ValueError(f"{self.msginfo}: When adding residual '{name}', expected "
                                      f"shape {shape} but got shape {it.shape} for argument 'ref'.")
 
@@ -504,74 +504,86 @@ class ImplicitComponent(Component):
         """
         if self._declared_residuals:
             # if we have renamed resids, remap them to use output naming
-            ofs, _ = self._get_partials_varlists(use_resname=True)
-            of_list = [of] if isinstance(of, str) else of
-            resbundle = [(pattern, find_matches(pattern, ofs)) for pattern in of_list]
 
             plen = len(self.pathname) + 1
+            resid_mapper = RangeMapper.create([(n, shape_to_len(meta['shape']))
+                                               for n, meta in self._declared_residuals.items()])
+            out_mapper = RangeMapper.create([(n[plen:], shape_to_len(meta['shape']))
+                                             for n, meta in self._var_abs2meta['output'].items()])
+
             rmap = self._resid2out_subjac_map
             omap = {}
-            for _, resids in resbundle:
-                if not resids:
-                    continue
-                for tup in _overlap_range_iter(self._declared_residuals,
-                                               self._var_abs2meta['output'], names1=resids):
-                    resid, rstart, rend, oname, ostart, oend = tup
 
+            # first, expand the glob patterns into a list of specific keys (resid, wrt)
+            for resid, wrtname in self._matching_key_iter(of, wrt, use_resname=True):
+                for _, rstart, rstop, oname, ostart, ostop in resid_mapper.overlap_iter(resid,
+                                                                                        out_mapper):
                     if resid not in rmap:
                         rmap[resid] = []
+                    if oname not in omap:
+                        omap[oname] = []
 
-                    pattern_meta = pattern_meta.copy()
-                    oslc, rslc = _get_overlap_slices(ostart, oend, rstart, rend)
-                    outname = oname[plen:]
-                    rmap[resid].append((outname, wrt, pattern_meta, oslc, rslc))
-                    if outname not in omap:
-                        omap[outname] = []
-                    omap[outname].append([oslc, pattern_meta, rslc])
+                    data = (oname, wrtname, pattern_meta.copy(),
+                            slice(ostart, ostop), slice(rstart, rstop))
+
+                    rmap[resid].append(data)
+                    omap[oname].append(data)
 
             for oname, lst in omap.items():
                 newmeta = {}
-                has_rows = False
-                for oslc, rmeta, rslc in lst:
-                    if 'rows' in rmeta and rmeta['rows'] is not None:
-                        has_rows = True
-                    newmeta.update(rmeta)
-                    
-                # now update the first metadata entry for use later
-                meta = lst[0][1]
-                meta.update(newmeta)
-                if 'val' in meta:
-                    del meta['val']
+                nsparse = 0
+                for _, wrtname, patmeta, _, _ in lst:
+                    if 'rows' in patmeta and patmeta['rows'] is not None:
+                        nsparse += 1
+                    newmeta.update(patmeta)
 
-                if has_rows:
+                if nsparse:
+                    if nsparse != len(lst):
+                        issue_warning(f"{self.msginfo}: Some residual partials that overlap output "
+                                      f"'{oname}' are sparse while others are dense. The combined "
+                                      "output partial will be sparse.")
+
                     # if any of the resid subjacs had rows, we need the output subjac to be sparse
                     rows = []
                     cols = []
                     data = []
-                    for oslc, rmeta, rslc in lst:
-                        if 'rows' in rmeta and rmeta['rows'] is not None:
-                            r, c, d = _get_sparse_slice(rmeta, oslc, rslc)
+                    for _, _, patmeta, oslc, rslc in lst:
+                        if 'rows' in patmeta and patmeta['rows'] is not None:
+                            r, c, d = _get_sparse_slice(patmeta, oslc, rslc)
                             rows.append(r)
                             cols.append(c)
-                            data.append(d)
+                            if d is not None:
+                                data.append(d)
                         else:
                             raise RuntimeError("No support currently for sparse and dense resid "
                                                "subjacs that overlap the same output.")
+
                     rows = np.concatenate(rows)
                     cols = np.concatenate(cols)
-                    data = np.concatenate(data)
 
                     newmeta['rows'] = rows
                     newmeta['cols'] = cols
-                    newmeta['val'] = data
 
-                else:
+                    if data:
+                        data = np.concatenate(data)
+                        if len(data) != len(rows):
+                            raise ValueError(f"{self.msginfo}: length of data array ({len(data)} != "
+                                             f"number of rows ({len(rows)} for sparse partial ({oname}, {wrt}).")
+                        newmeta['val'] = data
+
+                else:  # resid partials are all dense
                     if 'val' in newmeta:
-                        del newmeta['val']
+                        # we need to update 'val' with a combined value from resid metadata
+                        vals = []
+                        for _, wrtname, patmeta, oslice, rslice in lst:
+                            val = patmeta['val']
+                            if val is not None:
+                                if 'val' in newmeta:
+                                    newmeta['val'] += val
+                                else:
+                                    newmeta['val'] = val
 
-            for resid, lst in rmap.items():
-                for oname, wrt, patmeta, oslc, rslc in lst:
-                    super()._resolve_partials_patterns(oname, wrt, omap[oname][0][1])
+                super()._resolve_partials_patterns(oname, wrtname, newmeta)
         else:
             super()._resolve_partials_patterns(of, wrt, pattern_meta)
 
@@ -851,16 +863,10 @@ def _get_overlap_slices(ostart, oend, rstart, rend):
     minend = min(oend, rend)
     start = max(rstart - ostart, 0)
     stop = minend - ostart
-    #if start == 0 and stop == (oend - ostart):
-        #oslc = _full_slice
-    #else:
     oslc = slice(start, stop)
 
     start = max(ostart - rstart, 0)
     stop = minend - rstart
-    #if start == 0 and stop == (rend - rstart):
-        #return oslc, _full_slice
-    #else:
     return oslc, slice(start, stop)
 
 
@@ -971,13 +977,16 @@ class _JacobianWrapper(object):
 def _get_sparse_slice(meta, oslc, rslc):
     r = np.asarray(meta['rows'], dtype=int)
     c = np.asarray(meta['cols'], dtype=int)
-    if 'val' in meta:
-        d = np.asarray(meta['val'], dtype=float)
-    else:
-        d = np.zeros(r.size, dtype=float)
-
     mask = np.logical_and(r >= rslc.start, r < rslc.stop)
-    return r[mask] - rslc.start + oslc.start, c[mask], d[mask]
+
+    if 'val' in meta and meta['val'] is not None:
+        if np.isscalar(meta['val']):
+            d = np.full((len(r),), meta['val'], dtype=float)
+        else:
+            d = np.atleast_1d(meta['val'])
+        return r[mask] - rslc.start + oslc.start, c[mask], d[mask]
+    else:
+        return r[mask] - rslc.start + oslc.start, c[mask], None
 
 
 def _get_dense_slice_from_sparse(meta, oslc, rslc):

@@ -1020,21 +1020,10 @@ class Component(System):
         **kwargs : dict
             Keyword arguments for controlling the behavior of the approximation.
         """
-        pattern_matches = self._find_partial_matches(of, wrt)
         self._has_approx = True
+        info = self._subjacs_info
 
-        for of_bundle, wrt_bundle in product(*pattern_matches):
-            of_pattern, of_matches = of_bundle
-            wrt_pattern, wrt_matches = wrt_bundle
-            if not of_matches:
-                raise ValueError('{}: No matches were found for of="{}"'.format(self.msginfo,
-                                                                                of_pattern))
-            if not wrt_matches:
-                raise ValueError('{}: No matches were found for wrt="{}"'.format(self.msginfo,
-                                                                                 wrt_pattern))
-
-            info = self._subjacs_info
-            for abs_key in abs_key_iter(self, of_matches, wrt_matches):
+        for abs_key in self._matching_key_iter(of, wrt):
                 meta = info[abs_key]
                 meta['method'] = method
                 meta.update(kwargs)
@@ -1453,13 +1442,86 @@ class Component(System):
                 rows = None
                 cols = None
 
-        pattern_matches = self._find_partial_matches(of, '*' if wrt is None else wrt)
         abs2meta_in = self._var_abs2meta['input']
         abs2meta_out = self._var_abs2meta['output']
 
         is_array = isinstance(val, ndarray)
         patmeta = dict(pattern_meta)
         patmeta_not_none = {k: v for k, v in pattern_meta.items() if v is not None}
+
+        for abs_key in self._matching_key_iter(of, '*' if wrt is None else wrt):
+            if not dependent:
+                if abs_key in self._subjacs_info:
+                    del self._subjacs_info[abs_key]
+                continue
+
+            if abs_key in self._subjacs_info:
+                meta = self._subjacs_info[abs_key]
+                meta.update(patmeta_not_none)
+            else:
+                meta = patmeta.copy()
+
+            of, wrt = abs_key
+            meta['rows'] = rows
+            meta['cols'] = cols
+            csz = abs2meta_in[wrt]['size'] if wrt in abs2meta_in else abs2meta_out[wrt]['size']
+            meta['shape'] = shape = (abs2meta_out[of]['size'], csz)
+            dist_out = abs2meta_out[of]['distributed']
+            if wrt in abs2meta_in:
+                dist_in = abs2meta_in[wrt]['distributed']
+            else:
+                dist_in = abs2meta_out[wrt]['distributed']
+
+            if dist_in and not dist_out and not self.matrix_free:
+                rel_key = abs_key2rel_key(self, abs_key)
+                raise RuntimeError(f"{self.msginfo}: component has defined partial {rel_key} "
+                                   "which is a non-distributed output wrt a distributed input."
+                                   " This is only supported using the matrix free API.")
+
+            if shape[0] == 0 or shape[1] == 0:
+                msg = "{}: '{}' is an array of size 0"
+                if shape[0] == 0:
+                    if dist_out:
+                        # distributed vars are allowed to have zero size inputs on some procs
+                        rows_max = -1
+                    else:
+                        # non-distributed vars are not allowed to have zero size inputs
+                        raise ValueError(msg.format(self.msginfo, of))
+                if shape[1] == 0:
+                    if not dist_in:
+                        # non-distributed vars are not allowed to have zero size outputs
+                        raise ValueError(msg.format(self.msginfo, wrt))
+                    else:
+                        # distributed vars are allowed to have zero size outputs on some procs
+                        cols_max = -1
+
+            if val is None and not matfree:
+                # we can only get here if rows is None  (we're not sparse list format)
+                meta['val'] = np.zeros(shape)
+            elif is_array:
+                if rows is None and val.shape != shape and val.size == shape[0] * shape[1]:
+                    meta['val'] = val = val.copy().reshape(shape)
+                else:
+                    meta['val'] = val.copy()
+            elif is_scalar:
+                meta['val'] = np.full(shape, val, dtype=float)
+            else:
+                meta['val'] = val
+
+            if rows_max >= shape[0] or cols_max >= shape[1]:
+                of, wrt = abs_key2rel_key(self, abs_key)
+                raise ValueError(f"{self.msginfo}: d({of})/d({wrt}): Expected {shape[0]}x"
+                                 f"{shape[1]} but declared at least {rows_max + 1}x"
+                                 f"{cols_max + 1}")
+
+            self._check_partials_meta(abs_key, meta['val'],
+                                      shape if rows is None else (rows.shape[0], 1))
+
+            self._subjacs_info[abs_key] = meta
+
+    def _matching_key_iter(self, of_patterns, wrt_patterns, use_resname=False):
+        pattern_matches = self._find_partial_matches(of_patterns, wrt_patterns,
+                                                     use_resname=use_resname)
 
         for of_bundle, wrt_bundle in product(*pattern_matches):
             of_pattern, of_matches = of_bundle
@@ -1471,75 +1533,10 @@ class Component(System):
                 raise ValueError('{}: No matches were found for wrt="{}"'.format(self.msginfo,
                                                                                  wrt_pattern))
 
-            for abs_key in abs_key_iter(self, of_matches, wrt_matches):
-                if not dependent:
-                    if abs_key in self._subjacs_info:
-                        del self._subjacs_info[abs_key]
-                    continue
-
-                if abs_key in self._subjacs_info:
-                    meta = self._subjacs_info[abs_key]
-                    meta.update(patmeta_not_none)
-                else:
-                    meta = patmeta.copy()
-
-                of, wrt = abs_key
-                meta['rows'] = rows
-                meta['cols'] = cols
-                csz = abs2meta_in[wrt]['size'] if wrt in abs2meta_in else abs2meta_out[wrt]['size']
-                meta['shape'] = shape = (abs2meta_out[of]['size'], csz)
-                dist_out = abs2meta_out[of]['distributed']
-                if wrt in abs2meta_in:
-                    dist_in = abs2meta_in[wrt]['distributed']
-                else:
-                    dist_in = abs2meta_out[wrt]['distributed']
-
-                if dist_in and not dist_out and not self.matrix_free:
-                    rel_key = abs_key2rel_key(self, abs_key)
-                    raise RuntimeError(f"{self.msginfo}: component has defined partial {rel_key} "
-                                       "which is a non-distributed output wrt a distributed input."
-                                       " This is only supported using the matrix free API.")
-
-                if shape[0] == 0 or shape[1] == 0:
-                    msg = "{}: '{}' is an array of size 0"
-                    if shape[0] == 0:
-                        if dist_out:
-                            # distributed vars are allowed to have zero size inputs on some procs
-                            rows_max = -1
-                        else:
-                            # non-distributed vars are not allowed to have zero size inputs
-                            raise ValueError(msg.format(self.msginfo, of))
-                    if shape[1] == 0:
-                        if not dist_in:
-                            # non-distributed vars are not allowed to have zero size outputs
-                            raise ValueError(msg.format(self.msginfo, wrt))
-                        else:
-                            # distributed vars are allowed to have zero size outputs on some procs
-                            cols_max = -1
-
-                if val is None and not matfree:
-                    # we can only get here if rows is None  (we're not sparse list format)
-                    meta['val'] = np.zeros(shape)
-                elif is_array:
-                    if rows is None and val.shape != shape and val.size == shape[0] * shape[1]:
-                        meta['val'] = val = val.copy().reshape(shape)
-                    else:
-                        meta['val'] = val.copy()
-                elif is_scalar:
-                    meta['val'] = np.full(shape, val, dtype=float)
-                else:
-                    meta['val'] = val
-
-                if rows_max >= shape[0] or cols_max >= shape[1]:
-                    of, wrt = abs_key2rel_key(self, abs_key)
-                    raise ValueError(f"{self.msginfo}: d({of})/d({wrt}): Expected {shape[0]}x"
-                                     f"{shape[1]} but declared at least {rows_max + 1}x"
-                                     f"{cols_max + 1}")
-
-                self._check_partials_meta(abs_key, meta['val'],
-                                          shape if rows is None else (rows.shape[0], 1))
-
-                self._subjacs_info[abs_key] = meta
+            if use_resname:
+                yield from product(of_matches, wrt_matches)
+            else:
+                yield from abs_key_iter(self, of_matches, wrt_matches)
 
     def _find_partial_matches(self, of_pattern, wrt_pattern, use_resname=False):
         """
