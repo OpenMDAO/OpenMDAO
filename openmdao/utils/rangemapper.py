@@ -173,14 +173,11 @@ class RangeMapper(object):
         """
         start, stop = self._key2range[key]
 
-        start_rng, start_rel = other.index2key_rel(start)
-        if start_rng is None:
+        start_key, start_rel = other.index2key_rel(start)
+        if start_key is None:
             return
 
-        stop_rng, stop_rel = other.index2key_rel(stop - 1)
-
-        start_key = start_rng[0]
-        stop_key = stop_rng[0]
+        stop_key, stop_rel = other.index2key_rel(stop - 1)
 
         overlaps = [list(tup) for tup in other.between_iter(start_key, stop_key)]
         overlaps[0][1] = start_rel

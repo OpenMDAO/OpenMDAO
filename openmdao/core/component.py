@@ -1024,10 +1024,10 @@ class Component(System):
         info = self._subjacs_info
 
         for abs_key in self._matching_key_iter(of, wrt):
-                meta = info[abs_key]
-                meta['method'] = method
-                meta.update(kwargs)
-                info[abs_key] = meta
+            meta = info[abs_key]
+            meta['method'] = method
+            meta.update(kwargs)
+            info[abs_key] = meta
 
     def declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None,
                          method='exact', step=None, form=None, step_calc=None, minimum_step=None):

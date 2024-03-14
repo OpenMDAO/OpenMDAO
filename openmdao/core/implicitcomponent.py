@@ -511,11 +511,28 @@ class ImplicitComponent(Component):
             out_mapper = RangeMapper.create([(n[plen:], shape_to_len(meta['shape']))
                                              for n, meta in self._var_abs2meta['output'].items()])
 
+            if resid_mapper.size != out_mapper.size:
+                raise RuntimeError(f"{self.msginfo}: The number of residuals ({resid_mapper.size}) "
+                                   f"doesn't match number of outputs ({out_mapper.size}).  If any "
+                                   "residuals are added using 'add_residuals', their total size "
+                                   "must match the total size of the outputs.")
+
             rmap = self._resid2out_subjac_map
             omap = {}
+            wrtsize = None
 
             # first, expand the glob patterns into a list of specific keys (resid, wrt)
             for resid, wrtname in self._matching_key_iter(of, wrt, use_resname=True):
+                if wrtsize is None:
+                    abs_wrt = self.pathname + '.' + wrtname
+                    if abs_wrt in self._var_abs2meta['input']:
+                        wrtsize = shape_to_len(self._var_abs2meta['input'][abs_wrt]['shape'])
+                    else:
+                        wrtsize = shape_to_len(self._var_abs2meta['output'][abs_wrt]['shape'])
+
+                if resid in rmap:
+                    continue
+
                 for _, rstart, rstop, oname, ostart, ostop in resid_mapper.overlap_iter(resid,
                                                                                         out_mapper):
                     if resid not in rmap:
@@ -523,7 +540,7 @@ class ImplicitComponent(Component):
                     if oname not in omap:
                         omap[oname] = []
 
-                    data = (oname, wrtname, pattern_meta.copy(),
+                    data = (oname, pattern_meta.copy(),
                             slice(ostart, ostop), slice(rstart, rstop))
 
                     rmap[resid].append(data)
@@ -532,10 +549,13 @@ class ImplicitComponent(Component):
             for oname, lst in omap.items():
                 newmeta = {}
                 nsparse = 0
-                for _, wrtname, patmeta, _, _ in lst:
+                for _, patmeta, _, _ in lst:
                     if 'rows' in patmeta and patmeta['rows'] is not None:
                         nsparse += 1
                     newmeta.update(patmeta)
+
+                outsize = shape_to_len(self._var_abs2meta['output'][self.pathname + '.' +
+                                                                    oname]['shape'])
 
                 if nsparse:
                     if nsparse != len(lst):
@@ -547,7 +567,7 @@ class ImplicitComponent(Component):
                     rows = []
                     cols = []
                     data = []
-                    for _, _, patmeta, oslc, rslc in lst:
+                    for _, patmeta, oslc, rslc in lst:
                         if 'rows' in patmeta and patmeta['rows'] is not None:
                             r, c, d = _get_sparse_slice(patmeta, oslc, rslc)
                             rows.append(r)
@@ -567,23 +587,30 @@ class ImplicitComponent(Component):
                     if data:
                         data = np.concatenate(data)
                         if len(data) != len(rows):
-                            raise ValueError(f"{self.msginfo}: length of data array ({len(data)} != "
-                                             f"number of rows ({len(rows)} for sparse partial ({oname}, {wrt}).")
+                            raise ValueError(f"{self.msginfo}: length of data array ({len(data)} "
+                                             f"!= number of rows ({len(rows)} for sparse partial "
+                                             f"({oname}, {wrt}).")
                         newmeta['val'] = data
 
                 else:  # resid partials are all dense
-                    if 'val' in newmeta:
+                    if 'val' in newmeta and newmeta['val'] is not None:
                         # we need to update 'val' with a combined value from resid metadata
-                        vals = []
-                        for _, wrtname, patmeta, oslice, rslice in lst:
-                            val = patmeta['val']
-                            if val is not None:
-                                if 'val' in newmeta:
-                                    newmeta['val'] += val
-                                else:
-                                    newmeta['val'] = val
+                        val = np.zeros((outsize, wrtsize), dtype=float)
+                        seenval = False
+                        for _, patmeta, oslice, rslice in lst:
+                            v = patmeta['val']
+                            if v is None:
+                                if seenval:
+                                    raise RuntimeError(f"{self.msginfo}: 'val' must be provided "
+                                                       "for all or none of the residuals that "
+                                                       "overlap the same output '{oname}'.")
+                            else:
+                                seenval = True
+                                val[oslice, :] = v[rslice, :]
 
-                super()._resolve_partials_patterns(oname, wrtname, newmeta)
+                        newmeta['val'] = val
+
+                super()._resolve_partials_patterns(oname, wrt, newmeta)
         else:
             super()._resolve_partials_patterns(of, wrt, pattern_meta)
 
@@ -899,15 +926,6 @@ class _ResidsWrapper(object):
     def __init__(self, vec, name2slice_shape):
         self.__dict__['_vec'] = vec
         self.__dict__['_dct'] = name2slice_shape
-        # check that vec size matches mapped resids size
-        for slc, _ in name2slice_shape.values():
-            pass
-        if slc.stop != len(vec):
-            system = vec._system()
-            raise RuntimeError(f"{system.msginfo}: The number of residuals ({slc.stop}) doesn't "
-                               f"match number of outputs ({len(vec)}).  If any residuals are "
-                               "added using 'add_residuals', their total size must match the "
-                               "total size of the outputs.")
 
     def __getitem__(self, name):
         arr = self._vec.asarray(copy=False)
@@ -945,7 +963,7 @@ class _JacobianWrapper(object):
         res, wrt = key
 
         if len(self._dct) == 1:
-            of, _, _, slc, _ = self._dct[res]
+            of, _, slc, _ = self._dct[res]
             return self._jac[(of, wrt)][slc]
 
         return np.vstack([self._jac[(of, wrt)][slc] for of, _, _, slc, _ in self._dct[res]])
@@ -953,7 +971,7 @@ class _JacobianWrapper(object):
     def __setitem__(self, key, val):
         res, wrt = key
 
-        for of, _, _, outslc, resslc in self._dct[res]:
+        for of, _, outslc, resslc in self._dct[res]:
             if isinstance(val, np.ndarray):
                 v = val[resslc]
             else:
