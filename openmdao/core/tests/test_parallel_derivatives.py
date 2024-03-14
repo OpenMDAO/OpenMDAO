@@ -983,6 +983,16 @@ class TestParDerivRelevance(unittest.TestCase):
     N_PROCS = 3
 
     def test_par_deriv_relevance(self):
+        from openmdao.utils.general_utils import set_pyoptsparse_opt
+
+        # check that pyoptsparse is installed. if it is, try to use SLSQP.
+        OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
+
+        if OPTIMIZER:
+            from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
+        else:
+            raise unittest.SkipTest("pyOptSparseDriver is required.")
+
         prob = om.Problem()
         model = prob.model
 
@@ -995,12 +1005,9 @@ class TestParDerivRelevance(unittest.TestCase):
         # Add a dummy constraint because openmdao requires one
         model.add_objective("parallel.line1.z")
 
-        # Setup SNOPT to solve constrained problem
-        prob.driver = om.pyOptSparseDriver(debug_print=['desvars', 'objs', 'nl_cons'])
-        prob.driver.options['optimizer'] = "SNOPT"
-        prob.driver.opt_settings['Major iterations limit'] = 50
-        prob.driver.opt_settings['Feasible point'] = None
-        prob.driver.opt_settings['verify level'] = 3
+        # Setup to solve constrained problem
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = "SLSQP"
 
         prob.setup()
         prob.run_driver()
