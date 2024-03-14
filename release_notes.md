@@ -1,11 +1,12 @@
 ***********************************
 # Release Notes for OpenMDAO 3.31.0
 
-March 08, 2024
+March 15, 2024
 
 This release includes a significant refactor that affects the calculation of relevance.
 Derivatives are no longer inherently coupled to drivers.  This makes it possible to compute derivatives of a system
-without having to add a "dummy" driver with the appropriate constraints and design variables.
+without having to add a "dummy" driver with the appropriate constraints and design variables. The SubmodelComp has been
+refactored to reflect these changes. Relevance and 'pre/opt/post' driver logic has also been refactored for more uniformity.
 
 Previously, the stalling of nonlinear solvers was detected using relative tolerance. If any subsolves had already been converged, solvers can see little-to-no improvement in the relative error, despite the absolute tolerance being fine. OpenMDAO now allows `stall_tol_type` to be `'abs'` or `'rel'` so that the user
 has more control over the detection of stalling solvers.
@@ -28,15 +29,18 @@ any changes that break your models, please submit an issue so we can resolve the
 
 ## Backwards Incompatible Non-API Changes
 
+- Changed `find_plugins` to `find_repos` and changed it to use tabulator.js [#3144](https://github.com/OpenMDAO/OpenMDAO/pull/3144)
+
 ## New Features
 
 - Changed the error when attempting to `set_val` on a remote connected input to a warning [#3099](https://github.com/OpenMDAO/OpenMDAO/pull/3099)
-- Added option `stall_tol_type` to Nonlinear solvers [#3112](https://github.com/OpenMDAO/OpenMDAO/pull/3112)
+- Added option `stall_tol_type` to Nonlinear solvers [#3112](https://github.com/OpenMDAO/OpenMDAO/pull/3112
 - Refactored relevance and removed driver dependency for coloring. [#3113](https://github.com/OpenMDAO/OpenMDAO/pull/3113)
 - Updated ScipyKrylov for SciPy 1.12.0, updated 'latest' workflow [#3114](https://github.com/OpenMDAO/OpenMDAO/pull/3114)
 - Moved two functions from the n2 code to the utils part of the code (`convert_ndarray_to_support_nans_in_json` and `convert_nans_in_nested_list`) so other libraries can use them. [#3116](https://github.com/OpenMDAO/OpenMDAO/pull/3116)
 - Assigning a `linesearch` to a solver that does not support one will result in an error. [#3131](https://github.com/OpenMDAO/OpenMDAO/pull/3131)
 - Added `set_reports_dir` to openmdao.api. [#3137](https://github.com/OpenMDAO/OpenMDAO/pull/3137)
+- Moved pre/opt/post logic into the Relevance class. [#3142](https://github.com/OpenMDAO/OpenMDAO/pull/3142))
 
 ## Bug Fixes
 
@@ -52,6 +56,8 @@ any changes that break your models, please submit an issue so we can resolve the
 - Bugs Related to Serialization (thank you andrewellis55) [#3133](https://github.com/OpenMDAO/OpenMDAO/pull/3133)
 - Fixed jax config calls for compatibility with jax 0.4.25 [#3136](https://github.com/OpenMDAO/OpenMDAO/pull/3136)
 - Removed setting of distributed metadata to False if nprocs==1 [#3122](https://github.com/OpenMDAO/OpenMDAO/pull/3122)
+- Fix an MPI hang caused when one proc needs a complex linear vector and the others don't. [#3140](https://github.com/OpenMDAO/OpenMDAO/pull/3140)
+- Fixed deprecated assertEquals [#3141](https://github.com/OpenMDAO/OpenMDAO/pull/3141)
 
 ## Miscellaneous
 
