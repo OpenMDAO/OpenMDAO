@@ -432,7 +432,7 @@ class TestViewerData(unittest.TestCase):
             # create top-level problem
             p = om.Problem(name='top')
             p.model.add_subsystem('submodelcomp',
-                                  om.SubmodelComp(problem=subprob, inputs=['*'], outputs=['*']),
+                                  om.SubmodelComp(problem=subprob, inputs=['*'], outputs=['*'], do_coloring=False),
                                   promotes=['*'])
             p.model.add_subsystem('supercomp',
                                   om.ExecComp('z = 3 * y'),
@@ -444,12 +444,18 @@ class TestViewerData(unittest.TestCase):
             p.final_setup()
 
             # extract viewer data from N2 for problem and subproblem
-            om.n2(p, title='N2 for Problem', outfile='N2problem.html',
-                  show_browser=DEBUG_BROWSER)
+            om.n2(p, title='N2 for Problem', outfile='N2problem.html', show_browser=DEBUG_BROWSER)
             problem_data = extract_compressed_model('N2problem.html')
 
-            om.n2(subprob, title='N2 for SubProblem', outfile='N2subprob.html',
-                  show_browser=DEBUG_BROWSER)
+            # in this particular case, the value of subcomp.y will differ between this case and the
+            # later script based case because in the script case, the hook function triggers after final_setup of the
+            # subproblem, while in this case, the n2 is generated after final_setup of the
+            # top problem, and during that final_setup (in _setup_partials of the submodelcomp), the
+            # subproblem is executed, which sets the value of subcomp.y to 3.0 instead of 1.0.
+            # So here we'll reset the value of subcomp.y to 1.0 so that we can
+            # compare two data dictionaries using assertDictEqual.
+            subprob.set_val('y', 1.0)
+            om.n2(subprob, title='N2 for SubProblem', outfile='N2subprob.html', show_browser=DEBUG_BROWSER)
             subprob_data = extract_compressed_model('N2subprob.html')
 
             # check problem data generated from recording against data generated from problem
@@ -472,7 +478,7 @@ class TestViewerData(unittest.TestCase):
             # create top-level problem
             p = om.Problem(name='top')
             p.model.add_subsystem('submodelcomp',
-                                om.SubmodelComp(problem=subprob, inputs=['*'], outputs=['*']),
+                                om.SubmodelComp(problem=subprob, inputs=['*'], outputs=['*'], do_coloring=False),
                                 promotes=['*'])
             p.model.add_subsystem('supercomp',
                                 om.ExecComp('z = 3 * y'),
@@ -492,7 +498,7 @@ class TestViewerData(unittest.TestCase):
                 f.write(src)
 
             # check problem data generated from script against data generated from problem
-            check_call("openmdao n2 submodel_script.py -o N2_top.html"
+            check_call("openmdao n2 submodel_script.py -o N2_top.html --problem=top"
                        f"{' --no_browser' if not DEBUG_BROWSER else ''}")
             n2_top_data = extract_compressed_model('N2_top.html')
 
@@ -572,6 +578,7 @@ class TestN2(unittest.TestCase):
 
         p = om.Problem(model=SellarStateConnection())
         p.driver.add_recorder(SqliteRecorder(sql_filename))
+
         p.setup()
         p.final_setup()
         p.cleanup()

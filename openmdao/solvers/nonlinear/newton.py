@@ -183,7 +183,7 @@ class NewtonSolver(NonlinearSolver):
 
         # Execute guess_nonlinear if specified and
         # we have not restarted from a saved point
-        if not self._restarted:
+        if not self._restarted and system._has_guess:
             system._guess_nonlinear()
 
         with Recording('Newton_subsolve', 0, self) as rec:

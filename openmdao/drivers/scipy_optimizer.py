@@ -273,9 +273,9 @@ class ScipyOptimizeDriver(Driver):
         bool
             Failure flag; True if failed to converge, False is successful.
         """
-        problem = self._problem()
+        prob = self._problem()
         opt = self.options['optimizer']
-        model = problem.model
+        model = prob.model
         self.iter_count = 0
         self._total_jac = None
         self._desvar_array_cache = None
@@ -284,8 +284,9 @@ class ScipyOptimizeDriver(Driver):
         self._check_for_invalid_desvar_values()
 
         # Initial Run
-        with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-            model.run_solve_nonlinear()
+        with RecordingDebugging(self._get_name(), self.iter_count, self):
+            with model._relevance.nonlinear_active('iter'):
+                model.run_solve_nonlinear()
             self.iter_count += 1
 
         self._con_cache = self.get_constraint_values()
@@ -463,12 +464,12 @@ class ScipyOptimizeDriver(Driver):
             hess = None
 
         # compute dynamic simul deriv coloring if option is set
-        problem.get_total_coloring(self._coloring_info, run_model=False)
+        prob.get_total_coloring(self._coloring_info, run_model=False)
 
         # optimize
         try:
             if opt in _optimizers:
-                if self._problem().comm.rank != 0:
+                if prob.comm.rank != 0:
                     self.opt_settings['disp'] = False
 
                 result = minimize(self._objfunc, x_init,
@@ -563,47 +564,23 @@ class ScipyOptimizeDriver(Driver):
         self.result = result
 
         if hasattr(result, 'success'):
-            self.fail = False if result.success else True
+            self.fail = not result.success
             if self.fail:
-                if self._problem().comm.rank == 0:
+                if prob.comm.rank == 0:
                     print('Optimization FAILED.')
                     print(result.message)
                     print('-' * 35)
 
             elif self.options['disp']:
-                if self._problem().comm.rank == 0:
+                if prob.comm.rank == 0:
                     print('Optimization Complete')
                     print('-' * 35)
         else:
             self.fail = True  # It is not known, so the worst option is assumed
-            if self._problem().comm.rank == 0:
+            if prob.comm.rank == 0:
                 print('Optimization Complete (success not known)')
                 print(result.message)
                 print('-' * 35)
-
-        if not self.fail:
-            # restore design vars from last objective evaluation
-            # if self._desvar_array_cache is not None:
-            #     self._update_design_vars(result.x)
-
-            # update everything after the opt completes so even irrelevant components are updated
-            with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-                try:
-                    model.run_solve_nonlinear()
-                except AnalysisError:
-                    model._clear_iprint()
-
-                rec.abs = 0.0
-                rec.rel = 0.0
-
-            if self.recording_options['record_derivatives']:
-                try:
-                    self._total_jac = total_jac  # temporarily restore this to get deriv recording
-                    self.record_derivatives()
-                finally:
-                    self._total_jac = None
-
-            self.iter_count += 1
 
         return self.fail
 
@@ -655,7 +632,7 @@ class ScipyOptimizeDriver(Driver):
 
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 self.iter_count += 1
-                with model._relevant.all_seeds_active():
+                with model._relevance.nonlinear_active('iter'):
                     model.run_solve_nonlinear()
 
             # Get the objective function evaluations
@@ -788,7 +765,7 @@ class ScipyOptimizeDriver(Driver):
                                                     tol=self.options['singular_jac_tol'])
                 self._check_jac = False
 
-        except Exception as msg:
+        except Exception:
             if self._exc_info is None:  # only record the first one
                 self._exc_info = sys.exc_info()
             return np.array([[]])

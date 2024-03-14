@@ -1,7 +1,6 @@
 """
 Test DOE Driver and Generators.
 """
-from ast import Str
 from io import StringIO
 import unittest
 

@@ -282,8 +282,6 @@ class Problem(object):
 
         self.comm = comm
 
-        self._mode = None  # mode is assigned in setup()
-
         self._metadata = None
         self._run_counter = -1
         self._rec_mgr = RecordingManager()
@@ -439,6 +437,20 @@ class Problem(object):
         if self._name is None:
             return type(self).__name__
         return f'{type(self).__name__} {self._name}'
+
+    @property
+    def _mode(self):
+        """
+        Return the derivative mode.
+
+        Returns
+        -------
+        str
+            Derivative mode, 'fwd' or 'rev'.
+        """
+        if self._metadata is None:
+            return None
+        return self._metadata['mode']
 
     def _get_inst_id(self):
         return self._name
@@ -666,9 +678,6 @@ class Problem(object):
         finally:
             self._recording_iter.prefix = old_prefix
 
-    def _set_opt_status(self, status):
-        self._metadata['opt_status'] = status
-
     def run_driver(self, case_prefix=None, reset_iter_counts=True):
         """
         Run the driver on the model.
@@ -725,27 +734,9 @@ class Problem(object):
 
             model._clear_iprint()
 
-            if self.options['group_by_pre_opt_post'] and driver.supports['optimization']:
-                if model._run_on_opt[_OptStatus.PRE]:
-                    self._set_opt_status(_OptStatus.PRE)
-                    model.run_solve_nonlinear()
-
-                with SaveOptResult(driver):
-                    self._set_opt_status(_OptStatus.OPTIMIZING)
-                    result = driver.run()
-
-                if model._run_on_opt[_OptStatus.POST]:
-                    self._set_opt_status(_OptStatus.POST)
-                    model.run_solve_nonlinear()
-
-                return result
-            else:
-                with SaveOptResult(driver):
-                    return driver.run()
-
+            return driver._run()
         finally:
             self._recording_iter.prefix = old_prefix
-            self._set_opt_status(None)
 
     def compute_jacvec_product(self, of, wrt, mode, seed):
         """
@@ -956,7 +947,7 @@ class Problem(object):
             msg = f"{self.msginfo}: Unsupported mode: '{mode}'. Use either 'fwd' or 'rev'."
             raise ValueError(msg)
 
-        self._mode = self._orig_mode = mode
+        self._orig_mode = mode
 
         model_comm = self.driver._setup_comm(comm)
 
@@ -987,6 +978,7 @@ class Problem(object):
                                               # src data for inputs)
             'has_par_deriv_color': False,  # True if any dvs/responses have parallel deriv colors
             'mode': mode,  # mode (derivative direction) set by the user.  'auto' by default
+            'orig_mode': mode,  # mode (derivative direction) set by the user.  'auto' by default
             'abs_in2prom_info': {},  # map of abs input name to list of length = sys tree height
                                      # down to var location, to allow quick resolution of local
                                      # src_shape/src_indices due to promotes.  For example,
@@ -998,7 +990,6 @@ class Problem(object):
             'reports_dir': self.get_reports_dir(),  # directory where reports will be written
             'saved_errors': [],  # store setup errors here until after final_setup
             'checking': False,  # True if check_totals or check_partials is running
-            'opt_status': None,  # Tells Systems if they are in an optimization loop
             'model_options': self.model_options,  # A dict of options passed to all systems in tree
             'allow_post_setup_reorder': self.options['allow_post_setup_reorder'],  # see option
             'singular_jac_behavior': 'warn',  # How to handle singular jac conditions
@@ -1010,6 +1001,8 @@ class Problem(object):
             'coloring_randgen': None,  # If total coloring is being computed, will contain a random
                                        # number generator, else None.
             'group_by_pre_opt_post': self.options['group_by_pre_opt_post'],  # see option
+            'relevance_cache': {},  # cache of relevance objects
+            'rel_array_cache': {},  # cache of relevance arrays
         }
 
         if _prob_setup_stack:
@@ -1020,12 +1013,13 @@ class Problem(object):
 
         _prob_setup_stack.append(self)
         try:
-            model._setup(model_comm, mode, self._metadata)
+            model._setup(model_comm, self._metadata)
         finally:
             _prob_setup_stack.pop()
 
-        # set static mode back to True in all systems in this Problem
-        self._metadata['static_mode'] = True
+            # whenever we're outside of model._setup, static mode should be True so that anything
+            # added outside of _setup will persist.
+            self._metadata['static_mode'] = True
 
         # Cache all args for final setup.
         self._check = check
@@ -1054,22 +1048,13 @@ class Problem(object):
         # update mode if it's been set to 'auto'
         if self._orig_mode == 'auto':
             mode = 'rev' if response_size < desvar_size else 'fwd'
-            self._mode = mode
         else:
             mode = self._orig_mode
 
         self._metadata['mode'] = mode
 
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-            self.model._final_setup(self.comm, self._orig_mode)
-
-        if self.options['group_by_pre_opt_post']:
-            if self.driver.supports['optimization']:
-                self.model._setup_iteration_lists()
-            else:
-                issue_warning(f"In Problem '{self._name}, the 'group_by_pre_opt_post' option is "
-                              "True but the driver doesn't support optimization so the option will "
-                              "be ignored.")
+            self.model._final_setup()
 
         # If set_solver_print is called after an initial run, in a multi-run scenario,
         #  this part of _final_setup still needs to happen so that change takes effect
@@ -1925,7 +1910,7 @@ class Problem(object):
 
     def compute_totals(self, of=None, wrt=None, return_format='flat_dict', debug_print=False,
                        driver_scaling=False, use_abs_names=False, get_remote=True,
-                       use_coloring=None):
+                       coloring_info=None):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1951,10 +1936,9 @@ class Problem(object):
             This is deprecated and has no effect.
         get_remote : bool
             If True, the default, the full distributed total jacobian will be retrieved.
-        use_coloring : bool or None
-            If True, use coloring to compute total derivatives.  If False, do not.  If None, only
-            compute coloring if the Driver has declared coloring. This is only used if user supplies
-            of and wrt args.  Otherwise, coloring is completely determined by the driver.
+        coloring_info : ColoringMeta, None, or False
+            If False, do no coloring.  If None, use driver coloring info to compute the coloring.
+            Otherwise use the given coloring info object to provide the coloring, if it exists.
 
         Returns
         -------
@@ -1971,7 +1955,7 @@ class Problem(object):
 
         total_info = _TotalJacInfo(self, of, wrt, return_format, approx=self.model._owns_approx_jac,
                                    driver_scaling=driver_scaling, get_remote=get_remote,
-                                   debug_print=debug_print, use_coloring=use_coloring)
+                                   debug_print=debug_print, coloring_info=coloring_info)
         return total_info.compute_totals()
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
@@ -2657,21 +2641,17 @@ class Problem(object):
         else:
             out = open(outfile, 'w')
 
-        if not self.options['group_by_pre_opt_post']:
-            print("\nThe 'group_by_pre_opt_post' option is False, so all components will be "
-                  "included in the optimization loop.", file=out)
-
         model = self.model
         if model._pre_components:
             print("\nPre-optimization components:", file=out)
-            for name in model._pre_components:
+            for name in sorted(model._pre_components):
                 print(f"    {name}", file=out)
         else:
             print("\nPre-optimization components: []", file=out)
 
         if model._post_components:
             print("\nPost-optimization components:", file=out)
-            for name in model._post_components:
+            for name in sorted(model._post_components):
                 print(f"    {name}", file=out)
         else:
             print("\nPost-optimization components: []", file=out)

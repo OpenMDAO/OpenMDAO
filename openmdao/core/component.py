@@ -121,8 +121,9 @@ class Component(System):
                                   'apply_linear, apply_nonlinear, and compute_jacvec_product '
                                   'only on rank 0 and broadcast the results to the other ranks.')
         self.options.declare('always_opt', types=bool, default=False,
-                             desc='If True, force this component to be included in the optimization'
-                                  ' loop if the Problem option "group_by_pre_opt_post" is True.')
+                             desc='If True, force nonlinear operations on this component to be '
+                                  'included in the optimization loop even if this component is not '
+                                  'relevant to the design variables and responses.')
 
     def _check_matfree_deprecation(self):
         # check for mixed distributed variables
@@ -162,7 +163,7 @@ class Component(System):
         """
         pass
 
-    def _setup_procs(self, pathname, comm, mode, prob_meta):
+    def _setup_procs(self, pathname, comm, prob_meta):
         """
         Execute first phase of the setup process.
 
@@ -174,13 +175,10 @@ class Component(System):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
-        mode : str
-            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
-            reverse (adjoint). Default is 'rev'.
         prob_meta : dict
             Problem level metadata.
         """
-        super()._setup_procs(pathname, comm, mode, prob_meta)
+        super()._setup_procs(pathname, comm, prob_meta)
 
         if self._num_par_fd > 1:
             if comm.size > 1:
@@ -527,8 +525,8 @@ class Component(System):
                 raise TypeError('%s: The units argument should be a str or None.' % self.msginfo)
             units = simplify_unit(units, msginfo=self.msginfo)
 
-        if tags is not None and not isinstance(tags, (str, list)):
-            raise TypeError('The tags argument should be a str or list')
+        if tags is not None and not isinstance(tags, (str, list, set)):
+            raise TypeError('The tags argument should be a str, set, or list')
 
         if copy_shape and compute_shape:
             raise ValueError(f"{self.msginfo}: Only one of 'copy_shape' or 'compute_shape' can "

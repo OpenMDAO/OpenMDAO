@@ -334,9 +334,6 @@ class System(object):
         will not set the matrix_free flag correctly for Component instances having a matrix vector
         product function that is added dynamically (not declared as part of the class) and in that
         case the matrix_free flag must be set manually to True.
-    _relevant : dict
-        Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
-        and dependent systems.
     _mode : str
         Indicates derivative direction for the model, either 'fwd' or 'rev'.
     _scope_cache : dict
@@ -394,9 +391,6 @@ class System(object):
     _promotion_tree : dict
         Mapping of system path to promotion info indicating all subsystems where variables
         were promoted.
-    _run_on_opt: list of bool
-        Indicates whether this system should run before, during, or after the optimization process
-        (if there is an optimization process at all).
     _during_sparsity : bool
         If True, we're doing a sparsity computation and uncolored approxs need to be restricted
         to only colored columns.
@@ -507,8 +501,6 @@ class System(object):
         self._static_design_vars = {}
         self._static_responses = {}
 
-        self._mode = None
-
         self._scope_cache = {}
 
         self._num_par_fd = num_par_fd
@@ -536,16 +528,13 @@ class System(object):
 
         self._filtered_vars_to_record = {}
         self._owning_rank = None
-        self._coloring_info = coloring_mod._Partial_ColoringMeta()
+        self._coloring_info = coloring_mod.Partial_ColoringMeta()
         self._first_call_to_linearize = True  # will check in first call to _linearize
         self._tot_jac = None
         self._saved_errors = None if env_truthy('OPENMDAO_FAIL_FAST') else []
 
         self._output_solver_options = {}
         self._promotion_tree = None
-        # need separate values for [PRE, OPTIMIZE, POST] since a Group may participate in
-        # multiple phases because some of its subsystems may be in one phase and some in another.
-        self._run_on_opt = [False, True, False]
 
         self._during_sparsity = False
 
@@ -1503,7 +1492,7 @@ class System(object):
         show_summary : bool
             If True, display summary information after generating coloring.
         show_sparsity : bool
-            If True, display sparsity with coloring info after generating coloring.
+            If True, plot sparsity with coloring info after generating coloring.
         """
         if method not in ('fd', 'cs', 'jax'):
             raise RuntimeError(
@@ -1512,7 +1501,7 @@ class System(object):
         self._has_approx = True
 
         # start with defaults
-        options = coloring_mod._Partial_ColoringMeta()
+        options = coloring_mod.Partial_ColoringMeta()
 
         if method != 'jax':
             approx = self._get_approx_scheme(method)
@@ -1580,10 +1569,7 @@ class System(object):
         if info.show_sparsity or info.show_summary:
             print("\nColoring for '%s' (class %s)" % (self.pathname, type(self).__name__))
 
-        if info.show_sparsity:
-            coloring.display_txt(summary=False)
-        if info.show_summary:
-            coloring.summary()
+        info.display()
 
         self._save_coloring(coloring)
 
@@ -1738,7 +1724,8 @@ class System(object):
                     self._outputs.set_val(starting_outputs +
                                           out_offsets * np.random.random(out_offsets.size))
                 if is_total:
-                    self._solve_nonlinear()
+                    with self._relevance.nonlinear_active('iter'):
+                        self._solve_nonlinear()
                 else:
                     self._apply_nonlinear()
 
@@ -2017,7 +2004,7 @@ class System(object):
         self._design_vars.update(self._static_design_vars)
         self._responses.update(self._static_responses)
 
-    def _setup_procs(self, pathname, comm, mode, prob_meta):
+    def _setup_procs(self, pathname, comm, prob_meta):
         """
         Execute first phase of the setup process.
 
@@ -2030,16 +2017,12 @@ class System(object):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
-        mode : str
-            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
-            reverse (adjoint). Default is 'rev'.
         prob_meta : dict
             Problem level options.
         """
         self._reset_setup_vars()
 
         self.pathname = pathname
-        self._mode = mode
         self._set_problem_meta(prob_meta)
         self.load_model_options()
 
@@ -2764,8 +2747,8 @@ class System(object):
         return self._problem_meta['recording_iter']
 
     @property
-    def _relevant(self):
-        return self._problem_meta['relevant']
+    def _relevance(self):
+        return self._problem_meta['relevance']
 
     @property
     def _static_mode(self):
@@ -2781,6 +2764,30 @@ class System(object):
         True if outside of setup.
         """
         return self._problem_meta is None or self._problem_meta['static_mode']
+
+    @property
+    def _mode(self):
+        """
+        Return the current system mode.
+
+        Returns
+        -------
+        str
+            The current system mode, 'fwd' or 'rev'.
+        """
+        return self._problem_meta['mode']
+
+    @property
+    def _orig_mode(self):
+        """
+        Return the user specified system mode.
+
+        Returns
+        -------
+        str
+            The system mode specified during setup, 'fwd', 'rev', or 'auto'.
+        """
+        return self._problem_meta['orig_mode']
 
     def _set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
@@ -2905,17 +2912,9 @@ class System(object):
                 for sub in s.system_iter(recurse=True, typ=typ):
                     yield sub
 
-    def _solver_subsystem_iter(self, local_only=True, relevant=None):
+    def _all_subsystem_iter(self):
         """
         Do nothing.
-
-        Parameters
-        ----------
-        local_only : bool
-            If True, only iterate over local subsystems.
-        relevant : bool or None
-            If True, only return relevant subsystems. If False, only return
-            irrelevant subsystems. If None, return all subsystems.
 
         Returns
         -------
@@ -3583,7 +3582,7 @@ class System(object):
                 path = prom2abs_out[prom][0] if prom in prom2abs_out else prom
                 raise RuntimeError(f"{self.msginfo}: Constraint alias '{alias}' on '{path}'"
                                    " is the same name as an existing variable.")
-            meta['alias_path'] = self.pathname
+        meta['parent'] = self.pathname
 
         if prom in prom2abs_out:  # promoted output
             src_name = prom2abs_out[prom][0]

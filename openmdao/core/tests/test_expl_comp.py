@@ -952,7 +952,7 @@ class ExplCompTestCase(unittest.TestCase):
         with self.assertRaises(TypeError) as cm:
             prob.setup(self)
 
-        msg = "The tags argument should be a str or list"
+        msg = "The tags argument should be a str, set, or list"
         self.assertEqual(str(cm.exception), msg)
 
     def test_compute_inputs_read_only(self):

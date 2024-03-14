@@ -91,7 +91,7 @@ class _TotalJacInfo(object):
 
     def __init__(self, problem, of, wrt, return_format, approx=False,
                  debug_print=False, driver_scaling=True, get_remote=True, directional=False,
-                 use_coloring=None):
+                 coloring_info=None, driver=None):
         """
         Initialize object.
 
@@ -117,16 +117,20 @@ class _TotalJacInfo(object):
             Whether to get remote variables if using MPI.
         directional : bool
             If True, perform a single directional derivative.
-        use_coloring : bool or None
-            If True, use coloring to compute total derivatives.  If False, do not.  If None, use
-            driver coloring if it exists.
+        coloring_info : ColoringMeta, None, or False
+            If None, use driver coloring if it exists.  If False, do no coloring. Otherwise, either
+            use or generate a new coloring based on the state of the coloring_info object.
+        driver : <Driver>, None, or False
+            The driver that owns the total jacobian.  If None, use the driver from the problem.
+            If False, this total jacobian will be computed directly by the problem.
         """
-        driver = problem.driver
+        if driver is None:
+            driver = problem.driver
         self.model = model = problem.model
 
         self.comm = problem.comm
-        self.mode = problem._mode
-        self.has_scaling = driver._has_scaling and driver_scaling
+        self._orig_mode = problem._orig_mode
+        self.has_scaling = driver and driver._has_scaling and driver_scaling
         self.return_format = return_format
         self.lin_sol_cache = {}
         self.debug_print = debug_print
@@ -135,6 +139,7 @@ class _TotalJacInfo(object):
         self.directional = directional
         self.initialize = True
         self.approx = approx
+        self.coloring_info = coloring_info
 
         orig_of = of
         orig_wrt = wrt
@@ -145,13 +150,8 @@ class _TotalJacInfo(object):
 
         of_metadata, wrt_metadata, has_custom_derivs = model._get_totals_metadata(driver, of, wrt)
 
-        self.input_meta = {'fwd': wrt_metadata, 'rev': of_metadata}
-        self.output_meta = {'fwd': of_metadata, 'rev': wrt_metadata}
-        self.input_vec = {'fwd': model._dresiduals, 'rev': model._doutputs}
-        self.output_vec = {'fwd': model._doutputs, 'rev': model._dresiduals}
-        self._dist_driver_vars = driver._dist_driver_vars
-
-        all_abs2meta_out = model._var_allprocs_abs2meta['output']
+        ofsize = sum(meta['global_size'] for meta in of_metadata.values())
+        wrtsize = sum(meta['global_size'] for meta in wrt_metadata.values())
 
         for meta in of_metadata.values():
             if 'linear' in meta and meta['linear']:
@@ -160,7 +160,25 @@ class _TotalJacInfo(object):
         else:
             has_lin_cons = False
 
-        if not driver.supports['linear_constraints']:
+        if self._orig_mode == 'auto':
+            if has_lin_cons:
+                self.mode = model._mode
+            elif ofsize >= wrtsize:
+                self.mode = 'fwd'
+            else:
+                self.mode = 'rev'
+        else:
+            self.mode = self._orig_mode
+
+        self.input_meta = {'fwd': wrt_metadata, 'rev': of_metadata}
+        self.output_meta = {'fwd': of_metadata, 'rev': wrt_metadata}
+        self.input_vec = {'fwd': model._dresiduals, 'rev': model._doutputs}
+        self.output_vec = {'fwd': model._doutputs, 'rev': model._dresiduals}
+        self._dist_driver_vars = driver._dist_driver_vars if driver else {}
+
+        all_abs2meta_out = model._var_allprocs_abs2meta['output']
+
+        if not driver or not driver.supports['linear_constraints']:
             has_lin_cons = False
 
         self.has_lin_cons = has_lin_cons
@@ -177,36 +195,25 @@ class _TotalJacInfo(object):
             modes = [self.mode]
         else:
             if not has_lin_cons:
-                if (orig_of is None and orig_wrt is None) or not has_custom_derivs:
-                    if use_coloring is False:
-                        coloring_meta = None
-                    else:
-                        # just use coloring and desvars/responses from driver
-                        coloring_meta = driver._coloring_info
-                else:
-                    if use_coloring:
-                        coloring_meta = driver._coloring_info.copy()
-                        coloring_meta.coloring = None
-                        coloring_meta.dynamic = True
-                    else:
-                        coloring_meta = None
+                if driver and ((orig_of is None and orig_wrt is None) or not has_custom_derivs):
+                    # we're using driver ofs/wrts
+                    if coloring_info is None:
+                        self.coloring_info = coloring_info = driver._coloring_info
 
-                do_coloring = coloring_meta is not None and \
-                    coloring_meta.do_compute_coloring() and (coloring_meta.dynamic)
+                do_coloring = coloring_info and \
+                    coloring_info.do_compute_coloring() and (coloring_info.dynamic) \
+                    and not problem._computing_coloring
 
-                if do_coloring and not problem._computing_coloring:
-                    run_model = coloring_meta.run_model if 'run_model' in coloring_meta else None
+                if do_coloring:
+                    run_model = coloring_info.run_model if 'run_model' in coloring_info else None
 
-                    coloring_meta.coloring = problem.get_total_coloring(coloring_meta,
+                    coloring_info.coloring = problem.get_total_coloring(coloring_info,
                                                                         of=of_metadata,
                                                                         wrt=wrt_metadata,
                                                                         run_model=run_model)
 
-                if coloring_meta is not None:
-                    self.simul_coloring = coloring_meta.coloring
-
-            if not isinstance(self.simul_coloring, coloring_mod.Coloring):
-                self.simul_coloring = None
+                if coloring_info:
+                    self.simul_coloring = coloring_info.coloring
 
             if self.simul_coloring is None:
                 modes = [self.mode]
@@ -851,7 +858,7 @@ class _TotalJacInfo(object):
         get_remote = self.get_remote
         has_dist = False
 
-        for voi, meta in vois.items():
+        for meta in vois.values():
             if not get_remote and meta['remote']:
                 continue
 
@@ -1357,20 +1364,21 @@ class _TotalJacInfo(object):
             # Linearize Model
             model._tot_jac = self
 
-            with self._relevance_context():
-                relevant = self.relevance
-                with relevant.all_seeds_active():
-                    try:
-                        ln_solver = model._linear_solver
-                        with model._scaled_context_all():
-                            model._linearize(model._assembled_jac,
-                                             sub_do_ln=ln_solver._linearize_children())
-                        if ln_solver._assembled_jac is not None and \
-                                ln_solver._assembled_jac._under_complex_step:
-                            model.linear_solver._assembled_jac._update(model)
-                        ln_solver._linearize()
-                    finally:
-                        model._tot_jac = None
+            with self._totjac_context():
+                relevance = self.relevance
+                with relevance.active(model.linear_solver.use_relevance()):
+                    with relevance.all_seeds_active():
+                        try:
+                            ln_solver = model._linear_solver
+                            with model._scaled_context_all():
+                                model._linearize(model._assembled_jac,
+                                                 sub_do_ln=ln_solver._linearize_children())
+                            if ln_solver._assembled_jac is not None and \
+                                    ln_solver._assembled_jac._under_complex_step:
+                                model.linear_solver._assembled_jac._update(model)
+                            ln_solver._linearize()
+                        finally:
+                            model._tot_jac = None
 
                 self.J[:] = 0.0
 
@@ -1410,7 +1418,7 @@ class _TotalJacInfo(object):
                                 fwd_seeds = None
                                 rev_seeds = itermeta['seed_vars']
 
-                            with relevant.seeds_active(fwd_seeds=fwd_seeds, rev_seeds=rev_seeds):
+                            with relevance.seeds_active(fwd_seeds=fwd_seeds, rev_seeds=rev_seeds):
                                 # restore old linear solution if cache_linear_solution was set by
                                 # the user for any input variables involved in this linear solution.
                                 with model._scaled_context_all():
@@ -1482,7 +1490,7 @@ class _TotalJacInfo(object):
 
         t0 = time.perf_counter()
 
-        with self._relevance_context():
+        with self._totjac_context():
             model._tot_jac = self
             try:
                 if self.initialize:
@@ -1553,7 +1561,8 @@ class _TotalJacInfo(object):
         meta : dict
             Variable metadata.
         jac_arr : ndarray
-            Row or column of jacobian being checked for zero entries.
+            Row or column of jacobian being checked for zero entries. Note that in this
+            array, zero entries are True and nonzero ones are False.
 
         Returns
         -------
@@ -1561,11 +1570,9 @@ class _TotalJacInfo(object):
             Index array of zero entries.
         """
         inds = meta['indices']   # these must be indices into the flattened var
-        jac_slice = meta['jac_slice']
-        source = meta['source']
         shname = 'global_shape' if self.get_remote else 'shape'
-        shape = self.model._var_allprocs_abs2meta['output'][source][shname]
-        vslice = jac_arr[jac_slice]
+        shape = self.model._var_allprocs_abs2meta['output'][meta['source']][shname]
+        vslice = jac_arr[meta['jac_slice']]
 
         if inds is None:
             zero_idxs = np.atleast_1d(vslice.reshape(shape)).nonzero()
@@ -1598,7 +1605,7 @@ class _TotalJacInfo(object):
 
         # Check for zero rows, which correspond to constraints unaffected by any design vars.
         col = np.ones(self.J.shape[0], dtype=bool)
-        col[nzrows] = False  # False in this case means nonzero
+        col[nzrows] = False  # False here means nonzero
         if np.any(col):  # there's at least 1 row that's zero across all columns
             zero_rows = []
             for n, meta in self.output_meta['fwd'].items():
@@ -1689,10 +1696,10 @@ class _TotalJacInfo(object):
 
         if self.return_format in ('dict', 'array'):
             for prom_out, odict in J.items():
-                oscaler = responses[prom_out]['total_scaler']
+                oscaler = responses[prom_out].get('total_scaler')
 
                 for prom_in, val in odict.items():
-                    iscaler = desvars[prom_in]['total_scaler']
+                    iscaler = desvars[prom_in].get('total_scaler')
 
                     # Scale response side
                     if oscaler is not None:
@@ -1835,17 +1842,20 @@ class _TotalJacInfo(object):
         return newJ, slices
 
     @contextmanager
-    def _relevance_context(self):
+    def _totjac_context(self):
         """
         Context manager to set current relevance for the Problem.
         """
-        old_relevance = self.model._problem_meta['relevant']
-        self.model._problem_meta['relevant'] = self.relevance
+        old_relevance = self.model._problem_meta['relevance']
+        old_mode = self.model._problem_meta['mode']
+        self.model._problem_meta['relevance'] = self.relevance
+        self.model._problem_meta['mode'] = self.mode
 
         try:
             yield
         finally:
-            self.model._problem_meta['relevant'] = old_relevance
+            self.model._problem_meta['relevance'] = old_relevance
+            self.model._problem_meta['mode'] = old_mode
 
 
 def _fix_pdc_lengths(idx_iter_dict):

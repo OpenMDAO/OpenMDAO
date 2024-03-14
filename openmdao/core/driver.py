@@ -174,7 +174,7 @@ class Driver(object):
         self.iter_count = 0
         self.cite = ""
 
-        self._coloring_info = coloring_mod._ColoringMeta()
+        self._coloring_info = coloring_mod.ColoringMeta()
 
         self._total_jac_format = 'flat_dict'
         self._con_subjacs = {}
@@ -566,6 +566,38 @@ class Driver(object):
         self._filtered_vars_to_record = self._get_vars_to_record()
         self._rec_mgr.startup(self, self._problem().comm)
 
+    def _run(self):
+        """
+        Execute this driver.
+
+        This calls the run() method, which should be overriden by the subclass.
+
+        Returns
+        -------
+        bool
+            Failure flag; True if failed to converge, False is successful.
+        """
+        problem = self._problem()
+        model = problem.model
+
+        if self.supports['optimization'] and problem.options['group_by_pre_opt_post']:
+            if model._pre_components:
+                with model._relevance.nonlinear_active('pre'):
+                    model.run_solve_nonlinear()
+
+            with SaveOptResult(self):
+                with model._relevance.nonlinear_active('iter'):
+                    result = self.run()
+
+            if model._post_components:
+                with model._relevance.nonlinear_active('post'):
+                    model.run_solve_nonlinear()
+
+            return result
+        else:
+            with SaveOptResult(self):
+                return self.run()
+
     def _get_voi_val(self, name, meta, remote_vois, driver_scaling=True,
                      get_remote=True, rank=None):
         """
@@ -928,20 +960,6 @@ class Driver(object):
         """
         return 'FAIL' if self.fail else 'SUCCESS'
 
-    def get_constraints_without_dv(self):
-        """
-        Return a list of constraint names that don't depend on any design variables.
-
-        Returns
-        -------
-        list of str
-            Names of constraints that don't depend on any design variables.
-        """
-        relevant = self._problem().model._relevant
-        with relevant.all_seeds_active():
-            return [name for name, meta in self._cons.items()
-                    if not relevant.is_globally_relevant(meta['source'])]
-
     def check_relevance(self):
         """
         Check if there are constraints that don't depend on any design vars.
@@ -952,6 +970,13 @@ class Driver(object):
         if not self.supports['gradients']:
             return
 
+        if 'singular_jac_behavior' in self.options:
+            singular_behavior = self.options['singular_jac_behavior']
+            if singular_behavior == 'ignore':
+                return
+        else:
+            singular_behavior = 'warn'
+
         problem = self._problem()
 
         # Do not perform this check if any subgroup uses approximated partials.
@@ -960,13 +985,26 @@ class Driver(object):
             if system._has_approx:
                 return
 
-        bad_cons = [n for n in self.get_constraints_without_dv() if n not in self._designvars]
-        if bad_cons:
+        bad = {n for n in self._problem().model._relevance._no_dv_responses
+               if n not in self._designvars}
+        if bad:
+            bad_conns = [m['name'] for m in self._cons.values() if m['source'] in bad]
+            bad_objs = [m['name'] for m in self._objs.values() if m['source'] in bad]
+            badmsg = []
+            if bad_conns:
+                badmsg.append(f"constraint(s) {bad_conns}")
+            if bad_objs:
+                badmsg.append(f"objective(s) {bad_objs}")
+            bad = ' and '.join(badmsg)
             # Note: There is a hack in ScipyOptimizeDriver for older versions of COBYLA that
             #       implements bounds on design variables by adding them as constraints.
             #       These design variables as constraints will not appear in the wrt list.
-            raise RuntimeError(f"{self.msginfo}: Constraint(s) {bad_cons} do not depend on any "
-                               "design variables. Please check your problem formulation.")
+            msg = f"{self.msginfo}: {bad} do not depend on any " \
+                  "design variables. Please check your problem formulation."
+            if singular_behavior == 'error':
+                raise RuntimeError(msg)
+            else:
+                issue_warning(msg, category=DriverWarning)
 
     def run(self):
         """
@@ -1019,7 +1057,6 @@ class Driver(object):
             Derivatives in form requested by 'return_format'.
         """
         problem = self._problem()
-        total_jac = self._total_jac
         debug_print = 'totals' in self.options['debug_print'] and (not MPI or
                                                                    problem.comm.rank == 0)
 
@@ -1028,7 +1065,7 @@ class Driver(object):
             print(header)
             print(len(header) * '-' + '\n')
 
-        if total_jac is None:
+        if self._total_jac is None:
             total_jac = _TotalJacInfo(problem, of, wrt, return_format,
                                       approx=problem.model._owns_approx_jac,
                                       debug_print=debug_print,
@@ -1041,6 +1078,8 @@ class Driver(object):
                     self._total_jac_linear = total_jac
             else:
                 self._total_jac = total_jac
+        else:
+            total_jac = self._total_jac
 
         totals = total_jac.compute_totals()
 
@@ -1103,7 +1142,8 @@ class Driver(object):
                          perturb_size=coloring_mod._DEF_COMP_SPARSITY_ARGS['perturb_size'],
                          min_improve_pct=coloring_mod._DEF_COMP_SPARSITY_ARGS['min_improve_pct'],
                          show_summary=coloring_mod._DEF_COMP_SPARSITY_ARGS['show_summary'],
-                         show_sparsity=coloring_mod._DEF_COMP_SPARSITY_ARGS['show_sparsity']):
+                         show_sparsity=coloring_mod._DEF_COMP_SPARSITY_ARGS['show_sparsity'],
+                         use_scaling=coloring_mod._DEF_COMP_SPARSITY_ARGS['use_scaling']):
         """
         Set options for total deriv coloring.
 
@@ -1124,6 +1164,8 @@ class Driver(object):
             If True, display summary information after generating coloring.
         show_sparsity : bool
             If True, display sparsity with coloring info after generating coloring.
+        use_scaling : bool
+            If True, use driver scaling when generating the sparsity.
         """
         self._coloring_info.coloring = None
         self._coloring_info.num_full_jacs = num_full_jacs
@@ -1137,6 +1179,7 @@ class Driver(object):
             self._coloring_info.dynamic = False
         self._coloring_info.show_summary = show_summary
         self._coloring_info.show_sparsity = show_sparsity
+        self._coloring_info.use_scaling = use_scaling
 
     def use_fixed_coloring(self, coloring=coloring_mod._STD_COLORING_FNAME):
         """

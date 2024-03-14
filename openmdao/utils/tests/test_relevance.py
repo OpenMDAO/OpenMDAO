@@ -1,45 +1,8 @@
 import unittest
 
-import numpy as np
-from numpy.testing import assert_equal
-
 import openmdao.api as om
-from openmdao.utils.relevance import Relevance, SetChecker, _vars2systems, \
-    _get_set_checker
-from openmdao.utils.assert_utils import assert_near_equal
-
-
-_full_set = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'}
-
-class TestSetChecker(unittest.TestCase):
-    def test_contains(self):
-        checker = SetChecker(set(['a', 'b', 'c']))
-        self.assertTrue('a' in checker)
-        self.assertFalse('d' in checker)
-
-    def test_iter(self):
-        checker = SetChecker(set(['a', 'b', 'c']))
-        self.assertEqual(sorted(list(checker)), ['a', 'b', 'c'])
-
-    def test_len(self):
-        checker = SetChecker(set(['a', 'b', 'c']))
-        self.assertEqual(len(checker), 3)
-
-    def test_to_set(self):
-        checker = SetChecker(set(['a', 'b', 'c']))
-        self.assertEqual(checker.to_set(), set(['a', 'b', 'c']))
-
-    def test_intersection(self):
-        checker = SetChecker(set(['a', 'b', 'c']))
-        self.assertEqual(checker.intersection(set(['b', 'c', 'd'])), set(['b', 'c']))
-
-    def test_invert(self):
-        checker = SetChecker(set(['a', 'b', 'c']), full_set=set(['a', 'b', 'c', 'd', 'e']), invert=True)
-        self.assertTrue('d' in checker)
-        self.assertFalse('a' in checker)
-        self.assertEqual(len(checker), 2)
-        self.assertEqual(checker.to_set(), set(['d', 'e']))
-        self.assertEqual(checker.intersection(set(['b', 'c', 'd'])), set(['d']))
+from openmdao.utils.relevance import _vars2systems
+from openmdao.utils.assert_utils import assert_check_totals
 
 
 class TestRelevance(unittest.TestCase):
@@ -48,18 +11,35 @@ class TestRelevance(unittest.TestCase):
         expected = {'abc', 'abc.def', 'xyz', 'xyz.pdq', 'aaa', 'foobar', ''}
         self.assertEqual(_vars2systems(names), expected)
 
-    def test_set_checker_invert(self):
-        checker = _get_set_checker({'a', 'b', 'c', 'f', 'g', 'h', 'i', 'j'}, _full_set)
-        self.assertEqual(checker._invert, True)
-        self.assertEqual(checker._full_set, _full_set)
-        self.assertEqual(checker._set, {'d', 'e'})
-        self.assertTrue('c' in checker)
-        self.assertFalse('d' in checker)
 
-    def test_set_checker(self):
-        checker = _get_set_checker({'a','c'}, _full_set)
-        self.assertEqual(checker._invert, False)
-        self.assertEqual(checker._full_set, None)
-        self.assertEqual(checker._set, {'a', 'c'})
-        self.assertTrue('c' in checker)
-        self.assertFalse('d' in checker)
+class TestDerivsWithoutDVs(unittest.TestCase):
+    def test_derivs_with_no_dvs(self):
+        # this tests github issue #3037
+
+        class DummyComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('a', 1.)
+                self.add_output('b', 1.)
+            def compute(self, inputs, outputs):
+                outputs['b'] = 2. * inputs['a']
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                if mode=='rev':
+                    if 'a' in d_inputs:
+                        if 'b' in d_outputs:
+                            d_inputs['a'] += d_outputs['b'] * 2.
+
+        prob = om.Problem()
+        prob.model.add_subsystem('ivc', om.IndepVarComp(), promotes=['*'])
+        prob.model.ivc.add_output('a', 1.)
+        prob.model.add_subsystem('dummy', DummyComp(), promotes=['*'])
+
+        ### when there's a objective/constraint but no design var, derivatives were zero because the
+        ### derivative computation was skipped
+        #prob.model.add_design_var('a', lower=0., upper=2.)
+        #prob.model.add_constraint('b', lower=3.)
+        prob.model.add_objective('b')
+
+        prob.setup(mode='rev')
+        prob.run_model()
+        chk = prob.check_totals(of='b', wrt='a', show_only_incorrect=True)
+        assert_check_totals(chk)

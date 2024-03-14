@@ -7,6 +7,7 @@ from openmdao.test_suite.components.exec_comp_for_test import ExecComp4Test
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
+from openmdao.drivers.pyoptsparse_driver import pyoptsparse
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -39,8 +40,11 @@ def setup_problem(do_pre_post_opt, mode, use_ivc=False, coloring=False, size=3, 
     prob = om.Problem()
     prob.options['group_by_pre_opt_post'] = do_pre_post_opt
 
-    prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False)
-    prob.set_solver_print(level=0)
+    if parallel:
+        prob.driver = om.pyOptSparseDriver(optimizer='SLSQP')
+    else:
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False)
+        prob.set_solver_print(level=0)
 
     model = prob.model
 
@@ -53,6 +57,7 @@ def setup_problem(do_pre_post_opt, mode, use_ivc=False, coloring=False, size=3, 
     if parallel:
         par = model.add_subsystem('par', om.ParallelGroup(), promotes=['*'])
         par.nonlinear_solver = om.NonlinearBlockJac()
+        par.linear_solver = om.LinearBlockJac()
         parent = par
     else:
         parent = model
@@ -229,10 +234,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.iter1.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter2.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter3.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter4.num_nl_solves, 4)
+        self.assertEqual(prob.model.iter1.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter2.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter3.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter4.num_nl_solves, 3)
 
         self.assertEqual(prob.model.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.post2.num_nl_solves, 1)
@@ -247,10 +252,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.G1.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.G1.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.G1.iter1.num_nl_solves, 4)
-        self.assertEqual(prob.model.G1.iter2.num_nl_solves, 4)
-        self.assertEqual(prob.model.G2.iter3.num_nl_solves, 4)
-        self.assertEqual(prob.model.G2.iter4.num_nl_solves, 4)
+        self.assertEqual(prob.model.G1.iter1.num_nl_solves, 3)
+        self.assertEqual(prob.model.G1.iter2.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter3.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter4.num_nl_solves, 3)
 
         self.assertEqual(prob.model.G2.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.G2.post2.num_nl_solves, 1)
@@ -265,10 +270,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.iter1.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter2.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter3.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter4.num_nl_solves, 4)
+        self.assertEqual(prob.model.iter1.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter2.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter3.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter4.num_nl_solves, 3)
 
         self.assertEqual(prob.model.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.post2.num_nl_solves, 1)
@@ -283,10 +288,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.G1.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.G1.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.G1.iter1.num_nl_solves, 4)
-        self.assertEqual(prob.model.G1.iter2.num_nl_solves, 4)
-        self.assertEqual(prob.model.G2.iter3.num_nl_solves, 4)
-        self.assertEqual(prob.model.G2.iter4.num_nl_solves, 4)
+        self.assertEqual(prob.model.G1.iter1.num_nl_solves, 3)
+        self.assertEqual(prob.model.G1.iter2.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter3.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter4.num_nl_solves, 3)
 
         self.assertEqual(prob.model.G2.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.G2.post2.num_nl_solves, 1)
@@ -300,7 +305,11 @@ class TestPrePostIter(unittest.TestCase):
         prob.final_setup()
         prob.run_model()
 
-        J = prob.compute_totals(of=['iter2.y', 'iter3.y'], wrt=['iter1.x3'], use_coloring=True)
+        coloring_info = prob.driver._coloring_info.copy()
+        coloring_info.coloring = None
+        coloring_info.dynamic = True
+
+        J = prob.compute_totals(of=['iter2.y', 'iter3.y'], wrt=['iter1.x3'], coloring_info=coloring_info)
 
         data = prob.check_totals(of=['iter2.y', 'iter3.y'], wrt=['iter1.x3'], out_stream=None)
         assert_check_totals(data)
@@ -312,10 +321,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.iter1.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter2.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter3.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter4.num_nl_solves, 4)
+        self.assertEqual(prob.model.iter1.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter2.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter3.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter4.num_nl_solves, 3)
 
         self.assertEqual(prob.model.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.post2.num_nl_solves, 1)
@@ -330,10 +339,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.G1.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.G1.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.G1.iter1.num_nl_solves, 4)
-        self.assertEqual(prob.model.G1.iter2.num_nl_solves, 4)
-        self.assertEqual(prob.model.G2.iter3.num_nl_solves, 4)
-        self.assertEqual(prob.model.G2.iter4.num_nl_solves, 4)
+        self.assertEqual(prob.model.G1.iter1.num_nl_solves, 3)
+        self.assertEqual(prob.model.G1.iter2.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter3.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter4.num_nl_solves, 3)
 
         self.assertEqual(prob.model.G2.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.G2.post2.num_nl_solves, 1)
@@ -348,10 +357,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.iter1.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter2.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter3.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter4.num_nl_solves, 4)
+        self.assertEqual(prob.model.iter1.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter2.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter3.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter4.num_nl_solves, 3)
 
         self.assertEqual(prob.model.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.post2.num_nl_solves, 1)
@@ -366,10 +375,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.iter1.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter2.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter3.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter4.num_nl_solves, 4)
+        self.assertEqual(prob.model.iter1.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter2.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter3.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter4.num_nl_solves, 3)
 
         self.assertEqual(prob.model.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.post2.num_nl_solves, 1)
@@ -384,10 +393,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.G1.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.G1.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.G1.iter1.num_nl_solves, 4)
-        self.assertEqual(prob.model.G1.iter2.num_nl_solves, 4)
-        self.assertEqual(prob.model.G2.iter3.num_nl_solves, 4)
-        self.assertEqual(prob.model.G2.iter4.num_nl_solves, 4)
+        self.assertEqual(prob.model.G1.iter1.num_nl_solves, 3)
+        self.assertEqual(prob.model.G1.iter2.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter3.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter4.num_nl_solves, 3)
 
         self.assertEqual(prob.model.G2.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.G2.post2.num_nl_solves, 1)
@@ -402,10 +411,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.iter1.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter2.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter3.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter4.num_nl_solves, 4)
+        self.assertEqual(prob.model.iter1.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter2.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter3.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter4.num_nl_solves, 3)
 
         self.assertEqual(prob.model.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.post2.num_nl_solves, 1)
@@ -420,10 +429,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.G1.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.G1.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.G1.iter1.num_nl_solves, 4)
-        self.assertEqual(prob.model.G1.iter2.num_nl_solves, 4)
-        self.assertEqual(prob.model.G2.iter3.num_nl_solves, 4)
-        self.assertEqual(prob.model.G2.iter4.num_nl_solves, 4)
+        self.assertEqual(prob.model.G1.iter1.num_nl_solves, 3)
+        self.assertEqual(prob.model.G1.iter2.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter3.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter4.num_nl_solves, 3)
 
         self.assertEqual(prob.model.G2.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.G2.post2.num_nl_solves, 1)
@@ -436,19 +445,19 @@ class TestPrePostIter(unittest.TestCase):
                                   force=['post2'], mode='fwd')
         prob.run_driver()
 
-        self.assertEqual(prob.model._pre_components, ['G1.pre1', 'G1.pre2'])
-        self.assertEqual(prob.model._post_components, [])
+        self.assertEqual(prob.model._pre_components, {'G1.pre1', 'G1.pre2', '_auto_ivc'})
+        self.assertEqual(prob.model._post_components, set())
 
         self.assertEqual(prob.model.G1.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.G1.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.G1.iter1.num_nl_solves, 4)
-        self.assertEqual(prob.model.G1.iter2.num_nl_solves, 4)
-        self.assertEqual(prob.model.G2.iter3.num_nl_solves, 4)
-        self.assertEqual(prob.model.G2.iter4.num_nl_solves, 4)
+        self.assertEqual(prob.model.G1.iter1.num_nl_solves, 3)
+        self.assertEqual(prob.model.G1.iter2.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter3.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter4.num_nl_solves, 3)
 
-        self.assertEqual(prob.model.G2.post1.num_nl_solves, 4)
-        self.assertEqual(prob.model.G2.post2.num_nl_solves, 4)
+        self.assertEqual(prob.model.G2.post1.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.post2.num_nl_solves, 3)
 
         data = prob.check_totals(out_stream=None)
         assert_check_totals(data)
@@ -458,16 +467,16 @@ class TestPrePostIter(unittest.TestCase):
                                   force=['pre1'], mode='fwd')
         prob.run_driver()
 
-        self.assertEqual(prob.model._pre_components, [])
-        self.assertEqual(prob.model._post_components, ['G2.post1', 'G2.post2'])
+        self.assertEqual(prob.model._pre_components, set())
+        self.assertEqual(prob.model._post_components, {'G2.post1', 'G2.post2'})
 
-        self.assertEqual(prob.model.G1.pre1.num_nl_solves, 4)
-        self.assertEqual(prob.model.G1.pre2.num_nl_solves, 4)
+        self.assertEqual(prob.model.G1.pre1.num_nl_solves, 3)
+        self.assertEqual(prob.model.G1.pre2.num_nl_solves, 3)
 
-        self.assertEqual(prob.model.G1.iter1.num_nl_solves, 4)
-        self.assertEqual(prob.model.G1.iter2.num_nl_solves, 4)
-        self.assertEqual(prob.model.G2.iter3.num_nl_solves, 4)
-        self.assertEqual(prob.model.G2.iter4.num_nl_solves, 4)
+        self.assertEqual(prob.model.G1.iter1.num_nl_solves, 3)
+        self.assertEqual(prob.model.G1.iter2.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter3.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter4.num_nl_solves, 3)
 
         self.assertEqual(prob.model.G2.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.G2.post2.num_nl_solves, 1)
@@ -482,10 +491,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.iter1.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter2.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter3.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter4.num_nl_solves, 4)
+        self.assertEqual(prob.model.iter1.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter2.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter3.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter4.num_nl_solves, 3)
 
         self.assertEqual(prob.model.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.post2.num_nl_solves, 1)
@@ -500,10 +509,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.iter1.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter2.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter3.num_nl_solves, 4)
-        self.assertEqual(prob.model.iter4.num_nl_solves, 4)
+        self.assertEqual(prob.model.iter1.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter2.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter3.num_nl_solves, 3)
+        self.assertEqual(prob.model.iter4.num_nl_solves, 3)
 
         self.assertEqual(prob.model.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.post2.num_nl_solves, 1)
@@ -519,10 +528,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.iter1.num_nl_solves, 10)
-        self.assertEqual(prob.model.iter2.num_nl_solves, 10)
-        self.assertEqual(prob.model.iter3.num_nl_solves, 10)
-        self.assertEqual(prob.model.iter4.num_nl_solves, 10)
+        self.assertEqual(prob.model.iter1.num_nl_solves, 9)
+        self.assertEqual(prob.model.iter2.num_nl_solves, 9)
+        self.assertEqual(prob.model.iter3.num_nl_solves, 9)
+        self.assertEqual(prob.model.iter4.num_nl_solves, 9)
 
         self.assertEqual(prob.model.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.post2.num_nl_solves, 1)
@@ -537,10 +546,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.G1.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.G1.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.G1.iter1.num_nl_solves, 10)
-        self.assertEqual(prob.model.G1.iter2.num_nl_solves, 10)
-        self.assertEqual(prob.model.G2.iter3.num_nl_solves, 10)
-        self.assertEqual(prob.model.G2.iter4.num_nl_solves, 10)
+        self.assertEqual(prob.model.G1.iter1.num_nl_solves, 9)
+        self.assertEqual(prob.model.G1.iter2.num_nl_solves, 9)
+        self.assertEqual(prob.model.G2.iter3.num_nl_solves, 9)
+        self.assertEqual(prob.model.G2.iter4.num_nl_solves, 9)
 
         self.assertEqual(prob.model.G2.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.G2.post2.num_nl_solves, 1)
@@ -555,10 +564,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.iter1.num_nl_solves, 17)
-        self.assertEqual(prob.model.iter2.num_nl_solves, 17)
-        self.assertEqual(prob.model.iter3.num_nl_solves, 17)
-        self.assertEqual(prob.model.iter4.num_nl_solves, 17)
+        self.assertEqual(prob.model.iter1.num_nl_solves, 16)
+        self.assertEqual(prob.model.iter2.num_nl_solves, 16)
+        self.assertEqual(prob.model.iter3.num_nl_solves, 16)
+        self.assertEqual(prob.model.iter4.num_nl_solves, 16)
 
         self.assertEqual(prob.model.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.post2.num_nl_solves, 1)
@@ -573,10 +582,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.iter1.num_nl_solves, 10)
-        self.assertEqual(prob.model.iter2.num_nl_solves, 10)
-        self.assertEqual(prob.model.iter3.num_nl_solves, 10)
-        self.assertEqual(prob.model.iter4.num_nl_solves, 10)
+        self.assertEqual(prob.model.iter1.num_nl_solves, 9)
+        self.assertEqual(prob.model.iter2.num_nl_solves, 9)
+        self.assertEqual(prob.model.iter3.num_nl_solves, 9)
+        self.assertEqual(prob.model.iter4.num_nl_solves, 9)
 
         self.assertEqual(prob.model.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.post2.num_nl_solves, 1)
@@ -591,10 +600,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.iter1.num_nl_solves, 17)
-        self.assertEqual(prob.model.iter2.num_nl_solves, 17)
-        self.assertEqual(prob.model.iter3.num_nl_solves, 17)
-        self.assertEqual(prob.model.iter4.num_nl_solves, 17)
+        self.assertEqual(prob.model.iter1.num_nl_solves, 16)
+        self.assertEqual(prob.model.iter2.num_nl_solves, 16)
+        self.assertEqual(prob.model.iter3.num_nl_solves, 16)
+        self.assertEqual(prob.model.iter4.num_nl_solves, 16)
 
         self.assertEqual(prob.model.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.post2.num_nl_solves, 1)
@@ -659,10 +668,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(sorted(source_vars['outputs']), ['iter1.x3', 'iter1.y', 'iter2.y', 'iter3.y', 'iter4.y', 'post1.y', 'post2.y', 'pre1.x', 'pre1.y', 'pre2.x', 'pre2.y'])
 
         # Test to see if we got the correct number of cases
-        self.assertEqual(len(cr.list_cases('root', recurse=False, out_stream=None)), 6)
-        self.assertEqual(len(cr.list_cases('root.iter1', recurse=False, out_stream=None)), 4)
-        self.assertEqual(len(cr.list_cases('root.iter2', recurse=False, out_stream=None)), 4)
-        self.assertEqual(len(cr.list_cases('root.iter3', recurse=False, out_stream=None)), 4)
+        self.assertEqual(len(cr.list_cases('root', recurse=False, out_stream=None)), 5)
+        self.assertEqual(len(cr.list_cases('root.iter1', recurse=False, out_stream=None)), 3)
+        self.assertEqual(len(cr.list_cases('root.iter2', recurse=False, out_stream=None)), 3)
+        self.assertEqual(len(cr.list_cases('root.iter3', recurse=False, out_stream=None)), 3)
         self.assertEqual(len(cr.list_cases('root.pre1', recurse=False, out_stream=None)), 1)
         self.assertEqual(len(cr.list_cases('root.pre2', recurse=False, out_stream=None)), 1)
         self.assertEqual(len(cr.list_cases('root.post1', recurse=False, out_stream=None)), 1)
@@ -718,9 +727,9 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(p.model.pre1.num_nl_solves, 1)
         self.assertEqual(p.model.pre2.num_nl_solves, 1)
 
-        self.assertEqual(p.model.incomplete.num_nl_solves, 5)
-        self.assertEqual(p.model.iter1.num_nl_solves, 5)
-        self.assertEqual(p.model.obj.num_nl_solves, 5)
+        self.assertEqual(p.model.incomplete.num_nl_solves, 4)
+        self.assertEqual(p.model.iter1.num_nl_solves, 4)
+        self.assertEqual(p.model.obj.num_nl_solves, 4)
 
         self.assertEqual(p.model.post1.num_nl_solves, 1)
 
@@ -735,11 +744,11 @@ class TestPrePostIter(unittest.TestCase):
         G2 = model.add_subsystem('G2', om.Group(), promotes=['*'])
         G3 = model.add_subsystem('G3', om.Group(), promotes=['*'])
 
-        C1 = G1.add_subsystem('C1', MissingPartialsComp())
-        C2 = G1.add_subsystem('C2', MissingPartialsComp())
-        C3 = G1.add_subsystem('C3', MissingPartialsComp())
-        C4 = G2.add_subsystem('C4', MissingPartialsComp())
-        C5 = G3.add_subsystem('C5', MissingPartialsComp())
+        G1.add_subsystem('C1', MissingPartialsComp())
+        G1.add_subsystem('C2', MissingPartialsComp())
+        G1.add_subsystem('C3', MissingPartialsComp())
+        G2.add_subsystem('C4', MissingPartialsComp())
+        G3.add_subsystem('C5', MissingPartialsComp())
 
         model.connect('C1.y', 'C2.a')
         model.connect('C1.z', 'C4.a')
@@ -756,13 +765,13 @@ class TestPrePostIter(unittest.TestCase):
         p.setup()
         p.final_setup()
 
-        self.assertEqual(C1._run_on_opt, [True, False, False])
-        self.assertEqual(C2._run_on_opt, [True, False, False])
-        self.assertEqual(C3._run_on_opt, [False, True, False])
-        self.assertEqual(C4._run_on_opt, [False, True, False])
-        self.assertEqual(C5._run_on_opt, [False, False, True])
+        self.assertEqual(model._pre_components, {'_auto_ivc', 'G1.C1', 'G1.C2'})
+        self.assertEqual(model._iterated_components, {'G1.C3', 'G2.C4', '_auto_ivc'})
+        self.assertEqual(model._post_components, {'G3.C5'})
 
 
+@use_tempdirs
+@unittest.skipUnless(pyoptsparse, "pyoptsparse is required.")
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class PrePostMPITestCase(unittest.TestCase):
     N_PROCS = 2
