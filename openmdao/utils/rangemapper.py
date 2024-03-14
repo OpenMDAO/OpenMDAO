@@ -52,7 +52,7 @@ class RangeMapper(object):
             A mapper that maps indices to variable key and relative indices.
         """
         size = sum(size for _, size in sizes)
-        return FlatRangeMapper(sizes) if size < max_flat_range_size else RangeTree(sizes)
+        return FlatRangeMapper(sizes) if size <= max_flat_range_size else RangeTree(sizes)
 
     def key2range(self, key):
         """

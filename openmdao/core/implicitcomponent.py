@@ -507,9 +507,11 @@ class ImplicitComponent(Component):
 
             plen = len(self.pathname) + 1
             resid_mapper = RangeMapper.create([(n, shape_to_len(meta['shape']))
-                                               for n, meta in self._declared_residuals.items()])
+                                               for n, meta in self._declared_residuals.items()],
+                                               max_flat_range_size=100)
             out_mapper = RangeMapper.create([(n[plen:], shape_to_len(meta['shape']))
-                                             for n, meta in self._var_abs2meta['output'].items()])
+                                             for n, meta in self._var_abs2meta['output'].items()],
+                                             max_flat_range_size=100)
 
             if resid_mapper.size != out_mapper.size:
                 raise RuntimeError(f"{self.msginfo}: The number of residuals ({resid_mapper.size}) "
@@ -540,8 +542,7 @@ class ImplicitComponent(Component):
                     if oname not in omap:
                         omap[oname] = []
 
-                    data = (oname, pattern_meta.copy(),
-                            slice(ostart, ostop), slice(rstart, rstop))
+                    data = (oname, pattern_meta.copy(), slice(ostart, ostop), slice(rstart, rstop))
 
                     rmap[resid].append(data)
                     omap[oname].append(data)
