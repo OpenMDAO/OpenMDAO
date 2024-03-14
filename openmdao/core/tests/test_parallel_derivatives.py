@@ -12,6 +12,7 @@ import numpy as np
 import openmdao.api as om
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped, FanInGrouped, FanInGrouped2
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
+from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
 
 
@@ -943,6 +944,71 @@ class TestAutoIVCParDerivBug(unittest.TestCase):
         prob.run_model()
 
         assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+
+
+class LinearComp(om.ExplicitComponent):
+    def initialize(self):
+        self.options.declare("a", desc="slope")
+        self.options.declare("b", desc="y-intercept")
+
+    def setup(self):
+        self.a = self.options["a"]
+        self.b = self.options["b"]
+        self.add_input("x", val=0.0)
+        self.add_output("y", val=1.0)
+        self.add_output("z", val=0.0)
+        self.declare_partials("*", "*", method="cs")
+
+    def compute(self, inputs, outputs):
+        outputs["y"] = self.a * inputs["x"] + self.b
+        outputs["z"] = self.a * inputs["x"] ** 2 + self.b * inputs["x"] + 1.0
+
+class LinearGroup(om.Group):
+    def initialize(self):
+        self.options.declare("a", desc="slope")
+        self.options.declare("b", desc="y-intercept")
+
+    def setup(self):
+        ivc = self.add_subsystem("ivc", om.IndepVarComp("x", val=0.0), promotes=["*"])
+        self.add_subsystem("eval", LinearComp(a=self.options["a"], b=self.options["b"]), promotes=["*"])
+        # Make x a dv for the linear equation
+        self.add_design_var("x", lower=-100.0, upper=100.0)
+        # Add constraint to find x intercept
+        self.add_constraint("y", equals=0.0, parallel_deriv_color="lift_con")
+
+
+@use_tempdirs
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestParDerivRelevance(unittest.TestCase):
+    N_PROCS = 3
+
+    def test_par_deriv_relevance(self):
+        prob = om.Problem()
+        model = prob.model
+
+        # Solve linear equation in parallel
+        parallel = model.add_subsystem('parallel', om.ParallelGroup())
+        parallel.add_subsystem('line1', LinearGroup(a=1.0, b=1.0))
+        parallel.add_subsystem('line2', LinearGroup(a=-1.0, b=1.0))
+        parallel.add_subsystem('line3', LinearGroup(a=5.0, b=3.14159))
+
+        # Add a dummy constraint because openmdao requires one
+        model.add_objective("parallel.line1.z")
+
+        # Setup SNOPT to solve constrained problem
+        prob.driver = om.pyOptSparseDriver(debug_print=['desvars', 'objs', 'nl_cons'])
+        prob.driver.options['optimizer'] = "SNOPT"
+        prob.driver.opt_settings['Major iterations limit'] = 50
+        prob.driver.opt_settings['Feasible point'] = None
+        prob.driver.opt_settings['verify level'] = 3
+
+        prob.setup()
+        prob.run_driver()
+
+        # Solution should be (-1.0, 1.0, -0.6283)
+        assert_near_equal(prob.get_val("parallel.line1.x", get_remote=True), -1.0)
+        assert_near_equal(prob.get_val("parallel.line2.x", get_remote=True), 1.0)
+        assert_near_equal(prob.get_val("parallel.line3.x", get_remote=True), -0.628318)
 
 
 if __name__ == "__main__":
