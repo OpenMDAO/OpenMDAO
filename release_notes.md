@@ -27,6 +27,10 @@ any changes that break your models, please submit an issue so we can resolve the
 
 ## Backwards Incompatible API Changes
 
+Tthe jacobian as returned by compute_totals is now keyed with the 'user facing' names given to the design variables and responses, rather than the absolute names that were used previously. OpenMDAO's general rule of thumb is that users see "promoted names" or aliases for variables. [#3113](https://github.com/OpenMDAO/OpenMDAO/pull/3113)
+
+The automatic determination of derivative 'mode' is now done separately for the driver vs. a direct call to `compute_totals` or `check_totals` with a set of 'of' and 'wrt' variables that differ from the driver responses and design variables. This can modify the keys in the dict return value of `check_totals`, where for example the dict used to contain a 'J_fwd' key because it ran in fwd mode, it might now contain a 'J_rev' key instead because the best derivative mode was determined to be 'rev' based on the relative sizes of the 'of' and 'wrt' variables passed to check_totals.
+
 ## Backwards Incompatible Non-API Changes
 
 - Changed `find_plugins` to `find_repos` and changed it to use tabulator.js [#3144](https://github.com/OpenMDAO/OpenMDAO/pull/3144)
