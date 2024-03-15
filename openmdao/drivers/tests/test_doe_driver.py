@@ -17,9 +17,8 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.groups.parallel_groups import FanInGrouped
 
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
-from openmdao.utils.general_utils import run_driver, printoptions
-from openmdao.utils.om_warnings import OMDeprecationWarning
+from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.general_utils import run_driver
 from openmdao.utils.testing_utils import use_tempdirs
 
 from openmdao.utils.mpi import MPI
@@ -1639,14 +1638,6 @@ class TestDOEDriverListVars(unittest.TestCase):
         self.assertIn('x     -1   0', output)
         self.assertIn('y     3    0', output)
         self.assertIn('f_xy  59   0', output)
-
-        expected_warning = 'Method `list_problem_vars` has been ' \
-                           'renamed `list_driver_vars`.\nPlease update ' \
-                           'your code to use list_driver_vars to avoid ' \
-                           'this warning.'
-
-        with assert_warning(OMDeprecationWarning, expected_warning):
-            prob.list_problem_vars()
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

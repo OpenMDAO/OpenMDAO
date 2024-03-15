@@ -6,7 +6,6 @@ import itertools
 
 from io import StringIO
 import numpy as np
-from collections import defaultdict
 
 import openmdao.api as om
 from openmdao.core.problem import _default_prob_name
@@ -17,7 +16,7 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDeriv
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
 import openmdao.utils.hooks as hooks
 from openmdao.utils.units import convert_units
-from openmdao.utils.om_warnings import DerivativesWarning
+from openmdao.utils.om_warnings import DerivativesWarning, OMDeprecationWarning
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.tests.test_hooks import hooks_active
 
@@ -1690,7 +1689,7 @@ class TestProblem(unittest.TestCase):
         strout = StringIO()
         sys.stdout = strout
         try:
-            prob.list_problem_vars()
+            prob.list_driver_vars()
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
@@ -1806,7 +1805,33 @@ class TestProblem(unittest.TestCase):
         self.assertEqual(l['objectives'][0][1]['scaler'], None)
         self.assertEqual(l['objectives'][0][1]['adder'], None)
 
-    def test_list_problem_vars_before_final_setup(self):
+    def test_list_problem_vars_deprecated(self):
+        model = SellarDerivatives()
+        model.nonlinear_solver = om.NonlinearBlockGS()
+
+        prob = om.Problem(model)
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.setup()
+        prob.run_driver()
+
+        expected_warning = 'Method `list_problem_vars` has been ' \
+                           'renamed `list_driver_vars`.\nPlease update ' \
+                           'your code to use list_driver_vars to avoid ' \
+                           'this warning.'
+
+        with assert_warning(OMDeprecationWarning, expected_warning):
+            prob_vars = prob.list_problem_vars(out_stream=None)
+
+        # make sure the deprecated function still returns tha data
+        self.assertEqual(set(prob_vars.keys()), {'constraints', 'design_vars', 'objectives'})
+
+    def test_list_driver_vars_before_final_setup(self):
         prob = om.Problem()
         prob.model.add_subsystem('parab', Paraboloid(), promotes_inputs=['x', 'y'])
         prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
@@ -1935,7 +1960,7 @@ class TestProblem(unittest.TestCase):
 
         p.run_model()
 
-    def test_list_problem_vars_driver_scaling(self):
+    def test_list_driver_vars_driver_scaling(self):
         model = SellarDerivatives()
         model.nonlinear_solver = om.NonlinearBlockGS()
 
