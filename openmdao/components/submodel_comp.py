@@ -398,7 +398,7 @@ class SubmodelComp(ExplicitComponent):
 
         if coloring is None:
             # only declare partials where of and wrt are relevant to each other
-            ofs = [m['source'] for m in of_metadata.values()]
+            ofs = tuple([m['source'] for m in of_metadata.values()])
             relevance = get_relevance(p.model, of_metadata, wrt_metadata)
             for wrt, wrt_meta in wrt_metadata.items():
                 outer_wrt = self._to_outer_input(wrt)

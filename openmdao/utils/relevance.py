@@ -48,23 +48,6 @@ def get_relevance(model, of, wrt):
     return relevance
 
 
-def _to_seed(names):
-    """
-    Return the seed from the given iter of names.
-
-    Parameters
-    ----------
-    names : iter of str
-        Iterator over names.
-
-    Returns
-    -------
-    tuple
-        Key tuple for the given names.
-    """
-    return tuple(sorted(names))
-
-
 class Relevance(object):
     """
     Class that computes relevance based on a data flow graph.
@@ -132,6 +115,8 @@ class Relevance(object):
         Cache of relevance arrays stored by array hash.
     _no_dv_responses : list
         List of responses that have no relevant design variables.
+    _seed_cache : dict
+        Maps seed variable names to the source of the seed.
     _rel_array_cache : dict
         Cache of relevance arrays stored by array hash.
     """
@@ -147,6 +132,7 @@ class Relevance(object):
         self._graph = model._dataflow_graph
         self._rel_array_cache = {}
         self._no_dv_responses = []
+        self._seed_cache = {}
 
         # seed var(s) for the current derivative operation
         self._seed_vars = {'fwd': (), 'rev': ()}
@@ -183,6 +169,44 @@ class Relevance(object):
             String representation of the Relevance.
         """
         return f"Relevance({self._seed_vars}, active={self._active})"
+
+    def _to_seed(self, names):
+        """
+        Return the seed from the given iter of names.
+
+        Cache the given names iter if it is hashable.
+
+        Parameters
+        ----------
+        names : iter of str
+            Iterator over names.
+
+        Returns
+        -------
+        tuple
+            Key tuple for the given names.
+        """
+        try:
+            return self._seed_cache[names]
+        except TypeError:  # names is not hashable
+            issue_warning("Relevance seeds should be hashable, but the following seed is not: "
+                          f"{names}. It will be converted to a hashable form, but this could "
+                          "cause performance issues.", category=RuntimeWarning)
+            hashable = False
+        except KeyError:  # names is not in the cache
+            hashable = names
+
+        try:
+            names = [self._seed_cache[n] for n in names]
+        except KeyError:
+            raise KeyError(f"One or more of the relevance seeds '{names}' is invalid.")
+
+        seeds = tuple(sorted(names))
+
+        if hashable:
+            self._seed_cache[hashable] = seeds
+
+        return seeds
 
     def _get_cached_array(self, arr):
         """
@@ -386,8 +410,22 @@ class Relevance(object):
         rev_meta : dict
             Dictionary of metadata for reverse derivatives.
         """
-        fwd_seeds = _to_seed([m['source'] for m in fwd_meta.values()])
-        rev_seeds = _to_seed([m['source'] for m in rev_meta.values()])
+        fwd_seeds = []
+        rev_seeds = []
+        for name, meta in fwd_meta.items():
+            src = meta['source']
+            self._seed_cache[name] = src
+            self._seed_cache[src] = src
+            fwd_seeds.append(src)
+
+        for name, meta in rev_meta.items():
+            src = meta['source']
+            self._seed_cache[name] = src
+            self._seed_cache[src] = src
+            rev_seeds.append(src)
+
+        fwd_seeds = self._to_seed(tuple(fwd_seeds))
+        rev_seeds = self._to_seed(tuple(rev_seeds))
 
         self._seed_var_map = seed_var_map = {}
         self._seed_sys_map = seed_sys_map = {}
@@ -601,8 +639,10 @@ class Relevance(object):
             save = {'fwd': self._seed_vars['fwd'], 'rev': self._seed_vars['rev']}
             save_active = self._active
             self._active = True
-            fwd_seeds = self._all_seed_vars['fwd'] if fwd_seeds is None else fwd_seeds
-            rev_seeds = self._all_seed_vars['rev'] if rev_seeds is None else rev_seeds
+            if fwd_seeds is None:
+                fwd_seeds = self._seed_vars['fwd']
+            if rev_seeds is None:
+                rev_seeds = self._seed_vars['rev']
             self._set_seeds(fwd_seeds, rev_seeds)
             try:
                 yield
@@ -651,28 +691,19 @@ class Relevance(object):
         rev_seeds : frozenset
             Set of reverse seed variable names.
         """
-        try:
-            sub = self._seed_sys_map[fwd_seeds]
-        except Exception:
-            sub = None
-            fwd_seeds = _to_seed(fwd_seeds)
-            rev_seeds = _to_seed(rev_seeds)
-        else:
-            try:
-                sub[rev_seeds]
-            except Exception:
-                rev_seeds = _to_seed(rev_seeds)
+        fwd_seeds = self._to_seed(fwd_seeds)
+        rev_seeds = self._to_seed(rev_seeds)
 
         self._seed_vars['fwd'] = fwd_seeds
         self._seed_vars['rev'] = rev_seeds
 
-        if fwd_seeds and rev_seeds:
-            self._current_rel_varray = self._get_rel_array(self._seed_var_map,
-                                                           self._single_seed2relvars,
-                                                           fwd_seeds, rev_seeds)
-            self._current_rel_sarray = self._get_rel_array(self._seed_sys_map,
-                                                           self._single_seed2relsys,
-                                                           fwd_seeds, rev_seeds)
+        # if fwd_seeds and rev_seeds:
+        self._current_rel_varray = self._get_rel_array(self._seed_var_map,
+                                                       self._single_seed2relvars,
+                                                       fwd_seeds, rev_seeds)
+        self._current_rel_sarray = self._get_rel_array(self._seed_sys_map,
+                                                       self._single_seed2relsys,
+                                                       fwd_seeds, rev_seeds)
 
     def _get_rel_array(self, seed_map, single_seed2rel, fwd_seeds, rev_seeds):
         """
@@ -1165,8 +1196,9 @@ class Relevance(object):
         # need to pick a rank and bcast the final pre and post sets to all ranks to ensure
         # consistency.
         if model.comm.size > 1:
-            model._pre_components = model.comm.bcast(model._pre_components, root=0)
-            model._post_components = model.comm.bcast(model._post_components, root=0)
+            pre, post = model.comm.bcast((model._pre_components, model._post_components), root=0)
+            model._pre_components = pre
+            model._post_components = post
 
     def list_relevance(self, relevant=True, type='system'):
         """
