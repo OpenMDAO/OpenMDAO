@@ -1,4 +1,15 @@
 ***********************************
+# Release Notes for OpenMDAO 3.31.1
+
+March 15, 2024
+
+OpenMDAO 3.31.1 is a patch release to fix a bug in the newly deprecated `list_problem_vars` function, which was no longer returning the expected data.
+
+## Bug Fixes
+
+- Fixed bug in deprecated list_problem_vars() function . [#3149](https://github.com/OpenMDAO/OpenMDAO/pull/3149)
+
+***********************************
 # Release Notes for OpenMDAO 3.31.0
 
 March 15, 2024
