@@ -1,4 +1,79 @@
 ***********************************
+# Release Notes for OpenMDAO 3.31.0
+
+March 15, 2024
+
+This release includes a significant refactor that affects the calculation of relevance.
+Derivatives are no longer inherently coupled to drivers.  This makes it possible to compute derivatives of a system
+without having to add a "dummy" driver with the appropriate constraints and design variables. The SubmodelComp has been
+refactored to reflect these changes. Relevance and 'pre/opt/post' driver logic has also been refactored for more uniformity.
+
+Previously, the stalling of nonlinear solvers was detected using relative tolerance. If any subsolves had already been converged, solvers can see little-to-no improvement in the relative error, despite the absolute tolerance being fine. OpenMDAO now allows `stall_tol_type` to be `'abs'` or `'rel'` so that the user
+has more control over the detection of stalling solvers.
+
+Attempting to a assign a linesearch to a solver that doesn't support it will now result in an error.
+
+We no longer test against Python 3.7, as the python foundation no longer supports that version and some of our dependencies no longer work with it.
+
+Previously, there was no way of changing the top-level reports directory in the public API, and setting the corresponding environment variable had
+no effect after OpenMDAO was imported. The `set_reports_dir` has now been added to `openmdao.api`.
+
+Given some of the significant internal changes in this release, we tested it as thoroughly as we could. If you find
+any changes that break your models, please submit an issue so we can resolve them quickly.
+
+## New Deprecations
+
+- Renamed `list_problem_vars` to `list_driver_vars` [#3132](https://github.com/OpenMDAO/OpenMDAO/pull/3132)
+
+## Backwards Incompatible API Changes
+
+The jacobian as returned by compute_totals is now keyed with the 'user facing' names given to the design variables and responses, rather than the absolute names that were used previously. OpenMDAO's general rule of thumb is that users see "promoted names" or aliases for variables. [#3113](https://github.com/OpenMDAO/OpenMDAO/pull/3113)
+
+The automatic determination of derivative 'mode' is now done separately for the driver vs. a direct call to `compute_totals` or `check_totals` with a set of 'of' and 'wrt' variables that may differ from the driver responses and design variables. This can modify the keys in the dictionary return value of `check_totals`, where for example the dict used to contain a 'J_fwd' key because it ran in fwd mode, it might now contain a 'J_rev' key instead because the best derivative mode was determined to be 'rev' based on the relative sizes of the 'of' and 'wrt' variables passed to `check_totals`. [#3142](https://github.com/OpenMDAO/OpenMDAO/pull/3142)
+
+## Backwards Incompatible Non-API Changes
+
+- Changed `find_plugins` to `find_repos` and changed it to use tabulator.js [#3144](https://github.com/OpenMDAO/OpenMDAO/pull/3144)
+
+## New Features
+
+- Changed the error when attempting to `set_val` on a remote connected input to a warning. [#3099](https://github.com/OpenMDAO/OpenMDAO/pull/3099)
+- Added option `stall_tol_type` to Nonlinear solvers. [#3112](https://github.com/OpenMDAO/OpenMDAO/pull/3112)
+- Refactored relevance and removed driver dependency for coloring. [#3113](https://github.com/OpenMDAO/OpenMDAO/pull/3113)
+- Updated ScipyKrylov for SciPy 1.12.0, updated 'latest' workflow. [#3114](https://github.com/OpenMDAO/OpenMDAO/pull/3114)
+- Moved two functions from the n2 code to the utils part of the code. (`convert_ndarray_to_support_nans_in_json` and `convert_nans_in_nested_list`) so other libraries can use them. [#3116](https://github.com/OpenMDAO/OpenMDAO/pull/3116)
+- Assigning a `linesearch` to a solver that does not support one will result in an error. [#3131](https://github.com/OpenMDAO/OpenMDAO/pull/3131)
+- Added `set_reports_dir` to `openmdao.api`. [#3137](https://github.com/OpenMDAO/OpenMDAO/pull/3137)
+- Moved pre/opt/post logic into the Relevance class. [#3142](https://github.com/OpenMDAO/OpenMDAO/pull/3142)
+
+## Bug Fixes
+
+- In the Custom report example, made sure the entry point doesn't collide with our default names. [#3092](https://github.com/OpenMDAO/OpenMDAO/pull/3092)
+- Fixed an error in the coefficient calculation for 2D slinear interp. [#3094](https://github.com/OpenMDAO/OpenMDAO/pull/3094)
+- Fixed MPI hang and singular matrix due to mismatched mpi collective calls. [#3097](https://github.com/OpenMDAO/OpenMDAO/pull/3097)
+- Fixed a bug that caused bounds to not be respected by Nelder-Mead optimizer through ScipyOptimizeDriver. [#3098](https://github.com/OpenMDAO/OpenMDAO/pull/3098)
+- Fixed bug: `list_problem_vars` was writing to the incorrect `out_stream`. [#3102](https://github.com/OpenMDAO/OpenMDAO/pull/3102)
+- ScipyKrylov will no longer return an invalid solution if the solver did not converge. [#3107](https://github.com/OpenMDAO/OpenMDAO/pull/3107)
+- Skip any relevance/singular_jac checks when `approx_totals` is used. [#3117](https://github.com/OpenMDAO/OpenMDAO/pull/3117)
+- Fixed a bug in the hook system. [#3125](https://github.com/OpenMDAO/OpenMDAO/pull/3125)
+- Updated `check_partials` to account for scaling when using the matrix-free API. [#3126](https://github.com/OpenMDAO/OpenMDAO/pull/3126)
+- Fixed bugs related to Serialization (thank you @andrewellis55). [#3133](https://github.com/OpenMDAO/OpenMDAO/pull/3133)
+- Fixed jax config calls for compatibility with jax 0.4.25. [#3136](https://github.com/OpenMDAO/OpenMDAO/pull/3136)
+- Removed setting of distributed metadata to False if nprocs==1. [#3122](https://github.com/OpenMDAO/OpenMDAO/pull/3122)
+- Fixed an MPI hang caused when one proc needs a complex linear vector and the others don't. [#3140](https://github.com/OpenMDAO/OpenMDAO/pull/3140)
+- Fixed deprecated assertEquals. [#3141](https://github.com/OpenMDAO/OpenMDAO/pull/3141)
+
+## Miscellaneous
+
+- Removed extraneous code; updated CI to use conda-forge only [#3101](https://github.com/OpenMDAO/OpenMDAO/pull/3101)
+- Disabled tests that use the `MissingImports` decorator [#3111](https://github.com/OpenMDAO/OpenMDAO/pull/3111)
+- Corrected documentation about use of compute_partials and compute_jacvec_product [#3110](https://github.com/OpenMDAO/OpenMDAO/pull/3110)
+- Converted markdown pages to notebooks in openmdao documentation [#3119](https://github.com/OpenMDAO/OpenMDAO/pull/3119)
+- Added some comments and documentation to clarify driver scaling. [#3127](https://github.com/OpenMDAO/OpenMDAO/pull/3127)
+- Updated docs regarding sphinx autodoc use with decorated functions. [#3128](https://github.com/OpenMDAO/OpenMDAO/pull/3128)
+- Changed the minimum required version of Python from 3.7 to 3.8 [#3130](https://github.com/OpenMDAO/OpenMDAO/pull/3130)
+
+***********************************
 # Release Notes for OpenMDAO 3.30.0
 
 December 07, 2023
