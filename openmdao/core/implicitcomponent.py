@@ -508,10 +508,10 @@ class ImplicitComponent(Component):
             plen = len(self.pathname) + 1
             resid_mapper = RangeMapper.create([(n, shape_to_len(meta['shape']))
                                                for n, meta in self._declared_residuals.items()],
-                                               max_flat_range_size=100)
+                                              max_flat_range_size=100)
             out_mapper = RangeMapper.create([(n[plen:], shape_to_len(meta['shape']))
                                              for n, meta in self._var_abs2meta['output'].items()],
-                                             max_flat_range_size=100)
+                                            max_flat_range_size=100)
 
             if resid_mapper.size != out_mapper.size:
                 raise RuntimeError(f"{self.msginfo}: The number of residuals ({resid_mapper.size}) "
