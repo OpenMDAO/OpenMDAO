@@ -267,7 +267,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(driver_cases, [
             'rank0:ScipyOptimize_SLSQP|0', 'rank0:ScipyOptimize_SLSQP|1', 'rank0:ScipyOptimize_SLSQP|2',
             'rank0:ScipyOptimize_SLSQP|3', 'rank0:ScipyOptimize_SLSQP|4', 'rank0:ScipyOptimize_SLSQP|5',
-            'rank0:ScipyOptimize_SLSQP|6', 'rank0:ScipyOptimize_SLSQP|7'
+            'rank0:ScipyOptimize_SLSQP|6'
         ])
 
         # Test to see if the access by case keys works:
@@ -2212,7 +2212,6 @@ class TestSqliteCaseReader(unittest.TestCase):
             'rank0:ScipyOptimize_SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0|obj_cmp._solve_nonlinear|4',
             'rank0:ScipyOptimize_SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0|obj_cmp._solve_nonlinear|5',
             'rank0:ScipyOptimize_SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0|obj_cmp._solve_nonlinear|6',
-            'rank0:ScipyOptimize_SLSQP|7|root._solve_nonlinear|7|NLRunOnce|0|obj_cmp._solve_nonlinear|7'
         ]
         self.assertEqual(len(system_cases), len(expected_cases))
         for i, coord in enumerate(system_cases):
@@ -2244,7 +2243,6 @@ class TestSqliteCaseReader(unittest.TestCase):
             'rank0:ScipyOptimize_SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0',
             'rank0:ScipyOptimize_SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0',
             'rank0:ScipyOptimize_SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0',
-            'rank0:ScipyOptimize_SLSQP|7|root._solve_nonlinear|7|NLRunOnce|0'
         ]
         self.assertEqual(len(root_solver_cases), len(expected_cases))
         for i, coord in enumerate(root_solver_cases):

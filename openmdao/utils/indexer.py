@@ -54,6 +54,69 @@ def _truncate(s):
     return s
 
 
+def combine_ranges(ranges):
+    """
+    Combine a list of (start, end) tuples into the smallest possible list of contiguous ranges.
+
+    The ranges are assumed to be non-overlapping and in ascending order.
+
+    Parameters
+    ----------
+    ranges : list
+        List of (start, end) tuples.
+
+    Returns
+    -------
+    list of tuples
+        List of combined ranges.
+    """
+    rnglist = []
+    if not ranges:
+        return rnglist
+
+    cstart, cend = ranges[0]
+    for start, end in ranges[1:]:
+        if start == cend:
+            cend = end
+        else:
+            rnglist.append((cstart, cend))
+            cstart, cend = start, end
+
+    rnglist.append((cstart, cend))
+
+    return rnglist
+
+
+def ranges2indexer(ranges, src_shape=None):
+    """
+    Convert a list of ranges to an indexer.
+
+    Parameters
+    ----------
+    ranges : list
+        List of (start, end) tuples.
+    src_shape : tuple or None
+        The shape of the source array.
+
+    Returns
+    -------
+    Indexer
+        Indexer object.
+    """
+    ranges = combine_ranges(ranges)
+    if len(ranges) == 1:
+        idx = slice(ranges[0][0], ranges[0][1])
+    elif len(ranges) == 0:
+        idx = slice(0, 0)
+    else:
+        idx = np.concatenate([np.arange(start, end) for start, end in ranges])
+
+    if src_shape is None:
+        src_shape = (ranges[-1][1] - ranges[0][0],)
+
+    return indexer(idx, src_shape=src_shape, flat_src=True)
+
+
 class Indexer(object):
     """
     Abstract indexing class.

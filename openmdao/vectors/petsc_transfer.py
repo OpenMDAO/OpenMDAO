@@ -67,7 +67,7 @@ else:
             group : <Group>
                 Parent group.
             """
-            rev = group._mode != 'fwd'
+            rev = group._orig_mode != 'fwd'
 
             group._transfers = {
                 'fwd': PETScTransfer._setup_transfers_fwd(group)
@@ -154,7 +154,7 @@ else:
                     inp_boundary_set = set(all_abs2meta_in).difference(conns)
 
                     if inp_boundary_set:
-                        for dv, resp, rel in group._relevant.iter_seed_pair_relevance(inputs=True):
+                        for dv, resp, rel in group._relevance.iter_seed_pair_relevance(inputs=True):
                             if resp in all_abs2meta_out and dv not in allprocs_abs2prom:
                                 # response is continuous and inside this group and
                                 # dv is outside this group

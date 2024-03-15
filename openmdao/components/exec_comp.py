@@ -678,7 +678,7 @@ class ExecComp(ExplicitComponent):
                 if not self._has_distrib_vars and (sum(sizes['input'][rank]) > 1 and
                                                    sum(sizes['output'][rank]) > 1):
                     if not self._coloring_declared:
-                        super().declare_coloring(wrt=('*', ), method='cs')
+                        super().declare_coloring(wrt=('*', ), method='cs', show_summary=False)
                         self._coloring_info.dynamic = True
                         self._manual_decl_partials = False  # this gets reset in declare_partials
                         self._declared_partials_patterns = {}

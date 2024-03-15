@@ -8,11 +8,6 @@ from openmdao.test_suite.components.expl_comp_array import TestExplCompArraySpar
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArraySparse, TestImplCompArrayMatVec
 
 try:
-    from parameterized import parameterized
-except ImportError:
-    from openmdao.utils.assert_utils import SkipParameterized as parameterized
-
-try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
     PETScVector = None
@@ -183,15 +178,15 @@ class TestRunRootOnly(unittest.TestCase):
 
         J = p.compute_totals(of=['C2.y', 'C3.y'], wrt=['C1.lengths', 'C1.widths'])
 
-        if p.comm.rank == 0:
-            self.assertEqual(p.model.C1.njacvec_products, 8)
-        else:
-            self.assertEqual(p.model.C1.njacvec_products, 0)
-
         np.testing.assert_allclose(J['C3.y', 'C1.lengths'], np.eye(4) * 4.5)
         np.testing.assert_allclose(J['C3.y', 'C1.widths'], np.eye(4) * 1.5)
         np.testing.assert_allclose(J['C2.y', 'C1.lengths'], [np.ones(4) * 7.5])
         np.testing.assert_allclose(J['C2.y', 'C1.widths'], [np.ones(4) * 2.5])
+
+        if p.comm.rank == 0:
+            self.assertEqual(p.model.C1.njacvec_products, 5)
+        else:
+            self.assertEqual(p.model.C1.njacvec_products, 0)
 
     def test_serial_replication_impl(self):
         # run_root_only is False

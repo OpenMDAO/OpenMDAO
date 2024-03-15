@@ -378,7 +378,7 @@ class pyOptSparseDriver(Driver):
         """
         problem = self._problem()
         model = problem.model
-        relevant = model._relevant
+        relevance = model._relevance
 
         self.pyopt_solution = None
         self._total_jac = None
@@ -470,7 +470,9 @@ class pyOptSparseDriver(Driver):
         # # compute dynamic simul deriv coloring
         problem.get_total_coloring(self._coloring_info, run_model=not model_ran)
 
-        bad_cons = self.get_constraints_without_dv()
+        bad_resps = [n for n in model._relevance._no_dv_responses if n in self._cons]
+        bad_cons = [n for n, m in self._cons.items() if m['source'] in bad_resps]
+
         if bad_cons:
             issue_warning(f"Equality constraint(s) {sorted(bad_cons)} do not depend on any design "
                           "variables and were not added to the optimization.")
@@ -482,14 +484,14 @@ class pyOptSparseDriver(Driver):
         eqcons = {n: m for n, m in self._cons.items() if m['equals'] is not None}
         if eqcons:
             # set equality constraints as reverse seeds to see what dvs are relevant
-            with relevant.seeds_active(rev_seeds=eqcons):
+            with relevance.seeds_active(rev_seeds=[m['source'] for m in eqcons.values()]):
                 # Add all equality constraints
                 for name, meta in eqcons.items():
                     size = meta['global_size'] if meta['distributed'] else meta['size']
                     lower = upper = meta['equals']
-                    with relevant.seeds_active(rev_seeds=(meta['source'],)):
+                    with relevance.seeds_active(rev_seeds=(meta['source'],)):
                         wrts = [v for v in indep_list
-                                if relevant.is_relevant(self._designvars[v]['source'])]
+                                if relevance.is_relevant(self._designvars[v]['source'])]
 
                     if meta['linear']:
                         jac = {w: _lin_jacs[name][w] for w in wrts}
@@ -511,7 +513,7 @@ class pyOptSparseDriver(Driver):
         ineqcons = {n: m for n, m in self._cons.items() if m['equals'] is None}
         if ineqcons:
             # set inequality constraints as reverse seeds to see what dvs are relevant
-            with relevant.seeds_active(rev_seeds=ineqcons):
+            with relevance.seeds_active(rev_seeds=[m['source'] for m in ineqcons.values()]):
                 # Add all inequality constraints
                 for name, meta in ineqcons.items():
                     size = meta['global_size'] if meta['distributed'] else meta['size']
@@ -520,9 +522,9 @@ class pyOptSparseDriver(Driver):
                     lower = meta['lower']
                     upper = meta['upper']
 
-                    with relevant.seeds_active(rev_seeds=(meta['source'],)):
+                    with relevance.seeds_active(rev_seeds=(meta['source'],)):
                         wrts = [v for v in indep_list
-                                if relevant.is_relevant(self._designvars[v]['source'])]
+                                if relevance.is_relevant(self._designvars[v]['source'])]
 
                     if meta['linear']:
                         jac = {w: _lin_jacs[name][w] for w in wrts}
@@ -741,7 +743,7 @@ class pyOptSparseDriver(Driver):
                     self._in_user_function = True
                     # deactivate the relevance if we haven't run the full model yet, so that
                     # the full model will run at least once.
-                    with model._relevant.all_seeds_active(active=self._model_ran):
+                    with model._relevance.nonlinear_active('iter', active=self._model_ran):
                         model.run_solve_nonlinear()
                         self._model_ran = True
 

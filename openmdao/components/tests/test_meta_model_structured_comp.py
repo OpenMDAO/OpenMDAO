@@ -627,10 +627,9 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
 
         prob.run_model()
 
-        totals = prob.check_totals(of='comp.f', wrt=['tab.k', 'comp.p1', 'comp.p2', 'comp.p3'],
-                                   method='cs', out_stream=None);
-
-        assert_near_equal(totals['comp.f', 'tab.k']['abs error'][0], 0.0, tolerance=1e-10)
+        chk = prob.check_totals(of='comp.f', wrt=['tab.k', 'comp.p1', 'comp.p2', 'comp.p3'],
+                                method='cs', out_stream=None);
+        assert_check_totals(chk, atol=1e-10, rtol=1e-10)
 
     def test_training_gradient_setup_called_twice(self):
         model = om.Group()

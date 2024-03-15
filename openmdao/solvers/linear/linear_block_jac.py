@@ -21,8 +21,7 @@ class LinearBlockJac(BlockLinearSolver):
         system = self._system()
         mode = self._mode
 
-        subs = [s for s in
-                system._relevant.filter(system._solver_subsystem_iter(local_only=True))]
+        subs = list(system._relevance.filter(system._subsystems_myproc))
         scopelist = [None] * len(subs)
 
         if mode == 'fwd':

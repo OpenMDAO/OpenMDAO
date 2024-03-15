@@ -139,12 +139,12 @@ class ParallelGroup(Group):
 
     def _get_missing_partials(self, missing):
         """
-        Return a list of (of, wrt) tuples for which derivatives have not been declared.
+        Store information about any missing partial derivatives in the 'missing' dict.
 
         Parameters
         ----------
         missing : dict
-            Dictionary containing list of missing derivatives keyed by system pathname.
+            Dictionary containing list of missing derivatives (of, wrt) keyed by system pathname.
         """
         if self.comm.size > 1:
             msng = {}
@@ -161,3 +161,30 @@ class ParallelGroup(Group):
                         seen.add(sysname)
         else:
             super()._get_missing_partials(missing)
+
+    def _get_relevance_modifiers(self, grad_groups, always_opt_comps):
+        """
+        Collect information from the model that will modify the relevance graph of the model.
+
+        Parameters
+        ----------
+        grad_groups : set
+            Set of groups having nonlinear solvers that use gradients.
+        always_opt_comps : set
+            Set of components that are to be included in every iteration of the optimization,
+            even if they aren't relevant in terms of data flow.
+        """
+        if self.comm.size > 1:
+            gg = set()
+            aoc = set()
+            super()._get_relevance_modifiers(gg, aoc)
+            if self._gather_full_data():
+                gathered = self.comm.allgather((gg, aoc))
+            else:
+                gathered = self.comm.allgather((set(), set()))
+
+            for g, a in gathered:
+                grad_groups.update(g)
+                always_opt_comps.update(a)
+        else:
+            super()._get_relevance_modifiers(grad_groups, always_opt_comps)

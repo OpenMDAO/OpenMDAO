@@ -37,7 +37,7 @@ class NonlinearRunOnce(NonlinearSolver):
                 system._transfer('nonlinear', 'fwd')
 
                 with multi_proc_fail_check(system.comm):
-                    for subsys in system._solver_subsystem_iter(local_only=True):
+                    for subsys in system._relevance.filter(system._subsystems_myproc):
                         subsys._solve_nonlinear()
 
             # If this is not a parallel group, transfer for each subsystem just prior to running it.
