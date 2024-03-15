@@ -7,7 +7,7 @@ OpenMDAO 3.31.1 is a patch release to fix a bug in the newly deprecated `list_pr
 
 ## Bug Fixes
 
-- Fixed bug in deprecated list_problem_vars() function . [#3149](https://github.com/OpenMDAO/OpenMDAO/pull/3149)
+- Fixed bug in deprecated list_problem_vars() function. [#3149](https://github.com/OpenMDAO/OpenMDAO/pull/3149)
 
 ***********************************
 # Release Notes for OpenMDAO 3.31.0
