@@ -1234,13 +1234,12 @@ class Problem(object):
                     meta_with_defaults = FiniteDifference.DEFAULT_OPTIONS.copy()
                 meta_with_defaults.update(meta)
 
+                _, wrtpats = keypats
                 # For each of the partials, check to see if the
                 #   check partials options are different than the options used to compute
                 #   the partials
-                wrt_bundle = comp._find_partial_matches(*keypats)[1]
-                for wrt_var in wrt_bundle:
-                    _, vars = wrt_var
-                    for var in vars:
+                for _, wrtvars in comp._find_wrt_matches(wrtpats):
+                    for var in wrtvars:
                         # we now have individual vars like 'x'
                         # get the options for checking partials
                         fd_options, _ = _get_fd_options(var, requested_method, local_opts, step,
@@ -1315,7 +1314,8 @@ class Problem(object):
 
                 with comp._unscaled_context():
 
-                    of_list, wrt_list = comp._get_partials_varlists()
+                    of_list = comp._get_partials_ofs()
+                    wrt_list = comp._get_partials_wrts()
 
                     # Matrix-free components need to calculate their Jacobian by matrix-vector
                     # product.
@@ -1514,7 +1514,8 @@ class Problem(object):
             c_name = comp.pathname
             all_fd_options[c_name] = {}
 
-            of, wrt = comp._get_partials_varlists()
+            of = comp._get_partials_ofs()
+            wrt = comp._get_partials_wrts()
 
             actual_steps = defaultdict(list)
 

@@ -31,7 +31,11 @@ class RangeMapper(object):
         Initialize a RangeMapper.
         """
         self._key2range = {}
-        self.size = sum(size for _, size in sizes)
+        start = 0
+        for key, size in sizes:
+            self._key2range[key] = (start, start + size)
+            start += size
+        self.size = start
 
     @staticmethod
     def create(sizes, max_flat_range_size=MAX_FLAT_RANGE_SIZE):
@@ -377,7 +381,6 @@ class RangeTree(RangeMapper):
         key, start, stop = ranges[mid]
 
         node = RangeTreeNode(key, start, stop)
-        self._key2range[key] = (start, stop)
 
         left_slices = ranges[:mid]
         right_slices = ranges[mid + 1:]
@@ -417,7 +420,6 @@ class FlatRangeMapper(RangeMapper):
         for key, size in sizes:
             stop += size
             self.ranges[start:stop] = [(key, start, stop)] * size
-            self._key2range[key] = (start, stop)
             start = stop
 
     def __getitem__(self, idx):

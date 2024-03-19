@@ -9,7 +9,7 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.array_utils import shape_to_len
-from openmdao.utils.general_utils import format_as_float_or_array, find_matches
+from openmdao.utils.general_utils import format_as_float_or_array, _subjac_meta2value
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.utils.om_warnings import issue_warning
@@ -521,49 +521,62 @@ class ImplicitComponent(Component):
 
             rmap = self._resid2out_subjac_map
             omap = {}
-            wrtsize = None
 
             # first, expand the glob patterns into a list of specific keys (resid, wrt)
-            for resid, wrtname in self._matching_key_iter(of, wrt, use_resname=True):
-                if wrtsize is None:
-                    abs_wrt = self.pathname + '.' + wrtname
+            for _, resids in self._find_of_matches(of, use_resname=True):
+                for resid in resids:
+                    for tup in resid_mapper.overlap_iter(resid, out_mapper):
+                        _, rstart, rstop, oname, ostart, ostop = tup
+                        if resid not in rmap:
+                            rmap[resid] = []
+                        if oname not in omap:
+                            omap[oname] = []
+
+                        data = (oname, pattern_meta.copy(),
+                                slice(ostart, ostop), slice(rstart, rstop))
+
+                        rmap[resid].append(data)
+                        omap[oname].append(data)
+
+            pattern_val, pattern_rows, _ = _subjac_meta2value(pattern_meta)
+
+            abs_wrts = []
+            if pattern_val is not None or pattern_rows is not None:
+                for _, wrts in self._find_wrt_matches(wrt):
+                    for w in wrts:
+                        abs_wrts.append(self.pathname + '.' + w)
+
+                wrt_sizes = set()
+                for abs_wrt in abs_wrts:
                     if abs_wrt in self._var_abs2meta['input']:
                         wrtsize = shape_to_len(self._var_abs2meta['input'][abs_wrt]['shape'])
                     else:
                         wrtsize = shape_to_len(self._var_abs2meta['output'][abs_wrt]['shape'])
+                    wrt_sizes.add(wrtsize)
 
-                if resid in rmap:
-                    continue
+                if len(wrt_sizes) > 1:
+                    raise ValueError(f"{self.msginfo}: declared residual partial ({of}, {wrt}) "
+                                     f"specifies a sub-jacobian value or shape, but it matches "
+                                     f"multiple 'wrt' values that don't all have the same size. "
+                                     f"Sizes found: {sorted(wrt_sizes)}.")
 
-                for _, rstart, rstop, oname, ostart, ostop in resid_mapper.overlap_iter(resid,
-                                                                                        out_mapper):
-                    if resid not in rmap:
-                        rmap[resid] = []
-                    if oname not in omap:
-                        omap[oname] = []
-
-                    data = (oname, pattern_meta.copy(), slice(ostart, ostop), slice(rstart, rstop))
-
-                    rmap[resid].append(data)
-                    omap[oname].append(data)
+            is_sparse = pattern_rows is not None
 
             for oname, lst in omap.items():
-                newmeta = {}
-                nsparse = 0
-                for _, patmeta, _, _ in lst:
-                    if 'rows' in patmeta and patmeta['rows'] is not None:
-                        nsparse += 1
-                    newmeta.update(patmeta)
+                oabs_name = self.pathname + '.' + oname
+                existing_metas = []
+                # gather any existing metadata dicts declared for the current output
+                for wabs in abs_wrts:
+                    if (oabs_name, wabs) in self._subjacs_info:
+                        existing_metas.append(self._subjacs_info[oabs_name, wabs])
+                if not existing_metas:
+                    existing_metas.append({'dependent': True, 'rows': None, 'cols': None})
+                    if 'method' in pattern_meta:
+                        method = pattern_meta['method']
+                        if method in ('fd', 'cs'):
+                            existing_metas[0]['method'] = method
 
-                outsize = shape_to_len(self._var_abs2meta['output'][self.pathname + '.' +
-                                                                    oname]['shape'])
-
-                if nsparse:
-                    if nsparse != len(lst):
-                        issue_warning(f"{self.msginfo}: Some residual partials that overlap output "
-                                      f"'{oname}' are sparse while others are dense. The combined "
-                                      "output partial will be sparse.")
-
+                if is_sparse:
                     # if any of the resid subjacs had rows, we need the output subjac to be sparse
                     rows = []
                     cols = []
@@ -582,36 +595,52 @@ class ImplicitComponent(Component):
                     rows = np.concatenate(rows)
                     cols = np.concatenate(cols)
 
-                    newmeta['rows'] = rows
-                    newmeta['cols'] = cols
-
                     if data:
                         data = np.concatenate(data)
                         if len(data) != len(rows):
                             raise ValueError(f"{self.msginfo}: length of data array ({len(data)} "
                                              f"!= number of rows ({len(rows)} for sparse partial "
                                              f"({oname}, {wrt}).")
-                        newmeta['val'] = data
+                        val = data
+                    else:
+                        val = None
+
+                    for meta in existing_metas:
+                        v, r, c = _subjac_meta2value(meta)
+                        if r is not None:
+                            meta['rows'] = np.concatenate((r, rows))
+                            meta['cols'] = np.concatenate((c, cols))
+                            if v is not None:
+                                meta['val'] = np.concatenate((v, val))
+                            else:
+                                meta['val'] = val
+                        elif v is not None:
+                            issue_warning(f"{self.msginfo}: The existing subjac value for "
+                                          f"({oname}, {wrt}) is dense, but is being updated with a "
+                                          "sparse value. The combined subjac will be dense.",
+                                          RuntimeWarning)
+                            meta['val'][oslc] = _get_dense_slice_from_sparse(meta, oslc, rslc)
+                        else:
+                            meta['rows'] = rows
+                            meta['cols'] = cols
+                            meta['val'] = val
 
                 else:  # resid partials are all dense
-                    if 'val' in newmeta and newmeta['val'] is not None:
-                        # we need to update 'val' with a combined value from resid metadata
-                        val = np.zeros((outsize, wrtsize), dtype=float)
-                        seenval = False
-                        for _, patmeta, oslice, rslice in lst:
-                            v = patmeta['val']
-                            if v is None:
-                                if seenval:
-                                    raise RuntimeError(f"{self.msginfo}: 'val' must be provided "
-                                                       "for all or none of the residuals that "
-                                                       "overlap the same output '{oname}'.")
-                            else:
-                                seenval = True
-                                val[oslice, :] = v[rslice, :]
+                    outsize = shape_to_len(self._var_abs2meta['output'][self.pathname + '.' +
+                                                                        oname]['shape'])
+                    for meta in existing_metas:
+                        if pattern_val is not None:
+                            val, r, c = _subjac_meta2value(meta)
+                            if r is not None:
+                                pass
+                                continue
+                            elif val is None:
+                                val = meta['val'] = np.zeros((outsize, wrtsize), dtype=float)
 
-                        newmeta['val'] = val
+                            for _, _, oslice, rslice in lst:
+                                val[oslice, :] = pattern_val[rslice, :]
 
-                super()._resolve_partials_patterns(oname, wrt, newmeta)
+                super()._resolve_partials_patterns(oname, wrt, meta)
         else:
             super()._resolve_partials_patterns(of, wrt, pattern_meta)
 
@@ -656,9 +685,20 @@ class ImplicitComponent(Component):
                                                              self._var_abs2meta['output']):
             self._check_res_vs_out_meta(resid, output)
 
-    def _get_partials_varlists(self, use_resname=False):
+    def _get_partials_wrts(self):
         """
-        Get lists of 'of' and 'wrt' variables that form the partial jacobian.
+        Get the list of wrt variables that form the partial jacobian.
+
+        Returns
+        -------
+        list
+            List of wrt variable names (relative names).
+        """
+        return list(self._var_rel_names['output']) + list(self._var_rel_names['input'])
+
+    def _get_partials_ofs(self, use_resname=False):
+        """
+        Get the list of 'of' variables that form the partial jacobian.
 
         Parameters
         ----------
@@ -667,22 +707,13 @@ class ImplicitComponent(Component):
 
         Returns
         -------
-        tuple(list, list)
-            'of' and 'wrt' variable lists (promoted names).
+        list
+            List of of variable names (relative names).
         """
-        of = list(self._var_allprocs_prom2abs_list['output'])
-        wrt = list(self._var_allprocs_prom2abs_list['input'])
-
-        # filter out any discrete inputs or outputs
-        if self._discrete_outputs:
-            of = [n for n in of if n not in self._discrete_outputs]
-        if self._discrete_inputs:
-            wrt = [n for n in wrt if n not in self._discrete_inputs]
-
         if use_resname and self._declared_residuals:
-            return list(self._declared_residuals), of + wrt
+            return list(self._declared_residuals)
 
-        return of, of + wrt
+        return super()._get_partials_ofs()
 
     def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs=None,
                         discrete_outputs=None):

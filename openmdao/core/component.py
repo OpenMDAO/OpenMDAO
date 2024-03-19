@@ -441,8 +441,7 @@ class Component(System):
         return False
 
     def _promoted_wrt_iter(self):
-        _, wrts = self._get_partials_varlists()
-        yield from wrts
+        yield from self._get_partials_wrts()
 
     def _update_subjac_sparsity(self, sparsity):
         """
@@ -1329,7 +1328,7 @@ class Component(System):
         if not self._declared_partial_checks:
             return {}
         opts = {}
-        _, wrt = self._get_partials_varlists()
+        wrt = self._get_partials_wrts()
         invalid_wrt = []
         matrix_free = self.matrix_free
 
@@ -1517,11 +1516,64 @@ class Component(System):
 
             self._subjacs_info[abs_key] = meta
 
-    def _matching_key_iter(self, of_patterns, wrt_patterns, use_resname=False):
-        pattern_matches = self._find_partial_matches(of_patterns, wrt_patterns,
-                                                     use_resname=use_resname)
+    def _get_partials_wrts(self):
+        """
+        Get list of 'wrt' variables that form the partial jacobian.
 
-        for of_bundle, wrt_bundle in product(*pattern_matches):
+        Returns
+        -------
+        list
+            List of 'wrt' relative variable names.
+        """
+        # filter out any discrete inputs or outputs
+        if self._discrete_inputs:
+            return [n for n in self._var_rel_names['input'] if n not in self._discrete_inputs]
+
+        return list(self._var_rel_names['input'])
+
+    def _get_partials_ofs(self, use_resname=False):
+        """
+        Get lists of 'of' variables that form the partial jacobian.
+
+        Parameters
+        ----------
+        use_resname : bool
+            Ignored.
+
+        Returns
+        -------
+        list
+            List of 'of' relative variable names.
+        """
+        # filter out any discrete inputs or outputs
+        if self._discrete_outputs:
+            return [n for n in self._var_rel_names['output'] if n not in self._discrete_outputs]
+
+        return list(self._var_rel_names['output'])
+
+    def _matching_key_iter(self, of_patterns, wrt_patterns, use_resname=False):
+        """
+        Iterate over all combinations of matching keys for the given patterns.
+
+        Parameters
+        ----------
+        of_patterns : list of str
+            List of variable names and/or glob patterns for the 'of' variables.
+        wrt_patterns : list of str
+            List of variable names and/or glob patterns for the 'wrt' variables.
+        use_resname : bool, optional
+            If True, match of_patterns against residuals instead of outputs.
+
+        Yields
+        ------
+        tuple
+            A tuple of matching keys, where the first element is the 'of' key and the second
+            element is the 'wrt' key.  Both are absolute names.
+        """
+        of_bundles = self._find_of_matches(of_patterns, use_resname=use_resname)
+        wrt_bundles = self._find_wrt_matches(wrt_patterns)
+
+        for of_bundle, wrt_bundle in product(of_bundles, wrt_bundles):
             of_pattern, of_matches = of_bundle
             wrt_pattern, wrt_matches = wrt_bundle
             if not of_matches:
@@ -1530,43 +1582,46 @@ class Component(System):
             if not wrt_matches:
                 raise ValueError('{}: No matches were found for wrt="{}"'.format(self.msginfo,
                                                                                  wrt_pattern))
+            yield from abs_key_iter(self, of_matches, wrt_matches)
 
-            if use_resname:
-                yield from product(of_matches, wrt_matches)
-            else:
-                yield from abs_key_iter(self, of_matches, wrt_matches)
-
-    def _find_partial_matches(self, of_pattern, wrt_pattern, use_resname=False):
+    def _find_of_matches(self, pattern, use_resname=False):
         """
-        Find all partial derivative matches from of_pattern and wrt_pattern.
+        Find all matches for the given 'of' pattern.
 
         Parameters
         ----------
-        of_pattern : str or list of str
-            The relative name(s) of the residual(s) that derivatives are being computed for.
-            May also contain glob patterns.
-        wrt_pattern : str or list of str
-            The relative name(s) of the variable(s) that derivatives are taken with respect to.
-            Each name can refer to an input or an output variable. May also contain glob patterns.
+        pattern : str
+            Glob pattern or relative variable name.
         use_resname : bool
-            If True, use residual names for 'of' patterns.
+            If True, match residual names instead of output names.
 
         Returns
         -------
-        tuple(list, list)
-            Pair of lists containing pattern matches (if any). Returns (of_matches, wrt_matches)
-            where of_matches is a list of tuples (pattern, matches) and wrt_matches is a list of
-            tuples (pattern, output_matches, input_matches).
+        list
+            List of tuples of the form (abs_name, meta) where abs_name is the absolute name of the
+            matching variable and meta is the metadata for that variable.
         """
-        ofs, wrts = self._get_partials_varlists(use_resname=use_resname)
+        of_list = [pattern] if isinstance(pattern, str) else pattern
+        return [(pattern, find_matches(pattern, self._get_partials_ofs(use_resname=use_resname)))
+                for pattern in of_list]
 
-        of_list = [of_pattern] if isinstance(of_pattern, str) else of_pattern
-        wrt_list = [wrt_pattern] if isinstance(wrt_pattern, str) else wrt_pattern
+    def _find_wrt_matches(self, pattern):
+        """
+        Find all matches for the given 'wrt' pattern.
 
-        of_pattern_matches = [(pattern, find_matches(pattern, ofs)) for pattern in of_list]
-        wrt_pattern_matches = [(pattern, find_matches(pattern, wrts)) for pattern in wrt_list]
+        Parameters
+        ----------
+        pattern : str
+            Glob pattern or relative variable name.
 
-        return of_pattern_matches, wrt_pattern_matches
+        Returns
+        -------
+        list
+            List of tuples of the form (abs_name, meta) where abs_name is the absolute name of the
+            matching variable and meta is the metadata for that variable.
+        """
+        wrt_list = [pattern] if isinstance(pattern, str) else pattern
+        return [(pattern, find_matches(pattern, self._get_partials_wrts())) for pattern in wrt_list]
 
     def _check_partials_meta(self, abs_key, val, shape):
         """
