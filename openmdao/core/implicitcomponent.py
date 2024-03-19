@@ -560,8 +560,6 @@ class ImplicitComponent(Component):
                                      f"multiple 'wrt' values that don't all have the same size. "
                                      f"Sizes found: {sorted(wrt_sizes)}.")
 
-            is_sparse = pattern_rows is not None
-
             for oname, lst in omap.items():
                 oabs_name = self.pathname + '.' + oname
                 existing_metas = []
@@ -569,14 +567,16 @@ class ImplicitComponent(Component):
                 for wabs in abs_wrts:
                     if (oabs_name, wabs) in self._subjacs_info:
                         existing_metas.append(self._subjacs_info[oabs_name, wabs])
+
+                newmeta = {'dependent': True, 'rows': None, 'cols': None}
                 if not existing_metas:
-                    existing_metas.append({'dependent': True, 'rows': None, 'cols': None})
+                    existing_metas.append(newmeta)
                     if 'method' in pattern_meta:
                         method = pattern_meta['method']
                         if method in ('fd', 'cs'):
                             existing_metas[0]['method'] = method
 
-                if is_sparse:
+                if pattern_rows is not None:
                     # if any of the resid subjacs had rows, we need the output subjac to be sparse
                     rows = []
                     cols = []
@@ -631,10 +631,7 @@ class ImplicitComponent(Component):
                     for meta in existing_metas:
                         if pattern_val is not None:
                             val, r, c = _subjac_meta2value(meta)
-                            if r is not None:
-                                pass
-                                continue
-                            elif val is None:
+                            if val is None:
                                 val = meta['val'] = np.zeros((outsize, wrtsize), dtype=float)
 
                             for _, _, oslice, rslice in lst:
