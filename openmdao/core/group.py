@@ -30,7 +30,7 @@ from openmdao.utils.general_utils import common_subpath, all_ancestors, \
     meta2src_iter, get_rev_conns, _contains_all
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
-from openmdao.utils.graph_utils import get_sccs_topo, get_out_of_order_nodes
+from openmdao.utils.graph_utils import get_out_of_order_nodes, write_graph
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
@@ -774,7 +774,7 @@ class Group(System):
         # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
 
-    def _get_dataflow_graph(self):
+    def _get_dataflow_graph(self, include_display_data=False):
         """
         Return a graph of all variables and components in the model.
 
@@ -4215,6 +4215,307 @@ class Group(System):
 
         return graph
 
+    def _get_graph_display_info(self, display_map=None):
+        base_display_map = {
+            'ExplicitComponent': {
+                'fillcolor': '"aquamarine3:aquamarine"',
+                'style': 'filled',
+                'shape': 'box',
+            },
+            'ImplicitComponent': {
+                'fillcolor': '"lightblue:lightslateblue"',
+                'style': 'filled',
+                'shape': 'box',
+            },
+            'IndepVarComp': {
+                'fillcolor': '"chartreuse2:chartreuse4"',
+                'style': 'filled',
+                'shape': 'box',
+            },
+            'Group': {
+                'fillcolor': 'gray75',
+                'style': 'filled',
+                'shape': 'octagon',
+            },
+        }
+
+        node_info = {}
+        for s in self.system_iter(recurse=True, include_self=True):
+            meta = s._get_graph_node_meta()
+            if display_map and 'classname' in meta and meta['classname'] in display_map:
+                meta.update(display_map[meta['classname']])
+            elif display_map and 'base' in meta and meta['base'] in display_map:
+                meta.update(display_map[meta['base']])
+            elif 'base' in meta and meta['base'] in base_display_map:
+                meta.update(base_display_map[meta['base']])
+            node_info[s.pathname] = meta.copy()
+
+        if self.comm.size > 1:
+            abs2prom = self._var_abs2prom
+            all_abs2prom = self._var_allprocs_abs2prom
+            if (len(all_abs2prom['input']) != len(abs2prom['input']) or
+                    len(all_abs2prom['output']) != len(abs2prom['output'])):
+                # not all systems exist in all procs, so must gather info from all procs
+                if self._gather_full_data():
+                    all_node_info = self.comm.allgather(node_info)
+                else:
+                    all_node_info = self.comm.allgather({})
+
+                for info in all_node_info:
+                    for pathname, meta in info.items():
+                        if pathname not in node_info:
+                            node_info[pathname] = meta
+
+        return node_info
+
+    def _get_graph_node_meta(self):
+        """
+        Return metadata to add to this system's graph node.
+
+        Returns
+        -------
+        dict
+            Metadata for this system's graph node.
+        """
+        meta = super()._get_graph_node_meta()
+        # TODO: maybe set 'implicit' based on whether there are any implicit comps anywhere
+        # inside of the group or its children.
+        meta['base'] = 'Group'
+        return meta
+
+    def _get_cluster_tree(self, node_info):
+        """
+        Create a nested collection of pydot Cluster objects to represent the tree of groups.
+
+        Parameters
+        ----------
+        node_info : dict
+            A dict of metadata keyed by pathname.
+
+        Returns
+        -------
+        pydot.Dot, dict
+            The pydot graph and a dict of groups keyed by pathname.
+        """
+        try:
+            import pydot
+        except ImportError:
+            issue_warning("write_graph requires pydot.  Install pydot using 'pip install pydot'.")
+            return
+
+        groups = {}
+        pydot_graph = pydot.Dot(graph_type='digraph')
+        prefix = self.pathname + '.' if self.pathname else ''
+        for varpath in chain(self._var_allprocs_abs2prom['input'],
+                             self._var_allprocs_abs2prom['output']):
+            group = varpath.rpartition('.')[0].rpartition('.')[0]
+            if group not in groups:
+                # reverse the list so parents will exist before children
+                ancestor_list = list(all_ancestors(group))[::-1]
+                for path in ancestor_list:
+                    if path.startswith(prefix):
+                        if path not in groups:
+                            parent, _, name = path.rpartition('.')
+                            if path in node_info:
+                                ttip = f"{node_info[path]['classname']} {path}"
+                            else:
+                                ttip = path
+                            groups[path] = pydot.Cluster(path, label=name, tooltip=ttip,
+                                                         fillcolor=_cluster_color(path),
+                                                         style='filled')
+                            if parent and parent.startswith(prefix):
+                                groups[parent].add_subgraph(groups[path])
+                            else:
+                                pydot_graph.add_subgraph(groups[path])
+
+        return pydot_graph, groups
+
+    def _get_tree_graph(self, display_map=None):
+        """
+        Create a pydot graph of the system tree (without clusters).
+
+        Parameters
+        ----------
+        display_map : dict or None
+            A map of classnames to pydot node attributes.
+
+        Returns
+        -------
+        pydot.Dot
+            The pydot tree graph.
+        """
+        try:
+            import pydot
+        except ImportError:
+            issue_warning("write_graph requires pydot.  Install pydot using 'pip install pydot'.")
+            return
+
+        node_info = self._get_graph_display_info(display_map)
+
+        systems = {}
+        pydot_graph = pydot.Dot(graph_type='graph')
+        prefix = self.pathname + '.' if self.pathname else ''
+        label = self.name if self.name else 'Model'
+        top_node = pydot.Node(label, label=label,
+                              tooltip=f"{node_info[self.pathname]['classname']} {self.pathname}",
+                              fillcolor='gray95', style='filled')
+        pydot_graph.add_node(top_node)
+        systems[self.pathname] = top_node
+
+        for varpath in chain(self._var_allprocs_abs2prom['input'],
+                             self._var_allprocs_abs2prom['output']):
+            system = varpath.rpartition('.')[0]
+            if system not in systems:
+                # reverse the list so parents will exist before children
+                ancestor_list = list(all_ancestors(system))[::-1]
+                for path in ancestor_list:
+                    if path.startswith(prefix):
+                        if path not in systems:
+                            parent, _, name = path.rpartition('.')
+                            kwargs = _filter_meta4dot(node_info[path])
+                            ttip = f"{node_info[path]['classname']} {path}"
+                            systems[path] = pydot.Node(path, label=name, tooltip=ttip, **kwargs)
+                            pydot_graph.add_node(systems[path])
+                            if parent.startswith(prefix) or parent == self.pathname:
+                                pydot_graph.add_edge(pydot.Edge(systems[parent], systems[path]))
+
+        return pydot_graph
+
+    def _decorate_graph_for_display(self, G, exclude=()):
+        try:
+            import pydot
+        except ImportError:
+            issue_warning("write_graph requires pydot.  Install pydot using 'pip install pydot'.")
+            return G, {}
+
+        node_info = self._get_graph_display_info()
+
+        exclude = set(exclude)
+
+        # dot doesn't like ':' in node names, so if we find any, we have to put explicit quotes
+        # around the node name and label.
+        replace = {}
+        for node, meta in G.nodes(data=True):
+            if node in node_info:
+                meta.update(_filter_meta4dot(node_info[node]))
+                meta['tooltip'] = f"{node_info[node]['classname']} {node}"
+            quoted = node.rpartition('.')[2]
+            meta['label'] = f'"{quoted}"'
+            if 'type_' in meta:  # variable node
+                if node.rpartition('.')[0] in exclude:
+                    exclude.add(node)  # remove all variables of excluded components
+                if ':' in node and node not in exclude:
+                    replace[node] = node.replace(':', ';')
+
+        if replace:
+            G = nx.relabel_nodes(G, replace, copy=True)
+
+        if exclude:
+            if not replace:
+                G = G.copy()
+            G.remove_nodes_from(exclude)
+
+        return G, node_info
+
+    def _apply_clusters(self, G, node_info):
+        try:
+            import pydot
+        except ImportError:
+            issue_warning("write_graph requires pydot.  Install pydot using 'pip install pydot'.")
+            return G
+
+        pydot_graph, groups = self._get_cluster_tree(node_info)
+        prefix = self.pathname + '.' if self.pathname else ''
+        pydot_nodes = {}
+        skip = {'type_', 'local', 'base'}
+        for node, meta in G.nodes(data=True):
+            kwargs = {n:v for n, v in meta.items() if n not in skip}
+            if 'type_' in meta:  # variable node
+                group = node.rpartition('.')[0].rpartition('.')[0]
+                kwargs['shape'] = 'plain'  # just text for variables, otherwise too busy
+            else:
+                group = node.rpartition('.')[0]
+
+            pdnode = pydot_nodes[node] = pydot.Node(node, **kwargs)
+
+            if group and group.startswith(prefix):
+                groups[group].add_node(pdnode)
+            else:
+                pydot_graph.add_node(pdnode)
+
+        for u, v in G.edges():
+            node1 = pydot_nodes[u]
+            node2 = pydot_nodes[v]
+            pydot_graph.add_edge(pydot.Edge(node1, node2, arrowhead='lnormal'))
+
+        # layout graph from left to right
+        pydot_graph.set_rankdir('LR')
+
+        return pydot_graph
+
+    def write_graph(self, gtype='dataflow', recurse=True, show_vars=False,
+                    display=True, exclude=(), outfile=None):
+        """
+        Use pydot to create a graphical representation of the specified graph.
+
+        Parameters
+        ----------
+        gtype : str
+            The type of graph to create. Options include 'system', 'component', 'nested',
+            and 'dataflow'.
+        recurse : bool
+            If True, recurse into subsystems when gtype is 'dataflow'.
+        show_vars : bool
+            If True, show all variables in the graph. Only relevant when gtype is 'dataflow'.
+        display : bool
+            If True, pop up a window to view the graph.
+        exclude : iter of str
+            Iter of pathnames to exclude from the generated graph.
+        outfile : str or None
+            The name of the file to write the graph to.  The format is inferred from the extension.
+            Default is None, which writes to '<system_path>_<gtype>_graph.svg', where system_path
+            is 'model' for the top level group, and any '.' in the pathname is replaced with '_'.
+
+        Returns
+        -------
+        pydot.Dot or None
+            The pydot graph that was created.
+        """
+        if gtype == 'tree':
+            G = self._get_tree_graph()
+        elif gtype == 'dataflow':
+            if show_vars:
+                if self.pathname == '':
+                    G = self._dataflow_graph
+                else:
+                    G = self._problem_meta['model_ref']()._dataflow_graph
+                    # we're not the top level group, so get our subgraph of the top level graph
+                    prefix = self.pathname + '.'
+                    ournodes = {n for n in G.nodes() if n.startswith(prefix)}
+                    G = nx.subgraph(G, ournodes)
+
+                G, node_info = self._decorate_graph_for_display(G, exclude=exclude)
+                G = self._apply_clusters(G, node_info)
+            elif recurse:
+                G = self.compute_sys_graph(comps_only=True, add_edge_info=False)
+                G, node_info = self._decorate_graph_for_display(G, exclude=exclude)
+                G = self._apply_clusters(G, node_info)
+            else:
+                G = self.compute_sys_graph(comps_only=False, add_edge_info=False)
+                G, _ = self._decorate_graph_for_display(G, exclude=exclude)
+        else:
+            raise ValueError(f"unrecognized graph type '{gtype}'. Allowed types are ['tree', "
+                             "'dataflow'].")
+
+        if G is None:
+            return
+
+        if outfile is None:
+            name = self.pathname.replace('.', '_') if self.pathname else 'model'
+            outfile = f"{name}_{gtype}_graph.svg"
+
+        return write_graph(G, prog='dot', display=display, outfile=outfile)
+
     def _get_auto_ivc_out_val(self, tgts, vars_to_gather):
         # all tgts are continuous variables
         # only called from top level group
@@ -5186,3 +5487,71 @@ class Group(System):
             meta['remote'] = meta['source'] not in self._var_abs2meta['output']
 
         return active_resps
+
+
+def _vars2groups(varnameiter):
+    """
+    Return a set of all groups containing the given variables.
+
+    Parameters
+    ----------
+    varnameiter : iter of str
+        Iterator of variable pathnames.
+
+    Returns
+    -------
+    set
+        Set of group pathnames.
+    """
+    groups = {}
+    for name in varnameiter:
+        gname = name.rpartition('.')[0].rpartition('.')[0]
+        if gname not in groups:
+            groups.update(all_ancestors(gname))
+
+    return groups
+
+
+def _cluster_color(path):
+    """
+    Return the color of the cluster that contains the given path.
+
+    The idea here is to make nested clusters stand out wrt their parent cluster.
+
+    Parameters
+    ----------
+    path : str
+        Pathname of a variable.
+
+    Returns
+    -------
+    int
+        The color of the cluster that contains the given path.
+    """
+    depth = path.count('.') + 1 if path else 0
+
+    ncols = 10
+    maxcol = 98
+    mincol = 40
+
+    # allow 8 nesting levels of difference
+    col = maxcol - (depth % ncols) * (maxcol - mincol) // ncols
+    return f"gray{col}"
+
+
+def _filter_meta4dot(meta):
+    """
+    Remove unnecessary metadata from the given metadata dict before passing to pydot.
+
+    Parameters
+    ----------
+    meta : dict
+        Metadata dict.
+
+    Returns
+    -------
+    dict
+        Metadata dict with unnecessary items removed.
+    """
+    skip = {'type_', 'local', 'base', 'classname'}
+    return {k: v for k, v in meta.items() if k not in skip}

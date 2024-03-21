@@ -61,6 +61,7 @@ from openmdao.utils.entry_points import _list_installed_setup_parser, _list_inst
         _find_repos_setup_parser, _find_repos_exec
 from openmdao.utils.reports_system import _list_reports_setup_parser, _list_reports_cmd, \
     _view_reports_setup_parser, _view_reports_cmd
+from openmdao.utils.graph_utils import _graph_setup_parser, _graph_cmd
 
 
 def _view_connections_setup_parser(parser):
@@ -538,14 +539,14 @@ _command_map = {
                    'Display connection information for variables across multiple MPI processes.'),
     'find_repos': (_find_repos_setup_parser, _find_repos_exec,
                    'Find repos on github having openmdao topics.'),
+    'graph': (_graph_setup_parser, _graph_cmd, 'Generate a graph for a group.'),
     'iprof': (_iprof_setup_parser, _iprof_exec,
               'Profile calls to particular object instances.'),
     'iprof_totals': (_iprof_totals_setup_parser, _iprof_totals_exec,
                      'Generate total timings of calls to particular object instances.'),
     'list_installed': (_list_installed_setup_parser, _list_installed_cmd,
                        'List installed types recognized by OpenMDAO.'),
-    'list_reports': (_list_reports_setup_parser, _list_reports_cmd,
-                     'List available reports.'),
+    'list_reports': (_list_reports_setup_parser, _list_reports_cmd, 'List available reports.'),
     'mem': (_mem_prof_setup_parser, _mem_prof_exec,
             'Profile memory used by OpenMDAO related functions.'),
     'mempost': (_mempost_setup_parser, _mempost_exec, 'Post-process memory profile output.'),
@@ -570,8 +571,7 @@ _command_map = {
     'view_dyn_shapes': (_view_dyn_shapes_setup_parser, _view_dyn_shapes_cmd,
                         'View the dynamic shape dependency graph.'),
     'view_mm': (_meta_model_parser, _meta_model_cmd, "View a metamodel."),
-    'view_reports': (_view_reports_setup_parser, _view_reports_cmd,
-                     'View existing reports.'),
+    'view_reports': (_view_reports_setup_parser, _view_reports_cmd, 'View existing reports.'),
 }
 
 
