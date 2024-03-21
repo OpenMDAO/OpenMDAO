@@ -87,6 +87,8 @@ def write_graph(G, prog='dot', display=True, outfile='graph.svg'):
                            "'pip install pydot'.")
 
     ext = outfile.rpartition('.')[2]
+    if not ext:
+        ext = 'svg'
 
     if isinstance(G, nx.Graph):
         pydot_graph = nx.drawing.nx_pydot.to_pydot(G)

@@ -774,7 +774,7 @@ class Group(System):
         # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
 
-    def _get_dataflow_graph(self, include_display_data=False):
+    def _get_dataflow_graph(self):
         """
         Return a graph of all variables and components in the model.
 
@@ -5489,29 +5489,6 @@ class Group(System):
         return active_resps
 
 
-def _vars2groups(varnameiter):
-    """
-    Return a set of all groups containing the given variables.
-
-    Parameters
-    ----------
-    varnameiter : iter of str
-        Iterator of variable pathnames.
-
-    Returns
-    -------
-    set
-        Set of group pathnames.
-    """
-    groups = {}
-    for name in varnameiter:
-        gname = name.rpartition('.')[0].rpartition('.')[0]
-        if gname not in groups:
-            groups.update(all_ancestors(gname))
-
-    return groups
-
-
 def _cluster_color(path):
     """
     Return the color of the cluster that contains the given path.
@@ -5530,12 +5507,11 @@ def _cluster_color(path):
     """
     depth = path.count('.') + 1 if path else 0
 
-    ncols = 10
-    maxcol = 98
-    mincol = 40
+    ncolors = 10
+    maxcolor = 98
+    mincolor = 40
 
-    # allow 8 nesting levels of difference
-    col = maxcol - (depth % ncols) * (maxcol - mincol) // ncols
+    col = maxcolor - (depth % ncolors) * (maxcolor - mincolor) // ncolors
     return f"gray{col}"
 
 

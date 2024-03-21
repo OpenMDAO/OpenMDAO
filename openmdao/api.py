@@ -65,7 +65,6 @@ from openmdao.utils.find_cite import print_citations
 from openmdao.utils.spline_distributions import cell_centered
 from openmdao.utils.spline_distributions import sine_distribution
 from openmdao.utils.spline_distributions import node_centered
-from openmdao.utils.graph_utils import write_graph
 
 # Vectors
 from openmdao.vectors.default_vector import DefaultVector
