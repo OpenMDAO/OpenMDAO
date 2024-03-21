@@ -2031,13 +2031,13 @@ class Problem(object):
         """
         warn_deprecation(msg='Method `list_problem_vars` has been renamed `list_driver_vars`.\n'
                          'Please update your code to use list_driver_vars to avoid this warning.')
-        self.list_driver_vars(show_promoted_name=show_promoted_name,
-                              print_arrays=print_arrays,
-                              driver_scaling=driver_scaling,
-                              desvar_opts=desvar_opts,
-                              cons_opts=cons_opts,
-                              objs_opts=objs_opts,
-                              out_stream=out_stream)
+        return self.list_driver_vars(show_promoted_name=show_promoted_name,
+                                     print_arrays=print_arrays,
+                                     driver_scaling=driver_scaling,
+                                     desvar_opts=desvar_opts,
+                                     cons_opts=cons_opts,
+                                     objs_opts=objs_opts,
+                                     out_stream=out_stream)
 
     def list_driver_vars(self,
                          show_promoted_name=True,

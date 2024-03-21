@@ -22,7 +22,7 @@ from openmdao.components.exec_comp import _expr_dict, _temporary_expr_dict
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_warning
 from openmdao.utils.general_utils import env_truthy
 from openmdao.utils.testing_utils import force_check_partials
-from openmdao.utils.om_warnings import OMDeprecationWarning, SetupWarning
+from openmdao.utils.om_warnings import SetupWarning
 
 _ufunc_test_data = {
     'min': {
@@ -1975,7 +1975,8 @@ class TestExecCompParameterized(unittest.TestCase):
 
             for comp in cpd:
                 for (var, wrt) in cpd[comp]:
-                    np.testing.assert_almost_equal(cpd[comp][var, wrt]['abs error'][0], 0, decimal=4)
+                    np.testing.assert_almost_equal(cpd[comp][var, wrt]['abs error'][0], 0, decimal=4,
+                                                   verbose=True, err_msg=f"{test_data['args']=}")
 
 
 if __name__ == "__main__":
