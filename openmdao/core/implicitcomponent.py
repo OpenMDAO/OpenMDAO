@@ -473,7 +473,6 @@ class ImplicitComponent(Component):
         super()._setup_vectors(root_vectors)
 
         if self._declared_residuals:
-            self._check_res_out_overlaps()
             name2slcshape = _get_slice_shape_dict(self._resid_name_shape_iter())
 
             if self._use_derivatives:
@@ -522,11 +521,15 @@ class ImplicitComponent(Component):
             rmap = self._resid2out_subjac_map
             omap = {}
 
-            # first, expand the glob patterns into a list of specific keys (resid, wrt)
+            # expand the glob patterns into a list of specific residuals and map overlaps to
+            # both outputs and residuals
             for _, resids in self._find_of_matches(of, use_resname=True):
                 for resid in resids:
                     for tup in resid_mapper.overlap_iter(resid, out_mapper):
                         _, rstart, rstop, oname, ostart, ostop = tup
+
+                        self._check_res_vs_out_meta(resid, oname)
+
                         if resid not in rmap:
                             rmap[resid] = []
                         if oname not in omap:
@@ -577,7 +580,6 @@ class ImplicitComponent(Component):
                             existing_metas[0]['method'] = method
 
                 if pattern_rows is not None:
-                    # if any of the resid subjacs had rows, we need the output subjac to be sparse
                     rows = []
                     cols = []
                     data = []
@@ -655,8 +657,7 @@ class ImplicitComponent(Component):
             Local name of the output.
         """
         resmeta = self._declared_residuals[resid]
-        outmeta = self._var_abs2meta['output'][output]
-        loc_out = output[len(self.pathname) + 1:]
+        outmeta = self._var_abs2meta['output'][self.pathname + '.' + output]
 
         ref = resmeta['ref']
         res_ref = outmeta['res_ref']
@@ -667,7 +668,7 @@ class ImplicitComponent(Component):
             if (ref_arr != res_ref_arr or (ref_arr and not np.all(ref == res_ref) or
                                            (not ref_arr and ref != res_ref))):
                 raise ValueError(f"{self.msginfo}: ({ref} != {res_ref}), 'ref' for residual "
-                                 f"'{resid}' != 'res_ref' for output '{loc_out}'.")
+                                 f"'{resid}' != 'res_ref' for output '{output}'.")
 
         units = resmeta['units']
         res_units = outmeta['res_units']
@@ -675,12 +676,7 @@ class ImplicitComponent(Component):
         # assume units and res_units are already simplified
         if units is not None and res_units is not None and units != res_units:
             raise ValueError(f"{self.msginfo}: residual units '{units}' for residual '{resid}' != "
-                             f"output res_units '{res_units}' for output '{loc_out}'.")
-
-    def _check_res_out_overlaps(self):
-        for resid, _, _, output, _, _ in _overlap_range_iter(self._declared_residuals,
-                                                             self._var_abs2meta['output']):
-            self._check_res_vs_out_meta(resid, output)
+                             f"output res_units '{res_units}' for output '{output}'.")
 
     def _get_partials_wrts(self):
         """
@@ -910,20 +906,6 @@ def meta2range_iter(meta_dict, names=None, shp_name='shape'):
             if name in names:
                 yield name, start, end
             start = end
-
-
-def _get_overlap_slices(ostart, oend, rstart, rend):
-    """
-    For an overlapping residual and output, return the slices where they overlap.
-    """
-    minend = min(oend, rend)
-    start = max(rstart - ostart, 0)
-    stop = minend - ostart
-    oslc = slice(start, stop)
-
-    start = max(ostart - rstart, 0)
-    stop = minend - rstart
-    return oslc, slice(start, stop)
 
 
 def _overlap_range_iter(meta_dict1, meta_dict2, names1=None, names2=None):
