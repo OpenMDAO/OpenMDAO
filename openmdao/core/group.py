@@ -4508,6 +4508,9 @@ class Group(System):
                     G = self._dataflow_graph
 
                 if not recurse:
+                    # layout graph from left to right
+                    G.graph['graph'] = {'rankdir': 'LR'}
+
                     # keep all direct children and their variables
                     keep = {n for n in G.nodes() if n[lenpre:].count('.') == 0}
                     keep.update({n for n, d in G.nodes(data=True) if 'type_' in d and
@@ -4553,9 +4556,6 @@ class Group(System):
                 G, node_info = self._decorate_graph_for_display(G, exclude=exclude)
                 if recurse:
                     G = self._apply_clusters(G, node_info)
-                else:
-                    # layout graph from left to right
-                    G.graph['graph'] = {'rankdir': 'LR'}
 
             elif recurse:
                 G = self.compute_sys_graph(comps_only=True, add_edge_info=False)
