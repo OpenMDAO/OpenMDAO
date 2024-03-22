@@ -161,3 +161,4 @@ def _graph_cmd(options, user_args):
     # register the hooks
     hooks._register_hook('final_setup', 'Problem', post=_view_graph, exit=True)
     _load_and_exec(options.file[0], user_args)
+

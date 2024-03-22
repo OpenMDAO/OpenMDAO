@@ -11,6 +11,11 @@ from difflib import get_close_matches
 import numpy as np
 import networkx as nx
 
+try:
+    import pydot
+except ImportError:
+    pydot = None
+
 from openmdao.core.configinfo import _ConfigInfo
 from openmdao.core.system import System, collect_errors
 from openmdao.core.component import Component, _DictValues
@@ -42,6 +47,31 @@ from openmdao.utils.class_util import overrides_method
 # regex to check for valid names.
 import re
 namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
+
+
+# mapping of system type to graph display properties
+_base_display_map = {
+    'ExplicitComponent': {
+        'fillcolor': '"aquamarine3:aquamarine"',
+        'style': 'filled',
+        'shape': 'box',
+    },
+    'ImplicitComponent': {
+        'fillcolor': '"lightblue:lightslateblue"',
+        'style': 'filled',
+        'shape': 'box',
+    },
+    'IndepVarComp': {
+        'fillcolor': '"chartreuse2:chartreuse4"',
+        'style': 'filled',
+        'shape': 'box',
+    },
+    'Group': {
+        'fillcolor': 'gray75',
+        'style': 'filled',
+        'shape': 'octagon',
+    },
+}
 
 
 # use a class with slots instead of a namedtuple so that we can
@@ -4216,38 +4246,16 @@ class Group(System):
         return graph
 
     def _get_graph_display_info(self, display_map=None):
-        base_display_map = {
-            'ExplicitComponent': {
-                'fillcolor': '"aquamarine3:aquamarine"',
-                'style': 'filled',
-                'shape': 'box',
-            },
-            'ImplicitComponent': {
-                'fillcolor': '"lightblue:lightslateblue"',
-                'style': 'filled',
-                'shape': 'box',
-            },
-            'IndepVarComp': {
-                'fillcolor': '"chartreuse2:chartreuse4"',
-                'style': 'filled',
-                'shape': 'box',
-            },
-            'Group': {
-                'fillcolor': 'gray75',
-                'style': 'filled',
-                'shape': 'octagon',
-            },
-        }
-
         node_info = {}
         for s in self.system_iter(recurse=True, include_self=True):
             meta = s._get_graph_node_meta()
-            if display_map and 'classname' in meta and meta['classname'] in display_map:
+            if display_map and meta['classname'] in display_map:
                 meta.update(display_map[meta['classname']])
-            elif display_map and 'base' in meta and meta['base'] in display_map:
+            elif display_map and meta['base'] in display_map:
                 meta.update(display_map[meta['base']])
-            elif 'base' in meta and meta['base'] in base_display_map:
-                meta.update(base_display_map[meta['base']])
+            elif meta['base'] in _base_display_map:
+                meta.update(_base_display_map[meta['base']])
+            meta['tooltip'] = f"{meta['classname']} {s.pathname}"
             node_info[s.pathname] = meta.copy()
 
         if self.comm.size > 1:
@@ -4297,12 +4305,6 @@ class Group(System):
         pydot.Dot, dict
             The pydot graph and a dict of groups keyed by pathname.
         """
-        try:
-            import pydot
-        except ImportError:
-            issue_warning("write_graph requires pydot.  Install pydot using 'pip install pydot'.")
-            return
-
         groups = {}
         pydot_graph = pydot.Dot(graph_type='digraph')
         prefix = self.pathname + '.' if self.pathname else ''
@@ -4316,11 +4318,8 @@ class Group(System):
                     if path.startswith(prefix):
                         if path not in groups:
                             parent, _, name = path.rpartition('.')
-                            if path in node_info:
-                                ttip = f"{node_info[path]['classname']} {path}"
-                            else:
-                                ttip = path
-                            groups[path] = pydot.Cluster(path, label=name, tooltip=ttip,
+                            groups[path] = pydot.Cluster(path, label=name,
+                                                         tooltip=node_info[path]['tooltip'],
                                                          fillcolor=_cluster_color(path),
                                                          style='filled')
                             if parent and parent.startswith(prefix):
@@ -4344,12 +4343,6 @@ class Group(System):
         pydot.Dot
             The pydot tree graph.
         """
-        try:
-            import pydot
-        except ImportError:
-            issue_warning("write_graph requires pydot.  Install pydot using 'pip install pydot'.")
-            return
-
         node_info = self._get_graph_display_info(display_map)
 
         systems = {}
@@ -4373,8 +4366,7 @@ class Group(System):
                         if path not in systems:
                             parent, _, name = path.rpartition('.')
                             kwargs = _filter_meta4dot(node_info[path])
-                            ttip = f"{node_info[path]['classname']} {path}"
-                            systems[path] = pydot.Node(path, label=name, tooltip=ttip, **kwargs)
+                            systems[path] = pydot.Node(path, label=name, **kwargs)
                             pydot_graph.add_node(systems[path])
                             if parent.startswith(prefix) or parent == self.pathname:
                                 pydot_graph.add_edge(pydot.Edge(systems[parent], systems[path]))
@@ -4382,12 +4374,6 @@ class Group(System):
         return pydot_graph
 
     def _decorate_graph_for_display(self, G, exclude=()):
-        try:
-            import pydot
-        except ImportError:
-            issue_warning("write_graph requires pydot.  Install pydot using 'pip install pydot'.")
-            return G, {}
-
         node_info = self._get_graph_display_info()
 
         exclude = set(exclude)
@@ -4398,14 +4384,14 @@ class Group(System):
         for node, meta in G.nodes(data=True):
             if node in node_info:
                 meta.update(_filter_meta4dot(node_info[node]))
-                meta['tooltip'] = f"{node_info[node]['classname']} {node}"
-            quoted = node.rpartition('.')[2]
-            meta['label'] = f'"{quoted}"'
+            quoted = f'"{node.rpartition(".")[2]}"'
+            meta['label'] = quoted
             if 'type_' in meta:  # variable node
                 if node.rpartition('.')[0] in exclude:
                     exclude.add(node)  # remove all variables of excluded components
-                if ':' in node and node not in exclude:
-                    replace[node] = node.replace(':', ';')
+                if ':' in node and node not in exclude:  # fix ':' in node names for use in dot
+                    replace[node] = f'"{node}"'
+                meta['shape'] = 'plain'  # just text for variables, otherwise too busy
 
         if replace:
             G = nx.relabel_nodes(G, replace, copy=True)
@@ -4417,24 +4403,20 @@ class Group(System):
 
         return G, node_info
 
-    def _apply_clusters(self, G, node_info):
-        try:
-            import pydot
-        except ImportError:
-            issue_warning("write_graph requires pydot.  Install pydot using 'pip install pydot'.")
-            return G
+    def _add_boundary_nodes(self, G):
+        return G
 
+    def _apply_clusters(self, G, node_info):
         pydot_graph, groups = self._get_cluster_tree(node_info)
         prefix = self.pathname + '.' if self.pathname else ''
         pydot_nodes = {}
-        skip = {'type_', 'local', 'base'}
         for node, meta in G.nodes(data=True):
-            kwargs = {n:v for n, v in meta.items() if n not in skip}
+            noquote_node = node.strip('"')
+            kwargs = _filter_meta4dot(meta)
             if 'type_' in meta:  # variable node
-                group = node.rpartition('.')[0].rpartition('.')[0]
-                kwargs['shape'] = 'plain'  # just text for variables, otherwise too busy
+                group = noquote_node.rpartition('.')[0].rpartition('.')[0]
             else:
-                group = node.rpartition('.')[0]
+                group = noquote_node.rpartition('.')[0]
 
             pdnode = pydot_nodes[node] = pydot.Node(node, **kwargs)
 
@@ -4453,8 +4435,33 @@ class Group(System):
 
         return pydot_graph
 
+    def _get_boundary_conns(self):
+        """
+        Return lists of incoming and outgoing boundary connections.
+
+        Returns
+        -------
+        tuple
+            A tuple of (incoming, outgoing) boundary connections.
+        """
+        if not self.pathname:
+            return ([], [])
+
+        top = self._problem_meta['model_ref']()
+        prefix = self.pathname + '.'
+
+        incoming = []
+        outgoing = []
+        for abs_in, abs_out in top._conn_global_abs_in2out.items():
+            if abs_in.startswith(prefix) and not abs_out.startswith(prefix):
+                incoming.append((abs_in, abs_out))
+            if abs_out.startswith(prefix) and not abs_in.startswith(prefix):
+                outgoing.append((abs_in, abs_out))
+
+        return incoming, outgoing
+
     def write_graph(self, gtype='dataflow', recurse=True, show_vars=False,
-                    display=True, exclude=(), outfile=None):
+                    display=True, show_boundary=False, exclude=(), outfile=None):
         """
         Use pydot to create a graphical representation of the specified graph.
 
@@ -4469,6 +4476,8 @@ class Group(System):
             If True, show all variables in the graph. Only relevant when gtype is 'dataflow'.
         display : bool
             If True, pop up a window to view the graph.
+        show_boundary : bool
+            If True, include connections to variables outside the boundary of the Group.
         exclude : iter of str
             Iter of pathnames to exclude from the generated graph.
         outfile : str or None
@@ -4481,21 +4490,73 @@ class Group(System):
         pydot.Dot or None
             The pydot graph that was created.
         """
+        if pydot is None:
+            issue_warning("To view the system graph, you must install pydot. "
+                            "You can install it via 'pip install pydot'.")
+            return
+
         if gtype == 'tree':
             G = self._get_tree_graph()
         elif gtype == 'dataflow':
             if show_vars:
-                if self.pathname == '':
-                    G = self._dataflow_graph
-                else:
+                prefix = self.pathname + '.' if self.pathname else ''
+                lenpre = len(prefix)
+
+                if self.pathname:
                     G = self._problem_meta['model_ref']()._dataflow_graph
+                else:
+                    G = self._dataflow_graph
+
+                if not recurse:
+                    # keep all direct children and their variables
+                    keep = {n for n in G.nodes() if n[lenpre:].count('.') == 0}
+                    keep.update({n for n, d in G.nodes(data=True) if 'type_' in d and
+                                 n.rpartition('.')[0] in keep})
+
+                    # keep all variables involved in connections owned by this group
+                    inconnvars = set()
+                    outconnvars = set()
+                    for abs_in, abs_out in self._conn_abs_in2out.items():
+                        if abs_in not in keep:
+                            inconnvars.add(abs_in)
+                        if abs_out not in keep:
+                            outconnvars.add(abs_out)
+
+                    for invar in inconnvars:
+                        grp = prefix + invar[lenpre:].partition('.')[0]
+                        if grp not in G:
+                            G.add_node(grp, **_base_display_map['Group'])
+                        G.add_edge(invar, grp)
+                        keep.add(grp)
+                        keep.add(invar)
+
+                    for outvar in outconnvars:
+                        grp = prefix + outvar[lenpre:].partition('.')[0]
+                        if grp not in G:
+                            G.add_node(grp, **_base_display_map['Group'])
+                        G.add_edge(grp, outvar)
+                        keep.add(grp)
+                        keep.add(outvar)
+
+                if self.pathname == '':
+                    if not recurse:
+                       G = nx.subgraph(G, keep)
+                else:
                     # we're not the top level group, so get our subgraph of the top level graph
-                    prefix = self.pathname + '.'
                     ournodes = {n for n in G.nodes() if n.startswith(prefix)}
+
+                    if not recurse:
+                        ournodes.update(keep)
+
                     G = nx.subgraph(G, ournodes)
 
                 G, node_info = self._decorate_graph_for_display(G, exclude=exclude)
-                G = self._apply_clusters(G, node_info)
+                if recurse:
+                    G = self._apply_clusters(G, node_info)
+                else:
+                    # layout graph from left to right
+                    G.graph['graph'] = {'rankdir': 'LR'}
+
             elif recurse:
                 G = self.compute_sys_graph(comps_only=True, add_edge_info=False)
                 G, node_info = self._decorate_graph_for_display(G, exclude=exclude)
@@ -4503,6 +4564,9 @@ class Group(System):
             else:
                 G = self.compute_sys_graph(comps_only=False, add_edge_info=False)
                 G, _ = self._decorate_graph_for_display(G, exclude=exclude)
+
+            if show_boundary:
+                G = self._add_boundary_nodes(G)
         else:
             raise ValueError(f"unrecognized graph type '{gtype}'. Allowed types are ['tree', "
                              "'dataflow'].")
