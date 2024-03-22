@@ -156,5 +156,3 @@ if __name__ == "__main__":
     p['circuit.n2.V'] = .7
 
     p.run_model()
-
-    p.model.write_graph(gtype='dataflow', recurse=True, show_vars=True)

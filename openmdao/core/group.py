@@ -4385,7 +4385,8 @@ class Group(System):
             if node in node_info:
                 meta.update(_filter_meta4dot(node_info[node]))
             quoted = f'"{node.rpartition(".")[2]}"'
-            meta['label'] = quoted
+            if not ('label' in meta and meta['label']):
+                meta['label'] = quoted
             if 'type_' in meta:  # variable node
                 if node.rpartition('.')[0] in exclude:
                     exclude.add(node)  # remove all variables of excluded components
@@ -4532,6 +4533,7 @@ class Group(System):
                         G.add_edge(invar, grp)
                         keep.add(grp)
                         keep.add(invar)
+                        G.nodes[invar]['label'] = self._var_allprocs_abs2prom['input'][invar]
 
                     for outvar in outconnvars:
                         grp = prefix + outvar[lenpre:].partition('.')[0]
@@ -4540,6 +4542,7 @@ class Group(System):
                         G.add_edge(grp, outvar)
                         keep.add(grp)
                         keep.add(outvar)
+                        G.nodes[outvar]['label'] = self._var_allprocs_abs2prom['output'][outvar]
 
                 if self.pathname == '':
                     if not recurse:
