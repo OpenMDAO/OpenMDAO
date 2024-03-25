@@ -4245,6 +4245,17 @@ class Group(System):
 
         return graph
 
+    def _get_prom_conns(self, conns):
+        abs2prom_in = self._var_allprocs_abs2prom['input']
+        abs2prom_out = self._var_allprocs_abs2prom['output']
+        prom2abs_in = self._var_allprocs_prom2abs_list['input']
+        prefix = self.pathname + '.' if self.pathname else ''
+        prom_conns = {}
+        for inp, out in conns.items():
+            prom = abs2prom_in[inp]
+            prom_conns[prom] = (out, [i for i in prom2abs_in[prom] if i.startswith(prefix)])
+        return prom_conns
+
     def _get_graph_display_info(self, display_map=None):
         node_info = {}
         for s in self.system_iter(recurse=True, include_self=True):
@@ -4598,14 +4609,9 @@ class Group(System):
                 prefix = self.pathname + '.' if self.pathname else ''
                 lenpre = len(prefix)
 
-                if self.pathname:
-                    G = self._problem_meta['model_ref']()._dataflow_graph
-                else:
-                    G = self._dataflow_graph
+                G = self._problem_meta['model_ref']()._get_dataflow_graph()
 
                 if not recurse:
-                    G = G.copy()
-
                     # layout graph from left to right
                     gname = 'model' if self.pathname == '' else self.pathname
                     G.graph['graph'] = {'rankdir': 'LR', 'label': f"Dataflow for '{gname}'",
@@ -4617,42 +4623,44 @@ class Group(System):
                     keep.update({n for n, d in G.nodes(data=True) if 'type_' in d and
                                  n.rpartition('.')[0] in keep})
 
-                    # keep all variables involved in connections owned by this group
-                    inconnvars = set()
-                    outconnvars = set()
-                    for abs_in, abs_out in self._conn_abs_in2out.items():
-                        inconnvars.add(abs_in)
-                        outconnvars.add(abs_out)
+                    promconns = self._get_prom_conns(self._conn_abs_in2out)
 
-                    for invar in inconnvars:
-                        system = prefix + invar[lenpre:].partition('.')[0]
-                        if invar in G:
-                            if system not in G:
-                                G.add_node(system, **_base_display_map['Group'])
-                            G.add_edge(invar, system)
-                            keep.add(system)
-                            keep.add(invar)
-                            prom_in = self._var_allprocs_abs2prom["input"][invar]
-                            par, _, child = prom_in.partition('.')
-                            if par == invar[lenpre:].partition('.')[0]:
-                                G.nodes[invar]['label'] = child
-                            else:
-                                G.nodes[invar]['label'] = self._var_allprocs_abs2prom["input"][invar]
+                    for prom_in, (abs_out, abs_ins) in promconns.items():
+                        nins = len(abs_ins)
+                        the_in = abs_ins[0] if nins == 1 else prom_in
+                        if the_in not in G:
+                            G.add_node(the_in, type_='input', label=prom_in)
+                        else:
+                            l = prom_in[:lenpre] if prom_in.startswith(prefix) else prom_in
+                            G.nodes[the_in]['label'] = l
 
-                    for outvar in outconnvars:
-                        system = prefix + outvar[lenpre:].partition('.')[0]
-                        if outvar in G:
-                            if system not in G:
-                                G.add_node(system, **_base_display_map['Group'])
-                            G.add_edge(system, outvar)
-                            keep.add(system)
-                            keep.add(outvar)
-                            prom_out = self._var_allprocs_abs2prom["output"][outvar]
-                            par, _, child = prom_out.partition('.')
-                            if par == outvar[lenpre:].partition('.')[0]:
-                                G.nodes[outvar]['label'] = child
+                        sysout = prefix + abs_out[lenpre:].partition('.')[0]
+                        prom_out = self._var_allprocs_abs2prom['output'][abs_out]
+
+                        if sysout not in G:
+                            G.add_node(sysout, **_base_display_map['Group'])
+
+                        l = prom_out[:lenpre] if prom_out.startswith(prefix) else prom_out
+                        G.nodes[abs_out]['label'] = l
+                        G.add_edge(sysout, abs_out)
+
+                        keep.add(sysout)
+                        keep.add(abs_out)
+
+                        for abs_in in abs_ins:
+                            sysin = prefix + abs_in[lenpre:].partition('.')[0]
+                            if sysin not in G:
+                                G.add_node(sysin, **_base_display_map['Group'])
+                            if nins == 1:
+                                G.add_edge(abs_ins[0], sysin)
+                                keep.add(abs_ins[0])
                             else:
-                                G.nodes[outvar]['label'] = self._var_allprocs_abs2prom["output"][outvar]
+                                G.add_edge(prom_in, sysin)
+                                keep.add(prom_in)
+
+                        if prom_in in G and nins > 1:
+                            G.nodes[prom_in]['fontcolor'] = 'red'
+                            G.nodes[prom_in]['tooltip'] = '\n'.join(abs_ins)
 
                 if self.pathname == '':
                     if not recurse:
