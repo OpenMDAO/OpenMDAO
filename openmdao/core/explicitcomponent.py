@@ -74,31 +74,6 @@ class ExplicitComponent(Component):
         if self.matrix_free:
             self._check_matfree_deprecation()
 
-    def _get_partials_varlists(self, use_resname=False):
-        """
-        Get lists of 'of' and 'wrt' variables that form the partial jacobian.
-
-        Parameters
-        ----------
-        use_resname : bool
-            Ignored for explicit components.
-
-        Returns
-        -------
-        tuple(list, list)
-            'of' and 'wrt' variable lists.
-        """
-        of = list(self._var_rel_names['output'])
-        wrt = list(self._var_rel_names['input'])
-
-        # filter out any discrete inputs or outputs
-        if self._discrete_outputs:
-            of = [n for n in of if n not in self._discrete_outputs]
-        if self._discrete_inputs:
-            wrt = [n for n in wrt if n not in self._discrete_inputs]
-
-        return of, wrt
-
     def _jac_wrt_iter(self, wrt_matches=None):
         """
         Iterate over (name, start, end, vec, slice, dist_sizes) for each column var in the jacobian.
