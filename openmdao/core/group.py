@@ -49,7 +49,7 @@ import re
 namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
 
 
-# mapping of system type to graph display properties
+# mapping of base system type to graph display properties
 _base_display_map = {
     'ExplicitComponent': {
         'fillcolor': '"aquamarine3:aquamarine"',
@@ -69,7 +69,7 @@ _base_display_map = {
     'Group': {
         'fillcolor': 'gray75',
         'style': 'filled',
-        'shape': 'octagon',
+        'shape': 'box',
     },
 }
 
@@ -4253,9 +4253,16 @@ class Group(System):
                 meta.update(display_map[meta['classname']])
             elif display_map and meta['base'] in display_map:
                 meta.update(display_map[meta['base']])
-            elif meta['base'] in _base_display_map:
-                meta.update(_base_display_map[meta['base']])
-            meta['tooltip'] = f"{meta['classname']} {s.pathname}"
+            else:
+                _get_node_display_meta(s, meta)
+
+            ttlist = [f"Name: {s.pathname}"]
+            ttlist.append(f"Class: {meta['classname']}")
+            if _has_nondef_lin_solver(s):
+                ttlist.append(f"Linear Solver: {type(s.linear_solver).__name__}")
+            if _has_nondef_nl_solver(s):
+                ttlist.append(f"Nonlinear Solver: {type(s.nonlinear_solver).__name__}")
+            meta['tooltip'] = '\n'.join(ttlist)
             node_info[s.pathname] = meta.copy()
 
         if self.comm.size > 1:
@@ -4354,8 +4361,7 @@ class Group(System):
         prefix = self.pathname + '.' if self.pathname else ''
         label = self.name if self.name else 'Model'
         top_node = pydot.Node(label, label=label,
-                              tooltip=f"{node_info[self.pathname]['classname']} {self.pathname}",
-                              fillcolor='gray95', style='filled')
+                              **node_info[self.pathname])
         pydot_graph.add_node(top_node)
         systems[self.pathname] = top_node
 
@@ -4410,6 +4416,8 @@ class Group(System):
                 meta.update(_filter_meta4dot(node_info[node]))
             if not ('label' in meta and meta['label']):
                 meta['label'] = f'"{node.rpartition(".")[2]}"'
+            else:
+                meta['label'] = f'"{meta["label"]}"'
             if 'type_' in meta:  # variable node
                 if node.rpartition('.')[0] in exclude:
                     exclude.add(node)  # remove all variables of excluded components
@@ -4430,33 +4438,43 @@ class Group(System):
 
     def _add_boundary_nodes(self, G, incoming, outgoing, exclude=()):
         lenpre = len(self.pathname) + 1 if self.pathname else 0
+        for ex in exclude:
+            expre = ex + '.'
+            incoming = [(in_abs, out_abs) for in_abs, out_abs in incoming
+                        if in_abs != ex and out_abs != ex and
+                        not in_abs.startswith(expre) and not out_abs.startswith(expre)]
+            outgoing = [(in_abs, out_abs) for in_abs, out_abs in outgoing
+                        if in_abs != ex and out_abs != ex and
+                        not in_abs.startswith(expre) and not out_abs.startswith(expre)]
+
         if incoming:
             tooltip = ['External Connections:']
             connstrs = set()
             for in_abs, out_abs in incoming:
                 if in_abs in G:
-                    connstrs.add(f"{out_abs} -> {in_abs[lenpre:]}")
+                    connstrs.add(f"   {out_abs} -> {in_abs[lenpre:]}")
             tooltip += sorted(connstrs)
             tooltip='\n'.join(tooltip)
-            G.add_node('_Incoming', label='Incoming', shape='rarrow', fillcolor='peachpuff3',
-                       style='filled', tooltip=f'"{tooltip}"', rank='min')
-            for in_abs, _ in incoming:
-                if in_abs in G:
-                    G.add_edge('_Incoming', in_abs, style='dashed', arrowsize=0.5)
+            if connstrs:
+                G.add_node('_Incoming', label='Incoming', shape='rarrow', fillcolor='peachpuff3',
+                        style='filled', tooltip=f'"{tooltip}"', rank='min')
+                for in_abs, out_abs in incoming:
+                    if in_abs in G:
+                        G.add_edge('_Incoming', in_abs, style='dashed', arrowhead='lnormal', arrowsize=0.5)
 
         if outgoing:
             tooltip = ['External Connections:']
             connstrs = set()
             for in_abs, out_abs in outgoing:
                 if out_abs in G:
-                    connstrs.add(f"{out_abs[lenpre:]} -> {in_abs}")
+                    connstrs.add(f"   {out_abs[lenpre:]} -> {in_abs}")
             tooltip += sorted(connstrs)
             tooltip='\n'.join(tooltip)
-            G.add_node('_Outgoing', label='Outgoing', shape='rarrow', fillcolor='peachpuff3',
+            G.add_node('_Outgoing', label='Outgoing', arrowhead='rarrow', fillcolor='peachpuff3',
                        style='filled', tooltip=f'"{tooltip}"', rank='max')
-            for _, out_abs in outgoing:
+            for in_abs, out_abs in outgoing:
                 if out_abs in G:
-                    G.add_edge(out_abs, '_Outgoing', style='dashed', arrowsize=0.5)
+                    G.add_edge(out_abs, '_Outgoing', style='dashed', shape='lnormal', arrowsize=0.5)
 
         return G
 
@@ -4485,6 +4503,7 @@ class Group(System):
         for u, v, meta in G.edges(data=True):
             pydot_graph.add_edge(pydot.Edge(pydot_nodes[u], pydot_nodes[v],
                                             **_filter_meta4dot(meta,
+                                                               arrowhead='lnormal',
                                                                arrowsize=0.5)))
 
         # layout graph from left to right
@@ -4616,9 +4635,9 @@ class Group(System):
                             prom_in = self._var_allprocs_abs2prom["input"][invar]
                             par, _, child = prom_in.partition('.')
                             if par == invar[lenpre:].partition('.')[0]:
-                                G.nodes[invar]['label'] = f'"{child}"'
+                                G.nodes[invar]['label'] = child
                             else:
-                                G.nodes[invar]['label'] = f'"{self._var_allprocs_abs2prom["input"][invar]}"'
+                                G.nodes[invar]['label'] = self._var_allprocs_abs2prom["input"][invar]
 
                     for outvar in outconnvars:
                         system = prefix + outvar[lenpre:].partition('.')[0]
@@ -4631,9 +4650,9 @@ class Group(System):
                             prom_out = self._var_allprocs_abs2prom["output"][outvar]
                             par, _, child = prom_out.partition('.')
                             if par == outvar[lenpre:].partition('.')[0]:
-                                G.nodes[outvar]['label'] = f'"{child}"'
+                                G.nodes[outvar]['label'] = child
                             else:
-                                G.nodes[outvar]['label'] = f'"{self._var_allprocs_abs2prom["output"][outvar]}"'
+                                G.nodes[outvar]['label'] = self._var_allprocs_abs2prom["output"][outvar]
 
                 if self.pathname == '':
                     if not recurse:
@@ -4649,7 +4668,7 @@ class Group(System):
 
                 if show_boundary and self.pathname:
                     incoming, outgoing = self._get_boundary_conns()
-                    G = self._add_boundary_nodes(G.copy(), incoming, outgoing)
+                    G = self._add_boundary_nodes(G.copy(), incoming, outgoing, exclude)
 
                 G, node_info = self._decorate_graph_for_display(G, exclude=exclude)
 
@@ -4667,7 +4686,7 @@ class Group(System):
                                 for in_abs, out_abs in incoming]
                     outgoing = [(in_abs.rpartition('.')[0], out_abs.rpartition('.')[0])
                                 for in_abs, out_abs in outgoing]
-                    G = self._add_boundary_nodes(G.copy(), incoming, outgoing)
+                    G = self._add_boundary_nodes(G.copy(), incoming, outgoing, exclude)
 
                 G, node_info = self._decorate_graph_for_display(G, exclude=exclude)
                 G = self._apply_clusters(G, node_info)
@@ -5709,3 +5728,45 @@ def _filter_meta4dot(meta, **kwargs):
         if k not in dct:
             dct[k] = v
     return dct
+
+
+def _has_nondef_nl_solver(system):
+    """
+    Return True if the given system has a nonlinear solver that is not the default.
+
+    Parameters
+    ----------
+    system : System
+        The system to check.
+
+    Returns
+    -------
+    bool
+        True if the system has a nonlinear solver that is not the default.
+    """
+    return system.nonlinear_solver is not None and not isinstance(system.nonlinear_solver,
+                                                                  NonlinearRunOnce)
+
+
+def _has_nondef_lin_solver(system):
+    """
+    Return True if the given system has a linear solver that is not the default.
+
+    Parameters
+    ----------
+    system : System
+        The system to check.
+
+    Returns
+    -------
+    bool
+        True if the system has a linear solver that is not the default.
+    """
+    return system.linear_solver is not None and not isinstance(system.linear_solver, LinearRunOnce)
+
+
+def _get_node_display_meta(s, meta):
+    if meta['base'] in _base_display_map:
+        meta.update(_base_display_map[meta['base']])
+        if _has_nondef_lin_solver(s) or _has_nondef_nl_solver(s):
+            meta['shape'] = 'box3d'

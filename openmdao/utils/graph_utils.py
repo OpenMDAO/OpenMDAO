@@ -153,7 +153,7 @@ def _graph_cmd(options, user_args):
     """
     def _view_graph(problem):
         group = problem.model._get_subsystem(options.group) if options.group else problem.model
-        if not options.group and not options.auto_ivc:
+        if not options.auto_ivc:
             exclude = {'_auto_ivc'}
         else:
             exclude = set()
