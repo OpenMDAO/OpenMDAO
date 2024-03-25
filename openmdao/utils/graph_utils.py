@@ -132,6 +132,9 @@ def _graph_setup_parser(parser):
     parser.add_argument('--show-vars', action='store_true', dest='show_vars',
                         help="show variables in the graph. This only applies to the dataflow graph."
                         " Default is False.")
+    parser.add_argument('--show-boundary', action='store_true', dest='show_boundary',
+                        help="show connections to variables outside of the graph. This only "
+                        "applies to the dataflow graph. Default is False.")
     parser.add_argument('--autoivc', action='store_true', dest='auto_ivc',
                         help="include the _auto_ivc component in the graph. This applies to "
                              "graphs of the top level group only. Default is False.")
@@ -156,7 +159,7 @@ def _graph_cmd(options, user_args):
             exclude = set()
         group.write_graph(gtype=options.type, recurse=options.recurse,
                           show_vars=options.show_vars, display=options.show, exclude=exclude,
-                          outfile=options.outfile)
+                          show_boundary=options.show_boundary, outfile=options.outfile)
 
     # register the hooks
     hooks._register_hook('final_setup', 'Problem', post=_view_graph, exit=True)

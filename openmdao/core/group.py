@@ -4307,7 +4307,8 @@ class Group(System):
         """
         groups = {}
         pydot_graph = pydot.Dot(graph_type='digraph')
-        prefix = self.pathname + '.' if self.pathname else ''
+        mypath = self.pathname
+        prefix = mypath + '.' if mypath else ''
         for varpath in chain(self._var_allprocs_abs2prom['input'],
                              self._var_allprocs_abs2prom['output']):
             group = varpath.rpartition('.')[0].rpartition('.')[0]
@@ -4315,14 +4316,17 @@ class Group(System):
                 # reverse the list so parents will exist before children
                 ancestor_list = list(all_ancestors(group))[::-1]
                 for path in ancestor_list:
-                    if path.startswith(prefix):
+                    if path.startswith(prefix) or path==mypath:
                         if path not in groups:
                             parent, _, name = path.rpartition('.')
-                            groups[path] = pydot.Cluster(path, label=name,
+                            groups[path] = pydot.Cluster(path,
+                                                         label=path if path == mypath else name,
                                                          tooltip=node_info[path]['tooltip'],
                                                          fillcolor=_cluster_color(path),
                                                          style='filled')
                             if parent and parent.startswith(prefix):
+                                groups[parent].add_subgraph(groups[path])
+                            elif parent == mypath and parent in groups:
                                 groups[parent].add_subgraph(groups[path])
                             else:
                                 pydot_graph.add_subgraph(groups[path])
@@ -4346,7 +4350,7 @@ class Group(System):
         node_info = self._get_graph_display_info(display_map)
 
         systems = {}
-        pydot_graph = pydot.Dot(graph_type='graph')
+        pydot_graph = pydot.Dot(graph_type='graph', center=True)
         prefix = self.pathname + '.' if self.pathname else ''
         label = self.name if self.name else 'Model'
         top_node = pydot.Node(label, label=label,
@@ -4373,24 +4377,44 @@ class Group(System):
 
         return pydot_graph
 
-    def _decorate_graph_for_display(self, G, exclude=()):
+    def _decorate_graph_for_display(self, G, exclude=(), abs_graph_names=True):
+        """
+        Add metadata to the graph for display.
+
+        Returned graph will have any variable nodes containing certain characters relabeled with
+        explicit quotes to avoid issues with dot.
+
+        Parameters
+        ----------
+        G : nx.DiGraph
+            The graph to be decorated.
+        exclude : iter of str
+            Iter of pathnames to exclude from the generated graph.
+
+        Returns
+        -------
+        nx.DiGraph, dict
+            The decorated graph and a dict of node metadata keyed by pathname.
+        """
         node_info = self._get_graph_display_info()
 
         exclude = set(exclude)
 
-        # dot doesn't like ':' in node names, so if we find any, we have to put explicit quotes
-        # around the node name and label.
+        prefix = self.pathname + '.' if self.pathname else ''
+
         replace = {}
         for node, meta in G.nodes(data=True):
+            if not abs_graph_names:
+                node = prefix + node
             if node in node_info:
                 meta.update(_filter_meta4dot(node_info[node]))
-            quoted = f'"{node.rpartition(".")[2]}"'
             if not ('label' in meta and meta['label']):
-                meta['label'] = quoted
+                meta['label'] = f'"{node.rpartition(".")[2]}"'
             if 'type_' in meta:  # variable node
                 if node.rpartition('.')[0] in exclude:
                     exclude.add(node)  # remove all variables of excluded components
-                if ':' in node and node not in exclude:  # fix ':' in node names for use in dot
+                # quote node names containing certain characters for use in dot
+                if (':' in node or '<' in node) and node not in exclude:
                     replace[node] = f'"{node}"'
                 meta['shape'] = 'plain'  # just text for variables, otherwise too busy
 
@@ -4404,12 +4428,42 @@ class Group(System):
 
         return G, node_info
 
-    def _add_boundary_nodes(self, G):
+    def _add_boundary_nodes(self, G, incoming, outgoing, exclude=()):
+        lenpre = len(self.pathname) + 1 if self.pathname else 0
+        if incoming:
+            tooltip = ['External Connections:']
+            connstrs = set()
+            for in_abs, out_abs in incoming:
+                if in_abs in G:
+                    connstrs.add(f"{out_abs} -> {in_abs[lenpre:]}")
+            tooltip += sorted(connstrs)
+            tooltip='\n'.join(tooltip)
+            G.add_node('_Incoming', label='Incoming', shape='rarrow', fillcolor='peachpuff3',
+                       style='filled', tooltip=f'"{tooltip}"', rank='min')
+            for in_abs, _ in incoming:
+                if in_abs in G:
+                    G.add_edge('_Incoming', in_abs, style='dashed', arrowsize=0.5)
+
+        if outgoing:
+            tooltip = ['External Connections:']
+            connstrs = set()
+            for in_abs, out_abs in outgoing:
+                if out_abs in G:
+                    connstrs.add(f"{out_abs[lenpre:]} -> {in_abs}")
+            tooltip += sorted(connstrs)
+            tooltip='\n'.join(tooltip)
+            G.add_node('_Outgoing', label='Outgoing', shape='rarrow', fillcolor='peachpuff3',
+                       style='filled', tooltip=f'"{tooltip}"', rank='max')
+            for _, out_abs in outgoing:
+                if out_abs in G:
+                    G.add_edge(out_abs, '_Outgoing', style='dashed', arrowsize=0.5)
+
         return G
 
     def _apply_clusters(self, G, node_info):
         pydot_graph, groups = self._get_cluster_tree(node_info)
         prefix = self.pathname + '.' if self.pathname else ''
+        boundary_nodes = {'_Incoming', '_Outgoing'}
         pydot_nodes = {}
         for node, meta in G.nodes(data=True):
             noquote_node = node.strip('"')
@@ -4423,13 +4477,35 @@ class Group(System):
 
             if group and group.startswith(prefix):
                 groups[group].add_node(pdnode)
+            elif self.pathname in groups and node not in boundary_nodes:
+                groups[self.pathname].add_node(pdnode)
             else:
                 pydot_graph.add_node(pdnode)
 
-        for u, v in G.edges():
-            node1 = pydot_nodes[u]
-            node2 = pydot_nodes[v]
-            pydot_graph.add_edge(pydot.Edge(node1, node2, arrowhead='lnormal'))
+        for u, v, meta in G.edges(data=True):
+            pydot_graph.add_edge(pydot.Edge(pydot_nodes[u], pydot_nodes[v],
+                                            **_filter_meta4dot(meta,
+                                                               arrowsize=0.5)))
+
+        # layout graph from left to right
+        pydot_graph.set_rankdir('LR')
+
+        return pydot_graph
+
+    def _to_pydot_graph(self, G):
+        gmeta = G.graph.get('graph', {}).copy()
+        gmeta['graph_type'] = 'digraph'
+        pydot_graph = pydot.Dot(**gmeta)
+        pydot_nodes = {}
+
+        for node, meta in G.nodes(data=True):
+            pdnode = pydot_nodes[node] = pydot.Node(node, **_filter_meta4dot(meta))
+            pydot_graph.add_node(pdnode)
+
+        for u, v, meta in G.edges(data=True):
+            pydot_graph.add_edge(pydot.Edge(pydot_nodes[u], pydot_nodes[v],
+                                            **_filter_meta4dot(meta,
+                                                               arrowsize=0.5)))
 
         # layout graph from left to right
         pydot_graph.set_rankdir('LR')
@@ -4509,11 +4585,16 @@ class Group(System):
                     G = self._dataflow_graph
 
                 if not recurse:
+                    G = G.copy()
+
                     # layout graph from left to right
-                    G.graph['graph'] = {'rankdir': 'LR'}
+                    gname = 'model' if self.pathname == '' else self.pathname
+                    G.graph['graph'] = {'rankdir': 'LR', 'label': f"Dataflow for '{gname}'",
+                                        'center': 'True'}
 
                     # keep all direct children and their variables
-                    keep = {n for n in G.nodes() if n[lenpre:].count('.') == 0}
+                    keep = {n for n in G.nodes() if n[lenpre:].count('.') == 0 and
+                            n.startswith(prefix)}
                     keep.update({n for n, d in G.nodes(data=True) if 'type_' in d and
                                  n.rpartition('.')[0] in keep})
 
@@ -4521,28 +4602,38 @@ class Group(System):
                     inconnvars = set()
                     outconnvars = set()
                     for abs_in, abs_out in self._conn_abs_in2out.items():
-                        if abs_in not in keep:
-                            inconnvars.add(abs_in)
-                        if abs_out not in keep:
-                            outconnvars.add(abs_out)
+                        inconnvars.add(abs_in)
+                        outconnvars.add(abs_out)
 
                     for invar in inconnvars:
-                        grp = prefix + invar[lenpre:].partition('.')[0]
-                        if grp not in G:
-                            G.add_node(grp, **_base_display_map['Group'])
-                        G.add_edge(invar, grp)
-                        keep.add(grp)
-                        keep.add(invar)
-                        G.nodes[invar]['label'] = self._var_allprocs_abs2prom['input'][invar]
+                        system = prefix + invar[lenpre:].partition('.')[0]
+                        if invar in G:
+                            if system not in G:
+                                G.add_node(system, **_base_display_map['Group'])
+                            G.add_edge(invar, system)
+                            keep.add(system)
+                            keep.add(invar)
+                            prom_in = self._var_allprocs_abs2prom["input"][invar]
+                            par, _, child = prom_in.partition('.')
+                            if par == invar[lenpre:].partition('.')[0]:
+                                G.nodes[invar]['label'] = f'"{child}"'
+                            else:
+                                G.nodes[invar]['label'] = f'"{self._var_allprocs_abs2prom["input"][invar]}"'
 
                     for outvar in outconnvars:
-                        grp = prefix + outvar[lenpre:].partition('.')[0]
-                        if grp not in G:
-                            G.add_node(grp, **_base_display_map['Group'])
-                        G.add_edge(grp, outvar)
-                        keep.add(grp)
-                        keep.add(outvar)
-                        G.nodes[outvar]['label'] = self._var_allprocs_abs2prom['output'][outvar]
+                        system = prefix + outvar[lenpre:].partition('.')[0]
+                        if outvar in G:
+                            if system not in G:
+                                G.add_node(system, **_base_display_map['Group'])
+                            G.add_edge(system, outvar)
+                            keep.add(system)
+                            keep.add(outvar)
+                            prom_out = self._var_allprocs_abs2prom["output"][outvar]
+                            par, _, child = prom_out.partition('.')
+                            if par == outvar[lenpre:].partition('.')[0]:
+                                G.nodes[outvar]['label'] = f'"{child}"'
+                            else:
+                                G.nodes[outvar]['label'] = f'"{self._var_allprocs_abs2prom["output"][outvar]}"'
 
                 if self.pathname == '':
                     if not recurse:
@@ -4556,20 +4647,34 @@ class Group(System):
 
                     G = nx.subgraph(G, ournodes)
 
+                if show_boundary and self.pathname:
+                    incoming, outgoing = self._get_boundary_conns()
+                    G = self._add_boundary_nodes(G.copy(), incoming, outgoing)
+
                 G, node_info = self._decorate_graph_for_display(G, exclude=exclude)
+
                 if recurse:
                     G = self._apply_clusters(G, node_info)
+                else:
+                    G = self._to_pydot_graph(G)
 
             elif recurse:
                 G = self.compute_sys_graph(comps_only=True, add_edge_info=False)
+                if show_boundary and self.pathname:
+                    incoming, outgoing = self._get_boundary_conns()
+                    # convert var abs names to system abs names
+                    incoming = [(in_abs.rpartition('.')[0], out_abs.rpartition('.')[0])
+                                for in_abs, out_abs in incoming]
+                    outgoing = [(in_abs.rpartition('.')[0], out_abs.rpartition('.')[0])
+                                for in_abs, out_abs in outgoing]
+                    G = self._add_boundary_nodes(G.copy(), incoming, outgoing)
+
                 G, node_info = self._decorate_graph_for_display(G, exclude=exclude)
                 G = self._apply_clusters(G, node_info)
             else:
                 G = self.compute_sys_graph(comps_only=False, add_edge_info=False)
-                G, _ = self._decorate_graph_for_display(G, exclude=exclude)
-
-            if show_boundary:
-                G = self._add_boundary_nodes(G)
+                G, _ = self._decorate_graph_for_display(G, exclude=exclude, abs_graph_names=False)
+                G = self._to_pydot_graph(G)
         else:
             raise ValueError(f"unrecognized graph type '{gtype}'. Allowed types are ['tree', "
                              "'dataflow'].")
@@ -5582,7 +5687,7 @@ def _cluster_color(path):
     return f"gray{col}"
 
 
-def _filter_meta4dot(meta):
+def _filter_meta4dot(meta, **kwargs):
     """
     Remove unnecessary metadata from the given metadata dict before passing to pydot.
 
@@ -5590,6 +5695,8 @@ def _filter_meta4dot(meta):
     ----------
     meta : dict
         Metadata dict.
+    kwargs : dict
+        Additional metadata that will be added only if they are not already present.
 
     Returns
     -------
@@ -5597,4 +5704,8 @@ def _filter_meta4dot(meta):
         Metadata dict with unnecessary items removed.
     """
     skip = {'type_', 'local', 'base', 'classname'}
-    return {k: v for k, v in meta.items() if k not in skip}
+    dct = {k: v for k, v in meta.items() if k not in skip}
+    for k, v in kwargs.items():
+        if k not in dct:
+            dct[k] = v
+    return dct
