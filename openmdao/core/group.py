@@ -4397,7 +4397,8 @@ class Group(System):
 
         return pydot_graph
 
-    def _decorate_graph_for_display(self, G, exclude=(), abs_graph_names=True):
+    def _decorate_graph_for_display(self, G, exclude=(), abs_graph_names=True, dvs=None,
+                                    responses=None):
         """
         Add metadata to the graph for display.
 
@@ -4410,6 +4411,12 @@ class Group(System):
             The graph to be decorated.
         exclude : iter of str
             Iter of pathnames to exclude from the generated graph.
+        abs_graph_names : bool
+            If True, use absolute pathnames for nodes in the graph.
+        dvs : dict
+            Dict of design var metadata keyed on absolute name.
+        responses : list of str
+            Dict of response var metadata keyed on absolute name.
 
         Returns
         -------
@@ -4438,7 +4445,12 @@ class Group(System):
                 # quote node names containing certain characters for use in dot
                 if (':' in node or '<' in node) and node not in exclude:
                     replace[node] = f'"{node}"'
-                meta['shape'] = 'plain'  # just text for variables, otherwise too busy
+                if dvs and node in dvs:
+                    meta['shape'] = 'cds'
+                elif responses and node in responses:
+                    meta['shape'] = 'cds'
+                else:
+                    meta['shape'] = 'plain'  # just text for variables, otherwise too busy
 
         if replace:
             G = nx.relabel_nodes(G, replace, copy=True)
@@ -4611,7 +4623,11 @@ class Group(System):
             if show_vars:
                 # get dvs and responses so we can color them differently
                 dvs = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=True)
+                desvars = set(dvs)
+                desvars.update(m['source'] for m in dvs.values())
                 resps = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=True)
+                responses = set(resps)
+                responses.update(m['source'] for m in resps.values())
 
                 prefix = self.pathname + '.' if self.pathname else ''
                 lenpre = len(prefix)
@@ -4685,7 +4701,8 @@ class Group(System):
                     incoming, outgoing = self._get_boundary_conns()
                     G = self._add_boundary_nodes(G.copy(), incoming, outgoing, exclude)
 
-                G, node_info = self._decorate_graph_for_display(G, exclude=exclude)
+                G, node_info = self._decorate_graph_for_display(G, exclude=exclude,
+                                                                dvs=desvars, responses=responses)
 
                 if recurse:
                     G = self._apply_clusters(G, node_info)
