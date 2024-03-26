@@ -36,7 +36,7 @@ from openmdao.utils.general_utils import common_subpath, all_ancestors, \
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
 from openmdao.utils.graph_utils import get_out_of_order_nodes, write_graph, _filter_meta4dot, \
-    _to_pydot_graph, _add_boundary_nodes
+    _to_pydot_graph, _add_boundary_nodes, _cluster_color
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
@@ -4269,9 +4269,10 @@ class Group(System):
 
             ttlist = [f"Name: {s.pathname}"]
             ttlist.append(f"Class: {meta['classname']}")
-            if _has_nondef_lin_solver(s):
+            if s.linear_solver is not None and not isinstance(s.linear_solver, NonlinearRunOnce):
                 ttlist.append(f"Linear Solver: {type(s.linear_solver).__name__}")
-            if _has_nondef_nl_solver(s):
+            if s.nonlinear_solver is not None and not isinstance(s.nonlinear_solver,
+                                                                 NonlinearRunOnce):
                 ttlist.append(f"Nonlinear Solver: {type(s.nonlinear_solver).__name__}")
             meta['tooltip'] = '\n'.join(ttlist)
             node_info[s.pathname] = meta.copy()
@@ -5656,69 +5657,10 @@ class Group(System):
         return active_resps
 
 
-def _cluster_color(path):
-    """
-    Return the color of the cluster that contains the given path.
-
-    The idea here is to make nested clusters stand out wrt their parent cluster.
-
-    Parameters
-    ----------
-    path : str
-        Pathname of a variable.
-
-    Returns
-    -------
-    int
-        The color of the cluster that contains the given path.
-    """
-    depth = path.count('.') + 1 if path else 0
-
-    ncolors = 10
-    maxcolor = 98
-    mincolor = 40
-
-    col = maxcolor - (depth % ncolors) * (maxcolor - mincolor) // ncolors
-    return f"gray{col}"
-
-
-def _has_nondef_nl_solver(system):
-    """
-    Return True if the given system has a nonlinear solver that is not the default.
-
-    Parameters
-    ----------
-    system : System
-        The system to check.
-
-    Returns
-    -------
-    bool
-        True if the system has a nonlinear solver that is not the default.
-    """
-    return system.nonlinear_solver is not None and not isinstance(system.nonlinear_solver,
-                                                                  NonlinearRunOnce)
-
-
-def _has_nondef_lin_solver(system):
-    """
-    Return True if the given system has a linear solver that is not the default.
-
-    Parameters
-    ----------
-    system : System
-        The system to check.
-
-    Returns
-    -------
-    bool
-        True if the system has a linear solver that is not the default.
-    """
-    return system.linear_solver is not None and not isinstance(system.linear_solver, LinearRunOnce)
-
-
 def _get_node_display_meta(s, meta):
     if meta['base'] in _base_display_map:
         meta.update(_base_display_map[meta['base']])
-        if _has_nondef_lin_solver(s) or _has_nondef_nl_solver(s):
+        if s.nonlinear_solver is not None and not isinstance(s.nonlinear_solver, NonlinearRunOnce):
+            meta['shape'] = 'box3d'
+        elif s.linear_solver is not None and not isinstance(s.linear_solver, LinearRunOnce):
             meta['shape'] = 'box3d'

@@ -256,3 +256,28 @@ def _add_boundary_nodes(pathname, G, incoming, outgoing, exclude=()):
 
     return G
 
+
+def _cluster_color(path):
+    """
+    Return the color of the cluster that contains the given path.
+
+    The idea here is to make nested clusters stand out wrt their parent cluster.
+
+    Parameters
+    ----------
+    path : str
+        Pathname of a variable.
+
+    Returns
+    -------
+    int
+        The color of the cluster that contains the given path.
+    """
+    depth = path.count('.') + 1 if path else 0
+
+    ncolors = 10
+    maxcolor = 98
+    mincolor = 40
+
+    col = maxcolor - (depth % ncolors) * (maxcolor - mincolor) // ncolors
+    return f"gray{col}"
