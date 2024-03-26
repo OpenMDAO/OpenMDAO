@@ -4351,12 +4351,14 @@ class Group(System):
 
         return pydot_graph, groups
 
-    def _get_tree_graph(self, display_map=None):
+    def _get_tree_graph(self, exclude, display_map=None):
         """
         Create a pydot graph of the system tree (without clusters).
 
         Parameters
         ----------
+        exclude : iter of str
+            Iter of pathnames to exclude from the generated graph.
         display_map : dict or None
             A map of classnames to pydot node attributes.
 
@@ -4366,6 +4368,7 @@ class Group(System):
             The pydot tree graph.
         """
         node_info = self._get_graph_display_info(display_map)
+        exclude = set(exclude)
 
         systems = {}
         pydot_graph = pydot.Dot(graph_type='graph', center=True)
@@ -4379,7 +4382,7 @@ class Group(System):
         for varpath in chain(self._var_allprocs_abs2prom['input'],
                              self._var_allprocs_abs2prom['output']):
             system = varpath.rpartition('.')[0]
-            if system not in systems:
+            if system not in systems and system not in exclude:
                 # reverse the list so parents will exist before children
                 ancestor_list = list(all_ancestors(system))[::-1]
                 for path in ancestor_list:
@@ -4603,9 +4606,13 @@ class Group(System):
             return
 
         if gtype == 'tree':
-            G = self._get_tree_graph()
+            G = self._get_tree_graph(exclude)
         elif gtype == 'dataflow':
             if show_vars:
+                # get dvs and responses so we can color them differently
+                dvs = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=True)
+                resps = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=True)
+
                 prefix = self.pathname + '.' if self.pathname else ''
                 lenpre = len(prefix)
 
