@@ -441,8 +441,7 @@ class Component(System):
         return False
 
     def _promoted_wrt_iter(self):
-        _, wrts = self._get_partials_varlists()
-        yield from wrts
+        yield from self._get_partials_wrts()
 
     def _update_subjac_sparsity(self, sparsity):
         """
@@ -1018,25 +1017,14 @@ class Component(System):
         **kwargs : dict
             Keyword arguments for controlling the behavior of the approximation.
         """
-        pattern_matches = self._find_partial_matches(of, wrt)
         self._has_approx = True
+        info = self._subjacs_info
 
-        for of_bundle, wrt_bundle in product(*pattern_matches):
-            of_pattern, of_matches = of_bundle
-            wrt_pattern, wrt_matches = wrt_bundle
-            if not of_matches:
-                raise ValueError('{}: No matches were found for of="{}"'.format(self.msginfo,
-                                                                                of_pattern))
-            if not wrt_matches:
-                raise ValueError('{}: No matches were found for wrt="{}"'.format(self.msginfo,
-                                                                                 wrt_pattern))
-
-            info = self._subjacs_info
-            for abs_key in abs_key_iter(self, of_matches, wrt_matches):
-                meta = info[abs_key]
-                meta['method'] = method
-                meta.update(kwargs)
-                info[abs_key] = meta
+        for abs_key in self._matching_key_iter(of, wrt):
+            meta = info[abs_key]
+            meta['method'] = method
+            meta.update(kwargs)
+            info[abs_key] = meta
 
     def declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None,
                          method='exact', step=None, form=None, step_calc=None, minimum_step=None):
@@ -1340,7 +1328,7 @@ class Component(System):
         if not self._declared_partial_checks:
             return {}
         opts = {}
-        _, wrt = self._get_partials_varlists()
+        wrt = self._get_partials_wrts()
         invalid_wrt = []
         matrix_free = self.matrix_free
 
@@ -1451,7 +1439,6 @@ class Component(System):
                 rows = None
                 cols = None
 
-        pattern_matches = self._find_partial_matches(of, '*' if wrt is None else wrt)
         abs2meta_in = self._var_abs2meta['input']
         abs2meta_out = self._var_abs2meta['output']
 
@@ -1459,7 +1446,134 @@ class Component(System):
         patmeta = dict(pattern_meta)
         patmeta_not_none = {k: v for k, v in pattern_meta.items() if v is not None}
 
-        for of_bundle, wrt_bundle in product(*pattern_matches):
+        for abs_key in self._matching_key_iter(of, '*' if wrt is None else wrt):
+            if not dependent:
+                if abs_key in self._subjacs_info:
+                    del self._subjacs_info[abs_key]
+                continue
+
+            if abs_key in self._subjacs_info:
+                meta = self._subjacs_info[abs_key]
+                meta.update(patmeta_not_none)
+            else:
+                meta = patmeta.copy()
+
+            of, wrt = abs_key
+            meta['rows'] = rows
+            meta['cols'] = cols
+            csz = abs2meta_in[wrt]['size'] if wrt in abs2meta_in else abs2meta_out[wrt]['size']
+            meta['shape'] = shape = (abs2meta_out[of]['size'], csz)
+            dist_out = abs2meta_out[of]['distributed']
+            if wrt in abs2meta_in:
+                dist_in = abs2meta_in[wrt]['distributed']
+            else:
+                dist_in = abs2meta_out[wrt]['distributed']
+
+            if dist_in and not dist_out and not self.matrix_free:
+                rel_key = abs_key2rel_key(self, abs_key)
+                raise RuntimeError(f"{self.msginfo}: component has defined partial {rel_key} "
+                                   "which is a non-distributed output wrt a distributed input."
+                                   " This is only supported using the matrix free API.")
+
+            if shape[0] == 0 or shape[1] == 0:
+                msg = "{}: '{}' is an array of size 0"
+                if shape[0] == 0:
+                    if dist_out:
+                        # distributed vars are allowed to have zero size inputs on some procs
+                        rows_max = -1
+                    else:
+                        # non-distributed vars are not allowed to have zero size inputs
+                        raise ValueError(msg.format(self.msginfo, of))
+                if shape[1] == 0:
+                    if not dist_in:
+                        # non-distributed vars are not allowed to have zero size outputs
+                        raise ValueError(msg.format(self.msginfo, wrt))
+                    else:
+                        # distributed vars are allowed to have zero size outputs on some procs
+                        cols_max = -1
+
+            if val is None and not matfree:
+                # we can only get here if rows is None  (we're not sparse list format)
+                meta['val'] = np.zeros(shape)
+            elif is_array:
+                if rows is None and val.shape != shape and val.size == shape[0] * shape[1]:
+                    meta['val'] = val = val.copy().reshape(shape)
+                else:
+                    meta['val'] = val.copy()
+            elif is_scalar:
+                meta['val'] = np.full(shape, val, dtype=float)
+            else:
+                meta['val'] = val
+
+            if rows_max >= shape[0] or cols_max >= shape[1]:
+                of, wrt = abs_key2rel_key(self, abs_key)
+                raise ValueError(f"{self.msginfo}: d({of})/d({wrt}): Expected {shape[0]}x"
+                                 f"{shape[1]} but declared at least {rows_max + 1}x"
+                                 f"{cols_max + 1}")
+
+            self._check_partials_meta(abs_key, meta['val'],
+                                      shape if rows is None else (rows.shape[0], 1))
+
+            self._subjacs_info[abs_key] = meta
+
+    def _get_partials_wrts(self):
+        """
+        Get list of 'wrt' variables that form the partial jacobian.
+
+        Returns
+        -------
+        list
+            List of 'wrt' relative variable names.
+        """
+        # filter out any discrete inputs or outputs
+        if self._discrete_inputs:
+            return [n for n in self._var_rel_names['input'] if n not in self._discrete_inputs]
+
+        return list(self._var_rel_names['input'])
+
+    def _get_partials_ofs(self, use_resname=False):
+        """
+        Get lists of 'of' variables that form the partial jacobian.
+
+        Parameters
+        ----------
+        use_resname : bool
+            Ignored.
+
+        Returns
+        -------
+        list
+            List of 'of' relative variable names.
+        """
+        # filter out any discrete inputs or outputs
+        if self._discrete_outputs:
+            return [n for n in self._var_rel_names['output'] if n not in self._discrete_outputs]
+
+        return list(self._var_rel_names['output'])
+
+    def _matching_key_iter(self, of_patterns, wrt_patterns, use_resname=False):
+        """
+        Iterate over all combinations of matching keys for the given patterns.
+
+        Parameters
+        ----------
+        of_patterns : list of str
+            List of variable names and/or glob patterns for the 'of' variables.
+        wrt_patterns : list of str
+            List of variable names and/or glob patterns for the 'wrt' variables.
+        use_resname : bool, optional
+            If True, match of_patterns against residuals instead of outputs.
+
+        Yields
+        ------
+        tuple
+            A tuple of matching keys, where the first element is the 'of' key and the second
+            element is the 'wrt' key.  Both are absolute names.
+        """
+        of_bundles = self._find_of_matches(of_patterns, use_resname=use_resname)
+        wrt_bundles = self._find_wrt_matches(wrt_patterns)
+
+        for of_bundle, wrt_bundle in product(of_bundles, wrt_bundles):
             of_pattern, of_matches = of_bundle
             wrt_pattern, wrt_matches = wrt_bundle
             if not of_matches:
@@ -1468,107 +1582,46 @@ class Component(System):
             if not wrt_matches:
                 raise ValueError('{}: No matches were found for wrt="{}"'.format(self.msginfo,
                                                                                  wrt_pattern))
+            yield from abs_key_iter(self, of_matches, wrt_matches)
 
-            for abs_key in abs_key_iter(self, of_matches, wrt_matches):
-                if not dependent:
-                    if abs_key in self._subjacs_info:
-                        del self._subjacs_info[abs_key]
-                    continue
-
-                if abs_key in self._subjacs_info:
-                    meta = self._subjacs_info[abs_key]
-                    meta.update(patmeta_not_none)
-                else:
-                    meta = patmeta.copy()
-
-                of, wrt = abs_key
-                meta['rows'] = rows
-                meta['cols'] = cols
-                csz = abs2meta_in[wrt]['size'] if wrt in abs2meta_in else abs2meta_out[wrt]['size']
-                meta['shape'] = shape = (abs2meta_out[of]['size'], csz)
-                dist_out = abs2meta_out[of]['distributed']
-                if wrt in abs2meta_in:
-                    dist_in = abs2meta_in[wrt]['distributed']
-                else:
-                    dist_in = abs2meta_out[wrt]['distributed']
-
-                if dist_in and not dist_out and not self.matrix_free:
-                    rel_key = abs_key2rel_key(self, abs_key)
-                    raise RuntimeError(f"{self.msginfo}: component has defined partial {rel_key} "
-                                       "which is a non-distributed output wrt a distributed input."
-                                       " This is only supported using the matrix free API.")
-
-                if shape[0] == 0 or shape[1] == 0:
-                    msg = "{}: '{}' is an array of size 0"
-                    if shape[0] == 0:
-                        if dist_out:
-                            # distributed vars are allowed to have zero size inputs on some procs
-                            rows_max = -1
-                        else:
-                            # non-distributed vars are not allowed to have zero size inputs
-                            raise ValueError(msg.format(self.msginfo, of))
-                    if shape[1] == 0:
-                        if not dist_in:
-                            # non-distributed vars are not allowed to have zero size outputs
-                            raise ValueError(msg.format(self.msginfo, wrt))
-                        else:
-                            # distributed vars are allowed to have zero size outputs on some procs
-                            cols_max = -1
-
-                if val is None and not matfree:
-                    # we can only get here if rows is None  (we're not sparse list format)
-                    meta['val'] = np.zeros(shape)
-                elif is_array:
-                    if rows is None and val.shape != shape and val.size == shape[0] * shape[1]:
-                        meta['val'] = val = val.copy().reshape(shape)
-                    else:
-                        meta['val'] = val.copy()
-                elif is_scalar:
-                    meta['val'] = np.full(shape, val, dtype=float)
-                else:
-                    meta['val'] = val
-
-                if rows_max >= shape[0] or cols_max >= shape[1]:
-                    of, wrt = abs_key2rel_key(self, abs_key)
-                    raise ValueError(f"{self.msginfo}: d({of})/d({wrt}): Expected {shape[0]}x"
-                                     f"{shape[1]} but declared at least {rows_max + 1}x"
-                                     f"{cols_max + 1}")
-
-                self._check_partials_meta(abs_key, meta['val'],
-                                          shape if rows is None else (rows.shape[0], 1))
-
-                self._subjacs_info[abs_key] = meta
-
-    def _find_partial_matches(self, of_pattern, wrt_pattern, use_resname=False):
+    def _find_of_matches(self, pattern, use_resname=False):
         """
-        Find all partial derivative matches from of_pattern and wrt_pattern.
+        Find all matches for the given 'of' pattern.
 
         Parameters
         ----------
-        of_pattern : str or list of str
-            The relative name(s) of the residual(s) that derivatives are being computed for.
-            May also contain glob patterns.
-        wrt_pattern : str or list of str
-            The relative name(s) of the variable(s) that derivatives are taken with respect to.
-            Each name can refer to an input or an output variable. May also contain glob patterns.
+        pattern : str
+            Glob pattern or relative variable name.
         use_resname : bool
-            If True, use residual names for 'of' patterns.
+            If True, match residual names instead of output names.
 
         Returns
         -------
-        tuple(list, list)
-            Pair of lists containing pattern matches (if any). Returns (of_matches, wrt_matches)
-            where of_matches is a list of tuples (pattern, matches) and wrt_matches is a list of
-            tuples (pattern, output_matches, input_matches).
+        list
+            List of tuples of the form (abs_name, meta) where abs_name is the absolute name of the
+            matching variable and meta is the metadata for that variable.
         """
-        ofs, wrts = self._get_partials_varlists(use_resname=use_resname)
+        of_list = [pattern] if isinstance(pattern, str) else pattern
+        return [(pattern, find_matches(pattern, self._get_partials_ofs(use_resname=use_resname)))
+                for pattern in of_list]
 
-        of_list = [of_pattern] if isinstance(of_pattern, str) else of_pattern
-        wrt_list = [wrt_pattern] if isinstance(wrt_pattern, str) else wrt_pattern
+    def _find_wrt_matches(self, pattern):
+        """
+        Find all matches for the given 'wrt' pattern.
 
-        of_pattern_matches = [(pattern, find_matches(pattern, ofs)) for pattern in of_list]
-        wrt_pattern_matches = [(pattern, find_matches(pattern, wrts)) for pattern in wrt_list]
-        return of_pattern_matches, wrt_pattern_matches
+        Parameters
+        ----------
+        pattern : str
+            Glob pattern or relative variable name.
+
+        Returns
+        -------
+        list
+            List of tuples of the form (abs_name, meta) where abs_name is the absolute name of the
+            matching variable and meta is the metadata for that variable.
+        """
+        wrt_list = [pattern] if isinstance(pattern, str) else pattern
+        return [(pattern, find_matches(pattern, self._get_partials_wrts())) for pattern in wrt_list]
 
     def _check_partials_meta(self, abs_key, val, shape):
         """

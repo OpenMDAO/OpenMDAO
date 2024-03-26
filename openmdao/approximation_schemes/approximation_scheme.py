@@ -209,7 +209,7 @@ class ApproximationScheme(object):
             jaccols = cols if wrt_matches is None else ccol2jcol[cols]
             if is_total:
                 vcols = ccol2outvec[cols]
-                seed_vars = rangemapper.inds2keys(cols)
+                seed_vars = tuple(rangemapper.inds2keys(cols))
             else:
                 vcols = jaccols
                 seed_vars = None

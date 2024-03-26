@@ -664,6 +664,7 @@ class _TotalJacInfo(object):
             # the input
             seed.append(np.full(irange.size, -1.0, dtype=float))
 
+            imeta = None
             if parallel_deriv_color:
                 has_par_deriv_color = True
                 if parallel_deriv_color not in idx_iter_dict:
@@ -675,6 +676,8 @@ class _TotalJacInfo(object):
                     idx_iter_dict[parallel_deriv_color] = (imeta, it)
                 else:
                     imeta = idx_iter_dict[parallel_deriv_color][0]
+                    if isinstance(imeta['seed_vars'], tuple):
+                        imeta['seed_vars'] = set(imeta['seed_vars'])  # change back to a set
                     imeta['idx_list'].append((start, end))
                     imeta['seed_vars'].add(source)
             elif self.directional:
@@ -687,6 +690,10 @@ class _TotalJacInfo(object):
                 imeta['idx_list'] = range(start, end)
                 imeta['seed_vars'] = {source}
                 idx_iter_dict[name] = (imeta, self.single_index_iter)
+
+            # make the seeds hashable
+            if imeta is not None:
+                imeta['seed_vars'] = tuple(sorted(imeta['seed_vars']))
 
             tup = (cache_lin_sol, name, source)
 
@@ -729,7 +736,7 @@ class _TotalJacInfo(object):
                     iterdict['seeds'] = seed[ilist][active]
 
                 iterdict['cache_lin_solve'] = cache
-                iterdict['seed_vars'] = all_vois
+                iterdict['seed_vars'] = tuple(all_vois)
                 itermeta.append(iterdict)
 
             idx_iter_dict['@simul_coloring'] = (imeta, self.simul_coloring_iter)

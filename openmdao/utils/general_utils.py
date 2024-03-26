@@ -115,6 +115,43 @@ def ensure_compatible(name, value, shape=None, indices=None):
     return value, shape
 
 
+def _subjac_meta2value(meta):
+    """
+    Convert subjacobian metadata to value, rows, cols.
+
+    Parameters
+    ----------
+    meta : dict
+        Metadata dict.
+
+    Returns
+    -------
+    ndarray
+        Value of the subjacobian.
+    ndarray or None
+        Row indices of nonzero values in subjacobian.
+    ndarray or None
+        Column indices of nonzero values in subjacobian.
+    """
+    val = meta['val'] if 'val' in meta else None
+    rows = meta['rows'] if 'rows' in meta else None
+    cols = meta['cols'] if 'cols' in meta else None
+
+    if rows is not None:
+        if val is not None and np.isscalar(val):
+            val = np.full(len(rows), val)
+    elif np.isscalar(val):
+        shape = meta['shape'] if 'shape' in meta else None
+        if shape is not None:
+            val = np.full(shape, val)
+        else:
+            val = np.atleast_2d(val)
+    elif val is not None:
+        val = np.atleast_2d(val)
+
+    return val, rows, cols
+
+
 def determine_adder_scaler(ref0, ref, adder, scaler):
     r"""
     Determine proper values of adder and scaler based on user arguments.
