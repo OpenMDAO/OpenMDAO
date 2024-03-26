@@ -36,6 +36,7 @@ jobs:
             OPTIONAL: '[all]'
             JAX: '0.4.14'
             BANDIT: true
+            PEP517: true
             TESTS: true
             # set DEBUG to create an interactive debugging session just before testflo is run.
             # Note that the workflow will run until you cancel the debugging session.
@@ -151,7 +152,16 @@ jobs:
           echo "============================================================="
           echo "Install OpenMDAO"
           echo "============================================================="
-          python -m pip install .${{ matrix.OPTIONAL }}
+          if [[ "${{ matrix.PEP517 }}" == "true" ]]; then
+            pip wheel --no-deps --use-pep517 .
+            WHEEL=`find openmdao-*.whl`
+            echo "-----------------------------------------------------------"
+            echo "Installing from wheel: $WHEEL"
+            echo "-----------------------------------------------------------"
+            python -m pip install $WHEEL${{ matrix.OPTIONAL }}
+          else
+            python -m pip install .${{ matrix.OPTIONAL }}
+          fi
 
       - name: Install PETSc
         if: matrix.PETSc
