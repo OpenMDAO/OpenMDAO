@@ -215,6 +215,27 @@ def _filter_meta4dot(meta, **kwargs):
 
 
 def _add_boundary_nodes(pathname, G, incoming, outgoing, exclude=()):
+    """
+    Add boundary nodes to the graph.
+
+    Parameters
+    ----------
+    pathname : str
+        Pathname of the current group.
+    G : nx.DiGraph
+        The graph.
+    incoming : list of (str, str)
+        List of incoming connections.
+    outgoing : list of (str, str)
+        List of outgoing connections.
+    exclude : list of str
+        List of pathnames to exclude from the graph.
+
+    Returns
+    -------
+    nx.DiGraph
+        The modified graph.
+    """
     lenpre = len(pathname) + 1 if pathname else 0
     for ex in exclude:
         expre = ex + '.'

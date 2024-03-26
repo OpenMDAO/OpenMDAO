@@ -4247,6 +4247,19 @@ class Group(System):
         return graph
 
     def _get_prom_conns(self, conns):
+        """
+        Return a dict of promoted connections.
+
+        Parameters
+        ----------
+        conns : dict
+            Dictionary containing absolute connections.
+
+        Returns
+        -------
+        dict
+            Dictionary of promoted connections.
+        """
         abs2prom_in = self._var_allprocs_abs2prom['input']
         prom2abs_in = self._var_allprocs_prom2abs_list['input']
         prefix = self.pathname + '.' if self.pathname else ''
@@ -4257,6 +4270,19 @@ class Group(System):
         return prom_conns
 
     def _get_graph_display_info(self, display_map=None):
+        """
+        Return display related metadata for this Group and all of its children.
+
+        Parameters
+        ----------
+        display_map : dict or None
+            A map of classnames to pydot node attributes.
+
+        Returns
+        -------
+        dict
+            Metadata keyed by system pathname.
+        """
         node_info = {}
         for s in self.system_iter(recurse=True, include_self=True):
             meta = s._get_graph_node_meta()
@@ -4421,9 +4447,9 @@ class Group(System):
         abs_graph_names : bool
             If True, use absolute pathnames for nodes in the graph.
         dvs : dict
-            Dict of design var metadata keyed on absolute name.
+            Dict of design var metadata keyed on promoted name.
         responses : list of str
-            Dict of response var metadata keyed on absolute name.
+            Dict of response var metadata keyed on promoted name.
 
         Returns
         -------
@@ -4470,6 +4496,21 @@ class Group(System):
         return G, node_info
 
     def _apply_clusters(self, G, node_info):
+        """
+        Group nodes in the graph into clusters.
+
+        Parameters
+        ----------
+        G : nx.DiGraph
+            A pydot graph will be created based on this graph.
+        node_info : dict
+            A dict of metadata keyed by pathname.
+
+        Returns
+        -------
+        pydot.Graph
+            The corresponding pydot graph with clusters added.
+        """
         pydot_graph, groups = self._get_cluster_tree(node_info)
         prefix = self.pathname + '.' if self.pathname else ''
         boundary_nodes = {'_Incoming', '_Outgoing'}
