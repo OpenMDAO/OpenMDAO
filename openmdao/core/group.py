@@ -35,7 +35,8 @@ from openmdao.utils.general_utils import common_subpath, all_ancestors, \
     meta2src_iter, get_rev_conns, _contains_all
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
-from openmdao.utils.graph_utils import get_out_of_order_nodes, write_graph
+from openmdao.utils.graph_utils import get_out_of_order_nodes, write_graph, _filter_meta4dot, \
+    _to_pydot_graph, _add_boundary_nodes
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
@@ -4247,7 +4248,6 @@ class Group(System):
 
     def _get_prom_conns(self, conns):
         abs2prom_in = self._var_allprocs_abs2prom['input']
-        abs2prom_out = self._var_allprocs_abs2prom['output']
         prom2abs_in = self._var_allprocs_prom2abs_list['input']
         prefix = self.pathname + '.' if self.pathname else ''
         prom_conns = {}
@@ -4323,10 +4323,16 @@ class Group(System):
         pydot.Dot, dict
             The pydot graph and a dict of groups keyed by pathname.
         """
-        groups = {}
         pydot_graph = pydot.Dot(graph_type='digraph')
         mypath = self.pathname
         prefix = mypath + '.' if mypath else ''
+        groups = {}
+
+        if not mypath:
+            groups[''] = pydot.Cluster('', label='Model', style='filled', fillcolor=_cluster_color(''),
+                                       tooltip=node_info['']['tooltip'])
+            pydot_graph.add_subgraph(groups[''])
+
         for varpath in chain(self._var_allprocs_abs2prom['input'],
                              self._var_allprocs_abs2prom['output']):
             group = varpath.rpartition('.')[0].rpartition('.')[0]
@@ -4462,48 +4468,6 @@ class Group(System):
 
         return G, node_info
 
-    def _add_boundary_nodes(self, G, incoming, outgoing, exclude=()):
-        lenpre = len(self.pathname) + 1 if self.pathname else 0
-        for ex in exclude:
-            expre = ex + '.'
-            incoming = [(in_abs, out_abs) for in_abs, out_abs in incoming
-                        if in_abs != ex and out_abs != ex and
-                        not in_abs.startswith(expre) and not out_abs.startswith(expre)]
-            outgoing = [(in_abs, out_abs) for in_abs, out_abs in outgoing
-                        if in_abs != ex and out_abs != ex and
-                        not in_abs.startswith(expre) and not out_abs.startswith(expre)]
-
-        if incoming:
-            tooltip = ['External Connections:']
-            connstrs = set()
-            for in_abs, out_abs in incoming:
-                if in_abs in G:
-                    connstrs.add(f"   {out_abs} -> {in_abs[lenpre:]}")
-            tooltip += sorted(connstrs)
-            tooltip='\n'.join(tooltip)
-            if connstrs:
-                G.add_node('_Incoming', label='Incoming', shape='rarrow', fillcolor='peachpuff3',
-                        style='filled', tooltip=f'"{tooltip}"', rank='min')
-                for in_abs, out_abs in incoming:
-                    if in_abs in G:
-                        G.add_edge('_Incoming', in_abs, style='dashed', arrowhead='lnormal', arrowsize=0.5)
-
-        if outgoing:
-            tooltip = ['External Connections:']
-            connstrs = set()
-            for in_abs, out_abs in outgoing:
-                if out_abs in G:
-                    connstrs.add(f"   {out_abs[lenpre:]} -> {in_abs}")
-            tooltip += sorted(connstrs)
-            tooltip='\n'.join(tooltip)
-            G.add_node('_Outgoing', label='Outgoing', arrowhead='rarrow', fillcolor='peachpuff3',
-                       style='filled', tooltip=f'"{tooltip}"', rank='max')
-            for in_abs, out_abs in outgoing:
-                if out_abs in G:
-                    G.add_edge(out_abs, '_Outgoing', style='dashed', shape='lnormal', arrowsize=0.5)
-
-        return G
-
     def _apply_clusters(self, G, node_info):
         pydot_graph, groups = self._get_cluster_tree(node_info)
         prefix = self.pathname + '.' if self.pathname else ''
@@ -4530,26 +4494,6 @@ class Group(System):
             pydot_graph.add_edge(pydot.Edge(pydot_nodes[u], pydot_nodes[v],
                                             **_filter_meta4dot(meta,
                                                                arrowhead='lnormal',
-                                                               arrowsize=0.5)))
-
-        # layout graph from left to right
-        pydot_graph.set_rankdir('LR')
-
-        return pydot_graph
-
-    def _to_pydot_graph(self, G):
-        gmeta = G.graph.get('graph', {}).copy()
-        gmeta['graph_type'] = 'digraph'
-        pydot_graph = pydot.Dot(**gmeta)
-        pydot_nodes = {}
-
-        for node, meta in G.nodes(data=True):
-            pdnode = pydot_nodes[node] = pydot.Node(node, **_filter_meta4dot(meta))
-            pydot_graph.add_node(pdnode)
-
-        for u, v, meta in G.edges(data=True):
-            pydot_graph.add_edge(pydot.Edge(pydot_nodes[u], pydot_nodes[v],
-                                            **_filter_meta4dot(meta,
                                                                arrowsize=0.5)))
 
         # layout graph from left to right
@@ -4699,7 +4643,7 @@ class Group(System):
 
                 if show_boundary and self.pathname:
                     incoming, outgoing = self._get_boundary_conns()
-                    G = self._add_boundary_nodes(G.copy(), incoming, outgoing, exclude)
+                    G = _add_boundary_nodes(self.pathname, G.copy(), incoming, outgoing, exclude)
 
                 G, node_info = self._decorate_graph_for_display(G, exclude=exclude,
                                                                 dvs=desvars, responses=responses)
@@ -4707,7 +4651,7 @@ class Group(System):
                 if recurse:
                     G = self._apply_clusters(G, node_info)
                 else:
-                    G = self._to_pydot_graph(G)
+                    G = _to_pydot_graph(G)
 
             elif recurse:
                 G = self.compute_sys_graph(comps_only=True, add_edge_info=False)
@@ -4718,14 +4662,14 @@ class Group(System):
                                 for in_abs, out_abs in incoming]
                     outgoing = [(in_abs.rpartition('.')[0], out_abs.rpartition('.')[0])
                                 for in_abs, out_abs in outgoing]
-                    G = self._add_boundary_nodes(G.copy(), incoming, outgoing, exclude)
+                    G = _add_boundary_nodes(self.pathname, G.copy(), incoming, outgoing, exclude)
 
                 G, node_info = self._decorate_graph_for_display(G, exclude=exclude)
                 G = self._apply_clusters(G, node_info)
             else:
                 G = self.compute_sys_graph(comps_only=False, add_edge_info=False)
                 G, _ = self._decorate_graph_for_display(G, exclude=exclude, abs_graph_names=False)
-                G = self._to_pydot_graph(G)
+                G = _to_pydot_graph(G)
         else:
             raise ValueError(f"unrecognized graph type '{gtype}'. Allowed types are ['tree', "
                              "'dataflow'].")
@@ -5736,30 +5680,6 @@ def _cluster_color(path):
 
     col = maxcolor - (depth % ncolors) * (maxcolor - mincolor) // ncolors
     return f"gray{col}"
-
-
-def _filter_meta4dot(meta, **kwargs):
-    """
-    Remove unnecessary metadata from the given metadata dict before passing to pydot.
-
-    Parameters
-    ----------
-    meta : dict
-        Metadata dict.
-    kwargs : dict
-        Additional metadata that will be added only if they are not already present.
-
-    Returns
-    -------
-    dict
-        Metadata dict with unnecessary items removed.
-    """
-    skip = {'type_', 'local', 'base', 'classname'}
-    dct = {k: v for k, v in meta.items() if k not in skip}
-    for k, v in kwargs.items():
-        if k not in dct:
-            dct[k] = v
-    return dct
 
 
 def _has_nondef_nl_solver(system):

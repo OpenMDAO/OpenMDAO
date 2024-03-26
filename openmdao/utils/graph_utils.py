@@ -5,6 +5,11 @@ import networkx as nx
 from openmdao.utils.file_utils import _load_and_exec
 import openmdao.utils.hooks as hooks
 
+try:
+    import pydot
+except ImportError:
+    pydot = None
+
 
 def get_sccs_topo(graph):
     """
@@ -80,9 +85,7 @@ def write_graph(G, prog='dot', display=True, outfile='graph.svg'):
     """
     from openmdao.utils.webview import webview
 
-    try:
-        import pydot
-    except ImportError:
+    if pydot is None:
         raise RuntimeError("graph requires the pydot package.  You can install it using "
                            "'pip install pydot'.")
 
@@ -164,4 +167,92 @@ def _graph_cmd(options, user_args):
     # register the hooks
     hooks._register_hook('final_setup', 'Problem', post=_view_graph, exit=True)
     _load_and_exec(options.file[0], user_args)
+
+
+def _to_pydot_graph(G):
+    gmeta = G.graph.get('graph', {}).copy()
+    gmeta['graph_type'] = 'digraph'
+    pydot_graph = pydot.Dot(**gmeta)
+    pydot_nodes = {}
+
+    for node, meta in G.nodes(data=True):
+        pdnode = pydot_nodes[node] = pydot.Node(node, **_filter_meta4dot(meta))
+        pydot_graph.add_node(pdnode)
+
+    for u, v, meta in G.edges(data=True):
+        pydot_graph.add_edge(pydot.Edge(pydot_nodes[u], pydot_nodes[v],
+                                        **_filter_meta4dot(meta,
+                                                            arrowsize=0.5)))
+
+    # layout graph from left to right
+    pydot_graph.set_rankdir('LR')
+
+    return pydot_graph
+
+
+def _filter_meta4dot(meta, **kwargs):
+    """
+    Remove unnecessary metadata from the given metadata dict before passing to pydot.
+
+    Parameters
+    ----------
+    meta : dict
+        Metadata dict.
+    kwargs : dict
+        Additional metadata that will be added only if they are not already present.
+
+    Returns
+    -------
+    dict
+        Metadata dict with unnecessary items removed.
+    """
+    skip = {'type_', 'local', 'base', 'classname'}
+    dct = {k: v for k, v in meta.items() if k not in skip}
+    for k, v in kwargs.items():
+        if k not in dct:
+            dct[k] = v
+    return dct
+
+
+def _add_boundary_nodes(pathname, G, incoming, outgoing, exclude=()):
+    lenpre = len(pathname) + 1 if pathname else 0
+    for ex in exclude:
+        expre = ex + '.'
+        incoming = [(in_abs, out_abs) for in_abs, out_abs in incoming
+                    if in_abs != ex and out_abs != ex and
+                    not in_abs.startswith(expre) and not out_abs.startswith(expre)]
+        outgoing = [(in_abs, out_abs) for in_abs, out_abs in outgoing
+                    if in_abs != ex and out_abs != ex and
+                    not in_abs.startswith(expre) and not out_abs.startswith(expre)]
+
+    if incoming:
+        tooltip = ['External Connections:']
+        connstrs = set()
+        for in_abs, out_abs in incoming:
+            if in_abs in G:
+                connstrs.add(f"   {out_abs} -> {in_abs[lenpre:]}")
+        tooltip += sorted(connstrs)
+        tooltip='\n'.join(tooltip)
+        if connstrs:
+            G.add_node('_Incoming', label='Incoming', shape='rarrow', fillcolor='peachpuff3',
+                    style='filled', tooltip=f'"{tooltip}"', rank='min')
+            for in_abs, out_abs in incoming:
+                if in_abs in G:
+                    G.add_edge('_Incoming', in_abs, style='dashed', arrowhead='lnormal', arrowsize=0.5)
+
+    if outgoing:
+        tooltip = ['External Connections:']
+        connstrs = set()
+        for in_abs, out_abs in outgoing:
+            if out_abs in G:
+                connstrs.add(f"   {out_abs[lenpre:]} -> {in_abs}")
+        tooltip += sorted(connstrs)
+        tooltip='\n'.join(tooltip)
+        G.add_node('_Outgoing', label='Outgoing', arrowhead='rarrow', fillcolor='peachpuff3',
+                    style='filled', tooltip=f'"{tooltip}"', rank='max')
+        for in_abs, out_abs in outgoing:
+            if out_abs in G:
+                G.add_edge(out_abs, '_Outgoing', style='dashed', shape='lnormal', arrowsize=0.5)
+
+    return G
 
