@@ -4356,7 +4356,8 @@ class Group(System):
         groups = {}
 
         if not mypath:
-            groups[''] = pydot.Cluster('', label='Model', style='filled', fillcolor=_cluster_color(''),
+            groups[''] = pydot.Cluster('', label='Model', style='filled',
+                                       fillcolor=_cluster_color(''),
                                        tooltip=node_info['']['tooltip'])
             pydot_graph.add_subgraph(groups[''])
 
@@ -4367,7 +4368,7 @@ class Group(System):
                 # reverse the list so parents will exist before children
                 ancestor_list = list(all_ancestors(group))[::-1]
                 for path in ancestor_list:
-                    if path.startswith(prefix) or path==mypath:
+                    if path.startswith(prefix) or path == mypath:
                         if path not in groups:
                             parent, _, name = path.rpartition('.')
                             groups[path] = pydot.Cluster(path,
@@ -4600,7 +4601,7 @@ class Group(System):
         """
         if pydot is None:
             issue_warning("To view the system graph, you must install pydot. "
-                            "You can install it via 'pip install pydot'.")
+                          "You can install it via 'pip install pydot'.")
             return
 
         if gtype == 'tree':
@@ -4640,8 +4641,8 @@ class Group(System):
                         if the_in not in G:
                             G.add_node(the_in, type_='input', label=prom_in)
                         else:
-                            l = prom_in[:lenpre] if prom_in.startswith(prefix) else prom_in
-                            G.nodes[the_in]['label'] = l
+                            label = prom_in[:lenpre] if prom_in.startswith(prefix) else prom_in
+                            G.nodes[the_in]['label'] = label
 
                         sysout = prefix + abs_out[lenpre:].partition('.')[0]
                         prom_out = self._var_allprocs_abs2prom['output'][abs_out]
@@ -4649,8 +4650,8 @@ class Group(System):
                         if sysout not in G:
                             G.add_node(sysout, **_base_display_map['Group'])
 
-                        l = prom_out[:lenpre] if prom_out.startswith(prefix) else prom_out
-                        G.nodes[abs_out]['label'] = l
+                        label = prom_out[:lenpre] if prom_out.startswith(prefix) else prom_out
+                        G.nodes[abs_out]['label'] = label
                         G.add_edge(sysout, abs_out)
 
                         keep.add(sysout)
@@ -4673,7 +4674,7 @@ class Group(System):
 
                 if self.pathname == '':
                     if not recurse:
-                       G = nx.subgraph(G, keep)
+                        G = nx.subgraph(G, keep)
                 else:
                     # we're not the top level group, so get our subgraph of the top level graph
                     ournodes = {n for n in G.nodes() if n.startswith(prefix)}
