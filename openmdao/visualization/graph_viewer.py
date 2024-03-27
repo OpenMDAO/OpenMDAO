@@ -590,6 +590,9 @@ def write_graph(G, prog='dot', display=True, outfile='graph.svg'):
     except AttributeError:
         raise AttributeError(f"pydot graph has no 'create_{ext}' method.")
 
+    if ext == 'svg':
+        outfile = outfile.replace('.svg', '.html')
+
     with open(outfile, 'wb') as f:
         f.write(pstr)
 
