@@ -61,7 +61,7 @@ from openmdao.utils.entry_points import _list_installed_setup_parser, _list_inst
         _find_repos_setup_parser, _find_repos_exec
 from openmdao.utils.reports_system import _list_reports_setup_parser, _list_reports_cmd, \
     _view_reports_setup_parser, _view_reports_cmd
-from openmdao.utils.graph_utils import _graph_setup_parser, _graph_cmd
+from openmdao.visualization.graph_viewer import _graph_setup_parser, _graph_cmd
 
 
 def _view_connections_setup_parser(parser):
