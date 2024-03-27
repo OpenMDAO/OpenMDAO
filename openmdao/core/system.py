@@ -1380,6 +1380,20 @@ class System(object):
 
         raise KeyError(f"{self.msginfo}: source for '{name}' not found.")
 
+    def _get_graph_node_meta(self):
+        """
+        Return metadata to add to this system's graph node.
+
+        Returns
+        -------
+        dict
+            Metadata for this system's graph node.
+        """
+        return {
+            'classname': type(self).__name__,
+            'implicit': not self.is_explicit(),
+        }
+
     def _setup_check(self):
         """
         Do any error checking on user's setup, before any other recursion happens.
