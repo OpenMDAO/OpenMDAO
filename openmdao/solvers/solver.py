@@ -550,12 +550,12 @@ class Solver(object):
 
     def use_relevance(self):
         """
-        Return True if relevance is should be active.
+        Return True if relevance should be active.
 
         Returns
         -------
         bool
-            True if relevance is should be active.
+            True if relevance should be active.
         """
         return True
 
