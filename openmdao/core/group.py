@@ -3639,7 +3639,7 @@ class Group(System):
                 d_residuals *= -1.0
         else:
             self._linear_solver._set_matvec_scope(scope_out, scope_in)
-            with self._relevance.active(self.linear_solver.use_relevance()):
+            with self._relevance.active(self._linear_solver.use_relevance()):
                 self._linear_solver.solve(mode, None)
 
     def _linearize(self, jac, sub_do_ln=True):
@@ -3679,7 +3679,7 @@ class Group(System):
                 jac = self._assembled_jac
 
             relevance = self._relevance
-            with relevance.active(self.linear_solver.use_relevance()):
+            with relevance.active(self._linear_solver.use_relevance()):
                 subs = list(relevance.filter(self._subsystems_myproc))
 
                 # Only linearize subsystems if we aren't approximating the derivs at this level.
