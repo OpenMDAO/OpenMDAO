@@ -277,3 +277,14 @@ class ScipyKrylov(LinearSolver):
 
         # return resulting value of x vector
         return x_vec.asarray(copy=True)
+
+    def use_relevance(self):
+        """
+        Return True if relevance should be active.
+
+        Returns
+        -------
+        bool
+            True if relevance should be active.
+        """
+        return False
