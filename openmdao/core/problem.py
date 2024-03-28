@@ -1109,7 +1109,7 @@ class Problem(object):
             self.check_config(logger, checks=checks)
 
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, includes=None, excludes=None,
-                       compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
+                       compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6, zero_tol=0.0,
                        method='fd', step=None, form='forward', step_calc='abs',
                        minimum_step=1e-12, force_dense=True, show_only_incorrect=False):
         """
@@ -1135,6 +1135,9 @@ class Problem(object):
             Threshold value for relative error.  Errors about this value will have a '*' displayed
             next to them in output, making them easy to search for. Note at times there may be a
             significant relative error due to a minor absolute error.  Default is 1.0E-6.
+        zero_tol : float
+            The smallest allowable value for a derivative.  Any value below this will be treated as
+            a zero.  Default is 0.0.
         method : str
             Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'.
         step : None, float, or list/tuple of float
@@ -1613,8 +1616,8 @@ class Problem(object):
             issue_warning(msg, category=DerivativesWarning)
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
-                                  compact_print, comps, all_fd_options, indep_key=indep_key,
-                                  print_reverse=print_reverse,
+                                  compact_print, comps, all_fd_options, zero_tol=zero_tol,
+                                  indep_key=indep_key, print_reverse=print_reverse,
                                   show_only_incorrect=show_only_incorrect)
 
         if not do_steps:
@@ -2757,7 +2760,7 @@ _ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse']
 _MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
 
 
-def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
+def _compute_deriv_errors(derivative_info, matrix_free, directional, totals, zero_tol):
     """
     Compute the errors between derivatives that were computed using different modes or methods.
 
@@ -2773,6 +2776,9 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
         True if the current dirivtives are directional.
     totals : bool or _TotalJacInfo
         _TotalJacInfo if the current derivatives are total derivatives.
+    zero_tol : float
+        The smallest allowable value for a derivative.  Any value below this will be treated as
+        a zero. 
 
     Returns
     -------
@@ -2795,6 +2801,10 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
         rev_norm = calc_norm = safe_norm(Jreverse)
     if forward:
         fwd_norm = calc_norm = safe_norm(Jforward)
+
+    # Apply zero_tol to the calculated norm
+    if calc_norm < zero_tol:
+        calc_norm = 0.0
 
     try:
         fdinfo = derivative_info['J_fd']
@@ -2911,7 +2921,8 @@ def _errors_above_tol(deriv_info, abs_error_tol, rel_error_tol):
 
 
 def _iter_derivs(derivatives, sys_name, show_only_incorrect, global_options, totals,
-                 matrix_free, abs_error_tol=1e-6, rel_error_tol=1e-6, incon_keys=()):
+                 matrix_free, abs_error_tol=1e-6, rel_error_tol=1e-6, zero_tol=0.0,
+                 incon_keys=()):
     """
     Iterate over all of the derivatives.
 
@@ -2937,6 +2948,9 @@ def _iter_derivs(derivatives, sys_name, show_only_incorrect, global_options, tot
         Absolute error tolerance.
     rel_error_tol : float
         Relative error tolerance.
+    zero_tol : float
+        The smallest allowable value for a derivative.  Any value below this will be treated as
+        a zero.
     incon_keys : set or tuple
         Keys where there are serial d_inputs variables that are inconsistent across processes.
 
@@ -2976,7 +2990,7 @@ def _iter_derivs(derivatives, sys_name, show_only_incorrect, global_options, tot
 
         directional = bool(fd_opts) and fd_opts.get('directional')
 
-        fd_norm = _compute_deriv_errors(derivative_info, matrix_free, directional, totals)
+        fd_norm = _compute_deriv_errors(derivative_info, matrix_free, directional, totals, zero_tol)
 
         above_abs, above_rel = _errors_above_tol(derivative_info, abs_error_tol, rel_error_tol)
 
@@ -3008,7 +3022,7 @@ def _fix_check_data(data):
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
-                              compact_print, system_list, global_options, totals=False,
+                              compact_print, system_list, global_options, zero_tol=0.0, totals=False,
                               indep_key=None, print_reverse=False,
                               show_only_incorrect=False, lcons=None, sort=False):
     """
@@ -3031,6 +3045,9 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         The systems (in the proper order) that were checked.
     global_options : dict
         Dictionary containing the options for the approximation.
+    zero_tol : float
+        The smallest allowable value for a derivative.  Any value below this will be treated as
+        a zero.
     totals : bool or _TotalJacInfo
         Set to _TotalJacInfo if we are doing check_totals to skip a bunch of stuff.
     indep_key : dict of sets, optional
@@ -3106,7 +3123,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         for key, fd_norm, fd_opts, directional, above_abs, above_rel, inconsistent in \
                 _iter_derivs(derivatives, sys_name, show_only_incorrect,
                              global_options, totals, matrix_free,
-                             abs_error_tol, rel_error_tol, incon_keys):
+                             abs_error_tol, rel_error_tol, zero_tol, incon_keys):
 
             # Skip printing the non-dependent keys if the derivatives are fine.
             if not compact_print:
