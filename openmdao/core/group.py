@@ -3437,7 +3437,8 @@ class Group(System):
         name = self.pathname if self.pathname else 'root'
 
         with Recording(name + '._solve_nonlinear', self.iter_count, self):
-            self._nonlinear_solver._solve_with_cache_check()
+            with self._relevance.active(self._nonlinear_solver.use_relevance()):
+                self._nonlinear_solver._solve_with_cache_check()
 
         # Iteration counter is incremented in the Recording context manager at exit.
 
@@ -3638,7 +3639,8 @@ class Group(System):
                 d_residuals *= -1.0
         else:
             self._linear_solver._set_matvec_scope(scope_out, scope_in)
-            self._linear_solver.solve(mode, None)
+            with self._relevance.active(self.linear_solver.use_relevance()):
+                self._linear_solver.solve(mode, None)
 
     def _linearize(self, jac, sub_do_ln=True):
         """
