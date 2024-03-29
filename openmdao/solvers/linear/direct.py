@@ -7,7 +7,7 @@ import scipy.linalg
 import scipy.sparse.linalg
 from scipy.sparse import csc_matrix
 
-from openmdao.solvers.solver import LinearSolver
+from openmdao.solvers.solver import LinearSolver, LinearCacheManager
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.utils.array_utils import identity_column_iter
 
@@ -182,6 +182,14 @@ class DirectSolver(LinearSolver):
 
     SOLVER = 'LN: Direct'
 
+    def __init__(self, **kwargs):
+        """
+        Declare the solver options.
+        """
+        super().__init__(**kwargs)
+
+        self._lin_cache_manager = None
+
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
@@ -190,6 +198,9 @@ class DirectSolver(LinearSolver):
 
         self.options.declare('err_on_singular', types=bool, default=True,
                              desc="Raise an error if LU decomposition is singular.")
+
+        self.options.declare('use_cache', types=bool, default=True,
+                             desc="If True, cache linear solutions and RHS vectors for later use.")
 
         # this solver does not iterate
         self.options.undeclare("maxiter")
@@ -355,7 +366,6 @@ class DirectSolver(LinearSolver):
             Inverse Jacobian.
         """
         system = self._system()
-        iproc = system.comm.rank
         nproc = system.comm.size
 
         if self._assembled_jac is not None:
@@ -448,18 +458,33 @@ class DirectSolver(LinearSolver):
             trans_lu = 1
             trans_splu = 'T'
 
+        if system.under_complex_step:
+            self._lin_cache_manager = None
+        else:
+            if self.options['use_cache'] and self._lin_cache_manager is None:
+                self._lin_cache_manager = LinearCacheManager(self._system())
+
+            if self._lin_cache_manager is not None:
+                sol_array = self._lin_cache_manager.get_solution(b_vec, system)
+                if sol_array is not None:
+                    x_vec[:] = sol_array
+                    return
+
         # AssembledJacobians are unscaled.
         if self._assembled_jac is not None:
             full_b = b_vec
 
             with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
                 if isinstance(self._assembled_jac._int_mtx, DenseMatrix):
-                    arr = scipy.linalg.lu_solve(self._lup, full_b, trans=trans_lu)
+                    sol_array = scipy.linalg.lu_solve(self._lup, full_b, trans=trans_lu)
                 else:
-                    arr = self._lu.solve(full_b, trans_splu)
+                    sol_array = self._lu.solve(full_b, trans_splu)
 
-                x_vec[:] = arr
+                x_vec[:] = sol_array
 
         # matrix-vector-product generated jacobians are scaled.
         else:
-            x_vec[:] = scipy.linalg.lu_solve(self._lup, b_vec, trans=trans_lu)
+            x_vec[:] = sol_array = scipy.linalg.lu_solve(self._lup, b_vec, trans=trans_lu)
+
+        if self._lin_cache_manager is not None and not system.under_complex_step:
+            self._lin_cache_manager.add_solution(b_vec, sol_array)

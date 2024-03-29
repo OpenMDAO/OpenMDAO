@@ -4,7 +4,7 @@ import numpy as np
 import os
 import sys
 
-from openmdao.solvers.solver import LinearSolver
+from openmdao.solvers.solver import LinearSolver, LinearCacheManager
 from openmdao.utils.mpi import check_mpi_env
 
 use_mpi = check_mpi_env()
@@ -199,6 +199,8 @@ class PETScKrylov(LinearSolver):
         # initialize preconditioner to None
         self.precon = None
 
+        self._lin_cache_manager = None
+
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
@@ -214,6 +216,9 @@ class PETScKrylov(LinearSolver):
 
         self.options.declare('precon_side', default='right', values=['left', 'right'],
                              desc='Preconditioner side, default is right.')
+
+        self.options.declare('use_cache', types=bool, default=True,
+                             desc="If True, cache linear solutions and RHS vectors for later use.")
 
         # changing the default maxiter from the base class
         self.options['maxiter'] = 100
@@ -369,9 +374,22 @@ class PETScKrylov(LinearSolver):
             x_vec = system._dresiduals
             b_vec = system._doutputs
 
-        # create numpy arrays to interface with PETSc
+        rhs_array = b_vec.asarray()
+
+        if system.under_complex_step:
+            self._lin_cache_manager = None
+        else:
+            if self._lin_cache_manager is None and self.options['use_cache']:
+                self._lin_cache_manager = LinearCacheManager(self._system())
+
+            if self._lin_cache_manager is not None and not system.under_complex_step:
+                sol_array = self._lin_cache_manager.get_solution(rhs_array, system)
+                if sol_array is not None:
+                    x_vec.set_val(sol_array)
+                    return
+
+        rhs_array = rhs_array.copy()  # TODO: do we really need this copy?
         sol_array = x_vec.asarray(copy=True)
-        rhs_array = b_vec.asarray(copy=True)
 
         # create PETSc vectors from numpy arrays
         sol_petsc_vec = PETSc.Vec().createWithArray(sol_array, comm=system.comm)
@@ -394,6 +412,9 @@ class PETScKrylov(LinearSolver):
             self._convergence_failure()
 
         sol_petsc_vec = rhs_petsc_vec = None
+
+        if self._lin_cache_manager is not None and not system.under_complex_step:
+            self._lin_cache_manager.add_solution(rhs_array, sol_array)
 
     def apply(self, mat, in_vec, result):
         """

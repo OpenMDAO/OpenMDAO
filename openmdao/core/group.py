@@ -3460,6 +3460,7 @@ class Group(System):
             # all the lower level systems and the data transfers have happened
             complex_step = self._inputs._under_complex_step
 
+            # make sure guess_nonlinear doesn't run with complex inputs
             if complex_step:
                 self._inputs.set_complex_step_mode(False)
                 self._residuals.set_complex_step_mode(False)

@@ -15,6 +15,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.om_warnings import issue_warning, SolverWarning
+from openmdao.utils.array_utils import allclose
 
 
 class SolverInfo(object):
@@ -924,6 +925,8 @@ class LinearSolver(Solver):
         Relevant input variables for the current matrix vector product.
     _scope_out : set or None or _UNDEFINED
         Relevant output variables for the current matrix vector product.
+    _lin_cache_manager : LinearCacheManager or None
+        If not None, the LinearCacheManager instance used by this solver.
     """
 
     def __init__(self, **kwargs):
@@ -933,6 +936,7 @@ class LinearSolver(Solver):
         self._assembled_jac = None
         self._scope_out = _UNDEFINED
         self._scope_in = _UNDEFINED
+        self._lin_cache_manager = None
 
         super().__init__(**kwargs)
 
@@ -1283,3 +1287,103 @@ class BlockLinearSolver(LinearSolver):
             self._solve()
         finally:
             self._scope_out = self._scope_in = _UNDEFINED  # reset after solve is done
+
+
+class LinearCacheManager(object):
+    """
+    Class that manages caching of linear solutions.
+
+    Attributes
+    ----------
+    _cache_list : list
+        List of cached solutions.
+    ncompute_totals : int
+        Total number of compute_totals calls.
+    """
+
+    def __init__(self, system):
+        """
+        Initialize the LinearCacheManager.
+        """
+        self._cache_list = []
+        self.ncompute_totals = system._problem_meta['ncompute_totals']
+
+    def clear(self):
+        """
+        Clear the cache.
+        """
+        self._cache_list = []
+
+    def add_solution(self, rhs, solution):
+        """
+        Add a solution to the cache.
+
+        Parameters
+        ----------
+        rhs : ndarray
+            The RHS vector.
+        solution : ndarray
+            The solution vector.
+        """
+        self._cache_list.append((rhs.copy(), solution.copy(), np.linalg.norm(rhs)))
+
+    def get_solution(self, rhs_arr, system):
+        """
+        Return a cached solution if the RHS vector matches a cached vector.
+
+        Parameters
+        ----------
+        rhs_arr : ndarray
+            The RHS vector.
+        system : System
+            The system that owns the solver that owns this LinearCacheManager.
+
+        Returns
+        -------
+        ndarray or None
+            The cached solution if the RHS vector matches a cached vector, or None if no match
+            is found.
+        """
+        sol_array = None
+
+        if self.ncompute_totals != system._problem_meta['ncompute_totals']:
+            # reset the cache if we've run compute_totals since the last time we used the cache
+            self.clear()
+            self.ncompute_totals = system._problem_meta['ncompute_totals']
+
+        for i in range(len(self._cache_list) - 1, -1, -1):
+            rhs_cache, sol_cache, rhs_cache_norm = self._cache_list[i]
+            # Check if the RHS vector is the same as a cached vector. This part is not necessary,
+            # but is less expensive than checking if two vectors are parallel.
+            if np.allclose(rhs_arr, rhs_cache, rtol=1e-100, atol=1e-50):
+                print(f'*** use caching in {type(self).__name__} ***')
+                sol_array = sol_cache
+                break
+
+            # Check if the RHS vector is equal to -1 * cached vector.
+            if np.allclose(rhs_arr, -rhs_cache, atol=1e-50):
+                print(f'*** use caching in {type(self).__name__} with scaler = -1 ***')
+                sol_array = -sol_cache
+                break
+
+            # Check if the RHS vector and a cached vector are parallel
+            # NOTE: the following parallel vector check may be inaccurate for some cases. maybe
+            # should tighten the tolerance?
+            dot_product = np.dot(rhs_arr, rhs_cache)
+            rhs_norm = np.linalg.norm(rhs_arr)
+            if np.isclose(abs(dot_product), rhs_norm * rhs_cache_norm, rtol=1e-100, atol=1e-50):
+                # two vectors are parallel, thus we can use the cache.
+                scaler = dot_product / rhs_cache_norm**2
+                if not np.isnan(scaler):
+                    print(f'*** use caching in {type(self).__name__} with scaler = {scaler} ***')
+                    sol_array = sol_cache * scaler
+                    break
+
+        matched_cache = int(sol_array is not None)
+        if system.comm.size > 1:
+            # only return if the entire distributed array matches the cache
+            if system.comm.allreduce(matched_cache) == system.comm.size:
+                return sol_array
+
+        if matched_cache:
+            return sol_array

@@ -4743,7 +4743,7 @@ class System(object):
             if self.linear_solver:
                 self.linear_solver._set_complex_step_mode(active)
 
-            if self._owns_approx_jac and isinstance(self._jacobian, Jacobian):
+            if isinstance(self._jacobian, Jacobian):
                 self._jacobian.set_complex_step_mode(active)
 
             if self._assembled_jac:

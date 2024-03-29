@@ -10,6 +10,7 @@ import numpy as np
 from scipy.sparse import coo_matrix
 
 from openmdao.core.constants import INT_DTYPE
+from openmdao.utils.numba import jit, prange, numba
 
 
 if sys.version_info >= (3, 8):
@@ -813,3 +814,54 @@ def convert_ndarray_to_support_nans_in_json(val):
     val_as_list = val.tolist()
     convert_nans_in_nested_list(val_as_list)
     return val_as_list
+
+
+if numba is None:
+    allclose = np.allclose
+else:
+    @jit()
+    def allclose(a, b, rtol=1.e-5, atol=1.e-8):
+        """
+        Return True if all elements of a and b are close within the given absolute tolerance.
+
+        Returns when the first non-close element is found.
+
+        Parameters
+        ----------
+        a : ndarray
+            First array to be compared.
+        b : ndarray
+            Second array to be compared.
+        rtol : float
+            Relative tolerance for comparison.
+        atol : float
+            Absolute tolerance for comparison.
+
+        Returns
+        -------
+        bool
+            True if all elements of a and b are close within the given absolute tolerance.
+        """
+        for i in range(len(a)):
+            aval = a[i]
+            bval = b[i]
+
+            diff = aval - bval
+            if diff < -atol or diff > atol:
+                return False
+
+            if aval < 0.:
+                aval = -aval
+            if bval < 0.:
+                bval = -bval
+
+            if aval < bval:
+                aval = bval
+
+            if aval == 0.:  # both vals are 0. if this is true
+                continue
+
+            if diff / aval > rtol:
+                return False
+
+        return True
