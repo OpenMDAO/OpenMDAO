@@ -73,7 +73,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         self._no_check_partials = True
 
-    def _setup_procs(self, pathname, comm, mode, prob_meta):
+    def _setup_procs(self, pathname, comm, prob_meta):
         """
         Execute first phase of the setup process.
 
@@ -85,9 +85,6 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
-        mode : str
-            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
-            reverse (adjoint).
         prob_meta : dict
             Problem level options.
         """
@@ -98,7 +95,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         self._surrogate_output_names.extend(self._static_surrogate_output_names)
         self._input_size = self._static_input_size
 
-        super()._setup_procs(pathname, comm, mode, prob_meta)
+        super()._setup_procs(pathname, comm, prob_meta)
 
     def initialize(self):
         """
@@ -259,21 +256,21 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                     rows = np.tile(rows, vec_size) + repeat * n_of
                     cols = np.tile(cols, vec_size) + repeat * n_wrt
 
-                    dct = {
+                    pattern_meta = {
                         'rows': rows,
                         'cols': cols,
                         'dependent': True,
                     }
-                    self._declare_partials(of=of, wrt=wrt, dct=dct)
+                    self._resolve_partials_patterns(of=of, wrt=wrt, pattern_meta=pattern_meta)
         else:
-            dct = {
+            pattern_meta = {
                 'val': None,
                 'dependent': True,
             }
             # Dense specification of partials for non-vectorized models.
-            self._declare_partials(of=tuple([name[0] for name in self._surrogate_output_names]),
-                                   wrt=tuple([name[0] for name in self._surrogate_input_names]),
-                                   dct=dct)
+            self._resolve_partials_patterns(of=tuple([n[0] for n in self._surrogate_output_names]),
+                                            wrt=tuple([n[0] for n in self._surrogate_input_names]),
+                                            pattern_meta=pattern_meta)
 
         # Support for user declaring fd partials in a child class and assigning new defaults.
         # We want a warning for all partials that were not explicitly declared.

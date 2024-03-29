@@ -72,9 +72,7 @@ parts:
   - file: other_useful_docs/building_a_tool/building_a_tool.md
     sections:
     - file: other_useful_docs/building_a_tool/repository_structure
-    - file: other_useful_docs/building_a_tool/github_pages
     - file: other_useful_docs/building_a_tool/release_process
-    - file: other_useful_docs/building_a_tool/travis
   - file: other_useful_docs/auto_ivc_api_translation
   - file: other_useful_docs/api_translation
   - file: other_useful_docs/environment_vars

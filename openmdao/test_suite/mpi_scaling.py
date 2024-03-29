@@ -65,9 +65,6 @@ class ExplicitSleepComp(om.ExplicitComponent):
         outputs.set_val(inputs.asarray())
 
     def compute_partials(self, inputs, partials):
-        """
-        Jacobian for Sellar discipline 1.
-        """
         if debug: print(f"compute partials for {self.pathname}")
         self.sleep(self.compute_partials_delay)
         val = np.eye(np.product(self.varshape, dtype=int))

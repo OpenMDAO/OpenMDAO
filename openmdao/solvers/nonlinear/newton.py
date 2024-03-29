@@ -25,7 +25,7 @@ class NewtonSolver(NonlinearSolver):
     linear_solver : LinearSolver
         Linear solver to use to find the Newton search direction. The default
         is the parent system's linear solver.
-    linesearch : NonlinearSolver
+    _linesearch : NonlinearSolver
         Line search algorithm. Default is None for no line search.
     """
 
@@ -41,7 +41,8 @@ class NewtonSolver(NonlinearSolver):
         self.linear_solver = None
 
         # Slot for linesearch
-        self.linesearch = BoundsEnforceLS()
+        self.supports['linesearch'] = True
+        self._linesearch = BoundsEnforceLS()
 
     def _declare_options(self):
         """
@@ -137,8 +138,8 @@ class NewtonSolver(NonlinearSolver):
         finally:
             self._recording_iter.pop()
 
-        # Enable local fd
-        system._owns_approx_jac = approx_status
+            # Enable local fd
+            system._owns_approx_jac = approx_status
 
     def _linearize_children(self):
         """
@@ -182,7 +183,7 @@ class NewtonSolver(NonlinearSolver):
 
         # Execute guess_nonlinear if specified and
         # we have not restarted from a saved point
-        if not self._restarted:
+        if not self._restarted and system._has_guess:
             system._guess_nonlinear()
 
         with Recording('Newton_subsolve', 0, self) as rec:
@@ -225,7 +226,8 @@ class NewtonSolver(NonlinearSolver):
             my_asm_jac = self.linear_solver._assembled_jac
 
             system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
-            if (my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac):
+            if (my_asm_jac is not None and
+                    system.linear_solver._assembled_jac is not my_asm_jac):
                 my_asm_jac._update(system)
 
             self._linearize()
@@ -276,3 +278,14 @@ class NewtonSolver(NonlinearSolver):
             self.linear_solver.cleanup()
         if self.linesearch:
             self.linesearch.cleanup()
+
+    def use_relevance(self):
+        """
+        Return True if relevance should be active.
+
+        Returns
+        -------
+        bool
+            True if relevance should be active.
+        """
+        return False

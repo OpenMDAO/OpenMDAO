@@ -6,7 +6,6 @@ import itertools
 
 from io import StringIO
 import numpy as np
-from collections import defaultdict
 
 import openmdao.api as om
 from openmdao.core.problem import _default_prob_name
@@ -14,10 +13,10 @@ from openmdao.core.driver import Driver
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.misc_components import MultComp
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesConnected
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
 import openmdao.utils.hooks as hooks
 from openmdao.utils.units import convert_units
-from openmdao.utils.om_warnings import DerivativesWarning
+from openmdao.utils.om_warnings import DerivativesWarning, OMDeprecationWarning
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.tests.test_hooks import hooks_active
 
@@ -365,7 +364,7 @@ class TestProblem(unittest.TestCase):
             p.compute_totals()
 
         self.assertEqual(str(cm.exception),
-                         "Driver is not providing any design variables for compute_totals.")
+                         "No design variables were passed to compute_totals and the driver is not providing any.")
 
     def test_compute_totals_no_args_no_response(self):
         p = om.Problem()
@@ -386,7 +385,7 @@ class TestProblem(unittest.TestCase):
             p.compute_totals()
 
         self.assertEqual(str(cm.exception),
-                         "Driver is not providing any response variables for compute_totals.")
+                         "No response variables were passed to compute_totals and the driver is not providing any.")
 
     def test_compute_totals_no_args(self):
         p = om.Problem()
@@ -424,7 +423,7 @@ class TestProblem(unittest.TestCase):
 
         derivs = p.compute_totals()
 
-        assert_near_equal(derivs['calc.y', 'des_vars.x'], [[2.0]], 1e-6)
+        assert_near_equal(derivs['y', 'x'], [[2.0]], 1e-6)
 
     @parameterized.expand(itertools.product(['fwd', 'rev']))
     def test_compute_jacvec_product(self, mode):
@@ -1354,33 +1353,21 @@ class TestProblem(unittest.TestCase):
         p.setup(check=False, mode='rev')
         p.final_setup()
 
-        relevant = model._relevant
+        relevant = model._relevance
 
         indep1_ins = {'C8.b', 'G2.C5.a', 'G1.C1.a'}
         indep1_outs = {'C8.y', 'G1.C1.z', 'G2.C5.x', 'indep1.x'}
         indep1_sys = {'C8', 'G1.C1', 'G2.C5', 'indep1', 'G1', 'G2', ''}
 
-        dct, systems = relevant['C8.y']['indep1.x']
-        inputs = dct['input']
-        outputs = dct['output']
+        inputs, outputs, systems = relevant._all_relevant('indep1.x', 'C8.y')
 
         self.assertEqual(inputs, indep1_ins)
         self.assertEqual(outputs, indep1_outs)
         self.assertEqual(systems, indep1_sys)
 
-        dct, systems = relevant['C8.y']['indep1.x']
-        inputs = dct['input']
-        outputs = dct['output']
+        self.assertTrue('indep2.x' not in outputs)
 
-        self.assertEqual(inputs, indep1_ins)
-        self.assertEqual(outputs, indep1_outs)
-        self.assertEqual(systems, indep1_sys)
-
-        self.assertTrue('indep2.x' not in relevant['C8.y'])
-
-        dct, systems = relevant['C8.y']['@all']
-        inputs = dct['input']
-        outputs = dct['output']
+        inputs, outputs, systems = relevant._all_relevant(['indep1.x', 'indep2.x'], 'C8.y')
 
         self.assertEqual(inputs, indep1_ins)
         self.assertEqual(outputs, indep1_outs)
@@ -1679,7 +1666,7 @@ class TestProblem(unittest.TestCase):
             hooks._unregister_hook('final_setup', class_name='Problem')
             hooks.use_hooks = False
 
-    def test_list_problem_vars(self):
+    def test_list_driver_vars(self):
         model = SellarDerivatives()
         model.nonlinear_solver = om.NonlinearBlockGS()
 
@@ -1702,7 +1689,7 @@ class TestProblem(unittest.TestCase):
         strout = StringIO()
         sys.stdout = strout
         try:
-            prob.list_problem_vars()
+            prob.list_driver_vars()
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
@@ -1718,20 +1705,20 @@ class TestProblem(unittest.TestCase):
         strout = StringIO()
         sys.stdout = strout
         try:
-            prob.list_problem_vars(show_promoted_name=False)
+            prob.list_driver_vars(show_promoted_name=False)
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
         self.assertRegex(output[5], r'^z +\|[0-9. e+-]+\| +2')
-        self.assertRegex(output[14], r'^con_cmp2.con2 +\[[0-9. e+-]+\] +1')
-        self.assertRegex(output[21], r'^obj_cmp.obj +\[[0-9. e+-]+\] +1')
+        self.assertRegex(output[14], r'^con2 +\[[0-9. e+-]+\] +1')
+        self.assertRegex(output[21], r'^obj +\[[0-9. e+-]+\] +1')
 
         # With all the optional columns
         stdout = sys.stdout
         strout = StringIO()
         sys.stdout = strout
         try:
-            prob.list_problem_vars(
+            prob.list_driver_vars(
                 desvar_opts=['lower', 'upper', 'ref', 'ref0',
                              'indices', 'adder', 'scaler',
                              'parallel_deriv_color',
@@ -1761,7 +1748,7 @@ class TestProblem(unittest.TestCase):
         strout = StringIO()
         sys.stdout = strout
         try:
-            l = prob.list_problem_vars(print_arrays=True,
+            l = prob.list_driver_vars(print_arrays=True,
                                        desvar_opts=['lower', 'upper', 'ref', 'ref0',
                                                     'indices', 'adder', 'scaler',
                                                     'parallel_deriv_color',
@@ -1818,7 +1805,33 @@ class TestProblem(unittest.TestCase):
         self.assertEqual(l['objectives'][0][1]['scaler'], None)
         self.assertEqual(l['objectives'][0][1]['adder'], None)
 
-    def test_list_problem_vars_before_final_setup(self):
+    def test_list_problem_vars_deprecated(self):
+        model = SellarDerivatives()
+        model.nonlinear_solver = om.NonlinearBlockGS()
+
+        prob = om.Problem(model)
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.setup()
+        prob.run_driver()
+
+        expected_warning = 'Method `list_problem_vars` has been ' \
+                           'renamed `list_driver_vars`.\nPlease update ' \
+                           'your code to use list_driver_vars to avoid ' \
+                           'this warning.'
+
+        with assert_warning(OMDeprecationWarning, expected_warning):
+            prob_vars = prob.list_problem_vars(out_stream=None)
+
+        # make sure the deprecated function still returns tha data
+        self.assertEqual(set(prob_vars.keys()), {'constraints', 'design_vars', 'objectives'})
+
+    def test_list_driver_vars_before_final_setup(self):
         prob = om.Problem()
         prob.model.add_subsystem('parab', Paraboloid(), promotes_inputs=['x', 'y'])
         prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
@@ -1835,11 +1848,11 @@ class TestProblem(unittest.TestCase):
 
         prob.setup()
 
-        msg = f"Problem {prob._get_inst_id()}: Problem.list_problem_vars() cannot be called " \
+        msg = f"Problem {prob._get_inst_id()}: Problem.list_driver_vars() cannot be called " \
               "before `Problem.run_model()`, `Problem.run_driver()`, or `Problem.final_setup()`."
 
         with self.assertRaises(RuntimeError) as err:
-            prob.list_problem_vars()
+            prob.list_driver_vars()
         self.assertEqual(str(err.exception), msg)
 
     def test_list_problem_w_multi_constraints(self):
@@ -1872,7 +1885,7 @@ class TestProblem(unittest.TestCase):
         strout = StringIO()
         sys.stdout = strout
         try:
-            p.list_problem_vars()
+            p.list_driver_vars()
         finally:
             sys.stdout = stdout
 
@@ -1947,7 +1960,7 @@ class TestProblem(unittest.TestCase):
 
         p.run_model()
 
-    def test_list_problem_vars_driver_scaling(self):
+    def test_list_driver_vars_driver_scaling(self):
         model = SellarDerivatives()
         model.nonlinear_solver = om.NonlinearBlockGS()
 
@@ -1972,7 +1985,7 @@ class TestProblem(unittest.TestCase):
         sys.stdout = strout
 
         try:
-            prob.list_problem_vars()
+            prob.list_driver_vars()
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
@@ -1987,7 +2000,7 @@ class TestProblem(unittest.TestCase):
         sys.stdout = strout
 
         try:
-            prob.list_problem_vars(driver_scaling=False)
+            prob.list_driver_vars(driver_scaling=False)
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
@@ -1996,7 +2009,7 @@ class TestProblem(unittest.TestCase):
         self.assertTrue('-20.' in output[14]) # con
         self.assertTrue('3.18' in output[21]) # obj
 
-    def test_feature_list_problem_vars(self):
+    def test_feature_list_driver_vars(self):
 
         prob = om.Problem(model=SellarDerivatives())
         model = prob.model
@@ -2015,7 +2028,7 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        prob.list_problem_vars(print_arrays=True,
+        prob.list_driver_vars(print_arrays=True,
                                desvar_opts=['lower', 'upper', 'ref', 'ref0',
                                             'indices', 'adder', 'scaler',
                                             'parallel_deriv_color'],
@@ -2115,8 +2128,8 @@ class RelevanceTestCase(unittest.TestCase):
         model.add_subsystem('C2', MultComp(3.))
         model.add_subsystem('C3', MultComp(5.))
         model.add_subsystem('C4', MultComp(7.))
-        model.add_subsystem('C5', MultComp(9.))
-        model.add_subsystem('C6', MultComp(11.))
+        model.add_subsystem('C5', MultComp(.1))
+        model.add_subsystem('C6', MultComp(.01))
 
         model.connect('indeps.a', 'C1.x')
         model.connect('indeps.b', ['C1.y', 'C2.x'])
@@ -2133,9 +2146,11 @@ class RelevanceTestCase(unittest.TestCase):
         p = self._setup_relevance_problem()
         p.model.connect('C5.fxy', 'C4.y')
         p.model.connect('C6.fxy', 'C5.y')
+        p.model.nonlinear_solver = om.NonlinearBlockGS(maxiter=500)
+        p.model.linear_solver = om.LinearBlockGS(maxiter=500)
         return p
 
-    def _finish_setup_and_check(self, p, expected):
+    def _finish_setup_and_check(self, p, expected, approx=False):
         p.setup()
 
         p['indeps.a'] = 2.
@@ -2147,16 +2162,26 @@ class RelevanceTestCase(unittest.TestCase):
 
         p.run_model()
 
-        p.run_driver()
-
         allcomps = [getattr(p.model, f"C{i}") for i in range(1, 7)]
+
+        if approx:
+            for c in allcomps:
+                c._reset_counts(names=['_compute_wrapper'])
+            p.compute_totals()
+        else:
+            p.run_driver()
+
         ran_linearize = [c.name for c in allcomps if c._counts['_linearize'] > 0]
         ran_compute_partials = [c.name for c in allcomps if c._counts['_compute_partials_wrapper'] > 0]
         ran_solve_linear = [c.name for c in allcomps if c._counts['_solve_linear'] > 0]
 
-        self.assertEqual(ran_linearize, expected)
-        self.assertEqual(ran_compute_partials, expected)
-        self.assertEqual(ran_solve_linear, expected)
+        if approx:
+            for c in allcomps:
+                self.assertEqual(c._counts['_compute_wrapper'], expected[c.name], f"for {c.name}")
+        else:
+            self.assertEqual(ran_linearize, expected)
+            self.assertEqual(ran_compute_partials, expected)
+            self.assertEqual(ran_solve_linear, expected)
 
     def test_relevance(self):
         p = self._setup_relevance_problem()
@@ -2167,6 +2192,17 @@ class RelevanceTestCase(unittest.TestCase):
         p.model.add_constraint('C4.fxy', upper=1000.)
 
         self._finish_setup_and_check(p, ['C2', 'C4', 'C6'])
+
+    def test_relevance_approx(self):
+        p = self._setup_relevance_problem()
+
+        p.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9, optimizer='SLSQP')
+        p.model.add_design_var('indeps.b', lower=-50., upper=50.)
+        p.model.add_objective('C6.fxy')
+        p.model.add_constraint('C4.fxy', upper=1000.)
+        p.model.approx_totals(method='cs')
+
+        self._finish_setup_and_check(p, {'C2': 1, 'C4': 1, 'C6': 1, 'C1': 0, 'C3': 0, 'C5': 0}, approx=True)
 
     def test_relevance2(self):
         p = self._setup_relevance_problem()
@@ -2365,8 +2401,7 @@ class NestedProblemTestCase(unittest.TestCase):
         prob.run_model()
 
         totals = prob.check_totals(of='f_xy', wrt=['x', 'y'], method='cs', out_stream=None)
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-12)
+        assert_check_totals(totals)
 
     def test_nested_prob_default_naming(self):
         import openmdao.core.problem

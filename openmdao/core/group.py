@@ -3,17 +3,16 @@ import sys
 from collections import Counter, defaultdict
 from collections.abc import Iterable
 
-from itertools import product, chain, repeat
+from itertools import product, chain
 from numbers import Number
 import inspect
-from fnmatch import fnmatchcase
 from difflib import get_close_matches
 
 import numpy as np
 import networkx as nx
 
 from openmdao.core.configinfo import _ConfigInfo
-from openmdao.core.system import System, collect_errors, _OptStatus
+from openmdao.core.system import System, collect_errors
 from openmdao.core.component import Component, _DictValues
 from openmdao.core.constants import _UNDEFINED, INT_DTYPE, _SetupStatus
 from openmdao.vectors.vector import _full_slice
@@ -23,19 +22,22 @@ from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
+from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
-    shape_to_len
+    shape_to_len, ValueRepeater
 from openmdao.utils.general_utils import common_subpath, all_ancestors, \
-    convert_src_inds, _contains_all, shape2tuple, get_connection_owner, ensure_compatible, \
-    meta2src_iter, get_rev_conns
+    convert_src_inds, shape2tuple, get_connection_owner, ensure_compatible, \
+    meta2src_iter, get_rev_conns, _contains_all
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
 from openmdao.utils.graph_utils import get_sccs_topo, get_out_of_order_nodes
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
+from openmdao.utils.relevance import get_relevance
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     PromotionWarning, MPIWarning, DerivativesWarning
+from openmdao.utils.class_util import overrides_method
 
 # regex to check for valid names.
 import re
@@ -182,16 +184,15 @@ class Group(System):
         List of Auto IVC warnings to be raised later.
     _shapes_graph : nx.Graph
         Dynamic shape dependency graph, or None.
-    _pre_components : list of str or None
-        Sorted list of pathnames of components that are executed prior to the optimization loop.
-    _post_components : list of str or None
-        Sorted list of pathnames of components that are executed after the optimization loop.
-    _abs_desvars : dict or None
-        Dict of absolute design variable metadata.
-    _abs_responses : dict or None
-        Dict of absolute response metadata.
-    _relevance_graph : nx.DiGraph
-        Graph of relevance connections.  Always None except in the top level Group.
+    _pre_components : set of str or None
+        Set of pathnames of components that are executed prior to the optimization loop.  Empty
+        unless the 'group_by_pre_opt_post' option is True in the Problem.
+    _post_components : set of str or None
+        Set of pathnames of components that are executed after the optimization loop.  Empty
+        unless the 'group_by_pre_opt_post' option is True in the Problem.
+    _iterated_components : set of str or ContainsAll
+        Set of pathnames of components that are executed in the optimization loop if
+        'group_by_pre_opt_post' is True in the Problem.
     _fd_rev_xfer_correction_dist : dict
         If this group is using finite difference to compute derivatives,
         this is the set of inputs that are upstream of a distributed response
@@ -225,9 +226,7 @@ class Group(System):
         self._shapes_graph = None
         self._pre_components = None
         self._post_components = None
-        self._abs_desvars = None
-        self._abs_responses = None
-        self._relevance_graph = None
+        self._iterated_components = None
         self._fd_rev_xfer_correction_dist = {}
 
         # TODO: we cannot set the solvers with property setters at the moment
@@ -509,6 +508,8 @@ class Group(System):
             self._group_inputs[n] = lst.copy()
 
         self.matrix_free = False
+        self._has_guess = overrides_method('guess_nonlinear', self, Group)
+
         for subsys in self._sorted_sys_iter():
             subsys._configure()
             subsys._setup_var_data()
@@ -530,10 +531,9 @@ class Group(System):
         Reset all the stuff that gets initialized in setup.
         """
         super()._reset_setup_vars()
-        self._relevance_graph = None
         self._setup_procs_finished = False
 
-    def _setup_procs(self, pathname, comm, mode, prob_meta):
+    def _setup_procs(self, pathname, comm, prob_meta):
         """
         Execute first phase of the setup process.
 
@@ -546,13 +546,10 @@ class Group(System):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
-        mode : str
-            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
-            reverse (adjoint). Default is 'rev'.
         prob_meta : dict
             Problem level metadata.
         """
-        super()._setup_procs(pathname, comm, mode, prob_meta)
+        super()._setup_procs(pathname, comm, prob_meta)
 
         nproc = comm.size
 
@@ -560,7 +557,7 @@ class Group(System):
             info = self._coloring_info
             if comm.size > 1:
                 # if approx_totals has been declared, or there is an approx coloring, setup par FD
-                if self._owns_approx_jac or info['dynamic'] or info['static'] is not None:
+                if self._owns_approx_jac or info.dynamic or info.static is not None:
                     comm = self._setup_par_fd_procs(comm)
                 else:
                     msg = "%s: num_par_fd = %d but FD is not active." % (self.msginfo,
@@ -637,7 +634,7 @@ class Group(System):
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
-            subsys._setup_procs(subsys.pathname, sub_comm, mode, prob_meta)
+            subsys._setup_procs(subsys.pathname, sub_comm, prob_meta)
 
         # build a list of local subgroups to speed up later loops
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
@@ -704,7 +701,7 @@ class Group(System):
         else:
             return self._list_states()
 
-    def _setup(self, comm, mode, prob_meta):
+    def _setup(self, comm, prob_meta):
         """
         Perform setup for this system and its descendant systems.
 
@@ -714,8 +711,6 @@ class Group(System):
         ----------
         comm : MPI.Comm or <FakeComm> or None
             The global communicator.
-        mode : str
-            Derivative direction, either 'fwd', or 'rev', or 'auto'
         prob_meta : dict
             Problem level metadata dictionary.
         """
@@ -724,15 +719,17 @@ class Group(System):
         self._initial_condition_cache = {}
 
         # reset any coloring if a Coloring object was not set explicitly
-        if self._coloring_info['dynamic'] or self._coloring_info['static'] is not None:
-            self._coloring_info['coloring'] = None
+        if self._coloring_info.dynamic or self._coloring_info.static is not None:
+            self._coloring_info.coloring = None
 
         self.pathname = ''
         self.comm = comm
-        self._mode = mode
+
+        self._pre_components = None
+        self._post_components = None
 
         # Besides setting up the processors, this method also builds the model hierarchy.
-        self._setup_procs(self.pathname, comm, mode, self._problem_meta)
+        self._setup_procs(self.pathname, comm, self._problem_meta)
 
         prob_meta['config_info'] = _ConfigInfo()
 
@@ -747,8 +744,7 @@ class Group(System):
 
         self._setup_var_data()
 
-        # have to do this again because we are passed the point in
-        # _setup_var_data when this happens
+        # have to do this again because we are passed the point in _setup_var_data when this happens
         self._has_output_scaling = False
         self._has_output_adder = False
         self._has_resid_scaling = False
@@ -769,7 +765,7 @@ class Group(System):
         self._setup_global_connections()
         self._setup_dynamic_shapes()
 
-        self._top_level_post_connections(mode)
+        self._top_level_post_connections()
 
         self._setup_var_sizes()
 
@@ -778,388 +774,117 @@ class Group(System):
         # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
 
-    def _init_relevance(self, mode):
-        """
-        Create the relevance dictionary.
-
-        This is only called on the top level System.
-
-        Parameters
-        ----------
-        mode : str
-            Derivative direction, either 'fwd' or 'rev'.
-
-        Returns
-        -------
-        dict
-            The relevance dictionary.
-        """
-        self._abs_desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
-        self._abs_responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
-        assert self.pathname == '', "Relevance can only be initialized on the top level System."
-
-        if self._use_derivatives:
-            return self.get_relevant_vars(self._abs_desvars,
-                                          self._check_alias_overlaps(self._abs_responses), mode)
-
-        return {'@all': ({'input': _contains_all, 'output': _contains_all}, _contains_all)}
-
-    def get_relevance_graph(self, desvars, responses):
-        """
-        Return a graph of the relevance between desvars and responses.
-
-        Parameters
-        ----------
-        desvars : dict
-            Dictionary of design variable metadata.
-        responses : dict
-            Dictionary of response variable metadata.
-
-        Returns
-        -------
-        DiGraph
-            Graph of the relevance between desvars and responses.
-        """
-        if self._relevance_graph is not None:
-            return self._relevance_graph
-
-        graph = self.get_hybrid_graph()
-        outmeta = self._var_allprocs_abs2meta['output']
-
-        # now add design vars and responses to the graph
-        for dv in meta2src_iter(desvars.values()):
-            if dv not in graph:
-                graph.add_node(dv, type_='out',
-                               dist=outmeta[dv]['distributed'] if dv in outmeta else None)
-                graph.add_edge(dv.rpartition('.')[0], dv)
-            graph.nodes[dv]['isdv'] = True
-
-        resps = set(meta2src_iter(responses.values()))
-        for res in resps:
-            if res not in graph:
-                graph.add_node(res, type_='out',
-                               dist=outmeta[res]['distributed'] if res in outmeta else None)
-                graph.add_edge(res.rpartition('.')[0], res, isresponse=True)
-            graph.nodes[res]['isresponse'] = True
-
-        # figure out if we can remove any edges based on zero partials we find
-        # in components.  By default all component connected outputs
-        # are also connected to all connected inputs from the same component.
-        missing_partials = {}
-        self._get_missing_partials(missing_partials)
-        missing_responses = set()
-        for pathname, missing in missing_partials.items():
-            outputs = [n for _, n in graph.out_edges(pathname)]
-            inputs = [n for n, _ in graph.in_edges(pathname)]
-            graph.remove_node(pathname)
-
-            for output in outputs:
-                found = False
-                for inp in inputs:
-                    if (output, inp) not in missing:
-                        graph.add_edge(inp, output)
-                        found = True
-
-                if not found and output in resps:
-                    missing_responses.add(output)
-
-        if missing_responses:
-            msg = (f"Constraints or objectives [{', '.join(sorted(missing_responses))}] cannot"
-                   " be impacted by the design variables of the problem because no partials "
-                   "were defined for them in their parent component(s).")
-            if self._problem_meta['singular_jac_behavior'] == 'error':
-                raise RuntimeError(msg)
-            else:
-                issue_warning(msg, category=DerivativesWarning)
-
-        self._relevance_graph = graph
-        return graph
-
-    def get_hybrid_graph(self):
+    def _get_dataflow_graph(self):
         """
         Return a graph of all variables and components in the model.
 
-        Each component is connected to each of its input and output variables, and
-        those variables are connected to other variables based on the connections
-        in the model.
+        Each component is connected to each of its input and output variables, and those variables
+        are connected to other variables based on the connections in the model.
 
         This results in a smaller graph (fewer edges) than would be the case for a pure variable
         graph where all inputs to a particular component would have to be connected to all outputs
         from that component.
+
+        This should only be called on the top level Group.
 
         Returns
         -------
         networkx.DiGraph
             Graph of all variables and components in the model.
         """
+        assert self.pathname == '', "call _get_dataflow_graph on the top level Group only."
+
         graph = nx.DiGraph()
-        tgtmeta = self._var_allprocs_abs2meta['input']
-        srcmeta = self._var_allprocs_abs2meta['output']
+        comp_seen = set()
+
+        # locate any components that don't have any inputs or outputs and add them to the graph
+        for subsys in self.system_iter(recurse=True, typ=Component):
+            if not subsys._var_abs2meta['input'] and not subsys._var_abs2meta['output']:
+                graph.add_node(subsys.pathname, local=True)
+                comp_seen.add(subsys.pathname)
+
+        if self.comm.size > 1:
+            allemptycomps = self.comm.allgather(comp_seen)
+            for compset in allemptycomps:
+                for comp in compset:
+                    if comp not in comp_seen:
+                        graph.add_node(comp, local=False)
+                        comp_seen.add(comp)
+
+        for direction in ('input', 'output'):
+            isout = direction == 'output'
+            allvmeta = self._var_allprocs_abs2meta[direction]
+            vmeta = self._var_abs2meta[direction]
+            for vname in self._var_allprocs_abs2prom[direction]:
+                if vname in allvmeta:
+                    local = vname in vmeta
+                else:  # var is discrete
+                    local = vname in self._var_discrete[direction]
+
+                graph.add_node(vname, type_=direction, local=local)
+
+                comp = vname.rpartition('.')[0]
+                if comp not in comp_seen:
+                    graph.add_node(comp, local=local)
+                    comp_seen.add(comp)
+
+                if isout:
+                    graph.add_edge(comp, vname)
+                else:
+                    graph.add_edge(vname, comp)
 
         for tgt, src in self._conn_global_abs_in2out.items():
-            if src not in graph:
-                dist = srcmeta[src]['distributed'] if src in srcmeta else None
-                graph.add_node(src, type_='out', dist=dist,
-                               isdv=False, isresponse=False)
-
-            dist = tgtmeta[tgt]['distributed'] if tgt in tgtmeta else None
-            graph.add_node(tgt, type_='in', dist=dist,
-                           isdv=False, isresponse=False)
-
-            # create edges to/from the component
-            graph.add_edge(src.rpartition('.')[0], src)
-            graph.add_edge(tgt, tgt.rpartition('.')[0])
-
             # connect the variables src and tgt
             graph.add_edge(src, tgt)
 
         return graph
 
-    def get_relevant_vars(self, desvars, responses, mode):
+    def _check_alias_overlaps(self, responses):
         """
-        Find all relevant vars between desvars and responses.
+        Check for overlapping indices in aliased responses.
 
-        Both vars are assumed to be outputs (either design vars or responses).
+        If the responses contain aliases, the returned response dict will
+        be a copy with the alias keys removed and any missing alias sources
+        added.
+
+        This may only be called on the top level Group.
 
         Parameters
         ----------
-        desvars : dict
-            Dictionary of design variable metadata.
         responses : dict
-            Dictionary of response variable metadata.
-        mode : str
-            Direction of derivatives, either 'fwd' or 'rev'.
+            Dictionary of response metadata. Keys don't matter.
 
         Returns
         -------
         dict
-            Dict of ({'outputs': dep_outputs, 'inputs': dep_inputs}, dep_systems)
-            keyed by design vars and responses.
+            Dictionary of response metadata with alias keys removed.
         """
-        graph = self.get_relevance_graph(desvars, responses)
-        nodes = graph.nodes
-        grev = graph.reverse(copy=False)
-        rescache = {}
-        pd_dv_locs = {}  # local nodes dependent on a par deriv desvar
-        pd_res_locs = {}  # local nodes dependent on a par deriv response
-        pd_common = defaultdict(dict)
-        # for each par deriv color, keep list of all local dep nodes for each var
-        pd_err_chk = defaultdict(dict)
+        assert self.pathname == '', "call _check_alias_overlaps on the top level System only."
 
-        relevant = defaultdict(dict)
-
-        for dvmeta in desvars.values():
-            desvar = dvmeta['source']
-            dvset = set(self.all_connected_nodes(graph, desvar))
-            if dvmeta['parallel_deriv_color']:
-                pd_dv_locs[desvar] = set(self.all_connected_nodes(graph, desvar, local=True))
-                pd_err_chk[dvmeta['parallel_deriv_color']][desvar] = pd_dv_locs[desvar]
-
-            for resmeta in responses.values():
-                response = resmeta['source']
-                if response not in rescache:
-                    rescache[response] = set(self.all_connected_nodes(grev, response))
-                    if resmeta['parallel_deriv_color']:
-                        pd_res_locs[response] = set(self.all_connected_nodes(grev, response,
-                                                                             local=True))
-                        pd_err_chk[resmeta['parallel_deriv_color']][response] = \
-                            pd_res_locs[response]
-
-                common = dvset.intersection(rescache[response])
-
-                if common:
-                    if desvar in pd_dv_locs and pd_dv_locs[desvar]:
-                        pd_common[desvar][response] = \
-                            pd_dv_locs[desvar].intersection(rescache[response])
-                    elif response in pd_res_locs and pd_res_locs[response]:
-                        pd_common[response][desvar] = pd_res_locs[response].intersection(dvset)
-
-                    input_deps = set()
-                    output_deps = set()
-                    sys_deps = set()
-                    for node in common:
-                        if 'type_' in nodes[node]:
-                            typ = nodes[node]['type_']
-                            if typ == 'in':  # input var
-                                input_deps.add(node)
-                            else:  # output var
-                                output_deps.add(node)
-                            system = node.rpartition('.')[0]
-                            if system not in sys_deps:
-                                sys_deps.update(all_ancestors(system))
-
-                elif desvar == response:
-                    input_deps = set()
-                    output_deps = set([response])
-                    sys_deps = set(all_ancestors(desvar.rpartition('.')[0]))
-
-                else:
-                    continue
-
-                if mode != 'rev':  # fwd or auto
-                    relevant[desvar][response] = ({'input': input_deps,
-                                                   'output': output_deps}, sys_deps)
-                if mode != 'fwd':  # rev or auto
-                    relevant[response][desvar] = ({'input': input_deps,
-                                                   'output': output_deps}, sys_deps)
-
-                sys_deps.add('')  # top level Group is always relevant
-
-        rescache = None
-
-        if pd_dv_locs or pd_res_locs:
-            # check to make sure we don't have any overlapping dependencies between vars of the
-            # same color
-            vtype = 'design variable' if mode == 'fwd' else 'response'
-            err = (None, None)
-            for pdcolor, dct in pd_err_chk.items():
-                seen = set()
-                for vname, nodes in dct.items():
-                    if seen.intersection(nodes):
-                        err = (vname, pdcolor)
-                        break
-                    seen.update(nodes)
-
-            all_errs = self.comm.allgather(err)
-            for n, color in all_errs:
-                if n is not None:
-                    raise RuntimeError(f"{self.msginfo}: {vtype} '{n}' has overlapping dependencies"
-                                       f" on the same rank with other {vtype}s in "
-                                       f"parallel_deriv_color '{color}'.")
-
-            # we have some parallel deriv colors, so update relevance entries to throw out
-            # any dependencies that aren't on the same rank.
-            if pd_common:
-                for inp, sub in relevant.items():
-                    for out, tup in sub.items():
-                        meta = tup[0]
-                        if inp in pd_common:
-                            meta['input'] = meta['input'].intersection(pd_common[inp][out])
-                            meta['output'] = meta['output'].intersection(pd_common[inp][out])
-                            if out not in meta['output']:
-                                meta['input'] = set()
-                                meta['output'] = set()
-
-        voi_lists = []
-        if mode != 'rev':
-            voi_lists.append((desvars.values(), responses.values()))
-        if mode != 'fwd':
-            voi_lists.append((responses.values(), desvars.values()))
-
-        # now calculate dependencies between each VOI and all other VOIs of the
-        # other type, e.g for each input VOI wrt all output VOIs.  This is only
-        # done for design vars in fwd mode or responses in rev mode. In auto mode,
-        # we combine the results for fwd and rev modes.
-        for inputs_meta, outputs_meta in voi_lists:
-            for inpmeta in inputs_meta:
-                inp = inpmeta['source']
-                relinp = relevant[inp]
-                if relinp:
-                    if '@all' in relinp:
-                        dct, total_systems = relinp['@all']
-                        total_inps = dct['input']
-                        total_outs = dct['output']
-                    else:
-                        total_inps = set()
-                        total_outs = set()
-                        total_systems = set()
-
-                    for outmeta in outputs_meta:
-                        out = outmeta['source']
-                        if out in relinp:
-                            dct, systems = relinp[out]
-                            total_inps.update(dct['input'])
-                            total_outs.update(dct['output'])
-                            total_systems.update(systems)
-
-                    relinp['@all'] = ({'input': total_inps, 'output': total_outs},
-                                      total_systems)
-                else:
-                    relinp['@all'] = ({'input': set(), 'output': set()}, set())
-
-        return relevant
-
-    def all_connected_nodes(self, graph, start, local=False):
-        """
-        Yield all downstream nodes starting at the given node.
-
-        Parameters
-        ----------
-        graph : network.DiGraph
-            Graph being traversed.
-        start : hashable object
-            Identifier of the starting node.
-        local : bool
-            If True and a non-local node is encountered in the traversal, the traversal
-            ends on that branch.
-
-        Yields
-        ------
-        str
-            Each node found when traversal starts at start.
-        """
-        if local:
-            abs2meta_in = self._var_abs2meta['input']
-            abs2meta_out = self._var_abs2meta['output']
-            all_abs2meta_in = self._var_allprocs_abs2meta['input']
-            all_abs2meta_out = self._var_allprocs_abs2meta['output']
-
-            def is_local(name):
-                return (name in abs2meta_in or name in abs2meta_out or
-                        (name not in all_abs2meta_in and name not in all_abs2meta_out))
-
-        if not local or is_local(start):
-            stack = [start]
-            visited = set(stack)
-            yield start
-        else:
-            return
-
-        while stack:
-            src = stack.pop()
-            for tgt in graph[src]:
-                if not local or is_local(tgt):
-                    yield tgt
-                else:
-                    continue
-                if tgt not in visited:
-                    visited.add(tgt)
-                    stack.append(tgt)
-
-    def _check_alias_overlaps(self, responses):
-        # If you have response aliases, check for overlapping indices.  Also adds aliased
-        # sources to responses if they're not already there so relevance will work properly.
         aliases = set()
-        aliased_srcs = {}
-        to_add = {}
-        discrete = self._var_allprocs_discrete
+        srcdict = {}
+        discrete_outs = self._var_allprocs_discrete['output']
 
         # group all aliases by source so we can compute overlaps for each source individually
-        for name, meta in responses.items():
-            if meta['alias'] and not (name in discrete['input'] or name in discrete['output']):
-                aliases.add(name)  # name is the same as meta['alias'] here
-                src = meta['source']
-                if src in aliased_srcs:
-                    aliased_srcs[src].append(meta)
+        for meta in responses.values():
+            src = meta['source']
+            if src not in discrete_outs:
+                if meta['alias']:
+                    aliases.add(meta['alias'])
+                if src in srcdict:
+                    srcdict[src].append(meta)
                 else:
-                    aliased_srcs[src] = [meta]
+                    srcdict[src] = [meta]
 
-                    if src in responses:
-                        # source itself is also a constraint, so need to know indices
-                        aliased_srcs[src].append(responses[src])
-                    else:
-                        # If an alias is in responses, but the src isn't, then we need to
-                        # make sure the src is present for the relevance calculation.
-                        # This is allowed here because this responses dict is not used beyond
-                        # the relevance calculation.
-                        to_add[src] = meta
+        abs2meta_out = self._var_allprocs_abs2meta['output']
 
-        for src, metalist in aliased_srcs.items():
+        # loop over any sources having multiple aliases to ensure no overlap of indices
+        for src, metalist in srcdict.items():
             if len(metalist) == 1:
                 continue
 
-            size = self._var_allprocs_abs2meta['output'][src]['global_size']
-            shape = self._var_allprocs_abs2meta['output'][src]['global_shape']
+            size = abs2meta_out[src]['global_size']
+            shape = abs2meta_out[src]['global_shape']
             mat = np.zeros(size, dtype=np.ushort)
 
             for meta in metalist:
@@ -1174,13 +899,6 @@ class Group(System):
                 matching_aliases = sorted(m['alias'] for m in metalist if m['alias'])
                 raise RuntimeError(f"{self.msginfo}: Indices for aliases {matching_aliases} are "
                                    f"overlapping constraint/objective '{src}'.")
-
-        if aliases:
-            # now remove alias entries from the response dict because we don't need them in the
-            # relevance calculation. This response dict is used only for relevance and is *not*
-            # used by the driver.
-            responses.update(to_add)
-            responses = {r: meta for r, meta in responses.items() if r not in aliases}
 
         return responses
 
@@ -1298,18 +1016,11 @@ class Group(System):
 
         return sarr, tarr, tsize, has_dist_data
 
-    def _final_setup(self, comm, mode):
+    def _final_setup(self):
         """
         Perform final setup for this system and its descendant systems.
 
         This part of setup is called automatically at the start of run_model or run_driver.
-
-        Parameters
-        ----------
-        comm : MPI.Comm or <FakeComm> or None
-            The global communicator.
-        mode : str
-            Derivative direction, either 'fwd', 'rev', or 'auto'.
         """
         if self._use_derivatives:
             # must call this before vector setup because it determines if we need to alloc commplex
@@ -1317,12 +1028,26 @@ class Group(System):
 
         self._fd_rev_xfer_correction_dist = {}
 
-        self._problem_meta['relevant'] = self._init_relevance(mode)
+        desvars = self.get_design_vars(get_sizes=False)
+        responses = self._check_alias_overlaps(self.get_responses(get_sizes=False))
+
+        self._dataflow_graph = self._get_dataflow_graph()
+
+        # figure out if we can remove any edges based on zero partials we find
+        # in components.  By default all component connected outputs
+        # are also connected to all connected inputs from the same component.
+        self._missing_partials = {}
+        if not self._owns_approx_jac:  # don't check for missing partials when doing FD
+            self._get_missing_partials(self._missing_partials)
+            if self._missing_partials:
+                self._update_dataflow_graph(responses)
+
+        self._problem_meta['relevance'] = get_relevance(self, responses, desvars)
 
         self._setup_vectors(self._get_root_vectors())
 
         # Transfers do not require recursion, but they have to be set up after the vector setup.
-        self._setup_transfers(self._abs_desvars, self._abs_responses)
+        self._setup_transfers()
 
         # Same situation with solvers, partials, and Jacobians.
         # If we're updating, we just need to re-run setup on these, but no recursion necessary.
@@ -1334,6 +1059,43 @@ class Group(System):
         self._setup_recording()
 
         self.set_initial_values()
+
+    def _update_dataflow_graph(self, responses):
+        """
+        Update the dataflow graph based on missing partials.
+
+        Parameters
+        ----------
+        responses : dict
+            Dictionary of response metadata.
+        """
+        resps = set(meta2src_iter(responses.values()))
+
+        missing_responses = set()
+        for pathname, missing in self._missing_partials.items():
+            inputs = [n for n, _ in self._dataflow_graph.in_edges(pathname)]
+            outputs = [n for _, n in self._dataflow_graph.out_edges(pathname)]
+
+            self._dataflow_graph.remove_node(pathname)
+
+            for output in outputs:
+                found = False
+                for inp in inputs:
+                    if (output, inp) not in missing:
+                        self._dataflow_graph.add_edge(inp, output)
+                        found = True
+
+                if not found and output in resps:
+                    missing_responses.add(output)
+
+        if missing_responses:
+            msg = (f"Constraints or objectives [{', '.join(sorted(missing_responses))}] cannot"
+                   " be impacted by the design variables of the problem because no partials "
+                   "were defined for them in their parent component(s).")
+            if self._problem_meta['singular_jac_behavior'] == 'error':
+                raise RuntimeError(msg)
+            else:
+                issue_warning(msg, category=DerivativesWarning)
 
     def set_initial_values(self):
         """
@@ -1385,6 +1147,16 @@ class Group(System):
             self._vector_class = self._local_vector_class
 
         vectypes = ('nonlinear', 'linear') if self._use_derivatives else ('nonlinear',)
+
+        # If any proc's local systems need a complex vector, then all procs need it.
+        if self.comm.size > 1:
+            all_nl_alloc_complex = self.comm.allgather(nl_alloc_complex)
+            if np.any(all_nl_alloc_complex):
+                nl_alloc_complex = True
+
+            all_ln_alloc_complex = self.comm.allgather(ln_alloc_complex)
+            if np.any(all_ln_alloc_complex):
+                ln_alloc_complex = True
 
         for vec_name in vectypes:
             if vec_name == 'nonlinear':
@@ -1459,13 +1231,13 @@ class Group(System):
 
         return prom2abs
 
-    def _top_level_post_connections(self, mode):
+    def _top_level_post_connections(self):
         # this is called on the top level group after all connections are known
         self._problem_meta['vars_to_gather'] = self._vars_to_gather
-        self._problem_meta['prom2abs'] = self._get_all_promotes()
 
         self._resolve_group_input_defaults()
-        self._setup_auto_ivcs(mode)
+        self._setup_auto_ivcs()
+        self._problem_meta['prom2abs'] = self._get_all_promotes()
         self._check_prom_masking()
         self._check_order()
 
@@ -3177,7 +2949,7 @@ class Group(System):
                 xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
 
                 if self._problem_meta['parallel_deriv_color'] is None:
-                    key = (sub, 'nocolor')
+                    key = (sub, '@nocolor')
                     if key in self._transfers['rev']:
                         xfer = self._transfers['rev'][key]
                         xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
@@ -3244,18 +3016,14 @@ class Group(System):
                                 src_val = src_sys._discrete_outputs[src]
                             tgt_sys._discrete_inputs[tgt] = src_val
 
-    def _setup_transfers(self, desvars, responses):
+    def _setup_transfers(self):
         """
         Compute all transfers that are owned by this system.
-
-        Parameters
-        ----------
-        desvars : dict
-            Dictionary of all design variable metadata. Keyed by absolute source name or alias.
-        responses : dict
-            Dictionary of all response variable metadata. Keyed by absolute source name or alias.
         """
-        self._vector_class.TRANSFER._setup_transfers(self, desvars, responses)
+        for subsys in self._subgroups_myproc:
+            subsys._setup_transfers()
+
+        self._vector_class.TRANSFER._setup_transfers(self)
         if self._conn_discrete_in2out:
             self._vector_class.TRANSFER._setup_discrete_transfers(self)
 
@@ -3438,6 +3206,9 @@ class Group(System):
         if not isinstance(subsys, System):
             raise TypeError(f"{self.msginfo}: Subsystem '{name}' should be a System instance, but "
                             f"an instance of type {type(subsys).__name__} was found.")
+
+        if subsys is self:
+            raise RuntimeError(f"{self.msginfo}: System '{name}' can't be added to itself.")
 
         if proc_group is not None and not isinstance(proc_group, str):
             raise TypeError(f"{self.msginfo}: proc_group must be a str or None, but is of type "
@@ -3654,7 +3425,7 @@ class Group(System):
         """
         self._transfer('nonlinear', 'fwd')
         # Apply recursion
-        for subsys in self._solver_subsystem_iter(local_only=True):
+        for subsys in self._relevance.filter(self._subsystems_myproc):
             subsys._apply_nonlinear()
 
         self.iter_count_apply += 1
@@ -3666,7 +3437,8 @@ class Group(System):
         name = self.pathname if self.pathname else 'root'
 
         with Recording(name + '._solve_nonlinear', self.iter_count, self):
-            self._nonlinear_solver._solve_with_cache_check()
+            with self._relevance.active(self._nonlinear_solver.use_relevance()):
+                self._nonlinear_solver._solve_with_cache_check()
 
         # Iteration counter is incremented in the Recording context manager at exit.
 
@@ -3684,27 +3456,27 @@ class Group(System):
                 if sub._is_local and sub._has_guess:
                     sub._guess_nonlinear()
 
-        # call our own guess_nonlinear method, after the recursion is done to
-        # all the lower level systems and the data transfers have happened
-        complex_step = self._inputs._under_complex_step
-
-        if complex_step:
-            self._inputs.set_complex_step_mode(False)
-            self._residuals.set_complex_step_mode(False)
-            self._outputs.set_complex_step_mode(False)
-
-        try:
-            if self._discrete_inputs or self._discrete_outputs:
-                self.guess_nonlinear(self._inputs, self._outputs, self._residuals,
-                                     self._discrete_inputs, self._discrete_outputs)
-            else:
-                self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
-        finally:
+            # call our own guess_nonlinear method, after the recursion is done to
+            # all the lower level systems and the data transfers have happened
+            complex_step = self._inputs._under_complex_step
 
             if complex_step:
-                self._inputs.set_complex_step_mode(True)
-                self._residuals.set_complex_step_mode(True)
-                self._outputs.set_complex_step_mode(True)
+                self._inputs.set_complex_step_mode(False)
+                self._residuals.set_complex_step_mode(False)
+                self._outputs.set_complex_step_mode(False)
+
+            try:
+                if self._discrete_inputs or self._discrete_outputs:
+                    self.guess_nonlinear(self._inputs, self._outputs, self._residuals,
+                                         self._discrete_inputs, self._discrete_outputs)
+                else:
+                    self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
+            finally:
+
+                if complex_step:
+                    self._inputs.set_complex_step_mode(True)
+                    self._residuals.set_complex_step_mode(True)
+                    self._outputs.set_complex_step_mode(True)
 
     def guess_nonlinear(self, inputs, outputs, residuals,
                         discrete_inputs=None, discrete_outputs=None):
@@ -3746,7 +3518,7 @@ class Group(System):
         return (self._owns_approx_jac and self._jacobian is not None) or \
             self._assembled_jac is not None or not self._linear_solver.does_recursive_applies()
 
-    def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, jac, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -3754,8 +3526,6 @@ class Group(System):
         ----------
         jac : Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        rel_systems : set of str
-            Set of names of relevant systems based on the current linear solve.
         mode : str
             'fwd' or 'rev'.
         scope_out : set or None
@@ -3816,25 +3586,20 @@ class Group(System):
         else:
             if mode == 'fwd':
                 self._transfer('linear', mode)
-                if rel_systems is not None and rel_systems is not _contains_all:
-                    for s in self._solver_subsystem_iter(local_only=True):
-                        if s.pathname not in rel_systems:
-                            # zero out dvecs of irrelevant subsystems
-                            s._dresiduals.set_val(0.0)
+                for s in self._relevance.filter(self._subsystems_myproc, relevant=False):
+                    # zero out dvecs of irrelevant subsystems
+                    s._dresiduals.set_val(0.0)
 
-            for subsys in self._solver_subsystem_iter(local_only=True):
-                if rel_systems is None or subsys.pathname in rel_systems:
-                    subsys._apply_linear(jac, rel_systems, mode, scope_out, scope_in)
+            for s in self._relevance.filter(self._subsystems_myproc, relevant=True):
+                s._apply_linear(jac, mode, scope_out, scope_in)
 
             if mode == 'rev':
                 self._transfer('linear', mode)
-                if rel_systems is not None and rel_systems is not _contains_all:
-                    for s in self._solver_subsystem_iter(local_only=True):
-                        if s.pathname not in rel_systems:
-                            # zero out dvecs of irrelevant subsystems
-                            s._doutputs.set_val(0.0)
+                for s in self._relevance.filter(self._subsystems_myproc, relevant=False):
+                    # zero out dvecs of irrelevant subsystems
+                    s._doutputs.set_val(0.0)
 
-    def _solve_linear(self, mode, rel_systems, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
+    def _solve_linear(self, mode, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
@@ -3842,8 +3607,6 @@ class Group(System):
         ----------
         mode : str
             'fwd' or 'rev'.
-        rel_systems : set of str
-            Set of names of relevant systems based on the current linear solve.
         scope_out : set, None, or _UNDEFINED
             Outputs relevant to possible lower level calls to _apply_linear on Components.
         scope_in : set, None, or _UNDEFINED
@@ -3876,9 +3639,10 @@ class Group(System):
                 d_residuals *= -1.0
         else:
             self._linear_solver._set_matvec_scope(scope_out, scope_in)
-            self._linear_solver.solve(mode, rel_systems)
+            with self._relevance.active(self._linear_solver.use_relevance()):
+                self._linear_solver.solve(mode, None)
 
-    def _linearize(self, jac, sub_do_ln=True, rel_systems=_contains_all):
+    def _linearize(self, jac, sub_do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
@@ -3888,11 +3652,10 @@ class Group(System):
             If None, use local jacobian, else use assembled jacobian jac.
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
-        rel_systems : set or ContainsAll
-            Set of relevant system pathnames passed in to the model during computation of total
-            derivatives.
         """
-        if self._jacobian is None:
+        if self._tot_jac is not None and self._owns_approx_jac:
+            self._jacobian = self._tot_jac.J_dict
+        elif self._jacobian is None:
             self._jacobian = DictionaryJacobian(self)
 
         self._check_first_linearize()
@@ -3915,24 +3678,24 @@ class Group(System):
             if self._assembled_jac is not None:
                 jac = self._assembled_jac
 
-            # Only linearize subsystems if we aren't approximating the derivs at this level.
-            for subsys in self._solver_subsystem_iter(local_only=True):
-                if subsys.pathname in rel_systems:
+            relevance = self._relevance
+            with relevance.active(self._linear_solver.use_relevance()):
+                subs = list(relevance.filter(self._subsystems_myproc))
+
+                # Only linearize subsystems if we aren't approximating the derivs at this level.
+                for subsys in subs:
                     do_ln = sub_do_ln and (subsys._linear_solver is not None and
                                            subsys._linear_solver._linearize_children())
-                    if len(subsys._subsystems_allprocs) > 0:
-                        subsys._linearize(jac, sub_do_ln=do_ln, rel_systems=rel_systems)
-                    else:
-                        subsys._linearize(jac, sub_do_ln=do_ln)
+                    subsys._linearize(jac, sub_do_ln=do_ln)
 
-            # Update jacobian
-            if self._assembled_jac is not None:
-                self._assembled_jac._update(self)
+                # Update jacobian
+                if self._assembled_jac is not None:
+                    self._assembled_jac._update(self)
 
-            if sub_do_ln:
-                for subsys in self._solver_subsystem_iter(local_only=True):
-                    if subsys._linear_solver is not None and subsys.pathname in rel_systems:
-                        subsys._linear_solver._linearize()
+                if sub_do_ln:
+                    for subsys in subs:
+                        if subsys._linear_solver is not None:
+                            subsys._linear_solver._linearize()
 
     def _check_first_linearize(self):
         if self._first_call_to_linearize:
@@ -3940,14 +3703,13 @@ class Group(System):
             coloring = self._get_coloring() if coloring_mod._use_partial_sparsity else None
 
             if coloring is not None:
-                if not self._coloring_info['dynamic']:
-                    coloring._check_config_partial(self)
                 self._setup_approx_coloring()
+
             # TODO: for top level FD, call below is unnecessary, but we need this
             # for some tests that just call run_linearize directly without calling
             # compute_totals.
             elif self._approx_schemes:
-                self._setup_approx_partials()
+                self._setup_approx_derivs()
 
     def approx_totals(self, method='fd', step=None, form=None, step_calc=None):
         """
@@ -4017,87 +3779,87 @@ class Group(System):
 
         Yields
         ------
-        (key, meta) : (key, dict)
-            key: a tuple of the form (of, wrt)
-            meta: a dict containing the partial metadata
+        key : tuple (of, wrt)
+            Subjacobian key.
         """
         for subsys in self._subsystems_myproc:
             yield from subsys._declared_partials_iter()
 
     def _get_missing_partials(self, missing):
         """
-        Return a list of (of, wrt) tuples for which derivatives have not been declared.
+        Provide (of, wrt) tuples for which derivatives have not been declared in the system.
 
         Parameters
         ----------
         missing : dict
             Dictionary containing list of missing derivatives keyed by system pathname.
         """
+        if self._has_approx:
+            return
         for subsys in self._subsystems_myproc:
             subsys._get_missing_partials(missing)
 
     def _approx_subjac_keys_iter(self):
-        if self._owns_approx_wrt and not self.pathname:
-            candidate_wrt = self._owns_approx_wrt
+        # yields absolute keys (no aliases)
+        totals = self.pathname == ''
+
+        wrt = set()
+        ivc = set()
+        pro2abs = self._var_allprocs_prom2abs_list
+
+        if totals:
+            # When computing totals, weed out inputs connected to anything inside our system unless
+            # the source is an indepvarcomp.
+            all_abs2meta_out = self._var_allprocs_abs2meta['output']
+            if self._owns_approx_wrt:
+                for meta in self._owns_approx_wrt.values():
+                    src = meta['source']
+                    if 'openmdao:indep_var' in all_abs2meta_out[src]['tags']:
+                        wrt.add(src)
+            else:
+                for abs_inps in pro2abs['input'].values():
+                    for inp in abs_inps:
+                        src = self._conn_global_abs_in2out[inp]
+                        if 'openmdao:indep_var' in all_abs2meta_out[src]['tags']:
+                            wrt.add(src)
+                            ivc.add(src)
+                        break
+
         else:
-            pro2abs = self._var_allprocs_prom2abs_list
-            candidate_wrt = []
             for abs_inps in pro2abs['input'].values():
                 for inp in abs_inps:
-                    candidate_wrt.append(inp)
                     # If connection is inside of this Group, perturbation of all implicitly
                     # connected inputs will be handled properly via internal transfers. Otherwise,
                     # we need to add all implicitly connected inputs separately.
                     if inp in self._conn_abs_in2out:
                         break
+                    wrt.add(inp)
 
-        wrt = set()
-        ivc = set()
-        if self.pathname:  # get rid of any old stuff in here
+            # get rid of any old stuff in here
             self._owns_approx_of = self._owns_approx_wrt = None
-            totals = False
-        else:
-            totals = True
 
-        all_abs2meta_out = self._var_allprocs_abs2meta['output']
-
-        # When computing totals, weed out inputs connected to anything inside our system unless
-        # the source is an indepvarcomp.
-        prefix = self.pathname + '.' if self.pathname else ''
-        for var in candidate_wrt:
-            if var in self._conn_abs_in2out:
-                if totals:
-                    src = self._conn_abs_in2out[var]
-                    if src.startswith(prefix):
-                        meta = all_abs2meta_out[src]
-                        if 'openmdao:indep_var' in meta['tags']:
-                            wrt.add(src)
-                            ivc.add(src)
-            else:
-                wrt.add(var)
-
-        if self._owns_approx_of:
-            of = set(self._owns_approx_of)
+        if self._owns_approx_of:  # can only be total at this point
+            of = set(m['source'] for m in self._owns_approx_of.values())
         else:
             of = set(self._var_allprocs_abs2meta['output'])
             # Skip indepvarcomp res wrt other srcs
             of -= ivc
 
-        for key in product(of, wrt.union(of)):
-            # Create approximations for the ones we need.
-            if self._tot_jac is not None:
-                yield key  # get all combos if we're doing total derivs
-                continue
+        if totals:
+            yield from product(of, wrt.union(of))
+        else:
+            for key in product(of, wrt.union(of)):
+                # Create approximations for the ones we need.
 
-            _of, _wrt = key
-            # Skip explicit res wrt outputs
-            if _wrt in of and _wrt not in ivc:
+                _of, _wrt = key
+                # Skip explicit res wrt outputs
+                if _wrt in of and _wrt not in ivc:
 
-                # Support for specifying a desvar as an obj/con.
-                if _wrt not in wrt or _of == _wrt:
-                    continue
+                    # Support for specifying a desvar as an obj/con.
+                    if _wrt not in wrt or _of == _wrt:
+                        continue
 
-            yield key
+                yield key
 
     def _jac_of_iter(self):
         """
@@ -4110,7 +3872,7 @@ class Group(System):
         Yields
         ------
         str
-            Name of 'of' variable.
+            Absolute name of 'of' variable source.
         int
             Starting index.
         int
@@ -4126,34 +3888,32 @@ class Group(System):
             abs2meta = self._var_allprocs_abs2meta['output']
             abs2idx = self._var_allprocs_abs2idx
             sizes = self._var_sizes['output']
-            approx_of_idx = self._owns_approx_of_idx
-            responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
 
             szname = 'global_size' if total else 'size'
             # we're computing totals/semi-totals (vars may not be local)
             start = end = 0
-            for of in self._owns_approx_of:
-
-                # Support for constraint aliases.
-                if of in responses and responses[of]['alias'] is not None:
-                    path = responses[of]['source']
+            for name, ofmeta in self._owns_approx_of.items():
+                if total:
+                    src = ofmeta['source']
                 else:
-                    path = of
+                    src = name
 
-                if not total and path not in self._var_abs2meta['output']:
+                if not total and src not in self._var_abs2meta['output']:
                     continue
 
-                meta = abs2meta[path]
+                meta = abs2meta[src]
                 if meta['distributed']:
-                    dist_sizes = sizes[:, abs2idx[path]]
+                    dist_sizes = sizes[:, abs2idx[src]]
                 else:
                     dist_sizes = None
-                if of in approx_of_idx:
-                    end += approx_of_idx[of].indexed_src_size
-                    yield path, start, end, approx_of_idx[of].shaped_array().ravel(), dist_sizes
+
+                indices = ofmeta['indices']
+                if indices is not None:  # of in approx_of_idx:
+                    end += indices.indexed_src_size
+                    yield src, start, end, indices.shaped_array().ravel(), dist_sizes
                 else:
-                    end += abs2meta[path][szname]
-                    yield path, start, end, _full_slice, dist_sizes
+                    end += abs2meta[src][szname]
+                    yield src, start, end, _full_slice, dist_sizes
 
                 start = end
         else:
@@ -4191,7 +3951,6 @@ class Group(System):
             sizes = self._var_sizes
             toidx = self._var_allprocs_abs2idx
             abs2meta = self._var_allprocs_abs2meta
-            approx_wrt_idx = self._owns_approx_wrt_idx
             local_ins = self._var_abs2meta['input']
             local_outs = self._var_abs2meta['output']
 
@@ -4208,25 +3967,33 @@ class Group(System):
                         yield of, start, end, vec, _full_slice, dist_sizes
                         start = end
 
-            for wrt in self._owns_approx_wrt:
-                if (wrt_matches is None or wrt in wrt_matches) and wrt not in seen:
-                    io = 'input' if wrt in abs2meta['input'] else 'output'
-                    meta = abs2meta[io][wrt]
+            for wrt, wrtmeta in self._owns_approx_wrt.items():
+                if total:
+                    wrt = wrtmeta['source']
+                    if wrtmeta['remote']:
+                        vec = None
+                    else:
+                        vec = self._outputs
+                else:
                     if wrt in local_ins:
                         vec = self._inputs
                     elif wrt in local_outs:
                         vec = self._outputs
                     else:
                         vec = None  # remote wrt
-                    if wrt in approx_wrt_idx:
-                        sub_wrt_idx = approx_wrt_idx[wrt]
-                        size = sub_wrt_idx.indexed_src_size
-                        sub_wrt_idx = sub_wrt_idx.flat()
+
+                if (wrt_matches is None or wrt in wrt_matches) and wrt not in seen:
+                    io = 'input' if wrt in abs2meta['input'] else 'output'
+                    meta = abs2meta[io][wrt]
+                    if total and wrtmeta['indices'] is not None:
+                        sub_wrt_idx = wrtmeta['indices'].as_array()
+                        size = sub_wrt_idx.size
+                        sub_wrt_idx = sub_wrt_idx
                     else:
                         sub_wrt_idx = _full_slice
                         size = abs2meta[io][wrt][szname]
                     if vec is None:
-                        sub_wrt_idx = repeat(None, size)
+                        sub_wrt_idx = ValueRepeater(None, size)
                     end += size
                     dist_sizes = sizes[io][:, toidx[wrt]] if meta['distributed'] else None
                     yield wrt, start, end, vec, sub_wrt_idx, dist_sizes
@@ -4234,63 +4001,35 @@ class Group(System):
         else:
             yield from super()._jac_wrt_iter(wrt_matches)
 
-    def _update_wrt_matches(self, info):
-        """
-        Determine the list of wrt variables that match the wildcard(s) given in declare_coloring.
-
-        Parameters
-        ----------
-        info : dict
-            Coloring metadata dict.
-        """
+    def _promoted_wrt_iter(self):
         if not (self._owns_approx_of or self.pathname):
             return
 
-        wrt_color_patterns = info['wrt_patterns']
-
-        info['wrt_matches'] = wrt_colors_matched = set()
-
         abs2prom = self._var_allprocs_abs2prom
+        seen = set()
         for _, wrt in self._get_approx_subjac_keys():
-            if wrt in wrt_colors_matched:
-                continue
-            if wrt in abs2prom['output']:
-                wrtprom = abs2prom['output'][wrt]
-            else:
-                wrtprom = abs2prom['input'][wrt]
+            if wrt not in seen:
+                seen.add(wrt)
 
-            if wrt_color_patterns is None:
-                wrt_colors_matched.add(wrt)
-            else:
-                for patt in wrt_color_patterns:
-                    if patt == '*' or fnmatchcase(wrtprom, patt):
-                        wrt_colors_matched.add(wrt)
-                        break
+                if wrt in abs2prom['output']:
+                    yield abs2prom['output'][wrt]
+                else:
+                    yield abs2prom['input'][wrt]
 
-        baselen = len(self.pathname) + 1 if self.pathname else 0
-        info['wrt_matches_rel'] = [n[baselen:] for n in wrt_colors_matched]
-
-        if info.get('dynamic') and info['coloring'] is None and self._owns_approx_of:
-            if not wrt_colors_matched:
-                raise ValueError("{}: Invalid 'wrt' variable(s) specified for colored approx "
-                                 "partial options: {}.".format(self.msginfo, wrt_color_patterns))
-
-    def _setup_approx_partials(self):
+    def _setup_approx_derivs(self):
         """
         Add approximations for all approx derivs.
         """
-        self._jacobian = DictionaryJacobian(system=self)
+        if self._jacobian is None:
+            self._jacobian = DictionaryJacobian(system=self)
 
         abs2meta = self._var_allprocs_abs2meta
-        info = self._coloring_info
         total = self.pathname == ''
         nprocs = self.comm.size
 
-        responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
-
-        if info['coloring'] is not None and (self._owns_approx_of is None or
-                                             self._owns_approx_wrt is None):
-            method = info['method']
+        if self._coloring_info.coloring is not None and (self._owns_approx_of is None or
+                                                         self._owns_approx_wrt is None):
+            method = self._coloring_info.method
         else:
             method = list(self._approx_schemes)[0]
 
@@ -4309,24 +4048,17 @@ class Group(System):
         approx_keys = self._get_approx_subjac_keys()
         for key in approx_keys:
             left, right = key
-            if total:
-                if left in responses and responses[left]['alias'] is not None:
-                    left = responses[left]['source']
-                if right in responses and responses[right]['alias'] is not None:
-                    right = responses[right]['source']
-            elif nprocs > 1 and self._has_fd_group:
+            if not total and nprocs > 1 and self._has_fd_group:
                 sout = sizes_out[:, abs2idx[left]]
                 sin = sizes_in[:, abs2idx[right]]
                 if np.count_nonzero(sout[sin == 0]) > 0 and np.count_nonzero(sin[sout == 0]) > 0:
                     # we have of and wrt that exist on different procs. Now see if they're relevant
                     # to each other
-                    for rel in self._relevant.values():
-                        relins = rel['@all'][0]['input']
-                        relouts = rel['@all'][0]['output']
-                        if left in relouts:
-                            if right in relins or right in relouts:
-                                self._cross_keys.add(key)
-                                break
+                    for _, _, rel in self._relevance.iter_seed_pair_relevance(inputs=True,
+                                                                              outputs=True):
+                        if left in rel and right in rel:
+                            self._cross_keys.add(key)
+                            break
 
             if key in self._subjacs_info:
                 meta = self._subjacs_info[key]
@@ -4349,7 +4081,7 @@ class Group(System):
                 self._update_approx_coloring_meta(meta)
 
             if meta['val'] is None:
-                if right in abs2meta['input']:
+                if not total and right in abs2meta['input']:
                     sz = abs2meta['input'][right]['size']
                 else:
                     sz = abs2meta['output'][right]['size']
@@ -4363,32 +4095,48 @@ class Group(System):
             approx.add_approximation(key, self, meta)
 
         if not total:
-            abs_outs = self._var_allprocs_abs2meta['output']
-            abs_ins = self._var_allprocs_abs2meta['input']
             # we're taking semi-total derivs for this group. Update _owns_approx_of
             # and _owns_approx_wrt so we can use the same approx code for totals and
             # semi-totals.  Also, the order must match order of vars in the output and
             # input vectors.
+            abs_outs = self._var_allprocs_abs2meta['output']
+            abs_ins = self._var_allprocs_abs2meta['input']
+            abs2prom_out = self._var_allprocs_abs2prom['output']
+            abs2prom_in = self._var_allprocs_abs2prom['input']
+
+            self._owns_approx_of = {}
+            for n, m in abs_outs.items():
+                self._owns_approx_of[n] = dct = m.copy()
+                dct['name'] = abs2prom_out[n]
+                dct['source'] = n
+                dct['indices'] = None
+
             wrtset = set([k[1] for k in approx_keys])
-            self._owns_approx_of = list(abs_outs)
-            self._owns_approx_wrt = [n for n in chain(abs_outs, abs_ins) if n in wrtset]
+            self._owns_approx_wrt = {}
+            for n, m in abs_ins.items():
+                if n in wrtset:
+                    self._owns_approx_wrt[n] = dct = m.copy()
+                    dct['name'] = abs2prom_in[n]
+                    dct['source'] = n
+                    dct['indices'] = None
+
             self._owns_approx_jac = True
 
     def _setup_approx_coloring(self):
         """
         Ensure that if coloring is declared, approximations will be set up.
         """
-        if self._coloring_info['coloring'] is not None:
-            meta = self._coloring_info
-            self.approx_totals(meta['method'], meta.get('step'), meta.get('form'))
-        self._setup_approx_partials()
+        if self._coloring_info.coloring is not None:
+            self.approx_totals(self._coloring_info.method,
+                               self._coloring_info.get('step'),
+                               self._coloring_info.get('form'))
+        self._setup_approx_derivs()
 
     def _setup_check(self):
         """
         Do any error checking on user's setup, before any other recursion happens.
         """
-        info = self._coloring_info
-        if (info['static'] or info['dynamic']) and self.pathname != '':
+        if (self._coloring_info.static or self._coloring_info.dynamic) and self.pathname != '':
             msg = f"{self.msginfo}: semi-total coloring is currently not supported."
             raise RuntimeError(msg)
 
@@ -4433,9 +4181,10 @@ class Group(System):
         graph = nx.DiGraph()
 
         if comps_only:
-            # add all systems as nodes in the graph so they'll be there even if
-            # unconnected.
-            graph.add_nodes_from(self._ordered_comp_name_iter())
+            # add all compoenents as nodes in the graph so they'll be there even if unconnected.
+            comps = set(v.rpartition('.')[0] for v in chain(self._var_allprocs_abs2prom['output'],
+                                                            self._var_allprocs_abs2prom['input']))
+            graph.add_nodes_from(comps)
 
             edge_data = defaultdict(lambda: defaultdict(list))
             for in_abs, src_abs in self._conn_global_abs_in2out.items():
@@ -4452,25 +4201,19 @@ class Group(System):
                 for (src_sys, tgt_sys), data in edge_data.items():
                     graph.add_edge(src_sys, tgt_sys, conns=data)
         else:
-            systems = [s.name for s in self._subsystems_myproc]
-
-            if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
-                newsys = set()
-                for slist in self.comm.allgather(systems):
-                    newsys.update(slist)
-                systems = newsys
-
-            # add all systems as nodes in the graph so they'll be there even if
-            # unconnected.
-            graph.add_nodes_from(systems)
-
             glen = self.pathname.count('.') + 1 if self.pathname else 0
+            var2sys = {v: v.split('.', glen + 1)[glen]
+                       for v in chain(self._var_allprocs_abs2prom['output'],
+                                      self._var_allprocs_abs2prom['input'])}
+
+            # add all systems as nodes in the graph so they'll be there even if unconnected.
+            graph.add_nodes_from(var2sys.values())
+
             for in_abs, src_abs in self._conn_global_abs_in2out.items():
-                if src_abs is not None:
-                    src_sys = src_abs.split('.')[glen]
-                    tgt_sys = in_abs.split('.')[glen]
-                    if src_sys != tgt_sys:
-                        graph.add_edge(src_sys, tgt_sys)
+                src_sys = var2sys[src_abs]
+                tgt_sys = var2sys[in_abs]
+                if src_sys != tgt_sys:
+                    graph.add_edge(src_sys, tgt_sys)
 
         return graph
 
@@ -4636,7 +4379,7 @@ class Group(System):
 
         return info
 
-    def _setup_auto_ivcs(self, mode):
+    def _setup_auto_ivcs(self):
         # only happens at top level
         from openmdao.core.indepvarcomp import _AutoIndepVarComp
 
@@ -4774,7 +4517,7 @@ class Group(System):
         if not prom2auto:
             return auto_ivc
 
-        auto_ivc._setup_procs(auto_ivc.pathname, self.comm, mode, self._problem_meta)
+        auto_ivc._setup_procs(auto_ivc.pathname, self.comm, self._problem_meta)
         auto_ivc._configure()
         auto_ivc._configure_check()
         auto_ivc._setup_var_data()
@@ -4972,243 +4715,40 @@ class Group(System):
         else:
             yield from self._subsystems_allprocs
 
-    def _solver_subsystem_iter(self, local_only=False):
+    def _all_subsystem_iter(self):
         """
-        Iterate over subsystems that are being optimized.
-
-        If called on the top level Group when the Group is under an optimizer, this will
-        iterate over only the subsystems required to obtain the desired objectives and constraints.
-
-        Parameters
-        ----------
-        local_only : bool
-            If True, only iterate over local subsystems.
+        Iterate over all subsystems, local and nonlocal.
 
         Yields
         ------
         System
             A subsystem.
         """
-        opt_status = self._problem_meta['opt_status']
+        for s, _ in self._subsystems_allprocs.values():
+            yield s
 
-        if opt_status is None:
-            # we're not under an optimizer loop, so return all subsystems
-            if local_only:
-                yield from self._subsystems_myproc
-            else:
-                for s, _ in self._subsystems_allprocs.values():
-                    yield s
-        else:
-            for s, _ in self._subsystems_allprocs.values():
-                if not local_only or s._is_local:
-                    if s._run_on_opt[opt_status]:
-                        yield s
-
-    def _setup_iteration_lists(self):
+    def _get_relevance_modifiers(self, grad_groups, always_opt_comps):
         """
-        Set up the iteration lists containing the pre, iterated, and post subsets of systems.
+        Collect information from the model that will modify the relevance graph of the model.
 
-        This should only be called on the top level Group.
+        Parameters
+        ----------
+        grad_groups : set
+            Set of groups having nonlinear solvers that use gradients.
+        always_opt_comps : set
+            Set of components that are to be included in every iteration of the optimization,
+            even if they aren't relevant in terms of data flow.
         """
-        assert self.pathname == '', "call setup_iteration_lists on the top level Group only!"
-
-        # Find any groups that have a nl solver that computes gradients, because we can't
-        # split up the systems in those groups without inserting zeros into the jacobian.
-        # Also find any components that have the 'always_opt' option set to True and force them
-        # to be part of the optimization iteration.
         if self.nonlinear_solver is not None and self.nonlinear_solver.supports['gradients']:
-            issue_warning("The top level group has a nonlinear solver that computes gradients, so "
-                          "the entire model will be included in the optimization iteration.")
-            return
+            grad_groups.add(self.pathname)
+        elif self.linear_solver is not None and isinstance(self.linear_solver, DirectSolver):
+            grad_groups.add(self.pathname)
 
-        # keep track of Groups with nonlinear solvers that use gradients (like Newton). These groups
-        # and all systems they contain must be grouped together into the same iteration list.
-        grad_groups = []
-        always_opt = set()
-        for s in self.system_iter(recurse=True, include_self=True):
+        for s in self._subsystems_myproc:
             if isinstance(s, Group):
-                if s.nonlinear_solver is not None and s.nonlinear_solver.supports['gradients']:
-                    grad_groups.append(s.pathname)
+                s._get_relevance_modifiers(grad_groups, always_opt_comps)
             elif s.options['always_opt']:
-                always_opt.add(s.pathname)
-
-        designvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
-        responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
-
-        if not designvars or not responses:
-            return
-
-        graph = self.get_hybrid_graph()
-
-        # now add design vars and responses to the graph
-        for dv in meta2src_iter(designvars.values()):
-            if dv not in graph:
-                graph.add_node(dv, type_='out')
-                graph.add_edge(dv.rpartition('.')[0], dv)
-
-        resps = set(meta2src_iter(responses.values()))
-        for res in resps:
-            if res not in graph:
-                graph.add_node(res, type_='out')
-                graph.add_edge(res.rpartition('.')[0], res)
-
-        dvs = [meta['source'] for meta in designvars.values()]
-        dv0 = dvs[0]
-        dvs = set(dvs)
-        responses = [meta['source'] for meta in responses.values()]
-        response0 = responses[0]
-        responses = set(responses)  # get rid of dups due to aliases
-
-        # we don't want _auto_ivc dependency to force all subsystems to be iterated, so split
-        # the _auto_ivc node into two nodes, one for design vars and one for everything else.
-        if '_auto_ivc' in graph:
-            graph.add_node('_auto_ivc_other')
-            # we're modifying the graph, so have to save existing auto_ivc edges before iterating
-            edges = list(graph.edges('_auto_ivc'))
-            for _, autoivc_var in edges:
-                if autoivc_var not in dvs:
-                    new_autoivc_var = autoivc_var.replace('_auto_ivc', '_auto_ivc_other')
-                    graph.add_node(new_autoivc_var, type_='out')
-                    graph.add_edge('_auto_ivc_other', new_autoivc_var)
-                    for _, inp in graph.edges(autoivc_var):
-                        graph.add_edge(new_autoivc_var, inp)
-                    graph.remove_node(autoivc_var)
-
-        # add 'reverse' connections from inputs and outputs to their component if it exists in order
-        # to keep component and its vars in the same SCC. Also, for any 'always_opt' components,
-        # loop them into a response to force them to be in the opt SCC.
-        edges_to_add = []
-        for src, tgt in graph.edges():
-            varsrc = 'type_' in graph.nodes[src]
-            vartgt = 'type_' in graph.nodes[tgt]
-            if varsrc and not vartgt:  # tgt is a system
-                edges_to_add.append((tgt, src))  # connect from system back to var
-            elif vartgt and not varsrc:  # src is a system
-                edges_to_add.append((tgt, src))  # connect from var back to system
-
-        graph.add_edges_from(edges_to_add)
-
-        # One way to determine the contents of the pre/opt/post sets is to add edges from the
-        # response variables to the design variables (there are already edges,
-        # directly or indirectly, from the design variables to the response variables)
-        # and then find the strongly connected components of the resulting graph.  get_sccs_topo
-        # returns the strongly connected components in topological order, so we can use it to give
-        # us pre, iterated, and post subsets of the systems.
-
-        # add edges between response vars and design vars to form a strongly
-        # connected component for all systems involved in the optimization iteration.
-        for res in responses:
-            for dv in dvs:
-                graph.add_edge(res, dv)
-
-        # loop 'always_opt' components into a response to force them to be in the opt SCC.
-        for opt_sys in always_opt:
-            graph.add_edge(opt_sys, response0)
-            graph.add_edge(response0, opt_sys)
-
-        if self.comm.size > 1:
-            grad_groups = self.comm.allgather(grad_groups)
-            grad_groups = {g for grp in grad_groups for g in grp}
-
-        if grad_groups:
-            remaining = set(grad_groups)
-            for name in sorted(grad_groups, key=lambda x: x.count('.')):
-                prefix = name + '.'
-                match = {n for n in remaining if n.startswith(prefix)}
-                remaining -= match
-
-            gradlist = '\n'.join(sorted(remaining))
-            issue_warning("The following groups have a nonlinear solver that computes gradients "
-                          f"and will be treated as atomic for the purposes of determining "
-                          f"which systems are included in the optimization iteration: "
-                          f"\n{gradlist}\n")
-
-            # remaining groups are not contained within a higher level nl solver
-            # using gradient group, so make new connections to/from them to
-            # all systems that they contain.  This will force them to be
-            # treated as 'atomic' within the graph, so that if they contain
-            # any dv or response systems, or if their children are connected to
-            # both dv *and* response systems, then all systems within them will
-            # be included in the 'opt' set.
-            toadd = []
-            for grp in remaining:
-                prefix = grp + '.'
-                for node in graph:
-                    if node.startswith(prefix):
-                        toadd.append((grp, node))
-                        toadd.append((node, grp))
-
-            graph.add_edges_from(toadd)
-
-        # this gives us the strongly connected components in topological order
-        sccs = get_sccs_topo(graph)
-
-        pre = addto = set()
-        post = set()
-        iterated = set()
-        for strong_con in sccs:
-            # because the sccs are in topological order and all design vars and
-            # responses are in the iteration set, we know that until we
-            # see a design var (or response), we're in the pre-opt set.  Once we
-            # see a design var (or response), we're in the iterated set.  Once
-            # we see an scc without a design var (or response), we're in the
-            # post-opt set.
-            if dv0 in strong_con:
-                for s in strong_con:
-                    if 'type_' in graph.nodes[s]:
-                        s = s.rpartition('.')[0]
-                    if s not in iterated:
-                        iterated.update(all_ancestors(s))
-                addto = post
-            else:
-                for s in strong_con:
-                    if 'type_' in graph.nodes[s]:
-                        s = s.rpartition('.')[0]
-                    if s not in addto:
-                        addto.update(all_ancestors(s))
-
-        # change _auto_ivc_other back to _auto_ivc.
-        for iterset in (pre, iterated, post):
-            if '_auto_ivc_other' in iterset:
-                iterset.discard('_auto_ivc_other')
-                if iterset:
-                    iterset.add('_auto_ivc')
-
-        # remove _auto_ivc from pre and post if it's in iterated
-        if '_auto_ivc' in iterated:
-            pre.discard('_auto_ivc')
-            post.discard('_auto_ivc')
-        elif '_auto_ivc' in pre:
-            post.discard('_auto_ivc')
-
-        if pre:
-            self._run_on_opt[_OptStatus.PRE] = True
-        if post:
-            self._run_on_opt[_OptStatus.POST] = True
-
-        groups = set()
-        for s in self.system_iter(recurse=True):
-            isgroup = isinstance(s, Group)
-            if isgroup:
-                groups.add(s.pathname)
-            if s.pathname in iterated:
-                s._run_on_opt[_OptStatus.OPTIMIZING] = True
-            else:
-                # set OPTIMIZING to False because its default value is True
-                s._run_on_opt[_OptStatus.OPTIMIZING] = False
-
-            # groups can be in multiple iteration lists, but components can
-            # only be in one (with _auto_ivc being the exception), so we have to
-            # check for that here.
-            if s.pathname in pre and (isgroup or s.pathname not in iterated or
-                                      s.pathname == '_auto_ivc'):
-                s._run_on_opt[_OptStatus.PRE] = True
-            if s.pathname in post and (isgroup or s.pathname not in iterated or
-                                       s.pathname == '_auto_ivc'):
-                s._run_on_opt[_OptStatus.POST] = True
-
-        self._pre_components = sorted(pre - groups)
-        self._post_components = sorted(post - groups)
+                always_opt_comps.add(s.pathname)
 
     @property
     def model_options(self):
@@ -5227,7 +4767,7 @@ class Group(System):
 
     def _gather_full_data(self):
         """
-        Return True if this system should contribute full data to an allgather.
+        Return True if this system should contribute full data to a collective MPI call.
 
         This prevents sending a lot of unnecessary data across the network when
         the data is duplicated across multiple processes.
@@ -5281,3 +4821,370 @@ class Group(System):
                 of_dict[self._get_prom_name(wrt)] = jac[of][wrt]
 
         return new_jac
+
+    def get_design_vars(self, recurse=True, get_sizes=True, use_prom_ivc=True):
+        """
+        Get the DesignVariable settings from this system.
+
+        Retrieve all design variable settings from the system and, if recurse
+        is True, all of its subsystems.
+
+        Parameters
+        ----------
+        recurse : bool
+            If True, recurse through the subsystems and return the path of
+            all design vars relative to the this Group.
+        get_sizes : bool, optional
+            If True, compute the size of each design variable.
+        use_prom_ivc : bool
+            Use promoted names for inputs, else convert to absolute source names.
+
+        Returns
+        -------
+        dict
+            The design variables defined in the current system and, if
+            recurse=True, its subsystems.
+        """
+        out = super().get_design_vars(recurse=recurse, get_sizes=get_sizes,
+                                      use_prom_ivc=use_prom_ivc)
+        if recurse:
+            abs2prom_in = self._var_allprocs_abs2prom['input']
+            abs2prom_out = self._var_allprocs_abs2prom['output']
+            if (self.comm.size > 1 and self._mpi_proc_allocator.parallel):
+
+                # For parallel groups, we need to make sure that the design variable dictionary is
+                # assembled in the same order under mpi as for serial runs.
+                out_by_sys = {}
+
+                for subsys in self._sorted_sys_iter():
+                    sub_out = {}
+                    name = subsys.name
+                    dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
+                                                 use_prom_ivc=use_prom_ivc)
+                    if use_prom_ivc:
+                        # have to promote subsystem prom name to this level
+                        sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
+                        sub_pro2abs_out = subsys._var_allprocs_prom2abs_list['output']
+                        for dv, meta in dvs.items():
+                            if dv in sub_pro2abs_in:
+                                abs_dv = sub_pro2abs_in[dv][0]
+                                sub_out[abs2prom_in[abs_dv]] = meta
+                            elif dv in sub_pro2abs_out:
+                                abs_dv = sub_pro2abs_out[dv][0]
+                                sub_out[abs2prom_out[abs_dv]] = meta
+                            else:
+                                sub_out[dv] = meta
+                    else:
+                        sub_out.update(dvs)
+
+                    out_by_sys[name] = sub_out
+
+                out_by_sys_by_rank = self.comm.allgather(out_by_sys)
+                all_outs_by_sys = {}
+                for outs in out_by_sys_by_rank:
+                    for name, meta in outs.items():
+                        all_outs_by_sys[name] = meta
+
+                for subsys_name in self._sorted_sys_iter_all_procs():
+                    for name, meta in all_outs_by_sys[subsys_name].items():
+                        if name not in out:
+                            out[name] = meta
+
+            else:
+
+                for subsys in self._sorted_sys_iter():
+                    dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
+                                                 use_prom_ivc=use_prom_ivc)
+                    if use_prom_ivc:
+                        # have to promote subsystem prom name to this level
+                        sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
+                        sub_pro2abs_out = subsys._var_allprocs_prom2abs_list['output']
+                        for dv, meta in dvs.items():
+                            if dv in sub_pro2abs_in:
+                                abs_dv = sub_pro2abs_in[dv][0]
+                                out[abs2prom_in[abs_dv]] = meta
+                            elif dv in sub_pro2abs_out:
+                                abs_dv = sub_pro2abs_out[dv][0]
+                                out[abs2prom_out[abs_dv]] = meta
+                            else:
+                                out[dv] = meta
+                    else:
+                        out.update(dvs)
+
+        model = self._problem_meta['model_ref']()
+        if self is model:
+            abs2meta_out = model._var_allprocs_abs2meta['output']
+            for outmeta in out.values():
+                src = outmeta['source']
+                if src in abs2meta_out and "openmdao:allow_desvar" not in abs2meta_out[src]['tags']:
+                    prom_src, prom_tgt = outmeta['orig']
+                    if prom_src is None:
+                        self._collect_error(f"Design variable '{prom_tgt}' is connected to '{src}',"
+                                            f" but '{src}' is not an IndepVarComp or ImplicitComp "
+                                            "output.")
+                    else:
+                        self._collect_error(f"Design variable '{prom_src}' is not an IndepVarComp "
+                                            "or ImplicitComp output.")
+
+        return out
+
+    def get_responses(self, recurse=True, get_sizes=True, use_prom_ivc=False):
+        """
+        Get the response variable settings from this system.
+
+        Retrieve all response variable settings from the system as a dict,
+        keyed by either absolute variable name, promoted name, or alias name,
+        depending on the value of use_prom_ivc and whether the original key was
+        a promoted output, promoted input, or an alias.
+
+        Parameters
+        ----------
+        recurse : bool, optional
+            If True, recurse through the subsystems and return the path of
+            all responses relative to the this system.
+        get_sizes : bool, optional
+            If True, compute the size of each response.
+        use_prom_ivc : bool
+            Translate ivc names to their promoted input names.
+
+        Returns
+        -------
+        dict
+            The responses defined in the current system and, if
+            recurse=True, its subsystems.
+        """
+        out = super().get_responses(recurse=recurse, get_sizes=get_sizes, use_prom_ivc=use_prom_ivc)
+        if recurse:
+            abs2prom_out = self._var_allprocs_abs2prom['output']
+            if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
+                # For parallel groups, we need to make sure that the response dictionary is
+                # assembled in the same order under mpi as for serial runs.
+                out_by_sys = {}
+
+                for subsys in self._sorted_sys_iter():
+                    name = subsys.name
+                    sub_out = {}
+
+                    resps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
+                                                 use_prom_ivc=use_prom_ivc)
+                    if use_prom_ivc:
+                        # have to promote subsystem prom name to this level
+                        sub_pro2abs_out = subsys._var_allprocs_prom2abs_list['output']
+                        for res, meta in resps.items():
+                            if res in sub_pro2abs_out:
+                                abs_resp = sub_pro2abs_out[res][0]
+                                sub_out[abs2prom_out[abs_resp]] = meta
+                            else:
+                                sub_out[res] = meta
+                    else:
+                        for rkey, rmeta in resps.items():
+                            if rkey in out:
+                                tdict = {'con': 'constraint', 'obj': 'objective'}
+                                rpath = rmeta['parent']
+                                rname = '.'.join((rpath, rmeta['name'])) if rpath else rkey
+                                rtype = tdict[rmeta['type']]
+                                ometa = sub_out[rkey]
+                                opath = ometa['parent']
+                                oname = '.'.join((opath, ometa['name'])) if opath else ometa['name']
+                                otype = tdict[ometa['type']]
+                                raise NameError(f"The same response alias, '{rkey}' was declared"
+                                                f" for {rtype} '{rname}' and {otype} '{oname}'.")
+                            sub_out[rkey] = rmeta
+
+                    out_by_sys[name] = sub_out
+
+                out_by_sys_by_rank = self.comm.allgather(out_by_sys)
+                all_outs_by_sys = {}
+                for outs in out_by_sys_by_rank:
+                    for name, meta in outs.items():
+                        all_outs_by_sys[name] = meta
+
+                for subsys_name in self._sorted_sys_iter_all_procs():
+                    for name, meta in all_outs_by_sys[subsys_name].items():
+                        out[name] = meta
+
+            else:
+                for subsys in self._sorted_sys_iter():
+                    resps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
+                                                 use_prom_ivc=use_prom_ivc)
+                    if use_prom_ivc:
+                        # have to promote subsystem prom name to this level
+                        sub_pro2abs_out = subsys._var_allprocs_prom2abs_list['output']
+                        for res, meta in resps.items():
+                            if res in sub_pro2abs_out:
+                                out[abs2prom_out[sub_pro2abs_out[res][0]]] = meta
+                            else:
+                                out[res] = meta
+                    else:
+                        for rkey, rmeta in resps.items():
+                            if rkey in out:
+                                tdict = {'con': 'constraint', 'obj': 'objective'}
+                                rpath = rmeta['parent']
+                                rname = '.'.join((rpath, rmeta['name'])) if rpath else rkey
+                                rtype = tdict[rmeta['type']]
+                                ometa = out[rkey]
+                                opath = ometa['parent']
+                                oname = '.'.join((opath, ometa['name'])) if opath else ometa['name']
+                                otype = tdict[ometa['type']]
+                                raise NameError(f"The same response alias, '{rkey}' was declared"
+                                                f" for {rtype} '{rname}' and {otype} '{oname}'.")
+                            out[rkey] = rmeta
+
+        return out
+
+    def _get_totals_metadata(self, driver=None, of=None, wrt=None):
+        if isinstance(of, str):
+            of = [of]
+        if isinstance(wrt, str):
+            wrt = [wrt]
+
+        if not driver:
+            if of is None or wrt is None:
+                raise RuntimeError("driver must be specified if of and wrt variables are not "
+                                   "provided.")
+
+            if driver is False:  # force to not use any existing desvar or response metadata
+                return self._active_responses(of, responses=False), \
+                    self._active_desvars(wrt, designvars=False), True
+
+            return self._active_responses(of), self._active_desvars(wrt), True
+
+        has_custom_derivs = False
+        list_wrt = list(wrt) if wrt is not None else []
+
+        driver_wrt = list(driver._designvars)
+        if wrt is None:
+            wrt = driver_wrt
+            if not wrt:
+                raise RuntimeError("No design variables were passed to compute_totals and "
+                                   "the driver is not providing any.")
+        else:
+            wrt_src_names = [m['source'] for m in driver._designvars.values()]
+            if list_wrt != driver_wrt and list_wrt != wrt_src_names:
+                has_custom_derivs = True
+
+        driver_ordered_nl_resp_names = driver._get_ordered_nl_responses()
+        if of is None:
+            of = driver_ordered_nl_resp_names
+            if not of:
+                raise RuntimeError("No response variables were passed to compute_totals and "
+                                   "the driver is not providing any.")
+        else:
+            of_src_names = [m['source'] for n, m in driver._responses.items()
+                            if n in driver_ordered_nl_resp_names]
+            of = list(of)
+            if of != driver_ordered_nl_resp_names and of != of_src_names:
+                has_custom_derivs = True
+
+        return self._active_responses(of, driver._responses), \
+            self._active_desvars(wrt, driver._designvars), has_custom_derivs
+
+    def _active_desvars(self, user_dv_names, designvars=None):
+        """
+        Return a design variable dictionary.
+
+        Whatever names match the names of design variables in this system will use the metadata
+        from the design variable.  For other variables that have not been registered as design
+        variables, metadata will be constructed based on variable metadata.
+
+        Parameters
+        ----------
+        user_dv_names : iter of str
+            Iterator of user facing design variable names.
+        designvars : dict, None, or False
+            Dictionary of design variables.  If None, get_design_vars will be called. If False,
+            no design vars will be used.
+
+        Returns
+        -------
+        dict
+            Dictionary of design variables.
+        """
+        # do this to keep ordering the same as in the user list
+        active_dvs = {n: None for n in user_dv_names}
+
+        if designvars is None:
+            designvars = self.get_design_vars(recurse=True, get_sizes=True, use_prom_ivc=True)
+
+        if designvars:  # use any matching metadata from existing design vars
+            for name, meta in designvars.items():
+                if name in active_dvs:
+                    active_dvs[name] = meta.copy()
+                elif meta['name'] in active_dvs:
+                    active_dvs[meta['name']] = meta.copy()
+                elif meta['source'] in active_dvs:
+                    active_dvs[meta['source']] = meta.copy()
+
+        prom2abs_in = self._var_allprocs_prom2abs_list['input']
+
+        for name, meta in active_dvs.items():
+            if meta is None:
+                meta = {
+                    'parallel_deriv_color': None,
+                    'indices': None,
+                    'name': name,
+                    'cache_linear_solution': False,
+                }
+                self._update_dv_meta(meta, get_size=True)
+
+                if name in prom2abs_in:
+                    meta['ivc_print_name'] = name
+                else:
+                    meta['ivc_print_name'] = None
+
+                active_dvs[name] = meta
+
+            meta['remote'] = meta['source'] not in self._var_abs2meta['output']
+
+        return active_dvs
+
+    def _active_responses(self, user_response_names, responses=None):
+        """
+        Return a response dictionary containing the given variables.
+
+        Whatever names match the names of responses in this system, use the metadata
+        from the response.  For other variables that have not been registered as responses,
+        construct metadata based on variable metadata.
+
+        Parameters
+        ----------
+        user_response_names : iter of str
+            Iterator of user facing response names.  Aliases are allowed.
+        responses : dict, None, or False.
+            Dictionary of responses.  If None, get_responses will be called. If False,
+            no responses will be used.
+
+        Returns
+        -------
+        dict
+            Dictionary of responses.
+        """
+        # do this to keep ordering the same as in the user list
+        active_resps = {n: None for n in user_response_names}
+
+        if responses is None:
+            responses = self.get_responses(recurse=True, get_sizes=True, use_prom_ivc=True)
+
+        if responses:
+            for name, meta in responses.items():
+                if name in active_resps:
+                    active_resps[name] = meta.copy()
+
+        for name, meta in active_resps.items():
+            if meta is None:
+                # no response exists for this name, so create metadata with default values and
+                # update size, etc. based on the variable metadata.
+                meta = {
+                    'parallel_deriv_color': None,
+                    'indices': None,
+                    'alias': None,
+                    'name': name,
+                    'cache_linear_solution': False,
+                    'linear': False,
+                }
+                self._update_response_meta(meta, get_size=True)
+                active_resps[name] = meta
+
+            meta['remote'] = meta['source'] not in self._var_abs2meta['output']
+
+        return active_resps

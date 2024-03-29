@@ -12,6 +12,7 @@ import numpy as np
 import openmdao.api as om
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped, FanInGrouped, FanInGrouped2
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
+from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
 
 
@@ -161,7 +162,7 @@ class ParDerivTestCase(unittest.TestCase):
         if not prob.comm.rank:
             self.assertTrue('Solving color: par_dv (x1, x2)' in output)
             self.assertTrue('In mode: fwd.' in output)
-            self.assertTrue("('p.x3', [2])" in output)
+            self.assertTrue("('x3', [2])" in output)
 
     def test_fan_out_parallel_sets_rev(self):
 
@@ -190,6 +191,49 @@ class ParDerivTestCase(unittest.TestCase):
         # NOTE: BAN updated the norm value for the PR that removed vec_names vectors.
         # the seeds for the constraints are now back to -1 instead of -.5
         assert_near_equal(norm_val, 6.557438524302, 1e-6)
+
+    def test_ln_nl_complex_alloc_bug(self):
+        # This verifies a fix for an MPI hang when allocating the vectors. If one proc
+        # needs a complex vector, then they all do.
+
+        class ImpComp(om.ImplicitComponent):
+
+            def setup(self):
+                self.add_input('x', 3.0)
+                self.add_output('y', 4.0)
+
+                self. declare_partials('y', 'x', method='cs')
+                self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+                self.linear_solver = om.DirectSolver()
+
+            def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs=None,
+                                discrete_outputs=None):
+                pass
+
+        class Sub1(om.Group):
+
+            def setup(self):
+                self.add_subsystem('imp', ImpComp())
+
+        class Sub2(om.Group):
+
+            def setup(self):
+                self.add_subsystem('exp', om.ExecComp('y = x'))
+
+        class Par(om.ParallelGroup):
+
+            def setup(self):
+                self.add_subsystem('sub1', Sub1())
+                self.add_subsystem('sub2', Sub2())
+
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('par', Par())
+
+        prob.setup()
+
+        # Hangs on this step before bug fix.
+        prob.final_setup()
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -540,9 +584,9 @@ class SlowComp(om.ExplicitComponent):
     def compute_partials(self, inputs, partials):
         partials['y', 'x'] = self.mult
 
-    def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, jac, mode, scope_out=None, scope_in=None):
         time.sleep(self.delay)
-        super()._apply_linear(jac, rel_systems, mode, scope_out, scope_in)
+        super()._apply_linear(jac, mode, scope_out, scope_in)
 
 
 class PartialDependGroup(om.Group):
@@ -784,10 +828,10 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         prob.setup(mode='rev', force_alloc_complex=True)
         prob.run_model()
         data = prob.check_totals(method='cs', out_stream=None)
-        assert_near_equal(data[('pg.dc1.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc2.y2', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc2.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc3.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc1.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc2.y2', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc2.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc3.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
 
         comm = MPI.COMM_WORLD
         # should only need one jacvec product per linear solve
@@ -814,10 +858,10 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         prob.setup(mode='rev', force_alloc_complex=True)
         prob.run_model()
         data = prob.check_totals(method='cs', out_stream=None)
-        assert_near_equal(data[('pg.dc1.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc2.y2', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc2.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc3.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc1.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc2.y2', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc2.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc3.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
 
         # should only need one jacvec product per linear solve
         comm = MPI.COMM_WORLD
@@ -845,8 +889,7 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.final_setup()
         self.assertEqual(str(ctx.exception),
-           "<model> <class Group>: response 'pg.dc2.y' has overlapping dependencies on the "
-           "same rank with other responses in parallel_deriv_color 'a'.")
+           "Parallel derivative color 'a' has responses ['pg.dc2.y', 'pg.dc2.y2'] with overlapping dependencies on the same rank.")
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -901,6 +944,78 @@ class TestAutoIVCParDerivBug(unittest.TestCase):
         prob.run_model()
 
         assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+
+
+class LinearComp(om.ExplicitComponent):
+    def initialize(self):
+        self.options.declare("a", desc="slope")
+        self.options.declare("b", desc="y-intercept")
+
+    def setup(self):
+        self.a = self.options["a"]
+        self.b = self.options["b"]
+        self.add_input("x", val=0.0)
+        self.add_output("y", val=1.0)
+        self.add_output("z", val=0.0)
+        self.declare_partials("*", "*", method="cs")
+
+    def compute(self, inputs, outputs):
+        outputs["y"] = self.a * inputs["x"] + self.b
+        outputs["z"] = self.a * inputs["x"] ** 2 + self.b * inputs["x"] + 1.0
+
+class LinearGroup(om.Group):
+    def initialize(self):
+        self.options.declare("a", desc="slope")
+        self.options.declare("b", desc="y-intercept")
+
+    def setup(self):
+        ivc = self.add_subsystem("ivc", om.IndepVarComp("x", val=0.0), promotes=["*"])
+        self.add_subsystem("eval", LinearComp(a=self.options["a"], b=self.options["b"]), promotes=["*"])
+        # Make x a dv for the linear equation
+        self.add_design_var("x", lower=-100.0, upper=100.0)
+        # Add constraint to find x intercept
+        self.add_constraint("y", equals=0.0, parallel_deriv_color="lift_con")
+
+
+@use_tempdirs
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestParDerivRelevance(unittest.TestCase):
+    N_PROCS = 3
+
+    def test_par_deriv_relevance(self):
+        from openmdao.utils.general_utils import set_pyoptsparse_opt
+
+        # check that pyoptsparse is installed. if it is, try to use SLSQP.
+        OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
+
+        if OPTIMIZER:
+            from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
+        else:
+            raise unittest.SkipTest("pyOptSparseDriver is required.")
+
+        prob = om.Problem()
+        model = prob.model
+
+        # Solve linear equation in parallel
+        parallel = model.add_subsystem('parallel', om.ParallelGroup())
+        parallel.add_subsystem('line1', LinearGroup(a=1.0, b=1.0))
+        parallel.add_subsystem('line2', LinearGroup(a=-1.0, b=1.0))
+        parallel.add_subsystem('line3', LinearGroup(a=5.0, b=3.14159))
+
+        # Add a dummy constraint because openmdao requires one
+        model.add_objective("parallel.line1.z")
+
+        # Setup to solve constrained problem
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = "SLSQP"
+
+        prob.setup()
+        prob.run_driver()
+
+        # Solution should be (-1.0, 1.0, -0.6283)
+        assert_near_equal(prob.get_val("parallel.line1.x", get_remote=True), -1.0)
+        assert_near_equal(prob.get_val("parallel.line2.x", get_remote=True), 1.0)
+        assert_near_equal(prob.get_val("parallel.line3.x", get_remote=True), -0.628318)
 
 
 if __name__ == "__main__":

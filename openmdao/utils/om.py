@@ -5,10 +5,7 @@ A console script wrapper for multiple openmdao functions.
 import sys
 import os
 import argparse
-if sys.version_info.minor > 7:
-    import importlib.metadata as ilmd
-else:
-    ilmd = None
+import importlib.metadata as ilmd
 
 import re
 from openmdao import __version__ as version
@@ -61,7 +58,7 @@ from openmdao.utils.scaffold import _scaffold_setup_parser, _scaffold_exec
 from openmdao.utils.file_utils import _load_and_exec, _iter_entry_points
 from openmdao.utils.entry_points import _list_installed_setup_parser, _list_installed_cmd, \
     split_ep, _compute_entry_points_setup_parser, _compute_entry_points_exec, \
-        _find_plugins_setup_parser, _find_plugins_exec
+        _find_repos_setup_parser, _find_repos_exec
 from openmdao.utils.reports_system import _list_reports_setup_parser, _list_reports_cmd, \
     _view_reports_setup_parser, _view_reports_cmd
 
@@ -539,8 +536,8 @@ _command_map = {
                              'Compute entry point declarations to add to the setup.py file.'),
     'dist_conns': (_dist_conns_setup_parser, _dist_conns_cmd,
                    'Display connection information for variables across multiple MPI processes.'),
-    'find_plugins': (_find_plugins_setup_parser, _find_plugins_exec,
-                     'Find openmdao plugins on github.'),
+    'find_repos': (_find_repos_setup_parser, _find_repos_exec,
+                   'Find repos on github having openmdao topics.'),
     'iprof': (_iprof_setup_parser, _iprof_exec,
               'Profile calls to particular object instances.'),
     'iprof_totals': (_iprof_totals_setup_parser, _iprof_totals_exec,
@@ -660,7 +657,7 @@ def openmdao_cmd():
 
         if hasattr(options, 'executor'):
             options.executor(options, user_args)
-        elif options.dependency_versions is True and ilmd is not None:
+        elif options.dependency_versions is True:
             dep_versions = {}
             _get_deps(dep_versions, 'openmdao')
 

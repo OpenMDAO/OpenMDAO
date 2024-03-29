@@ -7,6 +7,7 @@ from openmdao.test_suite.components.exec_comp_for_test import ExecComp4Test
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
+from openmdao.drivers.pyoptsparse_driver import pyoptsparse
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -39,8 +40,11 @@ def setup_problem(do_pre_post_opt, mode, use_ivc=False, coloring=False, size=3, 
     prob = om.Problem()
     prob.options['group_by_pre_opt_post'] = do_pre_post_opt
 
-    prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False)
-    prob.set_solver_print(level=0)
+    if parallel:
+        prob.driver = om.pyOptSparseDriver(optimizer='SLSQP')
+    else:
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False)
+        prob.set_solver_print(level=0)
 
     model = prob.model
 
@@ -53,6 +57,7 @@ def setup_problem(do_pre_post_opt, mode, use_ivc=False, coloring=False, size=3, 
     if parallel:
         par = model.add_subsystem('par', om.ParallelGroup(), promotes=['*'])
         par.nonlinear_solver = om.NonlinearBlockJac()
+        par.linear_solver = om.LinearBlockJac()
         parent = par
     else:
         parent = model
@@ -135,6 +140,93 @@ def setup_problem(do_pre_post_opt, mode, use_ivc=False, coloring=False, size=3, 
 @use_tempdirs
 class TestPrePostIter(unittest.TestCase):
 
+    def setup_problem(self, do_pre_post_opt, mode, use_ivc=False, coloring=False, size=3, group=False,
+                      force=(), approx=False, force_complex=False, recording=False, set_vois=True):
+        prob = om.Problem()
+        prob.options['group_by_pre_opt_post'] = do_pre_post_opt
+
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False)
+        prob.set_solver_print(level=0)
+
+        model = prob.model
+
+        if approx:
+            model.approx_totals()
+
+        if use_ivc:
+            model.add_subsystem('ivc', om.IndepVarComp('x', np.ones(size)))
+
+        if group:
+            G1 = model.add_subsystem('G1', om.Group(), promotes=['*'])
+            G2 = model.add_subsystem('G2', om.Group(), promotes=['*'])
+        else:
+            G1 = model
+            G2 = model
+
+        comps = {
+            'pre1': G1.add_subsystem('pre1', ExecComp4Test('y=2.*x', x=np.ones(size), y=np.zeros(size))),
+            'pre2': G1.add_subsystem('pre2', ExecComp4Test('y=3.*x - 7.*xx', x=np.ones(size), xx=np.ones(size), y=np.zeros(size))),
+
+            'iter1': G1.add_subsystem('iter1', ExecComp4Test('y=x1 + x2*4. + x3',
+                                                    x1=np.ones(size), x2=np.ones(size),
+                                                    x3=np.ones(size), y=np.zeros(size))),
+            'iter2': G1.add_subsystem('iter2', ExecComp4Test('y=.5*x', x=np.ones(size), y=np.zeros(size))),
+            'iter4': G2.add_subsystem('iter4', ExecComp4Test('y=7.*x', x=np.ones(size), y=np.zeros(size))),
+            'iter3': G2.add_subsystem('iter3', ExecComp4Test('y=6.*x', x=np.ones(size), y=np.zeros(size))),
+
+            'post1': G2.add_subsystem('post1', ExecComp4Test('y=8.*x', x=np.ones(size), y=np.zeros(size))),
+            'post2': G2.add_subsystem('post2', ExecComp4Test('y=x1*9. + x2*5. + x3*3.', x1=np.ones(size),
+                                                    x2=np.ones(size), x3=np.zeros(size),
+                                                    y=np.zeros(size))),
+        }
+
+        for name in force:
+            if name in comps:
+                comps[name].options['always_opt'] = True
+            else:
+                raise RuntimeError(f'"{name}" not in comps')
+
+        if use_ivc:
+            model.connect('ivc.x', 'iter1.x3')
+
+        model.connect('pre1.y', ['iter1.x1', 'post2.x1', 'pre2.xx'])
+        model.connect('pre2.y', 'iter1.x2')
+        model.connect('iter1.y', ['iter2.x', 'iter4.x'])
+        model.connect('iter2.y', 'post2.x2')
+        model.connect('iter3.y', 'post1.x')
+        model.connect('iter4.y', 'iter3.x')
+        model.connect('post1.y', 'post2.x3')
+
+        if set_vois:
+            prob.model.add_design_var('iter1.x3', lower=-10, upper=10)
+            prob.model.add_constraint('iter2.y', upper=10.)
+            prob.model.add_objective('iter3.y', index=0)
+
+        if coloring:
+            prob.driver.declare_coloring()
+
+        if recording:
+            model.recording_options['record_inputs'] = True
+            model.recording_options['record_outputs'] = True
+            model.recording_options['record_residuals'] = True
+
+            recorder = om.SqliteRecorder("sqlite_test_pre_post", record_viewer_data=False)
+
+            model.add_recorder(recorder)
+            prob.driver.add_recorder(recorder)
+
+            for comp in comps.values():
+                comp.add_recorder(recorder)
+
+        prob.setup(mode=mode, force_alloc_complex=force_complex)
+
+        # we don't want ExecComps to be colored because it makes the iter counting more complicated.
+        for comp in model.system_iter(recurse=True, typ=ExecComp4Test):
+            comp.options['do_coloring'] = False
+            comp.options['has_diag_partials'] = True
+
+        return prob
+
     def test_pre_post_iter_rev(self):
         prob = setup_problem(do_pre_post_opt=True, mode='rev')
         prob.run_driver()
@@ -205,6 +297,21 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.G2.post2.num_nl_solves, 1)
 
         data = prob.check_totals(out_stream=None)
+        assert_check_totals(data)
+
+    def test_pre_post_iter_auto_coloring_grouped_no_vois(self):
+        # this computes totals and does total coloring without declaring dvs/objs/cons in the driver
+        prob = self.setup_problem(do_pre_post_opt=True, coloring=True, group=True, mode='auto', set_vois=False)
+        prob.final_setup()
+        prob.run_model()
+
+        coloring_info = prob.driver._coloring_info.copy()
+        coloring_info.coloring = None
+        coloring_info.dynamic = True
+
+        J = prob.compute_totals(of=['iter2.y', 'iter3.y'], wrt=['iter1.x3'], coloring_info=coloring_info)
+
+        data = prob.check_totals(of=['iter2.y', 'iter3.y'], wrt=['iter1.x3'], out_stream=None)
         assert_check_totals(data)
 
     def test_pre_post_iter_rev_ivc(self):
@@ -338,8 +445,8 @@ class TestPrePostIter(unittest.TestCase):
                                   force=['post2'], mode='fwd')
         prob.run_driver()
 
-        self.assertEqual(prob.model._pre_components, ['G1.pre1', 'G1.pre2'])
-        self.assertEqual(prob.model._post_components, [])
+        self.assertEqual(prob.model._pre_components, {'G1.pre1', 'G1.pre2', '_auto_ivc'})
+        self.assertEqual(prob.model._post_components, set())
 
         self.assertEqual(prob.model.G1.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.G1.pre2.num_nl_solves, 1)
@@ -360,8 +467,8 @@ class TestPrePostIter(unittest.TestCase):
                                   force=['pre1'], mode='fwd')
         prob.run_driver()
 
-        self.assertEqual(prob.model._pre_components, [])
-        self.assertEqual(prob.model._post_components, ['G2.post1', 'G2.post2'])
+        self.assertEqual(prob.model._pre_components, set())
+        self.assertEqual(prob.model._post_components, {'G2.post1', 'G2.post2'})
 
         self.assertEqual(prob.model.G1.pre1.num_nl_solves, 3)
         self.assertEqual(prob.model.G1.pre2.num_nl_solves, 3)
@@ -543,7 +650,7 @@ class TestPrePostIter(unittest.TestCase):
                 prob.run_model()
 
                 J = prob.compute_totals(return_format='flat_dict')
-                assert_near_equal(J[('obj_cmp.obj', 'pz.z')], np.array([[9.62568658, 1.78576699]]), .00001)
+                assert_near_equal(J[('obj', 'z')], np.array([[9.62568658, 1.78576699]]), .00001)
 
     def test_reading_system_cases_pre_opt_post(self):
         prob = setup_problem(do_pre_post_opt=True, mode='fwd', recording=True)
@@ -637,11 +744,11 @@ class TestPrePostIter(unittest.TestCase):
         G2 = model.add_subsystem('G2', om.Group(), promotes=['*'])
         G3 = model.add_subsystem('G3', om.Group(), promotes=['*'])
 
-        C1 = G1.add_subsystem('C1', MissingPartialsComp())
-        C2 = G1.add_subsystem('C2', MissingPartialsComp())
-        C3 = G1.add_subsystem('C3', MissingPartialsComp())
-        C4 = G2.add_subsystem('C4', MissingPartialsComp())
-        C5 = G3.add_subsystem('C5', MissingPartialsComp())
+        G1.add_subsystem('C1', MissingPartialsComp())
+        G1.add_subsystem('C2', MissingPartialsComp())
+        G1.add_subsystem('C3', MissingPartialsComp())
+        G2.add_subsystem('C4', MissingPartialsComp())
+        G3.add_subsystem('C5', MissingPartialsComp())
 
         model.connect('C1.y', 'C2.a')
         model.connect('C1.z', 'C4.a')
@@ -658,13 +765,13 @@ class TestPrePostIter(unittest.TestCase):
         p.setup()
         p.final_setup()
 
-        self.assertEqual(C1._run_on_opt, [True, False, False])
-        self.assertEqual(C2._run_on_opt, [True, False, False])
-        self.assertEqual(C3._run_on_opt, [False, True, False])
-        self.assertEqual(C4._run_on_opt, [False, True, False])
-        self.assertEqual(C5._run_on_opt, [False, False, True])
+        self.assertEqual(model._pre_components, {'_auto_ivc', 'G1.C1', 'G1.C2'})
+        self.assertEqual(model._iterated_components, {'G1.C3', 'G2.C4', '_auto_ivc'})
+        self.assertEqual(model._post_components, {'G3.C5'})
 
 
+@use_tempdirs
+@unittest.skipUnless(pyoptsparse, "pyoptsparse is required.")
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class PrePostMPITestCase(unittest.TestCase):
     N_PROCS = 2

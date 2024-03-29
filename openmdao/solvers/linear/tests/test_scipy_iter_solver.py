@@ -3,6 +3,9 @@
 import unittest
 
 import numpy as np
+import scipy
+
+from packaging.version import Version
 
 import openmdao.api as om
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
@@ -130,7 +133,8 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         output = d_residuals.asarray()
         assert_near_equal(output, g1.expected_solution, 3e-15)
 
-    def test_linear_solution_cache(self):
+    @unittest.skipIf(Version(scipy.__version__) == Version('1.12.0'), "Bug in scipy 1.12.0, see Issue #19948")
+    def test_linear_solution_cache_fwd(self):
         # Test derivatives across a converged Sellar model. When caching
         # is performed, the second solve takes less iterations than the
         # first one.
@@ -153,13 +157,20 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        J = prob.driver._compute_totals(of=['y'], wrt=['x'], use_abs_names=False, return_format='flat_dict')
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
         icount1 = prob.model.linear_solver._iter_count
-        J = prob.driver._compute_totals(of=['y'], wrt=['x'], use_abs_names=False, return_format='flat_dict')
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
         icount2 = prob.model.linear_solver._iter_count
 
         # Should take less iterations when starting from previous solution.
-        self.assertTrue(icount2 < icount1)
+        self.assertTrue(icount2 < icount1,
+                        f"Second solve ran for {icount2} iterations, which should have been less than "
+                        f"the first solve, which ran for {icount1} iterations.")
+
+    def test_linear_solution_cache_rev(self):
+        # Test derivatives across a converged Sellar model. When caching
+        # is performed, the second solve takes less iterations than the
+        # first one.
 
         # Reverse mode
 
@@ -179,13 +190,15 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        J = prob.driver._compute_totals(of=['y'], wrt=['x'], use_abs_names=False, return_format='flat_dict')
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
         icount1 = prob.model.linear_solver._iter_count
-        J = prob.driver._compute_totals(of=['y'], wrt=['x'], use_abs_names=False, return_format='flat_dict')
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
         icount2 = prob.model.linear_solver._iter_count
 
         # Should take less iterations when starting from previous solution.
-        self.assertTrue(icount2 < icount1)
+        self.assertTrue(icount2 < icount1,
+                        f"Second solve ran for {icount2} iterations, which should have been less than "
+                        f"the first solve, which ran for {icount1} iterations.")
 
 
 class TestScipyKrylovFeature(unittest.TestCase):

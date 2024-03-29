@@ -22,6 +22,7 @@ from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructur
 from openmdao.drivers.doe_driver import DOEDriver
 from openmdao.recorders.case_reader import CaseReader
 from openmdao.solvers.nonlinear.newton import NewtonSolver
+from openmdao.utils.array_utils import convert_ndarray_to_support_nans_in_json
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import default_noraise
 from openmdao.utils.mpi import MPI
@@ -38,66 +39,11 @@ _MAX_OPTION_SIZE = int(1e4)          # If option value is bigger than this do no
 _default_n2_filename = 'n2.html'
 
 
-def _convert_nans_in_nested_list(val_as_list):
-    """
-    Given a list, possibly nested, replace any numpy.nan values with the string "nan".
-
-    This is done since JSON does not handle nan. This code is used to pass variable values
-    to the N2 diagram.
-
-    The modifications to the list values are done in-place to avoid excessive copying of lists.
-
-    Parameters
-    ----------
-    val_as_list : list, possibly nested
-        the list whose nan elements need to be converted
-    """
-    for i, val in enumerate(val_as_list):
-        if isinstance(val, list):
-            _convert_nans_in_nested_list(val)
-        else:
-            if np.isnan(val):
-                val_as_list[i] = "nan"
-            elif np.isinf(val):
-                val_as_list[i] = "infinity"
-            else:
-                val_as_list[i] = val
-
-
-def _convert_ndarray_to_support_nans_in_json(val):
-    """
-    Given numpy array of arbitrary dimensions, return the equivalent nested list with nan replaced.
-
-    numpy.nan values are replaced with the string "nan".
-
-    Parameters
-    ----------
-    val : ndarray
-        the numpy array to be converted
-
-    Returns
-    -------
-    object : list, possibly nested
-        The equivalent list with any nan values replaced with the string "nan".
-    """
-    val = np.asarray(val)
-
-    # do a quick check for any nans or infs and if not we can avoid the slow check
-    nans = np.where(np.isnan(val))
-    infs = np.where(np.isinf(val))
-    if nans[0].size == 0 and infs[0].size == 0:
-        return val.tolist()
-
-    val_as_list = val.tolist()
-    _convert_nans_in_nested_list(val_as_list)
-    return val_as_list
-
-
 def _get_array_info(system, vec, name, prom, var_dict, from_src=True):
     ndarray_to_convert = vec._abs_get_val(name, flat=False) if vec else \
         system.get_val(prom, from_src=from_src)
 
-    var_dict['val'] = _convert_ndarray_to_support_nans_in_json(ndarray_to_convert)
+    var_dict['val'] = convert_ndarray_to_support_nans_in_json(ndarray_to_convert)
 
     # Find the minimum indices and value
     min_indices = np.unravel_index(np.nanargmin(ndarray_to_convert, axis=None),
@@ -363,8 +309,7 @@ def _get_declare_partials(system):
         beginning from the given system on down.
     """
     declare_partials_list = []
-    for key, _ in system._declared_partials_iter():
-        of, wrt = key
+    for of, wrt in system._declared_partials_iter():
         if of != wrt:
             declare_partials_list.append(f"{of} > {wrt}")
 

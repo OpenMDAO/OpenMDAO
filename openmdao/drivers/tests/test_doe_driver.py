@@ -1,6 +1,7 @@
 """
 Test DOE Driver and Generators.
 """
+from io import StringIO
 import unittest
 
 import os
@@ -17,7 +18,7 @@ from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.groups.parallel_groups import FanInGrouped
 
 from openmdao.utils.assert_utils import assert_near_equal
-from openmdao.utils.general_utils import run_driver, printoptions
+from openmdao.utils.general_utils import run_driver
 from openmdao.utils.testing_utils import use_tempdirs
 
 from openmdao.utils.mpi import MPI
@@ -267,8 +268,8 @@ class TestDOEDriver(unittest.TestCase):
 
         # data contains a list of list, but one has the wrong length
         cases = [
-            [['p1.x', 0.], ['p2.y', 0.]],
-            [['p1.x', 1.], ['p2.y', 1., 'foo']]
+            [['x', 0.], ['y', 0.]],
+            [['x', 1.], ['y', 1., 'foo']]
         ]
 
         prob.driver = om.DOEDriver(generator=om.ListGenerator(cases))
@@ -277,12 +278,12 @@ class TestDOEDriver(unittest.TestCase):
             prob.run_driver()
         self.assertEqual(str(err.exception), "Invalid DOE case found, "
                          "expecting a list of name/value pairs:\n"
-                         "[['p1.x', 1.0], ['p2.y', 1.0, 'foo']]")
+                         "[['x', 1.0], ['y', 1.0, 'foo']]")
 
         # data contains a list of list, but one case has an invalid design var
         cases = [
-            [['p1.x', 0.], ['p2.y', 0.]],
-            [['p1.x', 1.], ['p2.z', 1.]]
+            [['x', 0.], ['y', 0.]],
+            [['x', 1.], ['z', 1.]]
         ]
 
         prob.driver = om.DOEDriver(generator=om.ListGenerator(cases))
@@ -290,12 +291,12 @@ class TestDOEDriver(unittest.TestCase):
         with self.assertRaises(RuntimeError) as err:
             prob.run_driver()
         self.assertEqual(str(err.exception), "Invalid DOE case found, "
-                         "'p2.z' is not a valid design variable:\n"
-                         "[['p1.x', 1.0], ['p2.z', 1.0]]")
+                         "'z' is not a valid design variable:\n"
+                         "[['x', 1.0], ['z', 1.0]]")
 
         # data contains a list of list, but one case has multiple invalid design vars
         cases = [
-            [['p1.x', 0.], ['p2.y', 0.]],
+            [['x', 0.], ['y', 0.]],
             [['p1.y', 1.], ['p2.z', 1.]]
         ]
 
@@ -487,7 +488,7 @@ class TestDOEDriver(unittest.TestCase):
         with self.assertRaises(ValueError) as err:
             prob.run_driver()
         self.assertEqual(str(err.exception),
-                         "Error assigning p1.x = [0. 0. 0. 0.]: could not broadcast "
+                         "Error assigning x = [0. 0. 0. 0.]: could not broadcast "
                          "input array from shape (4,) into shape (1,)")
 
     def test_uniform(self):
@@ -1562,7 +1563,7 @@ class TestDOEDriver(unittest.TestCase):
 @use_tempdirs
 class TestDOEDriverListVars(unittest.TestCase):
 
-    def test_list_problem_vars(self):
+    def test_list_driver_vars(self):
         # this passes if no exception is raised
 
         prob = om.Problem()
@@ -1593,13 +1594,13 @@ class TestDOEDriverListVars(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        prob.list_problem_vars()
+        prob.list_driver_vars()
 
 
 @use_tempdirs
 class TestDOEDriverListVars(unittest.TestCase):
 
-    def test_list_problem_vars(self):
+    def test_list_driver_vars(self):
         # this passes if no exception is raised
 
         prob = om.Problem()
@@ -1630,7 +1631,13 @@ class TestDOEDriverListVars(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        prob.list_problem_vars()
+        f = StringIO()
+        prob.list_driver_vars(out_stream=f)
+        output = f.getvalue()
+
+        self.assertIn('x     -1   0', output)
+        self.assertIn('y     3    0', output)
+        self.assertIn('f_xy  59   0', output)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

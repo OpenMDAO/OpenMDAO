@@ -8,15 +8,14 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.constants import INT_DTYPE
 import openmdao.func_api as omf
 from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore, _add_options, \
-    jac_forward, jac_reverse, jacvec_prod, _get_tangents
+    jac_forward, jac_reverse, _get_tangents
 from openmdao.utils.array_utils import shape_to_len
 
 try:
     import jax
     from jax import jit
     import jax.numpy as jnp
-    from jax.config import config
-    config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
+    jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
 except Exception:
     _, err, tb = sys.exc_info()
     if not isinstance(err, ImportError):
@@ -56,6 +55,8 @@ class ExplicitFuncComp(ExplicitComponent):
         If not None, call this function when computing partials.
     _tangents : tuple
         Tuple of parts of the tangent matrix cached for jax derivative computation.
+    _tangent_direction : str
+        Direction of the last tangent computation.
     """
 
     def __init__(self, compute, compute_partials=None, **kwargs):
@@ -79,6 +80,7 @@ class ExplicitFuncComp(ExplicitComponent):
             self._compute_jax = omf.jax_decorate(self._compute._f)
 
         self._tangents = None
+        self._tangent_direction = None
 
         self._compute_partials = compute_partials
         if self.options['use_jax'] and self.options['use_jit']:
@@ -141,6 +143,10 @@ class ExplicitFuncComp(ExplicitComponent):
             Flag indicating if the children should call linearize on their linear solvers.
         """
         if self.options['use_jax']:
+            if self._mode != self._tangent_direction:
+                # force recomputation of coloring and tangents
+                self._first_call_to_linearize = True
+                self._tangents = None
             self._check_first_linearize()
             self._jax_linearize()
         else:
@@ -162,7 +168,7 @@ class ExplicitFuncComp(ExplicitComponent):
         osize = len(self._outputs)
         isize = len(self._inputs)
         invals = list(self._func_values(self._inputs))
-        coloring = self._coloring_info['coloring']
+        coloring = self._coloring_info.coloring
         func = self._compute_jax
 
         if self._mode == 'rev':  # use reverse mode to compute derivs
@@ -232,6 +238,7 @@ class ExplicitFuncComp(ExplicitComponent):
         """
         if self._tangents is None:
             self._tangents = _get_tangents(vals, direction, coloring, argnums)
+            self._tangent_direction = direction
         return self._tangents
 
     def compute(self, inputs, outputs):
@@ -246,24 +253,6 @@ class ExplicitFuncComp(ExplicitComponent):
             Unscaled, dimensional output variables.
         """
         outputs.set_vals(self._compute(*self._func_values(inputs)))
-
-    def declare_partials(self, *args, **kwargs):
-        """
-        Declare information about this component's subjacobians.
-
-        Parameters
-        ----------
-        *args : list
-            Positional args to be passed to base class version of declare_partials.
-        **kwargs : dict
-            Keyword args  to be passed to base class version of declare_partials.
-
-        Returns
-        -------
-        dict
-            Metadata dict for the specified partial(s).
-        """
-        return super().declare_partials(*args, **kwargs)
 
     def _setup_partials(self):
         """

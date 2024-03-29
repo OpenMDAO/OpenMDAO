@@ -214,10 +214,10 @@ class TestSqliteRecorder(unittest.TestCase):
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
         expected_derivs = {
-            "comp.f_xy!p1.x": np.array([[0.50120438]]),
-            "comp.f_xy!p2.y": np.array([[-0.49879562]]),
-            "con.c!p1.x": np.array([[-1.0]]),
-            "con.c!p2.y": np.array([[1.0]])
+            "f_xy!x": np.array([[0.50120438]]),
+            "f_xy!y": np.array([[-0.49879562]]),
+            "c!x": np.array([[-1.0]]),
+            "c!y": np.array([[1.0]])
         }
 
         expected_data = ((coordinate, (t0, t1), expected_derivs),)
@@ -400,10 +400,10 @@ class TestSqliteRecorder(unittest.TestCase):
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
         expected_derivs = {
-            "comp.f_xy!p1.x": np.array([[0.50120438]]),
-            "comp.f_xy!p2.y": np.array([[-0.49879562]]),
-            "con.c!p1.x": np.array([[-1.0]]),
-            "con.c!p2.y": np.array([[1.0]])
+            "f_xy!x": np.array([[0.50120438]]),
+            "f_xy!y": np.array([[-0.49879562]]),
+            "c!x": np.array([[-1.0]]),
+            "c!y": np.array([[1.0]])
         }
 
         expected_data = ((coordinate, (t0, t1), expected_derivs),)
@@ -660,10 +660,10 @@ class TestSqliteRecorder(unittest.TestCase):
         assertDriverIterDataRecorded(self, expected_data, self.eps, prefix='Run2')
 
         expected_derivs = {
-            "comp.f_xy!p1.x": np.array([[0.50120438]]),
-            "comp.f_xy!p2.y": np.array([[-0.49879562]]),
-            "con.c!p1.x": np.array([[-1.0]]),
-            "con.c!p2.y": np.array([[1.0]])
+            "f_xy!x": np.array([[0.50120438]]),
+            "f_xy!y": np.array([[-0.49879562]]),
+            "c!x": np.array([[-1.0]]),
+            "c!y": np.array([[1.0]])
         }
 
         expected_data = (
@@ -2594,10 +2594,10 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         expected_derivs = {
-            "comp.f_xy!p1.x": np.array([[0.5]]),
-            "comp.f_xy!p2.y": np.array([[-0.5]]),
-            "con.c!p1.x": np.array([[-1.0]]),
-            "con.c!p2.y": np.array([[1.0]])
+            "f_xy!x": np.array([[0.5]]),
+            "f_xy!y": np.array([[-0.5]]),
+            "c!x": np.array([[-1.0]]),
+            "c!y": np.array([[1.0]])
         }
 
         expected_data = ((case_name, (t0, t1), expected_derivs),)
@@ -3592,7 +3592,7 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         system_cases = cr.list_cases('root.obj_cmp')
 
         # Number of cases recorded for 'obj_cmp'
-        self.assertEqual(f"Number of cases: {len(system_cases)}", "Number of cases: 14")
+        self.assertEqual(len(system_cases), 14)
 
         # Get the keys of all the inputs to the objective function
         case = cr.get_case(system_cases[0])

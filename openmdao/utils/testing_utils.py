@@ -3,15 +3,20 @@ import json
 import functools
 import builtins
 import os
+import re
+import pickle
+from itertools import zip_longest
 from contextlib import contextmanager
-from openmdao.utils.general_utils import env_truthy, env_none
+
+import numpy as np
+from scipy.sparse import coo_matrix
 
 try:
     from parameterized import parameterized
 except ImportError:
     parameterized = None
 
-import numpy as np
+from openmdao.utils.general_utils import env_truthy, env_none
 
 
 def _new_setup(self):
@@ -352,3 +357,105 @@ class MissingImports(object):
             Traceback object.
         """
         builtins.__import__ = self._cached_import
+
+
+# this recognizes ints and floats with or without scientific notation.
+# it does NOT recognize hex or complex numbers
+num_rgx = re.compile(r"[-]?([0-9]+\.?[0-9]*|[0-9]*\.?[0-9]+)([eE][-+]?[0-9]+)?")
+
+
+def snum_iter(s):
+    """
+    Iterate through a string, yielding numeric strings as numbers along with non-numeric strings.
+
+    Parameters
+    ----------
+    s : str
+        The string to iterate through.
+
+    Yields
+    ------
+    str
+        The next number or non-number.
+    bool
+        True if the string is a number, False otherwise.
+    """
+    if not s:
+        return
+
+    end = 0
+    for m in num_rgx.finditer(s):
+        mstart = m.start()
+
+        if end != mstart:  # need to output the non-num string prior to this match
+            yield (s[end:mstart], False)
+
+        yield (float(m.group()), True)
+
+        end = m.end()
+
+    if end < len(s):  # yield any non-num at end of string
+        yield (s[end:], False)
+
+
+def snum_equal(s1, s2, atol=1e-6, rtol=1e-6):
+    """
+    Compare two strings, and if they contain numbers, compare the numbers subject to tolerance.
+
+    Also compare the non-number parts of the strings exactly.
+
+    Parameters
+    ----------
+    s1 : str
+        First string to compare.
+    s2 : str
+        Second string to compare.
+    atol : float, optional
+        Absolute tolerance. The default is 1e-6.
+    rtol : float, optional
+        Relative tolerance. The default is 1e-6.
+
+    Returns
+    -------
+    bool
+        True if the strings are equal within the tolerance, False otherwise.
+    """
+    for (s1, isnum1), (s2, isnum2) in zip_longest(snum_iter(s1), snum_iter(s2),
+                                                  fillvalue=("", False)):
+        if isnum1 and isnum2:
+            if rtol is None and atol is None:
+                if s1 != s2:
+                    return False
+            else:
+                if rtol is not None and rel_num_diff(s1, s2) > rtol:
+                    return False
+
+                if atol is not None and abs(s1 - s2) > atol:
+                    return False
+
+        elif s1 != s2:
+            return False
+
+    return True
+
+
+def rel_num_diff(n1, n2):
+    """
+    Return the relative numerical difference between two numbers.
+
+    Parameters
+    ----------
+    n1 : float
+        First number to compare.
+    n2 : float
+        Second number to compare.
+
+    Returns
+    -------
+    float
+        Relative difference between the numbers.
+    """
+    if n1 == 0.:
+        return 0. if n2 == 0. else 1.0
+    else:
+        return abs(n2 - n1) / abs(n1)

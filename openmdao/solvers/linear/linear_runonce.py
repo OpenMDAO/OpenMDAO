@@ -27,10 +27,9 @@ class LinearRunOnce(LinearBlockGS):
         mode : str
             'fwd' or 'rev'.
         rel_systems : set of str
-            Set of names of relevant systems based on the current linear solve.
+            Set of names of relevant systems based on the current linear solve.  Deprecated.
         """
         self._mode = mode
-        self._rel_systems = rel_systems
 
         self._update_rhs_vec()
 

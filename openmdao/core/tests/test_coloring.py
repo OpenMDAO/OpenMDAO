@@ -321,15 +321,6 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         coloring = compute_total_coloring(p_color)
 
         stream = StringIO()
-        coloring.display_txt(out_stream=stream, use_prom_names=False)
-        color_txt = stream.getvalue().split('\n')
-
-        self.assertTrue(color_txt[0].endswith('  circle.area'))
-        self.assertEqual(color_txt[22].strip(), '|_auto_ivc.v0')
-        self.assertEqual(color_txt[23].strip(), '|_auto_ivc.v1')
-        self.assertEqual(color_txt[24].strip(), '|_auto_ivc.v2')
-
-        stream = StringIO()
         coloring.display_txt(out_stream=stream)           # use_prom_names=True is the default
         color_txt = stream.getvalue().split('\n')
 
@@ -358,7 +349,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         self.assertEqual(p.model._solve_count, 21)
         self.assertEqual(p_color.model._solve_count, 5)
 
-        partial_coloring = p_color.model._get_subsystem('arctan_yox')._coloring_info['coloring']
+        partial_coloring = p_color.model._get_subsystem('arctan_yox')._coloring_info.coloring
         expected = [
             "self.declare_partials(of='g', wrt='x', rows=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], cols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])",
             "self.declare_partials(of='g', wrt='y', rows=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], cols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])",
@@ -367,7 +358,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         for i, d in enumerate(decl_partials_calls.split('\n')):
             self.assertEqual(d.strip(), expected[i])
 
-        fwd_solves, rev_solves = p_color.driver._coloring_info['coloring'].get_row_var_coloring('delta_theta_con.g')
+        fwd_solves, rev_solves = p_color.driver._coloring_info.coloring.get_row_var_coloring('delta_theta_con.g')
         self.assertEqual(fwd_solves, 4)
         self.assertEqual(rev_solves, 0)
 
@@ -565,7 +556,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         self.assertEqual(p_color.model._solve_count, 5)
 
         # test __repr__
-        rep = repr(p_color.driver._coloring_info['coloring'])
+        rep = repr(p_color.driver._coloring_info.coloring)
         self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21), pct nonzero: 13.42, tol: 1e-15)')
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
@@ -583,7 +574,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
         self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
-        self.assertTrue("('indeps.y', [1, 3, 5, 7, 9])" in output)
+        self.assertTrue("('y', [1, 3, 5, 7, 9])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
@@ -646,7 +637,7 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         self.assertEqual(p_color.model._solve_count, 11)
 
         # improve coverage of coloring.py
-        coloring = p_color.driver._coloring_info['coloring']
+        coloring = p_color.driver._coloring_info.coloring
         om.display_coloring(source=coloring, output_file=None, as_text=True, show=False)
         om.display_coloring(source=coloring, output_file=None, as_text=False, show=False)
 
@@ -697,16 +688,16 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         except:
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
+        # run w/o coloring
+        p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SLSQP', print_results=False)
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+
         p_color = run_opt(pyOptSparseDriver, 'fwd', optimizer='SLSQP', print_results=False,
                           dynamic_total_coloring=True)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
         # Tests a bug where coloring ran the model when not needed.
         self.assertEqual(p_color.model.iter_count, 9)
-
-        # run w/o coloring
-        p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SLSQP', print_results=False)
-        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
 
         p.model._solve_count = 0
         p_color.model._solve_count = 0
@@ -778,7 +769,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 
     def test_bad_mode(self):
         p_color_fwd = run_opt(om.ScipyOptimizeDriver, 'fwd', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
-        coloring = p_color_fwd.driver._coloring_info['coloring']
+        coloring = p_color_fwd.driver._coloring_info.coloring
 
         with self.assertRaises(Exception) as context:
             p_color = run_opt(om.ScipyOptimizeDriver, 'rev', color_info=coloring, optimizer='SLSQP', disp=False)
@@ -953,7 +944,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 
                 # turn on dynamic partial coloring
                 self.declare_coloring(wrt='*', method='cs', perturb_size=1e-5, num_full_jacs=2, tol=1e-20,
-                                      orders=20, show_summary=True, show_sparsity=True)
+                                      orders=20, show_summary=True)
 
             def compute(self, inputs, outputs):
                 outputs['g'] = np.arctan(inputs['y'] / inputs['x'])
@@ -1004,7 +995,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 
         #####################################
         # set up dynamic total coloring here
-        p.driver.declare_coloring(show_summary=True, show_sparsity=True)
+        p.driver.declare_coloring(show_summary=True)
         #####################################
 
         model.add_design_var('x')
@@ -1060,7 +1051,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
 
     def test_summary(self):
         p_color = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
-        coloring = p_color.driver._coloring_info['coloring']
+        coloring = p_color.driver._coloring_info.coloring
         save_out = sys.stdout
         sys.stdout = StringIO()
         try:
@@ -1092,7 +1083,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
 
     def test_repr(self):
         p_color = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
-        coloring = p_color.driver._coloring_info['coloring']
+        coloring = p_color.driver._coloring_info.coloring
         rep = repr(coloring)
         self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21), pct nonzero: 13.42, tol: 1e-15)')
 
@@ -1103,7 +1094,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
 
     def test_bad_mode(self):
         p_color_rev = run_opt(om.ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
-        coloring = p_color_rev.driver._coloring_info['coloring']
+        coloring = p_color_rev.driver._coloring_info.coloring
 
         with self.assertRaises(Exception) as context:
             p_color = run_opt(om.ScipyOptimizeDriver, 'fwd', color_info=coloring, optimizer='SLSQP', disp=False)
@@ -1360,12 +1351,12 @@ class DumbComp(om.ExplicitComponent):
         for name, size in zip(self._inames, self._isizes):
             self.add_input(name, val=np.zeros(size))
 
-        for name, size in zip(self._onames, self._osizes):
+        for i, (name, size) in enumerate(zip(self._onames, self._osizes)):
             self.add_output(name, val=np.zeros(size))
+            self.declare_partials(name, self._inames[i], method='cs')
 
         self.add_output('obj', val=0.0)
-
-        self.declare_partials('*', '*', method='cs')
+        self.declare_partials('obj', self._inames[0], method='cs')
 
     def compute(self, inputs, outputs):
         mult = 1.0
@@ -1554,6 +1545,18 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
 
         self.assertEqual(ctx.exception.args[0], "File '_bad_pickle_' is not a valid coloring file.")
 
+    def test_get_coloring(self):
+        p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
+                            sizes=[3, 4, 5], color='total', fixed=False)
+        p.run_driver()
+
+        self.assertIsNotNone(p.driver._get_coloring())
+
+        p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
+                            sizes=[3, 4, 5], color='total', fixed=True)
+        p.run_driver()
+
+        self.assertIsNotNone(p.driver._get_coloring())
 
 if __name__ == '__main__':
     unittest.main()

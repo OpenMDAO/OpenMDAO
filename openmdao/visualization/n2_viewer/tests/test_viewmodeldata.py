@@ -19,6 +19,7 @@ from openmdao.test_suite.components.sellar import SellarStateConnection
 from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data, n2
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
 from openmdao.test_suite.test_examples.test_betz_limit import ActuatorDisc
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI
 from openmdao.utils.shell_proc import check_call
 from openmdao.utils.testing_utils import use_tempdirs, set_env_vars_context
@@ -52,18 +53,79 @@ def extract_compressed_model(filename):
     return model_data
 
 
-@use_tempdirs
 def save_viewer_data(viewer_data, filename):
     """
     Save viewer data to JSON file for use in future testing.
     """
     from openmdao.utils.testing_utils import _ModelViewerDataTreeEncoder
-    with open(filename, 'w') as json_file:
+    with open(os.path.join(parent_dir, filename), 'w') as json_file:
         json.dump(viewer_data['tree'], json_file, cls=_ModelViewerDataTreeEncoder, indent=4)
-
 
 @use_tempdirs
 class TestViewerData(unittest.TestCase):
+
+    def recursive_tree_compare(self, tree, expected_tree, path=None, val_tol=1.0E-12):
+        """
+        Compare two tree structures and raise if they differ.
+
+        Parameters
+        ----------
+        tree : dict
+            The tree being tested.
+        expected_tree : dict
+            The expected tree being tested against.
+        path : list[str | int]
+            The path through the original tree to the currently tested subtree.
+        val_tol : float
+            The tolerance for comparing floating point values.
+
+        Raises
+        ------
+        ValueError
+            When both trees have the same item but with a different value.
+        KeyError
+            When the expected tree has a path that does not exist in tree, or vice-versa.
+        """
+        _path = [expected_tree['name']] if path is None else path + [expected_tree['name']]
+
+        tol_check_keys = ['val', 'val_min', 'val_max']
+
+        # Test that expected and tree have same keys
+        self.assertSetEqual(set(expected_tree.keys()), set(tree.keys()), msg=f'Keys differ at {_path}')
+
+        if 'dtype' in expected_tree and 'dtype' == 'ndarray':
+            # Compare val, min_val, and max_val using tolerance
+            for key in tol_check_keys:
+                if key in expected_tree:
+                    expected_val = np.asarray(expected_tree[key])
+                    val = np.asarray(tree[key])
+                    try:
+                        assert_near_equal(expected_val, val, tolerance=val_tol)
+                    except Error as e:
+                        raise AssertionError(f'{_path + [key]} did not match to expected value')
+
+        for i, key in enumerate(expected_tree.keys()):
+
+            expected_val = expected_tree[key]
+            val = tree[key]
+
+            if 'dtype' in expected_tree and key in tol_check_keys:
+                continue
+            elif key == 'children':
+                continue
+
+            # Iterables are serialized as lists
+            if isinstance(expected_val, list):
+                expected_val = tuple(expected_val)
+            if isinstance(val, list):
+                val = tuple(val)
+
+            self.assertEqual(expected_val, val, msg=f'Tree items differ at {_path + [key]}')
+
+        if 'children' in expected_tree:
+            for i, exs in enumerate(expected_tree['children']):
+                ts = tree['children'][i]
+                self.recursive_tree_compare(ts, exs, path=_path + ['children', i], val_tol=val_tol)
 
     def check_viewer_data(self, viewer_data, filename, partials=True):
         """
@@ -73,7 +135,8 @@ class TestViewerData(unittest.TestCase):
         with open(os.path.join(parent_dir, filename)) as json_file:
             expected_tree = json.load(json_file)
 
-        np.testing.assert_equal(viewer_data['tree'], expected_tree, err_msg='', verbose=True)
+        # np.testing.assert_equal(viewer_data['tree'], expected_tree, err_msg='', verbose=True)
+        self.recursive_tree_compare(viewer_data['tree'], expected_tree)
 
         # check additional items depending on the problem
         if filename.startswith('sellar'):
@@ -220,19 +283,26 @@ class TestViewerData(unittest.TestCase):
         Verify that the correct model structure data exists when stored as compared
         to the expected structure, using the SellarStateConnection model.
 
-        Note: Use self.save_model_data() to regenerate JSON file if needed when updating test
+        Note: Use save_viewer_data() to regenerate JSON file if needed when updating test
         """
-        filename = "sellarstate.sql"
+        filename = "sellarstate_test_viewer_data.sql"
 
         p = om.Problem(model=SellarStateConnection(), allow_post_setup_reorder=False)
         p.driver.add_recorder(SqliteRecorder(filename))
         p.setup()
+
+        # Uncomment to update regression data
+        # save_viewer_data(_get_viewer_data(p), 'sellar_no_values.json')
 
         # there should be no values when data is generated before final_setup
         self.check_viewer_data(_get_viewer_data(p), 'sellar_no_values.json', partials=False)
 
         # there should be initial values when data is generated after final_setup
         p.final_setup()
+
+        # Uncomment to update regression data
+        # save_viewer_data(_get_viewer_data(p), 'sellar_initial_values.json')
+
         self.check_viewer_data(_get_viewer_data(p), 'sellar_initial_values.json')
 
         # recorded viewer data should match
@@ -240,8 +310,12 @@ class TestViewerData(unittest.TestCase):
 
         # there should be final values when data is generated after run_model
         p.run_model()
-        # TODO: need to compare with tolerance for different platforms
-        # self.check_viewer_data(_get_viewer_data(p), 'sellar_final_values.json')
+
+        # Uncomment to update regression data
+        # save_viewer_data(_get_viewer_data(p), 'sellar_final_values.json')
+        # save_viewer_data(_get_viewer_data(p, values=False), 'sellar_no_values_run.json')
+
+        self.check_viewer_data(_get_viewer_data(p), 'sellar_final_values.json')
 
         # there should be no values when data is generated (after run) with values=False
         self.check_viewer_data(_get_viewer_data(p, values=False), 'sellar_no_values_run.json')
@@ -358,7 +432,7 @@ class TestViewerData(unittest.TestCase):
             # create top-level problem
             p = om.Problem(name='top')
             p.model.add_subsystem('submodelcomp',
-                                  om.SubmodelComp(problem=subprob, inputs=['*'], outputs=['*']),
+                                  om.SubmodelComp(problem=subprob, inputs=['*'], outputs=['*'], do_coloring=False),
                                   promotes=['*'])
             p.model.add_subsystem('supercomp',
                                   om.ExecComp('z = 3 * y'),
@@ -370,12 +444,18 @@ class TestViewerData(unittest.TestCase):
             p.final_setup()
 
             # extract viewer data from N2 for problem and subproblem
-            om.n2(p, title='N2 for Problem', outfile='N2problem.html',
-                  show_browser=DEBUG_BROWSER)
+            om.n2(p, title='N2 for Problem', outfile='N2problem.html', show_browser=DEBUG_BROWSER)
             problem_data = extract_compressed_model('N2problem.html')
 
-            om.n2(subprob, title='N2 for SubProblem', outfile='N2subprob.html',
-                  show_browser=DEBUG_BROWSER)
+            # in this particular case, the value of subcomp.y will differ between this case and the
+            # later script based case because in the script case, the hook function triggers after final_setup of the
+            # subproblem, while in this case, the n2 is generated after final_setup of the
+            # top problem, and during that final_setup (in _setup_partials of the submodelcomp), the
+            # subproblem is executed, which sets the value of subcomp.y to 3.0 instead of 1.0.
+            # So here we'll reset the value of subcomp.y to 1.0 so that we can
+            # compare two data dictionaries using assertDictEqual.
+            subprob.set_val('y', 1.0)
+            om.n2(subprob, title='N2 for SubProblem', outfile='N2subprob.html', show_browser=DEBUG_BROWSER)
             subprob_data = extract_compressed_model('N2subprob.html')
 
             # check problem data generated from recording against data generated from problem
@@ -398,7 +478,7 @@ class TestViewerData(unittest.TestCase):
             # create top-level problem
             p = om.Problem(name='top')
             p.model.add_subsystem('submodelcomp',
-                                om.SubmodelComp(problem=subprob, inputs=['*'], outputs=['*']),
+                                om.SubmodelComp(problem=subprob, inputs=['*'], outputs=['*'], do_coloring=False),
                                 promotes=['*'])
             p.model.add_subsystem('supercomp',
                                 om.ExecComp('z = 3 * y'),
@@ -418,7 +498,7 @@ class TestViewerData(unittest.TestCase):
                 f.write(src)
 
             # check problem data generated from script against data generated from problem
-            check_call("openmdao n2 submodel_script.py -o N2_top.html"
+            check_call("openmdao n2 submodel_script.py -o N2_top.html --problem=top"
                        f"{' --no_browser' if not DEBUG_BROWSER else ''}")
             n2_top_data = extract_compressed_model('N2_top.html')
 
@@ -498,6 +578,7 @@ class TestN2(unittest.TestCase):
 
         p = om.Problem(model=SellarStateConnection())
         p.driver.add_recorder(SqliteRecorder(sql_filename))
+
         p.setup()
         p.final_setup()
         p.cleanup()

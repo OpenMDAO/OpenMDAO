@@ -172,9 +172,9 @@ class TestParallelGroups(unittest.TestCase):
 
         J = prob.driver._compute_totals()
 
-        assert_near_equal(J['par.C1.y', 'indep.x'][0][0], 2.5, 1e-6)
+        assert_near_equal(J['par.C1.y', 'x'][0][0], 2.5, 1e-6)
         assert_near_equal(prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
-        assert_near_equal(J['par.C2.y', 'indep.x'][0][0], 7., 1e-6)
+        assert_near_equal(J['par.C2.y', 'x'][0][0], 7., 1e-6)
         assert_near_equal(prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
 
     @parameterized.expand(itertools.product(['fwd', 'rev'], [False]),

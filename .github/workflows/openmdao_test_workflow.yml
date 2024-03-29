@@ -36,6 +36,7 @@ jobs:
             OPTIONAL: '[all]'
             JAX: '0.4.14'
             BANDIT: true
+            PEP517: true
             TESTS: true
             # set DEBUG to create an interactive debugging session just before testflo is run.
             # Note that the workflow will run until you cancel the debugging session.
@@ -60,7 +61,6 @@ jobs:
             # PAROPT: true
             # SNOPT: '7.7'
             OPTIONAL: '[all]'
-            JAX: '0.4.14'
             TESTS: true
 
           # test minimal install
@@ -75,8 +75,8 @@ jobs:
           # test oldest supported versions
           - NAME: Ubuntu Oldest
             OS: ubuntu-latest
-            PY: '3.7'
-            NUMPY: '1.21'
+            PY: '3.8'
+            NUMPY: '1.22'
             SCIPY: '1.7'
             OPENMPI: '4.0'
             MPI4PY: '3.0'
@@ -96,7 +96,6 @@ jobs:
             PYOPTSPARSE: 'v2.10.1'
             SNOPT: '7.7'
             OPTIONAL: '[all]'
-            JAX: '0.4.14'
             BUILD_DOCS: true
 
     runs-on: ${{ matrix.OS }}
@@ -153,15 +152,16 @@ jobs:
           echo "============================================================="
           echo "Install OpenMDAO"
           echo "============================================================="
-          python -m pip install .${{ matrix.OPTIONAL }}
-
-      - name: Install jax
-        if: matrix.JAX
-        run: |
-          echo "============================================================="
-          echo "Install jax"
-          echo "============================================================="
-          python -m pip install jaxlib=='${{ matrix.JAX }}' jax=='${{ matrix.JAX }}'
+          if [[ "${{ matrix.PEP517 }}" == "true" ]]; then
+            pip wheel --no-deps --use-pep517 .
+            WHEEL=`find openmdao-*.whl`
+            echo "-----------------------------------------------------------"
+            echo "Installing from wheel: $WHEEL"
+            echo "-----------------------------------------------------------"
+            python -m pip install $WHEEL${{ matrix.OPTIONAL }}
+          else
+            python -m pip install .${{ matrix.OPTIONAL }}
+          fi
 
       - name: Install PETSc
         if: matrix.PETSc
@@ -194,6 +194,7 @@ jobs:
           echo "Check MPI and PETSc installation"
           echo "============================================================="
           export OMPI_MCA_rmaps_base_oversubscribe=1
+          export OMPI_MCA_btl=^openib
           echo "-----------------------"
           echo "Quick test of mpi4py:"
           mpirun -n 3 python -c "from mpi4py import MPI; print(f'Rank: {MPI.COMM_WORLD.rank}')"
@@ -206,6 +207,7 @@ jobs:
           echo "-----------------------"
 
           echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> $GITHUB_ENV
+          echo "OMPI_MCA_btl=^openib" >> $GITHUB_ENV
 
           echo "Workaround for intermittent failures with OMPI https://github.com/open-mpi/ompi/issues/7393"
           echo "TMPDIR=/tmp" >> $GITHUB_ENV

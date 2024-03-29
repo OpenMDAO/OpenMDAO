@@ -666,7 +666,10 @@ def _constraint_plot(kind, meta, val, width=300):
         raise ValueError("Value for the _constraint_plot function must be a "
                          f"scalar. Variable {meta['name']} is not a scalar")
     else:
-        val = val.item()
+        try:
+            val = val.item()
+        except AttributeError:
+            pass  # handle other than ndarray, e.g. int
 
     # If lower and upper bounds are None, return an HTML snippet indicating the issue
     if kind == 'constraint' and meta['upper'] == INF_BOUND and meta['lower'] == -INF_BOUND:

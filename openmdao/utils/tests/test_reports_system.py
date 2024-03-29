@@ -12,7 +12,7 @@ from openmdao.core.problem import _default_prob_name
 import openmdao.core.problem as probmod
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.utils.reports_system import set_reports_dir, _reports_dir, register_report, \
+from openmdao.utils.reports_system import _reports_dir, register_report, \
     list_reports, clear_reports, _reset_reports_dir, activate_report, _reports_registry
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.assert_utils import assert_no_warning
@@ -49,7 +49,7 @@ class TestReportsSystem(unittest.TestCase):
         # But we need to remember whether it was set so we can restore it
         self.testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
         clear_reports()
-        set_reports_dir(_reports_dir)
+        om.set_reports_dir(_reports_dir)
 
         self.count = 0
 
@@ -60,7 +60,7 @@ class TestReportsSystem(unittest.TestCase):
 
     def setup_and_run_simple_problem(self, driver=None, reports=_UNDEFINED, reports_dir=_UNDEFINED):
         if reports_dir is not _UNDEFINED:
-            set_reports_dir(reports_dir)
+            om.set_reports_dir(reports_dir)
 
         prob = om.Problem(reports=reports)
         model = prob.model
@@ -87,7 +87,7 @@ class TestReportsSystem(unittest.TestCase):
 
     def setup_problem_w_errors(self, prob_name, driver=None, reports=_UNDEFINED, reports_dir=_UNDEFINED):
         if reports_dir is not _UNDEFINED:
-            set_reports_dir(reports_dir)
+            om.set_reports_dir(reports_dir)
 
         prob = om.Problem(reports=reports, name=prob_name)
         model = prob.model
@@ -579,7 +579,7 @@ class TestReportsSystemMPI(unittest.TestCase):
         # But we need to remember whether it was set so we can restore it
         self.testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
         clear_reports()
-        set_reports_dir(_reports_dir)
+        om.set_reports_dir(_reports_dir)
 
         self.count = 0  # used to keep a count of reports generated
 

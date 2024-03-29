@@ -11,8 +11,10 @@ from scipy.optimize import minimize
 
 from openmdao.core.constants import INF_BOUND
 from openmdao.core.driver import Driver, RecordingDebugging
+from openmdao.core.group import Group
 from openmdao.utils.class_util import WeakMethodWrapper
 from openmdao.utils.mpi import MPI
+from openmdao.core.analysis_error import AnalysisError
 
 # Optimizers in scipy.minimize
 _optimizers = {'Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
@@ -116,6 +118,8 @@ class ScipyOptimizeDriver(Driver):
         Copy of _designvars.
     _lincongrad_cache : np.ndarray
         Pre-calculated gradients of linear constraints.
+    _desvar_array_cache : np.ndarray
+        Cached array for setting design variables.
     """
 
     def __init__(self, **kwargs):
@@ -149,6 +153,7 @@ class ScipyOptimizeDriver(Driver):
         self._obj_and_nlcons = None
         self._dvlist = None
         self._lincongrad_cache = None
+        self._desvar_array_cache = None
         self.fail = False
         self.iter_count = 0
         self._check_jac = False
@@ -229,6 +234,7 @@ class ScipyOptimizeDriver(Driver):
                     self._cons[name] = meta.copy()
                     self._cons[name]['equals'] = None
                     self._cons[name]['linear'] = True
+                    self._cons[name]['alias'] = None
 
     def get_driver_objective_calls(self):
         """
@@ -267,18 +273,20 @@ class ScipyOptimizeDriver(Driver):
         bool
             Failure flag; True if failed to converge, False is successful.
         """
-        problem = self._problem()
+        prob = self._problem()
         opt = self.options['optimizer']
-        model = problem.model
+        model = prob.model
         self.iter_count = 0
         self._total_jac = None
+        self._desvar_array_cache = None
 
         self._check_for_missing_objective()
         self._check_for_invalid_desvar_values()
 
         # Initial Run
-        with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-            model.run_solve_nonlinear()
+        with RecordingDebugging(self._get_name(), self.iter_count, self):
+            with model._relevance.nonlinear_active('iter'):
+                model.run_solve_nonlinear()
             self.iter_count += 1
 
         self._con_cache = self.get_constraint_values()
@@ -456,12 +464,12 @@ class ScipyOptimizeDriver(Driver):
             hess = None
 
         # compute dynamic simul deriv coloring if option is set
-        coloring = self._get_coloring(run_model=False)
+        prob.get_total_coloring(self._coloring_info, run_model=False)
 
         # optimize
         try:
             if opt in _optimizers:
-                if self._problem().comm.rank != 0:
+                if prob.comm.rank != 0:
                     self.opt_settings['disp'] = False
 
                 result = minimize(self._objfunc, x_init,
@@ -518,9 +526,7 @@ class ScipyOptimizeDriver(Driver):
                 from scipy.optimize import differential_evolution
                 # There is no "options" param, so "opt_settings" can be used to set the (many)
                 # keyword arguments
-                result = differential_evolution(self._objfunc,
-                                                bounds=bounds,
-                                                **self.opt_settings)
+                result = differential_evolution(self._objfunc, bounds=bounds, **self.opt_settings)
             elif opt == 'shgo':
                 from scipy.optimize import shgo
                 kwargs = dict()
@@ -548,6 +554,9 @@ class ScipyOptimizeDriver(Driver):
         except Exception as msg:
             if self._exc_info is None:
                 raise
+        finally:
+            total_jac = self._total_jac  # used later if this is the final iter
+            self._total_jac = None
 
         if self._exc_info is not None:
             self._reraise()
@@ -555,25 +564,40 @@ class ScipyOptimizeDriver(Driver):
         self.result = result
 
         if hasattr(result, 'success'):
-            self.fail = False if result.success else True
+            self.fail = not result.success
             if self.fail:
-                if self._problem().comm.rank == 0:
+                if prob.comm.rank == 0:
                     print('Optimization FAILED.')
                     print(result.message)
                     print('-' * 35)
 
             elif self.options['disp']:
-                if self._problem().comm.rank == 0:
+                if prob.comm.rank == 0:
                     print('Optimization Complete')
                     print('-' * 35)
         else:
             self.fail = True  # It is not known, so the worst option is assumed
-            if self._problem().comm.rank == 0:
+            if prob.comm.rank == 0:
                 print('Optimization Complete (success not known)')
                 print(result.message)
                 print('-' * 35)
 
         return self.fail
+
+    def _update_design_vars(self, x_new):
+        """
+        Update the design variables in the model.
+
+        Parameters
+        ----------
+        x_new : ndarray
+            Array containing input values at new design point.
+        """
+        i = 0
+        for name, meta in self._designvars.items():
+            size = meta['size']
+            self.set_design_var(name, x_new[i:i + size])
+            i += size
 
     def _objfunc(self, x_new):
         """
@@ -596,17 +620,20 @@ class ScipyOptimizeDriver(Driver):
         try:
 
             # Pass in new inputs
-            i = 0
             if MPI:
                 model.comm.Bcast(x_new, root=0)
-            for name, meta in self._designvars.items():
-                size = meta['size']
-                self.set_design_var(name, x_new[i:i + size])
-                i += size
+
+            if self._desvar_array_cache is None:
+                self._desvar_array_cache = np.empty(x_new.shape, dtype=x_new.dtype)
+
+            self._desvar_array_cache[:] = x_new
+
+            self._update_design_vars(x_new)
 
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 self.iter_count += 1
-                model.run_solve_nonlinear()
+                with model._relevance.nonlinear_active('iter'):
+                    model.run_solve_nonlinear()
 
             # Get the objective function evaluations
             for obj in self.get_objective_values().values():
@@ -719,6 +746,9 @@ class ScipyOptimizeDriver(Driver):
         ndarray
             Gradient of objective with respect to input array.
         """
+        prob = self._problem()
+        model = prob.model
+
         try:
             grad = self._compute_totals(of=self._obj_and_nlcons, wrt=self._dvlist,
                                         return_format=self._total_jac_format)
@@ -726,12 +756,16 @@ class ScipyOptimizeDriver(Driver):
 
             # First time through, check for zero row/col.
             if self._check_jac and self._total_jac is not None:
-                raise_error = self.options['singular_jac_behavior'] == 'error'
-                self._total_jac.check_total_jac(raise_error=raise_error,
-                                                tol=self.options['singular_jac_tol'])
+                for subsys in model.system_iter(include_self=True, recurse=True, typ=Group):
+                    if subsys._has_approx:
+                        break
+                else:
+                    raise_error = self.options['singular_jac_behavior'] == 'error'
+                    self._total_jac.check_total_jac(raise_error=raise_error,
+                                                    tol=self.options['singular_jac_tol'])
                 self._check_jac = False
 
-        except Exception as msg:
+        except Exception:
             if self._exc_info is None:  # only record the first one
                 self._exc_info = sys.exc_info()
             return np.array([[]])

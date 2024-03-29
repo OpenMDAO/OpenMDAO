@@ -647,7 +647,7 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         new_areas_equals_bound = np.array([4.0, 1.0, 0.5, 7.5])
         prob.model.set_constraint_options(name='areas', equals=new_areas_equals_bound)
         constraints_using_set_objective_options = prob.model.get_constraints()
-        assert_near_equal(constraints_using_set_objective_options['comp.areas']['equals'],
+        assert_near_equal(constraints_using_set_objective_options['areas']['equals'],
                           new_areas_equals_bound)
 
 

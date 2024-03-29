@@ -68,36 +68,11 @@ class ExplicitComponent(Component):
         """
         new_jacvec_prod = getattr(self, 'compute_jacvec_product', None)
 
-        if self.matrix_free is _UNDEFINED:
+        if self.matrix_free == _UNDEFINED:
             self.matrix_free = overrides_method('compute_jacvec_product', self, ExplicitComponent)
 
         if self.matrix_free:
             self._check_matfree_deprecation()
-
-    def _get_partials_varlists(self, use_resname=False):
-        """
-        Get lists of 'of' and 'wrt' variables that form the partial jacobian.
-
-        Parameters
-        ----------
-        use_resname : bool
-            Ignored for explicit components.
-
-        Returns
-        -------
-        tuple(list, list)
-            'of' and 'wrt' variable lists.
-        """
-        of = list(self._var_rel_names['output'])
-        wrt = list(self._var_rel_names['input'])
-
-        # filter out any discrete inputs or outputs
-        if self._discrete_outputs:
-            of = [n for n in of if n not in self._discrete_outputs]
-        if self._discrete_inputs:
-            wrt = [n for n in wrt if n not in self._discrete_inputs]
-
-        return of, wrt
 
     def _jac_wrt_iter(self, wrt_matches=None):
         """
@@ -367,7 +342,7 @@ class ExplicitComponent(Component):
             if dochk:
                 self._check_consistent_serial_dinputs(nzdresids)
 
-    def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, jac, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -375,8 +350,6 @@ class ExplicitComponent(Component):
         ----------
         jac : Jacobian or None
             If None, use local jacobian, else use jac.
-        rel_systems : set of str
-            Set of names of relevant systems based on the current linear solve.
         mode : str
             'fwd' or 'rev'.
         scope_out : set or None
@@ -436,7 +409,7 @@ class ExplicitComponent(Component):
                 finally:
                     d_inputs.read_only = d_residuals.read_only = False
 
-    def _solve_linear(self, mode, rel_systems, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
+    def _solve_linear(self, mode, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
@@ -444,8 +417,6 @@ class ExplicitComponent(Component):
         ----------
         mode : str
             'fwd' or 'rev'.
-        rel_systems : set of str
-            Set of names of relevant systems based on the current linear solve.
         scope_out : set, None, or _UNDEFINED
             Outputs relevant to possible lower level calls to _apply_linear on Components.
         scope_in : set, None, or _UNDEFINED

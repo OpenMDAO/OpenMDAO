@@ -15,7 +15,6 @@ from collections.abc import Iterable
 import numpy as np
 
 from openmdao.core.constants import INF_BOUND
-from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.array_utils import shape_to_len
 
 
@@ -114,6 +113,43 @@ def ensure_compatible(name, value, shape=None, indices=None):
                                  f"{value.shape}.")
 
     return value, shape
+
+
+def _subjac_meta2value(meta):
+    """
+    Convert subjacobian metadata to value, rows, cols.
+
+    Parameters
+    ----------
+    meta : dict
+        Metadata dict.
+
+    Returns
+    -------
+    ndarray
+        Value of the subjacobian.
+    ndarray or None
+        Row indices of nonzero values in subjacobian.
+    ndarray or None
+        Column indices of nonzero values in subjacobian.
+    """
+    val = meta['val'] if 'val' in meta else None
+    rows = meta['rows'] if 'rows' in meta else None
+    cols = meta['cols'] if 'cols' in meta else None
+
+    if rows is not None:
+        if val is not None and np.isscalar(val):
+            val = np.full(len(rows), val)
+    elif np.isscalar(val):
+        shape = meta['shape'] if 'shape' in meta else None
+        if shape is not None:
+            val = np.full(shape, val)
+        else:
+            val = np.atleast_2d(val)
+    elif val is not None:
+        val = np.atleast_2d(val)
+
+    return val, rows, cols
 
 
 def determine_adder_scaler(ref0, ref, adder, scaler):
@@ -340,9 +376,9 @@ def all_ancestors(pathname, delim='.'):
     ------
     str
     """
-    parts = pathname.split(delim)
-    for i in range(len(parts), 0, -1):
-        yield delim.join(parts[:i])
+    while pathname:
+        yield pathname
+        pathname, _, _ = pathname.rpartition(delim)
 
 
 def find_matches(pattern, var_list):
@@ -363,9 +399,44 @@ def find_matches(pattern, var_list):
     """
     if pattern == '*':
         return var_list
-    elif pattern in var_list:
-        return [pattern]
     return [name for name in var_list if fnmatchcase(name, pattern)]
+
+
+def pattern_filter(patterns, var_iter, name_index=None):
+    """
+    Yield variable names that match a given pattern.
+
+    Parameters
+    ----------
+    patterns : iter of str
+        Glob patterns or variable names.
+    var_iter : iter of str or iter of tuple/list
+        Iterator of variable names (or tuples containing variable names) to search for patterns.
+    name_index : int or None
+        If not None, the var_iter is assumed to yield tuples, and the
+        name_index is the index of the variable name in the tuple.
+
+    Yields
+    ------
+    str
+        Variable name that matches a pattern.
+    """
+    if '*' in patterns:
+        yield from var_iter
+    else:
+        if name_index is None:
+            for vname in var_iter:
+                for pattern in patterns:
+                    if fnmatchcase(vname, pattern):
+                        yield vname
+                        break
+        else:
+            for tup in var_iter:
+                vname = tup[name_index]
+                for pattern in patterns:
+                    if fnmatchcase(vname, pattern):
+                        yield tup
+                        break
 
 
 def _find_dict_meta(dct, key):
@@ -596,27 +667,6 @@ def remove_whitespace(s, right=False, left=False):
         return re.sub(r"^\s+", "", s, flags=re.UNICODE)
 
 
-_badtab = r'`~@#$%^&*()[]{}-+=|\/?<>,.:;'
-_transtab = str.maketrans(_badtab, '_' * len(_badtab))
-
-
-def str2valid_python_name(s):
-    """
-    Translate a given string into a valid python variable name.
-
-    Parameters
-    ----------
-    s : str
-        The string to be translated.
-
-    Returns
-    -------
-    str
-        The valid python name string.
-    """
-    return s.translate(_transtab)
-
-
 _container_classes = (list, tuple, set)
 
 
@@ -800,30 +850,6 @@ def match_includes_excludes(name, includes=None, excludes=None):
                 return True
 
     return False
-
-
-def filtered_name_iter(name_iter, includes=None, excludes=None):
-    """
-    Yield names that pass through the includes and excludes filters.
-
-    Parameters
-    ----------
-    name_iter : iter of str
-        Iterator over names to be checked for match.
-    includes : iter of str or None
-        Glob patterns for name to include in the filtering.  None, the default, means
-        include all.
-    excludes : iter of str or None
-        Glob patterns for name to exclude in the filtering.
-
-    Yields
-    ------
-    str
-        Each name that passes through the filters.
-    """
-    for name in name_iter:
-        if match_includes_excludes(name, includes, excludes):
-            yield name
 
 
 def meta2src_iter(meta_iter):
@@ -1010,14 +1036,6 @@ def _src_name_iter(proms):
     """
     for meta in proms.values():
         yield meta['source']
-
-
-def _src_or_alias_name(meta):
-    if 'alias' in meta:
-        alias = meta['alias']
-        if alias:
-            return alias
-    return meta['source']
 
 
 def _src_or_alias_item_iter(proms):
@@ -1249,7 +1267,7 @@ class LocalRangeIterable(object):
                 self._inds = range(slices[vname].stop - slices[vname].start)
             self._var_size = all_abs2meta[vname]['global_size']
 
-    def __str__(self):
+    def __repr__(self):
         """
         Return a string representation of the iterator.
 

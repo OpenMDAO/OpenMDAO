@@ -82,29 +82,32 @@ class TestSolverFeatures(unittest.TestCase):
         assert_near_equal(prob.get_val('g2.y2'), 0.80, .00001)
 
     def test_nonlinear_solver_stall_detection(self):
-        prob = om.Problem()
 
-        prob.model.add_subsystem('comp', om.ExecComp('y=3*x+1'), promotes=['*'])
+        for stall_tol_type in ('rel', 'abs'):
+            with self.subTest(f'Stall detection for stall_tol_type={stall_tol_type}'):
+                prob = om.Problem()
+                prob.model.add_subsystem('comp', om.ExecComp('y=3*x+1'), promotes=['*'])
 
-        balance = prob.model.add_subsystem('balance', om.BalanceComp(), promotes=['*'])
-        balance.add_balance('x', lower=-.1, upper=10, rhs_val=0, lhs_name='y')
+                balance = prob.model.add_subsystem('balance', om.BalanceComp(), promotes=['*'])
+                balance.add_balance('x', lower=-.1, upper=10, rhs_val=0, lhs_name='y')
 
-        newton = prob.model.nonlinear_solver = om.NewtonSolver()
-        newton.options['solve_subsystems'] = True
-        newton.options['stall_limit'] = 3
-        newton.options['stall_tol'] = 1e-8
-        newton.options['maxiter'] = 100
-        newton.options['err_on_non_converge'] = True
+                newton = prob.model.nonlinear_solver = om.NewtonSolver()
+                newton.options['solve_subsystems'] = True
+                newton.options['stall_limit'] = 3
+                newton.options['stall_tol'] = 1e-8
+                newton.options['stall_tol_type'] = stall_tol_type
+                newton.options['maxiter'] = 100
+                newton.options['err_on_non_converge'] = True
 
-        prob.model.linear_solver = om.DirectSolver()
+                prob.model.linear_solver = om.DirectSolver()
 
-        prob.setup()
+                prob.setup()
 
-        with self.assertRaises(om.AnalysisError) as context:
-            prob.run_model()
+                with self.assertRaises(om.AnalysisError) as context:
+                    prob.run_model()
 
-        msg = "Solver 'NL: Newton' on system '' stalled after 4 iterations."
-        self.assertEqual(str(context.exception), msg)
+                msg = "Solver 'NL: Newton' on system '' stalled after 4 iterations."
+                self.assertEqual(str(context.exception), msg)
 
     def test_nonlinear_solver_bounds_stall_warning(self):
         prob = om.Problem()
@@ -215,6 +218,51 @@ class TestSolverFeatures(unittest.TestCase):
         prob.set_solver_print()
 
         prob.run_model()
+
+    def test_linesearch_property(self):
+        import openmdao.api as om
+
+        ns = om.NewtonSolver()
+        bs = om.BroydenSolver()
+        nlbgs = om.NonlinearBlockGS()
+        nlbj = om.NonlinearBlockJac()
+
+        for solver in [ns, bs, nlbgs, nlbj]:
+            with self.subTest(msg=solver.msginfo):
+                if solver in (ns, bs):
+                    self.assertIsInstance(solver.linesearch, om.BoundsEnforceLS)
+                else:
+                    self.assertIsNone(solver.linesearch)
+
+                new_ls = om.ArmijoGoldsteinLS()
+
+                if solver in (nlbgs, nlbj):
+                    with self.assertRaises(AttributeError) as e:
+                        solver.linesearch = new_ls
+                    expected = (f'{solver.msginfo}: This solver does not '
+                                'support a linesearch.')
+                    self.assertEqual(expected, str(e.exception))
+                else:
+                    solver.linesearch = new_ls
+                    self.assertIs(solver.linesearch, new_ls)
+
+    def test_solver_broken_weakref(self):
+
+        prob = om.Problem()
+        sys = prob.model.add_subsystem('sellar', SellarDerivatives())
+
+        sys.nonlinear_solver =om.NewtonSolver(solve_subsystems=False)
+
+        # Simulate Broken Weakref
+        solver = sys.nonlinear_solver
+        solver._system = lambda: None
+
+        # Setup should still run with broken ref
+        prob.setup()
+
+        # Message info should still be readible
+        info = solver.msginfo
+        assert info == type(solver).__name__
 
 
 if __name__ == "__main__":

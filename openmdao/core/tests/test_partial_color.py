@@ -3,6 +3,7 @@ import tempfile
 import shutil
 import unittest
 import itertools
+from fnmatch import fnmatchcase
 
 try:
     from parameterized import parameterized
@@ -267,10 +268,10 @@ _TOLS = {
 
 def _check_partial_matrix(system, jac, expected, method):
     blocks = []
-    for of, ofmeta in system._var_allprocs_abs2meta['output'].items():
+    for abs_of, ofmeta in system._var_allprocs_abs2meta['output'].items():
         cblocks = []
-        for wrt, wrtmeta in system._var_allprocs_abs2meta['input'].items():
-            key = (of, wrt)
+        for abs_wrt, wrtmeta in system._var_allprocs_abs2meta['input'].items():
+            key = (abs_of, abs_wrt)
             if key in jac:
                 meta = jac[key]
                 if meta['rows'] is not None:
@@ -280,9 +281,22 @@ def _check_partial_matrix(system, jac, expected, method):
                 else:
                     cblocks.append(np.zeros(meta['shape']))
             else: # sparsity was all zeros so we declared this subjac as not dependent
-                relof = of.rsplit('.', 1)[-1]
-                relwrt = wrt.rsplit('.', 1)[-1]
-                if (relof, relwrt) in system._declared_partials and not system._declared_partials[(relof, relwrt)].get('dependent'):
+                relof = abs_of.rsplit('.', 1)[-1]
+                relwrt = abs_wrt.rsplit('.', 1)[-1]
+                for decl_key, meta in system._declared_partials_patterns.items():
+                    if not meta['dependent']:
+                        ofpats, wrtpats = decl_key
+                        done = False
+                        for p in ofpats:
+                            if fnmatchcase(relof, p):
+                                for wp in wrtpats:
+                                    if fnmatchcase(relwrt, wp):
+                                        cblocks.append(np.zeros((ofmeta['size'], wrtmeta['size'])))
+                                        done = True
+                                        break
+                                if done:
+                                    break
+                if (relof, relwrt) in system._declared_partials_patterns and not system._declared_partials_patterns[(relof, relwrt)].get('dependent'):
                     cblocks.append(np.zeros((ofmeta['size'], wrtmeta['size'])))
         if cblocks:
             blocks.append(np.hstack(cblocks))
@@ -291,16 +305,18 @@ def _check_partial_matrix(system, jac, expected, method):
 
 
 def _check_total_matrix(system, jac, expected, method):
-    blocks = []
-    for of in system._var_allprocs_abs2meta['output']:
-        cblocks = []
-        for wrt in itertools.chain(system._var_allprocs_abs2meta['output'], system._var_allprocs_abs2meta['input']):
-            key = (of, wrt)
-            if key in jac:
-                cblocks.append(jac[key])
-        if cblocks:
-            blocks.append(np.hstack(cblocks))
-    fullJ = np.vstack(blocks)
+    ofs = {}
+    for key, subjac in jac.items():
+        of, wrt = key
+        if of not in ofs:
+            ofs[of] = [subjac]
+        else:
+            ofs[of].append(subjac)
+
+    for of, sjacs in ofs.items():
+        ofs[of] = np.hstack(sjacs)
+
+    fullJ = np.vstack(list(ofs.values()))
     np.testing.assert_allclose(fullJ, expected, rtol=_TOLS[method])
 
 
@@ -483,9 +499,9 @@ class TestColoringExplicit(unittest.TestCase):
             jac = comp._jacobian._subjacs_info
             _check_partial_matrix(comp, jac, sparsity, method)
 
-        orig = comps[0]._coloring_info['coloring']
+        orig = comps[0]._coloring_info.coloring
         for comp in comps:
-            self.assertTrue(orig is comp._coloring_info['coloring'],
+            self.assertTrue(orig is comp._coloring_info.coloring,
                             "Instance '{}' is using a different coloring".format(comp.pathname))
 
 
@@ -881,7 +897,7 @@ class TestColoring(unittest.TestCase):
         # verify we're doing a solve for each column
         self.assertEqual(6, comp._nruns - start_nruns)
 
-        self.assertEqual(comp._coloring_info['coloring'], None)
+        self.assertEqual(comp._coloring_info.coloring, None)
         self.assertEqual(comp._coloring_info['static'], None)
 
         jac = comp._jacobian._subjacs_info
@@ -928,7 +944,7 @@ class TestColoring(unittest.TestCase):
             start_nruns = comp._nruns
             comp._linearize()
             self.assertEqual(6, comp._nruns - start_nruns)
-            self.assertEqual(comp._coloring_info['coloring'], None)
+            self.assertEqual(comp._coloring_info.coloring, None)
             self.assertEqual(comp._coloring_info['static'], None)
 
             jac = comp._jacobian._subjacs_info

@@ -676,3 +676,140 @@ def get_random_arr(shape, comm=None, generator=None):
         arr = np.empty(shape)
     comm.Bcast(arr, root=0)
     return arr
+
+
+class ValueRepeater(object):
+    """
+    An iterable over a single value that repeats a given number of times.
+
+    Parameters
+    ----------
+    val : object
+        The value to be repeated.
+    size : int
+        The number of times to repeat the value.
+
+    Attributes
+    ----------
+    val : object
+        The value to be repeated.
+    size : int
+        The number of times to repeat the value.
+
+    Yields
+    ------
+    object
+        The value.
+    """
+
+    def __init__(self, val, size):
+        """
+        Initialize all attributes.
+        """
+        self.val = val
+        self.size = size
+
+    def __iter__(self):
+        """
+        Return an iterator over the value.
+
+        Yields
+        ------
+        object
+            The value.
+        """
+        for i in range(self.size):
+            yield self.val
+
+    def __len__(self):
+        """
+        Return the size of the value.
+
+        Returns
+        -------
+        int
+            The size of the value.
+        """
+        return self.size
+
+    def __contains__(self, item):
+        """
+        Return True if the given item is equal to the value.
+
+        Parameters
+        ----------
+        item : object
+            The item to be checked for containment.
+        """
+        return item == self.val
+
+    def __getitem__(self, idx):
+        """
+        Return the value.
+
+        Parameters
+        ----------
+        idx : int
+            The index of the value to be returned.
+        """
+        i = idx
+        if idx < 0:
+            idx += self.size
+        if idx >= self.size:
+            raise IndexError(f"index {i} is out of bounds for size {self.size}")
+        return self.val
+
+
+def convert_nans_in_nested_list(val_as_list):
+    """
+    Given a list, possibly nested, replace any numpy.nan values with the string "nan".
+
+    This is done since JSON does not handle nan. This code is used to pass variable values
+    to the N2 diagram.
+
+    The modifications to the list values are done in-place to avoid excessive copying of lists.
+
+    Parameters
+    ----------
+    val_as_list : list
+        List, possibly nested, whose nan elements need to be converted.
+    """
+    for i, val in enumerate(val_as_list):
+        if isinstance(val, list):
+            convert_nans_in_nested_list(val)
+        else:
+            if np.isnan(val):
+                val_as_list[i] = "nan"
+            elif np.isinf(val):
+                val_as_list[i] = "infinity"
+            else:
+                val_as_list[i] = val
+
+
+def convert_ndarray_to_support_nans_in_json(val):
+    """
+    Given numpy array of arbitrary dimensions, return the equivalent nested list with nan replaced.
+
+    numpy.nan values are replaced with the string "nan".
+
+    Parameters
+    ----------
+    val : ndarray
+        Numpy array to be converted.
+
+    Returns
+    -------
+    list
+        The equivalent list (possibly nested) with any nan values replaced with the string "nan".
+    """
+    val = np.asarray(val)
+
+    # do a quick check for any nans or infs and if not we can avoid the slow check
+    nans = np.where(np.isnan(val))
+    infs = np.where(np.isinf(val))
+    if nans[0].size == 0 and infs[0].size == 0:
+        return val.tolist()
+
+    val_as_list = val.tolist()
+    convert_nans_in_nested_list(val_as_list)
+    return val_as_list

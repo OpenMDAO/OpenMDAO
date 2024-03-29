@@ -148,8 +148,7 @@ class ScipyKrylov(LinearSolver):
 
         x_vec.set_val(in_arr)
         scope_out, scope_in = system._get_matvec_scope()
-        system._apply_linear(self._assembled_jac, self._rel_systems, self._mode,
-                             scope_out, scope_in)
+        system._apply_linear(self._assembled_jac, self._mode, scope_out, scope_in)
 
         # DO NOT REMOVE: frequently used for debugging
         # print('in', in_arr)
@@ -185,9 +184,8 @@ class ScipyKrylov(LinearSolver):
         mode : str
             'fwd' or 'rev'.
         rel_systems : set of str
-            Names of systems relevant to the current solve.
+            Names of systems relevant to the current solve.  Deprecated.
         """
-        self._rel_systems = rel_systems
         self._mode = mode
 
         system = self._system()
@@ -197,6 +195,7 @@ class ScipyKrylov(LinearSolver):
 
         maxiter = self.options['maxiter']
         atol = self.options['atol']
+        rtol = self.options['rtol']
 
         if mode == 'fwd':
             x_vec = system._doutputs
@@ -217,13 +216,13 @@ class ScipyKrylov(LinearSolver):
 
         self._iter_count = 0
         if solver is gmres:
-            if Version(scipy.__version__) < Version("1.1"):
+            if Version(Version(scipy.__version__).base_version) < Version("1.12"):
                 x, info = solver(linop, b_vec.asarray(True), M=M, restart=restart,
                                  x0=x_vec_combined, maxiter=maxiter, tol=atol, atol='legacy',
                                  callback=self._monitor, callback_type='legacy')
             else:
                 x, info = solver(linop, b_vec.asarray(True), M=M, restart=restart,
-                                 x0=x_vec_combined, maxiter=maxiter, tol=atol, atol='legacy',
+                                 x0=x_vec_combined, maxiter=maxiter, atol=atol, rtol=rtol,
                                  callback=self._monitor, callback_type='legacy')
         else:
             x, info = solver(linop, b_vec.asarray(True), M=M,
@@ -278,3 +277,14 @@ class ScipyKrylov(LinearSolver):
 
         # return resulting value of x vector
         return x_vec.asarray(copy=True)
+
+    def use_relevance(self):
+        """
+        Return True if relevance should be active.
+
+        Returns
+        -------
+        bool
+            True if relevance should be active.
+        """
+        return False

@@ -22,7 +22,7 @@ from openmdao.components.exec_comp import _expr_dict, _temporary_expr_dict
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_warning
 from openmdao.utils.general_utils import env_truthy
 from openmdao.utils.testing_utils import force_check_partials
-from openmdao.utils.om_warnings import OMDeprecationWarning, SetupWarning
+from openmdao.utils.om_warnings import SetupWarning
 
 _ufunc_test_data = {
     'min': {
@@ -833,9 +833,7 @@ class TestExecComp(unittest.TestCase):
         model.add_subsystem('comp', comp)
         p.setup()
 
-        declared_partials = comp._declared_partials[('y','x')]
-        self.assertTrue('rows' not in declared_partials )
-        self.assertTrue('cols' not in declared_partials )
+        self.assertEqual(len(comp._declared_partials_patterns), 0)
 
         # run with has_diag_partials=True
         p = om.Problem()
@@ -845,11 +843,11 @@ class TestExecComp(unittest.TestCase):
         p.setup()
         p.final_setup()
 
-        declared_partials = comp._declared_partials[('y','x')]
+        declared_partials = comp._declared_partials_patterns[('y','x')]
         self.assertTrue('rows' in declared_partials )
-        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y','x')]['rows']))
+        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials_patterns[('y','x')]['rows']))
         self.assertTrue('cols' in declared_partials )
-        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y','x')]['cols']))
+        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials_patterns[('y','x')]['cols']))
 
     def test_exec_comp_deriv_sparsity(self):
         # Check to make sure that when an ExecComp has more than one
@@ -864,7 +862,7 @@ class TestExecComp(unittest.TestCase):
         p.final_setup()
 
         ## make sure only the partials that are needed are declared
-        declared_partials = comp._declared_partials
+        declared_partials = comp._declared_partials_patterns
         self.assertListEqual( sorted([('y1', 'x1'), ('y2', 'x2') ]),
                               sorted(declared_partials.keys()))
 
@@ -891,7 +889,7 @@ class TestExecComp(unittest.TestCase):
         p.setup()
         p.final_setup()
 
-        declared_partials = comp._declared_partials
+        declared_partials = comp._declared_partials_patterns
         self.assertListEqual( sorted([('y1', 'x1'), ('y2', 'x2') ]),
                               sorted(declared_partials.keys()))
 
@@ -910,17 +908,17 @@ class TestExecComp(unittest.TestCase):
         p.setup()
         p.final_setup()
 
-        declared_partials = comp._declared_partials
+        declared_partials = comp._declared_partials_patterns
         self.assertListEqual( sorted([('y1', 'x1'), ('y2', 'x2') ]),
                               sorted(declared_partials.keys()))
         self.assertTrue('cols' in declared_partials[('y1', 'x1')] )
         self.assertTrue('rows' in declared_partials[('y1', 'x1')] )
         self.assertTrue('cols' in declared_partials[('y2', 'x2')] )
         self.assertTrue('rows' in declared_partials[('y2', 'x2')] )
-        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y1','x1')]['rows']))
-        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y1','x1')]['cols']))
-        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y2','x2')]['rows']))
-        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y2','x2')]['cols']))
+        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials_patterns[('y1','x1')]['rows']))
+        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials_patterns[('y1','x1')]['cols']))
+        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials_patterns[('y2','x2')]['rows']))
+        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials_patterns[('y2','x2')]['cols']))
 
         p.run_model()
 
@@ -1977,7 +1975,8 @@ class TestExecCompParameterized(unittest.TestCase):
 
             for comp in cpd:
                 for (var, wrt) in cpd[comp]:
-                    np.testing.assert_almost_equal(cpd[comp][var, wrt]['abs error'][0], 0, decimal=4)
+                    np.testing.assert_almost_equal(cpd[comp][var, wrt]['abs error'][0], 0, decimal=4,
+                                                   verbose=True, err_msg=f"{test_data['args']=}")
 
 
 if __name__ == "__main__":

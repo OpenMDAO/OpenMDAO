@@ -19,7 +19,7 @@ from openmdao.test_suite.components.simple_comps import NonSquareArrayComp
 from openmdao.test_suite.groups.sin_fitter import SineFitter
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
 from openmdao.utils.general_utils import run_driver
-from openmdao.utils.testing_utils import set_env_vars_context
+from openmdao.utils.testing_utils import set_env_vars_context, use_tempdirs
 from openmdao.utils.mpi import MPI
 
 try:
@@ -92,6 +92,7 @@ class DummyComp(om.ExplicitComponent):
 
 
 @unittest.skipUnless(MPI, "MPI is required.")
+@use_tempdirs
 class TestMPIScatter(unittest.TestCase):
     N_PROCS = 2
 
@@ -157,8 +158,8 @@ class TestMPIScatter(unittest.TestCase):
 
         assert_check_totals(prob.check_totals(method='cs', out_stream=None))
 
-        assert_near_equal(obj['sum.f_sum'], 0.0, 2e-6)
-        assert_near_equal(con['parab.f_xy'],
+        assert_near_equal(obj['f_sum'], 0.0, 2e-6)
+        assert_near_equal(con['f_xy'],
                           np.zeros(7),
                           1e-5)
 
@@ -1462,7 +1463,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['x'], 7.16667, 1e-6)
         assert_near_equal(prob['y'], -7.833334, 1e-6)
 
-        self.assertEqual(prob.driver._obj_and_nlcons, ['comp.f_xy'])
+        self.assertEqual(prob.driver._obj_and_nlcons, ['f_xy'])
 
     def test_simple_paraboloid_equality_linear(self):
 
@@ -1522,7 +1523,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed.")
 
         self.assertTrue('In mode: rev.' in output)
-        self.assertTrue("('comp.f_xy', [0])" in output)
+        self.assertTrue("('f_xy', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
         prob = om.Problem()
@@ -1551,7 +1552,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed.")
 
         self.assertTrue('In mode: fwd.' in output)
-        self.assertTrue("('p1.x', [0])" in output)
+        self.assertTrue("('x', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
     def test_debug_print_all_options(self):
@@ -1590,14 +1591,14 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                         "Should be more than one linear constraint header printed")
         self.assertTrue(output.count("Objectives") > 1,
                         "Should be more than one objective header printed")
-        self.assertTrue(len([s for s in output if s.startswith("{'p1.x")]) > 1,
-                        "Should be more than one p1.x printed")
-        self.assertTrue(len([s for s in output if "'p2.y'" in s]) > 1,
-                        "Should be more than one p2.y printed")
-        self.assertTrue(len([s for s in output if s.startswith("{'con.c")]) > 1,
-                        "Should be more than one con.c printed")
-        self.assertTrue(len([s for s in output if s.startswith("{'comp.f_xy")]) > 1,
-                        "Should be more than one comp.f_xy printed")
+        self.assertTrue(len([s for s in output if s.startswith("{'x'")]) > 1,
+                        "Should be more than one x printed")
+        self.assertTrue(len([s for s in output if "'y'" in s]) > 1,
+                        "Should be more than one y printed")
+        self.assertTrue(len([s for s in output if s.startswith("{'c'")]) > 1,
+                        "Should be more than one c printed")
+        self.assertTrue(len([s for s in output if s.startswith("{'f_xy'")]) > 1,
+                        "Should be more than one f_xy printed")
 
     def test_sellar_mdf_linear_con_directsolver(self):
         # This test makes sure that we call solve_nonlinear first if we have any linear constraints

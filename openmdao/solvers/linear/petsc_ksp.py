@@ -228,6 +228,17 @@ class PETScKrylov(LinearSolver):
             for s in self.precon._assembled_jac_solver_iter():
                 yield s
 
+    def use_relevance(self):
+        """
+        Return True if relevance should be active.
+
+        Returns
+        -------
+        bool
+            True if relevance should be active.
+        """
+        return False
+
     def _setup_solvers(self, system, depth):
         """
         Assign system instance, set depth, and optionally perform setup.
@@ -300,8 +311,7 @@ class PETScKrylov(LinearSolver):
 
         # apply linear
         scope_out, scope_in = system._get_matvec_scope()
-        system._apply_linear(self._assembled_jac, self._rel_systems, self._mode,
-                             scope_out, scope_in)
+        system._apply_linear(self._assembled_jac, self._mode, scope_out, scope_in)
 
         # stuff resulting value of b vector into result for KSP
         result.array[:] = b_vec.asarray()
@@ -336,9 +346,8 @@ class PETScKrylov(LinearSolver):
         mode : str
             Derivative mode, can be 'fwd' or 'rev'.
         rel_systems : set of str
-            Names of systems relevant to the current solve.
+            Names of systems relevant to the current solve.  Deprecated.
         """
-        self._rel_systems = rel_systems
         self._mode = mode
 
         system = self._system()

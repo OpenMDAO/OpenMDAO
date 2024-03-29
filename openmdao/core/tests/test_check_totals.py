@@ -19,6 +19,7 @@ from openmdao.core.tests.test_check_partials import ParaboloidTricky, MyCompGood
     MyCompBadPartials, DirectionalVectorizedMatFreeComp
 from openmdao.test_suite.scripts.circle_opt import CircleOpt
 from openmdao.core.constants import _UNDEFINED
+import openmdao.core.total_jac as tot_jac_mod
 
 from openmdao.utils.mpi import MPI
 
@@ -135,11 +136,11 @@ class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
         dv_vals = p.driver.get_design_var_values(get_remote=False)
 
         # Compute totals and check the length of the gradient array on each proc
-        objcongrad = p.compute_totals(get_remote=False)
+        J = p.compute_totals(get_remote=False)
 
         # Check the values of the gradient array
-        assert_near_equal(objcongrad[('dp.y', 'distrib_ivc.x')][0], -6.0*np.ones(ndvs))
-        assert_near_equal(objcongrad[('dp.y', 'distrib_ivc.x')][1], -18.0*np.ones(ndvs))
+        assert_near_equal(J[('y', 'x')][0], -6.0*np.ones(ndvs))
+        assert_near_equal(J[('y', 'x')][1], -18.0*np.ones(ndvs))
 
     def test_distrib_compute_totals_fwd(self):
         self._do_compute_totals('fwd')
@@ -153,8 +154,8 @@ class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
 
         p = om.Problem()
         d_ivc = p.model.add_subsystem('distrib_ivc',
-                                    om.IndepVarComp(distributed=True),
-                                    promotes=['*'])
+                                      om.IndepVarComp(distributed=True),
+                                      promotes=['*'])
         if comm.rank == 0:
             ndvs = 6
             two_d = (3,2)
@@ -181,10 +182,10 @@ class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
         dv_vals = p.driver.get_design_var_values(get_remote=False)
 
         # Compute totals and check the length of the gradient array on each proc
-        objcongrad = p.compute_totals(get_remote=False)
+        J = p.compute_totals(get_remote=False)
 
         # Check the values of the gradient array
-        assert_near_equal(objcongrad[('dp.y', 'distrib_ivc.x')][0], -6.0*np.ones(ndvs))
+        assert_near_equal(J[('y', 'x')][0], -6.0*np.ones(ndvs))
 
     def test_distrib_compute_totals_2D_fwd(self):
         self._do_compute_totals_2D('fwd')
@@ -308,8 +309,8 @@ class Simple(om.ExplicitComponent):
         partials['y', 'x'] = np.ones(self.size) * 2.0
         self.ncompute_partials += 1
 
-    def _solve_linear(self, mode, rel_systems, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
-        super()._solve_linear(mode, rel_systems, scope_out, scope_in)
+    def _solve_linear(self, mode, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
+        super()._solve_linear(mode, scope_out, scope_in)
         self.nsolve_linear += 1
 
 
@@ -425,8 +426,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertTrue('9.80614' in lines[6], "'9.80614' not found in '%s'" % lines[6])
         self.assertTrue('cs:None' in lines[6], "'cs:None not found in '%s'" % lines[6])
 
-        assert_near_equal(totals['con_cmp2.con2', 'x']['J_fwd'], [[0.09692762]], 1e-5)
-        assert_near_equal(totals['con_cmp2.con2', 'x']['J_fd'], [[0.09692762]], 1e-5)
+        assert_near_equal(totals['con2', 'x']['J_fwd'], [[0.09692762]], 1e-5)
+        assert_near_equal(totals['con2', 'x']['J_fd'], [[0.09692762]], 1e-5)
 
         # Test compact_print output
         compact_stream = StringIO()
@@ -571,7 +572,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_near_equal(J['y1', 'x1'][1][1], Jbase[2, 3], 1e-8)
 
         totals = prob.check_totals()
-        jac = totals[('mycomp.y1', 'x_param1.x1')]['J_fd']
+        jac = totals[('y1', 'x1')]['J_fd']
         assert_near_equal(jac[0][0], Jbase[0, 1], 1e-8)
         assert_near_equal(jac[0][1], Jbase[0, 3], 1e-8)
         assert_near_equal(jac[1][0], Jbase[2, 1], 1e-8)
@@ -606,7 +607,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_near_equal(J['y1', 'x1'][0][1], Jbase[1, 3], 1e-8)
 
         totals = prob.check_totals()
-        jac = totals[('mycomp.y1', 'x_param1.x1')]['J_fd']
+        jac = totals[('y1', 'x1')]['J_fd']
         assert_near_equal(jac[0][0], Jbase[1, 1], 1e-8)
         assert_near_equal(jac[0][1], Jbase[1, 3], 1e-8)
 
@@ -635,7 +636,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         # check derivatives with complex step and a larger step size.
         totals = prob.check_totals(method='cs', out_stream=None)
 
-        data = totals['con_cmp2.con2', 'x']
+        data = totals['con2', 'x']
         self.assertTrue('J_fwd' in data)
         self.assertTrue('rel error' in data)
         self.assertTrue('abs error' in data)
@@ -819,8 +820,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         # Make sure we don't bomb out with an error.
         J = p.check_totals(out_stream=None)
 
-        assert_near_equal(J[('time.time', 'time_extents.t_duration')]['J_fwd'][0], 17.0, 1e-5)
-        assert_near_equal(J[('time.time', 'time_extents.t_duration')]['J_fd'][0], 17.0, 1e-5)
+        assert_near_equal(J[('time', 't_duration')]['J_fwd'][0], 17.0, 1e-5)
+        assert_near_equal(J[('time', 't_duration')]['J_fd'][0], 17.0, 1e-5)
 
         # Try again with a direct solver and sparse assembled hierarchy.
 
@@ -838,14 +839,14 @@ class TestProblemCheckTotals(unittest.TestCase):
         # Make sure we don't bomb out with an error.
         J = p.check_totals(out_stream=None)
 
-        assert_near_equal(J[('sub.time.time', 'sub.time_extents.t_duration')]['J_fwd'][0], 17.0, 1e-5)
-        assert_near_equal(J[('sub.time.time', 'sub.time_extents.t_duration')]['J_fd'][0], 17.0, 1e-5)
+        assert_near_equal(J[('sub.time', 'sub.t_duration')]['J_fwd'][0], 17.0, 1e-5)
+        assert_near_equal(J[('sub.time', 'sub.t_duration')]['J_fd'][0], 17.0, 1e-5)
 
-        # Make sure check_totals cleans up after itself by running it a second time.
+        # Make sure check_totals cleans up after itself by running it a second time
         J = p.check_totals(out_stream=None)
 
-        assert_near_equal(J[('sub.time.time', 'sub.time_extents.t_duration')]['J_fwd'][0], 17.0, 1e-5)
-        assert_near_equal(J[('sub.time.time', 'sub.time_extents.t_duration')]['J_fd'][0], 17.0, 1e-5)
+        assert_near_equal(J[('sub.time', 'sub.t_duration')]['J_fwd'][0], 17.0, 1e-5)
+        assert_near_equal(J[('sub.time', 'sub.t_duration')]['J_fd'][0], 17.0, 1e-5)
 
     def test_vector_scaled_derivs(self):
 
@@ -1126,10 +1127,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
         prob.run_model()
 
-        totals = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs', out_stream=None)
-
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 3e-8)
+        chk = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs', out_stream=None)
+        assert_check_totals(chk, atol=3e-8, rtol=3e-8)
 
     def test_cs_around_broyden_top_sparse(self):
         prob = om.Problem()
@@ -1141,10 +1140,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
         prob.run_model()
 
-        totals = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs', out_stream=None)
-
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 7e-8)
+        chk = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs', out_stream=None)
+        assert_check_totals(chk, atol=7e-8, rtol=7e-8)
 
     def test_check_totals_on_approx_model(self):
         prob = om.Problem()
@@ -1158,12 +1155,10 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.model.linear_solver = om.DirectSolver()
         prob.run_model()
 
-        totals = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs',
+        chk = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs',
                                    step = 1e-39, # needs to be different than arrox_totals or error
                                    out_stream=None)
-
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 3e-8)
+        assert_check_totals(chk, atol=3e-8, rtol=3e-8)
 
     def test_cs_error_allocate(self):
         prob = om.Problem()
@@ -1252,12 +1247,12 @@ class TestProblemCheckTotals(unittest.TestCase):
         J_driver = p.check_totals(out_stream=stream)
         lines = stream.getvalue().splitlines()
 
-        self.assertTrue("Full Model: 'stuff.lcy' wrt 'x' (Linear constraint)" in lines[4])
+        self.assertTrue("Full Model: 'lcy' wrt 'x' (Linear constraint)" in lines[4])
         self.assertTrue("Absolute Error (Jfor - Jfd)" in lines[8])
         self.assertTrue("Relative Error (Jfor - Jfd) / Jfd" in lines[10])
 
-        assert_near_equal(J_driver['stuff.y', 'x']['J_fwd'][0, 0], 1.0)
-        assert_near_equal(J_driver['stuff.lcy', 'x']['J_fwd'][0, 0], 3.0)
+        assert_near_equal(J_driver['y', 'x']['J_fwd'][0, 0], 1.0)
+        assert_near_equal(J_driver['lcy', 'x']['J_fwd'][0, 0], 3.0)
 
     def test_alias_constraints(self):
         prob = om.Problem()
@@ -1284,13 +1279,13 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         totals = prob.check_totals(out_stream=None)
 
-        assert_near_equal(totals['comp.areas', 'p1.widths']['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(totals['a2', 'p1.widths']['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(totals['a3', 'p1.widths']['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(totals['a4', 'p1.widths']['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(totals['areas', 'widths']['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(totals['a2', 'widths']['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(totals['a3', 'widths']['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(totals['a4', 'widths']['abs error'][0], 0.0, 1e-6)
 
-        l = prob.list_problem_vars(show_promoted_name=True, print_arrays=False,
-                                   cons_opts=['indices', 'alias'])
+        l = prob.list_driver_vars(show_promoted_name=True, print_arrays=False,
+                                  cons_opts=['indices', 'alias'])
 
         # Rev mode
 
@@ -1319,10 +1314,10 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         totals = prob.check_totals(out_stream=None)
 
-        assert_near_equal(totals['comp.areas', 'p1.widths']['abs error'][1], 0.0, 1e-6)
-        assert_near_equal(totals['a2', 'p1.widths']['abs error'][1], 0.0, 1e-6)
-        assert_near_equal(totals['a3', 'p1.widths']['abs error'][1], 0.0, 1e-6)
-        assert_near_equal(totals['a4', 'p1.widths']['abs error'][1], 0.0, 1e-6)
+        assert_near_equal(totals['areas', 'widths']['abs error'][1], 0.0, 1e-6)
+        assert_near_equal(totals['a2', 'widths']['abs error'][1], 0.0, 1e-6)
+        assert_near_equal(totals['a3', 'widths']['abs error'][1], 0.0, 1e-6)
+        assert_near_equal(totals['a4', 'widths']['abs error'][1], 0.0, 1e-6)
 
     def test_alias_constraints_nested(self):
         # Tests a bug where we need to lookup the constraint alias on a response that is from
@@ -1861,21 +1856,21 @@ class TestProblemCheckTotals(unittest.TestCase):
         data = p.check_totals(method='cs', directional=True)
         assert_check_totals(data, atol=1e-6, rtol=1e-6)
 
-    def _build_sparse_model(self, driver, coloring=False):
+    def _build_sparse_model(self, driver, coloring=False, size=5):
         prob = om.Problem()
         prob.driver = driver
 
-        prob.model.add_subsystem('comp1', Simple(size=5))
-        prob.model.add_subsystem('comp2', Simple(size=5))
-        prob.model.add_subsystem('comp3', Simple(size=5))
-        prob.model.add_subsystem('comp4', Simple(size=5))
+        prob.model.add_subsystem('comp1', Simple(size=size))
+        prob.model.add_subsystem('comp2', Simple(size=size))
+        prob.model.add_subsystem('comp3', Simple(size=size))
+        prob.model.add_subsystem('comp4', Simple(size=size))
 
-        prob.model.add_subsystem('comp', SparseJacVec(size=5))
+        prob.model.add_subsystem('comp', SparseJacVec(size=size))
 
-        prob.model.add_subsystem('comp5', Simple(size=5))
-        prob.model.add_subsystem('comp6', Simple(size=5))
-        prob.model.add_subsystem('comp7', Simple(size=5))
-        prob.model.add_subsystem('comp8', Simple(size=5))
+        prob.model.add_subsystem('comp5', Simple(size=size))
+        prob.model.add_subsystem('comp6', Simple(size=size))
+        prob.model.add_subsystem('comp7', Simple(size=size))
+        prob.model.add_subsystem('comp8', Simple(size=size))
 
         prob.model.connect('comp1.y', 'comp.in1')
         prob.model.connect('comp2.y', 'comp.in2')
@@ -2199,21 +2194,26 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
 
     def test_multi_fd_steps_compact_directional(self):
         expected_divs = {
-            'fwd': ('+----------------------------------------------------------------------------------------+------------------+-------------+-------------+-------------+-------------+-------------+------------+', 7),
-            'rev': ('+-------------------------------+-----------------------------------------+-------------+-------------+-------------+-------------+-------------+------------+', 13),
+            'fwd': 7,
+            'rev': 13,
         }
-        for mode in ('fwd', 'rev'):
-            with self.subTest(f"{mode} derivatives"):
-                p = om.Problem(model=CircleOpt(), driver=om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False))
-                p.setup(mode=mode)
-                p.run_model()
-                stream = StringIO()
-                J = p.check_totals(step=[1e-6, 1e-7], compact_print=True, directional=True, out_stream=stream)
-                contents = stream.getvalue()
-                self.assertEqual(contents.count("step"), 1)
-                # check number of rows/cols
-                s, times = expected_divs[mode]
-                self.assertEqual(contents.count(s), times)
+        try:
+            rand_save = tot_jac_mod._directional_rng
+            for mode in ('fwd', 'rev'):
+                with self.subTest(f"{mode} derivatives"):
+                    tot_jac_mod._directional_rng = np.random.default_rng(99)  # keep random seeds the same for directional check
+                    p = om.Problem(model=CircleOpt(), driver=om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False))
+                    p.setup(mode=mode)
+                    p.run_model()
+                    stream = StringIO()
+                    J = p.check_totals(step=[1e-6, 1e-7], compact_print=True, directional=True, out_stream=stream)
+                    contents = stream.getvalue()
+                    self.assertEqual(contents.count("step"), 1)
+                    # check number of rows/cols
+                    nrows = expected_divs[mode]
+                    self.assertEqual(contents.count('\n+-'), nrows)
+        finally:
+            tot_jac_mod._directional_rng = rand_save
 
 
 

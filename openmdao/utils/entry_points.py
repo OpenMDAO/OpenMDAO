@@ -24,6 +24,7 @@ from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case_recorder import CaseRecorder
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
 from openmdao.solvers.linesearch.backtracking import LinesearchSolver
+from openmdao.visualization.tables.table_builder import generate_table
 
 
 _epgroup_bases = {
@@ -360,7 +361,7 @@ def _list_installed_cmd(options, user_args):
     list_installed(options.types, options.includes, options.excludes, options.show_docs)
 
 
-def find_plugins(types=None):
+def find_repos(types=None, tablefmt='tabulator'):
     """
     Search github for repositories containing OpenMDAO plugins.
 
@@ -368,6 +369,9 @@ def find_plugins(types=None):
     ----------
     types : iter of str or None
         Sequence of entry point type names, e.g., component, group, driver, etc.
+    tablefmt : str
+        Format for generated table. Defaults to 'tabulator' which generates a sortable,
+        filterable web-based table.
 
     Returns
     -------
@@ -375,75 +379,92 @@ def find_plugins(types=None):
         Nested dict of the form  dct[eptype] = list of URLs.
     """
     if not types:
-        types = ['openmdao']
+        queries = ['topic:openmdao', 'openmdao in:description']
+    else:
+        queries = []
+        for type_ in types:
+            if type_ not in _github_topics:
+                raise RuntimeError("Type '{}' is not a valid type.  Try one of {}."
+                                   .format(type_, sorted(_github_topics)))
+            queries.append('topic:{}'.format(_github_topics[type_]))
 
     import requests
     allowed_set = set(_github_topics.values())
-    wid1 = wid2 = 0
-    pkgs = {}
-    for type_ in types:
-        if type_ not in _github_topics:
-            raise RuntimeError("Type '{}' is not a valid type.  Try one of {}."
-                               .format(type_, sorted(_github_topics)))
-
-        query = 'topic:{}'.format(_github_topics[type_])
-
+    rows = []
+    seen = set()
+    headers = ['Pkg Name', 'URL', 'Topics', 'Last Update', 'Description']
+    for query in queries:
         response = requests.get('https://api.github.com/search/repositories?q={}'.format(query),
                                 headers={'Accept': 'application/vnd.github.mercy-preview+json'},
                                 timeout=60)
 
         if response.status_code != 200:
-            print("Query failed for topic '{}' with response code {}.".format(_github_topics[type_],
-                                                                              response.status_code))
+            print("Query '{}' failed with response code {}.".format(query, response.status_code))
 
         resdict = response.json()
 
         items = resdict.get('items', None)
         if not items:
-            print(f"Query returned no items for topic '{_github_topics[type_]}'.")
+            print(f"Query '{query}' returned no items.")
         else:
             for item in items:
-                url = item['html_url']
-                name = item['name']
-                topics = [t for t in item['topics'] if t in allowed_set]
-                if len(name) > wid1:
-                    wid1 = len(name)
-                if len(url) > wid2:
-                    wid2 = len(url)
-                pkgs[url] = (name, topics)
+                topics = '\n'.join([t for t in item['topics']
+                                    if t in allowed_set and t != 'openmdao'])
+                if item['name'] in seen:
+                    continue
+                rows.append((item['name'], item['html_url'], topics, item['pushed_at'][:10],
+                             item['description']))
+                seen.add(item['name'])
 
         incomplete = resdict.get('incomplete_results', None)
         if incomplete:
             print("\nResults are incomplete.\n")
 
-    template = '{:<{wid1}}  {:<{wid2}}  {}'
-    if pkgs:
-        print(template.format('Pkg Name', 'URL', 'Topics', wid1=wid1, wid2=wid2))
-        print(template.format('--------', '---', '------', wid1=wid1, wid2=wid2))
-        for url, (name, topics) in sorted(pkgs.items(), key=lambda x: x[1][0]):
-            print(template.format(name, url, topics, wid1=wid1, wid2=wid2))
+    if rows:
+        if tablefmt == 'tabulator':
+            column_meta = [{'header': h} for h in headers]
+            column_meta[0]['formatter'] = 'link'
+            column_meta[0]['formatterParams'] = {'urlField': 'c1', 'target': '_blank'}
+            column_meta[1]['visible'] = False  # url is only used for a tooltip, so hide it
+            column_meta[3]['align'] = 'center'
+            column_meta[4]['width'] = '500'
+            if not rows:
+                column_meta = []
+
+            kwargs = {'rows': rows, 'tablefmt': tablefmt, 'column_meta': column_meta}
+            kwargs['title'] = "OpenMDAO Related Github Repositories"
+            kwargs['center'] = True
+
+            table = generate_table(**kwargs)
+            table._table_meta['initialSort'] = [
+                {'column': 'c0', 'dir': "asc"},    # first sort by package name
+                {'column': 'c3', 'dir': "desc"},  # then show most recently updated first
+            ]
+            table.display()
+        else:
+            generate_table(rows, headers=headers, tablefmt=tablefmt).display()
     else:
         print("No matching packages found.")
 
-    return pkgs
+    return rows
 
 
-def _find_plugins_setup_parser(parser):
+def _find_repos_setup_parser(parser):
     """
-    Set up the openmdao subparser for the 'openmdao find_plugins' command.
+    Set up the openmdao subparser for the 'openmdao find_repos' command.
 
     Parameters
     ----------
     parser : argparse subparser
         The parser we're adding options to.
     """
-    parser.add_argument('types', nargs='*', help='Find these types of plugins. '
-                        'Allowed types are {}.'.format(sorted(_github_topics)))
+    parser.add_argument('topics', nargs='*', help='Find github repos with these topics. '
+                        'Allowed topics are {}.'.format(sorted(_github_topics)))
 
 
-def _find_plugins_exec(options, user_args):
+def _find_repos_exec(options, user_args):
     """
-    Run the `openmdao find_plugins` command.
+    Run the `openmdao find_repos` command.
 
     Parameters
     ----------
@@ -457,4 +478,4 @@ def _find_plugins_exec(options, user_args):
     function
         The hook function.
     """
-    find_plugins(options.types)
+    find_repos(options.topics)

@@ -25,7 +25,7 @@ from openmdao.core.driver import Driver, record_iteration, SaveOptResult
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.system import System, _OptStatus
 from openmdao.core.group import Group
-from openmdao.core.total_jac import _TotalJacInfo, _contains_all
+from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.approximation_schemes.complex_step import ComplexStep
@@ -49,7 +49,7 @@ from openmdao.utils.array_utils import scatter_dist_to_local
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
     clear_reports, get_reports_dir, _load_report_plugins
-from openmdao.utils.general_utils import _contains_all, pad_name, LocalRangeIterable, \
+from openmdao.utils.general_utils import pad_name, LocalRangeIterable, \
     _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
@@ -139,7 +139,8 @@ class Problem(object):
     driver : <Driver> or None
         The driver for the problem. If not specified, a simple "Run Once" driver will be used.
     comm : MPI.Comm or <FakeComm> or None
-        The global communicator.
+        The MPI communicator for this Problem. If not specified, comm will be MPI.COMM_WORLD if
+        MPI is active, else it will be None.
     name : str
         Problem name. Can be used to specify a Problem instance when multiple Problems
         exist.
@@ -202,6 +203,8 @@ class Problem(object):
         The number of times run_driver or run_model has been called.
     _warned : bool
         Bool to check if `value` deprecation warning has occured yet
+    _computing_coloring : bool
+        When True, we are computing coloring.
     """
 
     def __init__(self, model=None, driver=None, comm=None, name=None, reports=_UNDEFINED,
@@ -219,6 +222,7 @@ class Problem(object):
 
         self.cite = CITATION
         self._warned = False
+        self._computing_coloring = False
 
         # Set the Problem name so that it can be referenced from command line tools (e.g. check)
         # that accept a Problem argument, and to name the corresponding reports subdirectory.
@@ -277,8 +281,6 @@ class Problem(object):
         self._driver = driver
 
         self.comm = comm
-
-        self._mode = None  # mode is assigned in setup()
 
         self._metadata = None
         self._run_counter = -1
@@ -435,6 +437,20 @@ class Problem(object):
         if self._name is None:
             return type(self).__name__
         return f'{type(self).__name__} {self._name}'
+
+    @property
+    def _mode(self):
+        """
+        Return the derivative mode.
+
+        Returns
+        -------
+        str
+            Derivative mode, 'fwd' or 'rev'.
+        """
+        if self._metadata is None:
+            return None
+        return self._metadata['mode']
 
     def _get_inst_id(self):
         return self._name
@@ -662,9 +678,6 @@ class Problem(object):
         finally:
             self._recording_iter.prefix = old_prefix
 
-    def _set_opt_status(self, status):
-        self._metadata['opt_status'] = status
-
     def run_driver(self, case_prefix=None, reset_iter_counts=True):
         """
         Run the driver on the model.
@@ -721,27 +734,9 @@ class Problem(object):
 
             model._clear_iprint()
 
-            if self.options['group_by_pre_opt_post'] and driver.supports['optimization']:
-                if model._run_on_opt[_OptStatus.PRE]:
-                    self._set_opt_status(_OptStatus.PRE)
-                    model.run_solve_nonlinear()
-
-                with SaveOptResult(driver):
-                    self._set_opt_status(_OptStatus.OPTIMIZING)
-                    result = driver.run()
-
-                if model._run_on_opt[_OptStatus.POST]:
-                    self._set_opt_status(_OptStatus.POST)
-                    model.run_solve_nonlinear()
-
-                return result
-            else:
-                with SaveOptResult(driver):
-                    return driver.run()
-
+            return driver._run()
         finally:
             self._recording_iter.prefix = old_prefix
-            self._set_opt_status(None)
 
     def compute_jacvec_product(self, of, wrt, mode, seed):
         """
@@ -932,19 +927,6 @@ class Problem(object):
         model = self.model
         comm = self.comm
 
-        if sys.version_info.minor < 8:
-            sv = sys.version_info
-            msg = f'OpenMDAO support for Python version {sv.major}.{sv.minor} will end soon.'
-            try:
-                from IPython import get_ipython
-                ip = get_ipython()
-                if ip is None or ip.config is None or 'IPKernelApp' not in ip.config:
-                    warn_deprecation(msg)
-            except ImportError:
-                warn_deprecation(msg)
-            except AttributeError:
-                warn_deprecation(msg)
-
         if not isinstance(self.model, Group):
             raise TypeError("The model for this Problem is of type "
                             f"'{self.model.__class__.__name__}'. "
@@ -965,7 +947,7 @@ class Problem(object):
             msg = f"{self.msginfo}: Unsupported mode: '{mode}'. Use either 'fwd' or 'rev'."
             raise ValueError(msg)
 
-        self._mode = self._orig_mode = mode
+        self._orig_mode = mode
 
         model_comm = self.driver._setup_comm(comm)
 
@@ -994,8 +976,9 @@ class Problem(object):
             'setup_status': _SetupStatus.PRE_SETUP,
             'model_ref': weakref.ref(model),  # ref to the model (needed to get out-of-scope
                                               # src data for inputs)
-            'using_par_deriv_color': False,  # True if parallel derivative coloring is being used
+            'has_par_deriv_color': False,  # True if any dvs/responses have parallel deriv colors
             'mode': mode,  # mode (derivative direction) set by the user.  'auto' by default
+            'orig_mode': mode,  # mode (derivative direction) set by the user.  'auto' by default
             'abs_in2prom_info': {},  # map of abs input name to list of length = sys tree height
                                      # down to var location, to allow quick resolution of local
                                      # src_shape/src_indices due to promotes.  For example,
@@ -1007,17 +990,19 @@ class Problem(object):
             'reports_dir': self.get_reports_dir(),  # directory where reports will be written
             'saved_errors': [],  # store setup errors here until after final_setup
             'checking': False,  # True if check_totals or check_partials is running
-            'opt_status': None,  # Tells Systems if they are in an optimization loop
             'model_options': self.model_options,  # A dict of options passed to all systems in tree
             'allow_post_setup_reorder': self.options['allow_post_setup_reorder'],  # see option
             'singular_jac_behavior': 'warn',  # How to handle singular jac conditions
             'parallel_deriv_color': None,  # None unless derivatives involving a parallel deriv
-                                           # colored dv/response are currently being computed
+                                           # colored dv/response are currently being computed.
             'seed_vars': None,  # set of names of seed variables. Seed variables are those that
                                 # have their derivative value set to 1.0 at the beginning of the
                                 # current derivative solve.
             'coloring_randgen': None,  # If total coloring is being computed, will contain a random
                                        # number generator, else None.
+            'group_by_pre_opt_post': self.options['group_by_pre_opt_post'],  # see option
+            'relevance_cache': {},  # cache of relevance objects
+            'rel_array_cache': {},  # cache of relevance arrays
         }
 
         if _prob_setup_stack:
@@ -1028,12 +1013,13 @@ class Problem(object):
 
         _prob_setup_stack.append(self)
         try:
-            model._setup(model_comm, mode, self._metadata)
+            model._setup(model_comm, self._metadata)
         finally:
             _prob_setup_stack.pop()
 
-        # set static mode back to True in all systems in this Problem
-        self._metadata['static_mode'] = True
+            # whenever we're outside of model._setup, static mode should be True so that anything
+            # added outside of _setup will persist.
+            self._metadata['static_mode'] = True
 
         # Cache all args for final setup.
         self._check = check
@@ -1062,20 +1048,13 @@ class Problem(object):
         # update mode if it's been set to 'auto'
         if self._orig_mode == 'auto':
             mode = 'rev' if response_size < desvar_size else 'fwd'
-            self._mode = mode
         else:
             mode = self._orig_mode
 
-        if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-            self.model._final_setup(self.comm, self._orig_mode)
+        self._metadata['mode'] = mode
 
-        if self.options['group_by_pre_opt_post']:
-            if self.driver.supports['optimization']:
-                self.model._setup_iteration_lists()
-            else:
-                issue_warning(f"In Problem '{self._name}, the 'group_by_pre_opt_post' option is "
-                              "True but the driver doesn't support optimization so the option will "
-                              "be ignored.")
+        if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
+            self.model._final_setup()
 
         # If set_solver_print is called after an initial run, in a multi-run scenario,
         #  this part of _final_setup still needs to happen so that change takes effect
@@ -1085,20 +1064,17 @@ class Problem(object):
 
         driver._setup_driver(self)
 
-        info = driver._coloring_info
-        coloring = info['coloring']
-        if coloring is None and info['static'] is not None:
-            coloring = driver._get_static_coloring()
-
-        if coloring and coloring_mod._use_total_sparsity:
-            # if we're using simultaneous total derivatives then our effective size is less
-            # than the full size
-            if coloring._fwd and coloring._rev:
-                pass  # we're doing both!
-            elif mode == 'fwd' and coloring._fwd:
-                desvar_size = coloring.total_solves()
-            elif mode == 'rev' and coloring._rev:
-                response_size = coloring.total_solves()
+        if coloring_mod._use_total_sparsity:
+            coloring = driver._coloring_info.coloring
+            if coloring is not None:
+                # if we're using simultaneous total derivatives then our effective size is less
+                # than the full size
+                if coloring._fwd and coloring._rev:
+                    pass  # we're doing both!
+                elif mode == 'fwd' and coloring._fwd:
+                    desvar_size = coloring.total_solves()
+                elif mode == 'rev' and coloring._rev:
+                    response_size = coloring.total_solves()
 
         if ((mode == 'fwd' and desvar_size > response_size) or
                 (mode == 'rev' and response_size > desvar_size)):
@@ -1210,11 +1186,12 @@ class Problem(object):
         excludes = [excludes] if isinstance(excludes, str) else excludes
 
         comps = []
-        under_CI = env_truthy('OPENMDAO_CHECK_ALL_PARTIALS')
+
+        # OPENMDAO_CHECK_ALL_PARTIALS overrides _no_check_partials (used for testing)
+        force_check_partials = env_truthy('OPENMDAO_CHECK_ALL_PARTIALS')
 
         for comp in model.system_iter(typ=Component, include_self=True):
-            # if we're under CI, do all of the partials, ignoring _no_check_partials
-            if comp._no_check_partials and not under_CI:
+            if comp._no_check_partials and not force_check_partials:
                 continue
 
             # skip any Component with no outputs
@@ -1244,7 +1221,7 @@ class Problem(object):
         for comp in comps:
             local_opts = comp._get_check_partial_options()
 
-            for key, meta in comp._declared_partials.items():
+            for keypats, meta in comp._declared_partials_patterns.items():
 
                 # Get the complete set of options, including defaults
                 #    for the computing of the derivs for this component
@@ -1257,14 +1234,12 @@ class Problem(object):
                     meta_with_defaults = FiniteDifference.DEFAULT_OPTIONS.copy()
                 meta_with_defaults.update(meta)
 
+                _, wrtpats = keypats
                 # For each of the partials, check to see if the
                 #   check partials options are different than the options used to compute
                 #   the partials
-                pattern_matches = comp._find_partial_matches(*key)
-                wrt_vars = pattern_matches[1]
-                for wrt_var in wrt_vars:
-                    _, vars = wrt_var
-                    for var in vars:
+                for _, wrtvars in comp._find_wrt_matches(wrtpats):
+                    for var in wrtvars:
                         # we now have individual vars like 'x'
                         # get the options for checking partials
                         fd_options, _ = _get_fd_options(var, requested_method, local_opts, step,
@@ -1339,7 +1314,8 @@ class Problem(object):
 
                 with comp._unscaled_context():
 
-                    of_list, wrt_list = comp._get_partials_varlists()
+                    of_list = comp._get_partials_ofs()
+                    wrt_list = comp._get_partials_wrts()
 
                     # Matrix-free components need to calculate their Jacobian by matrix-vector
                     # product.
@@ -1402,7 +1378,7 @@ class Problem(object):
                                 # Matrix Vector Product
                                 self._metadata['checking'] = True
                                 try:
-                                    comp._apply_linear(None, _contains_all, mode)
+                                    comp.run_apply_linear(mode)
                                 finally:
                                     self._metadata['checking'] = False
 
@@ -1538,7 +1514,8 @@ class Problem(object):
             c_name = comp.pathname
             all_fd_options[c_name] = {}
 
-            of, wrt = comp._get_partials_varlists()
+            of = comp._get_partials_ofs()
+            wrt = comp._get_partials_wrts()
 
             actual_steps = defaultdict(list)
 
@@ -1773,38 +1750,34 @@ class Problem(object):
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
         if wrt is None:
-            wrt = list(self.driver._designvars)
-            if not wrt:
+            if not self.driver._designvars:
                 raise RuntimeError("Driver is not providing any design variables "
                                    "for compute_totals.")
 
         lcons = []
         if of is None:
-            of = list(self.driver._objs)
-            of.extend(self.driver._cons)
-            if not of:
+            if not self.driver._responses:
                 raise RuntimeError("Driver is not providing any response variables "
                                    "for compute_totals.")
             lcons = [n for n, meta in self.driver._cons.items()
                      if ('linear' in meta and meta['linear'])]
+            if lcons:
+                # if driver has linear constraints, construct a full list of driver responses
+                # in order to avoid using any driver coloring that won't include the linear
+                # constraints. (The driver coloring would only be used if the supplied of and
+                # wrt lists were None or identical to the driver's lists.)
+                of = list(self.driver._responses)
 
         # Calculate Total Derivatives
-        if model._owns_approx_jac:
-            # Support this, even though it is a bit silly (though you could compare fd with cs.)
-            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
-                                       approx=True, driver_scaling=driver_scaling,
-                                       directional=directional)
-            Jcalc = total_info.compute_totals_approx(initialize=True)
-            Jcalc_name = 'J_fwd'
-        else:
-            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
-                                       driver_scaling=driver_scaling, directional=directional)
-            self._metadata['checking'] = True
-            try:
-                Jcalc = total_info.compute_totals()
-            finally:
-                self._metadata['checking'] = False
-            Jcalc_name = f"J_{total_info.mode}"
+        total_info = _TotalJacInfo(self, of, wrt, return_format='flat_dict',
+                                   approx=model._owns_approx_jac,
+                                   driver_scaling=driver_scaling, directional=directional)
+        self._metadata['checking'] = True
+        try:
+            Jcalc = total_info.compute_totals()
+        finally:
+            self._metadata['checking'] = False
+        Jcalc_name = f"J_{total_info.mode}"
 
         if step is None:
             if method == 'cs':
@@ -1843,7 +1816,7 @@ class Problem(object):
 
             model.approx_totals(method=method, step=step, form=form,
                                 step_calc=step_calc if method == 'fd' else None)
-            fd_tot_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
+            fd_tot_info = _TotalJacInfo(self, of, wrt, return_format='flat_dict',
                                         approx=True, driver_scaling=driver_scaling,
                                         directional=directional)
             if directional:
@@ -1852,10 +1825,9 @@ class Problem(object):
                 Jcalc, Jcalc_slices = total_info._get_as_directional()
 
             if show_progress:
-                Jfd = fd_tot_info.compute_totals_approx(initialize=True,
-                                                        progress_out_stream=out_stream)
+                Jfd = fd_tot_info.compute_totals(progress_out_stream=out_stream)
             else:
-                Jfd = fd_tot_info.compute_totals_approx(initialize=True)
+                Jfd = fd_tot_info.compute_totals()
 
             if directional:
                 Jfd, Jfd_slices = fd_tot_info._get_as_directional(total_info.mode)
@@ -1928,9 +1900,6 @@ class Problem(object):
                 if of in resp and resp[of]['indices'] is not None:
                     data[''][key]['indices'] = resp[of]['indices'].indexed_src_size
 
-        if out_stream == _DEFAULT_OUT_STREAM:
-            out_stream = sys.stdout
-
         _assemble_derivative_data(data, rel_err_tol, abs_err_tol, out_stream, compact_print,
                                   [model], {'': fd_args}, totals=total_info, lcons=lcons,
                                   show_only_incorrect=show_only_incorrect, sort=sort)
@@ -1941,7 +1910,8 @@ class Problem(object):
         return data['']
 
     def compute_totals(self, of=None, wrt=None, return_format='flat_dict', debug_print=False,
-                       driver_scaling=False, use_abs_names=False, get_remote=True):
+                       driver_scaling=False, use_abs_names=False, get_remote=True,
+                       coloring_info=None):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1964,41 +1934,30 @@ class Problem(object):
             or the ref and ref0 values that were specified when add_design_var, add_objective, and
             add_constraint were called on the model. Default is False, which is unscaled.
         use_abs_names : bool
-            Set to True when passing in absolute names to skip some translation steps.
+            This is deprecated and has no effect.
         get_remote : bool
             If True, the default, the full distributed total jacobian will be retrieved.
+        coloring_info : ColoringMeta, None, or False
+            If False, do no coloring.  If None, use driver coloring info to compute the coloring.
+            Otherwise use the given coloring info object to provide the coloring, if it exists.
 
         Returns
         -------
         object
             Derivatives in form requested by 'return_format'.
         """
+        if use_abs_names:
+            warn_deprecation("The use_abs_names argument to compute_totals is deprecated and has "
+                             "no effect.")
+
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             with multi_proc_exception_check(self.comm):
                 self.final_setup()
 
-        if wrt is None:
-            wrt = list(self.driver._designvars)
-            if not wrt:
-                raise RuntimeError("Driver is not providing any design variables "
-                                   "for compute_totals.")
-
-        if of is None:
-            of = list(self.driver._objs)
-            of.extend(self.driver._cons)
-            if not of:
-                raise RuntimeError("Driver is not providing any response variables "
-                                   "for compute_totals.")
-
-        if self.model._owns_approx_jac:
-            total_info = _TotalJacInfo(self, of, wrt, use_abs_names, return_format,
-                                       approx=True, driver_scaling=driver_scaling)
-            return total_info.compute_totals_approx(initialize=True)
-        else:
-            total_info = _TotalJacInfo(self, of, wrt, use_abs_names, return_format,
-                                       debug_print=debug_print, driver_scaling=driver_scaling,
-                                       get_remote=get_remote)
-            return total_info.compute_totals()
+        total_info = _TotalJacInfo(self, of, wrt, return_format, approx=self.model._owns_approx_jac,
+                                   driver_scaling=driver_scaling, get_remote=get_remote,
+                                   debug_print=debug_print, coloring_info=coloring_info)
+        return total_info.compute_totals()
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
@@ -2070,8 +2029,69 @@ class Problem(object):
             Name, size, val, and other requested parameters of design variables, constraints,
             and objectives.
         """
+        warn_deprecation(msg='Method `list_problem_vars` has been renamed `list_driver_vars`.\n'
+                         'Please update your code to use list_driver_vars to avoid this warning.')
+        return self.list_driver_vars(show_promoted_name=show_promoted_name,
+                                     print_arrays=print_arrays,
+                                     driver_scaling=driver_scaling,
+                                     desvar_opts=desvar_opts,
+                                     cons_opts=cons_opts,
+                                     objs_opts=objs_opts,
+                                     out_stream=out_stream)
+
+    def list_driver_vars(self,
+                         show_promoted_name=True,
+                         print_arrays=False,
+                         driver_scaling=True,
+                         desvar_opts=[],
+                         cons_opts=[],
+                         objs_opts=[],
+                         out_stream=_DEFAULT_OUT_STREAM
+                         ):
+        """
+        Print all design variables and responses (objectives and constraints).
+
+        Parameters
+        ----------
+        show_promoted_name : bool
+            If True, then show the promoted names of the variables.
+        print_arrays : bool, optional
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format is affected
+            by the values set with numpy.set_printoptions.
+            Default is False.
+        driver_scaling : bool, optional
+            When True, return values that are scaled according to either the adder and scaler or
+            the ref and ref0 values that were specified when add_design_var, add_objective, and
+            add_constraint were called on the model. Default is True.
+        desvar_opts : list of str
+            List of optional columns to be displayed in the desvars table.
+            Allowed values are:
+            ['lower', 'upper', 'ref', 'ref0', 'indices', 'adder', 'scaler', 'parallel_deriv_color',
+            'cache_linear_solution', 'units', 'min', 'max'].
+        cons_opts : list of str
+            List of optional columns to be displayed in the cons table.
+            Allowed values are:
+            ['lower', 'upper', 'equals', 'ref', 'ref0', 'indices', 'adder', 'scaler',
+            'linear', 'parallel_deriv_color', 'cache_linear_solution', 'units', 'min', 'max'].
+        objs_opts : list of str
+            List of optional columns to be displayed in the objs table.
+            Allowed values are:
+            ['ref', 'ref0', 'indices', 'adder', 'scaler', 'units',
+            'parallel_deriv_color', 'cache_linear_solution'].
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+
+        Returns
+        -------
+        dict
+            Name, size, val, and other requested parameters of design variables, constraints,
+            and objectives.
+        """
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-            raise RuntimeError(f"{self.msginfo}: Problem.list_problem_vars() cannot be called "
+            raise RuntimeError(f"{self.msginfo}: Problem.list_driver_vars() cannot be called "
                                "before `Problem.run_model()`, `Problem.run_driver()`, or "
                                "`Problem.final_setup()`.")
 
@@ -2517,30 +2537,33 @@ class Problem(object):
             raise RuntimeError("list_indep_vars requires that final_setup has been "
                                "run for the Problem.")
 
-        desvar_prom_names = model.get_design_vars(recurse=True,
-                                                  use_prom_ivc=True,
-                                                  get_sizes=False).keys()
+        design_vars = model.get_design_vars(recurse=True,
+                                            use_prom_ivc=True,
+                                            get_sizes=False)
 
         problem_indep_vars = []
         indep_var_names = set()
 
-        default_col_names = ['name', 'units', 'val']
-        col_names = default_col_names + ([] if options is None else options)
+        col_names = ['name', 'units', 'val']
+        if options is not None:
+            col_names.extend(options)
 
         abs2meta = model._var_allprocs_abs2meta['output']
-        prom2abs = self.model._var_allprocs_prom2abs_list['input']
 
-        prom2src = {prom: model.get_source(prom) for prom in prom2abs.keys()
-                    if 'openmdao:indep_var' in abs2meta[model.get_source(prom)]['tags']}
+        prom2src = {}
+        for prom in self.model._var_allprocs_prom2abs_list['input']:
+            src = model.get_source(prom)
+            if 'openmdao:indep_var' in abs2meta[src]['tags']:
+                prom2src[prom] = src
 
         for prom, src in prom2src.items():
             name = prom if src.startswith('_auto_ivc.') else src
-            meta = abs2meta[src]
-            meta = {key: val for key, val in meta.items() if key in col_names}
-            meta['val'] = self.get_val(prom)
 
-            if (include_design_vars or name not in desvar_prom_names) \
+            if (include_design_vars or name not in design_vars) \
                     and name not in indep_var_names:
+                meta = abs2meta[src]
+                meta = {key: meta[key] for key in col_names if key in meta}
+                meta['val'] = self.get_val(prom)
                 problem_indep_vars.append((name, meta))
                 indep_var_names.add(name)
 
@@ -2619,21 +2642,17 @@ class Problem(object):
         else:
             out = open(outfile, 'w')
 
-        if not self.options['group_by_pre_opt_post']:
-            print("\nThe 'group_by_pre_opt_post' option is False, so all components will be "
-                  "included in the optimization loop.", file=out)
-
         model = self.model
         if model._pre_components:
             print("\nPre-optimization components:", file=out)
-            for name in model._pre_components:
+            for name in sorted(model._pre_components):
                 print(f"    {name}", file=out)
         else:
             print("\nPre-optimization components: []", file=out)
 
         if model._post_components:
             print("\nPost-optimization components:", file=out)
-            for name in model._post_components:
+            for name in sorted(model._post_components):
                 print(f"    {name}", file=out)
         else:
             print("\nPost-optimization components: []", file=out)
@@ -2688,6 +2707,50 @@ class Problem(object):
                             seen.add(msg)
 
         return unique_errors
+
+    def get_total_coloring(self, coloring_info=None, of=None, wrt=None, run_model=None):
+        """
+        Get the total coloring.
+
+        If necessary, dynamically generate it.
+
+        Parameters
+        ----------
+        coloring_info : dict
+            Coloring metadata dict.
+        of : list of str or None
+            List of response names.
+        wrt : list of str or None
+            List of design variable names.
+        run_model : bool or None
+            If False, don't run model.  If None, use problem._run_counter to determine if model
+            should be run.
+
+        Returns
+        -------
+        Coloring or None
+            Coloring object, possibly dynamically generated, or None.
+        """
+        if coloring_mod._use_total_sparsity:
+            coloring = None
+            # if no coloring_info is supplied, copy the coloring_info from the driver but
+            # remove any existing coloring, and force dynamic coloring
+            if coloring_info is None:
+                coloring_info = self.driver._coloring_info.copy()
+                coloring_info.coloring = None
+                coloring_info.dynamic = True
+
+            if coloring_info.do_compute_coloring():
+                if coloring_info.dynamic:
+                    do_run = run_model if run_model is not None else self._run_counter < 0
+                    coloring = \
+                        coloring_mod.dynamic_total_coloring(
+                            self.driver, run_model=do_run,
+                            fname=self.driver._get_total_coloring_fname(), of=of, wrt=wrt)
+            else:
+                return coloring_info.coloring
+
+            return coloring
 
 
 _ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])

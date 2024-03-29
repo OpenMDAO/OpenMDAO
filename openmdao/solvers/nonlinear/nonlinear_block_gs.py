@@ -103,7 +103,7 @@ class NonlinearBlockGS(NonlinearSolver):
 
         # Execute guess_nonlinear if specified and
         # we have not restarted from a saved point
-        if not self._restarted:
+        if not self._restarted and system._has_guess:
             system._guess_nonlinear()
 
         return super()._iter_initialize()
@@ -235,11 +235,11 @@ class NonlinearBlockGS(NonlinearSolver):
                 outputs_n = outputs.asarray(copy=True)
 
             self._solver_info.append_subsolver()
-            for subsys in system._solver_subsystem_iter(local_only=False):
+            for subsys in system._relevance.filter(system._all_subsystem_iter()):
                 system._transfer('nonlinear', 'fwd', subsys.name)
                 if subsys._is_local:
                     subsys._solve_nonlinear()
 
             self._solver_info.pop()
-            with system._unscaled_context(residuals=[residuals]):
+            with system._unscaled_context(residuals=[residuals], outputs=[outputs]):
                 residuals.set_val(outputs.asarray() - outputs_n)
