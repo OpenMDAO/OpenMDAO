@@ -14,6 +14,12 @@ on:
 
     inputs:
 
+      run_name:
+        type: string
+        description: 'Name of workflow run as it will appear under Actions tab:'
+        required: false
+        default: ""
+
       Ubuntu_Baseline:
         type: boolean
         description: 'Include Ubuntu Baseline in test matrix'
@@ -56,6 +62,7 @@ on:
         required: false
         default: false
 
+run-name:  ${{ inputs.run_name }}
 
 permissions: {}
 
@@ -548,6 +555,7 @@ jobs:
             NUMPY: '1.24'
             SCIPY: '1.11'
             PYOPTSPARSE: '2.10.1'
+            BANDIT: true
             EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Windows_Baseline }}
 
     name: ${{ matrix.NAME }}
@@ -682,7 +690,7 @@ jobs:
           echo "============================================================="
           echo "Run bandit scan for high/medium severity issues"
           echo "============================================================="
-          cd $GITHUB_WORKSPACE
+          cd ${{ github.workspace }}
           python -m bandit -c bandit.yml -ll -r openmdao
 
       - name: Slack security issue
