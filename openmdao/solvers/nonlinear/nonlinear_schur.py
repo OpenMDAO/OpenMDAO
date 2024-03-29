@@ -47,7 +47,7 @@ class NonlinearSchurSolver(NonlinearSolver):
         self.linear_solver = None
 
         # Slot for linesearch
-        self.linesearch = BoundsEnforceLS()
+        # self.linesearch = BoundsEnforceLS()
 
     def _declare_options(self):
         """
@@ -299,7 +299,7 @@ class NonlinearSchurSolver(NonlinearSolver):
                 # run the jac-vec computation in the first subsystem, this ll give us the B[:,{ii}] vector
                 scope_out, scope_in = system._get_matvec_scope(subsys1)
 
-                subsys1._apply_linear(None, None, mode, scope_out, scope_in)
+                subsys1._apply_linear(None,  mode, scope_out, scope_in)
 
                 # amd then, by performing solve_linear we get A^-1 B[:,{ii}]
                 subsys1._solve_linear(mode, ContainsAll())
@@ -320,7 +320,7 @@ class NonlinearSchurSolver(NonlinearSolver):
                 # run the apply linear. we do it on the complete system here
                 # the result is the final jacobian for this using the schur complement method D[:,{ii}] - C A^-1 B[:,{ii}]
                 scope_out, scope_in = system._get_matvec_scope()
-                system._apply_linear(None, None, mode, scope_out, scope_in)
+                system._apply_linear(None,  mode, scope_out, scope_in)
 
                 # put this value into the jacobian.
                 schur_jac[:, ii] = subsys2._vectors["residual"]["linear"].asarray()
@@ -348,18 +348,18 @@ class NonlinearSchurSolver(NonlinearSolver):
 
                 # we get the C[{ii},:] vector by apply_linear on the system
                 scope_out, scope_in = system._get_matvec_scope()
-                system._apply_linear(None, None, mode, scope_out, scope_in)
+                system._apply_linear(None,  mode, scope_out, scope_in)
 
                 # do a solve_linear to find C[{ii},:] A^-1
                 scope_out, scope_in = system._get_matvec_scope(subsys1)
-                subsys1._solve_linear(mode, None, scope_out, scope_in)
+                subsys1._solve_linear(mode,  scope_out, scope_in)
 
                 # negate the resdiual first
                 subsys1._vectors["residual"]["linear"] *= -1.0
 
                 # do a apply_linear on the subsys1 to find the D[{ii},:] - C[{ii},:] A^-1 B
                 scope_out, scope_in = system._get_matvec_scope(subsys1)
-                subsys1._apply_linear(None, None, mode, scope_out, scope_in)
+                subsys1._apply_linear(None,  mode, scope_out, scope_in)
 
                 system._transfer("linear", mode, subsys2.name)
 

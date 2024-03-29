@@ -160,7 +160,7 @@ class LinearSchur(LinearSolver):
                 scope_out, scope_in = system._get_matvec_scope(subsys1)
                 scope_out = self._vars_union(self._scope_out, scope_out)
                 scope_in = self._vars_union(self._scope_in, scope_in)
-                subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+                subsys1._apply_linear(None, mode, scope_out, scope_in)
 
                 # amd then, by performing solve_linear we get A^-1 B[:,{ii}]
                 subsys1._solve_linear(mode, ContainsAll())
@@ -183,7 +183,7 @@ class LinearSchur(LinearSolver):
                 scope_out, scope_in = system._get_matvec_scope()
                 scope_out = self._vars_union(self._scope_out, scope_out)
                 scope_in = self._vars_union(self._scope_in, scope_in)
-                system._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+                system._apply_linear(None,  mode, scope_out, scope_in)
 
                 # put this value into the jacobian.
                 schur_jac[:, ii] = subsys2._vectors["residual"]["linear"].asarray(copy=True)
@@ -218,7 +218,7 @@ class LinearSchur(LinearSolver):
             scope_out, scope_in = system._get_matvec_scope(subsys2)
             scope_out = self._vars_union(self._scope_out, scope_out)
             scope_in = self._vars_union(self._scope_in, scope_in)
-            subsys2._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+            subsys2._apply_linear(None, mode, scope_out, scope_in)
 
             schur_rhs = subsys2._vectors["residual"]["linear"].asarray(copy=True)
 
@@ -270,7 +270,7 @@ class LinearSchur(LinearSolver):
             scope_in = self._vars_union(self._scope_in, scope_in)
 
             # if subsys1._iter_call_apply_linear():
-            subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+            subsys1._apply_linear(None, mode, scope_out, scope_in)
             b_vec *= -1.0
             b_vec += subsys1_rhs
             # else:
@@ -316,20 +316,20 @@ class LinearSchur(LinearSolver):
                 scope_out, scope_in = system._get_matvec_scope()
                 scope_out = self._vars_union(self._scope_out, scope_out)
                 scope_in = self._vars_union(self._scope_in, scope_in)
-                system._apply_linear(None, None, mode, scope_out, scope_in)
+                system._apply_linear(None, mode, scope_out, scope_in)
 
                 # do a solve_linear to find C[{ii},:] A^-1
                 scope_out, scope_in = system._get_matvec_scope(subsys1)
                 scope_out = self._vars_union(self._scope_out, scope_out)
                 scope_in = self._vars_union(self._scope_in, scope_in)
-                subsys1._solve_linear(mode, self._rel_systems, scope_out, scope_in)
+                subsys1._solve_linear(mode, scope_out, scope_in)
 
                 # negate the resdiual first
                 subsys1._vectors["residual"]["linear"] *= -1.0
 
                 # do a apply_linear on the subsys1 to find the D[{ii},:] - C[{ii},:] A^-1 B
                 scope_out, scope_in = system._get_matvec_scope(subsys1)
-                subsys1._apply_linear(None, None, mode, scope_out, scope_in)
+                subsys1._apply_linear(None, mode, scope_out, scope_in)
 
                 system._transfer("linear", mode, subsys2.name)
 
@@ -352,14 +352,14 @@ class LinearSchur(LinearSolver):
             scope_out, scope_in = system._get_matvec_scope(subsys1)
             scope_out = self._vars_union(self._scope_out, scope_out)
             scope_in = self._vars_union(self._scope_in, scope_in)
-            subsys1._solve_linear(mode, self._rel_systems, scope_out, scope_in)
+            subsys1._solve_linear(mode, scope_out, scope_in)
 
             # scope_out, scope_in = system._get_matvec_scope()
             # print("R", subsys1._dresiduals.asarray(), subsys1_rhs)
             # system._doutputs.set_val(0.0)
             # system._apply_linear(None, None, mode, scope_out, scope_in)
 
-            subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+            subsys1._apply_linear(None, mode, scope_out, scope_in)
             # print(system._dinputs.asarray())
             # print(system._doutputs.asarray())
             # subsys2_output = subsys2._vectors["output"]["linear"].asarray(copy=True)
@@ -428,7 +428,7 @@ class LinearSchur(LinearSolver):
             # print(system._doutputs.asarray())
             # print(system._dresiduals.asarray())
             # if subsys2._iter_call_apply_linear():
-            subsys2._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+            subsys2._apply_linear(None, mode, scope_out, scope_in)
             # else:
             #     b_vec2.set_val(0.0)
             # print(subsys2._dinputs.asarray())
@@ -459,11 +459,11 @@ class LinearSchur(LinearSolver):
             scope_out, scope_in = system._get_matvec_scope(subsys1)
             scope_out = self._vars_union(self._scope_out, scope_out)
             scope_in = self._vars_union(self._scope_in, scope_in)
-            subsys1._solve_linear(mode, self._rel_systems, scope_out, scope_in)
+            subsys1._solve_linear(mode, scope_out, scope_in)
 
             # if subsys1._iter_call_apply_linear():
             if subsys1._iter_call_apply_linear():
-                subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+                subsys1._apply_linear(None, mode, scope_out, scope_in)
             else:
                 b_vec.set_val(0.0)
             # else:
