@@ -126,8 +126,10 @@ class NewtonSolver(NonlinearSolver):
         Run the iterative solver.
         """
         if self.linear_solver is not None and self.linear_solver._lin_cache_manager is not None:
-            self.linear_solver._lin_cache_manager.clear()
-        super()._solve()
+            with self.linear_solver._lin_cache_manager.disabled():
+                super()._solve()
+        else:
+            super()._solve()
 
     def _run_apply(self):
         """

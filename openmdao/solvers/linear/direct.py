@@ -188,8 +188,6 @@ class DirectSolver(LinearSolver):
         """
         super().__init__(**kwargs)
 
-        self._lin_cache_manager = None
-
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
@@ -199,8 +197,13 @@ class DirectSolver(LinearSolver):
         self.options.declare('err_on_singular', types=bool, default=True,
                              desc="Raise an error if LU decomposition is singular.")
 
-        self.options.declare('use_cache', types=bool, default=True,
+        self.options.declare('use_cache', types=bool, default=False,
                              desc="If True, cache linear solutions and RHS vectors for later use.")
+
+        self.options.declare('max_cache_entries', types=int, default=3,
+                             desc="Maximum number of entries to store in the linear cache. When "
+                             "entries are added beyond the maximum, the oldest entries are "
+                             "deleted.")
 
         # this solver does not iterate
         self.options.undeclare("maxiter")
@@ -353,6 +356,9 @@ class DirectSolver(LinearSolver):
                 except ValueError as err:
                     raise RuntimeError(format_nan_error(system, mtx))
 
+        if self._lin_cache_manager is not None:
+            self._lin_cache_manager.clear()
+
     def _inverse(self):
         """
         Return the inverse Jacobian.
@@ -462,7 +468,8 @@ class DirectSolver(LinearSolver):
             self._lin_cache_manager = None
         else:
             if self.options['use_cache'] and self._lin_cache_manager is None:
-                self._lin_cache_manager = LinearCacheManager(self._system())
+                self._lin_cache_manager = LinearCacheManager(self._system(),
+                                                             self.options['max_cache_entries'])
 
             if self._lin_cache_manager is not None:
                 sol_array = self._lin_cache_manager.get_solution(b_vec, system)
