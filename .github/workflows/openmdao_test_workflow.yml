@@ -9,7 +9,53 @@ on:
     branches: [ master ]
 
   # Allow running the workflow manually from the Actions tab
+  # All jobs are excluded by default, desired jobs must be selected
   workflow_dispatch:
+
+    inputs:
+
+      Ubuntu_Baseline:
+        type: boolean
+        description: 'Include Ubuntu Baseline in test matrix'
+        required: false
+        default: false
+
+      MacOS_Baseline:
+        type: boolean
+        description: 'Include MacOS Baseline in test matrix'
+        required: false
+        default: false
+
+      Windows_Baseline:
+        type: boolean
+        description: 'Include Windows Baseline in test matrix'
+        required: false
+        default: false
+
+      Ubuntu_Minimal:
+        type: boolean
+        description: 'Include Ubuntu Minimal in test matrix'
+        required: false
+        default: false
+
+      Ubuntu_Oldest:
+        type: boolean
+        description: 'Include Ubuntu Oldest in test matrix'
+        required: false
+        default: false
+
+      Build_Docs:
+        type: boolean
+        description: 'Build docs'
+        required: false
+        default: false
+
+      debug_enabled:
+        type: boolean
+        description: 'Run the build with tmate debugging enabled (https://github.com/marketplace/actions/debugging-with-tmate)'
+        required: false
+        default: false
+
 
 permissions: {}
 
@@ -38,17 +84,7 @@ jobs:
             BANDIT: true
             PEP517: true
             TESTS: true
-            # set DEBUG to create an interactive debugging session just before testflo is run.
-            # Note that the workflow will run until you cancel the debugging session.
-            #   To access the terminal through the web-interface:
-            #     1. Click on the web-browser link printed out in this action from the github
-            #        workflow terminal
-            #     2. Press cntrl + c in the new tab that opens up to reveal the terminal
-            #     3. To activate the conda environment run:
-            #         $ source $CONDA/etc/profile.d/conda.sh
-            #         $ conda activate test
-            # See https://github.com/mxschmitt/action-tmate for more details
-            # DEBUG: true
+            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Baseline }}
 
           # test baseline versions on MacOS
           - NAME: MacOS Baseline
@@ -62,6 +98,7 @@ jobs:
             # SNOPT: '7.7'
             OPTIONAL: '[all]'
             TESTS: true
+            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.MacOS_Baseline }}
 
           # test minimal install
           - NAME: Ubuntu Minimal
@@ -71,6 +108,7 @@ jobs:
             SCIPY: '1.11'
             OPTIONAL: '[test]'
             TESTS: true
+            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Minimal }}
 
           # test oldest supported versions
           - NAME: Ubuntu Oldest
@@ -85,6 +123,7 @@ jobs:
             SNOPT: '7.2'
             OPTIONAL: '[all]'
             TESTS: true
+            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Oldest }}
 
           # build docs (baseline versions)
           - NAME: Build Docs
@@ -97,6 +136,7 @@ jobs:
             SNOPT: '7.7'
             OPTIONAL: '[all]'
             BUILD_DOCS: true
+            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Build_Docs }}
 
     runs-on: ${{ matrix.OS }}
 
@@ -116,6 +156,12 @@ jobs:
           echo "Triggered by: ${GITHUB_EVENT_NAME}"
           echo "Initiated by: ${GITHUB_ACTOR}"
           echo "============================================================="
+
+      - name: Exit if this job was excluded
+        if: matrix.EXCLUDE
+        uses: actions/github-script@v7
+        with:
+          script: core.setFailed('The ${{ matrix.NAME }} job was excluded from the run, exiting...');
 
       - name: Create SSH key
         if: (matrix.SNOPT || matrix.BUILD_DOCS)
@@ -300,11 +346,21 @@ jobs:
 
           grep changed $GITHUB_OUTPUT || echo ""
 
+      # Enable tmate debugging of manually-triggered workflows if the input option was provided
+      #
+      # To access the terminal through the web-interface:
+      #    1. Click on the web-browser link printed out in this action from the github
+      #       workflow terminal
+      #    2. Press cntrl + c in the new tab that opens up to reveal the terminal
+      #    3. To activate the conda environment run:
+      #        $ source $CONDA/etc/profile.d/conda.sh
+      #        $ conda activate test
       - name: Setup tmate session
-        if: matrix.DEBUG
+        if: ${{ inputs.debug_enabled }}
         uses: mxschmitt/action-tmate@v3
 
       - name: Run tests
+        id: run_tests
         if: matrix.TESTS
         env:
           OPENMDAO_CHECK_ALL_PARTIALS: true
@@ -387,7 +443,7 @@ jobs:
           done
 
       - name: Publish docs
-        if: ${{ github.event_name == 'push' && matrix.BUILD_DOCS }}
+        if: ${{ github.event_name != 'pull_request' && matrix.BUILD_DOCS }}
         env:
           DOCS_LOCATION: ${{ secrets.DOCS_LOCATION }}
         run: |
@@ -409,6 +465,7 @@ jobs:
       - name: Scan for security issues
         if: matrix.BANDIT
         id: bandit
+        continue-on-error: true
         run: |
           python -m pip install bandit
           echo "============================================================="
@@ -429,12 +486,52 @@ jobs:
             ```${{steps.env_info.outputs.errors}}```
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-      - name: Notify slack
+      - name: Slack unit test failure
+        if: steps.run_tests.outcome == 'failure'
         uses: act10ns/slack@v2.0.0
         with:
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          status: ${{ job.status }}
-        if: failure()
+          status: ${{ steps.run_tests.outcome }}
+          message:
+            Unit testing failed on `${{ matrix.NAME }}` build.
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Slack doc build failure
+        if: steps.build_docs.outcome == 'failure'
+        uses: act10ns/slack@v2.0.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: ${{ steps.build_docs.outcome }}
+          message: |
+            Doc build failed on `${{ matrix.NAME }}` build.
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Slack security issue
+        if: steps.bandit.outcome == 'failure'
+        uses: act10ns/slack@v2.0.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: ${{ steps.bandit.outcome }}
+          message:
+            Security issue found on `${{ matrix.NAME }}` build.
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Fail the workflow if tests or doc build failed
+        if: steps.run_tests.outcome == 'failure' || steps.build_docs.outcome == 'failure'
+        uses: actions/github-script@v3
+        with:
+          script: |
+              let test_fail = ${{ steps.run_tests.outcome == 'failure' }};
+              let docs_fail = ${{ steps.build_docs.outcome == 'failure' }};
+              if (test_fail && docs_fail) {
+                  core.setFailed('Tests and doc build failed.');
+              }
+              else if (test_fail) {
+                  core.setFailed('Tests failed.');
+              }
+              else if (docs_fail) {
+                  core.setFailed('Doc build failed.');
+              }
 
   windows_tests:
     runs-on: windows-latest
@@ -451,6 +548,7 @@ jobs:
             NUMPY: '1.24'
             SCIPY: '1.11'
             PYOPTSPARSE: '2.10.1'
+            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Windows_Baseline }}
 
     name: ${{ matrix.NAME }}
 
@@ -468,6 +566,12 @@ jobs:
           echo "Triggered by: $env:GITHUB_EVENT_NAME"
           echo "Initiated by: $env:GITHUB_ACTOR"
           echo "============================================================="
+
+      - name: Exit if this job was excluded
+        if: matrix.EXCLUDE
+        uses: actions/github-script@v7
+        with:
+          script: core.setFailed('The ${{ matrix.NAME }} job was excluded from the run, exiting...');
 
       - name: Checkout code
         uses: actions/checkout@v3
@@ -544,6 +648,8 @@ jobs:
           testflo -n 2 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20
 
       - name: Submit coverage
+        id: coveralls
+        continue-on-error: true
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COVERALLS_SERVICE_NAME: "github"
@@ -557,12 +663,38 @@ jobs:
           $SITE_DIR=python -c "import site; print(site.getsitepackages()[-1].replace('lib\\site-', 'Lib\\site-'))"
           coveralls --basedir $SITE_DIR
 
-      - name: Notify slack
+      - name: Slack failure to upload to coveralls.io
+        if: steps.coveralls.outcome == 'failure'
         uses: act10ns/slack@v2.0.0
         with:
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          status: ${{ job.status }}
-        if: failure()
+          status: 'warning'
+          message: |
+            Uploading of coverage data to coveralls.io failed.
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Scan for security issues
+        if: matrix.BANDIT
+        id: bandit
+        continue-on-error: true
+        run: |
+          python -m pip install bandit
+          echo "============================================================="
+          echo "Run bandit scan for high/medium severity issues"
+          echo "============================================================="
+          cd $GITHUB_WORKSPACE
+          python -m bandit -c bandit.yml -ll -r openmdao
+
+      - name: Slack security issue
+        if: steps.bandit.outcome == 'failure'
+        uses: act10ns/slack@v2.0.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: ${{ steps.bandit.outcome }}
+          message:
+            Security issue found on `${{ matrix.NAME }}` build.
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
 
   coveralls:
     name: Finish coverage
@@ -573,6 +705,7 @@ jobs:
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         parallel-finished: true
+
 
   dymos_tests:
     name: Run Dymos Tests
