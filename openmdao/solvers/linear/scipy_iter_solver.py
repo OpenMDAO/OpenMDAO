@@ -67,7 +67,7 @@ class ScipyKrylov(LinearSolver):
                                   'iteration cost, but may be necessary for convergence. This '
                                   'option applies only to gmres.')
 
-        self.options.declare('use_cache', types=bool, default=True,
+        self.options.declare('use_cache', types=bool, default=False,
                              desc="If True, cache linear solutions and RHS vectors for later use.")
 
         self.options.declare('max_cache_entries', types=int, default=3,

@@ -216,7 +216,7 @@ class PETScKrylov(LinearSolver):
         self.options.declare('precon_side', default='right', values=['left', 'right'],
                              desc='Preconditioner side, default is right.')
 
-        self.options.declare('use_cache', types=bool, default=True,
+        self.options.declare('use_cache', types=bool, default=False,
                              desc="If True, cache linear solutions and RHS vectors for later use.")
 
         self.options.declare('max_cache_entries', types=int, default=3,

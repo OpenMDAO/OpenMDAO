@@ -198,7 +198,7 @@ class DirectSolver(LinearSolver):
         self.options.declare('err_on_singular', types=bool, default=True,
                              desc="Raise an error if LU decomposition is singular.")
 
-        self.options.declare('use_cache', types=bool, default=True,
+        self.options.declare('use_cache', types=bool, default=False,
                              desc="If True, cache linear solutions and RHS vectors for later use.")
 
         self.options.declare('max_cache_entries', types=int, default=3,
