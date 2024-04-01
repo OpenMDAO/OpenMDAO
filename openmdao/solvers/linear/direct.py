@@ -7,7 +7,8 @@ import scipy.linalg
 import scipy.sparse.linalg
 from scipy.sparse import csc_matrix
 
-from openmdao.solvers.solver import LinearSolver, LinearCacheManager
+from openmdao.solvers.solver import LinearSolver
+from openmdao.solvers.linear.linear_cache_manager import LinearCacheManager
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.utils.array_utils import identity_column_iter
 
@@ -197,7 +198,7 @@ class DirectSolver(LinearSolver):
         self.options.declare('err_on_singular', types=bool, default=True,
                              desc="Raise an error if LU decomposition is singular.")
 
-        self.options.declare('use_cache', types=bool, default=False,
+        self.options.declare('use_cache', types=bool, default=True,
                              desc="If True, cache linear solutions and RHS vectors for later use.")
 
         self.options.declare('max_cache_entries', types=int, default=3,

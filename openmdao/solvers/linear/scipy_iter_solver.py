@@ -4,6 +4,7 @@ from packaging.version import Version
 import numpy as np
 import scipy
 from scipy.sparse.linalg import LinearOperator, gmres
+from openmdao.solvers.linear.linear_cache_manager import LinearCacheManager
 
 from openmdao.solvers.solver import LinearSolver
 
@@ -66,6 +67,14 @@ class ScipyKrylov(LinearSolver):
                                   'iteration cost, but may be necessary for convergence. This '
                                   'option applies only to gmres.')
 
+        self.options.declare('use_cache', types=bool, default=True,
+                             desc="If True, cache linear solutions and RHS vectors for later use.")
+
+        self.options.declare('max_cache_entries', types=int, default=3,
+                             desc="Maximum number of entries to store in the linear cache. When "
+                             "entries are added beyond the maximum, the oldest entries are "
+                             "deleted.")
+
         # changing the default maxiter from the base class
         self.options['maxiter'] = 1000
         self.options['atol'] = 1.0e-12
@@ -122,6 +131,9 @@ class ScipyKrylov(LinearSolver):
         """
         if self.precon is not None:
             self.precon._linearize()
+
+        if self._lin_cache_manager is not None:
+            self._lin_cache_manager.clear()
 
     def _mat_vec(self, in_arr):
         """
@@ -204,6 +216,22 @@ class ScipyKrylov(LinearSolver):
             x_vec = system._dresiduals
             b_vec = system._doutputs
 
+        if system.under_complex_step:
+            # disable caching under complex step
+            self._lin_cache_manager = None
+        else:
+            rhs_array = b_vec.asarray()
+
+            if self._lin_cache_manager is None and self.options['use_cache']:
+                self._lin_cache_manager = LinearCacheManager(self._system(),
+                                                             self.options['max_cache_entries'])
+
+            if self._lin_cache_manager is not None and not system.under_complex_step:
+                sol_array = self._lin_cache_manager.get_solution(rhs_array, system)
+                if sol_array is not None:
+                    x_vec.set_val(sol_array)
+                    return
+
         x_vec_combined = x_vec.asarray()
         size = x_vec_combined.size
         linop = LinearOperator((size, size), dtype=float, matvec=self._mat_vec)
@@ -238,6 +266,9 @@ class ScipyKrylov(LinearSolver):
                    f"had an illegal input or breakdown (info={info}) after {self._iter_count} "
                    "iterations.")
             self.report_failure(msg)
+
+        if self._lin_cache_manager is not None and not system.under_complex_step:
+            self._lin_cache_manager.add_solution(rhs_array, x)
 
     def _apply_precon(self, in_vec):
         """

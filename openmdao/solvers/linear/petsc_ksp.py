@@ -4,7 +4,8 @@ import numpy as np
 import os
 import sys
 
-from openmdao.solvers.solver import LinearSolver, LinearCacheManager
+from openmdao.solvers.solver import LinearSolver
+from openmdao.solvers.linear.linear_cache_manager import LinearCacheManager
 from openmdao.utils.mpi import check_mpi_env
 
 use_mpi = check_mpi_env()
@@ -215,7 +216,7 @@ class PETScKrylov(LinearSolver):
         self.options.declare('precon_side', default='right', values=['left', 'right'],
                              desc='Preconditioner side, default is right.')
 
-        self.options.declare('use_cache', types=bool, default=False,
+        self.options.declare('use_cache', types=bool, default=True,
                              desc="If True, cache linear solutions and RHS vectors for later use.")
 
         self.options.declare('max_cache_entries', types=int, default=3,
@@ -383,6 +384,7 @@ class PETScKrylov(LinearSolver):
         rhs_array = b_vec.asarray()
 
         if system.under_complex_step:
+            # disable caching under complex step
             self._lin_cache_manager = None
         else:
             if self._lin_cache_manager is None and self.options['use_cache']:
