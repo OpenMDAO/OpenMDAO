@@ -1136,8 +1136,8 @@ class Problem(object):
             next to them in output, making them easy to search for. Note at times there may be a
             significant relative error due to a minor absolute error.  Default is 1.0E-6.
         zero_tol : float
-            The smallest allowable value for a derivative.  Any value below this will be treated as
-            a zero.  Default is 0.0.
+            The smallest allowable value for a derivative.  Any value below this will be treated
+            as a zero.  Default is 0.0.
         method : str
             Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'.
         step : None, float, or list/tuple of float
@@ -2778,7 +2778,7 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals, zer
         _TotalJacInfo if the current derivatives are total derivatives.
     zero_tol : float
         The smallest allowable value for a derivative.  Any value below this will be treated as
-        a zero. 
+        a zero.
 
     Returns
     -------
@@ -3022,8 +3022,8 @@ def _fix_check_data(data):
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
-                              compact_print, system_list, global_options, zero_tol=0.0, totals=False,
-                              indep_key=None, print_reverse=False,
+                              compact_print, system_list, global_options, zero_tol=0.0,
+                              totals=False, indep_key=None, print_reverse=False,
                               show_only_incorrect=False, lcons=None, sort=False):
     """
     Compute the relative and absolute errors in the given derivatives and print to the out_stream.
