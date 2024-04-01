@@ -91,7 +91,7 @@ class GraphViewer(object):
             Iter of pathnames to exclude from the generated graph.
         outfile : str or None
             The name of the file to write the graph to.  The format is inferred from the extension.
-            Default is None, which writes to '<system_path>_<gtype>_graph.svg', where system_path
+            Default is None, which writes to '<system_path>_<gtype>_graph.html', where system_path
             is 'model' for the top level group, and any '.' in the pathname is replaced with '_'.
 
         Returns
@@ -224,7 +224,7 @@ class GraphViewer(object):
 
         if outfile is None:
             name = group.pathname.replace('.', '_') if group.pathname else 'model'
-            outfile = f"{name}_{gtype}_graph.svg"
+            outfile = f"{name}_{gtype}_graph.html"
 
         return write_graph(G, prog='dot', display=display, outfile=outfile)
 
@@ -550,7 +550,7 @@ def _get_node_display_meta(s, meta):
             meta['shape'] = 'box3d'
 
 
-def write_graph(G, prog='dot', display=True, outfile='graph.svg'):
+def write_graph(G, prog='dot', display=True, outfile='graph.html'):
     """
     Write the graph to a file and optionally display it.
 
@@ -563,7 +563,7 @@ def write_graph(G, prog='dot', display=True, outfile='graph.svg'):
     display : bool
         If True, display the graph after writing it.
     outfile : str
-        The name of the file to write.
+        The name of the file to write.  Default is 'graph.html'.
 
     Returns
     -------
@@ -578,20 +578,21 @@ def write_graph(G, prog='dot', display=True, outfile='graph.svg'):
 
     ext = outfile.rpartition('.')[2]
     if not ext:
-        ext = 'svg'
+        ext = 'html'
 
     if isinstance(G, nx.Graph):
         pydot_graph = nx.drawing.nx_pydot.to_pydot(G)
     else:
         pydot_graph = G
 
-    try:
-        pstr = getattr(pydot_graph, f"create_{ext}")(prog=prog)
-    except AttributeError:
-        raise AttributeError(f"pydot graph has no 'create_{ext}' method.")
+    ext_conv = {'html': 'svg', 'png': 'png', 'pdf': 'pdf', 'svg': 'svg'}
 
-    if ext == 'svg':
-        outfile = outfile.replace('.svg', '.html')
+    try:
+        create_func = f"create_{ext_conv[ext]}"
+    except KeyError:
+        raise AttributeError(f"Can't create a pydot graph file of type '{ext}'.")
+
+    pstr = getattr(pydot_graph, create_func)(prog=prog)
 
     with open(outfile, 'wb') as f:
         f.write(pstr)
@@ -702,11 +703,11 @@ def _add_boundary_nodes(pathname, G, incoming, outgoing, exclude=()):
                 connstrs.add(f"   {out_abs[lenpre:]} -> {in_abs}")
         tooltip += sorted(connstrs)
         tooltip = '\n'.join(tooltip)
-        G.add_node('_Outgoing', label='Outgoing', arrowhead='rarrow', fillcolor='peachpuff3',
+        G.add_node('_Outgoing', label='Outgoing', shape='rarrow', fillcolor='peachpuff3',
                    style='filled', tooltip=f'"{tooltip}"', rank='max')
         for in_abs, out_abs in outgoing:
             if out_abs in G:
-                G.add_edge(out_abs, '_Outgoing', style='dashed', shape='lnormal', arrowsize=0.5)
+                G.add_edge(out_abs, '_Outgoing', style='dashed', arrowhead='lnormal', arrowsize=0.5)
 
     return G
 
