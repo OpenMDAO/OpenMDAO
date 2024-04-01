@@ -119,8 +119,6 @@ class LinearCacheManager(object):
                 break
 
             # Check if the RHS vector and a cached vector are parallel
-            # NOTE: the following parallel vector check may be inaccurate for some cases. maybe
-            # should tighten the tolerance?
             dot_product = np.dot(rhs_arr, rhs_cache)
             rhs_norm = np.linalg.norm(rhs_arr)
             if np.isclose(abs(dot_product), rhs_norm * rhs_cache_norm, rtol=1e-100, atol=1e-50):

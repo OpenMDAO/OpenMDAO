@@ -366,5 +366,34 @@ class TestScipyKrylovFeature(unittest.TestCase):
         assert_near_equal(prob.get_val('sub2.q2.x'), 1.996, .0001)
 
 
+class TestCaching(unittest.TestCase):
+
+    def test_caching(self):
+        prob = om.Problem()
+        prob.driver = om.ScipyOptimizeDriver()
+        model = prob.model
+
+        model.add_subsystem('ivc', om.IndepVarComp('x', 1.0))
+        G = model.add_subsystem('G', om.Group())
+        G.add_subsystem('comp', om.ExecComp('y = 2.*x'))
+        G.linear_solver = om.ScipyKrylov(iprint=2, assemble_jac=True, use_cache=True)
+        G.linear_solver.precon = om.LinearBlockGS(iprint=-1)
+        model.add_subsystem('comp2', om.ExecComp('y = 3.*x'))
+        model.add_subsystem('comp3', om.ExecComp('y = 4.*x'))
+
+        model.connect('ivc.x', 'G.comp.x')
+        model.connect('G.comp.y', ['comp2.x', 'comp3.x'])
+
+        model.add_design_var('ivc.x')
+        model.add_objective('comp2.y')
+        model.add_constraint('comp3.y', upper=10.0)
+
+        prob.setup(mode='rev')
+
+        prob.set_val('ivc.x', .3)
+        prob.run_model()
+
+        J = prob.compute_totals()
+
 if __name__ == "__main__":
     unittest.main()

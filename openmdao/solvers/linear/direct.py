@@ -468,11 +468,11 @@ class DirectSolver(LinearSolver):
         if system.under_complex_step:
             self._lin_cache_manager = None
         else:
-            if self.options['use_cache'] and self._lin_cache_manager is None:
-                self._lin_cache_manager = LinearCacheManager(self._system(),
-                                                             self.options['max_cache_entries'])
+            if self.options['use_cache']:
+                if self._lin_cache_manager is None:
+                    self._lin_cache_manager = LinearCacheManager(self._system(),
+                                                                 self.options['max_cache_entries'])
 
-            if self._lin_cache_manager is not None:
                 sol_array = self._lin_cache_manager.get_solution(b_vec, system)
                 if sol_array is not None:
                     x_vec[:] = sol_array

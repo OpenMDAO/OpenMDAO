@@ -858,7 +858,7 @@ else:
             if aval < bval:
                 aval = bval
 
-            if aval == 0.:  # both vals are 0. if this is true
+            if aval == 0.0:  # both vals are 0.0 if this is true
                 continue
 
             if diff / aval > rtol:

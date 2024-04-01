@@ -222,11 +222,11 @@ class ScipyKrylov(LinearSolver):
         else:
             rhs_array = b_vec.asarray()
 
-            if self._lin_cache_manager is None and self.options['use_cache']:
-                self._lin_cache_manager = LinearCacheManager(self._system(),
-                                                             self.options['max_cache_entries'])
+            if self.options['use_cache']:
+                if self._lin_cache_manager is None:
+                    self._lin_cache_manager = LinearCacheManager(self._system(),
+                                                                 self.options['max_cache_entries'])
 
-            if self._lin_cache_manager is not None and not system.under_complex_step:
                 sol_array = self._lin_cache_manager.get_solution(rhs_array, system)
                 if sol_array is not None:
                     x_vec.set_val(sol_array)
