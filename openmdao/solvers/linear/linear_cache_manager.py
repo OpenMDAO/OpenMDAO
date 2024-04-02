@@ -110,21 +110,24 @@ class LinearCacheManager(object):
             # Check if the RHS vector is the same as a cached vector. This part is not necessary,
             # but is less expensive than checking if two vectors are parallel.
             if allclose(rhs_arr, rhs_cache, rtol=1e-100, atol=1e-50):
+                print("CACHE HIT - equal")
                 sol_array = sol_cache
                 break
 
             # Check if the RHS vector is equal to -1 * cached vector.
             if allclose(rhs_arr, -rhs_cache, atol=1e-50):
+                print("CACHE HIT - negative")
                 sol_array = -sol_cache
                 break
 
             # Check if the RHS vector and a cached vector are parallel
             dot_product = np.dot(rhs_arr, rhs_cache)
             rhs_norm = np.linalg.norm(rhs_arr)
-            if np.isclose(abs(dot_product), rhs_norm * rhs_cache_norm, rtol=1e-100, atol=1e-50):
+            if np.isclose(abs(dot_product), rhs_norm * rhs_cache_norm, rtol=3e-16, atol=3e-16):
                 # two vectors are parallel, thus we can use the cache.
                 scaler = dot_product / rhs_cache_norm**2
                 if not np.isnan(scaler):
+                    print(f"CACHE HIT - scaler = {scaler}")
                     sol_array = sol_cache * scaler
                     break
 
