@@ -87,7 +87,8 @@ def partial_deriv_plot(of, wrt, check_partials_data, title=None, jac_method='J_f
     #  backend issues when testing
     import matplotlib.pyplot as plt
     BINARY_CMP = plt.cm.gray
-    NON_BINARY_CMP = plt.cm.RdBu
+    NON_BINARY_CMP = plt.cm.viridis
+    NON_BINARY_DIFF_CMP = plt.cm.RdBu
     fig, ax = plt.subplots(ncols=3, figsize=(12, 6))
     if title is None:
         title = str(key)
@@ -118,7 +119,8 @@ def partial_deriv_plot(of, wrt, check_partials_data, title=None, jac_method='J_f
     if vmax - vmin < tol:  # Do not want range to be too small
         vmin = -1 * tol
         vmax = tol
-    im_diff = ax[2].imshow(diff, interpolation='none', vmin=vmin, vmax=vmax, cmap=NON_BINARY_CMP,
+    color_limit = max(abs(vmin), abs(vmax))
+    im_diff = ax[2].imshow(diff, interpolation='none', vmin=-color_limit, vmax=color_limit, cmap=NON_BINARY_DIFF_CMP,
                            aspect='auto')
     fig.colorbar(im_diff, orientation='horizontal', ax=ax[2], aspect=10)
     ax[2].set_title('Difference')
