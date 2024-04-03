@@ -60,7 +60,8 @@ To install all the optional dependencies:
 This allows you to install **OpenMDAO** from a local copy of the source code.
 
     git clone http://github.com/OpenMDAO/OpenMDAO
-    pip install OpenMDAO
+    cd OpenMDAO
+    pip install .
 
 If you would like to make changes to **OpenMDAO** it is recommended you
 install it in *[editable][16]* mode (i.e., development mode) by adding the `-e`
