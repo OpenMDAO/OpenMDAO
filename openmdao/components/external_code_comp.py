@@ -196,7 +196,7 @@ class ExternalCodeDelegate(object):
 
         if isinstance(command, str):
             # parse for the first word, which may contain dashes and path separators
-            program_to_execute = re.findall(r"^([\w\-\/\:]+)", command)[0]
+            program_to_execute = re.findall(r"^([\w\-\/\:\.]+)", command)[0]
         else:
             program_to_execute = command[0]
 
