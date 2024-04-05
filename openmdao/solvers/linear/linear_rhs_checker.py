@@ -32,6 +32,14 @@ class LinearRHSChecker(object):
     _ncompute_totals : int
         Total number of compute_totals calls. Used to determine when to
         reset the cache.
+    _check_zero : bool
+        If True, check if the RHS vector is zero.
+    _rtol : float
+        Relative tolerance for allclose and parallel check.
+    _atol : float
+        Absolute tolerance for allclose and parallel check.
+    _stats : dict or None
+        Dictionary to store cache statistics.
     """
     options = ('use_cache', 'check_zero', 'rtol', 'atol', 'max_cache_entries', 'collect_stats')
 
@@ -45,7 +53,6 @@ class LinearRHSChecker(object):
         self._check_zero = check_zero
         self._rtol = rtol
         self._atol = atol
-        self._collect_stats = collect_stats
         # print out cache stats at the end of the run
         if collect_stats:
                 self._stats = {'eqhits': 0, 'neghits': 0, 'parhits': 0, 'zerohits': 0,
