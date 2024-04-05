@@ -818,29 +818,6 @@ def convert_ndarray_to_support_nans_in_json(val):
     return val_as_list
 
 
-def are_parallel(a, b, atol=3e-16, rtol=3e-16):
-    """
-    Return True if a and b are parallel.
-
-    Parameters
-    ----------
-    a : ndarray
-        First vector to be compared.
-    b : ndarray
-        Second vector to be compared.
-    atol : float
-        Absolute tolerance for comparison.
-    rtol : float
-        Relative tolerance for comparison.
-
-    Returns
-    -------
-    bool
-        True if a and b are parallel.
-    """
-    return isclose(abs(np.dot(a, b)), norm(a) * norm(b), rel_tol=rtol, abs_tol=atol)
-
-
 if numba is None:
     allclose = np.allclose
 
@@ -883,15 +860,16 @@ else:
         Returns
         -------
         bool
-            True if all elements of a and b are close within the given absolute tolerance.
+            True if all elements of a and b are close within the given absolute and
+            relative tolerance.
         """
         for i in range(len(a)):
             aval = a[i]
             bval = b[i]
 
-            diff = aval - bval
-            if diff < -atol or diff > atol:
-                return False
+            absdiff = aval - bval
+            if absdiff < 0.:
+                absdiff = -absdiff
 
             if aval < 0.:
                 aval = -aval
@@ -899,9 +877,14 @@ else:
                 bval = -bval
 
             if aval < bval:
-                aval = bval
+                vmax = rtol * bval
+            else:
+                vmax = rtol * aval
 
-            if aval != 0.0 and diff / aval > rtol:
+            if atol > vmax:
+                vmax = atol
+
+            if absdiff > vmax:
                 return False
 
         return True
