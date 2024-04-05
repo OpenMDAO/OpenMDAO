@@ -1103,7 +1103,7 @@ class LinearSolver(Solver):
             else:
                 self._lin_rhs_checker = None
                 system = self._system()
-                if system.pathname in system._relevant.get_redundant_adjoint_systems():
+                if system.pathname in system._relevance.get_redundant_adjoint_systems():
                     issue_warning(f"'rhs_checking' is disabled for '{system.pathname}' but that "
                                   "system has redundant adjoint solves and may benefit from "
                                   "turning it on.")
