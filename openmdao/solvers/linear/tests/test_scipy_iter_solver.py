@@ -376,7 +376,7 @@ class TestCaching(unittest.TestCase):
         model.add_subsystem('ivc', om.IndepVarComp('x', 1.0))
         G = model.add_subsystem('G', om.Group())
         G.add_subsystem('comp', om.ExecComp('y = 2.*x'))
-        G.linear_solver = om.ScipyKrylov(iprint=2, assemble_jac=True, use_cache=True)
+        G.linear_solver = om.ScipyKrylov(iprint=2, assemble_jac=True, rhs_checking=True)
         G.linear_solver.precon = om.LinearBlockGS(iprint=-1)
         model.add_subsystem('comp2', om.ExecComp('y = 3.*x'))
         model.add_subsystem('comp3', om.ExecComp('y = 4.*x'))

@@ -4052,7 +4052,7 @@ class Group(System):
             if not total and nprocs > 1 and self._has_fd_group:
                 sout = sizes_out[:, abs2idx[left]]
                 sin = sizes_in[:, abs2idx[right]]
-                if np.count_nonzero(sout[sin == 0]) > 0 and np.count_nonzero(sin[sout == 0]) > 0:
+                if np.any(sout[sin == 0]) and np.any(sin[sout == 0]):
                     # we have of and wrt that exist on different procs. Now see if they're relevant
                     # to each other
                     for _, _, rel in self._relevance.iter_seed_pair_relevance(inputs=True,

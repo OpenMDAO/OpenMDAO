@@ -6,7 +6,7 @@ original function.
 """
 try:
     import numba
-    from numba import jit, prange
+    from numba import *
 except ImportError:
     numba = None
     prange = range

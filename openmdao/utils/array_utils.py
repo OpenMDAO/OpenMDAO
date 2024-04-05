@@ -3,14 +3,16 @@ Utils for dealing with arrays.
 """
 import sys
 from itertools import product
-from copy import copy
 import hashlib
+from math import isclose
 
 import numpy as np
+from numpy.linalg import norm
+
 from scipy.sparse import coo_matrix
 
 from openmdao.core.constants import INT_DTYPE
-from openmdao.utils.numba import jit, prange, numba
+from openmdao.utils.numba import numba
 
 
 if sys.version_info >= (3, 8):
@@ -816,15 +818,56 @@ def convert_ndarray_to_support_nans_in_json(val):
     return val_as_list
 
 
+def are_parallel(a, b, atol=3e-16, rtol=3e-16):
+    """
+    Return True if a and b are parallel.
+
+    Parameters
+    ----------
+    a : ndarray
+        First vector to be compared.
+    b : ndarray
+        Second vector to be compared.
+    atol : float
+        Absolute tolerance for comparison.
+    rtol : float
+        Relative tolerance for comparison.
+
+    Returns
+    -------
+    bool
+        True if a and b are parallel.
+    """
+    return isclose(abs(np.dot(a, b)), norm(a) * norm(b), rel_tol=rtol, abs_tol=atol)
+
+
 if numba is None:
     allclose = np.allclose
+
+    def allzero(a):
+        """
+        Return True if all elements of a are zero.
+
+        Parameters
+        ----------
+        a : ndarray
+            Array to be checked for zeros.
+
+        Returns
+        -------
+        bool
+            True if all elements of a are zero.
+        """
+        return not np.any(a)
+
 else:
-    @jit()
+
+    @numba.jit(nopython=True, nogil=True)
     def allclose(a, b, rtol=1.e-5, atol=1.e-8):
         """
         Return True if all elements of a and b are close within the given absolute tolerance.
 
-        Returns when the first non-close element is found.
+        Returns when the first non-close element is found.  a and b must have the same size.
 
         Parameters
         ----------
@@ -858,10 +901,145 @@ else:
             if aval < bval:
                 aval = bval
 
-            if aval == 0.0:  # both vals are 0.0 if this is true
-                continue
-
-            if diff / aval > rtol:
+            if aval != 0.0 and diff / aval > rtol:
                 return False
 
         return True
+
+    @numba.jit(nopython=True, nogil=True)
+    def allzero(a):
+        """
+        Return True if all elements of a are zero.
+
+        Unlike np.any, this returns as soon as a non-zero element is found and so can be
+        faster for arrays having nonzero values.  It's comparable in speed (slighly faster) to
+        'not np.any' for arrays that are all zeros.
+
+        Parameters
+        ----------
+        a : ndarray
+            Array to be checked for zeros.
+
+        Returns
+        -------
+        bool
+            True if all elements of a are zero.
+        """
+        for i in range(len(a)):
+            if a[i] != 0.:
+                return False
+        return True
+
+    @numba.jit(nopython=True, nogil=True)
+    def first_nonzero_idx(a):
+        """
+        Return the index of the first nonzero element in a.
+
+        Parameters
+        ----------
+        a : ndarray
+            Array to be checked for zeros.
+
+        Returns
+        -------
+        int
+            Index of the first nonzero element in a.
+        """
+        for i in range(len(a)):
+            if a[i] != 0.:
+                return i
+        return -1
+
+
+    @numba.jit(nopython=True, nogil=True)
+    def _jit_are_parallel(a, b, atol=1e-16, rtol=1e-16):
+        """
+        Return True if a is parallel to b.
+
+        a and b must be the same length and have at least 2 elements.
+
+        Parameters
+        ----------
+        a : ndarray
+            First vector to be compared.
+        b : ndarray
+            Second vector to be compared.
+        atol : float
+            Absolute tolerance for comparison.
+        rtol : float
+            Relative tolerance for comparison.
+
+        Returns
+        -------
+        bool
+            True if a is parallel to b.
+        """
+        # found = False
+        ia = first_nonzero_idx(a)
+        ib = first_nonzero_idx(b)
+        if ia != ib or ia == -1:
+            return False
+
+        ratio = b[ib] / a[ia]
+
+        for i in range(ia, len(a)):
+            aval = a[i]
+            bval = b[i]
+
+            if aval == 0.:
+                if bval != 0.:
+                    return False
+                continue
+
+            # if not found:
+            #     if bval == 0.:
+            #         return False
+            #     ratio = bval / aval
+            #     found = True
+            # else:
+
+            # chkb = aval * ratio
+            diff = bval - aval * ratio
+            if diff < -atol or diff > atol:
+                return False
+
+            # if bval < 0.:
+            #     bval = -bval
+            # if chkb < 0.:
+            #     chkb = -chkb
+
+            # if bval < chkb:
+            #     bval = chkb
+
+            # if bval != 0.0 and diff / bval > rtol:
+            #     return False
+
+        return True
+
+    def are_parallel(a, b, atol=1e-16, rtol=1e-16):
+        """
+        Return True if a is parallel to b.
+
+        Parameters
+        ----------
+        a : ndarray
+            First vector to be compared.
+        b : ndarray
+            Second vector to be compared.
+        atol : float
+            Absolute tolerance for comparison.
+        rtol : float
+            Relative tolerance for comparison.
+
+        Returns
+        -------
+        bool
+            True if a is parallel to b.
+        """
+        if len(a) != len(b):
+            return False
+
+        if len(a) < 2:
+            return _np_parallel(a, b)
+
+        return _jit_are_parallel(a, b, atol, rtol)

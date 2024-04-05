@@ -8,9 +8,9 @@ import scipy.sparse.linalg
 from scipy.sparse import csc_matrix
 
 from openmdao.solvers.solver import LinearSolver
-from openmdao.solvers.linear.linear_cache_manager import LinearCacheManager
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.utils.array_utils import identity_column_iter
+from openmdao.solvers.linear.linear_rhs_checker import LinearRHSChecker
 
 
 def index_to_varname(system, loc):
@@ -198,13 +198,11 @@ class DirectSolver(LinearSolver):
         self.options.declare('err_on_singular', types=bool, default=True,
                              desc="Raise an error if LU decomposition is singular.")
 
-        self.options.declare('use_cache', types=bool, default=False,
-                             desc="If True, cache linear solutions and RHS vectors for later use.")
-
-        self.options.declare('max_cache_entries', types=int, default=3,
-                             desc="Maximum number of entries to store in the linear cache. When "
-                             "entries are added beyond the maximum, the oldest entries are "
-                             "deleted.")
+        self.options.declare('rhs_checking', types=(bool, dict), default=False,
+                             desc="If True, check RHS vs. cache and/or zero to avoid some solves."
+                             "Can also be set to a dict of options for the LinearRHSChecker to "
+                             "allow finer control over it. Allowed options are: "
+                             f"{LinearRHSChecker.options}")
 
         # this solver does not iterate
         self.options.undeclare("maxiter")
@@ -229,6 +227,7 @@ class DirectSolver(LinearSolver):
         """
         super()._setup_solvers(system, depth)
         self._disallow_distrib_solve()
+        self._setup_rhs_checking(self.options['rhs_checking'])
 
     def _linearize_children(self):
         """
@@ -357,8 +356,8 @@ class DirectSolver(LinearSolver):
                 except ValueError as err:
                     raise RuntimeError(format_nan_error(system, mtx))
 
-        if self._lin_cache_manager is not None:
-            self._lin_cache_manager.clear()
+        if self._lin_rhs_checker is not None:
+            self._lin_rhs_checker.clear()
 
     def _inverse(self):
         """
@@ -465,18 +464,14 @@ class DirectSolver(LinearSolver):
             trans_lu = 1
             trans_splu = 'T'
 
-        if system.under_complex_step:
-            self._lin_cache_manager = None
-        else:
-            if self.options['use_cache']:
-                if self._lin_cache_manager is None:
-                    self._lin_cache_manager = LinearCacheManager(self._system(),
-                                                                 self.options['max_cache_entries'])
-
-                sol_array = self._lin_cache_manager.get_solution(b_vec, system)
-                if sol_array is not None:
-                    x_vec[:] = sol_array
-                    return
+        if self._lin_rhs_checker is not None:
+            sol_array, is_zero = self._lin_rhs_checker.get_solution(b_vec, system)
+            if is_zero:
+                x_vec[:] = 0.0
+                return
+            if sol_array is not None:
+                x_vec[:] = sol_array
+                return
 
         # AssembledJacobians are unscaled.
         if self._assembled_jac is not None:
@@ -494,5 +489,5 @@ class DirectSolver(LinearSolver):
         else:
             x_vec[:] = sol_array = scipy.linalg.lu_solve(self._lup, b_vec, trans=trans_lu)
 
-        if self._lin_cache_manager is not None and not system.under_complex_step:
-            self._lin_cache_manager.add_solution(b_vec, sol_array)
+        if not system.under_complex_step and self._lin_rhs_checker is not None:
+            self._lin_rhs_checker.add_solution(b_vec, sol_array)
