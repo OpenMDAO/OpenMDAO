@@ -1094,15 +1094,24 @@ class LinearSolver(Solver):
         opts : dict or bool
             True, False, or dictionary of options.
         """
+        system = self._system()
         if isinstance(opts, dict):
-            LinearRHSChecker.check_options(self._system(), opts)
-            self._lin_rhs_checker = LinearRHSChecker(self._system(), **opts)
+            LinearRHSChecker.check_options(system, opts)
+            if 'auto' in opts and opts['auto']:
+                if system.pathname in system._relevance.get_redundant_adjoint_systems():
+                    print(f"Using automated rhs checking for {system.pathname} because it has "
+                          "redundant adjoint solves and 'auto' was set in the rhs_checking "
+                          "options.")
+                    opts = opts.copy()
+                    opts.pop('auto')
+                    self._lin_rhs_checker = LinearRHSChecker(system, **opts)
+            else:
+                self._lin_rhs_checker = LinearRHSChecker(system, **opts)
         else:
             if opts:
-                self._lin_rhs_checker = LinearRHSChecker(self._system())
+                self._lin_rhs_checker = LinearRHSChecker(system)
             else:
                 self._lin_rhs_checker = None
-                system = self._system()
                 if system.pathname in system._relevance.get_redundant_adjoint_systems():
                     issue_warning(f"'rhs_checking' is disabled for '{system.pathname}' but that "
                                   "system has redundant adjoint solves and may benefit from "

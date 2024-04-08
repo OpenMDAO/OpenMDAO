@@ -41,7 +41,8 @@ class LinearRHSChecker(object):
     _stats : dict or None
         Dictionary to store cache statistics.
     """
-    options = ('use_cache', 'check_zero', 'rtol', 'atol', 'max_cache_entries', 'collect_stats')
+    options = ('use_cache', 'check_zero', 'rtol', 'atol', 'max_cache_entries', 'collect_stats',
+               'auto')
 
     def __init__(self, system, max_cache_entries=3, check_zero=True, rtol=3e-16, atol=3e-16,
                  collect_stats=False):
