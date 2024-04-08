@@ -100,9 +100,10 @@ class GraphViewer(object):
             The pydot graph that was created.
         """
         if pydot is None:
-            issue_warning("To view the system graph, you must install pydot. "
-                          "You can install it via 'pip install pydot'.")
-            return
+            raise RuntimeError(f"{self.msginfo}: write_graph requires pydot.  Install pydot using "
+                               "'pip install pydot'. Note that pydot requires graphviz, which is a "
+                               "non-Python application.\nIt can be installed at the system level "
+                               "or via a package manager like conda.")
 
         group = self._group
 
@@ -570,11 +571,11 @@ def write_graph(G, prog='dot', display=True, outfile='graph.html'):
     pydot.Dot
         The graph that was written.
     """
-    from openmdao.utils.webview import webview
-
     if pydot is None:
-        raise RuntimeError("graph requires the pydot package.  You can install it using "
-                           "'pip install pydot'.")
+        raise RuntimeError(f"write_graph requires pydot.  Install pydot using "
+                           "'pip install pydot'. Note that pydot requires graphviz, which is a "
+                           "non-Python application.\nIt can be installed at the system level "
+                           "or via a package manager like conda.")
 
     ext = outfile.rpartition('.')[2]
     if not ext:
@@ -598,6 +599,7 @@ def write_graph(G, prog='dot', display=True, outfile='graph.html'):
         f.write(pstr)
 
     if display:
+        from openmdao.utils.webview import webview
         webview(outfile)
 
     return pydot_graph
@@ -747,6 +749,7 @@ def _graph_setup_parser(parser):
     parser : argparse subparser
         The parser we're adding options to.
     """
+    parser.description = 'This command requires pydot and graphviz to be installed.'
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-p', '--problem', action='store', dest='problem', help='Problem name')
     parser.add_argument('-o', action='store', dest='outfile', help='file containing graph output.')
