@@ -4,6 +4,7 @@ Define the LinearRHSChecker class.
 LinearRHSChecker manages caching of solutions and right-hand sides for linear solves.
 """
 
+import os
 from collections import deque
 import atexit
 
@@ -11,7 +12,33 @@ import numpy as np
 
 from math import isclose
 from openmdao.utils.array_utils import allclose, allzero
+from openmdao.utils.file_utils import text2html
 from openmdao.utils.om_warnings import issue_warning
+from openmdao.visualization.tables.table_builder import generate_table
+
+
+_cache_stats = {}
+
+
+def _print_stats():
+    """
+    Print out cache statistics at the end of the run.
+    """
+    if _cache_stats:
+        headers = ['System', 'Eq Hits', 'Neg Hits', 'Parallel Hits', 'Zero Hits', 'Misses', 'Resets']
+        for repors_dir, dct in _cache_stats.items():
+            rows = []
+            for syspath, stats in dct.items():
+                rows.append([syspath, stats['eqhits'], stats['neghits'], stats['parhits'],
+                         stats['zerohits'], stats['misses'], stats['resets']])
+
+            table = generate_table(rows,tablefmt='html', headers=headers)
+
+            if not os.path.exists(repors_dir):
+                os.makedirs(repors_dir)
+
+            with open(os.path.join(repors_dir, 'linear_rhs_cache_stats.html'), 'w') as f:
+                print(str(table), file=f)
 
 
 class LinearRHSChecker(object):
@@ -49,6 +76,8 @@ class LinearRHSChecker(object):
         """
         Initialize the LinearRHSChecker.
         """
+        global _cache_stats
+
         self._caches = deque(maxlen=max_cache_entries)
         self._ncompute_totals = system._problem_meta['ncompute_totals']
         self._check_zero = check_zero
@@ -58,8 +87,12 @@ class LinearRHSChecker(object):
         if collect_stats:
                 self._stats = {'eqhits': 0, 'neghits': 0, 'parhits': 0, 'zerohits': 0,
                                'misses': 0, 'resets': 0}
-                msginfo = system.msginfo
-                atexit.register(lambda: print(f"{msginfo}: {self._stats}"))
+                reports_dir = system._problem_meta['reports_dir']
+                if not _cache_stats:
+                    atexit.register(_print_stats)
+                if reports_dir not in _cache_stats:
+                    _cache_stats[reports_dir] = {}
+                _cache_stats[reports_dir][system.pathname] = self._stats
         else:
             self._stats = None
 

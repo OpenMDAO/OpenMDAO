@@ -3,7 +3,6 @@ import numpy as np
 import math
 from html.parser import HTMLParser
 
-import openmdao.api as om
 from openmdao.visualization.tables.table_builder import generate_table
 from openmdao.utils.testing_utils import use_tempdirs
 
