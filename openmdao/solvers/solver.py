@@ -15,7 +15,6 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.om_warnings import issue_warning, SolverWarning
-from openmdao.solvers.linear.linear_rhs_checker import LinearRHSChecker
 
 
 class SolverInfo(object):

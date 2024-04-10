@@ -76,7 +76,7 @@ class LinearRHSChecker(object):
         If True, print out whenever a cache hit occurs.
     """
 
-    options = ('use_cache', 'check_zero', 'rtol', 'atol', 'max_cache_entries', 'collect_stats',
+    options = ('check_zero', 'rtol', 'atol', 'max_cache_entries', 'collect_stats',
                'auto', 'verbose')
 
     def __init__(self, system, max_cache_entries=3, check_zero=False, rtol=3e-16, atol=3e-16,

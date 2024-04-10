@@ -3460,7 +3460,6 @@ class Group(System):
             # all the lower level systems and the data transfers have happened
             complex_step = self._inputs._under_complex_step
 
-            # make sure guess_nonlinear doesn't run with complex inputs
             if complex_step:
                 self._inputs.set_complex_step_mode(False)
                 self._residuals.set_complex_step_mode(False)
@@ -4052,7 +4051,7 @@ class Group(System):
             if not total and nprocs > 1 and self._has_fd_group:
                 sout = sizes_out[:, abs2idx[left]]
                 sin = sizes_in[:, abs2idx[right]]
-                if np.any(sout[sin == 0]) and np.any(sin[sout == 0]):
+                if np.count_nonzero(sout[sin == 0]) > 0 and np.count_nonzero(sin[sout == 0]) > 0:
                     # we have of and wrt that exist on different procs. Now see if they're relevant
                     # to each other
                     for _, _, rel in self._relevance.iter_seed_pair_relevance(inputs=True,
