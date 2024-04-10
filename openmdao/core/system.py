@@ -1051,8 +1051,9 @@ class System(object):
                             'got {}'.format(self.msginfo, name))
 
         if alias is not _UNDEFINED:
-            warn_deprecation("Option 'alias' of set_constraint_options is deprecated. If the constraint "
-                             "has an alias, provide that as the 'name' argument to set_constraint_options.")
+            warn_deprecation("Option 'alias' of set_constraint_options is deprecated. "
+                             "If the constraint has an alias, provide that as the "
+                             "'name' argument to set_constraint_options.")
             name = alias
 
         are_new_bounds = equals is not _UNDEFINED or lower is not _UNDEFINED or upper is not \
@@ -1235,8 +1236,9 @@ class System(object):
             raise TypeError(f'{self.msginfo}: The name argument should be a string, got {name}')
 
         if alias is not _UNDEFINED:
-            warn_deprecation("Option 'alias' of set_objective_options is deprecated. If the objective "
-                             "has an alias, provide that as the 'name' argument to set_objective_options.")
+            warn_deprecation("Option 'alias' of set_objective_options is deprecated. "
+                             "If the objective has an alias, provide that as the 'name' "
+                             "argument to set_objective_options.")
             name = alias
 
         # At least one of the scaling parameters must be set or function does nothing
