@@ -925,8 +925,6 @@ class LinearSolver(Solver):
         Relevant input variables for the current matrix vector product.
     _scope_out : set or None or _UNDEFINED
         Relevant output variables for the current matrix vector product.
-    _lin_rhs_checker : LinearRHSChecker or None
-        Object for checking the right-hand side of the linear solve.
     """
 
     def __init__(self, **kwargs):
@@ -936,7 +934,6 @@ class LinearSolver(Solver):
         self._assembled_jac = None
         self._scope_out = _UNDEFINED
         self._scope_in = _UNDEFINED
-        self._lin_rhs_checker = None
 
         super().__init__(**kwargs)
 
@@ -1082,40 +1079,6 @@ class LinearSolver(Solver):
             system._apply_linear(self._assembled_jac, self._mode, scope_out, scope_in)
         finally:
             self._recording_iter.pop()
-
-    def _setup_rhs_checking(self, opts):
-        """
-        Perform any necessary setup for checking the RHS vector.
-
-        This has to be called explicitly by derived classes that need to check the RHS vector.
-
-        Parameters
-        ----------
-        opts : dict or bool
-            True, False, or dictionary of options.
-        """
-        system = self._system()
-        if isinstance(opts, dict):
-            LinearRHSChecker.check_options(system, opts)
-            if 'auto' in opts and opts['auto']:
-                if system.pathname in system._relevance.get_redundant_adjoint_systems():
-                    print(f"Using automated rhs checking for {system.pathname} because it has "
-                          "redundant adjoint solves and 'auto' was set in the rhs_checking "
-                          "options.")
-                    opts = opts.copy()
-                    opts.pop('auto')
-                    self._lin_rhs_checker = LinearRHSChecker(system, **opts)
-            else:
-                self._lin_rhs_checker = LinearRHSChecker(system, **opts)
-        else:
-            if opts:
-                self._lin_rhs_checker = LinearRHSChecker(system)
-            else:
-                self._lin_rhs_checker = None
-                if system.pathname in system._relevance.get_redundant_adjoint_systems():
-                    issue_warning(f"'rhs_checking' is disabled for '{system.pathname}' but that "
-                                  "system has redundant adjoint solves and may benefit from "
-                                  "turning it on.")
 
 
 class BlockLinearSolver(LinearSolver):

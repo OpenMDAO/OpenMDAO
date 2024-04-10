@@ -30,6 +30,8 @@ class ScipyKrylov(LinearSolver):
     ----------
     precon : Solver
         Preconditioner for linear solve. Default is None for no preconditioner.
+    _lin_rhs_checker : LinearRHSChecker or None
+        Object for checking the right-hand side of the linear solve.
     """
 
     SOLVER = 'LN: SCIPY'
@@ -40,8 +42,8 @@ class ScipyKrylov(LinearSolver):
         """
         super().__init__(**kwargs)
 
-        # initialize preconditioner to None
         self.precon = None
+        self._lin_rhs_checker = None
 
     def _assembled_jac_solver_iter(self):
         """
@@ -67,7 +69,8 @@ class ScipyKrylov(LinearSolver):
                                   'iteration cost, but may be necessary for convergence. This '
                                   'option applies only to gmres.')
 
-        self.options.declare('rhs_checking', types=(bool, dict), default=False,
+        self.options.declare('rhs_checking', types=(bool, dict),
+                             default={'verbose': True, 'collect_stats': True},
                              desc="If True, check RHS vs. cache and/or zero to avoid some solves."
                              "Can also be set to a dict of options for the LinearRHSChecker to "
                              "allow finer control over it. Allowed options are: "
@@ -93,7 +96,8 @@ class ScipyKrylov(LinearSolver):
         if self.precon is not None:
             self.precon._setup_solvers(self._system(), self._depth + 1)
 
-        self._setup_rhs_checking(self.options['rhs_checking'])
+        self._lin_rhs_checker = LinearRHSChecker.create(self._system(),
+                                                        self.options['rhs_checking'])
 
     def _set_solver_print(self, level=2, type_='all'):
         """
@@ -216,16 +220,14 @@ class ScipyKrylov(LinearSolver):
             x_vec = system._dresiduals
             b_vec = system._doutputs
 
-        rhs_array = b_vec.asarray()
-
-        if self._lin_rhs_checker is not None:
-            sol_array, is_zero = self._lin_rhs_checker.get_solution(rhs_array, system)
-            if is_zero:
-                x_vec.set_val(0.0)
-                return
-            if sol_array is not None:
-                x_vec.set_val(sol_array)
-                return
+            if self._lin_rhs_checker is not None:
+                sol_array, is_zero = self._lin_rhs_checker.get_solution(b_vec.asarray(), system)
+                if is_zero:
+                    x_vec.set_val(0.0)
+                    return
+                if sol_array is not None:
+                    x_vec.set_val(sol_array)
+                    return
 
         x_vec_combined = x_vec.asarray()
         size = x_vec_combined.size
@@ -262,8 +264,8 @@ class ScipyKrylov(LinearSolver):
                    "iterations.")
             self.report_failure(msg)
 
-        if not system.under_complex_step and self._lin_rhs_checker is not None:
-            self._lin_rhs_checker.add_solution(rhs_array, x)
+        if not system.under_complex_step and self._lin_rhs_checker is not None and mode == 'rev':
+            self._lin_rhs_checker.add_solution(b_vec.asarray(), x, copy=True)
 
     def _apply_precon(self, in_vec):
         """
