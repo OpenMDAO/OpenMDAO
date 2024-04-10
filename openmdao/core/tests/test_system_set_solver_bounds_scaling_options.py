@@ -44,20 +44,23 @@ class TestSystemSetSolverDesvarConstraintObjectiveOutputOptions(unittest.TestCas
             prob.model.set_design_var_options(name='bad_var', lower=-100, upper=100)
         self.assertEqual(str(ctx.exception),
                          "<class SellarDerivatives>: set_design_var_options called with design "
-                         "variable 'bad_var' "
-                         "that does not exist.")
+                         "variable 'bad_var' that does not exist.")
 
         with self.assertRaises(RuntimeError) as ctx:
             prob.model.set_constraint_options(name='bad_var', ref0=-100.0, ref=100)
         self.assertEqual(str(ctx.exception),
-                         "<class SellarDerivatives>: set_constraint_options called with "
-                         "constraint variable 'bad_var' that does not exist.")
+                         "<class SellarDerivatives>: set_constraint_options called "
+                         "with constraint 'bad_var' that does not exist. If the "
+                         "constraint was provided an alias, use that in place of "
+                         "its name for set_constraint_options.")
 
         with self.assertRaises(RuntimeError) as ctx:
             prob.model.set_objective_options(name='bad_var', ref0=-100.0, ref=100)
         self.assertEqual(str(ctx.exception),
-                         "<class SellarDerivatives>: set_objective_options called with "
-                         "objective variable 'bad_var' that does not exist.")
+                         "<class SellarDerivatives>: set_objective_options called "
+                         "with objective 'bad_var' that does not exist. If the "
+                         "objective was provided an alias, use that in place of "
+                         "its name for set_objective_options.")
 
 
 class TestSystemSetSolverOutputOptions(unittest.TestCase):
@@ -515,7 +518,46 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
                     0.5: 2.691370063179728,
                     1.0: 2.2033093115996443}
 
-        assert_near_equal(objs, expected)
+        assert_near_equal(objs, expected, tolerance=1.0E-6)
+
+    def test_sweep_bounds_with_aliases(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.sellar_feature import SellarMDA
+
+        prob = om.Problem()
+        prob.model = SellarMDA()
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        # prob.driver.options['maxiter'] = 100
+        prob.driver.options['tol'] = 1e-8
+
+        prob.model.add_design_var('x', lower=0, upper=10)
+        prob.model.add_design_var('z', lower=0, upper=10)
+        prob.model.add_objective('obj')
+        prob.model.add_constraint('con1', upper=0, alias='con1_alias')
+        prob.model.add_constraint('con2', upper=0)
+
+        # # Ask OpenMDAO to finite-difference across the model to compute the gradients for the optimizer
+        # prob.model.approx_totals()
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+
+        objs = {}
+
+        for con1_upper in [0, 0.5, 1.0]:
+            prob.model.set_constraint_options('con1_alias', upper=con1_upper)
+
+            prob.run_driver()
+
+            objs[con1_upper] = prob.get_val('obj')[0]
+
+        expected = {0: 3.1833939532866893,
+                    0.5: 2.691370063179728,
+                    1.0: 2.2033093115996443}
+
+        assert_near_equal(objs, expected, tolerance=1.0E-6)
 
     def test_set_constraints_options_lower_upper_overrides_equals(self):
         # First set lower and upper in add_constraint
