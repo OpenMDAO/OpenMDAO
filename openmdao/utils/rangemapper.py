@@ -31,7 +31,11 @@ class RangeMapper(object):
         Initialize a RangeMapper.
         """
         self._key2range = {}
-        self.size = sum(size for _, size in sizes)
+        start = 0
+        for key, size in sizes:
+            self._key2range[key] = (start, start + size)
+            start += size
+        self.size = start
 
     @staticmethod
     def create(sizes, max_flat_range_size=MAX_FLAT_RANGE_SIZE):
@@ -52,7 +56,7 @@ class RangeMapper(object):
             A mapper that maps indices to variable key and relative indices.
         """
         size = sum(size for _, size in sizes)
-        return FlatRangeMapper(sizes) if size < max_flat_range_size else RangeTree(sizes)
+        return FlatRangeMapper(sizes) if size <= max_flat_range_size else RangeTree(sizes)
 
     def key2range(self, key):
         """
@@ -124,6 +128,70 @@ class RangeMapper(object):
             The set of keys corresponding to the given indices.
         """
         return {self[idx] for idx in inds}
+
+    def between_iter(self, start_key, stop_key):
+        """
+        Iterate over (key, start, stop) tuples between the given start and stop keys.
+
+        Parameters
+        ----------
+        start_key : object
+            Key corresponding to an index range.
+        stop_key : object
+            Key corresponding to an index range.
+
+        Yields
+        ------
+        (obj, int, int)
+            (key, relative start index, relative stop index), where key is a hashable object.
+        """
+        started = False
+        for key, (start, stop) in self._key2range.items():
+            if key == start_key:
+                yield (key, 0, stop - start)
+                if start_key == stop_key:
+                    break
+                started = True
+            elif started:
+                if key == stop_key:
+                    yield (key, 0, stop - start)
+                    break
+                else:
+                    yield (key, 0, stop - start)
+
+    def overlap_iter(self, key, other):
+        """
+        Find the set of keys that overlap between this mapper and another.
+
+        Parameters
+        ----------
+        key : object
+            Key corresponding to an index range.
+        other : RangeMapper
+            Another mapper.
+
+        Yields
+        ------
+        (obj, int, int, obj, int, int)
+            (key, start, stop, otherkey, otherstart, otherstop).
+        """
+        start, stop = self._key2range[key]
+
+        start_key, start_rel = other.index2key_rel(start)
+        if start_key is None:
+            return
+
+        stop_key, stop_rel = other.index2key_rel(stop - 1)
+
+        overlaps = [list(tup) for tup in other.between_iter(start_key, stop_key)]
+        overlaps[0][1] = start_rel
+        overlaps[-1][2] = stop_rel + 1
+
+        start = stop = 0
+        for k, kstart, kstop in overlaps:
+            stop += kstop - kstart
+            yield (key, start, stop, k, kstart, kstop)
+            start = stop
 
     def dump(self):
         """
@@ -313,7 +381,6 @@ class RangeTree(RangeMapper):
         key, start, stop = ranges[mid]
 
         node = RangeTreeNode(key, start, stop)
-        self._key2range[key] = (start, stop)
 
         left_slices = ranges[:mid]
         right_slices = ranges[mid + 1:]
@@ -353,7 +420,6 @@ class FlatRangeMapper(RangeMapper):
         for key, size in sizes:
             stop += size
             self.ranges[start:stop] = [(key, start, stop)] * size
-            self._key2range[key] = (start, stop)
             start = stop
 
     def __getitem__(self, idx):

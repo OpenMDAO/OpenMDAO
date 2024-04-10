@@ -316,18 +316,40 @@ class ResidNamingTestCase(unittest.TestCase):
 
 class _InputResidComp(om.ImplicitComponent):
 
+    def __init__(self, jac, add_io_in_setup=True):
+        self._jac = jac
+        self._add_io_in_setup = add_io_in_setup
+        super().__init__()
+
+    def setup(self):
+        if self._add_io_in_setup:
+            self.add_output('x', shape=(3,))
+            self.add_residual_from_input('aa', shape=(1,))
+            self.add_residual_from_input('bb', shape=(2,))
+
     def add_residual_from_input(self, name, **kwargs):
         resid_name = 'resid_' + name
+        shape = kwargs['shape'] if 'shape' in kwargs else (1,)
+        size = np.prod(shape)
 
         self.add_input(name, **kwargs)
         self.add_residual(resid_name, **kwargs)
-        self.declare_partials(of='*', wrt='*', method='fd')
+
+        if self._jac in ('fd', 'cs'):
+            self.declare_partials(of=resid_name, wrt=name, method=self._jac)
+        elif self._jac == 'dense':
+            self.declare_partials(of=resid_name, wrt=name, val=np.eye(size))
+        elif self._jac == 'sparse':
+            ar = np.arange(size, dtype=int)
+            self.declare_partials(of=resid_name, wrt=name, rows=ar, cols=ar, val=1.0)
+        else:
+            raise ValueError('invalid value for jac use one of ', ['fd', 'cs', 'dense', 'sparse'])
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         residuals.set_val(inputs.asarray())
 
 
-class _TestGroup(om.Group):
+class _TestGroupConfig(om.Group):
 
     def setup(self):
         self.add_subsystem('exec_com', om.ExecComp(['res_a = a - x[0]', 'res_b = b - x[1:]'],
@@ -338,7 +360,7 @@ class _TestGroup(om.Group):
                                                    x={'shape':3}),
                            promotes_inputs=['*'], promotes_outputs=['*'])
 
-        self.add_subsystem('resid_comp', _InputResidComp(),
+        self.add_subsystem('resid_comp', _InputResidComp(add_io_in_setup=False, jac='fd'),
                            promotes_inputs=['*'], promotes_outputs=['*'])
 
     def configure(self):
@@ -354,7 +376,7 @@ class TestAddResidualConfigure(unittest.TestCase):
 
     def test_add_residual_configure(self):
         p = om.Problem()
-        p.model.add_subsystem('test_group', _TestGroup())
+        p.model.add_subsystem('test_group', _TestGroupConfig())
         p.setup()
 
         p.set_val('test_group.a', 3.0)
@@ -368,6 +390,59 @@ class TestAddResidualConfigure(unittest.TestCase):
 
         assert_near_equal(a, x[0], tolerance=1.0E-9)
         assert_near_equal(b, x[1:], tolerance=1.0E-9)
+
+
+class _TestGroup(om.Group):
+
+    def __init__(self, jac):
+        self._jac = jac
+        super().__init__()
+
+    def setup(self):
+        self.add_subsystem('exec_com', om.ExecComp(['aa = a - x[0]', 'bb = b - x[1:]'],
+                                                   a={'shape': (1,)},
+                                                   b={'shape': (2,)},
+                                                   aa={'shape': (1,)},
+                                                   bb={'shape': (2,)},
+                                                   x={'shape':3}),
+                           promotes=['*'])
+
+        self.add_subsystem('resid_comp', _InputResidComp(jac=self._jac),
+                           promotes_inputs=['*'], promotes_outputs=['*'])
+        self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        self.linear_solver = om.DirectSolver()
+
+
+def run_rename_test(jac):
+    p = om.Problem()
+    p.model.add_subsystem('test_group', _TestGroup(jac=jac))
+    p.setup()
+
+    p.set_val('test_group.a', 3.0)
+    p.set_val('test_group.b', [4.0, 5.0])
+
+    p.run_model()
+
+    a = p.get_val('test_group.a')
+    b = p.get_val('test_group.b')
+    x = p.get_val('test_group.x')
+
+    assert_near_equal(a, x[0], tolerance=1.0E-9)
+    assert_near_equal(b, x[1:], tolerance=1.0E-9)
+
+
+class TestRenamedResidsDifferentJacs(unittest.TestCase):
+    def test_fd(self):
+        run_rename_test('fd')
+
+    def test_cs(self):
+        run_rename_test('cs')
+
+    def test_dense(self):
+        run_rename_test('dense')
+
+    def test_sparse(self):
+        run_rename_test('sparse')
 
 
 if __name__ == '__main__':
