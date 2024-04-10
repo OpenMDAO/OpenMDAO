@@ -30,8 +30,7 @@
         "assemble_jac": false,
         "solver": "gmres",
         "restart": 20,
-        "use_cache": true,
-        "max_cache_entries": 3
+        "rhs_checking": false
     },
     "component_type": null,
     "subsystem_type": "group",
@@ -111,8 +110,7 @@
                 "assemble_jac": false,
                 "solver": "gmres",
                 "restart": 20,
-                "use_cache": true,
-                "max_cache_entries": 3
+                "rhs_checking": false
             },
             "component_type": null,
             "subsystem_type": "group",
@@ -137,8 +135,7 @@
                         "assemble_jac": false,
                         "solver": "gmres",
                         "restart": 20,
-                        "use_cache": true,
-                        "max_cache_entries": 3
+                        "rhs_checking": false
                     },
                     "component_type": null,
                     "subsystem_type": "group",

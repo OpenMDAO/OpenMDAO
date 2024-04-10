@@ -25,14 +25,15 @@ def _print_stats():
     Print out cache statistics at the end of the run.
     """
     if _cache_stats:
-        headers = ['System', 'Eq Hits', 'Neg Hits', 'Parallel Hits', 'Zero Hits', 'Misses', 'Resets']
+        headers = ['System', 'Eq Hits', 'Neg Hits', 'Parallel Hits', 'Zero Hits', 'Misses',
+                   'Resets']
         for repors_dir, dct in _cache_stats.items():
             rows = []
             for syspath, stats in dct.items():
                 rows.append([syspath, stats['eqhits'], stats['neghits'], stats['parhits'],
-                         stats['zerohits'], stats['misses'], stats['resets']])
+                             stats['zerohits'], stats['misses'], stats['resets']])
 
-            table = generate_table(rows,tablefmt='html', headers=headers)
+            table = generate_table(rows, tablefmt='html', headers=headers)
 
             if not os.path.exists(repors_dir):
                 os.makedirs(repors_dir)
@@ -49,8 +50,16 @@ class LinearRHSChecker(object):
     ----------
     system : System
         The system that owns the solver that owns this LinearRHSChecker.
-    maxlen : int
+    max_cache_entries : int
         Maximum number of solutions to cache.
+    check_zero : bool
+        If True, check if the RHS vector is zero.
+    rtol : float
+        Relative tolerance for equivalence checks.
+    atol : float
+        Absolute tolerance for equivalence checks.
+    collect_stats : bool
+        If True, collect cache statistics.
 
     Attributes
     ----------
@@ -62,12 +71,13 @@ class LinearRHSChecker(object):
     _check_zero : bool
         If True, check if the RHS vector is zero.
     _rtol : float
-        Relative tolerance for allclose and parallel check.
+        Relative tolerance for equivalence check.
     _atol : float
-        Absolute tolerance for allclose and parallel check.
+        Absolute tolerance for equivalence check.
     _stats : dict or None
         Dictionary to store cache statistics.
     """
+
     options = ('use_cache', 'check_zero', 'rtol', 'atol', 'max_cache_entries', 'collect_stats',
                'auto')
 
@@ -85,20 +95,21 @@ class LinearRHSChecker(object):
         self._atol = atol
         # print out cache stats at the end of the run
         if collect_stats:
-                self._stats = {'eqhits': 0, 'neghits': 0, 'parhits': 0, 'zerohits': 0,
-                               'misses': 0, 'resets': 0}
-                reports_dir = system._problem_meta['reports_dir']
-                if not _cache_stats:
-                    atexit.register(_print_stats)
-                if reports_dir not in _cache_stats:
-                    _cache_stats[reports_dir] = {}
-                _cache_stats[reports_dir][system.pathname] = self._stats
+            self._stats = {
+                'eqhits': 0, 'neghits': 0, 'parhits': 0, 'zerohits': 0, 'misses': 0, 'resets': 0
+            }
+            reports_dir = system._problem_meta['reports_dir']
+            if not _cache_stats:
+                atexit.register(_print_stats)
+            if reports_dir not in _cache_stats:
+                _cache_stats[reports_dir] = {}
+            _cache_stats[reports_dir][system.pathname] = self._stats
         else:
             self._stats = None
 
         # check if cache is necessary and warn if not
         if max_cache_entries > 0:
-            if not system.pathname in system._relevance.get_redundant_adjoint_systems():
+            if system.pathname not in system._relevance.get_redundant_adjoint_systems():
                 issue_warning(f"{system.msginfo}: 'rhs_checking' is active but no redundant adjoint"
                               " dependencies were found, so caching is unlikely to be beneficial.")
 
