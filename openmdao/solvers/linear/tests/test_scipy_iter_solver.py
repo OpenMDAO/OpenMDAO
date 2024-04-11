@@ -14,7 +14,7 @@ from openmdao.test_suite.components.misc_components import Comp4LinearCacheTest
 from openmdao.test_suite.components.quad_implicit import QuadraticComp
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
 
 
 # use this to fake out the TestImplicitGroup so it'll use the solver we want.
@@ -376,7 +376,8 @@ class TestCaching(unittest.TestCase):
         model.add_subsystem('ivc', om.IndepVarComp('x', 1.0))
         G = model.add_subsystem('G', om.Group())
         G.add_subsystem('comp', om.ExecComp('y = 2.*x'))
-        G.linear_solver = om.ScipyKrylov(iprint=2, assemble_jac=True, rhs_checking=True)
+        G.linear_solver = om.ScipyKrylov(iprint=2, assemble_jac=True,
+                                         rhs_checking={'verbose': True, 'collect_stats': True})
         G.linear_solver.precon = om.LinearBlockGS(iprint=-1)
         model.add_subsystem('comp2', om.ExecComp('y = 3.*x'))
         model.add_subsystem('comp3', om.ExecComp('y = 4.*x'))
@@ -386,7 +387,7 @@ class TestCaching(unittest.TestCase):
 
         model.add_design_var('ivc.x')
         model.add_objective('comp2.y')
-        model.add_constraint('comp3.y', upper=10.0)
+        model.add_constraint('G.comp.y', upper=10.0)
 
         prob.setup(mode='rev')
 
@@ -394,6 +395,10 @@ class TestCaching(unittest.TestCase):
         prob.run_model()
 
         J = prob.compute_totals()
+
+        self.assertEqual(G.linear_solver._lin_rhs_checker._stats['parhits'], 1)
+
+        assert_check_totals(prob.check_totals(out_stream=None))
 
 if __name__ == "__main__":
     unittest.main()

@@ -217,7 +217,7 @@ class PETScKrylov(LinearSolver):
                              desc='Preconditioner side, default is right.')
 
         self.options.declare('rhs_checking', types=(bool, dict),
-                             default={'verbose': True, 'collect_stats': True},
+                             default=False,
                              desc="If True, check RHS vs. cache and/or zero to avoid some solves."
                              "Can also be set to a dict of options for the LinearRHSChecker to "
                              "allow finer control over it. Allowed options are: "
