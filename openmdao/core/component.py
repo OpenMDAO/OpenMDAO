@@ -1819,6 +1819,19 @@ class Component(System):
         """
         return True
 
+    def _get_graph_node_meta(self):
+        """
+        Return metadata to add to this system's graph node.
+
+        Returns
+        -------
+        dict
+            Metadata for this system's graph node.
+        """
+        meta = super()._get_graph_node_meta()
+        meta['base'] = 'ExplicitComponent' if self.is_explicit() else 'ImplicitComponent'
+        return meta
+
 
 class _DictValues(object):
     """

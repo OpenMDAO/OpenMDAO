@@ -320,7 +320,8 @@ jobs:
           echo "============================================================="
           echo "Install additional packages for testing/coverage"
           echo "============================================================="
-          python -m pip install pyparsing psutil objgraph pyxdsm
+          conda install graphviz
+          python -m pip install pyparsing psutil objgraph pyxdsm pydot
 
       - name: Display environment info
         id: env_info
