@@ -34,7 +34,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, \
-    DerivativesWarning, PromotionWarning, UnusedOptionWarning, UnitsWarning
+    DerivativesWarning, PromotionWarning, UnusedOptionWarning, UnitsWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, all_ancestors, make_set, match_prom_or_abs, \
     ensure_compatible, env_truthy, make_traceback, _is_slicer_op
@@ -1022,7 +1022,7 @@ class System(object):
         Parameters
         ----------
         name : str
-            Name of the response variable in the system.
+            Name of the response variable in the system, or alias if given.
         ref : float or ndarray, optional
             Value of response variable that scales to 1.0 in the driver.
         ref0 : float or ndarray, optional
@@ -1050,6 +1050,12 @@ class System(object):
             raise TypeError('{}: The name argument should be a string, '
                             'got {}'.format(self.msginfo, name))
 
+        if alias is not _UNDEFINED:
+            warn_deprecation("Option 'alias' of set_constraint_options is deprecated. "
+                             "If the constraint has an alias, provide that as the "
+                             "'name' argument to set_constraint_options.")
+            name = alias
+
         are_new_bounds = equals is not _UNDEFINED or lower is not _UNDEFINED or upper is not \
             _UNDEFINED
         are_new_scaling = scaler is not _UNDEFINED or adder is not _UNDEFINED or \
@@ -1065,26 +1071,16 @@ class System(object):
             msg = "{}: Constraint '{}' cannot be both equality and inequality."
             raise ValueError(msg.format(self.msginfo, name))
 
-        if self._static_mode:
+        if self._static_mode and self._static_responses:
             responses = self._static_responses
         else:
             responses = self._responses
 
-        # Look through responses to see if there are multiple responses with that name
-        aliases = [resp['alias'] for resp in responses.values() if resp['name'] == name]
-        if len(aliases) > 1 and alias is _UNDEFINED:
-            msg = "{}: set_constraint_options called with constraint variable '{}' that has " \
-                  "multiple aliases: {}. Call set_objective_options with the 'alias' argument " \
-                  "set to one of those aliases."
-            raise RuntimeError(msg.format(self.msginfo, name, aliases))
-
-        if len(aliases) == 0:
-            msg = "{}: set_constraint_options called with constraint variable '{}' that does not " \
-                  "exist."
-            raise RuntimeError(msg.format(self.msginfo, name))
-
-        if alias is not _UNDEFINED:
-            name = alias
+        if name not in responses:
+            msg = f"{self.msginfo}: set_constraint_options called with " \
+                f"constraint '{name}' that does not exist. If the constraint was provided " \
+                f"an alias, use that in place of its name for set_constraint_options."
+            raise RuntimeError(msg)
 
         existing_cons_meta = responses[name]
         are_existing_scaling = existing_cons_meta['scaler'] is not None or \
@@ -1217,7 +1213,7 @@ class System(object):
         Parameters
         ----------
         name : str
-            Name of the response variable in the system.
+            Name of the response variable in the system, or alias if given.
         ref : float or ndarray, optional
             Value of response variable that scales to 1.0 in the driver.
         ref0 : float or ndarray, optional
@@ -1231,40 +1227,38 @@ class System(object):
             is second in precedence. adder and scaler are an alterantive to using ref
             and ref0.
         alias : str
-            Alias for this response. Necessary when adding multiple objectives on different
-            indices or slices of a single variable.
+            Alias for this response. Used to disambiguate variable names when adding
+            multiple objectives on different indices or slices of a single variable. Deprecated.
         """
         # Check inputs
         # Name must be a string
         if not isinstance(name, str):
-            raise TypeError('{}: The name argument should be a string, got {}'.format(self.msginfo,
-                                                                                      name))
+            raise TypeError(f'{self.msginfo}: The name argument should be a string, got {name}')
+
+        if alias is not _UNDEFINED:
+            warn_deprecation("Option 'alias' of set_objective_options is deprecated. "
+                             "If the objective has an alias, provide that as the 'name' "
+                             "argument to set_objective_options.")
+            name = alias
+
         # At least one of the scaling parameters must be set or function does nothing
         if scaler is _UNDEFINED and adder is _UNDEFINED and ref is _UNDEFINED and ref0 == \
                 _UNDEFINED:
             raise RuntimeError(
                 'Must set a value for at least one argument in call to set_objective_options.')
 
-        if self._static_mode:
+        if self._static_mode and self._static_responses:
             responses = self._static_responses
         else:
             responses = self._responses
 
-        # Look through responses to see if there are multiple responses with that name
-        aliases = [resp['alias'] for resp in responses.values() if resp['name'] == name]
-        if len(aliases) > 1 and alias is _UNDEFINED:
-            msg = "{}: set_objective_options called with objective variable '{}' that has " \
-                  "multiple aliases: {}. Call set_objective_options with the 'alias' argument " \
-                  "set to one of those aliases."
-            raise RuntimeError(msg.format(self.msginfo, name, aliases))
-
-        if len(aliases) == 0:
-            msg = "{}: set_objective_options called with objective variable '{}' that does not " \
-                  "exist."
-            raise RuntimeError(msg.format(self.msginfo, name))
-
-        if alias is not _UNDEFINED:
-            name = alias
+        # If the name is not in responses, which are keyed by alias, then it was given
+        # as the actual variable name but the variable has a different alias.
+        if name not in responses:
+            msg = f"{self.msginfo}: set_objective_options called with " \
+                f"objective '{name}' that does not exist. If the objective was provided " \
+                f"an alias, use that in place of its name for set_objective_options."
+            raise RuntimeError(msg)
 
         # Since one or more of these are being set by the incoming arguments, the
         #   ones that are not being set should be set to None since they will be re-computed below
