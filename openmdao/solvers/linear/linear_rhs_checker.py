@@ -74,6 +74,8 @@ class LinearRHSChecker(object):
         Dictionary to store cache statistics.
     _verbose : bool
         If True, print out whenever a cache hit occurs.
+    _solver_msginfo : str
+        The message info for the solver that owns this LinearRHSChecker.
     """
 
     options = ('check_zero', 'rtol', 'atol', 'max_cache_entries', 'collect_stats',
