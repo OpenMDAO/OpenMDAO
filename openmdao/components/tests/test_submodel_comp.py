@@ -656,8 +656,6 @@ class TestSubModelBug(unittest.TestCase):
 
         p.run_model()
 
-        p.model.sub1.show_interface()
-
         assert_near_equal(p.get_val('y'), 2.0 * 3.0)
 
 
@@ -665,8 +663,6 @@ class TestSubModelBug(unittest.TestCase):
         p = build_submodel(compute_x=True)
 
         p.run_model()
-
-        p.model.sub1.show_interface()
 
         assert_near_equal(p.get_val('y'), 2.0 * 3.0)
 
