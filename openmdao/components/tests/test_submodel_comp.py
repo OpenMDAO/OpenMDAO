@@ -422,6 +422,18 @@ class TestSubmodelComp(unittest.TestCase):
         totals = p.check_totals(method='cs')
         assert_check_totals(totals, atol=1e-11, rtol=1e-11)
 
+    def test_problem_property(self):
+        """Tests the problem property of SubmodelComp"""
+        p = om.Problem()
+        submodel = om.SubmodelComp(problem=p)
+        subprob = submodel.problem
+
+        self.assertIsInstance(subprob, om.Problem) # make sure it returns a problem
+        self.assertEqual(subprob, p) # make sure it returns correct problem
+
+        with self.assertRaises(AttributeError): # make sure it cannot be assigned
+            submodel.problem = om.Problem()
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestSubmodelCompMPI(unittest.TestCase):
