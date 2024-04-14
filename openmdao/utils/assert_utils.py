@@ -434,6 +434,7 @@ def assert_near_equal(actual, desired, tolerance=1e-15, atol=None):
         Maximum relative error ``(actual - desired) / desired``.
     atol : float
         Maximum absolute error ``(actual - desired)``.
+
     Returns
     -------
     float
