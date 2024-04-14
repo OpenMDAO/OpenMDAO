@@ -432,7 +432,8 @@ def assert_near_equal(actual, desired, tolerance=1e-15, atol=None):
         The value expected.
     tolerance : float
         Maximum relative error ``(actual - desired) / desired``.
-
+    atol : float
+        Maximum absolute error ``(actual - desired)``.
     Returns
     -------
     float
