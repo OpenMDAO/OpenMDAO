@@ -415,7 +415,7 @@ def assert_no_dict_jacobians(system, include_self=True, recurse=True):
         raise AssertionError('\n'.join(parts))
 
 
-def assert_near_equal(actual, desired, tolerance=1e-15):
+def assert_near_equal(actual, desired, tolerance=1e-15, atol=None):
     """
     Check relative error.
 
@@ -500,7 +500,7 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
 
         for key in actual_keys:
             try:
-                new_error = assert_near_equal(actual[key], desired[key], tolerance)
+                new_error = assert_near_equal(actual[key], desired[key], tolerance, atol)
                 error = max(error, new_error)
             except ValueError as exception:
                 msg = '{}: '.format(key) + str(exception)
@@ -566,10 +566,16 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
                                      ' values')
             if np.linalg.norm(desired) == 0:
                 error = np.linalg.norm(actual)
+            elif atol:
+                error = np.linalg.norm(actual - desired)
             else:
                 error = np.linalg.norm(actual - desired) / np.linalg.norm(desired)
 
-            if abs(error) > tolerance:
+            if atol:
+                if abs(error) > atol:
+                    raise ValueError('actual %s, desired %s, rel error %s, absolute tolerance %s'
+                                     % (actual, desired, error, atol))
+            elif abs(error) > tolerance:
                 if actual.size < 10 and desired.size < 10:
                     raise ValueError('actual %s, desired %s, rel error %s, tolerance %s'
                                      % (actual, desired, error, tolerance))
@@ -579,7 +585,7 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
     elif isinstance(actual, tuple) and isinstance(desired, tuple):
         error = 0.0
         for act, des in zip(actual, desired):
-            new_error = assert_near_equal(act, des, tolerance)
+            new_error = assert_near_equal(act, des, tolerance, atol)
             error = max(error, new_error)
     else:
         raise ValueError(
