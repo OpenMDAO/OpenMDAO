@@ -575,7 +575,7 @@ def assert_near_equal(actual, desired, tolerance=1e-15, atol=None):
 
             if atol:
                 if abs(error) > atol:
-                    raise ValueError('actual %s, desired %s, rel error %s, absolute tolerance %s'
+                    raise ValueError('actual %s, desired %s, abs error %s, abs tolerance %s'
                                      % (actual, desired, error, atol))
             elif abs(error) > tolerance:
                 if actual.size < 10 and desired.size < 10:

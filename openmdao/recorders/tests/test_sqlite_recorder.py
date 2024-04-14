@@ -2747,10 +2747,10 @@ class TestSqliteRecorder(unittest.TestCase):
         obj = case.get_objectives()
 
         assert_near_equal(obj, {'f_xy': -27.33333333}, tolerance=1e-8)
-        assert_near_equal(dvs, {'x': 6.66666669, 'y': -7.33333338}, tolerance=1e-8, atol=1e-7)
+        assert_near_equal(dvs, {'x': 6.66666669, 'y': -7.33333338}, tolerance=1e-8, atol=8.1e-8)
 
         if Version(scipy_version) < Version("1.11"):
-            assert_near_equal(con, {'x': 6.66666669, 'y': -7.33333338}, tolerance=1e-8, atol=1e-7)
+            assert_near_equal(con, {'x': 6.66666669, 'y': -7.33333338}, tolerance=1e-8, atol=8.1e-8)
         else:
             self.assertEqual(con, {})
 
