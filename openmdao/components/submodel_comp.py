@@ -273,15 +273,15 @@ class SubmodelComp(ExplicitComponent):
                     meta = abs2meta_local[src]  # get local metadata if we have it
                 self.indep_vars[prom] = (src, meta)
 
-        # add any inputs connected to indep vars as indep vars.  Their name will be the
+        # add any inputs connected to auto_ivc vars as indep vars.  Their name will be the
         # promoted name of the input that connects to the actual indep var.
         for prom in prom2abs_in:
             src = p.model.get_source(prom)
-            if src in abs2meta_local:
-                meta = abs2meta_local[src]  # get local metadata if we have it
-            else:
-                meta = abs2meta[src]
-            if 'openmdao:indep_var' in meta['tags']:
+            if src.startswith('_auto_ivc.'):
+                if src in abs2meta_local:
+                    meta = abs2meta_local[src]  # get local metadata if we have it
+                else:
+                    meta = abs2meta[src]
                 self.indep_vars[prom] = (src, meta)
 
         self._submodel_inputs = {}
@@ -305,7 +305,7 @@ class SubmodelComp(ExplicitComponent):
             if _is_glob(inner_prom):
                 found = False
                 for match in pattern_filter(inner_prom, prom2abs_out):
-                    if match.startswith('_auto_ivc.'):
+                    if match.startswith('_auto_ivc.') or match in self._submodel_inputs:
                         continue
                     self._submodel_outputs[match] = (match, kwargs.copy())
                     found = True
@@ -485,8 +485,6 @@ class SubmodelComp(ExplicitComponent):
         if self._do_opt:
             raise RuntimeError("Can't compute partial derivatives of a SubmodelComp with "
                                "an internal optimizer.")
-
-        p = self._subprob
 
         # we don't need to set our inputs into the submodel here because we've already done it
         # in compute.
