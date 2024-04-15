@@ -160,7 +160,7 @@ class SubmodelComp(ExplicitComponent):
     @property
     def problem(self):
         """
-        Allows user read-only access to the sub-problem.
+        Allow user read-only access to the sub-problem.
 
         Returns
         -------
