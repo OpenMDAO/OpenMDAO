@@ -157,6 +157,18 @@ class SubmodelComp(ExplicitComponent):
         """
         return name.replace('.', ':')
 
+    @property
+    def problem(self):
+        """
+        Allow user read-only access to the sub-problem.
+
+        Returns
+        -------
+        <Problem>
+            Instantiated problem used to run the model.
+        """
+        return self._subprob
+
     def add_input(self, prom_in, name=None, **kwargs):
         """
         Add input to model before or after setup.
