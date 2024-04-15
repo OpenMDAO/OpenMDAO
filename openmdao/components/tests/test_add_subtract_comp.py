@@ -516,7 +516,7 @@ class TestDuplicateWarning(unittest.TestCase):
 
     def test_no_warning(self):
         """
-        Tests that no warning is issued when there are no duplicate inputs
+        Tests if no warning is issued when there are no duplicate inputs
         """
         comp = om.AddSubtractComp()
         input_names = ["f1", "f2", "f3", "f4", "f5"]
