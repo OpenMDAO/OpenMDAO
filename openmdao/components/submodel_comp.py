@@ -4,7 +4,7 @@ from collections import defaultdict, Counter
 from openmdao.core.constants import _SetupStatus, INF_BOUND
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.total_jac import _TotalJacInfo
-from openmdao.utils.general_utils import pattern_filter, vprint
+from openmdao.utils.general_utils import pattern_filter
 from openmdao.utils.reports_system import clear_reports
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.coloring import compute_total_coloring, ColoringMeta
