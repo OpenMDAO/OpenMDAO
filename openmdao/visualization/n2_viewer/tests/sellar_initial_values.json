@@ -29,7 +29,8 @@
         "err_on_non_converge": false,
         "assemble_jac": false,
         "solver": "gmres",
-        "restart": 20
+        "restart": 20,
+        "rhs_checking": false
     },
     "component_type": null,
     "subsystem_type": "group",
@@ -131,7 +132,8 @@
                 "err_on_non_converge": false,
                 "assemble_jac": false,
                 "solver": "gmres",
-                "restart": 20
+                "restart": 20,
+                "rhs_checking": false
             },
             "component_type": null,
             "subsystem_type": "group",
@@ -155,7 +157,8 @@
                         "err_on_non_converge": false,
                         "assemble_jac": false,
                         "solver": "gmres",
-                        "restart": 20
+                        "restart": 20,
+                        "rhs_checking": false
                     },
                     "component_type": null,
                     "subsystem_type": "group",

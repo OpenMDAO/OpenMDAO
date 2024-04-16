@@ -164,7 +164,9 @@ class TestSubmodelComp(unittest.TestCase):
         p = om.Problem()
         model = om.Group()
 
-        model.add_subsystem('sub', om.ExecComp('z = x1**2 + x2**2 + x3**2'), promotes=['*'])
+        model.add_subsystem('sub', om.ExecComp(['z = foo**2 + bar**2 + baz**2',
+                                                'out = bgd - xyz*foo + baz',
+                                                'result = -foo*bgd + bar*xyz']), promotes=['*'])
         subprob = om.Problem()
         subprob.model.add_subsystem('submodel', model, promotes=['*'])
         comp = om.SubmodelComp(problem=subprob, inputs=['x*'], outputs=['*'])
@@ -172,9 +174,11 @@ class TestSubmodelComp(unittest.TestCase):
         p.model.add_subsystem('comp', comp, promotes_inputs=['*'], promotes_outputs=['*'])
         p.setup()
 
-        p.set_val('x1', 1)
-        p.set_val('x2', 2)
-        p.set_val('x3', 3)
+        p.set_val('foo', 1)
+        p.set_val('bar', 2)
+        p.set_val('baz', 3)
+        p.set_val('bgd', 4)
+        p.set_val('xyz', 5)
 
         p.run_model()
 
@@ -184,10 +188,12 @@ class TestSubmodelComp(unittest.TestCase):
         inputs = {inputs[i][0]: inputs[i][1]['val'] for i in range(len(inputs))}
         outputs = {outputs[i][0]: outputs[i][1]['val'] for i in range(len(outputs))}
 
-        assert_near_equal(inputs['x1'], 1)
-        assert_near_equal(inputs['x2'], 2)
-        assert_near_equal(inputs['x3'], 3)
+        assert_near_equal(inputs['foo'], 1)
+        assert_near_equal(inputs['bar'], 2)
+        assert_near_equal(inputs['baz'], 3)
         assert_near_equal(outputs['z'], 14)
+
+        assert_check_partials(p.check_partials(out_stream=None), atol=2e-6)
 
     def test_add_io_before_setup(self):
         p = om.Problem()
@@ -221,7 +227,7 @@ class TestSubmodelComp(unittest.TestCase):
         p.setup(force_alloc_complex=True)
 
         p.run_model()
-        cpd = p.check_partials(method='cs', out_stream=None)
+        assert_check_partials(p.check_partials(out_stream=None))
 
         assert_near_equal(p.get_val('z'), 1.0)
 
@@ -280,7 +286,7 @@ class TestSubmodelComp(unittest.TestCase):
         p.set_val('theta', np.pi)
 
         p.run_model()
-        cpd = p.check_partials(method='cs', out_stream=None)
+        assert_check_partials(p.check_partials(method='cs', out_stream=None))
 
         assert_near_equal(p.get_val('z'), 1)
 
@@ -422,6 +428,18 @@ class TestSubmodelComp(unittest.TestCase):
         totals = p.check_totals(method='cs')
         assert_check_totals(totals, atol=1e-11, rtol=1e-11)
 
+    def test_problem_property(self):
+        """Tests the problem property of SubmodelComp"""
+        p = om.Problem()
+        submodel = om.SubmodelComp(problem=p)
+        subprob = submodel.problem
+
+        self.assertIsInstance(subprob, om.Problem) # make sure it returns a problem
+        self.assertEqual(subprob, p) # make sure it returns correct problem
+
+        with self.assertRaises(AttributeError): # make sure it cannot be assigned
+            submodel.problem = om.Problem()
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestSubmodelCompMPI(unittest.TestCase):
@@ -441,8 +459,7 @@ class TestSubmodelCompMPI(unittest.TestCase):
 
         p.setup(force_alloc_complex=True)
         p.run_model()
-        cpd = p.check_partials(method='cs', out_stream=None)
-        assert_check_partials(cpd)
+        assert_check_partials(p.check_partials(method='cs', out_stream=None))
 
 
 class IncompleteRelevanceGroup(om.Group):
@@ -601,6 +618,65 @@ class TestSubmodelOpt(unittest.TestCase):
         self.assertEqual(cm.exception.args[0],
                          "'submodel' <class SubmodelComp>: Error calling compute_partials(), Can't compute partial "
                          "derivatives of a SubmodelComp with an internal optimizer.")
+
+
+
+
+def build_submodel(compute_x=False):
+    p = om.Problem()
+    supmodel = om.Group()
+    supmodel.add_subsystem('supComp', om.ExecComp('diameter = r * theta'),
+                            promotes_inputs=['*'],
+                            promotes_outputs=['*', ('diameter', 'aircraft:fuselage:diameter')])
+
+    subprob1 = om.Problem()
+    submodel1 = subprob1.model.add_subsystem('submodel1', om.Group(), promotes=['*'])
+
+    if compute_x:
+        submodel1.add_subsystem('x', om.ExecComp('x = diameter * 2 * r * theta'), promotes=['*', ('diameter', 'aircraft:fuselage:diameter')])
+    submodel1.add_subsystem('y', om.ExecComp('y = mass * donkey_kong'), promotes=['*', ('mass', 'dynamic:mission:mass'), ('donkey_kong', 'aircraft:engine:donkey_kong')])
+
+
+    p.model.add_subsystem('supModel', supmodel, promotes_inputs=['*'],
+                            promotes_outputs=['*'])
+
+
+    submodel = om.SubmodelComp(problem=subprob1, inputs=['*'], outputs=['*'], do_coloring=False)
+    p.model.add_subsystem('sub1', submodel,
+                            promotes_inputs=['*'],
+                            promotes_outputs=['*'])
+
+    p.model.set_input_defaults('r', 1.25)
+    p.model.set_input_defaults('theta', np.pi)
+
+    p.setup(force_alloc_complex=True)
+
+    p.set_val('r', 1.25)
+    p.set_val('theta', 0.5)
+    p.set_val('dynamic:mission:mass', 2.0)
+    p.set_val('aircraft:engine:donkey_kong', 3.0)
+    p.set_val('aircraft:fuselage:diameter', 3.5)
+
+    return p
+
+
+
+class TestSubModelBug(unittest.TestCase):
+
+    def test_submodel_bug(self):
+        p = build_submodel(compute_x=False)
+
+        p.run_model()
+
+        assert_near_equal(p.get_val('y'), 2.0 * 3.0)
+
+
+    def test_submodel_bug_fails(self):
+        p = build_submodel(compute_x=True)
+
+        p.run_model()
+
+        assert_near_equal(p.get_val('y'), 2.0 * 3.0)
 
 
 if __name__ == '__main__':
