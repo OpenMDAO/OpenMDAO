@@ -1445,3 +1445,27 @@ def get_rev_conns(conns):
         else:
             rev[src] = [tgt]
     return rev
+
+
+def vprint(it, end='\n', getter=None, file=None):
+    """
+    Iterate over the given iterator and print each item separated by end.
+
+    Parameters
+    ----------
+    it : iter
+        Iterator to be printed.
+    end : str
+        String written after each item.
+    getter : function or None
+        If not None, only print the part of each item returned by getter(item).
+    file : file-like or None
+        File to write to.  If None, use sys.stdout.
+    """
+    if file is None:
+        file = sys.stdout
+
+    for val in it:
+        if getter is not None:
+            val = getter(val)
+        print(val, end=end, file=file)

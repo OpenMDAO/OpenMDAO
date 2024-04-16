@@ -273,7 +273,8 @@ class SubmodelComp(ExplicitComponent):
 
         # store indep vars by promoted name, excluding _auto_ivc vars because later we'll
         # add the inputs connected to _auto_ivc vars as indep vars (because that's how the user
-        # would expect them to be named)
+        # would expect them to be named).  Note that not all indep_vars will be visible outside
+        # of this component.
         self.indep_vars = {}
         for src, meta in abs2meta.items():
             if src.startswith('_auto_ivc.'):
@@ -284,16 +285,16 @@ class SubmodelComp(ExplicitComponent):
                     meta = abs2meta_local[src]  # get local metadata if we have it
                 self.indep_vars[prom] = (src, meta)
 
-        # add any inputs connected to _auto_ivc vars as indep vars
+        # add any inputs connected to auto_ivc vars as indep vars.  Their name will be the
+        # promoted name of the input that connects to the actual indep var.
         for prom in prom2abs_in:
             src = p.model.get_source(prom)
-            if not src.startswith('_auto_ivc.'):
-                continue
-            if src in abs2meta_local:
-                meta = abs2meta_local[src]  # get local metadata if we have it
-            else:
-                meta = abs2meta[src]
-            self.indep_vars[prom] = (src, meta)
+            if src.startswith('_auto_ivc.'):
+                if src in abs2meta_local:
+                    meta = abs2meta_local[src]  # get local metadata if we have it
+                else:
+                    meta = abs2meta[src]
+                self.indep_vars[prom] = (src, meta)
 
         self._submodel_inputs = {}
         self._submodel_outputs = {}
@@ -316,7 +317,7 @@ class SubmodelComp(ExplicitComponent):
             if _is_glob(inner_prom):
                 found = False
                 for match in pattern_filter(inner_prom, prom2abs_out):
-                    if match.startswith('_auto_ivc.'):
+                    if match.startswith('_auto_ivc.') or match in self._submodel_inputs:
                         continue
                     self._submodel_outputs[match] = (match, kwargs.copy())
                     found = True
@@ -385,8 +386,6 @@ class SubmodelComp(ExplicitComponent):
         of_metadata, wrt_metadata, _ = p.model._get_totals_metadata(driver=p.driver,
                                                                     of=ofs, wrt=wrts)
 
-        self._setup_transfer_idxs(of_metadata, wrt_metadata)
-
         if len(inputs) == 0 or len(outputs) == 0:
             return
 
@@ -436,6 +435,18 @@ class SubmodelComp(ExplicitComponent):
                                       wrt=self._to_outer_input(wrt),
                                       rows=nzrows, cols=nzcols)
 
+    def _setup_vectors(self, root_vectors):
+        """
+        Compute all vectors for all vec names and assign excluded variables lists.
+
+        Parameters
+        ----------
+        root_vectors : dict of dict of Vector
+            Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        """
+        super()._setup_vectors(root_vectors)
+        self._setup_transfer_idxs()
+
     def _set_complex_step_mode(self, active):
         super()._set_complex_step_mode(active)
         self._subprob.set_complex_step_mode(active)
@@ -459,10 +470,10 @@ class SubmodelComp(ExplicitComponent):
         p = self._subprob
 
         # set our inputs and outputs into the submodel
-        p.model._outputs.set_val(self._inputs.asarray(), idxs=self._input_xfer_idxs())
+        p.model._outputs.set_val(inputs.asarray(), idxs=self._input_xfer_idxs())
 
         inner_idxs = self._output_xfer_idxs()
-        p.model._outputs.set_val(self._outputs.asarray(), idxs=inner_idxs)
+        p.model._outputs.set_val(outputs.asarray(), idxs=inner_idxs)
 
         if self._do_opt:
             p.run_driver()
@@ -487,8 +498,6 @@ class SubmodelComp(ExplicitComponent):
             raise RuntimeError("Can't compute partial derivatives of a SubmodelComp with "
                                "an internal optimizer.")
 
-        p = self._subprob
-
         # we don't need to set our inputs into the submodel here because we've already done it
         # in compute.
 
@@ -505,7 +514,7 @@ class SubmodelComp(ExplicitComponent):
                 partials[(self._to_outer_output(of), self._to_outer_input(wrt))] = \
                     tots[of, wrt][nzrows, nzcols].ravel()
 
-    def _setup_transfer_idxs(self, of_metadata, wrt_metadata):
+    def _setup_transfer_idxs(self):
         """
         Set up the transfer indices for input and output variables.
 
@@ -521,10 +530,13 @@ class SubmodelComp(ExplicitComponent):
 
         full_shape = (rng[1],) if full_inner_map else (0,)
 
+        # map outer name of inputs to their inner promoted name
+        input_map = {v[0]: k for k, v in self._submodel_inputs.items()}
+
         # get ranges for subodel outputs corresponding to our inputs
         inp_ranges = []
-        for inner_prom in self._submodel_inputs:
-            src, _ = self.indep_vars[inner_prom]
+        for inner_prom in self._inputs:
+            src, _ = self.indep_vars[input_map[inner_prom]]
             inp_ranges.append(full_inner_map[src])
 
         # get ranges for submodel outputs corresponding to our outputs
