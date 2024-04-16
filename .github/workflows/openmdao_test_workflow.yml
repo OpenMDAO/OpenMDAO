@@ -495,7 +495,7 @@ jobs:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Slack unit test failure
-        if: steps.run_tests.outcome == 'failure'
+        if: failure() && steps.run_tests.outcome == 'failure'
         uses: act10ns/slack@v2.0.0
         with:
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -505,7 +505,7 @@ jobs:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Slack doc build failure
-        if: steps.build_docs.outcome == 'failure'
+        if: failure() && steps.build_docs.outcome == 'failure'
         uses: act10ns/slack@v2.0.0
         with:
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -655,6 +655,16 @@ jobs:
           cd $HOME
           Set-DisplayResolution -Width 1920 -Height 1080 -Force
           testflo -n 2 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20
+
+      - name: Slack unit test failure
+        if: failure() && steps.run_tests.outcome == 'failure'
+        uses: act10ns/slack@v2.0.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: ${{ steps.run_tests.outcome }}
+          message:
+            Unit testing failed on `${{ matrix.NAME }}` build.
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Submit coverage
         id: coveralls
