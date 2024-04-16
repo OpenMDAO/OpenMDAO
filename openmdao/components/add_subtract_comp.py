@@ -7,6 +7,7 @@ import numpy as np
 from scipy import sparse as sp
 
 from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.utils.om_warnings import issue_warning
 
 
 class AddSubtractComp(ExplicitComponent):
@@ -172,6 +173,10 @@ class AddSubtractComp(ExplicitComponent):
         elif len(scaling_factors) != len(input_names):
             raise ValueError(self.msginfo + ': Scaling factors list needs to be same length '
                              'as input names')
+
+        if len(input_names) != len(set(input_names)):
+            issue_warning(f"Duplicate inputs are connected to '{output_name}'. This will "
+                          "double count the same value, which may cause unexpected behavior.")
 
         if length == 1:
             shape = (vec_size,)
