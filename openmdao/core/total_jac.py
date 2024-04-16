@@ -1349,6 +1349,7 @@ class _TotalJacInfo(object):
             Derivatives in form requested by 'return_format'.
         """
         self.model._recording_iter.push(('_compute_totals', 0))
+        self.model._problem_meta['ncompute_totals'] += 1
 
         if self.approx:
             try:
