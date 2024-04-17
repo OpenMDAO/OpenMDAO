@@ -522,6 +522,7 @@ class SubmodelComp(ExplicitComponent):
 
         # map outer name of inputs to their inner promoted name
         input_map = {v[0]: k for k, v in self._submodel_inputs.items()}
+        output_map = {v[0]: k for k, v in self._submodel_outputs.items()}
 
         # get ranges for subodel outputs corresponding to our inputs
         inp_ranges = []
@@ -531,8 +532,8 @@ class SubmodelComp(ExplicitComponent):
 
         # get ranges for submodel outputs corresponding to our outputs
         out_ranges = []
-        for inner_prom in self._submodel_outputs:
-            out_ranges.append(full_inner_map[prom2abs[inner_prom][0]])
+        for inner_prom in self._outputs:
+            out_ranges.append(full_inner_map[prom2abs[output_map[inner_prom]][0]])
 
         self._input_xfer_idxs = ranges2indexer(inp_ranges, src_shape=full_shape)
         self._output_xfer_idxs = ranges2indexer(out_ranges, src_shape=full_shape)
