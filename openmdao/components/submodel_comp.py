@@ -522,13 +522,15 @@ class SubmodelComp(ExplicitComponent):
 
         # map outer name of inputs to their inner promoted name
         input_map = {v[0]: k for k, v in self._submodel_inputs.items()}
-        output_map = {v[0]: k for k, v in self._submodel_outputs.items()}
 
         # get ranges for subodel outputs corresponding to our inputs
         inp_ranges = []
         for inner_prom in self._inputs:
             src, _ = self.indep_vars[input_map[inner_prom]]
             inp_ranges.append(full_inner_map[src])
+
+        # map outer name of outputs to their inner promoted name
+        output_map = {v[0]: k for k, v in self._submodel_outputs.items()}
 
         # get ranges for submodel outputs corresponding to our outputs
         out_ranges = []
