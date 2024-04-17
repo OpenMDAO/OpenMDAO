@@ -9,6 +9,8 @@ from packaging.version import Version
 import numpy as np
 from scipy import __version__ as scipy_version
 
+ScipyVersion = Version(scipy_version)
+
 import openmdao.api as om
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense, TestExplCompArraySparse, TestExplCompArrayJacVec
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -1234,7 +1236,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['z'][1], 0.0, 1e-3)
         assert_near_equal(prob['x'], 0.0, 1e-3)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.1"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.1"),
                          "scipy >= 1.1 is required.")
     def test_trust_constr(self):
 
@@ -1276,7 +1278,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertTrue(prob['c'] < 10)
         self.assertTrue(prob['c'] > 0)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.1"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.1"),
                          "scipy >= 1.1 is required.")
     def test_trust_constr_hess_option(self):
 
@@ -1319,7 +1321,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertTrue(prob['c'] < 10)
         self.assertTrue(prob['c'] > 0)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.1"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.1"),
                          "scipy >= 1.1 is required.")
     def test_trust_constr_equality_con(self):
 
@@ -1360,7 +1362,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         assert_near_equal(prob['con.c'], 1., 1e-3)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.2"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.2"),
                          "scipy >= 1.2 is required.")
     def test_trust_constr_inequality_con(self):
 
@@ -1398,7 +1400,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         assert_near_equal(prob['c'], 1.0, 1e-2)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.2"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.2"),
                          "scipy >= 1.2 is required.")
     def test_trust_constr_bounds(self):
         class Rosenbrock(om.ExplicitComponent):
@@ -1652,10 +1654,11 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        expected_msg = \
-            "Problem .*: run_model must be called before total derivatives can be checked\."
-        with self.assertRaisesRegex(RuntimeError, expected_msg):
-            totals = prob.check_totals(method='fd', out_stream=False)
+        with self.assertRaises(RuntimeError) as cm:
+            prob.check_totals(method='fd', out_stream=False)
+
+        self.assertEqual(str(cm.exception), f"Problem {prob._get_inst_id()}: "
+                         "run_model must be called before total derivatives can be checked.")
 
     def test_cobyla_linear_constraint(self):
         # Bug where ScipyOptimizeDriver tried to compute and cache the constraint derivatives for the
@@ -1793,7 +1796,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['x'], np.array([0.234171, -0.1000]), 1e-3)
         assert_near_equal(prob['f'], -0.907267, 1e-3)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.2"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.2"),
                          "scipy >= 1.2 is required.")
     def test_dual_annealing_rastrigin(self):
         # Example from the Scipy documentation
@@ -1901,7 +1904,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['x'], -np.ones(size), 1e-2)
         assert_near_equal(prob['f'], 3.0, 1e-2)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.4"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.4"),
                          "scipy >= 1.4 is required.")
     def test_differential_evolution_constrained_linear(self):
         # Source of example:
@@ -1935,8 +1938,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['x'], [0.96632622, 0.93367155], 1e-2)
         assert_near_equal(prob['f'], 0.0011352416852625719, 1e-2)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.4"),
-                         "scipy >= 1.4 is required.")
+    @unittest.skipUnless(ScipyVersion >= Version("1.4") and ScipyVersion < Version("1.12"),
+                         "scipy >= 1.4, < 1.12 is required.")
     def test_differential_evolution_constrained_nonlinear(self):
         # Source of example:
         # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.differential_evolution.html
@@ -1969,7 +1972,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['x'], [0.96632622, 0.93367155], 1e-2)
         assert_near_equal(prob['f'], 0.0011352416852625719, 1e-2)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.4"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.4"),
                          "scipy >= 1.4 is required.")
     def test_differential_evolution_constrained_linear_nonlinear(self):
         # test of the differential evolution optimizer with both
@@ -2004,7 +2007,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['x'], [0.94999253, 0.90250721], 1e-2)
         assert_near_equal(prob['f'], 0.00250079, 1e-2)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.2"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.2"),
                          "scipy >= 1.2 is required.")
     def test_shgo_rosenbrock(self):
         # Source of example:
@@ -2229,7 +2232,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertEqual(str(msg.exception),
                          "Constraints or objectives [('parab.f_z', inds=[(1, 1, 0)])] cannot be impacted by the design variables of the problem.")
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.2"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.2"),
                          "scipy >= 1.2 is required.")
     def test_feature_shgo_rastrigin(self):
         # Source of example: https://stefan-endres.github.io/shgo/
