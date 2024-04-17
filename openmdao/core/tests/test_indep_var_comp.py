@@ -105,6 +105,40 @@ class TestIndepVarComp(unittest.TestCase):
         assert_near_equal(prob.get_val('indep_var_1'), 1.0)
         assert_near_equal(prob.get_val('indep_var_2'), 2.0)
 
+    def test_tuple_ivc(self):
+        """Define one independent variable using a tuple."""
+
+        ivcs = [
+            ('indep_var', 1.0),
+            ('indep_var2', 2.0),
+        ]
+
+        comp = om.IndepVarComp(ivcs)
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', comp, promotes=['*'])
+        prob.setup(check=False)
+
+        assert_near_equal(prob.get_val('indep_var'), 1.0)
+        assert_near_equal(prob.get_val('indep_var2'), 2.0)
+
+    def test_tuple_ivc_kwargs(self):
+        """Define one independent variable using a tuple with additional options."""
+
+        ivcs = [
+            ('indep_var', 1.0, {'units': 'm'}),
+            ('indep_var2', 2.0, {'units': 'm'}),
+        ]
+
+        comp = om.IndepVarComp(ivcs)
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', comp, promotes=['*'])
+        prob.setup(check=False)
+
+        assert_near_equal(prob.get_val('indep_var', units='m'), 1.0)
+        assert_near_equal(prob.get_val('indep_var2', units='m'), 2.0)
+
     def test_promote_glob_no_inputs(self):
         p = om.Problem()
         p.model.add_subsystem('indep',

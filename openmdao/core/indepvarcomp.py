@@ -39,6 +39,16 @@ class IndepVarComp(ExplicitComponent):
         if isinstance(name, str):
             super().add_output(name, val, **kwargs)
 
+        elif isinstance(name, (list, tuple)):
+            for tup in name:
+                if len(tup) == 2:
+                    super().add_output(tup[0], tup[1], **kwargs)
+                elif len(tup) == 3:
+                    super().add_output(tup[0], tup[1], **tup[2])
+                else:
+                    raise ValueError("Each entry in the list of tuples must be of the form "
+                                     "(name, value) or (name, value, keyword_dict).")
+
         elif name is None:
             pass
 
