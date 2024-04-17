@@ -44,20 +44,23 @@ class TestSystemSetSolverDesvarConstraintObjectiveOutputOptions(unittest.TestCas
             prob.model.set_design_var_options(name='bad_var', lower=-100, upper=100)
         self.assertEqual(str(ctx.exception),
                          "<class SellarDerivatives>: set_design_var_options called with design "
-                         "variable 'bad_var' "
-                         "that does not exist.")
+                         "variable 'bad_var' that does not exist.")
 
         with self.assertRaises(RuntimeError) as ctx:
             prob.model.set_constraint_options(name='bad_var', ref0=-100.0, ref=100)
         self.assertEqual(str(ctx.exception),
-                         "<class SellarDerivatives>: set_constraint_options called with "
-                         "constraint variable 'bad_var' that does not exist.")
+                         "<class SellarDerivatives>: set_constraint_options called "
+                         "with constraint 'bad_var' that does not exist. If the "
+                         "constraint was provided an alias, use that in place of "
+                         "its name for set_constraint_options.")
 
         with self.assertRaises(RuntimeError) as ctx:
             prob.model.set_objective_options(name='bad_var', ref0=-100.0, ref=100)
         self.assertEqual(str(ctx.exception),
-                         "<class SellarDerivatives>: set_objective_options called with "
-                         "objective variable 'bad_var' that does not exist.")
+                         "<class SellarDerivatives>: set_objective_options called "
+                         "with objective 'bad_var' that does not exist. If the "
+                         "objective was provided an alias, use that in place of "
+                         "its name for set_objective_options.")
 
 
 class TestSystemSetSolverOutputOptions(unittest.TestCase):
@@ -478,6 +481,84 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         constraints_using_set_constraint_options = prob.model.get_constraints()
         self.assertEqual(constraints_using_add_constraint, constraints_using_set_constraint_options)
 
+    def test_sweep_bounds(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.sellar_feature import SellarMDA
+
+        prob = om.Problem()
+        prob.model = SellarMDA()
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        # prob.driver.options['maxiter'] = 100
+        prob.driver.options['tol'] = 1e-8
+
+        prob.model.add_design_var('x', lower=0, upper=10)
+        prob.model.add_design_var('z', lower=0, upper=10)
+        prob.model.add_objective('obj')
+        prob.model.add_constraint('con1', upper=0)
+        prob.model.add_constraint('con2', upper=0)
+
+        # # Ask OpenMDAO to finite-difference across the model to compute the gradients for the optimizer
+        # prob.model.approx_totals()
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+
+        objs = {}
+
+        for con1_upper in [0, 0.5, 1.0]:
+            prob.model.set_constraint_options('con1', upper=con1_upper)
+
+            prob.run_driver()
+
+            objs[con1_upper] = prob.get_val('obj')[0]
+
+        expected = {0: 3.1833939532866893,
+                    0.5: 2.691370063179728,
+                    1.0: 2.2033093115996443}
+
+        assert_near_equal(objs, expected, tolerance=1.0E-6)
+
+    def test_sweep_bounds_with_aliases(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.sellar_feature import SellarMDA
+
+        prob = om.Problem()
+        prob.model = SellarMDA()
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        # prob.driver.options['maxiter'] = 100
+        prob.driver.options['tol'] = 1e-8
+
+        prob.model.add_design_var('x', lower=0, upper=10)
+        prob.model.add_design_var('z', lower=0, upper=10)
+        prob.model.add_objective('obj')
+        prob.model.add_constraint('con1', upper=0, alias='con1_alias')
+        prob.model.add_constraint('con2', upper=0)
+
+        # # Ask OpenMDAO to finite-difference across the model to compute the gradients for the optimizer
+        # prob.model.approx_totals()
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+
+        objs = {}
+
+        for con1_upper in [0, 0.5, 1.0]:
+            prob.model.set_constraint_options('con1_alias', upper=con1_upper)
+
+            prob.run_driver()
+
+            objs[con1_upper] = prob.get_val('obj')[0]
+
+        expected = {0: 3.1833939532866893,
+                    0.5: 2.691370063179728,
+                    1.0: 2.2033093115996443}
+
+        assert_near_equal(objs, expected, tolerance=1.0E-6)
+
     def test_set_constraints_options_lower_upper_overrides_equals(self):
         # First set lower and upper in add_constraint
         prob = Problem()
@@ -603,10 +684,11 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         exec_comp.add_expr('y = x**2', y={'shape': (10, 3)}, x={'shape': (10, 3)})
         prob.model.add_constraint('exec.y', alias='y0', indices=slicer[0, -1])
         prob.model.add_constraint('exec.y', alias='yf', indices=slicer[-1, 0], equals=0)
-        prob.model.set_constraint_options('exec.y', alias='y0', scaler=3.5, adder=77.0)
+        prob.model.set_constraint_options(name='exec.y', alias='y0', scaler=3.5, adder=77.0)
         prob.setup()
 
         constraints_using_set_constraint_options = prob.model.get_constraints()
+
         assert_near_equal(constraints_using_add_constraint,
                           constraints_using_set_constraint_options)
 
@@ -614,15 +696,15 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         prob = Problem()
         exec_comp = prob.model.add_subsystem('exec', ExecComp())
         exec_comp.add_expr('y = x**2', y={'shape': (10, 3)}, x={'shape': (10, 3)})
-        prob.model.add_constraint('exec.y', alias='y0', indices=slicer[0, -1], scaler=3.5,
+        prob.model.add_constraint('y0', indices=slicer[0, -1], scaler=3.5,
                                   adder=77.0)
-        prob.model.add_constraint('exec.y', alias='yf', indices=slicer[-1, 0], equals=0)
+        prob.model.add_constraint('yf', indices=slicer[-1, 0], equals=0)
 
         with self.assertRaises(RuntimeError) as cm:
             prob.model.set_constraint_options('exec.y', ref0=-2.0, ref=20)
-        msg = "<class Group>: set_constraint_options called with constraint variable 'exec.y' " \
-              "that has multiple aliases: ['y0', 'yf']. Call set_objective_options with the " \
-              "'alias' argument set to one of those aliases."
+        msg = "<class Group>: set_constraint_options called with constraint 'exec.y' that " \
+              "does not exist. If the constraint was provided an alias, use that in place of " \
+              "its name for set_constraint_options."
         self.assertEqual(str(cm.exception), msg)
 
     def test_set_constraint_options_vector_values(self):
@@ -760,7 +842,7 @@ class TestSystemSetObjectiveOptions(unittest.TestCase):
         prob = _build_model()
         prob.model.add_constraint('fg_xy', indices=[1], alias='g_xy', lower=0, upper=10)
         prob.model.add_objective('fg_xy', index=0, alias='f_xy')
-        prob.model.set_objective_options(name='fg_xy', alias='f_xy', ref=3.0, ref0=2.0)
+        prob.model.set_objective_options(name='f_xy', ref=3.0, ref0=2.0)
         prob.setup()
 
         objective_using_set_objective_options = deepcopy(prob.model.get_objectives())
@@ -788,7 +870,7 @@ class TestSystemSetObjectiveOptions(unittest.TestCase):
         prob = _build_model()
         prob.model.add_constraint('fg_xy', indices=[1], alias='g_xy', lower=0, upper=10)
         prob.model.add_objective('fg_xy', index=0, alias='f_xy')
-        prob.model.set_objective_options(name='fg_xy', alias='f_xy', scaler=3.0, adder=2.0)
+        prob.model.set_objective_options(name='f_xy', scaler=3.0, adder=2.0)
         prob.setup()
 
         objective_using_set_objective_options = deepcopy(prob.model.get_objectives())
@@ -810,9 +892,9 @@ class TestSystemSetObjectiveOptions(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as cm:
             prob.model.set_objective_options(name='fg_xy', ref=3.0, ref0=2.0)
-        msg = "<class Group>: set_objective_options called with objective variable 'fg_xy' that " \
-              "has multiple aliases: ['g_xy', 'f_xy']. Call set_objective_options with the " \
-              "'alias' argument set to one of those aliases."
+        msg = "<class Group>: set_objective_options called with objective 'fg_xy' that does " \
+              "not exist. If the objective was provided an alias, use that in place of its " \
+              "name for set_objective_options."
         self.assertEqual(str(cm.exception), msg)
 
 

@@ -3,13 +3,16 @@ Utils for dealing with arrays.
 """
 import sys
 from itertools import product
-from copy import copy
 import hashlib
+from math import isclose
 
 import numpy as np
+from numpy.linalg import norm
+
 from scipy.sparse import coo_matrix
 
 from openmdao.core.constants import INT_DTYPE
+from openmdao.utils.numba import numba
 
 
 if sys.version_info >= (3, 8):
@@ -813,3 +816,99 @@ def convert_ndarray_to_support_nans_in_json(val):
     val_as_list = val.tolist()
     convert_nans_in_nested_list(val_as_list)
     return val_as_list
+
+
+if numba is None:
+    allclose = np.allclose
+
+    def allzero(a):
+        """
+        Return True if all elements of a are zero.
+
+        Parameters
+        ----------
+        a : ndarray
+            Array to be checked for zeros.
+
+        Returns
+        -------
+        bool
+            True if all elements of a are zero.
+        """
+        return not np.any(a)
+
+else:
+
+    @numba.jit(nopython=True, nogil=True)
+    def allclose(a, b, rtol=3e-16, atol=3e-16):
+        """
+        Return True if all elements of a and b are close within the given absolute tolerance.
+
+        Returns when the first non-close element is found.  a and b must have the same size.
+
+        Parameters
+        ----------
+        a : ndarray
+            First array to be compared.
+        b : ndarray
+            Second array to be compared.
+        rtol : float
+            Relative tolerance for comparison.
+        atol : float
+            Absolute tolerance for comparison.
+
+        Returns
+        -------
+        bool
+            True if all elements of a and b are close within the given absolute and
+            relative tolerance.
+        """
+        for i in range(len(a)):
+            aval = a[i]
+            bval = b[i]
+
+            absdiff = aval - bval
+            if absdiff < 0.:
+                absdiff = -absdiff
+
+            if aval < 0.:
+                aval = -aval
+            if bval < 0.:
+                bval = -bval
+
+            if aval < bval:
+                vmax = rtol * bval
+            else:
+                vmax = rtol * aval
+
+            if atol > vmax:
+                vmax = atol
+
+            if absdiff > vmax:
+                return False
+
+        return True
+
+    @numba.jit(nopython=True, nogil=True)
+    def allzero(a):
+        """
+        Return True if all elements of a are zero.
+
+        Unlike np.any, this returns as soon as a non-zero element is found and so can be
+        faster for arrays having nonzero values.  It's comparable in speed (slighly faster) to
+        'not np.any' for arrays that are all zeros.
+
+        Parameters
+        ----------
+        a : ndarray
+            Array to be checked for zeros.
+
+        Returns
+        -------
+        bool
+            True if all elements of a are zero.
+        """
+        for i in range(len(a)):
+            if a[i] != 0.:
+                return False
+        return True
