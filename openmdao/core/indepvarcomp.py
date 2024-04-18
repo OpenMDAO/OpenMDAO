@@ -41,6 +41,8 @@ class IndepVarComp(ExplicitComponent):
 
         elif isinstance(name, (list, tuple)):
             for tup in name:
+                if not isinstance(tup, tuple):
+                    raise TypeError("Each entry in the list of tuples must be of type tuple.")
                 if len(tup) == 2:
                     super().add_output(tup[0], tup[1], **kwargs)
                 elif len(tup) == 3:

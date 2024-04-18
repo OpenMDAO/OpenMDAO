@@ -139,6 +139,18 @@ class TestIndepVarComp(unittest.TestCase):
         assert_near_equal(prob.get_val('indep_var', units='m'), 1.0)
         assert_near_equal(prob.get_val('indep_var2', units='m'), 2.0)
 
+    def test_tuple_error(self):
+        """Test to see if the objects in the list are actually tuples."""
+            
+        ivcs = ['indep_var', 'indep_var2']
+
+        try:
+            om.IndepVarComp(ivcs)
+        except TypeError as err:
+            self.assertEqual(str(err), "Each entry in the list of tuples must be of type tuple.")
+        else:
+            self.fail('Exception expected.')
+
     def test_promote_glob_no_inputs(self):
         p = om.Problem()
         p.model.add_subsystem('indep',
