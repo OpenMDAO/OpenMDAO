@@ -310,6 +310,7 @@ class Driver(object):
                             # Discrete vars aren't distributed.
                             break
 
+
                         if abs2meta_in[abs_name]['distributed']:
                             dist_vars.append(dv)
                             break
