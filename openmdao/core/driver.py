@@ -92,7 +92,6 @@ class Driver(object):
     _has_scaling : bool
         If True, scaling has been set for this driver.
     """
-    # TODO: Driver.get_coloring bug
     def __init__(self, **kwargs):
         """
         Initialize the driver.
