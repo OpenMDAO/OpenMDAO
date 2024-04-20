@@ -1,0 +1,50 @@
+Traceback (most recent call last):
+  File "/opt/homebrew/lib/python3.9/site-packages/jupyter_cache/executors/utils.py", line 58, in single_nb_execution
+    executenb(
+  File "/Users/leena/Library/Python/3.9/lib/python/site-packages/nbclient/client.py", line 1265, in execute
+    return NotebookClient(nb=nb, resources=resources, km=km, **kwargs).execute()
+  File "/Users/leena/Library/Python/3.9/lib/python/site-packages/jupyter_core/utils/__init__.py", line 166, in wrapped
+    return loop.run_until_complete(inner)
+  File "/opt/homebrew/Cellar/python@3.9/3.9.19/Frameworks/Python.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 647, in run_until_complete
+    return future.result()
+  File "/Users/leena/Library/Python/3.9/lib/python/site-packages/nbclient/client.py", line 703, in async_execute
+    await self.async_execute_cell(
+  File "/Users/leena/Library/Python/3.9/lib/python/site-packages/nbclient/client.py", line 1021, in async_execute_cell
+    await self._check_raise_for_error(cell, cell_index, exec_reply)
+  File "/Users/leena/Library/Python/3.9/lib/python/site-packages/nbclient/client.py", line 915, in _check_raise_for_error
+    raise CellExecutionError.from_cell_and_msg(cell, exec_reply_content)
+nbclient.exceptions.CellExecutionError: An error occurred while executing the following cell:
+------------------
+%matplotlib inline
+from ipyparallel import Client, error
+cluster=Client(profile="mpi")
+view=cluster[:]
+view.block=True
+
+try:
+    from openmdao.utils.notebook_utils import notebook_mode
+except ImportError:
+    !python -m pip install openmdao[notebooks]
+------------------
+
+[0;31m---------------------------------------------------------------------------[0m
+[0;31mOSError[0m                                   Traceback (most recent call last)
+Cell [0;32mIn[1], line 3[0m
+[1;32m      1[0m get_ipython()[38;5;241m.[39mrun_line_magic([38;5;124m'[39m[38;5;124mmatplotlib[39m[38;5;124m'[39m, [38;5;124m'[39m[38;5;124minline[39m[38;5;124m'[39m)
+[1;32m      2[0m [38;5;28;01mfrom[39;00m [38;5;21;01mipyparallel[39;00m [38;5;28;01mimport[39;00m Client, error
+[0;32m----> 3[0m cluster[38;5;241m=[39m[43mClient[49m[43m([49m[43mprofile[49m[38;5;241;43m=[39;49m[38;5;124;43m"[39;49m[38;5;124;43mmpi[39;49m[38;5;124;43m"[39;49m[43m)[49m
+[1;32m      4[0m view[38;5;241m=[39mcluster[:]
+[1;32m      5[0m view[38;5;241m.[39mblock[38;5;241m=[39m[38;5;28;01mTrue[39;00m
+
+File [0;32m/opt/homebrew/lib/python3.9/site-packages/ipyparallel/client/client.py:461[0m, in [0;36mClient.__init__[0;34m(self, connection_info, url_file, profile, profile_dir, ipython_dir, context, debug, sshserver, sshkey, password, paramiko, timeout, cluster_id, cluster, **extra_args)[0m
+[1;32m    458[0m         connection_info [38;5;241m=[39m json[38;5;241m.[39mload(f)
+[1;32m    460[0m [38;5;28;01mif[39;00m connection_info [38;5;129;01mis[39;00m [38;5;28;01mNone[39;00m:
+[0;32m--> 461[0m     [38;5;28;01mraise[39;00m [38;5;167;01mOSError[39;00m(no_file_msg)
+[1;32m    463[0m [38;5;28;01mif[39;00m [38;5;28misinstance[39m(connection_info, [38;5;28mdict[39m):
+[1;32m    464[0m     cfg [38;5;241m=[39m connection_info[38;5;241m.[39mcopy()
+
+[0;31mOSError[0m: You have attempted to connect to an IPython Cluster but no Controller could be found.
+Please double-check your configuration and ensure that a cluster is running.
+OSError: You have attempted to connect to an IPython Cluster but no Controller could be found.
+Please double-check your configuration and ensure that a cluster is running.
+

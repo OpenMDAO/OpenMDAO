@@ -1,0 +1,71 @@
+Traceback (most recent call last):
+  File "/opt/homebrew/lib/python3.9/site-packages/jupyter_cache/executors/utils.py", line 58, in single_nb_execution
+    executenb(
+  File "/Users/leena/Library/Python/3.9/lib/python/site-packages/nbclient/client.py", line 1265, in execute
+    return NotebookClient(nb=nb, resources=resources, km=km, **kwargs).execute()
+  File "/Users/leena/Library/Python/3.9/lib/python/site-packages/jupyter_core/utils/__init__.py", line 166, in wrapped
+    return loop.run_until_complete(inner)
+  File "/opt/homebrew/Cellar/python@3.9/3.9.19/Frameworks/Python.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 647, in run_until_complete
+    return future.result()
+  File "/Users/leena/Library/Python/3.9/lib/python/site-packages/nbclient/client.py", line 703, in async_execute
+    await self.async_execute_cell(
+  File "/Users/leena/Library/Python/3.9/lib/python/site-packages/nbclient/client.py", line 1021, in async_execute_cell
+    await self._check_raise_for_error(cell, cell_index, exec_reply)
+  File "/Users/leena/Library/Python/3.9/lib/python/site-packages/nbclient/client.py", line 915, in _check_raise_for_error
+    raise CellExecutionError.from_cell_and_msg(cell, exec_reply_content)
+nbclient.exceptions.CellExecutionError: An error occurred while executing the following cell:
+------------------
+import numpy as np 
+import openmdao.api as om
+from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
+
+prob = om.Problem()
+model = prob.model
+
+model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                           z=np.array([0.0, 0.0]), x=0.0),
+                    promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+model.nonlinear_solver = om.NonlinearBlockGS()
+
+model.linear_solver = om.PETScKrylov()
+
+prob.setup()
+
+prob.set_val('x', 1.)
+prob.set_val('z', np.array([5.0, 2.0]))
+
+prob.run_model()
+
+wrt = ['z']
+of = ['obj']
+
+J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
+------------------
+
+[0;31m---------------------------------------------------------------------------[0m
+[0;31mRuntimeError[0m                              Traceback (most recent call last)
+Cell [0;32mIn[4], line 20[0m
+[1;32m     16[0m model[38;5;241m.[39madd_subsystem([38;5;124m'[39m[38;5;124mcon_cmp2[39m[38;5;124m'[39m, om[38;5;241m.[39mExecComp([38;5;124m'[39m[38;5;124mcon2 = y2 - 24.0[39m[38;5;124m'[39m), promotes[38;5;241m=[39m[[38;5;124m'[39m[38;5;124mcon2[39m[38;5;124m'[39m, [38;5;124m'[39m[38;5;124my2[39m[38;5;124m'[39m])
+[1;32m     18[0m model[38;5;241m.[39mnonlinear_solver [38;5;241m=[39m om[38;5;241m.[39mNonlinearBlockGS()
+[0;32m---> 20[0m model[38;5;241m.[39mlinear_solver [38;5;241m=[39m [43mom[49m[38;5;241;43m.[39;49m[43mPETScKrylov[49m[43m([49m[43m)[49m
+[1;32m     22[0m prob[38;5;241m.[39msetup()
+[1;32m     24[0m prob[38;5;241m.[39mset_val([38;5;124m'[39m[38;5;124mx[39m[38;5;124m'[39m, [38;5;241m1.[39m)
+
+File [0;32m~/dev/eecs481/hw6/OpenMDAO/openmdao/solvers/linear/petsc_ksp.py:193[0m, in [0;36mPETScKrylov.__init__[0;34m(self, **kwargs)[0m
+[1;32m    190[0m [38;5;28msuper[39m()[38;5;241m.[39m[38;5;21m__init__[39m([38;5;241m*[39m[38;5;241m*[39mkwargs)
+[1;32m    192[0m [38;5;28;01mif[39;00m PETSc [38;5;129;01mis[39;00m [38;5;28;01mNone[39;00m:
+[0;32m--> 193[0m     [38;5;28;01mraise[39;00m [38;5;167;01mRuntimeError[39;00m([38;5;124mf[39m[38;5;124m"[39m[38;5;132;01m{[39;00m[38;5;28mself[39m[38;5;241m.[39mmsginfo[38;5;132;01m}[39;00m[38;5;124m: PETSc is not available. [39m[38;5;124m"[39m
+[1;32m    194[0m                        [38;5;124m"[39m[38;5;124mSet shell variable OPENMDAO_USE_MPI=1 to detect earlier.[39m[38;5;124m"[39m)
+[1;32m    196[0m [38;5;66;03m# initialize dictionary of KSP instances (keyed on vector name)[39;00m
+[1;32m    197[0m [38;5;28mself[39m[38;5;241m.[39m_ksp [38;5;241m=[39m [38;5;28;01mNone[39;00m
+
+[0;31mRuntimeError[0m: PETScKrylov: PETSc is not available. Set shell variable OPENMDAO_USE_MPI=1 to detect earlier.
+RuntimeError: PETScKrylov: PETSc is not available. Set shell variable OPENMDAO_USE_MPI=1 to detect earlier.
+

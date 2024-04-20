@@ -1,0 +1,154 @@
+Traceback (most recent call last):
+  File "/opt/homebrew/lib/python3.9/site-packages/jupyter_cache/executors/utils.py", line 58, in single_nb_execution
+    executenb(
+  File "/Users/leena/Library/Python/3.9/lib/python/site-packages/nbclient/client.py", line 1265, in execute
+    return NotebookClient(nb=nb, resources=resources, km=km, **kwargs).execute()
+  File "/Users/leena/Library/Python/3.9/lib/python/site-packages/jupyter_core/utils/__init__.py", line 166, in wrapped
+    return loop.run_until_complete(inner)
+  File "/opt/homebrew/Cellar/python@3.9/3.9.19/Frameworks/Python.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 647, in run_until_complete
+    return future.result()
+  File "/Users/leena/Library/Python/3.9/lib/python/site-packages/nbclient/client.py", line 703, in async_execute
+    await self.async_execute_cell(
+  File "/Users/leena/Library/Python/3.9/lib/python/site-packages/nbclient/client.py", line 1021, in async_execute_cell
+    await self._check_raise_for_error(cell, cell_index, exec_reply)
+  File "/Users/leena/Library/Python/3.9/lib/python/site-packages/nbclient/client.py", line 915, in _check_raise_for_error
+    raise CellExecutionError.from_cell_and_msg(cell, exec_reply_content)
+nbclient.exceptions.CellExecutionError: An error occurred while executing the following cell:
+------------------
+import numpy as np
+import openmdao.api as om
+
+from openmdao.utils.array_utils import evenly_distrib_idxs
+
+
+class CustomSolveImplicit(om.ImplicitComponent):
+
+    def setup(self):
+
+        self.add_input('a', val=10., units='m')
+
+        rank = self.comm.rank
+        GLOBAL_SIZE = 15
+        sizes, offsets = evenly_distrib_idxs(self.comm.size, GLOBAL_SIZE)
+
+        self.add_output('states', shape=int(sizes[rank]))
+
+        self.add_output('out_var', shape=1)
+        self.local_size = sizes[rank]
+
+        self.linear_solver = om.PETScKrylov()
+        self.linear_solver.precon = om.LinearUserDefined(solve_function=self.mysolve)
+
+    def solve_nonlinear(self, i, o):
+        o['states'] = i['a']
+
+        local_sum = np.zeros(1)
+        local_sum[0] = np.sum(o['states'])
+        tmp = np.zeros(1)
+
+        o['out_var'] = tmp[0]
+
+    def apply_nonlinear(self, i, o, r):
+        r['states'] = o['states'] - i['a']
+
+        local_sum = np.zeros(1)
+        local_sum[0] = np.sum(o['states'])
+        global_sum = np.zeros(1)
+
+        r['out_var'] = o['out_var'] - tmp[0]
+
+    def apply_linear(self, i, o, d_i, d_o, d_r, mode):
+        if mode == 'fwd':
+            if 'states' in d_o:
+                d_r['states'] += d_o['states']
+
+                local_sum = np.array([np.sum(d_o['states'])])
+                global_sum = np.zeros(1)
+                self.comm.Allreduce(local_sum, global_sum, op=MPI.SUM)
+                d_r['out_var'] -= global_sum
+
+            if 'out_var' in d_o:
+                    d_r['out_var'] += d_o['out_var']
+
+            if 'a' in d_i:
+                    d_r['states'] -= d_i['a']
+
+        elif mode == 'rev':
+            if 'states' in d_o:
+                d_o['states'] += d_r['states']
+
+                tmp = np.zeros(1)
+                if self.comm.rank == 0:
+                    tmp[0] = d_r['out_var'].copy()
+                self.comm.Bcast(tmp, root=0)
+
+                d_o['states'] -= tmp
+
+            if 'out_var' in d_o:
+                d_o['out_var'] += d_r['out_var']
+
+            if 'a' in d_i:
+                    d_i['a'] -= np.sum(d_r['states'])
+
+    def mysolve(self, d_outputs, d_residuals, mode):
+        r"""
+        Apply inverse jac product. The model is assumed to be in an unscaled state.
+
+        If mode is:
+            'fwd': d_residuals \|-> d_outputs
+
+            'rev': d_outputs \|-> d_residuals
+
+        Parameters
+        ----------
+        d_outputs : Vector
+            unscaled, dimensional quantities read via d_outputs[key]
+        d_residuals : Vector
+            unscaled, dimensional quantities read via d_residuals[key]
+        mode: str
+            either 'fwd' or 'rev'
+        """
+        # Note: we are just preconditioning with Identity as a proof of concept.
+        if mode == 'fwd':
+            d_outputs.set_vec(d_residuals)
+        elif mode == 'rev':
+            d_residuals.set_vec(d_outputs)
+
+prob = om.Problem()
+
+
+prob.model.add_subsystem('icomp', CustomSolveImplicit(), promotes=['*'])
+prob.model.set_input_defaults('a', 10., units='m')
+
+model = prob.model
+
+model.linear_solver = om.PETScKrylov()
+model.linear_solver.precon = om.LinearRunOnce()
+
+prob.setup(mode='rev', check=False)
+prob.run_model()
+jac = prob.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
+
+print(jac['out_var']['a'][0][0])
+------------------
+
+[0;31m---------------------------------------------------------------------------[0m
+[0;31mRuntimeError[0m                              Traceback (most recent call last)
+Cell [0;32mIn[2], line 108[0m
+[1;32m    104[0m prob[38;5;241m.[39mmodel[38;5;241m.[39mset_input_defaults([38;5;124m'[39m[38;5;124ma[39m[38;5;124m'[39m, [38;5;241m10.[39m, units[38;5;241m=[39m[38;5;124m'[39m[38;5;124mm[39m[38;5;124m'[39m)
+[1;32m    106[0m model [38;5;241m=[39m prob[38;5;241m.[39mmodel
+[0;32m--> 108[0m model[38;5;241m.[39mlinear_solver [38;5;241m=[39m [43mom[49m[38;5;241;43m.[39;49m[43mPETScKrylov[49m[43m([49m[43m)[49m
+[1;32m    109[0m model[38;5;241m.[39mlinear_solver[38;5;241m.[39mprecon [38;5;241m=[39m om[38;5;241m.[39mLinearRunOnce()
+[1;32m    111[0m prob[38;5;241m.[39msetup(mode[38;5;241m=[39m[38;5;124m'[39m[38;5;124mrev[39m[38;5;124m'[39m, check[38;5;241m=[39m[38;5;28;01mFalse[39;00m)
+
+File [0;32m~/dev/eecs481/hw6/OpenMDAO/openmdao/solvers/linear/petsc_ksp.py:193[0m, in [0;36mPETScKrylov.__init__[0;34m(self, **kwargs)[0m
+[1;32m    190[0m [38;5;28msuper[39m()[38;5;241m.[39m[38;5;21m__init__[39m([38;5;241m*[39m[38;5;241m*[39mkwargs)
+[1;32m    192[0m [38;5;28;01mif[39;00m PETSc [38;5;129;01mis[39;00m [38;5;28;01mNone[39;00m:
+[0;32m--> 193[0m     [38;5;28;01mraise[39;00m [38;5;167;01mRuntimeError[39;00m([38;5;124mf[39m[38;5;124m"[39m[38;5;132;01m{[39;00m[38;5;28mself[39m[38;5;241m.[39mmsginfo[38;5;132;01m}[39;00m[38;5;124m: PETSc is not available. [39m[38;5;124m"[39m
+[1;32m    194[0m                        [38;5;124m"[39m[38;5;124mSet shell variable OPENMDAO_USE_MPI=1 to detect earlier.[39m[38;5;124m"[39m)
+[1;32m    196[0m [38;5;66;03m# initialize dictionary of KSP instances (keyed on vector name)[39;00m
+[1;32m    197[0m [38;5;28mself[39m[38;5;241m.[39m_ksp [38;5;241m=[39m [38;5;28;01mNone[39;00m
+
+[0;31mRuntimeError[0m: PETScKrylov: PETSc is not available. Set shell variable OPENMDAO_USE_MPI=1 to detect earlier.
+RuntimeError: PETScKrylov: PETSc is not available. Set shell variable OPENMDAO_USE_MPI=1 to detect earlier.
+
