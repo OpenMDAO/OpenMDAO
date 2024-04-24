@@ -2816,7 +2816,7 @@ class TestPyoptSparse(unittest.TestCase):
         with assert_warning(OMDeprecationWarning, msg):
             driver.hist_file = filename
         with assert_warning(OMDeprecationWarning, msg):
-            driver.hist_file
+            self.assertEqual(driver.hist_file, filename)
         self.assertEqual(driver.options['hist_file'], filename)
 
         prob.setup()
@@ -2833,7 +2833,7 @@ class TestPyoptSparse(unittest.TestCase):
         with assert_warning(OMDeprecationWarning, msg):
             driver.hotstart_file = filename
         with assert_warning(OMDeprecationWarning, msg):
-            driver.hotstart_file
+            self.assertEqual(driver.hotstart_file, filename)
         self.assertEqual(driver.options['hotstart_file'], filename)
 
         prob.setup()
