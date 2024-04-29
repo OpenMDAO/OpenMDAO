@@ -8,6 +8,7 @@ import weakref
 
 import numpy as np
 
+from openmdao.core.driver_result import DriverResult
 from openmdao.core.group import Group
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import INT_DTYPE, _SetupStatus
@@ -186,13 +187,7 @@ class Driver(object):
         self._declare_options()
         self.options.update(kwargs)
 
-        self.opt_result = {
-            'runtime': 0.0,
-            'iter_count': 0,
-            'obj_calls': 0,
-            'deriv_calls': 0,
-            'exit_status': 'NOT_RUN'
-        }
+        self.result = DriverResult()
 
         self._has_scaling = False
 
@@ -593,10 +588,11 @@ class Driver(object):
                 with model._relevance.nonlinear_active('post'):
                     model.run_solve_nonlinear()
 
-            return result
         else:
             with SaveOptResult(self):
-                return self.run()
+                result = self.run()
+
+        return result
 
     def _get_voi_val(self, name, meta, remote_vois, driver_scaling=True,
                      get_remote=True, rank=None):
@@ -1465,13 +1461,12 @@ class SaveOptResult(object):
             Solver recording requires extra args.
         """
         driver = self._driver
-        driver.opt_result = {
-            'runtime': time.perf_counter() - self._start_time,
-            'iter_count': driver.iter_count,
-            'obj_calls': driver.get_driver_objective_calls(),
-            'deriv_calls': driver.get_driver_derivative_calls(),
-            'exit_status': driver.get_exit_status()
-        }
+        result = driver.result
+        result.runtime = time.perf_counter() - self._start_time
+        result.iter_count = driver.iter_count
+        result.model_evals = driver.get_driver_objective_calls()
+        result.deriv_evals = driver.get_driver_derivative_calls()
+        result.exit_status = driver.get_exit_status()
 
 
 class RecordingDebugging(Recording):

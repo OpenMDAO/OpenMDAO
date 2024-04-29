@@ -207,22 +207,23 @@ def _make_header_table(prob):
     """
     t = datetime.datetime.now()
     time_stamp = t.strftime("%Y-%m-%d %H:%M:%S %Z")
-    runtime = prob.driver.opt_result['runtime']
+    runtime = prob.driver.result.runtime
     runtime_ms = (runtime * 1000.0) % 1000.0
     runtime_formatted = \
         f"{time.strftime('%H hours %M minutes %S seconds', time.gmtime(runtime))} " \
         f"{runtime_ms:.1f} milliseconds"
 
+    opt_result = prob.driver.result
     rows = list()
     rows.append(['Problem:', prob._name])
     rows.append(['Script:', sys.argv[0]])
     rows.append(['Optimizer:', prob.driver._get_name()])
-    rows.append(['Number of driver iterations:', prob.driver.opt_result['iter_count']])
-    rows.append(['Number of objective calls:', prob.driver.opt_result['obj_calls']])
-    rows.append(['Number of derivative calls:', prob.driver.opt_result['deriv_calls']])
+    rows.append(['Number of driver iterations:', opt_result.iter_count])
+    rows.append(['Number of objective calls:', opt_result.model_evals])
+    rows.append(['Number of derivative calls:', opt_result.deriv_evals])
     rows.append(['Execution start time:', time_stamp])
     rows.append(['Wall clock run time:', runtime_formatted])
-    rows.append(['Exit status:', prob.driver.opt_result['exit_status']])
+    rows.append(['Exit status:', opt_result.exit_status])
 
     return generate_table(rows, tablefmt='html')
 

@@ -1,8 +1,10 @@
 import os
 import pathlib
+from types import SimpleNamespace
 import unittest
 
 import numpy as np
+from sympy import Q
 
 import openmdao.api as om
 
@@ -88,24 +90,24 @@ class TestOptimizationReport(unittest.TestCase):
         Check that the data in the opt_result dict is valid for the run.
         """
         if opt_result is None:
-            opt_result = self.prob.driver.opt_result
-        if expected is None:
-            expected = {}
+            opt_result = self.prob.driver.result
 
-        self.assertTrue(opt_result['runtime'] > 0.0,
-                        f"Unexpected value for runtime: {opt_result['runtime']} (should be > 0.0)")
+        self.assertTrue(opt_result.runtime > 0.0,
+                        f"Unexpected value for runtime: {opt_result.runtime} (should be > 0.0)")
 
-        for key in ['iter_count', 'obj_calls', 'deriv_calls']:
-            if key in expected:
-                self.assertTrue( opt_result[key] == expected[key] ,
-                    f"Unexpected value for {key}: {opt_result[key]}. Expected {expected[key]}")
+        for key in ['iter_count', 'model_evals', 'deriv_evals']:
+            result_val = getattr(opt_result, key)
+            if expected and hasattr(expected, key):
+                expected_val = getattr(expected, key)
+                self.assertTrue( result_val == expected_val ,
+                    f"Unexpected value for {key}: {result_val}. Expected {expected_val}")
             else:
-                self.assertTrue( opt_result[key] >= 1,
-                    f"Unexpected value for {key}: {opt_result[key]}. Expected value to be >= 1")
+                self.assertTrue( getattr(opt_result, key) >= 1,
+                    f"Unexpected value for {key}: {result_val}. Expected value to be >= 1")
 
-        self.assertTrue(opt_result['exit_status'] == expected['exit_status'] if 'exit_status' in expected
-                        else opt_result['exit_status'] == 'SUCCESS',
-                        f"Unexpected value for exit_status: {opt_result['exit_status']}")
+        self.assertTrue(opt_result.exit_status == expected.exit_status if hasattr(expected, 'exit_status')
+                        else opt_result.exit_status == 'SUCCESS',
+                        f"Unexpected value for exit_status: {opt_result.exit_status}")
 
     def check_opt_report(self, prob=None, expected=None):
         """
@@ -118,8 +120,8 @@ class TestOptimizationReport(unittest.TestCase):
         check_rows = {
             # 'runtime': 'Wall clock run time:',
             'iter_count':  'Number of driver iterations:',
-            'obj_calls':   'Number of objective calls:',
-            'deriv_calls': 'Number of derivative calls:',
+            'model_evals':   'Number of objective calls:',
+            'deriv_evals': 'Number of derivative calls:',
             'exit_status': 'Exit status:'
         }
 
@@ -153,7 +155,7 @@ class TestOptimizationReport(unittest.TestCase):
                     # skip the rest of the file
                     break
 
-        self.check_opt_result(reported, expected)
+        self.check_opt_result(SimpleNamespace(**reported), expected)
 
     # First test all the different Drivers
     def test_opt_report_run_once_driver(self):
@@ -161,7 +163,7 @@ class TestOptimizationReport(unittest.TestCase):
                                           vars_lower=-50, vars_upper=50.,
                                           cons_lower=-1,
                                           )
-        expect = {'obj_calls': 0, 'deriv_calls': 0}
+        expect = SimpleNamespace(model_evals=0, deriv_evals=0)
         self.check_opt_result(expected=expect)
 
         expected_warning_msg = "The optimizer report is not applicable for Driver type 'Driver', " \
@@ -188,7 +190,7 @@ class TestOptimizationReport(unittest.TestCase):
                                           cons_lower=0, cons_upper=10.,
                                           optimizer='COBYLA',
                                           )
-        expect = {'deriv_calls': None}
+        expect = SimpleNamespace(driver_evals = None)
         self.check_opt_result(expected=expect)
         opt_report(self.prob)
         self.check_opt_report(expected=expect)
@@ -199,7 +201,7 @@ class TestOptimizationReport(unittest.TestCase):
                                           cons_lower=0, cons_upper=10.,
                                           optimizer='COBYLA',
                                           )
-        expect = {'deriv_calls': None}
+        expect = {'deriv_evals': None}
         self.check_opt_result(expected=expect)
         opt_report(self.prob)
         self.check_opt_report(expected=expect)
@@ -249,7 +251,8 @@ class TestOptimizationReport(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        self.check_opt_result(prob.driver.opt_result, expected={'obj_calls': 0, 'deriv_calls': 0})
+        print(prob.driver.result)
+        self.check_opt_result(prob.driver.result, expected={'model_evals': 0, 'deriv_evals': 0})
 
         expected_warning_msg = "The optimizer report is not applicable for Driver type 'DOEDriver', " \
                                "which does not support optimization"
@@ -264,7 +267,7 @@ class TestOptimizationReport(unittest.TestCase):
                                           vars_lower=-50, vars_upper=50.,
                                           cons_lower=0, cons_upper=10.,
                                           )
-        expect = {'deriv_calls': 0}
+        expect = {'deriv_evals': 0}
         self.check_opt_result(expected=expect)
         opt_report(self.prob)
         self.check_opt_report(expected=expect)
@@ -295,8 +298,8 @@ class TestOptimizationReport(unittest.TestCase):
 
         prob.run_driver()
 
-        expect = {'deriv_calls': 0}
-        self.check_opt_result(prob.driver.opt_result, expected=expect)
+        expect = {'deriv_evals': 0}
+        self.check_opt_result(prob.driver.result, expected=expect)
         opt_report(prob)
         self.check_opt_report(prob, expected=expect)
 

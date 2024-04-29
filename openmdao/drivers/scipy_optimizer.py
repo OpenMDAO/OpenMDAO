@@ -10,7 +10,8 @@ from scipy import __version__ as scipy_version
 from scipy.optimize import minimize
 
 from openmdao.core.constants import INF_BOUND
-from openmdao.core.driver import Driver, RecordingDebugging
+from openmdao.core.optimization_driver import OptimizationDriver
+from openmdao.core.driver import RecordingDebugging
 from openmdao.core.group import Group
 from openmdao.utils.class_util import WeakMethodWrapper
 from openmdao.utils.mpi import MPI
@@ -78,7 +79,7 @@ CITATIONS = """
 """
 
 
-class ScipyOptimizeDriver(Driver):
+class ScipyOptimizeDriver(OptimizationDriver):
     """
     Driver wrapper for the scipy.optimize.minimize family of local optimizers.
 
@@ -151,7 +152,6 @@ class ScipyOptimizeDriver(Driver):
         # The user places optimizer-specific settings in here.
         self.opt_settings = {}
 
-        self.result = None
         self._grad_cache = None
         self._con_cache = None
         self._con_idx = {}
@@ -160,7 +160,6 @@ class ScipyOptimizeDriver(Driver):
         self._lincongrad_cache = None
         self._desvar_array_cache = None
         self.fail = False
-        self.iter_count = 0
         self._check_jac = False
         self._exc_info = None
         self._total_jac_format = 'array'
@@ -585,7 +584,7 @@ class ScipyOptimizeDriver(Driver):
         if self._exc_info is not None:
             self._reraise()
 
-        self.result = result
+        self.result.update_from_scipy(result)
 
         if hasattr(result, 'success'):
             self.fail = not result.success

@@ -7,14 +7,15 @@ import inspect
 
 import numpy as np
 
-from openmdao.core.driver import Driver, RecordingDebugging
+from openmdao.core.analysis_driver import AnalysisDriver
+from openmdao.core.driver import RecordingDebugging
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.drivers.doe_generators import DOEGenerator, ListGenerator
 
 from openmdao.utils.mpi import MPI
 
 
-class DOEDriver(Driver):
+class DOEDriver(AnalysisDriver):
     """
     Design-of-Experiments Driver.
 
@@ -77,6 +78,9 @@ class DOEDriver(Driver):
         self._indep_list = []
         self._quantities = []
         self._total_jac_format = 'dict'
+
+        self._num_solve_nonlinear = 0
+        self._num_compute_totals = 0
 
     def _declare_options(self):
         """
@@ -162,6 +166,8 @@ class DOEDriver(Driver):
             Failure flag; True if failed to converge, False is successful.
         """
         self.iter_count = 0
+        self._num_solve_nonlinear = 0
+        self._num_compute_totals = 0
         self._quantities = []
 
         # set driver name with current generator
@@ -192,6 +198,28 @@ class DOEDriver(Driver):
 
         return False
 
+    def get_driver_objective_calls(self):
+        """
+        Returns the number of times the driver has evaluated the model.
+
+        Returns
+        -------
+        int
+            The number of times model.solve_nonlinear was called.
+        """
+        return self._num_solve_nonlinear
+
+    def get_driver_derivative_calls(self):
+        """
+        Return the number of times the driver evaluated the model total derivatives.
+
+        Returns
+        -------
+        int
+            The number of times driver._compute_totals was called.
+        """
+        return self._num_compute_totals
+
     def _run_case(self, case):
         """
         Run case, save exception info and mark the metadata if the case fails.
@@ -219,6 +247,7 @@ class DOEDriver(Driver):
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             try:
                 self._problem().model.run_solve_nonlinear()
+                self._num_solve_nonlinear += 1
                 metadata['success'] = 1
                 metadata['msg'] = ''
             except AnalysisError:
@@ -227,7 +256,6 @@ class DOEDriver(Driver):
             except Exception:
                 metadata['success'] = 0
                 metadata['msg'] = traceback.format_exc()
-                print(metadata['msg'])
 
             # save reference to metadata for use in record_iteration
             self._metadata = metadata
@@ -237,6 +265,7 @@ class DOEDriver(Driver):
                                  wrt=self._indep_list,
                                  return_format=self._total_jac_format,
                                  driver_scaling=False)
+            self._num_compute_totals += 1
 
     def _parallel_generator(self, design_vars, model=None):
         """
