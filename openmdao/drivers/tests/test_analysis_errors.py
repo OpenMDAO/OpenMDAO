@@ -215,7 +215,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
         #
         try:
             prob, comp = self.setup_problem(optimizer)
-            failed = prob.run_driver()
+            failed = not prob.run_driver().success
         except ImportError as err:
             raise unittest.SkipTest(str(err))
 
@@ -238,7 +238,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
         # Now try raising Analysis Errors in compute()
         #
         prob, comp = self.setup_problem(optimizer, func='compute')
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         expected_result = self.expected_result_eval_errors[optimizer]
         opt_inform = prob.driver.pyopt_solution.optInform
@@ -279,7 +279,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
         #
         try:
             prob, comp = self.setup_problem(optimizer)
-            failed = prob.run_driver()
+            failed = not prob.run_driver().success
         except ImportError as err:
             raise unittest.SkipTest(str(err))
 
@@ -303,7 +303,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
         #
         try:
             prob, comp = self.setup_problem(optimizer, func='compute_partials')
-            failed = prob.run_driver()
+            failed = not prob.run_driver().success
         except ImportError as err:
             raise unittest.SkipTest(str(err))
 

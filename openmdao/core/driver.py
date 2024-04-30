@@ -25,6 +25,24 @@ from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, DriverWarning
 
 
+class DriverResult():
+
+    def __init__(self):
+        self.runtime = 0.0
+        self.iter_count = 0
+        self.obj_calls = 0
+        self.deriv_calls = 0
+        self.exit_status = 'NOT_RUN'
+        self.success = False
+
+    def __getitem__(self, s):
+        return getattr(self, s)
+
+    def __setitem__(self, s, val):
+        if not hasattr(self, s):
+            raise AttributeError(f'DriverResult has no attribute {s}.')
+        setattr(self, s, val)
+
 class Driver(object):
     """
     Top-level container for the systems and drivers.
@@ -186,13 +204,15 @@ class Driver(object):
         self._declare_options()
         self.options.update(kwargs)
 
-        self.opt_result = {
-            'runtime': 0.0,
-            'iter_count': 0,
-            'obj_calls': 0,
-            'deriv_calls': 0,
-            'exit_status': 'NOT_RUN'
-        }
+        # self.opt_result = {
+        #     'runtime': 0.0,
+        #     'iter_count': 0,
+        #     'obj_calls': 0,
+        #     'deriv_calls': 0,
+        #     'exit_status': 'NOT_RUN'
+        # }
+
+        self.opt_result = DriverResult()
 
         self._has_scaling = False
 
@@ -574,8 +594,8 @@ class Driver(object):
 
         Returns
         -------
-        bool
-            Failure flag; True if failed to converge, False is successful.
+        dict
+            optimization_result dict, containing information about the run.
         """
         problem = self._problem()
         model = problem.model
@@ -587,16 +607,21 @@ class Driver(object):
 
             with SaveOptResult(self):
                 with model._relevance.nonlinear_active('iter'):
-                    result = self.run()
+                    failed = self.run()
 
             if model._post_components:
                 with model._relevance.nonlinear_active('post'):
                     model.run_solve_nonlinear()
 
-            return result
         else:
             with SaveOptResult(self):
-                return self.run()
+                failed = self.run()
+
+        self.opt_result['success'] = not failed
+
+        return self.opt_result
+
+
 
     def _get_voi_val(self, name, meta, remote_vois, driver_scaling=True,
                      get_remote=True, rank=None):
@@ -1414,6 +1439,12 @@ class Driver(object):
 
             return self._coloring_info.coloring
 
+    def _update_results(self):
+        """
+        Custom drivers should override this method to set any
+        additional attributes of opt_results.
+        """
+        pass
 
 class SaveOptResult(object):
     """
@@ -1465,13 +1496,16 @@ class SaveOptResult(object):
             Solver recording requires extra args.
         """
         driver = self._driver
-        driver.opt_result = {
-            'runtime': time.perf_counter() - self._start_time,
-            'iter_count': driver.iter_count,
-            'obj_calls': driver.get_driver_objective_calls(),
-            'deriv_calls': driver.get_driver_derivative_calls(),
-            'exit_status': driver.get_exit_status()
-        }
+
+        # The standard driver results
+        driver.opt_result['runtime'] = time.perf_counter() - self._start_time
+        driver.opt_result['iter_count'] = driver.iter_count
+        driver.opt_result['obj_calls'] = driver.get_driver_objective_calls()
+        driver.opt_result['deriv_calls'] = driver.get_driver_derivative_calls()
+        driver.opt_result['exit_status'] = driver.get_exit_status()
+
+        # The custom driver results
+        driver._update_results()
 
 
 class RecordingDebugging(Recording):

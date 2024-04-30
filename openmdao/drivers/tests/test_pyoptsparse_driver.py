@@ -304,7 +304,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -348,7 +348,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -383,7 +383,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -417,7 +417,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -459,7 +459,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -494,7 +494,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -526,7 +526,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -557,7 +557,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -647,7 +647,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -679,7 +679,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -739,7 +739,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -781,7 +781,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -816,7 +816,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -856,7 +856,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -961,7 +961,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='fwd')
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -996,7 +996,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1030,7 +1030,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1063,7 +1063,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1096,7 +1096,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='fwd')
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1130,7 +1130,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1164,7 +1164,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1197,7 +1197,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1230,7 +1230,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='fwd')
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1263,7 +1263,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1293,7 +1293,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1401,7 +1401,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1517,10 +1517,10 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        failed, output = run_driver(prob)
+        result, output = run_driver(prob)
 
-        self.assertFalse(failed, "Optimization failed, info = " +
-                                 str(prob.driver.pyopt_solution.optInform))
+        self.assertTrue(result.success, "Optimization failed, info = " +
+                        str(prob.driver.pyopt_solution.optInform))
 
         self.assertTrue('In mode: rev.' in output)
         self.assertTrue("('f_xy', [0])" in output)
@@ -1551,10 +1551,10 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='fwd')
 
-        failed, output = run_driver(prob)
+        result, output = run_driver(prob)
 
-        self.assertFalse(failed, "Optimization failed, info = " +
-                             str(prob.driver.pyopt_solution.optInform))
+        self.assertTrue(result.success, "Optimization failed, info = " +
+                        str(prob.driver.pyopt_solution.optInform))
 
         self.assertTrue('In mode: fwd.' in output)
         self.assertTrue("('y', [1])" in output)
@@ -1588,10 +1588,10 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        failed, output = run_driver(prob)
+        result, output = run_driver(prob)
 
-        self.assertFalse(failed, "Optimization failed, info = " +
-                                 str(prob.driver.pyopt_solution.optInform))
+        self.assertTrue(result.success, "Optimization failed, info = " +
+                        str(prob.driver.pyopt_solution.optInform))
 
         self.assertTrue('In mode: rev.' in output)
         self.assertTrue("('f_xy', [0])" in output)
@@ -1622,10 +1622,10 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='fwd')
 
-        failed, output = run_driver(prob)
+        result, output = run_driver(prob)
 
-        self.assertFalse(failed, "Optimization failed, info = " +
-                             str(prob.driver.pyopt_solution.optInform))
+        self.assertTrue(result.success, "Optimization failed, info = " +
+                        str(prob.driver.pyopt_solution.optInform))
 
         self.assertTrue('In mode: fwd.' in output)
         self.assertTrue("('y', [1])" in output)
@@ -1658,10 +1658,10 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed, output = run_driver(prob)
+        result, output = run_driver(prob)
 
-        self.assertFalse(failed, "Optimization failed, info = " +
-                                 str(prob.driver.pyopt_solution.optInform))
+        self.assertTrue(result.success, "Optimization failed, info = " +
+                        str(prob.driver.pyopt_solution.optInform))
 
         output = output.split('\n')
 
@@ -3027,7 +3027,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -3067,7 +3067,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -3187,10 +3187,10 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        failed, output = run_driver(prob)
+        result, output = run_driver(prob)
 
-        self.assertFalse(failed, "Optimization failed, info = " +
-                                 str(prob.driver.pyopt_solution.optInform))
+        self.assertTrue(result.success, "Optimization failed, info = " +
+                        str(prob.driver.pyopt_solution.optInform))
 
         assert_near_equal(prob['z'][0], 1.9776, 1e-3)
         assert_near_equal(prob['z'][1], 0.0, 1e-3)
