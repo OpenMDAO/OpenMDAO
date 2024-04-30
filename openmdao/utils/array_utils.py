@@ -12,7 +12,7 @@ from numpy.linalg import norm
 from scipy.sparse import coo_matrix
 
 from openmdao.core.constants import INT_DTYPE
-from openmdao.utils.numba import numba
+from openmdao.utils.omnumba import numba
 
 
 if sys.version_info >= (3, 8):

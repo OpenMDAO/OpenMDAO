@@ -284,7 +284,7 @@ class Vector(object):
         path = system.pathname
         idx = len(path) + 1 if path else 0
 
-        return (n[idx:] for n in system._var_abs2meta[self._typ] if n in self._names)
+        return (n[idx:] for n in self._views if n in self._names)
 
     def _abs_item_iter(self, flat=True):
         """
@@ -761,3 +761,31 @@ class Vector(object):
             start = end
 
         return dct
+
+    def to_dict(self):
+        """
+        Return a dict of the variables in this vector.
+
+        Returns
+        -------
+        dict
+            Dictionary containing variable values keyed by variable name.
+        """
+        return {n: v for n, v in self.items()}
+
+    def update_from_dict(self, vec_dict):
+        """
+        Update the variables in this vector from a dictionary.
+
+        Parameters
+        ----------
+        vec_dict : dict
+            Dictionary containing variable values keyed by variable name.
+        """
+        if self._system().pathname:
+            prefix = self._system().pathname + '.'
+            for name, val in vec_dict.items():
+                self._views[prefix + name][:] = val
+        else:
+            for name, val in vec_dict.items():
+                self._views[name][:] = val

@@ -751,22 +751,17 @@ def jax_decorate(func):
     """
     g = func.__globals__
 
-    try:
-        src = inspect.getsource(func)
-    except OSError:
-        src = None
-
-    savenp = g['np'] if 'np' in g and g['np'] is np and (src is None or 'np.' in src) else False
-    savenumpy = g['numpy'] if 'numpy' in g and (src is None or 'numpy' in src) else False
+    savenp = g['np'] if 'np' in g and g['np'] is np else False
+    savenumpy = g['numpy'] if 'numpy' in g and g['numpy'] is np else False
 
     if savenp or savenumpy:
-        def _wrap(*args):
+        def _wrap(*args, **kwargs):
             if savenp:
                 g['np'] = jnp
             if savenumpy:
                 g['numpy'] = jnp
             try:
-                ret = func(*args)
+                ret = func(*args, **kwargs)
             finally:
                 if savenp:
                     g['np'] = savenp
