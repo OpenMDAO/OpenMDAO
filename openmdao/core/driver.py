@@ -26,6 +26,24 @@ from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, Driver
 
 
 class DriverResult():
+    """
+    A container that stores information pertaining to the result of a driver execution.
+
+    Attributes
+    ----------
+    runtime : float
+        The time required to execute the driver, in seconds.
+    iter_count : int
+        The number of iterations used by the optimizer.
+    obj_calls : int
+        The number of times the objective function was evaluated (model solve_nonlinear calls).
+    deriv_calls : int
+        The number of times the total jacobian was computed.
+    exit_status : str
+        A string that may provide more detail about the results of the driver run.
+    success : bool
+        A boolean that dictates whether or not the driver was successful.
+    """
 
     def __init__(self):
         self.runtime = 0.0
@@ -38,10 +56,6 @@ class DriverResult():
     def __getitem__(self, s):
         return getattr(self, s)
 
-    def __setitem__(self, s, val):
-        if not hasattr(self, s):
-            raise AttributeError(f'DriverResult has no attribute {s}.')
-        setattr(self, s, val)
 
 class Driver(object):
     """
@@ -617,11 +631,9 @@ class Driver(object):
             with SaveOptResult(self):
                 failed = self.run()
 
-        self.opt_result['success'] = not failed
+        self.opt_result.success = not failed
 
         return self.opt_result
-
-
 
     def _get_voi_val(self, name, meta, remote_vois, driver_scaling=True,
                      get_remote=True, rank=None):
@@ -1446,6 +1458,7 @@ class Driver(object):
         """
         pass
 
+
 class SaveOptResult(object):
     """
     A context manager that saves details about a driver run.
@@ -1498,11 +1511,11 @@ class SaveOptResult(object):
         driver = self._driver
 
         # The standard driver results
-        driver.opt_result['runtime'] = time.perf_counter() - self._start_time
-        driver.opt_result['iter_count'] = driver.iter_count
-        driver.opt_result['obj_calls'] = driver.get_driver_objective_calls()
-        driver.opt_result['deriv_calls'] = driver.get_driver_derivative_calls()
-        driver.opt_result['exit_status'] = driver.get_exit_status()
+        driver.opt_result.runtime = time.perf_counter() - self._start_time
+        driver.opt_result.iter_count = driver.iter_count
+        driver.opt_result.obj_calls = driver.get_driver_objective_calls()
+        driver.opt_result.deriv_calls = driver.get_driver_derivative_calls()
+        driver.opt_result.exit_status = driver.get_exit_status()
 
         # The custom driver results
         driver._update_results()

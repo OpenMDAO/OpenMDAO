@@ -2182,7 +2182,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.recording_options['record_desvars'] = True
         prob.add_recorder(self.recorder)
 
-        fail = prob.run_driver()
+        fail = not prob.run_driver().success
 
         prob.record('final')
         prob.cleanup()
