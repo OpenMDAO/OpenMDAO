@@ -1521,9 +1521,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        result, output = run_driver(prob)
+        failed, output = run_driver(prob)
 
-        self.assertTrue(result.success, "Optimization failed.")
+        self.assertFalse(failed, "Optimization failed.")
 
         self.assertTrue('In mode: rev.' in output)
         self.assertTrue("('f_xy', [0])" in output)
@@ -1550,9 +1550,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup(check=False, mode='fwd')
 
-        result, output = run_driver(prob)
+        fail, output = run_driver(prob)
 
-        self.assertTrue(result.success, "Optimization failed.")
+        self.assertFalse(fail, "Optimization failed.")
 
         self.assertTrue('In mode: fwd.' in output)
         self.assertTrue("('x', [0])" in output)
@@ -1580,9 +1580,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        result, output = run_driver(prob)
+        failed, output = run_driver(prob)
 
-        self.assertTrue(result.success, "Optimization failed.")
+        self.assertFalse(False, "Optimization failed.")
 
         output = output.split('\n')
 

@@ -1588,10 +1588,10 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        result, output = run_driver(prob)
+        fail, output = run_driver(prob)
 
-        self.assertTrue(result.success, "Optimization failed, info = " +
-                        str(prob.driver.pyopt_solution.optInform))
+        self.assertFalse(fail, "Optimization failed, info = " +
+                         str(prob.driver.pyopt_solution.optInform))
 
         self.assertTrue('In mode: rev.' in output)
         self.assertTrue("('f_xy', [0])" in output)
@@ -1622,10 +1622,10 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='fwd')
 
-        result, output = run_driver(prob)
+        fail, output = run_driver(prob)
 
-        self.assertTrue(result.success, "Optimization failed, info = " +
-                        str(prob.driver.pyopt_solution.optInform))
+        self.assertFalse(fail, "Optimization failed, info = " +
+                         str(prob.driver.pyopt_solution.optInform))
 
         self.assertTrue('In mode: fwd.' in output)
         self.assertTrue("('y', [1])" in output)
