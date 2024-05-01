@@ -637,8 +637,8 @@ class Driver(object):
 
         Returns
         -------
-        dict
-            optimization_result dict, containing information about the run.
+        DriverResult
+            DriverResult object, containing information about the run.
         """
         problem = self._problem()
         model = problem.model
