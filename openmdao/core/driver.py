@@ -56,6 +56,25 @@ class DriverResult():
         self.exit_status = 'NOT_RUN'
         self.success = False
 
+    def __getitem__(self, s):
+        """
+        Provide key access to the attributes of DriverResult.
+
+        This is included for backward compatibility with some
+        tests which require dictionary-like access.
+
+        Parameters
+        ----------
+        s : str
+            The name of the attribute.
+
+        Returns
+        -------
+        object
+            The value of the attribute
+        """
+        return getattr(self, s)
+
 
 class Driver(object):
     """
