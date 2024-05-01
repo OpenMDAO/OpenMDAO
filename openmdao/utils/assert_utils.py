@@ -415,7 +415,7 @@ def assert_no_dict_jacobians(system, include_self=True, recurse=True):
         raise AssertionError('\n'.join(parts))
 
 
-def assert_near_equal(actual, desired, tolerance=1e-15):
+def assert_near_equal(actual, desired, tolerance=1e-15, tol_type='rel'):
     """
     Check relative error.
 
@@ -431,7 +431,12 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
     desired : float, array-like, dict
         The value expected.
     tolerance : float
-        Maximum relative error ``(actual - desired) / desired``.
+        Maximum relative or absolute error.
+        For relative tolerance: ``(actual - desired) / desired``.
+        For absolute  tolerance: ``(actual - desired)``.
+    tol_type : {'rel', 'abs'}
+        Type of error to use: 'rel' for relative error, 'abs' for absolute error.
+        Default is set to 'rel'.
 
     Returns
     -------
@@ -500,7 +505,7 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
 
         for key in actual_keys:
             try:
-                new_error = assert_near_equal(actual[key], desired[key], tolerance)
+                new_error = assert_near_equal(actual[key], desired[key], tolerance, tol_type)
                 error = max(error, new_error)
             except ValueError as exception:
                 msg = '{}: '.format(key) + str(exception)
@@ -564,22 +569,22 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
                 else:
                     raise ValueError('actual and desired values have non-matching nan'
                                      ' values')
-            if np.linalg.norm(desired) == 0:
-                error = np.linalg.norm(actual)
+            if np.linalg.norm(desired) == 0 or tol_type == 'abs':
+                error = np.linalg.norm(actual - desired)
             else:
                 error = np.linalg.norm(actual - desired) / np.linalg.norm(desired)
 
             if abs(error) > tolerance:
                 if actual.size < 10 and desired.size < 10:
-                    raise ValueError('actual %s, desired %s, rel error %s, tolerance %s'
-                                     % (actual, desired, error, tolerance))
+                    raise ValueError('actual %s, desired %s, %s error %s, tolerance %s'
+                                     % (actual, desired, tol_type, error, tolerance))
                 else:
                     raise ValueError('arrays do not match, rel error %.3e > tol (%.3e)' %
                                      (error, tolerance))
     elif isinstance(actual, tuple) and isinstance(desired, tuple):
         error = 0.0
         for act, des in zip(actual, desired):
-            new_error = assert_near_equal(act, des, tolerance)
+            new_error = assert_near_equal(act, des, tolerance, tol_type)
             error = max(error, new_error)
     else:
         raise ValueError(

@@ -306,7 +306,7 @@ class pyOptSparseDriver(Driver):
         """
         warn_deprecation("The 'hotstart_file' attribute is deprecated. "
                          "Use the 'hotstart_file' option instead.")
-        return self.options['hist_file']
+        return self.options['hotstart_file']
 
     @hotstart_file.setter
     def hotstart_file(self, file_name):

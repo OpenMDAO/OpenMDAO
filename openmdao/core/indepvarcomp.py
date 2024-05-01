@@ -14,13 +14,17 @@ class IndepVarComp(ExplicitComponent):
 
     Parameters
     ----------
-    name : str or None
-        Name of the variable.
+    name : str, list, tuple, or None
+        Name of the variable or list/tuple of variables.
+        If a string, defines a single variable with the specified name.
+        If a list or tuple, each element should be a tuple with the format (name, value) or
+        (name, value, kwargs) where `name` is a string, `value` can be any type compatible with val,
+        and `kwargs` is a dictionary of keyword arguments.
         If None, variables should be defined external to this class by calling add_output.
     val : float or ndarray
-        Value of the variable if a single variable is being defined.
+        Initial value of the variable if a single variable is being defined.
     **kwargs : dict
-        Keyword arguments.
+        Additional keyword arguments.
     """
 
     def __init__(self, name=None, val=1.0, **kwargs):
@@ -38,6 +42,33 @@ class IndepVarComp(ExplicitComponent):
         # A single variable is declared during instantiation
         if isinstance(name, str):
             super().add_output(name, val, **kwargs)
+
+        elif isinstance(name, (list, tuple)):
+            for tup in name:
+                if not isinstance(tup, tuple):
+                    raise TypeError("Each entry in the list of tuples must be of type tuple.")
+                if len(tup) == 2:
+                    if not isinstance(tup[0], str):
+                        raise TypeError("The first element of the tuple must be a "
+                                        "string representing the variable name.")
+                    if not isinstance(tup[1], (int, float, list, tuple, np.ndarray)):
+                        raise TypeError("The second element of the tuple must be "
+                                        "the initial value of the variable.")
+                    super().add_output(tup[0], tup[1], **kwargs)
+                elif len(tup) == 3:
+                    if not isinstance(tup[0], str):
+                        raise TypeError("The first element of the tuple must be a "
+                                        "string representing the variable name.")
+                    if not isinstance(tup[1], (int, float, list, tuple, np.ndarray)):
+                        raise TypeError("The second element of the tuple must be "
+                                        "the initial value of the variable.")
+                    if not isinstance(tup[2], dict):
+                        raise TypeError("The third element of the tuple must be a "
+                                        "dictionary of keyword arguments.")
+                    super().add_output(tup[0], tup[1], **tup[2])
+                else:
+                    raise ValueError("Each entry in the list of tuples must be of the form "
+                                     "(name, value) or (name, value, keyword_dict).")
 
         elif name is None:
             pass

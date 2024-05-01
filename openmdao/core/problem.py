@@ -1003,6 +1003,7 @@ class Problem(object):
             'group_by_pre_opt_post': self.options['group_by_pre_opt_post'],  # see option
             'relevance_cache': {},  # cache of relevance objects
             'rel_array_cache': {},  # cache of relevance arrays
+            'ncompute_totals': 0,  # number of times compute_totals has been called
         }
 
         if _prob_setup_stack:

@@ -33,7 +33,7 @@ classifiers = [
 ]
 dependencies = [
     "networkx>=2.0",
-    "numpy",
+    "numpy<2",
     "packaging",
     "requests",
     "scipy",
@@ -49,6 +49,7 @@ docs = [
     "matplotlib",
     "numpydoc>=1.1",
     "sphinx-sitemap",
+    "idna>=3.7",
 ]
 doe = [
     "pyDOE3",
@@ -60,6 +61,7 @@ jax = [
 notebooks = [
     "ipympl",
     "notebook",
+    "idna>=3.7",
 ]
 test = [
     "aiounittest",

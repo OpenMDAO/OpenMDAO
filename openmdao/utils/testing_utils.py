@@ -4,7 +4,7 @@ import functools
 import builtins
 import os
 import re
-import pickle
+import sys
 from itertools import zip_longest
 from contextlib import contextmanager
 
@@ -23,7 +23,7 @@ def _new_setup(self):
     import os
     import tempfile
 
-    from openmdao.utils.mpi import MPI
+    from openmdao.utils.mpi import MPI, multi_proc_exception_check
     self.startdir = os.getcwd()
     if MPI is None:
         self.tempdir = tempfile.mkdtemp(prefix='testdir-')
@@ -35,16 +35,24 @@ def _new_setup(self):
 
     os.chdir(self.tempdir)
     if hasattr(self, 'original_setUp'):
-        self.original_setUp()
+        if MPI is not None and MPI.COMM_WORLD.size > 1:
+            with multi_proc_exception_check(MPI.COMM_WORLD):
+                self.original_setUp()
+        else:
+            self.original_setUp()
 
 
 def _new_teardown(self):
     import os
     import shutil
 
-    from openmdao.utils.mpi import MPI
+    from openmdao.utils.mpi import MPI, multi_proc_exception_check
     if hasattr(self, 'original_tearDown'):
-        self.original_tearDown()
+        if MPI is not None and MPI.COMM_WORLD.size > 1:
+            with multi_proc_exception_check(MPI.COMM_WORLD):
+                self.original_tearDown()
+        else:
+            self.original_tearDown()
 
     os.chdir(self.startdir)
 

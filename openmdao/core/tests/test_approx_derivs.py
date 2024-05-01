@@ -2,7 +2,12 @@
 import time
 import unittest
 
+from packaging.version import Version
+
 import numpy as np
+from scipy import __version__ as scipy_version
+
+ScipyVersion = Version(scipy_version)
 
 import openmdao.api as om
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, TestImplCompArrayDense
@@ -279,7 +284,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.add_design_var('p2.x2')
         model.add_constraint('comp.y1')
         model.add_constraint('comp.y2')
-        
+
         prob.setup()
         prob.run_model()
         model.run_linearize(driver=prob.driver)
@@ -1083,7 +1088,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.add_design_var('p2.x2')
         model.add_constraint('comp.y1')
         model.add_constraint('comp.y2')
-        
+
         prob.setup()
         prob.run_model()
         model.run_linearize(driver=prob.driver)
@@ -1586,6 +1591,8 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
         assert_near_equal(J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
 
+    @unittest.skipUnless(ScipyVersion < Version("1.13"),
+                         "scipy < 1.13 is required, see issue #3156.")
     def test_newton_with_cscjac_under_cs(self):
         # Basic sellar test.
 
