@@ -394,6 +394,8 @@ class System(object):
     _during_sparsity : bool
         If True, we're doing a sparsity computation and uncolored approxs need to be restricted
         to only colored columns.
+    _compute_primal : function or None
+        Function that computes the primal for the given system.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -411,6 +413,8 @@ class System(object):
         self.options.declare('assembled_jac_type', values=['csc', 'dense'], default='csc',
                              desc='Linear solver(s) in this group or implicit component, '
                                   'if using an assembled jacobian, will use this type.')
+        self.options.declare('derivs_method', default=None, values=['jax', 'complex_step'],
+                             desc='The method to use for computing derivatives')
 
         # Case recording options
         self.recording_options = OptionsDictionary(parent_name=type(self).__name__)
@@ -537,6 +541,26 @@ class System(object):
         self._promotion_tree = None
 
         self._during_sparsity = False
+
+        self._compute_primal = None
+
+    def __call__(self, *args):
+        """
+        A functional interface for computing outputs from inputs for use with jax.
+
+        Parameters
+        ----------
+        *args : tuple
+            Input values.
+
+        Returns
+        -------
+        tuple
+            Output values.
+        """
+        if self._compute_primal is None:
+            raise RuntimeError(f"{self.msginfo}: The primal function has not been set.")
+        return self._compute_primal(*args)
 
     @property
     def under_approx(self):
@@ -5999,6 +6023,19 @@ class System(object):
             True if this is an explicit component.
         """
         return False
+
+    def best_deriv_direction(self):
+        """
+        Return the best direction for derivative calculations based on sizes of inputs and outputs.
+
+        Returns
+        -------
+        str
+            The best direction for derivative calculations.
+        """
+        if len(self._outputs) > len(self._inputs):
+            return 'fwd'
+        return 'rev'
 
     def _get_sys_promotion_tree(self, tree=None):
         """

@@ -5,6 +5,8 @@ import ast
 import textwrap
 import inspect
 
+from openmdao.utils.om_warnings import issue_warning
+
 
 def jit_stub(f, *args, **kwargs):
     """
@@ -29,22 +31,14 @@ def jit_stub(f, *args, **kwargs):
 
 try:
     import jax
+    jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
     import jax.numpy as jnp
-    # Importing Jax functions useful for tracing/interpreting.
-    from jax import core
-    from jax import lax
-    from jax._src.util import safe_map
-    from jax._src.core import eval_jaxpr
     from jax import jit as jjit
 except ImportError:
     jax = None
     jjit = jit_stub
 
 import numpy as np
-from functools import wraps, partial
-import openmdao.func_api as omf
-
-
 
 
 def register_jax_component(comp_class):
@@ -138,39 +132,83 @@ def examine_jaxpr(closed_jaxpr):
   print("jaxpr:", jaxpr)
 
 
+
+# TODO: discrete vars not supported yet
 class Compute2Jax(ast.NodeTransformer):
     """
     An ast.NodeTransformer that transforms a compute function definition to jax compatible form.
 
+    So compute(self, inputs, outputs) becomes f(self, *args) where args are the input values
+    in the order they are stored in inputs.  The new function will return a tuple of the
+    output values in the order they are stored in outputs.
+
+    Parameters
+    ----------
+    comp : ExplicitComponent
+        The Component whose compute function is to be transformed. This NodeTransformer may only
+        be used after the Component has had its _setup_var_data method called, because that
+        determines the ordering of the inputs and outputs.
+
+    Attributes
+    ----------
+    _args : list
+        The argument names of the original compute function.
+    _dict_keys : dict
+        A dictionary that maps each argument name to a list of subscript values.
+    _transformed : function
+        The transformed compute function.
     """
-    def __init__(self, func):
+    # these ops require static objects so their args should not be traced.  Traced array ops should
+    # use jnp and static ones should use np.
+    _static_ops = {'reshape'}
+    _np_names = {'np', 'numpy'}
+
+    def __init__(self, comp):
+        func = comp.compute
+        self._namespace = comp.compute.__globals__.copy()
+        if 'jnp' not in self._namespace:
+            self._namespace['jnp'] = jnp
         self._args = list(inspect.signature(func).parameters)
         self._dict_keys = {arg: [] for arg in self._args}
         node = self.visit(ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec'))
         newast = ast.fix_missing_locations(node)
+
+        if comp._var_discrete['input'] or comp._var_discrete['output']:
+            raise RuntimeError(f"{self.msginfo}: Discrete variables not supported yet when using "
+                               "jax.")
+
+        # check that inputs/outputs referenced in the function match those declared in the component
+        if set(self._dict_keys['inputs']) != set(comp._var_rel_names['input']):
+            raise RuntimeError(f"{self.msginfo}: The inputs referenced in the compute method "
+                               f"{sorted(self._dict_keys['inputs'])} do not match the inputs "
+                               f"declared in the component {sorted(comp._var_rel_names['input'])}.")
+        if set(self._dict_keys['outputs']) != set(comp._var_rel_names['output']):
+            raise RuntimeError(f"{self.msginfo}: The outputs referenced in the compute method "
+                               f"{sorted(self._dict_keys['outputs'])} do not match the outputs "
+                               f"declared in the component {sorted(comp._var_rel_names['output'])}."
+                               )
+
+        # ensure that ordering of args and returns exactly matches the order of the inputs and
+        # outputs vectors.
+        self._dict_keys['input'] = [n for n in comp._var_rel_names['input']]
+        self._dict_keys['output'] = [n for n in comp._var_rel_names['output']]
+
         # print(ast.unparse(newast))
         code = compile(newast, '<ast>', 'exec')
-        namespace = func.__globals__.copy()  # don't clutter up the original namespace
-        exec(code, namespace)
-        self._transformed = jjit(namespace[func.__name__], static_argnums=(0,))
+        exec(code, self._namespace)
+        self._transformed = jjit(self._namespace[func.__name__], static_argnums=(0,))
 
     def _get_input_names(self):
-        return self._dict_keys[self._args[1]]
+        return self._dict_keys[self._args[0]]
 
     def _get_input_names_src(self):
         return ', '.join([f"'{n}'" for n in self._get_input_names()])
 
     def _get_output_names(self):
-        return self._dict_keys[self._args[2]]
+        return self._dict_keys[self._args[1]]
 
     def _get_output_names_src(self):
         return ', '.join([f"'{n}'" for n in self._get_output_names()])
-
-    # def dump(self):
-    #     print(ast.unparse(self._transformed))
-    #     print("dict keys:")
-    #     import pprint
-    #     pprint.pprint(self._dict_keys)
 
     def get_new_args(self):
         new_args = [ast.arg('self', annotation=None)]
@@ -179,14 +217,15 @@ class Compute2Jax(ast.NodeTransformer):
         return ast.arguments(args=new_args, posonlyargs=[], vararg=None, kwonlyargs=[],
                              kw_defaults=[], kwarg=None, defaults=[])
 
-    def _make_return(self, names):
-        val = ast.Tuple([ast.Name(id=n, ctx=ast.Load()) for n in names], ctx=ast.Load())
+    def _make_return(self):
+        val = ast.Tuple([ast.Name(id=n, ctx=ast.Load()) for n in self._get_output_names()],
+                        ctx=ast.Load())
         return ast.Return(val)
 
     def visit_FunctionDef(self, node):
         newbody = [self.visit(statement) for statement in node.body]
         # add a return statement for the outputs
-        newbody.append(self._make_return(self._get_output_names()))
+        newbody.append(self._make_return())
 
         newargs = self.get_new_args()
         return ast.FunctionDef(node.name, newargs, newbody, node.decorator_list, node.returns,
@@ -206,137 +245,33 @@ class Compute2Jax(ast.NodeTransformer):
         ast.Any
             The transformed node.
         """
+        # if we encounter a subscript of the 'inputs' arg (it may not be named that) then replace
+        # inputs['name'] with name.
         if (isinstance(node.value, ast.Name) and node.value.id in self._args and
                 isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str)):
             self._dict_keys[node.value.id].append(node.slice.value)
             return ast.copy_location(ast.Name(id=node.slice.value, ctx=node.ctx), node)
-        else:
-            return self.generic_visit(node)
 
+        return self.generic_visit(node)
 
-def _get_new_compute(comp):
-    # TODO: ordering here will be an issue...
-    src = f"""
-def compute(self, inputs, outputs):
-    # print('ins:', list(inputs.values()))
-    # print('outs:', self.compute_primal(*inputs.values()))
-    outputs.set_vals(*self.compute_primal(*inputs.values()))
-"""
-    node = ast.parse(src, mode='exec')
-    code = compile(node, '<string>', 'exec')
-    # print("COMPUTE:")
-    # print(ast.dump(node))
-    namespace = {}
-    exec(code, namespace)
-    return namespace['compute']
+    def visit_Attribute(self, node):
+        """
+        Translate any non-static use of 'numpy' or 'np' to 'jnp'.
 
+        Parameters
+        ----------
+        node : ast.Attribute
+            The Attribute node being visited.
 
-def _get_compute_partials(compute_info):
-    src = f"""
-def compute_partials(self, inputs, partials):
-    deriv_func = self._get_deriv_func_()
-    deriv_vals = deriv_func(*inputs.values())[0]
-    ideriv = 0
-    for ofname in [{compute_info._get_output_names_src()}]:
-        for wrtname in [{compute_info._get_input_names_src()}]:
-            print("SETTING PARTIALS:", self._mode, ofname, wrtname)
-            print(deriv_vals[0][ideriv])
-            partials[ofname, wrtname] = deriv_vals[ideriv]
-            ideriv += 1
-"""
-    # print("SRC:")
-    # print(src)
-    node = ast.parse(src, mode='exec')
-    code = compile(node, '<string>', 'exec')
-    namespace = {}
-    exec(code, namespace)
-    return namespace['compute_partials']
+        Returns
+        -------
+        ast.Any
+            The transformed node.
+        """
+        if isinstance(node.value, ast.Name) and node.value.id in self._np_names:
+            if node.attr not in self._static_ops:
+                if 'jnp' in self._namespace:
+                    return ast.copy_location(ast.Attribute(value=ast.Name(id='jnp', ctx=ast.Load()),
+                                                           attr=node.attr, ctx=node.ctx), node)
 
-
-def _get_deriv_func(compute_info):
-    argnums = list(range(len(compute_info._get_input_names())))
-    src = f"""
-def _get_deriv_func_(self):
-    try:
-        cache = self._deriv_func_cache_
-    except AttributeError:
-        cache = self._deriv_func_cache_ = {{}}
-    mode = self._mode
-
-    if mode not in cache:
-        if mode == 'fwd':
-            cache[mode] = jax.jacfwd(self.compute_primal, argnums={argnums})
-        else:  # mode == 'rev'")
-            cache[mode] = jax.jacrev(self.compute_primal, argnums={argnums})
-    return cache[mode]
-"""
-    node = ast.parse(src, mode='exec')
-    code = compile(node, '<string>', 'exec')
-    namespace = {'jax': jax}
-    exec(code, namespace)
-    return namespace['_get_deriv_func_']
-
-
-# TODO: make this a class decorator that can take args so we can tell it which jax deriv
-# method(s) to use.
-def jaxify_component(comp_class):
-    """
-    Jaxify a normal OpenMDAO component class.
-
-    Parameters
-    ----------
-    comp_class : class
-        The class to be decorated.
-
-    Returns
-    -------
-    class
-        The decorated class.
-    """
-    compute_info = Compute2Jax(comp_class.compute)
-    setattr(comp_class, 'compute_primal', compute_info._transformed)
-    setattr(comp_class, 'compute', _get_new_compute(comp_class))
-    setattr(comp_class, 'compute_partials', _get_compute_partials(compute_info))
-    setattr(comp_class, '_get_deriv_func_', _get_deriv_func(compute_info))
-
-    return comp_class
-
-
-if __name__ == '__main__':
-    import openmdao.api as om
-
-    # @ jax.tree_util.register_pytree_node_class
-    @jaxify_component
-    class MyComp(om.ExplicitComponent):
-        def setup(self):
-            self.add_input('x', shape=(3, 3))
-            self.add_input('y', shape=(3, 4))
-            self.add_output('z', shape=(3, 4))
-
-            self.declare_partials(of='z', wrt=['x', 'y'])
-
-        def compute(self, inputs, outputs):
-            outputs['z'] = jnp.dot(inputs['x'], inputs['y'])
-
-    p = om.Problem()
-    comp = p.model.add_subsystem('comp', MyComp())
-    p.setup(mode='rev')
-
-    x = np.arange(1,10).reshape((3,3))
-    y = np.arange(1,13).reshape((3,4))
-    p.set_val('comp.x', x)
-    p.set_val('comp.y', y)
-    p.final_setup()
-    p.run_model()
-    p.check_totals(of=['comp.z'], wrt=['comp.x', 'comp.y'], method='fd', show_only_incorrect=True)
-    p.check_partials(show_only_incorrect=True)
-
-    # inputs = {'x': jnp.ones((5, 4))*5., 'y': jnp.ones((4, 7))*3.}
-    # outputs = {'z': jnp.zeros((5, 7))}
-    # closed_jaxpr = jax.make_jaxpr(f)(inputs, outputs)
-    # examine_jaxpr(closed_jaxpr)
-    # print(eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, inputs['x'], inputs['y'], outputs['z']))
-    # print("inputs:", list(comp._inputs.items()))
-    # comp.compute(comp._inputs, comp._outputs)
-    print(np.dot(x, y))
-    print(list(comp._outputs.items()))
+        return self.generic_visit(node)

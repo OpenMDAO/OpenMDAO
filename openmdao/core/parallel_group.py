@@ -188,3 +188,22 @@ class ParallelGroup(Group):
                 always_opt_comps.update(a)
         else:
             super()._get_relevance_modifiers(grad_groups, always_opt_comps)
+
+    def is_explicit(self):
+        """
+        Return True if this Group contains only explicit systems and has no cycles.
+
+        Returns
+        -------
+        bool
+            True if this is an explicit component.
+        """
+        if self._is_explicit is None:
+            expl = super().is_explicit()
+            if self.comm.size > 1:
+                for e in self.comm.allgather(expl):
+                    if not e:
+                        self._is_explicit = False
+                        break
+
+        return self._is_explicit

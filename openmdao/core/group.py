@@ -228,6 +228,7 @@ class Group(System):
         self._post_components = None
         self._iterated_components = None
         self._fd_rev_xfer_correction_dist = {}
+        self._is_explicit = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -659,6 +660,28 @@ class Group(System):
 
         self._setup_procs_finished = True
 
+    def is_explicit(self):
+        """
+        Return True if this Group contains only explicit systems and has no cycles.
+
+        Returns
+        -------
+        bool
+            True if this is an explicit component.
+        """
+        if self._is_explicit is None:
+            self._is_explicit = True
+            for subsys in self._subsystems_myproc:
+                if not subsys.is_explicit():
+                    self._is_explicit = False
+                    break
+
+            # check for cycles
+            if self._is_explicit:
+                self._is_explicit = nx.is_directed_acyclic_graph(self._compute_sys_graph())
+
+        return self._is_explicit
+
     def _configure_check(self):
         """
         Do any error checking on i/o and connections.
@@ -763,6 +786,7 @@ class Group(System):
         # after auto_ivcs have been added, but auto_ivcs can't be added until after we know all of
         # the connections.
         self._setup_global_connections()
+        self._setup_ad()
         self._setup_dynamic_shapes()
 
         self._top_level_post_connections()
@@ -2229,6 +2253,18 @@ class Group(System):
         for inp in src_ind_inputs:
             allprocs_abs2meta_in[inp]['has_src_indices'] = True
 
+    def _setup_ad(self):
+        """
+        If jax is active, jaxify this group and all subgroups.
+
+        Any Components directly or indirectly within this group have already been jaxified.
+        """
+        for subgroup in self._subgroups_myproc:
+            subgroup._setup_ad()
+
+        if self.options['derivs_method'] == 'jax':
+            pass  # do some jax setup here after all children are set up
+
     def _setup_dynamic_shapes(self):
         """
         Dynamically add shape/size metadata for variables.
@@ -2621,7 +2657,6 @@ class Group(System):
 
         knowns = {n for n, d in graph.nodes(data=True) if d['shape'] is not None}
         all_knowns = knowns.copy()
-        all_resolved = set()
 
         nodes = graph.nodes
         edges = graph.edges

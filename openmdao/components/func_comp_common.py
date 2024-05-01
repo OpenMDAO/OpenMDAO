@@ -26,10 +26,6 @@ except Exception:
         traceback.print_tb(tb)
     jax = None
 
-from openmdao.utils.om_warnings import issue_warning
-from openmdao.vectors.vector import Vector
-from openmdao.core.constants import INT_DTYPE
-
 
 # regex to check for variable names.
 namecheck_rgx = re.compile('[_a-zA-Z][_a-zA-Z0-9]*')

@@ -1,6 +1,9 @@
 """Define the ExplicitComponent class."""
 
+import sys
+
 import numpy as np
+from types import MethodType
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.core.component import Component
@@ -8,6 +11,7 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE, _UNDEFINED
+from openmdao.utils.jax_utils import jax, Compute2Jax
 
 
 class ExplicitComponent(Component):
@@ -33,6 +37,7 @@ class ExplicitComponent(Component):
 
         self._has_compute_partials = overrides_method('compute_partials', self, ExplicitComponent)
         self.options.undeclare('assembled_jac_type')
+        self._jac_func_ = None
 
     @property
     def nonlinear_solver(self):
@@ -558,3 +563,27 @@ class ExplicitComponent(Component):
             True if this is an explicit component.
         """
         return True
+
+    def _setup_jax(self):
+        compute_info = Compute2Jax(self)
+        wrt_idxs = list(range(len(compute_info._get_input_names())))
+
+        # replacement for the original compute method which calls _compute_primal, the original
+        # compute method converted to a simple function taking inputs as args and returning
+        # outputs as a tuple
+        def compute(self, inputs, outputs):
+            outputs.set_vals(*self._compute_primal(*inputs.values()))
+
+        def compute_partials(self, inputs, partials):
+            if self._jac_func_ is None:
+                fjax = jax.jacfwd if self.best_deriv_direction() == 'fwd' else jax.jacrev
+                self._jac_func_ = fjax(self._compute_primal, argnums=wrt_idxs)
+            deriv_vals = self._jac_func_(*inputs.values())
+            for ofidx, ofname in enumerate(compute_info._get_output_names()):
+                for wrtidx, wrtname in enumerate(compute_info._get_input_names()):
+                    partials[ofname, wrtname] = deriv_vals[ofidx][wrtidx]
+
+        self._compute_primal = MethodType(compute_info._transformed, self)
+        self.compute = MethodType(compute, self)
+        self.compute_partials = MethodType(compute_partials, self)
+        self._has_compute_partials = True

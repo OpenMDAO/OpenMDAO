@@ -309,6 +309,12 @@ class Component(System):
         self._serial_idxs = None
         self._inconsistent_keys = set()
 
+        if self.options['derivs_method'] == 'jax':
+            self._setup_jax()
+
+    def _setup_jax(self):
+        pass
+
     @collect_errors
     def _setup_var_sizes(self):
         """
@@ -539,12 +545,11 @@ class Component(System):
             raise TypeError(f"{self.msginfo}: The compute_shape argument should be a function but "
                             f"a '{type(compute_shape).__name__}' was given.")
 
-        if (shape_by_conn or copy_shape or compute_shape):
+        if shape_by_conn or copy_shape or compute_shape:
             if shape is not None or ndim(val) > 0:
-                raise ValueError("%s: If shape is to be set dynamically using 'shape_by_conn', "
-                                 "'copy_shape', or 'compute_shape', 'shape' and 'val' should be a "
-                                 "scalar, but shape of '%s' and val of '%s' was given for variable"
-                                 " '%s'." % (self.msginfo, shape, val, name))
+                raise ValueError("%s: If shape is to be set dynamically, 'shape' and 'val' should "
+                                 "be a scalar, but shape of '%s' and val of '%s' was given for "
+                                 "variable '%s'." % (self.msginfo, shape, val, name))
         else:
             # value, shape: based on args, making sure they are compatible
             val, shape = ensure_compatible(name, val, shape)
