@@ -101,7 +101,7 @@ class ScipyOptimizeDriver(Driver):
         Flag that indicates failure of most recent optimization.
     iter_count : int
         Counter for function evaluations.
-    result : OptimizeResult
+    _scipy_optimize_result : OptimizeResult
         Result returned from scipy.optimize call.
     opt_settings : dict
         Dictionary of solver-specific options. See the scipy.optimize.minimize documentation.

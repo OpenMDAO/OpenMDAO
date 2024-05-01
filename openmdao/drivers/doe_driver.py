@@ -37,6 +37,10 @@ class DOEDriver(Driver):
         List of design variables, used to compute derivatives.
     _quantities : list
         Contains the objectives plus nonlinear constraints, used to compute derivatives.
+    _num_model_evals : int
+        The number of times the Driver called model.solve_nonlinear.
+    _num_deriv_evals : int
+        The number of times the Driver called Driver._compute_totals.
     """
 
     def __init__(self, generator=None, **kwargs):

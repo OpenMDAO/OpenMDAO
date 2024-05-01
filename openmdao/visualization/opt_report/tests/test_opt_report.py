@@ -249,7 +249,7 @@ class TestOptimizationReport(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        self.check_opt_result(prob.driver.result, expected={'obj_calls': 0, 'deriv_calls': 0})
+        self.check_opt_result(prob.driver.result, expected={'obj_calls': 5, 'deriv_calls': 0})
 
         expected_warning_msg = "The optimizer report is not applicable for Driver type 'DOEDriver', " \
                                "which does not support optimization"

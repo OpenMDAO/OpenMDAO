@@ -109,8 +109,6 @@ class Driver(object):
 
     Attributes
     ----------
-    fail : bool
-        Reports whether the driver ran successfully.
     iter_count : int
         Keep track of iterations for case recording.
     options : <OptionsDictionary>
@@ -160,8 +158,8 @@ class Driver(object):
         Cached total jacobian handling object.
     _total_jac_linear : _TotalJacInfo or None
         Cached linear total jacobian handling object.
-    opt_result : dict
-        Dictionary containing information for use in the optimization report.
+    result : dict
+        DriverResult object containing information for use in the optimization report.
     _has_scaling : bool
         If True, scaling has been set for this driver.
     """
