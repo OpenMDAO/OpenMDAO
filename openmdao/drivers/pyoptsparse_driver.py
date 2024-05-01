@@ -253,7 +253,7 @@ class pyOptSparseDriver(Driver):
                              desc='Title of this optimization run')
         self.options.declare('print_opt_prob', types=bool, default=False,
                              desc='Print the opt problem summary before running the optimization')
-        self.options.declare('print_results', types=(bool,str), default=True,
+        self.options.declare('print_results', types=(bool, str), default=True,
                              desc='Print pyOpt results if True')
         self.options.declare('gradient_method', default='openmdao',
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},
