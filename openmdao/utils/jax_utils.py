@@ -168,8 +168,14 @@ class Compute2Jax(ast.NodeTransformer):
         self._namespace = comp.compute.__globals__.copy()
         if 'jnp' not in self._namespace:
             self._namespace['jnp'] = jnp
-        self._args = list(inspect.signature(func).parameters)
-        self._dict_keys = {arg: [] for arg in self._args}
+        self._orig_args = list(inspect.signature(func).parameters)
+
+        # ensure that ordering of args and returns exactly matches the order of the inputs and
+        # outputs vectors.
+        self._args = [n for n in comp._var_rel_names['input']]
+        self._returns = [n for n in comp._var_rel_names['output']]
+
+        self._dict_keys = {arg: set() for arg in self._orig_args}
         node = self.visit(ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec'))
         newast = ast.fix_missing_locations(node)
 
@@ -188,24 +194,19 @@ class Compute2Jax(ast.NodeTransformer):
                                f"declared in the component {sorted(comp._var_rel_names['output'])}."
                                )
 
-        # ensure that ordering of args and returns exactly matches the order of the inputs and
-        # outputs vectors.
-        self._dict_keys['input'] = [n for n in comp._var_rel_names['input']]
-        self._dict_keys['output'] = [n for n in comp._var_rel_names['output']]
-
-        # print(ast.unparse(newast))
+        print(ast.unparse(newast))
         code = compile(newast, '<ast>', 'exec')
         exec(code, self._namespace)
         self._transformed = jjit(self._namespace[func.__name__], static_argnums=(0,))
 
     def _get_input_names(self):
-        return self._dict_keys[self._args[0]]
+        return self._args
 
     def _get_input_names_src(self):
         return ', '.join([f"'{n}'" for n in self._get_input_names()])
 
     def _get_output_names(self):
-        return self._dict_keys[self._args[1]]
+        return self._returns
 
     def _get_output_names_src(self):
         return ', '.join([f"'{n}'" for n in self._get_output_names()])
@@ -247,9 +248,9 @@ class Compute2Jax(ast.NodeTransformer):
         """
         # if we encounter a subscript of the 'inputs' arg (it may not be named that) then replace
         # inputs['name'] with name.
-        if (isinstance(node.value, ast.Name) and node.value.id in self._args and
+        if (isinstance(node.value, ast.Name) and node.value.id in self._orig_args and
                 isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str)):
-            self._dict_keys[node.value.id].append(node.slice.value)
+            self._dict_keys[node.value.id].add(node.slice.value)
             return ast.copy_location(ast.Name(id=node.slice.value, ctx=node.ctx), node)
 
         return self.generic_visit(node)

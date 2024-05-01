@@ -542,25 +542,13 @@ class System(object):
 
         self._during_sparsity = False
 
-        self._compute_primal = None
+        self._compute_primal = self._no_compute_primal
 
-    def __call__(self, *args):
+    def _no_compute_primal(self, *args):
         """
-        A functional interface for computing outputs from inputs for use with jax.
-
-        Parameters
-        ----------
-        *args : tuple
-            Input values.
-
-        Returns
-        -------
-        tuple
-            Output values.
+        Placeholder for the compute_primal function.
         """
-        if self._compute_primal is None:
-            raise RuntimeError(f"{self.msginfo}: The primal function has not been set.")
-        return self._compute_primal(*args)
+        raise NotImplementedError(f"{self.msginfo}: no compute_primal method found.")
 
     @property
     def under_approx(self):

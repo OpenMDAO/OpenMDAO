@@ -6,6 +6,7 @@ import sys
 import traceback
 import re
 from functools import partial
+from collections.abc import Iterable
 
 import numpy as np
 try:
@@ -241,3 +242,21 @@ def _get_tangents(vals, direction, coloring=None, argnums=None, trans=None):
         tangents = tangents[0]
 
     return tangents
+
+
+def _ensure_iter(val):
+    """
+    Yield (value, size) tuples for the given value.
+
+    Parameters
+    ----------
+    val : object
+        The value to be iterated over.
+
+    Returns
+    -------
+    tuple or iterable
+    """
+    if isinstance(val, Iterable):
+        return val
+    return val,

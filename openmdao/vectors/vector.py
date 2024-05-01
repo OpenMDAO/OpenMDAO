@@ -4,7 +4,7 @@ import weakref
 import hashlib
 
 import numpy as np
-from numpy import ndim
+from numpy import size as npsize
 
 from openmdao.utils.name_maps import prom_name2abs_name
 from openmdao.utils.indexer import Indexer, indexer
@@ -580,26 +580,21 @@ class Vector(object):
 
         Parameters
         ----------
-        vals : ndarray, float, or iter of ndarrays and/or floats
+        vals : iter of ndarrays
             Values for each variable contained in this vector, in the proper order.
         """
         arr = self.asarray()
 
-        if self.nvars() == 1:
-            if ndim(vals) == 0:
-                arr[:] = vals
+        start = end = 0
+        for v in vals:
+            try:
+                end += v.size
+            except AttributeError:  # assume a plain float
+                arr[start] = v
+                end += 1
             else:
-                arr[:] = vals.ravel()
-        else:
-            start = end = 0
-            for v in vals:
-                if ndim(v) == 0:
-                    end += 1
-                    arr[start] = v
-                else:
-                    end += v.size
-                    arr[start:end] = v.ravel()
-                start = end
+                arr[start:end] = v.ravel()
+            start = end
 
     def set_var(self, name, val, idxs=_full_slice, flat=False, var_name=None):
         """

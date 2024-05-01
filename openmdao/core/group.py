@@ -678,7 +678,7 @@ class Group(System):
 
             # check for cycles
             if self._is_explicit:
-                self._is_explicit = nx.is_directed_acyclic_graph(self._compute_sys_graph())
+                self._is_explicit = nx.is_directed_acyclic_graph(self.compute_sys_graph())
 
         return self._is_explicit
 

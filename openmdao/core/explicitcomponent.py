@@ -572,7 +572,7 @@ class ExplicitComponent(Component):
         # compute method converted to a simple function taking inputs as args and returning
         # outputs as a tuple
         def compute(self, inputs, outputs):
-            outputs.set_vals(*self._compute_primal(*inputs.values()))
+            outputs.set_vals(self._compute_primal(*inputs.values()))
 
         def compute_partials(self, inputs, partials):
             if self._jac_func_ is None:
