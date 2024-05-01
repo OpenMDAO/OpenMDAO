@@ -22,7 +22,8 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import sizes2offsets
 from openmdao.vectors.vector import _full_slice, _flat_full_indexer
 from openmdao.utils.indexer import indexer
-from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, DriverWarning
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, \
+    DriverWarning, OMDeprecationWarning
 
 
 class DriverResult():
@@ -74,6 +75,27 @@ class DriverResult():
             The value of the attribute
         """
         return getattr(self, s)
+
+    def __bool__(self):
+        """
+        Mimick the behavior of the previous `failed` return value of run_driver.
+
+        The return value is True if the driver was NOT successful.
+        An OMDeprecationWarning is currently issued so users know to change their code.
+        Users should utilize the `success` attribute to test for driver success.
+
+        Returns
+        -------
+        bool
+            True if the Driver was NOT successful.
+
+        """
+        issue_warning(msg='boolean evaluation of DriverResult is temporarily implemented '
+                      'to mimick the previous `failed` return behavior of run_driver.\n'
+                      'Use the `success` attribute of the returned DriverResult '
+                      'object to test for successful driver completion.',
+                      category=OMDeprecationWarning)
+        return not self.success
 
 
 class Driver(object):
@@ -232,21 +254,9 @@ class Driver(object):
         self._total_jac = None
         self._total_jac_linear = None
 
-        self.fail = False
-
         self._declare_options()
         self.options.update(kwargs)
-
-        # self.opt_result = {
-        #     'runtime': 0.0,
-        #     'iter_count': 0,
-        #     'obj_calls': 0,
-        #     'deriv_calls': 0,
-        #     'exit_status': 'NOT_RUN'
-        # }
-
-        self.opt_result = DriverResult()
-
+        self.result = DriverResult()
         self._has_scaling = False
 
     def _get_inst_id(self):
@@ -640,7 +650,7 @@ class Driver(object):
 
             with SaveOptResult(self):
                 with model._relevance.nonlinear_active('iter'):
-                    failed = self.run()
+                    self.result.success = not self.run()
 
             if model._post_components:
                 with model._relevance.nonlinear_active('post'):
@@ -648,11 +658,9 @@ class Driver(object):
 
         else:
             with SaveOptResult(self):
-                failed = self.run()
+                self.result.success = not self.run()
 
-        self.opt_result.success = not failed
-
-        return self.opt_result
+        return self.result
 
     def _get_voi_val(self, name, meta, remote_vois, driver_scaling=True,
                      get_remote=True, rank=None):
@@ -1014,7 +1022,7 @@ class Driver(object):
         str
             String indicating result of driver run.
         """
-        return 'FAIL' if self.fail else 'SUCCESS'
+        return 'SUCCESS' if self.result.success else 'FAIL'
 
     def check_relevance(self):
         """
@@ -1470,9 +1478,9 @@ class Driver(object):
 
             return self._coloring_info.coloring
 
-    def _update_results(self, results):
+    def _update_result(self, result):
         """
-        Set additional attributes and information to the DriverResults.
+        Set additional attributes and information to the DriverResult.
         """
         pass
 
@@ -1529,14 +1537,14 @@ class SaveOptResult(object):
         driver = self._driver
 
         # The standard driver results
-        driver.opt_result.runtime = time.perf_counter() - self._start_time
-        driver.opt_result.iter_count = driver.iter_count
-        driver.opt_result.obj_calls = driver.get_driver_objective_calls()
-        driver.opt_result.deriv_calls = driver.get_driver_derivative_calls()
-        driver.opt_result.exit_status = driver.get_exit_status()
+        driver.result.runtime = time.perf_counter() - self._start_time
+        driver.result.iter_count = driver.iter_count
+        driver.result.obj_calls = driver.get_driver_objective_calls()
+        driver.result.deriv_calls = driver.get_driver_derivative_calls()
+        driver.result.exit_status = driver.get_exit_status()
 
         # The custom driver results
-        driver._update_results(driver.opt_result)
+        driver._update_result(driver.result)
 
 
 class RecordingDebugging(Recording):

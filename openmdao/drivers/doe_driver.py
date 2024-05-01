@@ -73,6 +73,8 @@ class DOEDriver(Driver):
         self._name = ''
         self._problem_comm = None
         self._color = None
+        self._num_model_evals = 0
+        self._num_deriv_evals = 0
 
         self._indep_list = []
         self._quantities = []
@@ -228,6 +230,8 @@ class DOEDriver(Driver):
                 metadata['success'] = 0
                 metadata['msg'] = traceback.format_exc()
                 print(metadata['msg'])
+            finally:
+                self._num_model_evals += 1
 
             # save reference to metadata for use in record_iteration
             self._metadata = metadata
@@ -237,6 +241,7 @@ class DOEDriver(Driver):
                                  wrt=self._indep_list,
                                  return_format=self._total_jac_format,
                                  driver_scaling=False)
+            self._num_deriv_evals += 1
 
     def _parallel_generator(self, design_vars, model=None):
         """
@@ -304,3 +309,25 @@ class DOEDriver(Driver):
         """
         self._metadata['name'] = case_name
         return self._metadata
+
+    def get_driver_objective_calls(self):
+        """
+        Return the number of times the model was evaluated during run.
+
+        Returns
+        -------
+        int
+            The number of calls to model.solve_nonlinear.
+        """
+        return self._num_model_evals
+
+    def get_driver_derivative_calls(self):
+        """
+        Return the number of times the total derivatives were evaluated during the run.
+
+        Returns
+        -------
+        int
+            The number of calls to _compute_totals.
+        """
+        return self._num_deriv_evals

@@ -88,7 +88,7 @@ class TestOptimizationReport(unittest.TestCase):
         Check that the data in the opt_result dict is valid for the run.
         """
         if opt_result is None:
-            opt_result = self.prob.driver.opt_result
+            opt_result = self.prob.driver.result
         if expected is None:
             expected = {}
 
@@ -249,7 +249,7 @@ class TestOptimizationReport(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        self.check_opt_result(prob.driver.opt_result, expected={'obj_calls': 0, 'deriv_calls': 0})
+        self.check_opt_result(prob.driver.result, expected={'obj_calls': 0, 'deriv_calls': 0})
 
         expected_warning_msg = "The optimizer report is not applicable for Driver type 'DOEDriver', " \
                                "which does not support optimization"
@@ -296,7 +296,7 @@ class TestOptimizationReport(unittest.TestCase):
         prob.run_driver()
 
         expect = {'deriv_calls': 0}
-        self.check_opt_result(prob.driver.opt_result, expected=expect)
+        self.check_opt_result(prob.driver.result, expected=expect)
         opt_report(prob)
         self.check_opt_report(prob, expected=expect)
 

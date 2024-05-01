@@ -151,7 +151,7 @@ class ScipyOptimizeDriver(Driver):
         # The user places optimizer-specific settings in here.
         self.opt_settings = {}
 
-        self.result = None
+        self._scipy_optimize_result = None
         self._grad_cache = None
         self._con_cache = None
         self._con_idx = {}
@@ -250,8 +250,8 @@ class ScipyOptimizeDriver(Driver):
         int
             Number of objective evaluations made during a driver run.
         """
-        if self.result and hasattr(self.result, 'nfev'):
-            return self.result.nfev
+        if self._scipy_optimize_result and hasattr(self._scipy_optimize_result, 'nfev'):
+            return self._scipy_optimize_result.nfev
         else:
             return None
 
@@ -264,8 +264,8 @@ class ScipyOptimizeDriver(Driver):
         int
             Number of derivative evaluations made during a driver run.
         """
-        if self.result and hasattr(self.result, 'njev'):
-            return self.result.njev
+        if self._scipy_optimize_result and hasattr(self._scipy_optimize_result, 'njev'):
+            return self._scipy_optimize_result.njev
         else:
             return None
 
@@ -585,7 +585,7 @@ class ScipyOptimizeDriver(Driver):
         if self._exc_info is not None:
             self._reraise()
 
-        self.result = result
+        self._scipy_optimize_result = result
 
         if hasattr(result, 'success'):
             self.fail = not result.success

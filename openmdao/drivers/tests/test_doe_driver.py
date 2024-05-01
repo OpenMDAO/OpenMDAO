@@ -1511,7 +1511,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.driver.recording_options['record_derivatives'] = True
 
         prob.setup()
-        prob.run_driver()
+        result = prob.run_driver()
         prob.cleanup()
 
         expected_vals = self.expected_fullfact3
@@ -1530,6 +1530,13 @@ class TestDOEDriver(unittest.TestCase):
             derivs = cr.get_case(case).derivatives
             for dv in ('x', 'y'):
                 self.assertEqual(derivs['f_xy', dv], expected_deriv['f_xy', dv])
+
+        self.assertGreater(result.runtime, 1.0E-16)
+        self.assertEqual(result.iter_count, 9)
+        self.assertEqual(result.obj_calls, 9)
+        self.assertEqual(result.deriv_calls, 9)
+        self.assertEqual(result.success, True)
+        self.assertEqual(result.exit_status, 'SUCCESS')
 
     def test_derivative_no_recording(self):
         prob = om.Problem()
