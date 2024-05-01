@@ -46,15 +46,15 @@ class DriverResult():
     """
 
     def __init__(self):
+        """
+        Initialize the DriverResult object.
+        """
         self.runtime = 0.0
         self.iter_count = 0
         self.obj_calls = 0
         self.deriv_calls = 0
         self.exit_status = 'NOT_RUN'
         self.success = False
-
-    def __getitem__(self, s):
-        return getattr(self, s)
 
 
 class Driver(object):
@@ -1451,10 +1451,9 @@ class Driver(object):
 
             return self._coloring_info.coloring
 
-    def _update_results(self):
+    def _update_results(self, results):
         """
-        Custom drivers should override this method to set any
-        additional attributes of opt_results.
+        Set additional attributes and information to the DriverResults.
         """
         pass
 
@@ -1518,7 +1517,7 @@ class SaveOptResult(object):
         driver.opt_result.exit_status = driver.get_exit_status()
 
         # The custom driver results
-        driver._update_results()
+        driver._update_results(driver.opt_results)
 
 
 class RecordingDebugging(Recording):
