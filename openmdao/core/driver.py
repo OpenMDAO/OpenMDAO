@@ -1517,7 +1517,7 @@ class SaveOptResult(object):
         driver.opt_result.exit_status = driver.get_exit_status()
 
         # The custom driver results
-        driver._update_results(driver.opt_results)
+        driver._update_results(driver.opt_result)
 
 
 class RecordingDebugging(Recording):
