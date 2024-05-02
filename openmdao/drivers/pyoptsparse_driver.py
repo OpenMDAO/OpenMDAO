@@ -678,7 +678,7 @@ class pyOptSparseDriver(Driver):
             else:
                 # exit status may be the empty string for optimizers that don't support it
                 if exit_status and exit_status > 2:
-                self.fail = True
+                    self.fail = True
 
         except KeyError:
             # optimizers other than pySNOPT may not populate this dict
