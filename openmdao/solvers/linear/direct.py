@@ -10,6 +10,7 @@ from scipy.sparse import csc_matrix
 from openmdao.solvers.solver import LinearSolver
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.utils.array_utils import identity_column_iter
+from openmdao.solvers.linear.linear_rhs_checker import LinearRHSChecker
 
 
 def index_to_varname(system, loc):
@@ -178,9 +179,21 @@ class DirectSolver(LinearSolver):
     ----------
     **kwargs : dict
         Options dictionary.
+
+    Attributes
+    ----------
+    _lin_rhs_checker : LinearRHSChecker or None
+        Object for checking the right-hand side of the linear solve.
     """
 
     SOLVER = 'LN: Direct'
+
+    def __init__(self, **kwargs):
+        """
+        Declare the solver options.
+        """
+        super().__init__(**kwargs)
+        self._lin_rhs_checker = None
 
     def _declare_options(self):
         """
@@ -190,6 +203,13 @@ class DirectSolver(LinearSolver):
 
         self.options.declare('err_on_singular', types=bool, default=True,
                              desc="Raise an error if LU decomposition is singular.")
+
+        self.options.declare('rhs_checking', types=(bool, dict),
+                             default=False,
+                             desc="If True, check RHS vs. cache and/or zero to avoid some solves."
+                             "Can also be set to a dict of options for the LinearRHSChecker to "
+                             "allow finer control over it. Allowed options are: "
+                             f"{LinearRHSChecker.options}")
 
         # this solver does not iterate
         self.options.undeclare("maxiter")
@@ -214,6 +234,8 @@ class DirectSolver(LinearSolver):
         """
         super()._setup_solvers(system, depth)
         self._disallow_distrib_solve()
+        self._lin_rhs_checker = LinearRHSChecker.create(self._system(),
+                                                        self.options['rhs_checking'])
 
     def _linearize_children(self):
         """
@@ -342,6 +364,9 @@ class DirectSolver(LinearSolver):
                 except ValueError as err:
                     raise RuntimeError(format_nan_error(system, mtx))
 
+        if self._lin_rhs_checker is not None:
+            self._lin_rhs_checker.clear()
+
     def _inverse(self):
         """
         Return the inverse Jacobian.
@@ -355,7 +380,6 @@ class DirectSolver(LinearSolver):
             Inverse Jacobian.
         """
         system = self._system()
-        iproc = system.comm.rank
         nproc = system.comm.size
 
         if self._assembled_jac is not None:
@@ -448,18 +472,30 @@ class DirectSolver(LinearSolver):
             trans_lu = 1
             trans_splu = 'T'
 
+            if self._lin_rhs_checker is not None:
+                sol_array, is_zero = self._lin_rhs_checker.get_solution(b_vec, system)
+                if is_zero:
+                    x_vec[:] = 0.0
+                    return
+                if sol_array is not None:
+                    x_vec[:] = sol_array
+                    return
+
         # AssembledJacobians are unscaled.
         if self._assembled_jac is not None:
             full_b = b_vec
 
             with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
                 if isinstance(self._assembled_jac._int_mtx, DenseMatrix):
-                    arr = scipy.linalg.lu_solve(self._lup, full_b, trans=trans_lu)
+                    sol_array = scipy.linalg.lu_solve(self._lup, full_b, trans=trans_lu)
                 else:
-                    arr = self._lu.solve(full_b, trans_splu)
+                    sol_array = self._lu.solve(full_b, trans_splu)
 
-                x_vec[:] = arr
+                x_vec[:] = sol_array
 
         # matrix-vector-product generated jacobians are scaled.
         else:
-            x_vec[:] = scipy.linalg.lu_solve(self._lup, b_vec, trans=trans_lu)
+            x_vec[:] = sol_array = scipy.linalg.lu_solve(self._lup, b_vec, trans=trans_lu)
+
+        if not system.under_complex_step and self._lin_rhs_checker is not None and mode == 'rev':
+            self._lin_rhs_checker.add_solution(b_vec, sol_array, copy=True)

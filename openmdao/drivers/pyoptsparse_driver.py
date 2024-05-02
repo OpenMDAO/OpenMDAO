@@ -306,7 +306,7 @@ class pyOptSparseDriver(Driver):
         """
         warn_deprecation("The 'hotstart_file' attribute is deprecated. "
                          "Use the 'hotstart_file' option instead.")
-        return self.options['hist_file']
+        return self.options['hotstart_file']
 
     @hotstart_file.setter
     def hotstart_file(self, file_name):
@@ -675,8 +675,10 @@ class pyOptSparseDriver(Driver):
             if optimizer == 'IPOPT':
                 if exit_status not in {0, 1}:
                     self.fail = True
-            elif exit_status > 2:
-                self.fail = True
+            else:
+                # exit status may be the empty string for optimizers that don't support it
+                if exit_status and exit_status > 2:
+                    self.fail = True
 
         except KeyError:
             # optimizers other than pySNOPT may not populate this dict

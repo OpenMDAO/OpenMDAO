@@ -9,6 +9,8 @@ from packaging.version import Version
 import numpy as np
 from scipy import __version__ as scipy_version
 
+ScipyVersion = Version(scipy_version)
+
 import openmdao.api as om
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense, TestExplCompArraySparse, TestExplCompArrayJacVec
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -29,8 +31,6 @@ except ImportError:
     vector_class = om.DefaultVector
     PETScVector = None
 
-rosenbrock_size = 6  # size of the design variable
-
 def rosenbrock(x):
     x_0 = x[:-1]
     x_1 = x[1:]
@@ -39,8 +39,11 @@ def rosenbrock(x):
 
 class Rosenbrock(om.ExplicitComponent):
 
+    def initialize(self):
+        self.options.declare('vec_size', default=6, desc='Size of input vector.')
+
     def setup(self):
-        self.add_input('x', np.ones(rosenbrock_size))
+        self.add_input('x', np.ones(self.options['vec_size']))
         self.add_output('f', 0.0)
 
     def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
@@ -1233,7 +1236,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['z'][1], 0.0, 1e-3)
         assert_near_equal(prob['x'], 0.0, 1e-3)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.1"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.1"),
                          "scipy >= 1.1 is required.")
     def test_trust_constr(self):
 
@@ -1275,7 +1278,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertTrue(prob['c'] < 10)
         self.assertTrue(prob['c'] > 0)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.1"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.1"),
                          "scipy >= 1.1 is required.")
     def test_trust_constr_hess_option(self):
 
@@ -1318,7 +1321,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertTrue(prob['c'] < 10)
         self.assertTrue(prob['c'] > 0)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.1"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.1"),
                          "scipy >= 1.1 is required.")
     def test_trust_constr_equality_con(self):
 
@@ -1359,7 +1362,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         assert_near_equal(prob['con.c'], 1., 1e-3)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.2"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.2"),
                          "scipy >= 1.2 is required.")
     def test_trust_constr_inequality_con(self):
 
@@ -1397,7 +1400,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         assert_near_equal(prob['c'], 1.0, 1e-2)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.2"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.2"),
                          "scipy >= 1.2 is required.")
     def test_trust_constr_bounds(self):
         class Rosenbrock(om.ExplicitComponent):
@@ -1651,10 +1654,11 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        expected_msg = \
-            "Problem .*: run_model must be called before total derivatives can be checked\."
-        with self.assertRaisesRegex(RuntimeError, expected_msg):
-            totals = prob.check_totals(method='fd', out_stream=False)
+        with self.assertRaises(RuntimeError) as cm:
+            prob.check_totals(method='fd', out_stream=False)
+
+        self.assertEqual(str(cm.exception), f"Problem {prob._get_inst_id()}: "
+                         "run_model must be called before total derivatives can be checked.")
 
     def test_cobyla_linear_constraint(self):
         # Bug where ScipyOptimizeDriver tried to compute and cache the constraint derivatives for the
@@ -1792,7 +1796,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['x'], np.array([0.234171, -0.1000]), 1e-3)
         assert_near_equal(prob['f'], -0.907267, 1e-3)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.2"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.2"),
                          "scipy >= 1.2 is required.")
     def test_dual_annealing_rastrigin(self):
         # Example from the Scipy documentation
@@ -1900,7 +1904,110 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['x'], -np.ones(size), 1e-2)
         assert_near_equal(prob['f'], 3.0, 1e-2)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.2"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.4"),
+                         "scipy >= 1.4 is required.")
+    def test_differential_evolution_constrained_linear(self):
+        # Source of example:
+        # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.differential_evolution.html
+        # In this example the minimum is not the unbounded global minimum.
+
+        size = 2
+
+        model = om.Group()
+
+        model.add_subsystem('rosenbrock', Rosenbrock(vec_size=size), promotes=['*'])
+
+        model.add_design_var('x', lower=0, upper=2)
+        model.add_objective('f')
+
+        # We add the constraint that the sum of x[0] and x[1] must be less than or equal to 1.9.
+        model.add_subsystem('constraint_comp',
+                            om.ExecComp('con = sum(x)', con={'shape': (1,)}, x={'shape': (size)}),
+                            promotes=['*'])
+        model.add_constraint('con', upper=1.9, linear=True)
+
+        driver = om.ScipyOptimizeDriver(optimizer='differential_evolution', disp=False)
+        driver.opt_settings['seed'] = 1
+
+        prob = om.Problem(model, driver)
+        prob.setup()
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, f"Optimization failed, result = \n{prob.driver.result}")
+
+        assert_near_equal(prob['x'], [0.96632622, 0.93367155], 1e-2)
+        assert_near_equal(prob['f'], 0.0011352416852625719, 1e-2)
+
+    @unittest.skipUnless(ScipyVersion >= Version("1.4") and ScipyVersion < Version("1.12"),
+                         "scipy >= 1.4, < 1.12 is required.")
+    def test_differential_evolution_constrained_nonlinear(self):
+        # Source of example:
+        # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.differential_evolution.html
+        # In this example the minimum is not the unbounded global minimum.
+
+        size = 2
+
+        model = om.Group()
+
+        model.add_subsystem('rosenbrock', Rosenbrock(vec_size=size), promotes=['*'])
+
+        # We add the constraint that the sum of x[0] and x[1] must be less than or equal to 1.9.
+        model.add_subsystem('constraint_comp',
+                            om.ExecComp('con = sum(x)', con={'shape': (1,)}, x={'shape': (size)}),
+                            promotes=['*'])
+
+        model.add_design_var('x', lower=0, upper=1)
+        model.add_constraint('con', upper=1.9, linear=False)
+        model.add_objective('f')
+
+        driver = om.ScipyOptimizeDriver(optimizer='differential_evolution', disp=False)
+        driver.opt_settings['seed'] = 1
+
+        prob = om.Problem(model, driver)
+        prob.setup()
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, f"Optimization failed, result = \n{prob.driver.result}")
+
+        assert_near_equal(prob['x'], [0.96632622, 0.93367155], 1e-2)
+        assert_near_equal(prob['f'], 0.0011352416852625719, 1e-2)
+
+    @unittest.skipUnless(ScipyVersion >= Version("1.4"),
+                         "scipy >= 1.4 is required.")
+    def test_differential_evolution_constrained_linear_nonlinear(self):
+        # test of the differential evolution optimizer with both
+        # a linear and a nonlinear constraint
+
+        size = 2
+
+        model = om.Group()
+
+        model.add_subsystem('rosenbrock', Rosenbrock(vec_size=size), promotes=['*'])
+
+        # We add the constraint that the sum of x[0] and x[1] must be less than or equal to 1.9.
+        model.add_subsystem('constraint_comp',
+                            om.ExecComp('con = sum(x)',
+                                        con={'shape': (1,)}, x={'shape': (size)}),
+                            promotes=['*'])
+
+        model.add_design_var('x', lower=0, upper=1)
+        model.add_constraint('con', upper=1.9, linear=True)
+        model.add_constraint('x', indices=[0], upper=.95, linear=False)
+        model.add_objective('f')
+
+        driver = om.ScipyOptimizeDriver(optimizer='differential_evolution', disp=False)
+        driver.opt_settings['seed'] = 1
+
+        prob = om.Problem(model, driver)
+        prob.setup()
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, f"Optimization failed, result = \n{prob.driver.result}")
+
+        assert_near_equal(prob['x'], [0.94999253, 0.90250721], 1e-2)
+        assert_near_equal(prob['f'], 0.00250079, 1e-2)
+
+    @unittest.skipUnless(ScipyVersion >= Version("1.2"),
                          "scipy >= 1.2 is required.")
     def test_shgo_rosenbrock(self):
         # Source of example:
@@ -1909,8 +2016,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
+        rosenbrock_size = 6  # size of the design variable
+
         model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(rosenbrock_size)), promotes=['*'])
-        model.add_subsystem('rosen', Rosenbrock(), promotes=['*'])
+        model.add_subsystem('rosen', Rosenbrock(vec_size=rosenbrock_size), promotes=['*'])
 
         prob.driver = driver = om.ScipyOptimizeDriver()
         driver.options['optimizer'] = 'shgo'
@@ -2123,7 +2232,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertEqual(str(msg.exception),
                          "Constraints or objectives [('parab.f_z', inds=[(1, 1, 0)])] cannot be impacted by the design variables of the problem.")
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.2"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.2"),
                          "scipy >= 1.2 is required.")
     def test_feature_shgo_rastrigin(self):
         # Source of example: https://stefan-endres.github.io/shgo/

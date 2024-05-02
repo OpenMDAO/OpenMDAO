@@ -30,7 +30,7 @@ from openmdao.utils.general_utils import common_subpath, all_ancestors, \
     meta2src_iter, get_rev_conns, _contains_all
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
-from openmdao.utils.graph_utils import get_sccs_topo, get_out_of_order_nodes
+from openmdao.utils.graph_utils import get_out_of_order_nodes
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
@@ -5188,3 +5188,18 @@ class Group(System):
             meta['remote'] = meta['source'] not in self._var_abs2meta['output']
 
         return active_resps
+
+    def _get_graph_node_meta(self):
+        """
+        Return metadata to add to this system's graph node.
+
+        Returns
+        -------
+        dict
+            Metadata for this system's graph node.
+        """
+        meta = super()._get_graph_node_meta()
+        # TODO: maybe set 'implicit' based on whether there are any implicit comps anywhere
+        # inside of the group or its children.
+        meta['base'] = 'Group'
+        return meta

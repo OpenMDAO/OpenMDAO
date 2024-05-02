@@ -29,7 +29,8 @@
         "err_on_non_converge": false,
         "assemble_jac": false,
         "solver": "gmres",
-        "restart": 20
+        "restart": 20,
+        "rhs_checking": false
     },
     "component_type": null,
     "subsystem_type": "group",
@@ -131,7 +132,8 @@
                 "err_on_non_converge": false,
                 "assemble_jac": false,
                 "solver": "gmres",
-                "restart": 20
+                "restart": 20,
+                "rhs_checking": false
             },
             "component_type": null,
             "subsystem_type": "group",
@@ -155,7 +157,8 @@
                         "err_on_non_converge": false,
                         "assemble_jac": false,
                         "solver": "gmres",
-                        "restart": 20
+                        "restart": 20,
+                        "rhs_checking": false
                     },
                     "component_type": null,
                     "subsystem_type": "group",
@@ -539,16 +542,16 @@
                     "implicit": false,
                     "units": "None",
                     "val": [
-                        28.588308164980585
+                        28.58830816498059
                     ],
                     "val_min_indices": [
                         0
                     ],
-                    "val_min": 28.588308164980585,
+                    "val_min": 28.58830816498059,
                     "val_max_indices": [
                         0
                     ],
-                    "val_max": 28.588308164980585
+                    "val_max": 28.58830816498059
                 }
             ],
             "options": {

@@ -105,6 +105,52 @@ class TestIndepVarComp(unittest.TestCase):
         assert_near_equal(prob.get_val('indep_var_1'), 1.0)
         assert_near_equal(prob.get_val('indep_var_2'), 2.0)
 
+    def test_tuple_ivc(self):
+        """Define one independent variable using a tuple."""
+
+        ivcs = [
+            ('indep_var', 1.0),
+            ('indep_var2', 2.0),
+        ]
+
+        comp = om.IndepVarComp(ivcs)
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', comp, promotes=['*'])
+        prob.setup(check=False)
+
+        assert_near_equal(prob.get_val('indep_var'), 1.0)
+        assert_near_equal(prob.get_val('indep_var2'), 2.0)
+
+    def test_tuple_ivc_kwargs(self):
+        """Define one independent variable using a tuple with additional options."""
+
+        ivcs = [
+            ('indep_var', 1.0, {'units': 'm'}),
+            ('indep_var2', 2.0, {'units': 'm'}),
+        ]
+
+        comp = om.IndepVarComp(ivcs)
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', comp, promotes=['*'])
+        prob.setup(check=False)
+
+        assert_near_equal(prob.get_val('indep_var', units='m'), 1.0)
+        assert_near_equal(prob.get_val('indep_var2', units='m'), 2.0)
+
+    def test_tuple_error(self):
+        """Test to see if the objects in the list are actually tuples."""
+            
+        ivcs = ['indep_var', 'indep_var2']
+
+        try:
+            om.IndepVarComp(ivcs)
+        except TypeError as err:
+            self.assertEqual(str(err), "Each entry in the list of tuples must be of type tuple.")
+        else:
+            self.fail('Exception expected.')
+
     def test_promote_glob_no_inputs(self):
         p = om.Problem()
         p.model.add_subsystem('indep',

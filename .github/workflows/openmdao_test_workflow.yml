@@ -32,6 +32,12 @@ on:
         required: false
         default: false
 
+      MacOS_ARM:
+        type: boolean
+        description: 'Include MacOS ARM in test matrix'
+        required: false
+        default: false
+
       Windows_Baseline:
         type: boolean
         description: 'Include Windows Baseline in test matrix'
@@ -79,15 +85,14 @@ jobs:
           # test baseline versions on Ubuntu
           - NAME: Ubuntu Baseline
             OS: ubuntu-latest
-            PY: '3.11'
+            PY: '3.12'
             NUMPY: '1.26'
-            SCIPY: '1.11'
-            PETSc: '3.18'
-            PYOPTSPARSE: 'v2.10.1'
+            SCIPY: '1.13'
+            PETSc: '3.20'
+            PYOPTSPARSE: 'v2.11.0'
             # PAROPT: true
             SNOPT: '7.7'
             OPTIONAL: '[all]'
-            JAX: '0.4.14'
             BANDIT: true
             PEP517: true
             TESTS: true
@@ -95,24 +100,38 @@ jobs:
 
           # test baseline versions on MacOS
           - NAME: MacOS Baseline
-            OS: macos-latest
-            PY: '3.11'
+            OS: macos-13
+            PY: '3.12'
             NUMPY: '1.26'
-            SCIPY: '1.11'
-            PETSc: '3.18'
-            # PYOPTSPARSE: 'v2.10.1'
+            SCIPY: '1.13'
+            PETSc: '3.20'
+            PYOPTSPARSE: 'v2.11.0'
+            # PAROPT: true
+            SNOPT: '7.7'
+            OPTIONAL: '[docs,doe,jax,notebooks,test]'
+            TESTS: true
+            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.MacOS_Baseline }}
+
+          # test baseline versions on MacOS/ARM
+          - NAME: MacOS ARM
+            OS: macos-14
+            PY: '3.12'
+            NUMPY: '1.26'
+            SCIPY: '1.13'
+            PETSc: '3.20'
+            # PYOPTSPARSE: 'v2.11.0'
             # PAROPT: true
             # SNOPT: '7.7'
             OPTIONAL: '[all]'
             TESTS: true
-            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.MacOS_Baseline }}
+            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.MacOS_ARM }}
 
           # test minimal install
           - NAME: Ubuntu Minimal
             OS: ubuntu-latest
-            PY: '3.11'
+            PY: '3.12'
             NUMPY: '1.26'
-            SCIPY: '1.11'
+            SCIPY: '1.13'
             OPTIONAL: '[test]'
             TESTS: true
             EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Minimal }}
@@ -137,9 +156,9 @@ jobs:
             OS: ubuntu-latest
             PY: '3.11'
             NUMPY: '1.26'
-            SCIPY: '1.11'
-            PETSc: '3.18'
-            PYOPTSPARSE: 'v2.10.1'
+            SCIPY: '1.13'
+            PETSc: '3.19'
+            PYOPTSPARSE: 'v2.11.0'
             SNOPT: '7.7'
             OPTIONAL: '[all]'
             BUILD_DOCS: true
@@ -189,12 +208,11 @@ jobs:
           git fetch --prune --unshallow --tags
 
       - name: Setup conda
-        uses: conda-incubator/setup-miniconda@v2
+        uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: ${{ matrix.PY }}
           conda-version: "*"
-          channels: conda-forge,defaults
-          channel-priority: true
+          channels: conda-forge
 
       - name: Install OpenMDAO
         run: |
@@ -215,6 +233,11 @@ jobs:
           else
             python -m pip install .${{ matrix.OPTIONAL }}
           fi
+
+      - name: Install MacOS-specific dependencies
+        if: matrix.OS == 'macos-13'
+        run: |
+          conda install swig
 
       - name: Install PETSc
         if: matrix.PETSc
@@ -320,7 +343,8 @@ jobs:
           echo "============================================================="
           echo "Install additional packages for testing/coverage"
           echo "============================================================="
-          python -m pip install pyparsing psutil objgraph pyxdsm
+          conda install graphviz
+          python -m pip install pyparsing psutil objgraph pyxdsm pydot
 
       - name: Display environment info
         id: env_info
@@ -365,6 +389,8 @@ jobs:
       - name: Setup tmate session
         if: ${{ inputs.debug_enabled }}
         uses: mxschmitt/action-tmate@v3
+        with:
+          limit-access-to-actor: true
 
       - name: Run tests
         id: run_tests
@@ -494,7 +520,7 @@ jobs:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Slack unit test failure
-        if: steps.run_tests.outcome == 'failure'
+        if: failure() && steps.run_tests.outcome == 'failure'
         uses: act10ns/slack@v2.0.0
         with:
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -504,7 +530,7 @@ jobs:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Slack doc build failure
-        if: steps.build_docs.outcome == 'failure'
+        if: failure() && steps.build_docs.outcome == 'failure'
         uses: act10ns/slack@v2.0.0
         with:
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -551,10 +577,10 @@ jobs:
         include:
           # baseline versions
           - NAME: Windows Baseline
-            PY: '3.11'
-            NUMPY: '1.24'
-            SCIPY: '1.11'
-            PYOPTSPARSE: '2.10.1'
+            PY: '3.12'
+            NUMPY: '1.26'
+            SCIPY: '1.13'
+            PYOPTSPARSE: '2.11.0'
             BANDIT: true
             EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Windows_Baseline }}
 
@@ -584,12 +610,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Fetch tags
-        run: |
-          git fetch --prune --unshallow --tags
-
       - name: Setup conda
-        uses: conda-incubator/setup-miniconda@v2
+        uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: ${{ matrix.PY }}
           conda-version: "*"
@@ -654,6 +676,16 @@ jobs:
           cd $HOME
           Set-DisplayResolution -Width 1920 -Height 1080 -Force
           testflo -n 2 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20
+
+      - name: Slack unit test failure
+        if: failure() && steps.run_tests.outcome == 'failure'
+        uses: act10ns/slack@v2.0.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: ${{ steps.run_tests.outcome }}
+          message:
+            Unit testing failed on `${{ matrix.NAME }}` build.
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Submit coverage
         id: coveralls
