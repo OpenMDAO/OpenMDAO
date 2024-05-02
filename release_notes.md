@@ -36,6 +36,7 @@ The `openmdao graph` command has been added as a quick way to visualize the call
 - Updated ExternalCodeComp to handle path separators in the executable name [#3173](https://github.com/OpenMDAO/OpenMDAO/pull/3173)
 - Fixes a relevance related bug in the krylov solvers that was introduced in a recent relevance PR [#3165](https://github.com/OpenMDAO/OpenMDAO/pull/3165)
 - Fix for bug when 'val' is passed as part of metadata to declare_partials involving residuals. [#3157](https://github.com/OpenMDAO/OpenMDAO/pull/3157)
+- Updated pyoptsparse_driver to address change in pyoptsparse v2.11.0 [#3218](https://github.com/OpenMDAO/OpenMDAO/pull/3218)
 
 ## Miscellaneous
 
