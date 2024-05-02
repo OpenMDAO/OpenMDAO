@@ -283,7 +283,7 @@ jobs:
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
           status: 'warning'
           message: |
-            Environment change detected on ${{ matrix.NAME }} build.
+            Environment change detected on `${{ matrix.NAME }}` build.
             Python, NumPy or SciPy was not the requested version:
             ```${{steps.env_info.outputs.errors}}```
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -295,7 +295,7 @@ jobs:
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
           status: ${{ steps.run_tests.outcome }}
           message:
-            Unit testing failed on ${{ matrix.NAME }} build.
+            Unit testing failed on `${{ matrix.NAME }}` build.
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Slack doc build failure
@@ -305,7 +305,7 @@ jobs:
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
           status: ${{ steps.build_docs.outcome }}
           message: |
-            Doc build failed on ${{ matrix.NAME }} build.
+            Doc build failed on `${{ matrix.NAME }}` build.
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Slack deprecation warnings
@@ -315,7 +315,7 @@ jobs:
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
           status: 'warning'
           message: |
-            Deprecations were detected on ${{ matrix.NAME }} build.
+            Deprecations were detected on `${{ matrix.NAME }}` build.
             ```${{ steps.deprecations_report.outputs.summary }}```
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
