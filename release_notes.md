@@ -1,4 +1,54 @@
 ***********************************
+# Release Notes for OpenMDAO 3.32.0
+
+May 03, 2024
+
+OpenMDAO 3.32.0 is a regular update with a few new features and several bug fixes. We're continuing to refine our submodel implementation, and now we give the user explicit access to the subproblem so that they can interact with it
+using the `Problem` API.
+
+POEM 093 is implemented, which allows caching of the linear solution which can improve performance in some situations.
+
+The `assert_near_equal` utility for testing can now be set to only enforce absolute error, in cases where the nominal value is small and relative error isn't meaningful.
+
+We now support scipy's differential evolution optimizer's ability to enforce constraints.
+
+From a Python development perspective we've upgraded from using `setup.py` to using `pyproject.toml`, which should hep users who want to manage OpenMDAO installation with non-pip tools, like `poetry`.
+
+The `openmdao graph` command has been added as a quick way to visualize the call graph in OpenMDAO. This is mostly for debugging purposes as it can get very complex with any sizable model.
+
+## New Features
+
+- Added an 'openmdao graph' command to visualize OpenMDAO's computational graph. [#3163](https://github.com/OpenMDAO/OpenMDAO/pull/3163)
+- Added capability for IVCs to be instantiated with a list of variables [#3204](https://github.com/OpenMDAO/OpenMDAO/pull/3204)
+- Gave user explicit access to the subproblem in SubModelComp [#3191](https://github.com/OpenMDAO/OpenMDAO/pull/3191)
+- Warning in AddSubtractComp for duplicate input names [#3190](https://github.com/OpenMDAO/OpenMDAO/pull/3190)
+- Added ability to force `assert_near_equal` to use absolute error. [#3188](https://github.com/OpenMDAO/OpenMDAO/pull/3188)
+- Added support for constraints when using the SciPy differential evolution optimizer [#3187](https://github.com/OpenMDAO/OpenMDAO/pull/3187)
+- Implementation branch for POEM93 (Linear solution caching) [#3185](https://github.com/OpenMDAO/OpenMDAO/pull/3185)
+
+## Bug Fixes
+
+- Fix pyOptSparse `hotstart_file` `@property` method [#3202](https://github.com/OpenMDAO/OpenMDAO/pull/3202)
+- Fix for a SubmodelComp indexing issue that was preventing data from being copied properly from the outer model to the inner model. [#3192](https://github.com/OpenMDAO/OpenMDAO/pull/3192)
+- Fixed bugs pertaining to the use of aliases in set_constraint_options and set_objective_options. [#3184](https://github.com/OpenMDAO/OpenMDAO/pull/3184)
+- Updated ExternalCodeComp to handle a period in the executable pathname [#3178](https://github.com/OpenMDAO/OpenMDAO/pull/3178)
+- Quick fix for colormap on partials plot [#3175](https://github.com/OpenMDAO/OpenMDAO/pull/3175)
+- Updated ExternalCodeComp to handle path separators in the executable name [#3173](https://github.com/OpenMDAO/OpenMDAO/pull/3173)
+- Fixes a relevance related bug in the krylov solvers that was introduced in a recent relevance PR [#3165](https://github.com/OpenMDAO/OpenMDAO/pull/3165)
+- Fix for bug when 'val' is passed as part of metadata to declare_partials involving residuals. [#3157](https://github.com/OpenMDAO/OpenMDAO/pull/3157)
+- Updated pyoptsparse_driver to address change in pyoptsparse v2.11.0 [#3218](https://github.com/OpenMDAO/OpenMDAO/pull/3218)
+
+## Miscellaneous
+
+- Updated Audit and Test workflows to use `setup-miniconda@v3` [#3210](https://github.com/OpenMDAO/OpenMDAO/pull/3210)
+- Updated dependencies and tests for NumPy/SciPy compatibility [#3198](https://github.com/OpenMDAO/OpenMDAO/pull/3198)
+- Addressed vulnerability in dependency [#3194](https://github.com/OpenMDAO/OpenMDAO/pull/3194)
+- Fixed the temporarily broken search functionality in the docs [#3170](https://github.com/OpenMDAO/OpenMDAO/pull/3170)
+- Added inputs to OpenMDAO Tests workflow_dispatch trigger [#3168](https://github.com/OpenMDAO/OpenMDAO/pull/3168)
+- Replaced `setup.py` with `pyproject.toml` using `hatchling` backend [#3152](https://github.com/OpenMDAO/OpenMDAO/pull/3152)
+
+
+***********************************
 # Release Notes for OpenMDAO 3.31.1
 
 March 15, 2024
