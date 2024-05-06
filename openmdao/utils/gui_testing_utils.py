@@ -1,5 +1,7 @@
 """Define utils for use in testing GUIs with Playwright."""
 
+import contextlib
+import socket
 import unittest
 
 
@@ -104,3 +106,18 @@ class _GuiTestCase(unittest.TestCase):
                              selector + "' in the N2 diagram.")
 
         return handle
+
+
+def get_free_port():
+    """
+    Get a free port.
+
+    Returns
+    -------
+    int
+        A free port.
+    """
+    with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as _socket:
+        _socket.bind(('', 0))
+        _, port = _socket.getsockname()
+        return port
