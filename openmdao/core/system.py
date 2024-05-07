@@ -542,13 +542,10 @@ class System(object):
 
         self._during_sparsity = False
 
-        self._compute_primal = self._no_compute_primal
+        if not hasattr(self, '_compute_primal'):
+            self._compute_primal = None
 
-    def _no_compute_primal(self, *args):
-        """
-        Placeholder for the compute_primal function.
-        """
-        raise NotImplementedError(f"{self.msginfo}: no compute_primal method found.")
+        self._jac_func_ = None  # for computing jacobian using AD (jax)
 
     @property
     def under_approx(self):

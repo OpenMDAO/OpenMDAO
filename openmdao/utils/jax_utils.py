@@ -195,32 +195,20 @@ class Compute2Jax(ast.NodeTransformer):
                                )
 
         print(ast.unparse(newast))
+
         code = compile(newast, '<ast>', 'exec')
         exec(code, self._namespace)
         self._transformed = jjit(self._namespace[func.__name__], static_argnums=(0,))
 
-    def _get_input_names(self):
-        return self._args
-
-    def _get_input_names_src(self):
-        return ', '.join([f"'{n}'" for n in self._get_input_names()])
-
-    def _get_output_names(self):
-        return self._returns
-
-    def _get_output_names_src(self):
-        return ', '.join([f"'{n}'" for n in self._get_output_names()])
-
     def get_new_args(self):
         new_args = [ast.arg('self', annotation=None)]
-        for arg_name in self._get_input_names():
+        for arg_name in self._args:
             new_args.append(ast.arg(arg=arg_name, annotation=None))
         return ast.arguments(args=new_args, posonlyargs=[], vararg=None, kwonlyargs=[],
                              kw_defaults=[], kwarg=None, defaults=[])
 
     def _make_return(self):
-        val = ast.Tuple([ast.Name(id=n, ctx=ast.Load()) for n in self._get_output_names()],
-                        ctx=ast.Load())
+        val = ast.Tuple([ast.Name(id=n, ctx=ast.Load()) for n in self._returns], ctx=ast.Load())
         return ast.Return(val)
 
     def visit_FunctionDef(self, node):

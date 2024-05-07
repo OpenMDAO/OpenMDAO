@@ -37,7 +37,6 @@ class ExplicitComponent(Component):
 
         self._has_compute_partials = overrides_method('compute_partials', self, ExplicitComponent)
         self.options.undeclare('assembled_jac_type')
-        self._jac_func_ = None
 
     @property
     def nonlinear_solver(self):
@@ -565,25 +564,34 @@ class ExplicitComponent(Component):
         return True
 
     def _setup_jax(self):
-        compute_info = Compute2Jax(self)
-        wrt_idxs = list(range(len(compute_info._get_input_names())))
-
         # replacement for the original compute method which calls _compute_primal, the original
         # compute method converted to a simple function taking inputs as args and returning
         # outputs as a tuple
         def compute(self, inputs, outputs):
-            outputs.set_vals(self._compute_primal(*inputs.values()))
+            # self._inputs.set_vals(*inputs.values())
+            ret = self._compute_primal(*inputs.values())
+            if isinstance(ret[0], np.ndarray):
+                print(f"{self.pathname}: compute:\n{ret}")
+            outputs.set_vals(ret)
 
         def compute_partials(self, inputs, partials):
-            if self._jac_func_ is None:
-                fjax = jax.jacfwd if self.best_deriv_direction() == 'fwd' else jax.jacrev
-                self._jac_func_ = fjax(self._compute_primal, argnums=wrt_idxs)
-            deriv_vals = self._jac_func_(*inputs.values())
-            for ofidx, ofname in enumerate(compute_info._get_output_names()):
-                for wrtidx, wrtname in enumerate(compute_info._get_input_names()):
+            deriv_vals = self._get_jac_func()(*inputs.values())
+            for ofidx, ofname in enumerate(self._var_rel_names['output']):
+                for wrtidx, wrtname in enumerate(self._var_rel_names['input']):
+                    ret = deriv_vals[ofidx][wrtidx]
+                    if isinstance(ret, np.ndarray):
+                        print(f"{self.pathname}: d_{ofname} / d_{wrtname}:\n{ret}")
                     partials[ofname, wrtname] = deriv_vals[ofidx][wrtidx]
 
+        compute_info = Compute2Jax(self)
         self._compute_primal = MethodType(compute_info._transformed, self)
         self.compute = MethodType(compute, self)
         self.compute_partials = MethodType(compute_partials, self)
         self._has_compute_partials = True
+
+    def _get_jac_func(self):
+        if self._jac_func_ is None:
+            fjax = jax.jacfwd if self.best_deriv_direction() == 'fwd' else jax.jacrev
+            wrt_idxs = list(range(len(self._var_abs2meta['input'])))
+            self._jac_func_ = fjax(self._compute_primal, argnums=wrt_idxs)
+        return self._jac_func_

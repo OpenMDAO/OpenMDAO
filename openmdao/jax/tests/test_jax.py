@@ -1,7 +1,7 @@
 import unittest
 
 import numpy as np
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
 import openmdao.api as om
 
 try:
@@ -83,34 +83,90 @@ class TestJax(unittest.TestCase):
         assert_near_equal(ksmin, npmin, tolerance=1.0E-6)
 
 
+class MyCompJax1(om.ExplicitComponent):
+    def setup(self):
+        self.add_input('x', shape_by_conn=True)
+        self.add_input('y', shape_by_conn=True)
+        self.add_output('z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
+
+        self.declare_partials(of='z', wrt=['x', 'y'])
+
+    def compute(self, inputs, outputs):
+        outputs['z'] = np.dot(inputs['x'], inputs['y'])
+
+
+class MyCompJax1Shaped(om.ExplicitComponent):
+    def __init__(self, xshape, yshape, **kwargs):
+        super().__init__(**kwargs)
+        self.xshape = xshape
+        self.yshape = yshape
+
+    def setup(self):
+        self.add_input('x', shape=self.xshape)
+        self.add_input('y', shape=self.yshape)
+        self.add_output('z', shape=(self.xshape[0], self.yshape[1]))
+
+        self.declare_partials(of='z', wrt=['x', 'y'])
+
+    def compute(self, inputs, outputs):
+        outputs['z'] = np.dot(inputs['x'], inputs['y'])
+
+
+class MyCompJax2(om.ExplicitComponent):
+    def setup(self):
+        self.add_input('x', shape_by_conn=True)
+        self.add_input('y', shape_by_conn=True)
+        self.add_output('z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
+        self.add_output('zz', copy_shape='y')
+
+        self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
+
+    def compute(self, inputs, outputs):
+        outputs['z'] = jnp.dot(inputs['x'], inputs['y'])
+        outputs['zz'] = inputs['y'] * 2.5
+
+
+class MyCompJax2Shaped(om.ExplicitComponent):
+    def __init__(self, xshape, yshape, **kwargs):
+        super().__init__(**kwargs)
+        self.xshape = xshape
+        self.yshape = yshape
+
+    def setup(self):
+        self.add_input('x', shape=self.xshape)
+        self.add_input('y', shape=self.yshape)
+        self.add_output('z', shape=(self.xshape[0], self.yshape[1]))
+        self.add_output('zz', shape=self.yshape)
+
+        self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
+
+    def compute(self, inputs, outputs):
+        outputs['z'] = jnp.dot(inputs['x'], inputs['y'])
+        outputs['zz'] = inputs['y'] * 2.5
+
+
+#x_shape = (1, 1)
+x_shape = (2, 3)
+#y_shape = (1, 1)
+y_shape = (3, 2)
+
 @unittest.skipIf(jax is None, 'jax is not available.')
 class TestJaxComp(unittest.TestCase):
 
     def test_jax_explicit_comp(self):
-        class MyComp(om.ExplicitComponent):
-            def setup(self):
-                self.add_input('x', shape_by_conn=True)
-                self.add_input('y', shape_by_conn=True)
-                self.add_output('z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
-
-                self.declare_partials(of='z', wrt=['x', 'y'])
-
-            def compute(self, inputs, outputs):
-                outputs['z'] = np.dot(inputs['x'], inputs['y'])
-
         p = om.Problem()
         # create an IVC manually so we can set the shapes.  Otherwise must set shape in the component
         # itself.
-        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones((3, 4))))
-        ivc.add_output('y', val=np.ones((4, 5)))
-        p.model.add_subsystem('comp', MyComp(derivs_method='jax'))
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
+        ivc.add_output('y', val=np.ones(y_shape))
+        p.model.add_subsystem('comp', MyCompJax1(derivs_method='jax'))
         p.model.connect('ivc.x', 'comp.x')
         p.model.connect('ivc.y', 'comp.y')
 
         p.setup(mode='rev')
 
-        x = np.arange(1,13).reshape((3,4))
-        y = np.arange(1,21).reshape((4, 5))
+        x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
+        y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
         p.set_val('ivc.x', x)
         p.set_val('ivc.y', y)
         p.final_setup()
@@ -121,39 +177,140 @@ class TestJaxComp(unittest.TestCase):
         p.check_partials(show_only_incorrect=True)
 
     def test_jax_explicit_comp2(self):
-        class MyComp(om.ExplicitComponent):
-            def setup(self):
-                self.add_input('x', shape_by_conn=True)
-                self.add_input('y', shape_by_conn=True)
-                self.add_output('z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
-                self.add_output('zz', copy_shape='x')
-
-                self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
-
-            def compute(self, inputs, outputs):
-                outputs['z'] = jnp.dot(inputs['x'], inputs['y'])
-                outputs['zz'] = inputs['x'] * 2.0
-
         p = om.Problem()
-        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones((3, 4))))
-        ivc.add_output('y', val=np.ones((4, 5)))
-        p.model.add_subsystem('comp', MyComp(derivs_method='jax'))
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
+        ivc.add_output('y', val=np.ones(y_shape))
+        p.model.add_subsystem('comp', MyCompJax2(derivs_method='jax'))
         p.model.connect('ivc.x', 'comp.x')
         p.model.connect('ivc.y', 'comp.y')
 
         p.setup(mode='rev')
 
-        x = np.arange(1,13).reshape((3,4))
-        y = np.arange(1,21).reshape((4, 5))
+        x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
+        y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
         p.set_val('ivc.x', x)
         p.set_val('ivc.y', y)
         p.final_setup()
         p.run_model()
 
         assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
-        assert_near_equal(p.get_val('comp.zz'), x * 2.0)
+        assert_near_equal(p.get_val('comp.zz'), y * 2.5)
         p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'], method='fd', show_only_incorrect=True)
         p.check_partials(show_only_incorrect=True)
+
+@unittest.skipIf(jax is None, 'jax is not available.')
+class TestJaxGroup(unittest.TestCase):
+    def test_jax_group_outer_ivc(self):
+        p = om.Problem()
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
+        ivc.add_output('y', val=np.ones(y_shape))
+        G = p.model.add_subsystem('G', om.Group())
+        G.options['derivs_method'] = 'jax'
+        G.add_subsystem('comp2', MyCompJax2())
+        G.add_subsystem('comp', MyCompJax1())
+
+        p.model.connect('ivc.x', ['G.comp.x', 'G.comp2.x'])
+        p.model.connect('ivc.y', 'G.comp2.y')
+        G.connect('comp2.zz', 'comp.y')
+
+        p.setup(mode='rev')
+
+        x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
+        y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
+        p.set_val('ivc.x', x)
+        p.set_val('ivc.y', y)
+        p.final_setup()
+        p.run_model()
+
+        assert_near_equal(p.get_val('G.comp2.z'), np.dot(x, y))
+        assert_near_equal(p.get_val('G.comp2.zz'), y * 2.5)
+        assert_check_partials(p.check_partials(show_only_incorrect=True))
+        assert_check_totals(p.check_totals(of=['G.comp.z','G.comp2.z', 'G.comp2.zz'],
+                                             wrt=['G.comp2.x', 'G.comp2.y'], method='fd', show_only_incorrect=True))
+
+    def test_jax_group_auto_ivc(self):
+        p = om.Problem()
+        G = p.model.add_subsystem('G', om.Group())
+        G.options['derivs_method'] = 'jax'
+        G.add_subsystem('comp2', MyCompJax2Shaped(x_shape, y_shape))
+        G.add_subsystem('comp', MyCompJax1Shaped(x_shape, y_shape))
+
+        G.connect('comp2.zz', 'comp.y')
+
+        p.setup(mode='rev')
+
+        x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
+        y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
+        p.set_val('G.comp.x', x)
+        p.set_val('G.comp2.x', x)
+        p.set_val('G.comp2.y', y)
+        p.final_setup()
+        p.run_model()
+
+        assert_near_equal(p.get_val('G.comp2.z'), np.dot(x, y))
+        assert_near_equal(p.get_val('G.comp2.zz'), y * 2.5)
+        assert_check_partials(p.check_partials(show_only_incorrect=True))
+        assert_check_totals(p.check_totals(of=['G.comp.z','G.comp2.z', 'G.comp2.zz'],
+                                             wrt=['G.comp2.x', 'G.comp2.y'], method='fd', show_only_incorrect=True))
+
+    def test_jax_group_inner_ivc(self):
+        p = om.Problem()
+        G = p.model.add_subsystem('G', om.Group())
+        ivc = G.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
+        ivc.add_output('y', val=np.ones(y_shape))
+        G.options['derivs_method'] = 'jax'
+        G.add_subsystem('comp2', MyCompJax2())
+        G.add_subsystem('comp', MyCompJax1())
+
+        p.model.connect('G.ivc.x', ['G.comp.x', 'G.comp2.x'])
+        p.model.connect('G.ivc.y', 'G.comp2.y')
+        G.connect('comp2.zz', 'comp.y')
+
+        p.setup(mode='rev')
+
+        x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
+        y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
+        p.set_val('G.ivc.x', x)
+        p.set_val('G.ivc.y', y)
+        p.final_setup()
+        p.run_model()
+
+        assert_near_equal(p.get_val('G.comp2.z'), np.dot(x, y))
+        assert_near_equal(p.get_val('G.comp2.zz'), y * 2.5)
+
+        print('-' * 80)
+        assert_check_partials(p.check_partials(show_only_incorrect=True))
+        assert_check_totals(p.check_totals(of=['G.comp.z','G.comp2.z', 'G.comp2.zz'],
+                                             wrt=['G.ivc.x', 'G.ivc.y'], method='fd', show_only_incorrect=True))
+
+    def test_jax_group_top_level(self):
+        p = om.Problem()
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
+        ivc.add_output('y', val=np.ones(y_shape))
+        G = p.model
+        G.options['derivs_method'] = 'jax'
+        G.add_subsystem('comp2', MyCompJax2())
+        G.add_subsystem('comp', MyCompJax1())
+
+        p.model.connect('ivc.x', ['comp.x', 'comp2.x'])
+        p.model.connect('ivc.y', 'comp2.y')
+        G.connect('comp2.zz', 'comp.y')
+
+        p.setup(mode='rev')
+
+        x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
+        y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape) * 3.0
+        p.set_val('ivc.x', x)
+        p.set_val('ivc.y', y)
+        p.final_setup()
+        p.run_model()
+
+        assert_near_equal(p.get_val('comp2.z'), np.dot(x, y))
+        assert_near_equal(p.get_val('comp2.zz'), y * 2.5)
+        # assert_check_partials(p.check_partials(show_only_incorrect=True))
+        assert_check_totals(p.check_totals(of=['comp.z','comp2.z', 'comp2.zz'],
+                                             wrt=['comp2.x', 'comp2.y'], method='fd', show_only_incorrect=True))
+
 
     # TODO: test with discrete vars
     # TODO: test with options
