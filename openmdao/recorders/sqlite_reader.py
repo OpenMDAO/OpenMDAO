@@ -1,11 +1,14 @@
 """
 Definition of the SqliteCaseReader.
 """
+import importlib
 import sqlite3
 from collections import OrderedDict
 
+import os
 import sys
 import numpy as np
+import io
 
 from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import Case
@@ -25,6 +28,64 @@ import re
 from json import loads as json_loads
 from io import TextIOBase
 
+
+class _InstanceWithNoClassDefinition:
+    """
+    A class used by _RestrictedUnpickler to indicate 
+    the unpickler can't generate an instance of a class
+    whose class definition is not available
+    """
+    pass
+
+class _RestrictedUnpicklerForCaseReader(pickle.Unpickler):
+
+    def __init__(self, file, *, fix_imports=True, encoding="ASCII", 
+                 errors="strict", buffers=None):
+        super().__init__(file, fix_imports=fix_imports, encoding=encoding, 
+                         errors=errors, buffers=buffers)
+        self.error_strings = ''  # Used to document which classes are not available
+
+    def find_class(self, module, name):
+        # Only allow classes from 'module'
+        
+        module_available = importlib.util.find_spec(module) is not None
+        if module_available:  # module is available so do as normal
+            return super().find_class(module, name)
+
+        # If module not available...
+        # Save into the error_strings variable what was not available.
+        if self.error_strings:
+            self.error_strings += ', '
+        self.error_strings += f"global '{module}.{name}' is not available."
+        
+        # Returning this acts as a kind of flag to indicate that 
+        # the unpickler can't generate instances of classes whose class definition
+        # is not available
+        return _InstanceWithNoClassDefinition
+
+    def loads_and_return_errors(self):
+        l = self.load()
+        return l, self.error_strings
+        
+def _loads_and_return_errors(s):
+    """Helper function analogous to pickle.loads()."""
+    i = io.BytesIO(s)
+    
+    # returns a tuple of the value and also error strings
+    dictionary, error_string = _RestrictedUnpicklerForCaseReader(i).loads_and_return_errors()
+    
+    # remove any InstanceWithNoClassDefinition classes
+    # Only want to return legit values in the OptionsDictionary
+    keys = [ key for key, value in dictionary.items() ]
+    for key in keys:
+        try:
+            isInstanceWithNoClassDefinition = isinstance(dictionary[key], _InstanceWithNoClassDefinition)
+            if isInstanceWithNoClassDefinition:
+                dictionary.undeclare(key)
+        except RuntimeError:  # OptionDictionary item might not be set yet
+            pass
+    
+    return dictionary, error_string
 
 class SqliteCaseReader(BaseCaseReader):
     """
@@ -303,8 +364,14 @@ class SqliteCaseReader(BaseCaseReader):
             if self._format_version >= 14:
                 self._system_options[id]['scaling_factors'] = \
                     pickle.loads(zlib.decompress(row[1]))
-                self._system_options[id]['component_options'] = \
-                    pickle.loads(zlib.decompress(row[2]))
+                # First step is to decompress
+                pickled_component_options = zlib.decompress(row[2])
+                # Second, unpickle
+                unpickled_component_options, error_string = _loads_and_return_errors(pickled_component_options)
+                if error_string:
+                    issue_warning(f"While reading system options from case recorder, the "
+                                f"following errors occurred: {error_string}", category=RuntimeWarning)
+                self._system_options[id]['component_options'] = unpickled_component_options
             else:
                 self._system_options[id]['scaling_factors'] = pickle.loads(row[1])
                 self._system_options[id]['component_options'] = pickle.loads(row[2])
