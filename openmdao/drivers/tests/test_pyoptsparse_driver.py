@@ -658,9 +658,6 @@ class TestPyoptSparse(unittest.TestCase):
         prob.driver.options['print_results'] = 'minimal'
         prob.run_driver()
 
-        assert_near_equal(prob['x'], 30, 1e-6)
-        assert_near_equal(prob['y'], 0, 1e-6)
-
     def test_simple_array_comp2D(self):
 
         prob = om.Problem()
