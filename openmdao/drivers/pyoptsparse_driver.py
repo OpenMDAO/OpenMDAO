@@ -647,8 +647,13 @@ class pyOptSparseDriver(Driver):
         if self.options['print_results']:
             if not MPI or model.comm.rank == 0:
                 if self.options['print_results'] == 'minimal':
-                    sol.minimal_print = True
-                print(sol)
+                    if hasattr(sol, 'summary_str'):
+                        print(sol.summary_str(minimal_print=True))
+                    else:
+                        print('minimal_print is not available for this solution')
+                        print(sol)
+                else:
+                    print(sol)
 
         # Pull optimal parameters back into framework and re-run, so that
         # framework is left in the right final state
