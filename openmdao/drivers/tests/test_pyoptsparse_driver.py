@@ -640,8 +640,6 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
-        prob.driver.opt_settings['max_iter'] = 0
-        prob.driver.options['print_results'] = False
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
