@@ -226,7 +226,7 @@ class IndepVarComp(ExplicitComponent):
         # define this for IndepVarComp to avoid overhead of ExplicitComponent._linearize.
         pass
 
-    def _compute_primal(self):
+    def compute_primal(self):
         """
         Compute the primal part of the derivative.
         """

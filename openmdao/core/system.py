@@ -542,8 +542,8 @@ class System(object):
 
         self._during_sparsity = False
 
-        if not hasattr(self, '_compute_primal'):
-            self._compute_primal = None
+        if not hasattr(self, 'compute_primal'):
+            self.compute_primal = None
 
         self._jac_func_ = None  # for computing jacobian using AD (jax)
 
@@ -4486,7 +4486,7 @@ class System(object):
             initialized, the driver for this model must be supplied in order to properly
             initialize the approximations.
         """
-        if self.pathname == '' and self._owns_approx_jac and driver is not None:
+        if self.pathname == '' and (self._owns_approx_jac or self.options['derivs_method'] == 'jax') and driver is not None:
             self._tot_jac = _TotalJacInfo(driver._problem(), None, None, 'flat_dict', approx=True)
 
         try:
@@ -6018,6 +6018,7 @@ class System(object):
         str
             The best direction for derivative calculations.
         """
+        return 'fwd'
         if len(self._outputs) > len(self._inputs):
             return 'fwd'
         return 'rev'

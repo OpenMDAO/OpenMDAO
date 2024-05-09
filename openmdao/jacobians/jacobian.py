@@ -255,7 +255,7 @@ class Jacobian(object):
         mode : str
             'fwd' or 'rev'.
         """
-        pass
+        raise NotImplementedError(f"Class {type(self).__name__} does not implement _apply.")
 
     def _randomize_subjac(self, subjac, key):
         """

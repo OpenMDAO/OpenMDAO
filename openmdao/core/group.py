@@ -231,6 +231,7 @@ class Group(System):
         self._iterated_components = None
         self._fd_rev_xfer_correction_dist = {}
         self._is_explicit = None
+        self._loc_ivcs = {}
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -1631,6 +1632,7 @@ class Group(System):
         abs2prom = self._var_abs2prom
 
         allprocs_abs2meta = {'input': {}, 'output': {}}
+        self._loc_ivcs = {}
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
 
@@ -1702,6 +1704,9 @@ class Group(System):
                         self._group_inputs[key] = [{'path': self.pathname, 'prom': key,
                                                     'auto': True}]
                     self._group_inputs[key].extend(metalist)
+
+        # create mapping of local indep var names to their metadata
+        self._loc_ivcs = self.get_indep_vars(local=True)
 
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
@@ -2255,67 +2260,107 @@ class Group(System):
         for inp in src_ind_inputs:
             allprocs_abs2meta_in[inp]['has_src_indices'] = True
 
-    def _get_indep_vars(self):
+    def get_indep_vars(self, local):
         """
-        Return a list of all independant variables in this group.
+        Return a dict of independant variables contained in this group or any of its subgroups.
 
-        Returns
-        -------
-        list of str
-            List of all independant variables in this group.
-        """
-        return {n:meta for n, meta in self._var_abs2meta['output'].items()
-                if 'openmdao:indep_var' in meta['tags']}
-
-    def _get_jax_inputs(self):
-        """
-        Return a dict of 'inputs' that will be used to compute the primal.
-
-        This includes any inputs passing the boundary, plus any outputs from IndepVarComps
-        contained, directly or indirectly, within this group.
+        Parameters
+        ----------
+        local : bool
+            If True, return only the variables local to the current process.
 
         Returns
         -------
         dict
-            A dict of inputs that will be used to compute the primal.
+            Dict of all independant variables in this group and their corresponding metadata.
         """
-        ivcs = self._get_indep_vars()
+        abs2meta = self._var_abs2meta['output'] if local else self._var_allprocs_abs2meta['output']
+        return {n:meta for n, meta in abs2meta.items() if 'openmdao:indep_var' in meta['tags']}
+
+    def get_boundary_inputs(self, local):
+        """
+        Return a set of inputs connected to sources outside of this Group.
+
+        Parameters
+        ----------
+        local : bool
+            If True, return only the variables local to the current process.
+
+        Returns
+        -------
+        set
+            Set of inputs connected to sources outside of this Group.
+        """
+        inputs = self._var_abs2meta['input'] if local else self._var_allprocs_abs2meta['input']
+        return set(inputs).difference(self._conn_global_abs_in2out)
+
+    def _get_compute_primal_inputs(self):
+        """
+        Return a dict of 'inputs' that will be used to compute the primal.
+
+        This includes any inputs connected to a source outside the group boundary, plus any outputs
+        from IndepVarComps that are contained, directly or indirectly, within this group.
+
+        Returns
+        -------
+        dict
+            A dict of names of inputs passed to compute_primal mapped to a tuple of the form
+            (shape, is_input).
+        """
+        ivcs = self.get_indep_vars(local=True)
         if self.pathname == '':
             # top level has no boundary, so only inputs are ivcs
             ins = {n: (m['shape'], False) for n, m in ivcs.items()}
         else:
-            boundary_ins = set(self._var_abs2meta['input']).difference(self._conn_global_abs_in2out)
+            boundary_ins = self.get_boundary_inputs(local=True)
             ins = {n: (m['shape'], True) for n, m in self._var_abs2meta['input'].items()
                    if n in boundary_ins}
             ins.update({n: (m['shape'], False) for n, m in ivcs.items()})
 
-        return ins, ivcs
+        return ins
 
-    def _get_jax_invals(self, inputs, outputs):
-        if self._boundary_ins_slclist is None:
-            self._boundary_ins_slclist = []
+    def _get_compute_primal_outputs(self):
+        return self._var_abs2meta['output']
+
+    def _get_compute_primal_invals(self, inputs, outputs):
+        """
+        Return a list of input values that will be passed into compute_primal.
+
+        Parameters
+        ----------
+        inputs : <Vector>
+            Inputs vector.
+        outputs : <Vector>
+            Outputs vector.
+
+        Returns
+        -------
+        list
+            List of input values that will be passed into compute_primal.
+        """
+        if self._compute_primal_in_slices is None:
+            self._compute_primal_in_slices = []
             islices = inputs.get_slice_dict()
             oslices = outputs.get_slice_dict()
-            for absname, (shape, isinput) in self._boundary_ins.items():
+            for absname, (shape, isinput) in self._compute_primal_ins.items():
                 if isinput:
-                    self._boundary_ins_slclist.append((True, islices[absname], shape))
+                    self._compute_primal_in_slices.append((True, islices[absname], shape))
                 else:
-                    self._boundary_ins_slclist.append((False, oslices[absname], shape))
+                    self._compute_primal_in_slices.append((False, oslices[absname], shape))
 
         iarray = inputs.asarray()
         oarray = outputs.asarray()
         ins = []
-        for isinput, slc, shape in self._boundary_ins_slclist:
+        for isinput, slc, shape in self._compute_primal_in_slices:
             ins.append(iarray[slc].reshape(shape) if isinput else oarray[slc].reshape(shape))
 
-        print("INVALS:", ins)
         return ins
 
     def _setup_ad(self):
         """
         If jax is active, jaxify this group and all subgroups.
 
-        Any Components directly or indirectly within this group have already been jaxified.
+        Any Components directly or indirectly within this group will also be jaxified.
         """
         from openmdao.core.indepvarcomp import IndepVarComp
 
@@ -2329,46 +2374,33 @@ class Group(System):
             raise RuntimeError(f"{self.msginfo}: JAX mode not currently supported for parallel "
                                "groups or groups that contain them.")
 
-        self._boundary_ins, self._ivcs = self._get_jax_inputs()
-        self._boundary_ins_slclist = None
+        self._compute_primal_ins = self._get_compute_primal_inputs()
+        self._compute_primal_in_slices = None
+        self._compute_primal_outs = self._get_compute_primal_outputs()
 
         pathlen = len(self.pathname) + 1 if self.pathname else 0
 
         # local var names within our compute_primal function
-        goutput_map = {n: f'o{i}' for i, n in enumerate(self._var_abs2meta['output'])}
-        # ginput_map = {n: f'v{i}' for i, n in enumerate(self._var_abs2meta['input'])}
+        goutput_map = {n: f'o{i}' for i, n in enumerate(self._compute_primal_outs)}
         ginput_map = {}
-        for i, name in enumerate(self._boundary_ins):
-            if self._boundary_ins[name][1]:  # input
+        for i, name in enumerate(self._compute_primal_ins):
+            if self._compute_primal_ins[name][1]:  # input
                 ginput_map[name] = f'v{i}'
             else:  # output
                 ginput_map[name] = goutput_map[name]
 
         print(f"{self.pathname} inputs: {ginput_map}")
-        # instrs = ", ".join(n for vname, n in ginput_map.items()
-        #                           if vname in self._boundary_ins)
         instrs = ", ".join(ginput_map.values())
-        src = [''.join(["def _compute_primal(self, ", instrs, "):"])]
+        src = [''.join(["def compute_primal(self, ", instrs, "):"])]
 
-        # TODO: we could allow user to configure whether we call all leaf nodes from here or
-        # instead call _compute_primals just on our direct children where those children may
-        # be groups.  Calling only direct children is more flexible but slower due to
-        # multiple levels of Group _compute_primals calls.  Note that if any group is doing AD,
-        # then all of its children (all the way down) must also do AD for this to work.
-
-        # this will call _compute_primals on all Components directly or indirectly under this group
+        # this will call compute_primal on all Components directly or indirectly under this group
         sys_iter = self.system_iter(recurse=True, include_self=False, typ=Component)
 
-        # this will call _compute_primals only on our direct child systems
-        # (and currently won't work without some modification...)
-        # sys_iter = self.system_iter(recurse=False, include_self=False)
-
-        #src.append(f"    print('inputs:', {instrs})")
         for system in sys_iter:
             if isinstance(system, IndepVarComp):
                 continue
 
-            if system._compute_primal is None:
+            if system.compute_primal is None:
                 system._setup_jax()
 
             ins = []
@@ -2382,80 +2414,114 @@ class Group(System):
             outs = ', '.join(goutput_map[n] for n in system._var_abs2meta['output'])
             if len(system._var_abs2meta['output']) == 1:
                 outs += ','
-            src.append(f"    {outs} = self.{system.pathname[pathlen:]}._compute_primal({ins})")
-            src.append(f"    print('{system.pathname[pathlen:]}')")
-            src.append(f"    print('takes:', {ins})")
-            src.append(f"    print('returns:', {outs})")
+            src.append(f"    {outs} = self.{system.pathname[pathlen:]}.compute_primal({ins})")
+            # src.append(f"    print('{system.pathname[pathlen:]}')")
+            # src.append(f"    print('takes:', {ins})")
+            # src.append(f"    print('returns:', {outs})")
 
+        # src.append(f"    print('returns:', {', '.join(goutput_map.values())})")
         src.append('    return ' + ', '.join(goutput_map.values()))
         if len(goutput_map) == 1:
             src[-1] += ','  # make the output a tuple
 
         src = '\n'.join(src)
 
-        print(f"{self.msginfo} _compute_primal:\n" + src)
+        print(f"{self.msginfo} compute_primal:\n" + src)
 
         # compile the function
         namespace = {}
         exec(compile(src, '<string>', 'exec'), namespace)
-        self._compute_primal = MethodType(namespace['_compute_primal'], self)
+        self.compute_primal = MethodType(namespace['compute_primal'], self)
 
     def _jax_linearize(self, inputs, partials):
         if self._jac_func_ is None:
-            fjax = jax.jacfwd if self.best_deriv_direction() == 'fwd' else jax.jacrev
-            wrt_idxs = list(range(len(self._boundary_ins)))
-            self._jac_func_ = fjax(self._compute_primal, argnums=wrt_idxs)
             self._setup_jax_derivs()
 
-        # print("INVALS:", self._get_jax_invals(inputs, self._outputs))
-        deriv_vals = self._jac_func_(*self._get_jax_invals(inputs, self._outputs))
+        total = self.pathname == ''
+
+        if total:
+            jdict = self._tot_jac
+            # allow keying by orig name or source to catch all possibilities
+            of_tot_meta = {m['source']: m for m in self._tot_jac.output_meta['fwd'].values()}
+            of_tot_meta.update(self._tot_jac.output_meta['fwd'].items())
+            wrt_tot_meta = {m['source']: m for m in self._tot_jac.input_meta['fwd'].values()}
+            wrt_tot_meta.update(self._tot_jac.input_meta['fwd'].items())
+        else:
+            jdict = self._subjacs_info
+
+        # print("INVALS:", self._get_compute_primal_invals(inputs, self._outputs))
+        deriv_vals = self._jac_func_(*self._get_compute_primal_invals(inputs, self._outputs))
         prefix_len = len(self.pathname) + 1 if self.pathname else 0
         for ofidx, (ofabs, ofmeta) in enumerate(self._var_abs2meta['output'].items()):
             of_size = shape_to_len(ofmeta['shape'])
-            if ofabs in self._ivcs:
+            if ofabs in self._loc_ivcs:
                 continue
-            ofname = ofabs[prefix_len:]
-            for wrtidx, (wrtabs, wtup) in enumerate(self._boundary_ins.items()):
-                wrt_size = shape_to_len(wtup[0])
-                key = (ofabs, wrtabs)
-                if key in self._subjac_key_map:
-                    key = self._subjac_key_map[key]
-                    wrtabs = key[1]
-                print('deriv_val', ofabs, wrtabs, deriv_vals[ofidx][wrtidx])
-                if key in self._subjacs_info:
-                    meta = self._subjacs_info[key] # partials[ofname, wrtabs[prefix_len:]]
-                    if meta['val'] is None:
-                        meta['val'] = np.array(deriv_vals[ofidx][wrtidx]).reshape(of_size, wrt_size)
-                    partials[ofname, wrtabs[prefix_len:]] = deriv_vals[ofidx][wrtidx]
-                # elif np.any(deriv_vals[ofidx][wrtidx]):
-                #     self._subjacs_info[key] = meta = SUBJAC_META_DEFAULTS.copy()
-                #     meta['val'] = np.array(deriv_vals[ofidx][wrtidx])
-                #     partials[ofname, wrtabs[prefix_len:]] = deriv_vals[ofidx][wrtidx]
+            if total:
+                if ofabs in of_tot_meta:
+                    ofname = of_tot_meta[ofabs]['name']
+                else:
+                    continue
+            else:
+                ofname = ofabs[prefix_len:]
+
+            for wrtidx, (wrtabs, wtup) in enumerate(self._compute_primal_ins.items()):
+                if total:
+                    if wrtabs in wrt_tot_meta:
+                        wrtname = wrt_tot_meta[wrtabs]['name']
+                        key = (ofname, wrtname)
+                    else:
+                        continue
+                else:
+                    wrtname = wrtabs[prefix_len:]
+                    key = (ofabs, wrtabs)
+                    if key not in self._subjacs_info and key in self._subjac_key_map:
+                        key = self._subjac_key_map[key]
+                        wrtname = key[1][prefix_len:]
+
+                if key in jdict:
+                    wrt_size = shape_to_len(wtup[0])
+                    shaped_val = deriv_vals[ofidx][wrtidx].reshape(of_size, wrt_size)
+                    print('deriv_val', key)
+                    print(shaped_val)
+                    if total:
+                        self._tot_jac[key] = shaped_val
+                    else:
+                        meta = self._subjacs_info[key]
+                        if meta['val'] is None:
+                            meta['val'] = np.array(shaped_val)
+                        partials[ofname, wrtname] = shaped_val
 
     def _setup_jax_derivs(self):
-        abs2meta_out = self._var_abs2meta['output']
+        fjax = jax.jacfwd if self.best_deriv_direction() == 'fwd' else jax.jacrev
+        wrt_idxs = list(range(len(self._compute_primal_ins)))
+        self._jac_func_ = fjax(self.compute_primal, argnums=wrt_idxs)
         self._subjac_key_map = {}
-        conns = self._conn_global_abs_in2out
-        for of, wrt in self._subjacs_info:
-            if wrt in conns:
-                src = conns[wrt]
-                if src in self._ivcs:
-                    self._subjac_key_map[(of, src)] = (of, wrt)
 
-        for key in self._subjac_keys_iter():
-            if key not in self._subjacs_info and key not in self._subjac_key_map:
-                of, wrt = key
+        if self._tot_jac is None:  # doing semitotals
+            #abs2meta_out = self._var_abs2meta['output']
+            #conns = self._conn_global_abs_in2out
+            #for key in self._subjacs_info:
+                #of, wrt = key
+                #if wrt in conns:
+                    #src = conns[wrt]
+                    #if src in self._loc_ivcs and (of, src) not in self._subjacs_info:
+                        #self._subjac_key_map[(of, src)] = (of, wrt)
 
-                meta = SUBJAC_META_DEFAULTS.copy()
+            # add any missing partials
+            for key in self._subjac_keys_iter():
+                if key not in self._subjacs_info and key not in self._subjac_key_map:
+                    of, wrt = key
 
-                if of == wrt:
-                    size = abs2meta_out[of]['size']
-                    meta['rows'] = meta['cols'] = np.arange(size)
-                    # All group approximations are treated as explicit components, so we
-                    # have a -1 on the diagonal.
-                    meta['val'] = np.full(size, -1.0)
+                    meta = SUBJAC_META_DEFAULTS.copy()
 
-                self._subjacs_info[key] = meta
+                    if of == wrt:
+                        size = abs2meta_out[of]['size']
+                        meta['rows'] = meta['cols'] = np.arange(size)
+                        # All group approximations are treated as explicit components, so we
+                        # have a -1 on the diagonal.
+                        meta['val'] = np.full(size, -1.0)
+
+                    self._subjacs_info[key] = meta
 
     def _setup_dynamic_shapes(self):
         """
@@ -3663,7 +3729,7 @@ class Group(System):
         """
         if self.options['derivs_method'] == 'jax':
             # TODO: figure out recording and relevance
-            self._outputs.set_vals(self._compute_primal(*self._get_jax_invals(self._inputs,
+            self._outputs.set_vals(self.compute_primal(*self._get_compute_primal_invals(self._inputs,
                                                                               self._outputs)))
             return
 
@@ -3871,34 +3937,10 @@ class Group(System):
 
                 # ExplicitComponent jacobian defined with -1 on diagonal.
                 d_residuals *= -1.0
-        #elif self.options['derivs_method'] == 'jax':
-            #self._jax_solve_linear(mode, scope_out, scope_in)
         else:
             self._linear_solver._set_matvec_scope(scope_out, scope_in)
             with self._relevance.active(self._linear_solver.use_relevance()):
                 self._linear_solver.solve(mode, None)
-
-    def _jax_solve_linear(self, mode, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
-        b_vec = self._doutputs
-        b_vec.set_val(0.0)
-        parent_offset = self._doutputs._root_offset
-
-        b_vec *= -1.0
-        off = b_vec._root_offset - parent_offset
-
-        if self._mode == 'fwd':
-            rhs = self._dresiduals.asarray()
-        else:
-            rhs = self._doutputs.asarray()
-
-        b_vec += rhs[off:off + len(b_vec)]
-
-        #with self._matvec_context(scope_out, scope_in, mode) as vecs:
-            #d_inputs, d_outputs, d_residuals = vecs
-        d_inputs = self._vectors['input']['linear']
-        d_outputs = self._vectors['output']['linear']
-        d_residuals = self._vectors['residual']['linear']
-        self._jacobian._apply(self, d_inputs, d_outputs, d_residuals, mode)
 
     def _linearize(self, jac, sub_do_ln=True):
         """
@@ -3913,7 +3955,7 @@ class Group(System):
         """
         if self._tot_jac is not None and (self._owns_approx_jac or
                                           self.options['derivs_method'] == 'jax'):
-            self._jacobian = self._tot_jac.J_dict
+            self._jacobian = self._tot_jac
         elif self._jacobian is None:
             self._jacobian = DictionaryJacobian(self)
 
@@ -4070,40 +4112,46 @@ class Group(System):
         totals = self.pathname == ''
 
         wrt = set()
-        ivc = set()
+        ivc = set(self.get_indep_vars(local=False))
         pro2abs = self._var_allprocs_prom2abs_list
 
         if totals:
             # When computing totals, weed out inputs connected to anything inside our system unless
             # the source is an indepvarcomp.
-            all_abs2meta_out = self._var_allprocs_abs2meta['output']
             if self._owns_approx_wrt:
-                for meta in self._owns_approx_wrt.values():
-                    src = meta['source']
-                    if 'openmdao:indep_var' in all_abs2meta_out[src]['tags']:
-                        wrt.add(src)
-            #elif self.options['derivs_method'] == 'jax':
-                #for src, meta in self._var_abs2meta['output'].items():
-                    #if 'openmdao:indep_var' in meta['tags']:
-                        #wrt.add(src)
+                wrt = {m['source'] for m in self._owns_approx_wrt.values()}
+                diff = wrt.difference(ivc)
+                if diff:
+                    bad = [n for n, m in self._owns_approx_wrt.items() if m['source'] in diff]
+                    raise RuntimeError("When computing total derivatives for the model, the "
+                                       "following wrt variables are not independent variables or "
+                                       "do not have an independant variable as a source: "
+                                       f"{sorted(bad)}")
+                wrt = wrt.intersection(ivc)
             else:
-                for abs_inps in pro2abs['input'].values():
-                    for inp in abs_inps:
-                        src = self._conn_global_abs_in2out[inp]
-                        if 'openmdao:indep_var' in all_abs2meta_out[src]['tags']:
-                            wrt.add(src)
-                            ivc.add(src)
-                        break
+                wrt = ivc
 
         else:
-            for abs_inps in pro2abs['input'].values():
-                for inp in abs_inps:
-                    # If connection is inside of this Group, perturbation of all implicitly
-                    # connected inputs will be handled properly via internal transfers. Otherwise,
-                    # we need to add all implicitly connected inputs separately.
-                    if inp in self._conn_abs_in2out:
-                        break
-                    wrt.add(inp)
+            if self.options['derivs_method'] == 'jax':
+                wrt = set(self._var_abs2meta['input'])
+                # no internal transfers used when jax is active
+                #conns = self._conn_global_abs_in2out
+
+                #for abs_inps in pro2abs['input'].values():
+                    #if abs_inps[0] not in conns:
+                        ## If connection is inside of this Group, perturbation of all implicitly
+                        ## connected inputs will be handled properly via internal transfers. Otherwise,
+                        ## we need to add all implicitly connected inputs separately.
+                        #wrt.update(abs_inps)
+                    #elif conns[abs_inps[0]] in ivc:
+                        #wrt.update(abs_inps)
+            else:
+                for abs_inps in pro2abs['input'].values():
+                    if abs_inps[0] not in self._conn_abs_in2out:
+                        # If connection is inside of this Group, perturbation of all implicitly
+                        # connected inputs will be handled properly via internal transfers. Otherwise,
+                        # we need to add all implicitly connected inputs separately.
+                        wrt.update(abs_inps)
 
             # get rid of any old stuff in here
             self._owns_approx_of = self._owns_approx_wrt = None
@@ -4828,6 +4876,9 @@ class Group(System):
         self._var_allprocs_abs2meta[io] = {}
         self._var_allprocs_abs2meta[io].update(auto_ivc._var_allprocs_abs2meta[io])
         self._var_allprocs_abs2meta[io].update(old)
+
+        # add all auto_ivc vars to our _loc_ivcs
+        self._loc_ivcs.update(auto_ivc._var_abs2meta[io])
 
         self._approx_subjac_keys = None  # this will force re-initialization
         self._setup_procs_finished = True

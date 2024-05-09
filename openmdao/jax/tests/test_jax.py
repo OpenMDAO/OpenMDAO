@@ -307,9 +307,9 @@ class TestJaxGroup(unittest.TestCase):
 
         assert_near_equal(p.get_val('comp2.z'), np.dot(x, y))
         assert_near_equal(p.get_val('comp2.zz'), y * 2.5)
-        # assert_check_partials(p.check_partials(show_only_incorrect=True))
+        assert_check_partials(p.check_partials(show_only_incorrect=True))
         assert_check_totals(p.check_totals(of=['comp.z','comp2.z', 'comp2.zz'],
-                                             wrt=['comp2.x', 'comp2.y'], method='fd', show_only_incorrect=True))
+                                             wrt=['ivc.x', 'comp2.y'], method='fd', show_only_incorrect=True))
 
 
     # TODO: test with discrete vars

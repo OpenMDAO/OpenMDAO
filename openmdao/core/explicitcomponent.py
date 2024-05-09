@@ -569,22 +569,19 @@ class ExplicitComponent(Component):
         # outputs as a tuple
         def compute(self, inputs, outputs):
             # self._inputs.set_vals(*inputs.values())
-            ret = self._compute_primal(*inputs.values())
-            if isinstance(ret[0], np.ndarray):
-                print(f"{self.pathname}: compute:\n{ret}")
-            outputs.set_vals(ret)
+            outputs.set_vals(self.compute_primal(*inputs.values()))
 
         def compute_partials(self, inputs, partials):
             deriv_vals = self._get_jac_func()(*inputs.values())
             for ofidx, ofname in enumerate(self._var_rel_names['output']):
+                ofmeta = self._var_rel2meta[ofname]
                 for wrtidx, wrtname in enumerate(self._var_rel_names['input']):
-                    ret = deriv_vals[ofidx][wrtidx]
-                    if isinstance(ret, np.ndarray):
-                        print(f"{self.pathname}: d_{ofname} / d_{wrtname}:\n{ret}")
-                    partials[ofname, wrtname] = deriv_vals[ofidx][wrtidx]
+                    wrtmeta = self._var_rel2meta[wrtname]
+                    partials[ofname, wrtname] = \
+                        deriv_vals[ofidx][wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
 
         compute_info = Compute2Jax(self)
-        self._compute_primal = MethodType(compute_info._transformed, self)
+        self.compute_primal = MethodType(compute_info._transformed, self)
         self.compute = MethodType(compute, self)
         self.compute_partials = MethodType(compute_partials, self)
         self._has_compute_partials = True
@@ -593,5 +590,5 @@ class ExplicitComponent(Component):
         if self._jac_func_ is None:
             fjax = jax.jacfwd if self.best_deriv_direction() == 'fwd' else jax.jacrev
             wrt_idxs = list(range(len(self._var_abs2meta['input'])))
-            self._jac_func_ = fjax(self._compute_primal, argnums=wrt_idxs)
+            self._jac_func_ = fjax(self.compute_primal, argnums=wrt_idxs)
         return self._jac_func_
