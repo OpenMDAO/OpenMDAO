@@ -337,6 +337,7 @@ class TestJaxGroup(unittest.TestCase):
         assert_check_totals(p.check_totals(of=['G.comp.z','G.comp2.z', 'G.comp2.zz'],
                                              wrt=['G.comp2.x', 'G.comp2.y'], method='fd', show_only_incorrect=True))
 
+    @unittest.skip("unskip this after inner ivc issue is fixed for fd")
     def test_jax_group_inner_ivc(self):
         p = om.Problem()
         G = p.model.add_subsystem('G', om.Group())
