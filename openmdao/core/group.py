@@ -231,7 +231,7 @@ class Group(System):
         self._iterated_components = None
         self._fd_rev_xfer_correction_dist = {}
         self._is_explicit = None
-        self._loc_ivcs = {}
+        self._ivcs = {}
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -1632,7 +1632,7 @@ class Group(System):
         abs2prom = self._var_abs2prom
 
         allprocs_abs2meta = {'input': {}, 'output': {}}
-        self._loc_ivcs = {}
+        self._ivcs = {}
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
 
@@ -1704,9 +1704,6 @@ class Group(System):
                         self._group_inputs[key] = [{'path': self.pathname, 'prom': key,
                                                     'auto': True}]
                     self._group_inputs[key].extend(metalist)
-
-        # create mapping of local indep var names to their metadata
-        self._loc_ivcs = self.get_indep_vars(local=True)
 
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
@@ -1806,6 +1803,9 @@ class Group(System):
             self._discrete_inputs = self._discrete_outputs = ()
 
         self._vars_to_gather = self._find_vars_to_gather()
+
+        # create mapping of indep var names to their metadata
+        self._ivcs = self.get_indep_vars(local=False)
 
     def _resolve_group_input_defaults(self, show_warnings=False):
         """
@@ -2320,7 +2320,8 @@ class Group(System):
         return ins
 
     def _get_compute_primal_outputs(self):
-        return self._var_abs2meta['output']
+        return {n: m for n, m in self._var_abs2meta['output'].items()
+                if 'openmdao:indep_var' not in m['tags']}
 
     def _get_compute_primal_invals(self, inputs, outputs):
         """
@@ -2362,6 +2363,9 @@ class Group(System):
 
         Any Components directly or indirectly within this group will also be jaxified.
         """
+        if jax is None:
+            return
+
         from openmdao.core.indepvarcomp import IndepVarComp
 
         for subgroup in self._subgroups_myproc:
@@ -2381,7 +2385,7 @@ class Group(System):
         pathlen = len(self.pathname) + 1 if self.pathname else 0
 
         # local var names within our compute_primal function
-        goutput_map = {n: f'o{i}' for i, n in enumerate(self._compute_primal_outs)}
+        goutput_map = {n: f'o{i}' for i, n in enumerate(self._var_abs2meta['output'])}
         ginput_map = {}
         for i, name in enumerate(self._compute_primal_ins):
             if self._compute_primal_ins[name][1]:  # input
@@ -2411,7 +2415,8 @@ class Group(System):
                     ins.append(ginput_map[n])
 
             ins = ', '.join(ins)
-            outs = ', '.join(goutput_map[n] for n in system._var_abs2meta['output'])
+            outs = ', '.join(goutput_map[n] for n, m in system._var_abs2meta['output'].items()
+                             if 'openmdao:indep_var' not in m['tags'])
             if len(system._var_abs2meta['output']) == 1:
                 outs += ','
             src.append(f"    {outs} = self.{system.pathname[pathlen:]}.compute_primal({ins})")
@@ -2420,7 +2425,7 @@ class Group(System):
             # src.append(f"    print('returns:', {outs})")
 
         # src.append(f"    print('returns:', {', '.join(goutput_map.values())})")
-        src.append('    return ' + ', '.join(goutput_map.values()))
+        src.append('    return ' + ', '.join([goutput_map[n] for n in self._compute_primal_outs]))
         if len(goutput_map) == 1:
             src[-1] += ','  # make the output a tuple
 
@@ -2431,7 +2436,9 @@ class Group(System):
         # compile the function
         namespace = {}
         exec(compile(src, '<string>', 'exec'), namespace)
-        self.compute_primal = MethodType(namespace['compute_primal'], self)
+        compute_primal = namespace['compute_primal']
+        compute_primal = jax.jit(compute_primal, static_argnums=[0])
+        self.compute_primal = MethodType(compute_primal, self)
 
     def _jax_linearize(self, inputs, partials):
         if self._jac_func_ is None:
@@ -2452,10 +2459,8 @@ class Group(System):
         # print("INVALS:", self._get_compute_primal_invals(inputs, self._outputs))
         deriv_vals = self._jac_func_(*self._get_compute_primal_invals(inputs, self._outputs))
         prefix_len = len(self.pathname) + 1 if self.pathname else 0
-        for ofidx, (ofabs, ofmeta) in enumerate(self._var_abs2meta['output'].items()):
+        for ofidx, (ofabs, ofmeta) in enumerate(self._compute_primal_outs.items()):
             of_size = shape_to_len(ofmeta['shape'])
-            if ofabs in self._loc_ivcs:
-                continue
             if total:
                 if ofabs in of_tot_meta:
                     ofname = of_tot_meta[ofabs]['name']
@@ -2498,14 +2503,14 @@ class Group(System):
         self._subjac_key_map = {}
 
         if self._tot_jac is None:  # doing semitotals
-            #abs2meta_out = self._var_abs2meta['output']
-            #conns = self._conn_global_abs_in2out
-            #for key in self._subjacs_info:
-                #of, wrt = key
-                #if wrt in conns:
-                    #src = conns[wrt]
-                    #if src in self._loc_ivcs and (of, src) not in self._subjacs_info:
-                        #self._subjac_key_map[(of, src)] = (of, wrt)
+            abs2meta_out = self._var_abs2meta['output']
+            conns = self._conn_global_abs_in2out
+            for key in self._subjacs_info:
+                of, wrt = key
+                if wrt in conns:
+                    src = conns[wrt]
+                    if src in self._ivcs and (of, src) not in self._subjacs_info:
+                        self._subjac_key_map[(of, src)] = (of, wrt)
 
             # add any missing partials
             for key in self._subjac_keys_iter():
@@ -4878,7 +4883,7 @@ class Group(System):
         self._var_allprocs_abs2meta[io].update(old)
 
         # add all auto_ivc vars to our _loc_ivcs
-        self._loc_ivcs.update(auto_ivc._var_abs2meta[io])
+        self._ivcs.update(auto_ivc._var_abs2meta[io])
 
         self._approx_subjac_keys = None  # this will force re-initialization
         self._setup_procs_finished = True

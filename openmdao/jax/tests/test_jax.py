@@ -122,7 +122,7 @@ class MyCompJax2(om.ExplicitComponent):
         self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
 
     def compute(self, inputs, outputs):
-        outputs['z'] = jnp.dot(inputs['x'], inputs['y'])
+        outputs['z'] = np.dot(inputs['x'], inputs['y'])
         outputs['zz'] = inputs['y'] * 2.5
 
 
@@ -141,14 +141,51 @@ class MyCompJax2Shaped(om.ExplicitComponent):
         self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
 
     def compute(self, inputs, outputs):
-        outputs['z'] = jnp.dot(inputs['x'], inputs['y'])
+        outputs['z'] = np.dot(inputs['x'], inputs['y'])
         outputs['zz'] = inputs['y'] * 2.5
 
 
-#x_shape = (1, 1)
+class MyCompJaxWithOption(om.ExplicitComponent):
+    def setup(self):
+        self.add_input('x', shape_by_conn=True)
+        self.add_input('y', shape_by_conn=True)
+        self.add_output('z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
+        self.add_output('zz', copy_shape='y')
+
+        self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
+
+        self.options.declare('mult', default=2.5, desc='multiplier', types=(float,))
+
+    def compute(self, inputs, outputs):
+        outputs['z'] = np.dot(inputs['x'], inputs['y'])
+        outputs['zz'] = inputs['y'] * self.options['mult']
+
+
+class MyCompJaxWithDiscrete(om.ExplicitComponent):
+    def setup(self):
+        self.add_input('x', shape_by_conn=True)
+        self.add_input('y', shape_by_conn=True)
+        self.add_discrete_input('disc_in', val=2)
+        self.add_output('z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
+        self.add_output('zz', copy_shape='y')
+        self.add_discrete_output('disc_out', val=3)
+
+        self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
+
+    def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+        if discrete_inputs['disc_in'] > 0:
+            outputs['z'] = np.dot(inputs['x'], inputs['y'])
+        else:
+            outputs['z'] = -np.dot(inputs['x'], inputs['y'])
+
+        if discrete_outputs['disc_out'] > 0:
+            outputs['zz'] = inputs['y'] * 2.5
+        else:
+            outputs['zz'] = inputs['y'] * 3.0
+
+
 x_shape = (2, 3)
-#y_shape = (1, 1)
-y_shape = (3, 2)
+y_shape = (3, 4)
 
 @unittest.skipIf(jax is None, 'jax is not available.')
 class TestJaxComp(unittest.TestCase):
@@ -197,6 +234,53 @@ class TestJaxComp(unittest.TestCase):
         assert_near_equal(p.get_val('comp.zz'), y * 2.5)
         p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'], method='fd', show_only_incorrect=True)
         p.check_partials(show_only_incorrect=True)
+
+    def test_jax_explicit_comp_with_option(self):
+        p = om.Problem()
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
+        ivc.add_output('y', val=np.ones(y_shape))
+        p.model.add_subsystem('comp', MyCompJaxWithOption(derivs_method='jax'))
+        p.model.connect('ivc.x', 'comp.x')
+        p.model.connect('ivc.y', 'comp.y')
+
+        p.setup(mode='rev')
+
+        x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
+        y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
+        p.set_val('ivc.x', x)
+        p.set_val('ivc.y', y)
+        p.final_setup()
+        p.run_model()
+
+        assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
+        assert_near_equal(p.get_val('comp.zz'), y * 2.5)
+        p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'], method='fd', show_only_incorrect=True)
+        p.check_partials(show_only_incorrect=True)
+
+    def test_jax_explicit_comp_with_discrete(self):
+        p = om.Problem()
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
+        ivc.add_output('y', val=np.ones(y_shape))
+        ivc.add_discrete_output('disc_out', val=3)
+        p.model.add_subsystem('comp', MyCompJaxWithDiscrete(derivs_method='jax'))
+        p.model.connect('ivc.x', 'comp.x')
+        p.model.connect('ivc.y', 'comp.y')
+        p.model.connect('ivc.disc_out', 'comp.disc_in')
+
+        p.setup(mode='rev')
+
+        x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
+        y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
+        p.set_val('ivc.x', x)
+        p.set_val('ivc.y', y)
+        p.final_setup()
+        p.run_model()
+
+        assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
+        assert_near_equal(p.get_val('comp.zz'), y * 2.5)
+        p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'], method='fd', show_only_incorrect=True)
+        p.check_partials(show_only_incorrect=True)
+
 
 @unittest.skipIf(jax is None, 'jax is not available.')
 class TestJaxGroup(unittest.TestCase):
@@ -266,7 +350,7 @@ class TestJaxGroup(unittest.TestCase):
         p.model.connect('G.ivc.y', 'G.comp2.y')
         G.connect('comp2.zz', 'comp.y')
 
-        p.setup(mode='rev')
+        p.setup(mode='fwd')
 
         x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
         y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0

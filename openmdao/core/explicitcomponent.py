@@ -1,6 +1,7 @@
 """Define the ExplicitComponent class."""
 
 import sys
+from itertools import chain
 
 import numpy as np
 from types import MethodType
@@ -564,16 +565,35 @@ class ExplicitComponent(Component):
         return True
 
     def _setup_jax(self):
-        # replacement for the original compute method which calls _compute_primal, the original
+        # replacement for the original compute method which calls compute_primal, the original
         # compute method converted to a simple function taking inputs as args and returning
         # outputs as a tuple
-        def compute(self, inputs, outputs):
+        def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
             # self._inputs.set_vals(*inputs.values())
-            outputs.set_vals(self.compute_primal(*inputs.values()))
+            if discrete_inputs is None:
+                returns = self.compute_primal(*inputs.values())
+            else:
+                ins = list(self._discrete_inputs.values())
+                ins.extend(inputs.values())
+                returns = self.compute_primal(*ins)
 
-        def compute_partials(self, inputs, partials):
-            deriv_vals = self._get_jac_func()(*inputs.values())
-            for ofidx, ofname in enumerate(self._var_rel_names['output']):
+            if discrete_outputs is None:
+                outputs.set_vals(returns)
+            else:
+                self._discrete_outputs.set_vals(returns[:len(self._discrete_outputs)])
+                outputs.set_vals(returns[len(self._discrete_outputs):])
+
+        def compute_partials(self, inputs, partials, discrete_inputs=None):
+            if discrete_inputs is None:
+                deriv_vals = self._get_jac_func()(*inputs.values())
+            else:
+                ins = list(self._discrete_inputs.values())
+                ins.extend(inputs.values())
+                deriv_vals = self._get_jac_func()(*ins)
+
+            for ofidx, ofname in enumerate(chain(self._discrete_outputs, self._var_rel_names['output'])):
+                if ofname in self._discrete_outputs:
+                    continue
                 ofmeta = self._var_rel2meta[ofname]
                 for wrtidx, wrtname in enumerate(self._var_rel_names['input']):
                     wrtmeta = self._var_rel2meta[wrtname]
@@ -589,6 +609,7 @@ class ExplicitComponent(Component):
     def _get_jac_func(self):
         if self._jac_func_ is None:
             fjax = jax.jacfwd if self.best_deriv_direction() == 'fwd' else jax.jacrev
-            wrt_idxs = list(range(len(self._var_abs2meta['input'])))
+            ndiscrete = len(self._discrete_inputs)
+            wrt_idxs = list(range(ndiscrete, len(self._var_abs2meta['input']) + ndiscrete))
             self._jac_func_ = fjax(self.compute_primal, argnums=wrt_idxs)
         return self._jac_func_

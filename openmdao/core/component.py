@@ -1858,5 +1858,21 @@ class _DictValues(object):
     def __len__(self):
         return len(self._dict)
 
+    def __iter__(self):
+        return iter(self._dict)
+
+    def __bool__(self):
+        return bool(self._dict)
+
+    def keys(self):
+        return self._dict.keys()
+
     def items(self):
-        return [(key, self._dict[key]['val']) for key in self._dict]
+        return [(key, meta['val']) for key, meta in self._dict.items()]
+
+    def values(self):
+        return [meta['val'] for meta in self._dict.values()]
+
+    def set_vals(self, *vals):
+        for key, val in zip(self._dict, vals):
+            self[key] = val

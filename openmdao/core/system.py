@@ -394,7 +394,7 @@ class System(object):
     _during_sparsity : bool
         If True, we're doing a sparsity computation and uncolored approxs need to be restricted
         to only colored columns.
-    _compute_primal : function or None
+    compute_primal : function or None
         Function that computes the primal for the given system.
     """
 
@@ -6018,7 +6018,6 @@ class System(object):
         str
             The best direction for derivative calculations.
         """
-        return 'fwd'
         if len(self._outputs) > len(self._inputs):
             return 'fwd'
         return 'rev'

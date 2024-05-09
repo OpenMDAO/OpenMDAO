@@ -4,6 +4,7 @@ Utilities for the use of jax in combination with OpenMDAO.
 import ast
 import textwrap
 import inspect
+from itertools import chain
 
 from openmdao.utils.om_warnings import issue_warning
 
@@ -163,7 +164,7 @@ class Compute2Jax(ast.NodeTransformer):
     _static_ops = {'reshape'}
     _np_names = {'np', 'numpy'}
 
-    def __init__(self, comp):
+    def __init__(self, comp, use_jit=True):
         func = comp.compute
         self._namespace = comp.compute.__globals__.copy()
         if 'jnp' not in self._namespace:
@@ -172,24 +173,21 @@ class Compute2Jax(ast.NodeTransformer):
 
         # ensure that ordering of args and returns exactly matches the order of the inputs and
         # outputs vectors.
-        self._args = [n for n in comp._var_rel_names['input']]
-        self._returns = [n for n in comp._var_rel_names['output']]
+        self._args = [n for n in chain(comp._discrete_inputs, comp._var_rel_names['input'])]
+        self._returns = [n for n in chain(comp._discrete_outputs, comp._var_rel_names['output'])]
+        self._discrete_outs = list(comp._discrete_outputs)
 
         self._dict_keys = {arg: set() for arg in self._orig_args}
         node = self.visit(ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec'))
         newast = ast.fix_missing_locations(node)
 
-        if comp._var_discrete['input'] or comp._var_discrete['output']:
-            raise RuntimeError(f"{self.msginfo}: Discrete variables not supported yet when using "
-                               "jax.")
-
         # check that inputs/outputs referenced in the function match those declared in the component
         if set(self._dict_keys['inputs']) != set(comp._var_rel_names['input']):
-            raise RuntimeError(f"{self.msginfo}: The inputs referenced in the compute method "
+            raise RuntimeError(f"{comp.msginfo}: The inputs referenced in the compute method "
                                f"{sorted(self._dict_keys['inputs'])} do not match the inputs "
                                f"declared in the component {sorted(comp._var_rel_names['input'])}.")
         if set(self._dict_keys['outputs']) != set(comp._var_rel_names['output']):
-            raise RuntimeError(f"{self.msginfo}: The outputs referenced in the compute method "
+            raise RuntimeError(f"{comp.msginfo}: The outputs referenced in the compute method "
                                f"{sorted(self._dict_keys['outputs'])} do not match the outputs "
                                f"declared in the component {sorted(comp._var_rel_names['output'])}."
                                )
@@ -198,7 +196,10 @@ class Compute2Jax(ast.NodeTransformer):
 
         code = compile(newast, '<ast>', 'exec')
         exec(code, self._namespace)
-        self._transformed = jjit(self._namespace[func.__name__], static_argnums=(0,))
+        self._transformed = self._namespace['compute_primal']
+        if use_jit:
+            statics = tuple(range(len(comp._var_discrete['input']) + 1))
+            self._transformed = jjit(self._transformed, static_argnums=statics)
 
     def get_new_args(self):
         new_args = [ast.arg('self', annotation=None)]
@@ -207,17 +208,43 @@ class Compute2Jax(ast.NodeTransformer):
         return ast.arguments(args=new_args, posonlyargs=[], vararg=None, kwonlyargs=[],
                              kw_defaults=[], kwarg=None, defaults=[])
 
+    def get_pre_body(self):
+        if not self._discrete_outs:
+            return []
+
+        # add a statement to pull individual values out of the discrete outputs
+        elts = [ast.Name(id=name, ctx=ast.Store()) for name in self._discrete_outs]
+        return [ast.Assign(targets=[ast.Tuple(elts=elts, ctx=ast.Store())],
+                           value=ast.Call(func=ast.Attribute(
+                               value=ast.Attribute(value=ast.Name(id='self', ctx=ast.Load()),
+                                                   attr='_discrete_outputs', ctx=ast.Load()),
+                                                   attr='values', ctx=ast.Load()),
+                                                   args=[], keywords=[]))]
+
+    def get_post_body(self):
+        if not self._discrete_outs:
+            return []
+
+        # add a statement to set the values of self._discrete outputs
+        args = [ast.Name(id=name, ctx=ast.Load()) for name in self._discrete_outs]
+        return [ast.Expr(value=ast.Call(func=ast.Attribute(
+            value=ast.Attribute(value=ast.Name(id='self', ctx=ast.Load()),
+                                attr='_discrete_outputs', ctx=ast.Load()),
+                                attr='set_vals', ctx=ast.Load()), args=args, keywords=[]))]
+
     def _make_return(self):
         val = ast.Tuple([ast.Name(id=n, ctx=ast.Load()) for n in self._returns], ctx=ast.Load())
         return ast.Return(val)
 
     def visit_FunctionDef(self, node):
-        newbody = [self.visit(statement) for statement in node.body]
+        newbody = self.get_pre_body()
+        newbody.extend([self.visit(statement) for statement in node.body])
+        newbody.extend(self.get_post_body())
         # add a return statement for the outputs
         newbody.append(self._make_return())
 
         newargs = self.get_new_args()
-        return ast.FunctionDef(node.name, newargs, newbody, node.decorator_list, node.returns,
+        return ast.FunctionDef('compute_primal', newargs, newbody, node.decorator_list, node.returns,
                                node.type_comment)
 
     def visit_Subscript(self, node):
