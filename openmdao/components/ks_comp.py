@@ -160,9 +160,10 @@ class KSComp(ExplicitComponent):
         self.options.declare('vec_size', types=int, default=1,
                              desc='The number of rows to independently aggregate.')
         self.options.declare('minimum', types=bool, default=False,
-                             desc='Return the minimum instead of the maximum by multiplying both the inputs '
-                                  'and output by -1. It is not recommended to use both this option and the '
-                                  'lower_flag option (it will return the negative of the aggregated max.)')
+                             desc='Return the minimum instead of the maximum by multiplying both '
+                                  'the inputs and output by -1. It is not recommended to use both '
+                                  'this option and the lower_flag option (it will return the '
+                                  'negative of the aggregated max.)')
         self.options.declare('lower_flag', types=bool, default=False,
                              desc='Set to True to reverse sign of input constraints.')
         self.options.declare('rho', 50.0, desc="Constraint Aggregation Factor.")
