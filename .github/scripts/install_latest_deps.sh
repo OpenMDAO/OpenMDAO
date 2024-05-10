@@ -83,7 +83,7 @@ python -m pip install --upgrade --pre jax jaxlib
 echo "============================================================="
 echo "Install latest PETSc"
 echo "============================================================="
-conda install mpi4py petsc petsc4py -q -y
+conda install mpi4py petsc!=3.21.1 petsc4py -q -y
 
 echo "============================================================="
 echo "Check MPI and PETSc installation"

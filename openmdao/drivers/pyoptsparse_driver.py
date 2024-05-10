@@ -253,7 +253,7 @@ class pyOptSparseDriver(Driver):
                              desc='Title of this optimization run')
         self.options.declare('print_opt_prob', types=bool, default=False,
                              desc='Print the opt problem summary before running the optimization')
-        self.options.declare('print_results', types=bool, default=True,
+        self.options.declare('print_results', types=(bool, str), default=True,
                              desc='Print pyOpt results if True')
         self.options.declare('gradient_method', default='openmdao',
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},
@@ -646,7 +646,14 @@ class pyOptSparseDriver(Driver):
         # Print results
         if self.options['print_results']:
             if not MPI or model.comm.rank == 0:
-                print(sol)
+                if self.options['print_results'] == 'minimal':
+                    if hasattr(sol, 'summary_str'):
+                        print(sol.summary_str(minimal_print=True))
+                    else:
+                        print('minimal_print is not available for this solution')
+                        print(sol)
+                else:
+                    print(sol)
 
         # Pull optimal parameters back into framework and re-run, so that
         # framework is left in the right final state
@@ -675,8 +682,10 @@ class pyOptSparseDriver(Driver):
             if optimizer == 'IPOPT':
                 if exit_status not in {0, 1}:
                     self.fail = True
-            elif exit_status > 2:
-                self.fail = True
+            else:
+                # exit status may be the empty string for optimizers that don't support it
+                if exit_status and exit_status > 2:
+                    self.fail = True
 
         except KeyError:
             # optimizers other than pySNOPT may not populate this dict
