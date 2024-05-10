@@ -733,7 +733,7 @@ class pyOptSparseDriver(Driver):
                 func_dict = self.get_objective_values()
                 func_dict.update(self.get_constraint_values(lintype='nonlinear'))
                 # convert func_dict to use promoted names
-                func_dict = model._prom_names_dict(func_dict)
+                # func_dict = model._prom_names_dict(func_dict)
                 return func_dict, 2
 
             # Execute the model
@@ -775,7 +775,7 @@ class pyOptSparseDriver(Driver):
                 func_dict[name].fill(np.NAN)
 
         # convert func_dict to use promoted names
-        func_dict = model._prom_names_dict(func_dict)
+        # func_dict = model._prom_names_dict(func_dict)
 
         # print("Functions calculated")
         # print(dv_dict)
@@ -888,7 +888,7 @@ class pyOptSparseDriver(Driver):
                             sens_dict[okey][ikey].fill(np.NAN)
 
         # convert sens_dict to use promoted names
-        sens_dict = model._prom_names_jac(sens_dict)
+        # sens_dict = model._prom_names_jac(sens_dict)
 
         # print("Derivatives calculated")
         # print(dv_dict)

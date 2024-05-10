@@ -179,7 +179,6 @@ def get_partials_deps(func, outputs, *args, **kwargs):
                 yield (out, inp)
 
 
-# TODO: discrete vars not supported yet
 class Compute2Jax(ast.NodeTransformer):
     """
     An ast.NodeTransformer that transforms a compute function definition to jax compatible form.

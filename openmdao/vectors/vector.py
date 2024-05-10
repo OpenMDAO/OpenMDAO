@@ -756,31 +756,3 @@ class Vector(object):
             start = end
 
         return dct
-
-    def to_dict(self):
-        """
-        Return a dict of the variables in this vector.
-
-        Returns
-        -------
-        dict
-            Dictionary containing variable values keyed by variable name.
-        """
-        return {n: v for n, v in self.items()}
-
-    def update_from_dict(self, vec_dict):
-        """
-        Update the variables in this vector from a dictionary.
-
-        Parameters
-        ----------
-        vec_dict : dict
-            Dictionary containing variable values keyed by variable name.
-        """
-        if self._system().pathname:
-            prefix = self._system().pathname + '.'
-            for name, val in vec_dict.items():
-                self._views[prefix + name][:] = val
-        else:
-            for name, val in vec_dict.items():
-                self._views[name][:] = val

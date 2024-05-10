@@ -4136,18 +4136,8 @@ class Group(System):
 
         else:
             if self.options['derivs_method'] == 'jax':
-                wrt = set(self._var_abs2meta['input'])
                 # no internal transfers used when jax is active
-                #conns = self._conn_global_abs_in2out
-
-                #for abs_inps in pro2abs['input'].values():
-                    #if abs_inps[0] not in conns:
-                        ## If connection is inside of this Group, perturbation of all implicitly
-                        ## connected inputs will be handled properly via internal transfers. Otherwise,
-                        ## we need to add all implicitly connected inputs separately.
-                        #wrt.update(abs_inps)
-                    #elif conns[abs_inps[0]] in ivc:
-                        #wrt.update(abs_inps)
+                wrt = set(self._var_abs2meta['input'])
             else:
                 for abs_inps in pro2abs['input'].values():
                     if abs_inps[0] not in self._conn_abs_in2out:
