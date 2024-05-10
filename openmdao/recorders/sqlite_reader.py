@@ -29,7 +29,7 @@ from json import loads as json_loads
 from io import TextIOBase
 
 
-class _InstanceWithNoClassDefinition:
+class UknownType:
     """
     A class used by _RestrictedUnpickler.
 
@@ -64,7 +64,7 @@ class _RestrictedUnpicklerForCaseReader(pickle.Unpickler):
         # Returning this acts as a kind of flag to indicate that
         # the unpickler can't generate instances of classes whose class definition
         # is not available
-        return _InstanceWithNoClassDefinition
+        return UknownType
 
     def loads_and_return_errors(self):
         unpickled_contents = self.load()
@@ -88,7 +88,7 @@ def _loads_and_return_errors(s):
     for key in keys:
         try:
             isInstanceWithNoClassDefinition = isinstance(dictionary[key],
-                                                         _InstanceWithNoClassDefinition)
+                                                         UknownType)
             if isInstanceWithNoClassDefinition:
                 dictionary.undeclare(key)
         except RuntimeError:  # OptionDictionary item might not be set yet

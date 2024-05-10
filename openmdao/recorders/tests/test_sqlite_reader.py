@@ -3074,13 +3074,6 @@ class DummyClass(object):
             with open(module_path, 'w') as file:
                 file.write(module_content)
 
-            # need to do this because the use_tempdirs decorator does not 
-            #  update the python path and so "." is not included and this 
-            #  module being created cannot be found
-            current_dir = os.getcwd()
-            if current_dir not in sys.path:
-                sys.path.append(current_dir)
-
             # import the newly created module
             import mymodule
             
@@ -3123,9 +3116,19 @@ class DummyClass(object):
             del sys.modules['mymodule']
             os.remove(module_path)
 
+        # need to do this because the use_tempdirs decorator does not 
+        #  update the python path and so "." is not included and this 
+        #  module being created cannot be found
+        syspath_save = sys.path[:]
+        current_dir = os.getcwd()
+        if current_dir not in sys.path:
+            sys.path.append(current_dir)
 
-        create_case_recording_file()
-        
+        try:
+            create_case_recording_file()
+        finally:
+            sys.path = syspath_save
+
         # check to see if the case file can be read even though one item in the
         # metadata will not be able to be read because the definition of the class
         # for the instance is not available since the module containing it was removed
