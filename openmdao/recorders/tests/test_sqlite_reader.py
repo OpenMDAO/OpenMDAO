@@ -3137,10 +3137,13 @@ class DummyClass(object):
         with assert_warning(RuntimeWarning, "While reading system options from case recorder, the following errors occurred: global 'mymodule.DummyClass' is not available."):
             cr = om.CaseReader('cases.sql')
             
-        # Check to see that all the other component options for the DummyClass a retrievable from the case recorder file
+        # Check to see that all the component options for the DummyClass are retrievable from the case recorder file
         parab_component_options = cr._system_options['parab_with_dummy_metadata']['component_options']
         component_options_names = [name for name in parab_component_options]
-        self.assertEqual(['always_opt', 'distributed', 'run_root_only'], sorted(component_options_names))
+        from openmdao.recorders.sqlite_reader import UnknownType
+        self.assertEqual(['always_opt', 'distributed', 'dummy', 'run_root_only'], 
+                         sorted(component_options_names))
+        self.assertTrue(isinstance(parab_component_options['dummy'], UnknownType))
 
 
 @use_tempdirs
