@@ -2393,7 +2393,6 @@ class Group(System):
             else:  # output
                 ginput_map[name] = goutput_map[name]
 
-        print(f"{self.pathname} inputs: {ginput_map}")
         instrs = ", ".join(ginput_map.values())
         src = [''.join(["def compute_primal(self, ", instrs, "):"])]
 
@@ -2456,7 +2455,6 @@ class Group(System):
         else:
             jdict = self._subjacs_info
 
-        # print("INVALS:", self._get_compute_primal_invals(inputs, self._outputs))
         deriv_vals = self._jac_func_(*self._get_compute_primal_invals(inputs, self._outputs))
         prefix_len = len(self.pathname) + 1 if self.pathname else 0
         for ofidx, (ofabs, ofmeta) in enumerate(self._compute_primal_outs.items()):
@@ -2486,8 +2484,8 @@ class Group(System):
                 if key in jdict:
                     wrt_size = shape_to_len(wtup[0])
                     shaped_val = deriv_vals[ofidx][wrtidx].reshape(of_size, wrt_size)
-                    print('deriv_val', key)
-                    print(shaped_val)
+                    # print('deriv_val', key)
+                    # print(shaped_val)
                     if total:
                         self._tot_jac[key] = shaped_val
                     else:
@@ -3734,8 +3732,8 @@ class Group(System):
         """
         if self.options['derivs_method'] == 'jax':
             # TODO: figure out recording and relevance
-            self._outputs.set_vals(self.compute_primal(*self._get_compute_primal_invals(self._inputs,
-                                                                              self._outputs)))
+            self._outputs.set_vals(
+                self.compute_primal(*self._get_compute_primal_invals(self._inputs, self._outputs)))
             return
 
         name = self.pathname if self.pathname else 'root'

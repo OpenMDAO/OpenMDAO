@@ -12,7 +12,7 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE, _UNDEFINED
-from openmdao.utils.jax_utils import jax, Compute2Jax
+from openmdao.utils.jax_utils import jax, Compute2Jax, get_partials_deps
 
 
 class ExplicitComponent(Component):
@@ -569,12 +569,10 @@ class ExplicitComponent(Component):
         # compute method converted to a simple function taking inputs as args and returning
         # outputs as a tuple
         def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
-            # self._inputs.set_vals(*inputs.values())
             if discrete_inputs is None:
                 returns = self.compute_primal(*inputs.values())
             else:
-                ins = list(self._discrete_inputs.values())
-                ins.extend(inputs.values())
+                ins = list(chain(self._discrete_inputs.values(), inputs.values()))
                 returns = self.compute_primal(*ins)
 
             if discrete_outputs is None:
@@ -600,7 +598,7 @@ class ExplicitComponent(Component):
                     partials[ofname, wrtname] = \
                         deriv_vals[ofidx][wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
 
-        compute_info = Compute2Jax(self)
+        compute_info = Compute2Jax(self, verbose=True)
         self.compute_primal = MethodType(compute_info._transformed, self)
         self.compute = MethodType(compute, self)
         self.compute_partials = MethodType(compute_partials, self)
@@ -612,4 +610,9 @@ class ExplicitComponent(Component):
             ndiscrete = len(self._discrete_inputs)
             wrt_idxs = list(range(ndiscrete, len(self._var_abs2meta['input']) + ndiscrete))
             self._jac_func_ = fjax(self.compute_primal, argnums=wrt_idxs)
+            # print(list(get_partials_deps(self.compute_primal,
+            #                              tuple(chain(self._discrete_outputs,
+            #                                          self._var_rel_names['output'])),
+            #                              *chain(self._discrete_inputs.values(),
+            #                                     self._inputs.values()))))
         return self._jac_func_

@@ -6,7 +6,7 @@ import textwrap
 import inspect
 from itertools import chain
 
-from openmdao.utils.om_warnings import issue_warning
+import networkx as nx
 
 
 def jit_stub(f, *args, **kwargs):
@@ -121,17 +121,62 @@ def register_jax_component(comp_class):
 #   return safe_map(read, jaxpr.outvars)
 
 def examine_jaxpr(closed_jaxpr):
-  jaxpr = closed_jaxpr.jaxpr
-  print("invars:", jaxpr.invars)
-  print("in_avals", closed_jaxpr.in_avals, closed_jaxpr.in_avals[0].dtype)
-  print("outvars:", jaxpr.outvars)
-  print("out_avals:", closed_jaxpr.out_avals)
-  print("constvars:", jaxpr.constvars)
-  for eqn in jaxpr.eqns:
-    print("equation:", eqn.invars, eqn.primitive, eqn.outvars, eqn.params)
-  print()
-  print("jaxpr:", jaxpr)
+    jaxpr = closed_jaxpr.jaxpr
+    print("invars:", jaxpr.invars)
+    print("in_avals", closed_jaxpr.in_avals, closed_jaxpr.in_avals[0].dtype)
+    print("outvars:", jaxpr.outvars)
+    print("out_avals:", closed_jaxpr.out_avals)
+    print("constvars:", jaxpr.constvars)
+    for eqn in jaxpr.eqns:
+      print("equation:", eqn.invars, eqn.primitive, eqn.outvars, eqn.params)
+    print()
+    print("jaxpr:", jaxpr)
 
+
+def get_func_graph(func, *args, **kwargs):
+    closed_jaxpr = jax.make_jaxpr(func)(*args, **kwargs)
+    jaxpr = closed_jaxpr.jaxpr
+
+    graph = nx.DiGraph()
+    for i, name in enumerate(chain(jaxpr.invars, jaxpr.outvars)):
+        graph.add_node(i, label=f"({i}){name}")  # use index to map to real varnames later
+    n2index = {str(n): i for i, n in enumerate(chain(jaxpr.invars, jaxpr.outvars))}
+    i = len(n2index)
+
+    for eqn in jaxpr.eqns:
+        for inp in eqn.invars:
+            if type(inp) == jax._src.core.Var:
+                inp = str(inp)
+                if inp not in n2index:
+                    n2index[inp] = i
+                    graph.add_node(i, label=inp)
+                    i += 1
+                for out in eqn.outvars:
+                    if type(out) == jax._src.core.Var:
+                        out = str(out)
+                        if out not in n2index:
+                            n2index[out] = i
+                            graph.add_node(i, label=out)
+                            i += 1
+                        graph.add_edge(n2index[inp], n2index[out])
+
+    # show the function graph visually
+    # from openmdao.visualization.graph_viewer import write_graph, _to_pydot_graph
+    # G = _to_pydot_graph(graph)
+    # write_graph(G)
+
+    return graph
+
+
+def get_partials_deps(func, outputs, *args, **kwargs):
+    graph = get_func_graph(func, *args, **kwargs)
+    inputs = list(inspect.signature(func).parameters)
+    n2index = {n: i for i, n in enumerate(chain(inputs, outputs))}
+    for inp in inputs:
+        for out in outputs:
+            # TODO: not sure how efficient this is...
+            if nx.has_path(graph, n2index[inp], n2index[out]):
+                yield (out, inp)
 
 
 # TODO: discrete vars not supported yet
@@ -164,7 +209,7 @@ class Compute2Jax(ast.NodeTransformer):
     _static_ops = {'reshape'}
     _np_names = {'np', 'numpy'}
 
-    def __init__(self, comp, use_jit=True):
+    def __init__(self, comp, use_jit=True, verbose=False):
         func = comp.compute
         self._namespace = comp.compute.__globals__.copy()
         if 'jnp' not in self._namespace:
@@ -192,7 +237,9 @@ class Compute2Jax(ast.NodeTransformer):
                                f"declared in the component {sorted(comp._var_rel_names['output'])}."
                                )
 
-        print(ast.unparse(newast))
+        if verbose:
+            print("Converted function:")
+            print(ast.unparse(newast))
 
         code = compile(newast, '<ast>', 'exec')
         exec(code, self._namespace)
@@ -291,3 +338,27 @@ class Compute2Jax(ast.NodeTransformer):
                                                            attr=node.attr, ctx=node.ctx), node)
 
         return self.generic_visit(node)
+
+
+if __name__ == '__main__':
+    def func(x, y):
+        z = jnp.sin(x) * y
+        q = x * 1.5
+        zz = q + x * 1.5
+        return z, zz
+
+    shape = (3, 2)
+    x =  jnp.ones(shape)
+    y =  jnp.ones(shape) * 2.0
+    jaxpr = jax.make_jaxpr(func)(x, y)
+
+    examine_jaxpr(jaxpr)
+
+    print(list(get_partials_deps(func, ('z', 'zz'), x, y)))
+
+    jac_func = jax.jacfwd(func)
+
+    jaxpr = jax.make_jaxpr(jac_func)(x, y)
+    examine_jaxpr(jaxpr)
+
+    print(list(get_partials_deps(jac_func, ('z', 'zz'), x, y)))
