@@ -49,17 +49,12 @@ class _RestrictedUnpicklerForCaseReader(pickle.Unpickler):
         self.error_strings = ''  # Used to document which classes are not available
 
     def find_class(self, module, name):
-        # Only allow classes from 'module'
-
-        module_available = importlib.util.find_spec(module) is not None
-        if module_available:  # module is available so do as normal
+        try:
             return super().find_class(module, name)
-
-        # If module not available...
-        # Save into the error_strings variable what was not available.
-        if self.error_strings:
-            self.error_strings += ', '
-        self.error_strings += f"global '{module}.{name}' is not available."
+        except ModuleNotFoundError as e:
+            if self.error_strings:
+                self.error_strings += ', '
+            self.error_strings += str(e)
 
         # Returning this acts as a kind of flag to indicate that
         # the unpickler can't generate instances of classes whose class definition
