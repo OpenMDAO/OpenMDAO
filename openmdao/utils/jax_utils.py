@@ -7,6 +7,7 @@ import inspect
 from itertools import chain
 
 import networkx as nx
+import numpy as np
 
 
 def jit_stub(f, *args, **kwargs):
@@ -38,8 +39,6 @@ try:
 except ImportError:
     jax = None
     jjit = jit_stub
-
-import numpy as np
 
 
 def register_jax_component(comp_class):
@@ -89,38 +88,15 @@ def register_jax_component(comp_class):
     return comp_class
 
 
-# def eval_jaxpr(jaxpr, consts, *args):
-#   # Mapping from variable -> value
-#   env = {}
-
-#   def read(var):
-#     # Literals are values baked into the Jaxpr
-#     if type(var) is core.Literal:
-#       return var.val
-#     return env[var]
-
-#   def write(var, val):
-#     env[var] = val
-
-#   # Bind args and consts to environment
-#   safe_map(write, jaxpr.invars, args)
-#   safe_map(write, jaxpr.constvars, consts)
-
-#   # Loop through equations and evaluate primitives using `bind`
-#   for eqn in jaxpr.eqns:
-#     # Read inputs to equation from environment
-#     invals = safe_map(read, eqn.invars)
-#     # `bind` is how a primitive is called
-#     outvals = eqn.primitive.bind(*invals, **eqn.params)
-#     # Primitives may return multiple outputs or not
-#     if not eqn.primitive.multiple_results:
-#       outvals = [outvals]
-#     # Write the results of the primitive into the environment
-#     safe_map(write, eqn.outvars, outvals)
-#   # Read the final result of the Jaxpr from the environment
-#   return safe_map(read, jaxpr.outvars)
-
 def examine_jaxpr(closed_jaxpr):
+    """
+    Print out the contents of a Jaxpr.
+
+    Parameters
+    ----------
+    closed_jaxpr : jax.core.ClosedJaxpr
+        The Jaxpr to be examined.
+    """
     jaxpr = closed_jaxpr.jaxpr
     print("invars:", jaxpr.invars)
     print("in_avals", closed_jaxpr.in_avals, closed_jaxpr.in_avals[0].dtype)
@@ -128,12 +104,29 @@ def examine_jaxpr(closed_jaxpr):
     print("out_avals:", closed_jaxpr.out_avals)
     print("constvars:", jaxpr.constvars)
     for eqn in jaxpr.eqns:
-      print("equation:", eqn.invars, eqn.primitive, eqn.outvars, eqn.params)
+        print("equation:", eqn.invars, eqn.primitive, eqn.outvars, eqn.params)
     print()
     print("jaxpr:", jaxpr)
 
 
 def get_func_graph(func, *args, **kwargs):
+    """
+    Generate a networkx graph from a jax function.
+
+    Parameters
+    ----------
+    func : Callable
+        The function to be analyzed.
+    *args : list
+        Positional arguments.
+    **kwargs : dict
+        Keyword arguments.
+
+    Returns
+    -------
+    networkx.DiGraph
+        The graph representing the function.
+    """
     closed_jaxpr = jax.make_jaxpr(func)(*args, **kwargs)
     jaxpr = closed_jaxpr.jaxpr
 
@@ -169,6 +162,28 @@ def get_func_graph(func, *args, **kwargs):
 
 
 def get_partials_deps(func, outputs, *args, **kwargs):
+    """
+    Generate a list of tuples of the form (output, input) for the given function.
+
+    Only tuples where the output depends on the input are yielded. This can be used to
+    determine which partials need to be declared.
+
+    Parameters
+    ----------
+    func : Callable
+        The function to be analyzed.
+    outputs : list
+        The list of output variable names.
+    *args : list
+        Positional arguments.
+    **kwargs : dict
+        Keyword arguments.
+
+    Yields
+    ------
+    tuple
+        A tuple of the form (output, input).
+    """
     graph = get_func_graph(func, *args, **kwargs)
     inputs = list(inspect.signature(func).parameters)
     n2index = {n: i for i, n in enumerate(chain(inputs, outputs))}
@@ -193,6 +208,10 @@ class Compute2Jax(ast.NodeTransformer):
         The Component whose compute function is to be transformed. This NodeTransformer may only
         be used after the Component has had its _setup_var_data method called, because that
         determines the ordering of the inputs and outputs.
+    use_jit : bool
+        If True, the transformed function will be jitted.
+    verbose : bool
+        If True, the transformed function will be printed to stdout.
 
     Attributes
     ----------
@@ -202,13 +221,22 @@ class Compute2Jax(ast.NodeTransformer):
         A dictionary that maps each argument name to a list of subscript values.
     _transformed : function
         The transformed compute function.
+    _namespace : dict
+        The namespace in which the transformed function is instantiated.
+    _discrete_outs : list
+        The names of the discrete outputs.
+    _orig_args : list
+        The original argument names of the compute function.
+    _returns : list
+        The names of the outputs from the new function.
     """
+
     # these ops require static objects so their args should not be traced.  Traced array ops should
     # use jnp and static ones should use np.
     _static_ops = {'reshape'}
     _np_names = {'np', 'numpy'}
 
-    def __init__(self, comp, use_jit=True, verbose=False):
+    def __init__(self, comp, use_jit=True, verbose=False):  # noqa: D107
         func = comp.compute
         self._namespace = comp.compute.__globals__.copy()
         if 'jnp' not in self._namespace:
@@ -247,27 +275,30 @@ class Compute2Jax(ast.NodeTransformer):
             statics = tuple(range(len(comp._var_discrete['input']) + 1))
             self._transformed = jjit(self._transformed, static_argnums=statics)
 
-    def get_new_args(self):
+    def _get_new_args(self):
         new_args = [ast.arg('self', annotation=None)]
         for arg_name in self._args:
             new_args.append(ast.arg(arg=arg_name, annotation=None))
         return ast.arguments(args=new_args, posonlyargs=[], vararg=None, kwonlyargs=[],
                              kw_defaults=[], kwarg=None, defaults=[])
 
-    def get_pre_body(self):
+    def _get_pre_body(self):
         if not self._discrete_outs:
             return []
 
         # add a statement to pull individual values out of the discrete outputs
         elts = [ast.Name(id=name, ctx=ast.Store()) for name in self._discrete_outs]
-        return [ast.Assign(targets=[ast.Tuple(elts=elts, ctx=ast.Store())],
-                           value=ast.Call(func=ast.Attribute(
-                               value=ast.Attribute(value=ast.Name(id='self', ctx=ast.Load()),
-                                                   attr='_discrete_outputs', ctx=ast.Load()),
-                                                   attr='values', ctx=ast.Load()),
-                                                   args=[], keywords=[]))]
+        return [
+            ast.Assign(targets=[ast.Tuple(elts=elts, ctx=ast.Store())],
+                       value=ast.Call(
+                           func=ast.Attribute(value=ast.Attribute(value=ast.Name(id='self',
+                                                                                 ctx=ast.Load()),
+                                                                  attr='_discrete_outputs',
+                                                                  ctx=ast.Load()),
+                                              attr='values', ctx=ast.Load()),
+                                      args=[], keywords=[]))]
 
-    def get_post_body(self):
+    def _get_post_body(self):
         if not self._discrete_outs:
             return []
 
@@ -283,15 +314,35 @@ class Compute2Jax(ast.NodeTransformer):
         return ast.Return(val)
 
     def visit_FunctionDef(self, node):
-        newbody = self.get_pre_body()
+        """
+        Transform the compute function definition.
+
+        The function will be transformed from compute(self, inputs, outputs) to
+        compute_primal(self, *args) where args are the input values in the order they are stored in
+        inputs.  All subscript accesses into the input args will be replaced with the name of the
+        key being accessed, e.g., inputs['foo'] becomes foo. The new function will return a tuple
+        of the output values in the order they are stored in outputs.  If compute has the
+        additional args discrete_inputs and discrete_outputs, they will be handled similarly.
+
+        Parameters
+        ----------
+        node : ast.FunctionDef
+            The FunctionDef node being visited.
+
+        Returns
+        -------
+        ast.FunctionDef
+            The transformed node.
+        """
+        newbody = self._get_pre_body()
         newbody.extend([self.visit(statement) for statement in node.body])
-        newbody.extend(self.get_post_body())
+        newbody.extend(self._get_post_body())
         # add a return statement for the outputs
         newbody.append(self._make_return())
 
-        newargs = self.get_new_args()
-        return ast.FunctionDef('compute_primal', newargs, newbody, node.decorator_list, node.returns,
-                               node.type_comment)
+        newargs = self._get_new_args()
+        return ast.FunctionDef('compute_primal', newargs, newbody, node.decorator_list,
+                               node.returns, node.type_comment)
 
     def visit_Subscript(self, node):
         """
@@ -307,8 +358,7 @@ class Compute2Jax(ast.NodeTransformer):
         ast.Any
             The transformed node.
         """
-        # if we encounter a subscript of the 'inputs' arg (it may not be named that) then replace
-        # inputs['name'] with name.
+        # if we encounter a subscript of any of the input args, then replace arg['name'] with name.
         if (isinstance(node.value, ast.Name) and node.value.id in self._orig_args and
                 isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str)):
             self._dict_keys[node.value.id].add(node.slice.value)
@@ -340,15 +390,16 @@ class Compute2Jax(ast.NodeTransformer):
 
 
 if __name__ == '__main__':
-    def func(x, y):
+
+    def func(x, y):  # noqa: D103
         z = jnp.sin(x) * y
         q = x * 1.5
         zz = q + x * 1.5
         return z, zz
 
     shape = (3, 2)
-    x =  jnp.ones(shape)
-    y =  jnp.ones(shape) * 2.0
+    x = jnp.ones(shape)
+    y = jnp.ones(shape) * 2.0
     jaxpr = jax.make_jaxpr(func)(x, y)
 
     examine_jaxpr(jaxpr)

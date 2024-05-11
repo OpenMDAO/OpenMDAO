@@ -396,6 +396,8 @@ class System(object):
         to only colored columns.
     compute_primal : function or None
         Function that computes the primal for the given system.
+    _jac_func_ : function or None
+        Function that computes the jacobian using AD (jax).
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -4486,7 +4488,8 @@ class System(object):
             initialized, the driver for this model must be supplied in order to properly
             initialize the approximations.
         """
-        if self.pathname == '' and (self._owns_approx_jac or self.options['derivs_method'] == 'jax') and driver is not None:
+        if self.pathname == '' and (self._owns_approx_jac or
+                                    self.options['derivs_method'] == 'jax') and driver is not None:
             self._tot_jac = _TotalJacInfo(driver._problem(), None, None, 'flat_dict', approx=True)
 
         try:

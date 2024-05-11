@@ -229,6 +229,11 @@ class IndepVarComp(ExplicitComponent):
     def compute_primal(self):
         """
         Compute the primal part of the derivative.
+
+        Returns
+        -------
+        tuple
+            A tuple containing the output derivative for each output.
         """
         return self._outputs.values()
 

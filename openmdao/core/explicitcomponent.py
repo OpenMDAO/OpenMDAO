@@ -589,7 +589,8 @@ class ExplicitComponent(Component):
                 ins.extend(inputs.values())
                 deriv_vals = self._get_jac_func()(*ins)
 
-            for ofidx, ofname in enumerate(chain(self._discrete_outputs, self._var_rel_names['output'])):
+            for ofidx, ofname in enumerate(chain(self._discrete_outputs,
+                                                 self._var_rel_names['output'])):
                 if ofname in self._discrete_outputs:
                     continue
                 ofmeta = self._var_rel2meta[ofname]

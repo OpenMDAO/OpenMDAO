@@ -5,7 +5,6 @@ If numba is not available, this module provides a dummy jit decorator that simpl
 original function.
 """
 
-
 try:
     import numba
     from numba import *

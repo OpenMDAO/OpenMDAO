@@ -201,6 +201,10 @@ class Group(System):
         within this group, keyed by active response.  These determine if contributions
         from all ranks will be added together to get the correct input values when derivatives
         in the larger model are being solved using reverse mode.
+    _is_explicit : bool or None
+        True if this Group contains only explicit systems and has no cycles.
+    _ivcs : dict
+        Dict containing metadata for each independent variable.
     """
 
     def __init__(self, **kwargs):
@@ -2275,7 +2279,7 @@ class Group(System):
             Dict of all independant variables in this group and their corresponding metadata.
         """
         abs2meta = self._var_abs2meta['output'] if local else self._var_allprocs_abs2meta['output']
-        return {n:meta for n, meta in abs2meta.items() if 'openmdao:indep_var' in meta['tags']}
+        return {n: meta for n, meta in abs2meta.items() if 'openmdao:indep_var' in meta['tags']}
 
     def get_boundary_inputs(self, local):
         """
@@ -4142,8 +4146,8 @@ class Group(System):
                 for abs_inps in pro2abs['input'].values():
                     if abs_inps[0] not in self._conn_abs_in2out:
                         # If connection is inside of this Group, perturbation of all implicitly
-                        # connected inputs will be handled properly via internal transfers. Otherwise,
-                        # we need to add all implicitly connected inputs separately.
+                        # connected inputs will be handled properly via internal transfers.
+                        # Otherwise, we need to add all implicitly connected inputs separately.
                         wrt.update(abs_inps)
 
             # get rid of any old stuff in here
