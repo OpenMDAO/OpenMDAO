@@ -3134,7 +3134,7 @@ class DummyClass(object):
         # for the instance is not available since the module containing it was removed
         
         # need to check for warning being issued about not being able to read it
-        with assert_warning(RuntimeWarning, "While reading system options from case recorder, the following errors occurred: global 'mymodule.DummyClass' is not available."):
+        with assert_warning(RuntimeWarning, "While reading system options from case recorder, the following errors occurred: No module named 'mymodule'"):
             cr = om.CaseReader('cases.sql')
             
         # Check to see that all the component options for the DummyClass are retrievable from the case recorder file
