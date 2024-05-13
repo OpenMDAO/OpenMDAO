@@ -1924,7 +1924,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_subsystem('constraint_comp',
                             om.ExecComp('con = sum(x)', con={'shape': (1,)}, x={'shape': (size)}),
                             promotes=['*'])
-        model.add_constraint('con', upper=1.9, linear=True)
+        model.add_constraint('con', upper=1.9, scaler=2, linear=True)
 
         driver = om.ScipyOptimizeDriver(optimizer='differential_evolution', disp=False)
         driver.opt_settings['seed'] = 1
@@ -1958,7 +1958,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                             promotes=['*'])
 
         model.add_design_var('x', lower=0, upper=1)
-        model.add_constraint('con', upper=1.9, linear=False, scaler=1e1)
+        model.add_constraint('con', upper=1.9, scaler=2, linear=False)
         model.add_objective('f')
 
         driver = om.ScipyOptimizeDriver(optimizer='differential_evolution', disp=False)
