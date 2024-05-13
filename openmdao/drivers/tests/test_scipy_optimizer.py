@@ -1836,7 +1836,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
     def test_differential_evolution(self):
         # Source of example:
-        # https://scipy.github.io/devdocs/generated/scipy.optimize.dual_annealing.html
+        # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.differential_evolution.html
         np.random.seed(6)
 
         size = 3  # size of the design variable
@@ -1935,11 +1935,12 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         self.assertFalse(failed, f"Optimization failed, result = \n{prob.driver.result}")
 
-        assert_near_equal(prob['x'], [0.96632622, 0.93367155], 1e-2)
-        assert_near_equal(prob['f'], 0.0011352416852625719, 1e-2)
+        assert_near_equal(prob['con'], 1.8999999, 1e-5)
+        assert_near_equal(prob['x'], [0.96632622, 0.93367155], 1e-3)
+        assert_near_equal(prob['f'], 0.0011352416852625719, 1e-3)
 
-    @unittest.skipUnless(ScipyVersion >= Version("1.4") and ScipyVersion < Version("1.12"),
-                         "scipy >= 1.4, < 1.12 is required.")
+    @unittest.skipUnless(ScipyVersion >= Version("1.4"),
+                         "scipy >= 1.4 is required.")
     def test_differential_evolution_constrained_nonlinear(self):
         # Source of example:
         # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.differential_evolution.html
@@ -1957,10 +1958,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                             promotes=['*'])
 
         model.add_design_var('x', lower=0, upper=1)
-        model.add_constraint('con', upper=1.9, linear=False)
+        model.add_constraint('con', upper=1.9, linear=False, scaler=1e1)
         model.add_objective('f')
 
-        driver = om.ScipyOptimizeDriver(optimizer='differential_evolution', disp=False)
+        driver = om.ScipyOptimizeDriver(optimizer='differential_evolution', disp=True)
         driver.opt_settings['seed'] = 1
 
         prob = om.Problem(model, driver)
@@ -1969,8 +1970,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         self.assertFalse(failed, f"Optimization failed, result = \n{prob.driver.result}")
 
-        assert_near_equal(prob['x'], [0.96632622, 0.93367155], 1e-2)
-        assert_near_equal(prob['f'], 0.0011352416852625719, 1e-2)
+        assert_near_equal(prob['con'], 1.8999999, 1e-5)
+        assert_near_equal(prob['x'], [0.96632622, 0.93367155], 1e-3)
+        assert_near_equal(prob['f'], 0.0011352416852625719, 1e-3)
 
     @unittest.skipUnless(ScipyVersion >= Version("1.4"),
                          "scipy >= 1.4 is required.")
