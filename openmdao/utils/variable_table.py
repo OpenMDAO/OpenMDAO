@@ -77,10 +77,10 @@ def write_var_table(pathname, var_list, var_type, var_dict,
 
     if var_type == 'input':
         header = "%d Input(s) in '%s'" % (count, pathname)
-    elif var_type == 'output':
-        header = "%d %s Output(s) in '%s'" % (count, var_type.capitalize(), pathname)
-    else:
+    elif var_type == 'all':
         header = "%d %s Variables(s) in '%s'" % (count, var_type.capitalize(), pathname)
+    else:
+        header = "%d %s Output(s) in '%s'" % (count, var_type.capitalize(), pathname)
 
     out_stream.write(header + '\n')
 
@@ -92,11 +92,11 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     #  so that we do the column output in the correct order
     if var_type == 'input':
         out_types = ('val', 'units', 'shape', 'global_shape', 'prom_name', 'desc', 'min', 'max')
-    elif var_type == 'output':
-        out_types = ('val', 'resids', 'units', 'shape', 'global_shape', 'lower', 'upper',
+    elif var_type == 'all':
+        out_types = ('val', 'io', 'resids', 'units', 'shape', 'global_shape', 'lower', 'upper',
                      'ref', 'ref0', 'res_ref', 'prom_name', 'desc', 'min', 'max')
     else:
-        out_types = ('val', 'io', 'resids', 'units', 'shape', 'global_shape', 'lower', 'upper',
+        out_types = ('val', 'resids', 'units', 'shape', 'global_shape', 'lower', 'upper',
                      'ref', 'ref0', 'res_ref', 'prom_name', 'desc', 'min', 'max')
 
     # Figure out which columns will be displayed

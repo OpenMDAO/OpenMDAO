@@ -4160,8 +4160,11 @@ class System(object):
         for _, meta in outputs.items():
             for key in to_remove:
                 del meta[key]
+        for _, meta in inputs.items():
+            for key in to_remove:
+                del meta[key]
 
-        variables=set(outputs.keys()).union(set(inputs.keys()))
+        variables = set(outputs.keys()).union(set(inputs.keys()))
         var_list = []
         var_dict = {}
 
@@ -4172,8 +4175,9 @@ class System(object):
             from openmdao.core.component import Component
             for subsys in self.system_iter(recurse=True, typ=Component):
                 prefix = subsys.pathname + '.'
-                for var_name in chain(real_vars['input'], real_vars['output'], disc_vars['input'], disc_vars['output']):
-                    if variables is None or var_name in variables:
+                for var_name in chain(real_vars['input'], real_vars['output'],
+                                      disc_vars['input'], disc_vars['output']):
+                    if var_name in variables:
                         if var_name.startswith(prefix):
                             var_list.append(var_name)
                             if var_name in outputs:
@@ -4184,8 +4188,9 @@ class System(object):
                                 var_dict[var_name]['io'] = 'input'
         else:
             # For components with no children, self._subsystems_allprocs is empty.
-            for var_name in chain(real_vars['input'], real_vars['output'], disc_vars['input'], disc_vars['output']):
-                if not variables or var_name in variables:
+            for var_name in chain(real_vars['input'], real_vars['output'],
+                                  disc_vars['input'], disc_vars['output']):
+                if var_name in variables:
                     var_list.append(var_name)
                     if var_name in outputs:
                         var_dict[var_name] = outputs[var_name]
@@ -4198,6 +4203,7 @@ class System(object):
             write_var_table(self.pathname, var_list, 'all', var_dict,
                             True, '', print_arrays, out_stream)
 
+        return var_dict
 
     def list_inputs(self,
                     val=True,
