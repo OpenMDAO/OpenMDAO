@@ -1961,7 +1961,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_constraint('con', upper=1.9, linear=False, scaler=1e1)
         model.add_objective('f')
 
-        driver = om.ScipyOptimizeDriver(optimizer='differential_evolution', disp=True)
+        driver = om.ScipyOptimizeDriver(optimizer='differential_evolution', disp=False)
         driver.opt_settings['seed'] = 1
 
         prob = om.Problem(model, driver)
