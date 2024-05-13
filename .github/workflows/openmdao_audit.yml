@@ -111,13 +111,13 @@ jobs:
           echo "Scan environment for pypi packages with known vulnerabilities"
           echo "found in the Python Packaging Advisory Database"
           echo "======================================================================="
-          python -m pip_audit -s pypi --ignore-vuln GHSA-hcpj-qp55-gfph
+          python -m pip_audit -s pypi
 
           echo "======================================================================="
           echo "Scan environment for packages with known vulnerabilities"
           echo "found in the Open Source Vulnerability database"
           echo "======================================================================="
-          python -m pip_audit -s osv --ignore-vuln GHSA-hcpj-qp55-gfph
+          python -m pip_audit -s osv
 
       - name: Notify slack
         uses: act10ns/slack@v2.0.0
