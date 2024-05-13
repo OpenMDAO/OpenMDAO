@@ -40,8 +40,8 @@ def write_var_table(pathname, var_list, var_type, var_dict,
         Pathname to be printed. If None, defaults to 'model'.
     var_list : list of str
         List of variable names in the order they are to be written.
-    var_type : 'input', 'explicit' or 'implicit'
-        Indicates type of variables, input or explicit/implicit output.
+    var_type : 'input', 'explicit', 'implicit', or 'all'
+        Indicates type of variables, input or explicit/implicit output, or all for all vars.
     var_dict : dict
         Dict storing vals and metadata for each var name.
     hierarchical : bool
@@ -157,6 +157,7 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     if hierarchical:
 
         cur_sys_names = []
+
         for abs_name in var_list:
             rel_name = abs_name[rel_idx:]
 
@@ -185,7 +186,6 @@ def write_var_table(pathname, var_list, var_type, var_dict,
             row = '{:{align}{width}}'.format(indent * ' ' + abs_name.split('.')[-1],
                                              align=align, width=max_varname_len)
             _write_variable(out_stream, row, column_names, var_dict[abs_name], print_arrays)
-
     else:
         for name in var_list:
             row = '{:{align}{width}}'.format(name[rel_idx:], align=align, width=max_varname_len)
