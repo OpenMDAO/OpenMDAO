@@ -92,8 +92,11 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     #  so that we do the column output in the correct order
     if var_type == 'input':
         out_types = ('val', 'units', 'shape', 'global_shape', 'prom_name', 'desc', 'min', 'max')
-    else:
+    elif var_type == 'output':
         out_types = ('val', 'resids', 'units', 'shape', 'global_shape', 'lower', 'upper',
+                     'ref', 'ref0', 'res_ref', 'prom_name', 'desc', 'min', 'max')
+    else:
+        out_types = ('val', 'io', 'resids', 'units', 'shape', 'global_shape', 'lower', 'upper',
                      'ref', 'ref0', 'res_ref', 'prom_name', 'desc', 'min', 'max')
 
     # Figure out which columns will be displayed
@@ -154,9 +157,6 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     if hierarchical:
 
         cur_sys_names = []
-        if var_type == 'all':
-            old_iotype = new_iotype = 'input'
-
         for abs_name in var_list:
             rel_name = abs_name[rel_idx:]
 
@@ -182,17 +182,10 @@ def write_var_table(pathname, var_list, var_type, var_dict,
                 indent += indent_inc
             cur_sys_names = sys_names
 
-            if var_type == 'all':
-                new_iotype = var_dict[abs_name]['io']
-                if new_iotype != old_iotype and new_iotype == 'output':
-                    out_stream.write(indent * ' ' + column_dashes[indent:] + '\n')
-
             row = '{:{align}{width}}'.format(indent * ' ' + abs_name.split('.')[-1],
                                              align=align, width=max_varname_len)
             _write_variable(out_stream, row, column_names, var_dict[abs_name], print_arrays)
 
-            if var_type == 'all':
-                old_iotype = new_iotype
     else:
         for name in var_list:
             row = '{:{align}{width}}'.format(name[rel_idx:], align=align, width=max_varname_len)
