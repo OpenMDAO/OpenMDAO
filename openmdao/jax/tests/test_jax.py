@@ -13,6 +13,7 @@ if jax is not None:
     jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
     import jax.numpy as jnp
     from openmdao.jax import act_tanh, smooth_abs, smooth_max, smooth_min, ks_max, ks_min
+    from openmdao.utils.jax_utils import Compute2Jax
 
 
 @unittest.skipIf(jax is None, 'jax is not available.')
@@ -186,6 +187,96 @@ class MyCompJaxWithDiscrete(om.ExplicitComponent):
 
 x_shape = (2, 3)
 y_shape = (3, 4)
+
+
+class ASTContinuousCompTester(om.ExplicitComponent):
+    def setup(self):
+        self.add_input('in_scalar', val=7.0)
+        self.add_input('in_array', val=np.ones((2, 3)))
+        self.add_input('in_array2', val=np.ones((3,4)))
+        self.add_output('out_scalar', val=5.0)
+        self.add_output('out_array', val=np.ones((2, 3)))
+        self.add_output('out_array2', val=np.ones((3, 4)))
+
+    def compute(self, inputs, outputs):
+        outputs['out_scalar'] = inputs['in_scalar'] * 2.0
+        outputs['out_array'] = inputs['in_array'] * 2.0
+        outputs['out_array2'] = np.dot(inputs['in_array'], inputs['in_array2'])
+
+
+class ASTDiscreteCompTester(om.ExplicitComponent):
+    def setup(self):
+        self.add_input('in_scalar', val=7.0)
+        self.add_input('in_array', val=np.ones((2, 3)))
+        self.add_input('in_array2', val=np.ones((3,4)))
+        self.add_output('out_scalar', val=5.0)
+        self.add_output('out_array', val=np.ones((2, 3)))
+        self.add_output('out_array2', val=np.ones((3, 4)))
+        self.add_discrete_input('disc_in', val=2)
+        self.add_discrete_output('disc_out', val=3)
+
+    def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+        outputs['out_scalar'] = inputs['in_scalar'] * 2.0
+        outputs['out_array'] = inputs['in_array'] * 2.0
+        outputs['out_array2'] = np.dot(inputs['in_array'], inputs['in_array2'])
+        if discrete_inputs['disc_in'] > 0:
+            outputs['out_scalar'] *= 2.0
+            outputs['out_array'] *= 2.0
+            outputs['out_array2'] *= 2.0
+        else:
+            outputs['out_scalar'] *= 3.0
+            outputs['out_array'] *= 3.0
+            outputs['out_array2'] *= 3.0
+
+
+@unittest.skipIf(jax is None, 'jax is not available.')
+class TestJaxAST(unittest.TestCase):
+    def test_ast_continuous(self):
+        p = om.Problem()
+        comp = p.model.add_subsystem('comp', ASTContinuousCompTester())
+        p.setup()
+        p.final_setup()
+
+        converter = Compute2Jax(comp)
+
+        expected = """
+def compute_primal(self, in_scalar, in_array, in_array2):
+    out_scalar = in_scalar * 2.0
+    out_array = in_array * 2.0
+    out_array2 = jnp.dot(in_array, in_array2)
+    return (out_scalar, out_array, out_array2)
+""".strip()
+
+        self.assertEqual(converter.get_new_source().strip(), expected)
+
+    def test_ast_discrete(self):
+        p = om.Problem()
+        comp = p.model.add_subsystem('comp', ASTDiscreteCompTester())
+        p.setup()
+        p.final_setup()
+
+        converter = Compute2Jax(comp)
+
+        expected = """
+def compute_primal(self, disc_in, in_scalar, in_array, in_array2):
+    disc_out, = self._discrete_outputs.values()
+    out_scalar = in_scalar * 2.0
+    out_array = in_array * 2.0
+    out_array2 = jnp.dot(in_array, in_array2)
+    if disc_in > 0:
+        out_scalar *= 2.0
+        out_array *= 2.0
+        out_array2 *= 2.0
+    else:
+        out_scalar *= 3.0
+        out_array *= 3.0
+        out_array2 *= 3.0
+    self._discrete_outputs.set_vals((disc_out,))
+    return (disc_out, out_scalar, out_array, out_array2)
+""".strip()
+
+        self.assertEqual(converter.get_new_source().strip(), expected)
+
 
 @unittest.skipIf(jax is None, 'jax is not available.')
 class TestJaxComp(unittest.TestCase):

@@ -1873,6 +1873,6 @@ class _DictValues(object):
     def values(self):
         return [meta['val'] for meta in self._dict.values()]
 
-    def set_vals(self, *vals):
+    def set_vals(self, vals):
         for key, val in zip(self._dict, vals):
             self[key] = val

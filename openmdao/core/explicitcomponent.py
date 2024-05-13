@@ -599,8 +599,10 @@ class ExplicitComponent(Component):
                     partials[ofname, wrtname] = \
                         deriv_vals[ofidx][wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
 
-        compute_info = Compute2Jax(self, verbose=True)
-        self.compute_primal = MethodType(compute_info._transformed, self)
+        compute_info = Compute2Jax(self)
+        # to see the transformed function, uncomment the next line
+        print(compute_info.get_new_source())
+        self.compute_primal = MethodType(compute_info.get_new_func(), self)
         self.compute = MethodType(compute, self)
         self.compute_partials = MethodType(compute_partials, self)
         self._has_compute_partials = True

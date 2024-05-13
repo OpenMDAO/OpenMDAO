@@ -221,8 +221,10 @@ class Compute2Jax(ast.NodeTransformer):
         A dictionary that maps each argument name to a list of subscript values.
     _transformed : function
         The transformed compute function.
-    _namespace : dict
-        The namespace in which the transformed function is instantiated.
+    _transformed_src : str or None
+        The source code of the transformed compute function.
+    _jitted: function or None
+        The jitted version of the transformed compute function.
     _discrete_outs : list
         The names of the discrete outputs.
     _orig_args : list
@@ -236,11 +238,9 @@ class Compute2Jax(ast.NodeTransformer):
     _static_ops = {'reshape'}
     _np_names = {'np', 'numpy'}
 
-    def __init__(self, comp, use_jit=True, verbose=False):  # noqa: D107
+    def __init__(self, comp):  # noqa: D107
         func = comp.compute
-        self._namespace = comp.compute.__globals__.copy()
-        if 'jnp' not in self._namespace:
-            self._namespace['jnp'] = jnp
+        namespace = comp.compute.__globals__.copy()
         self._orig_args = list(inspect.signature(func).parameters)
 
         # ensure that ordering of args and returns exactly matches the order of the inputs and
@@ -251,7 +251,7 @@ class Compute2Jax(ast.NodeTransformer):
 
         self._dict_keys = {arg: set() for arg in self._orig_args}
         node = self.visit(ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec'))
-        newast = ast.fix_missing_locations(node)
+        self._new_ast = ast.fix_missing_locations(node)
 
         # check that inputs/outputs referenced in the function match those declared in the component
         if set(self._dict_keys['inputs']) != set(comp._var_rel_names['input']):
@@ -264,16 +264,45 @@ class Compute2Jax(ast.NodeTransformer):
                                f"declared in the component {sorted(comp._var_rel_names['output'])}."
                                )
 
-        if verbose:
-            print("Converted function:")
-            print(ast.unparse(newast))
+        code = compile(self._new_ast, '<ast>', 'exec')
+        exec(code, namespace)
+        self._transformed = namespace['compute_primal']
+        self._static_argnums = tuple(range(len(comp._var_discrete['input']) + 1))
+        self._jitted = None
+        self._transformed_src = None
 
-        code = compile(newast, '<ast>', 'exec')
-        exec(code, self._namespace)
-        self._transformed = self._namespace['compute_primal']
+    def get_new_func(self, use_jit=True):
+        """
+        Return the transformed function.
+
+        Parameters
+        ----------
+        use_jit : bool
+            If True, return the jitted function.
+
+        Returns
+        -------
+        function
+            The transformed function.
+        """
         if use_jit:
-            statics = tuple(range(len(comp._var_discrete['input']) + 1))
-            self._transformed = jjit(self._transformed, static_argnums=statics)
+            if self._jitted is None:
+                self._jitted = jjit(self._transformed, static_argnums=self._static_argnums)
+            return self._jitted
+        return self._transformed
+
+    def get_new_source(self):
+        """
+        Return the source code of the transformed function.
+
+        Returns
+        -------
+        str
+            The source code of the transformed function.
+        """
+        if self._transformed_src is None:
+            self._transformed_src = ast.unparse(self._new_ast)
+        return self._transformed_src
 
     def _get_new_args(self):
         new_args = [ast.arg('self', annotation=None)]
@@ -303,7 +332,8 @@ class Compute2Jax(ast.NodeTransformer):
             return []
 
         # add a statement to set the values of self._discrete outputs
-        args = [ast.Name(id=name, ctx=ast.Load()) for name in self._discrete_outs]
+        elts = [ast.Name(id=name, ctx=ast.Load()) for name in self._discrete_outs]
+        args = [ast.Tuple(elts=elts, ctx=ast.Load())]
         return [ast.Expr(value=ast.Call(func=ast.Attribute(
             value=ast.Attribute(value=ast.Name(id='self', ctx=ast.Load()),
                                 attr='_discrete_outputs', ctx=ast.Load()),
@@ -382,9 +412,8 @@ class Compute2Jax(ast.NodeTransformer):
         """
         if isinstance(node.value, ast.Name) and node.value.id in self._np_names:
             if node.attr not in self._static_ops:
-                if 'jnp' in self._namespace:
-                    return ast.copy_location(ast.Attribute(value=ast.Name(id='jnp', ctx=ast.Load()),
-                                                           attr=node.attr, ctx=node.ctx), node)
+                return ast.copy_location(ast.Attribute(value=ast.Name(id='jnp', ctx=ast.Load()),
+                                                       attr=node.attr, ctx=node.ctx), node)
 
         return self.generic_visit(node)
 
