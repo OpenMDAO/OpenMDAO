@@ -57,6 +57,20 @@ class DriverResult():
         self.exit_status = 'NOT_RUN'
         self.success = False
 
+        self.obj_time = 0.0
+        self.deriv_time = 0.0
+
+    def reset(self):
+        self.runtime = 0.0
+        self.iter_count = 0
+        self.obj_calls = 0
+        self.deriv_calls = 0
+        self.exit_status = 'NOT_RUN'
+        self.success = False
+
+        self._obj_time = 0.0
+        self._deriv_time = 0.0
+
     def __getitem__(self, s):
         """
         Provide key access to the attributes of DriverResult.
@@ -96,6 +110,40 @@ class DriverResult():
                       'object to test for successful driver completion.',
                       category=OMDeprecationWarning)
         return not self.success
+
+    @staticmethod
+    def track_stats(kind):
+        """
+        Decorator which tracks either the objective the deriv time and call count for a Driver.
+
+        This decorator should be applied to the _objfunc or _gradfunc (or equivalent) methods
+        of drivers. It will either accumulated the elapsed time in driver.result.obj_time or
+        driver.result.deriv_time, based on the value of time_type.
+
+        Parameters
+        ----------
+        kind : str
+            One of 'obj' or 'deriv', specifying which statistics should be accumulated.
+        """
+        if kind not in ('obj', 'deriv'):
+            raise AttributeError('time_type must be one of "obj" or "deriv".')
+        def _track_time(func):
+            @functools.wraps(func)
+            def wrapper(*args, **kwargs):
+                start_time = time.perf_counter()
+                ret = func(*args, **kwargs)
+                end_time = time.perf_counter()
+                result = args[0].result
+
+                if kind == 'obj':
+                    result.obj_time += end_time - start_time
+                    result.obj_calls += 1
+                else:
+                    result.deriv_time += end_time - start_time
+                    result.deriv_calls += 1
+                return ret
+            return wrapper
+        return _track_time
 
 
 class Driver(object):
