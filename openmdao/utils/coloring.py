@@ -2903,12 +2903,11 @@ def _total_coloring_cmd(options, user_args):
                 coloring_info.show_sparsity = options.show_sparsity
 
             with profiling('coloring_profile.out') if options.profile else do_nothing_context():
-                coloring_info.coloring = compute_total_coloring(prob,
-                                                  num_full_jacs=coloring_info.num_full_jacs,
-                                                  tol=coloring_info.tol,
-                                                  orders=coloring_info.orders,
-                                                  setup=False, run_model=True, fname=outfile,
-                                                  driver=prob.driver)
+                coloring_info.coloring = \
+                    compute_total_coloring(prob, num_full_jacs=coloring_info.num_full_jacs,
+                                           tol=coloring_info.tol, orders=coloring_info.orders,
+                                           setup=False, run_model=True, fname=outfile,
+                                           driver=prob.driver)
 
             coloring_info.display()
         else:
