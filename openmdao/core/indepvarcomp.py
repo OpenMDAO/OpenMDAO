@@ -85,6 +85,7 @@ class IndepVarComp(ExplicitComponent):
                                  "in IndepVarComp." % illegal)
 
         self._no_check_partials = True
+        self.options['derivs_method'] = None
 
     def initialize(self):
         """

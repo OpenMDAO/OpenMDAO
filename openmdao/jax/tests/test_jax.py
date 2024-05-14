@@ -14,6 +14,7 @@ if jax is not None:
     import jax.numpy as jnp
     from openmdao.jax import act_tanh, smooth_abs, smooth_max, smooth_min, ks_max, ks_min
     from openmdao.utils.jax_utils import Compute2Jax
+    from openmdao.utils.jax_utils import benchmark_component
 
 
 @unittest.skipIf(jax is None, 'jax is not available.')
@@ -285,23 +286,25 @@ class TestJaxComp(unittest.TestCase):
         p = om.Problem()
         # create an IVC manually so we can set the shapes.  Otherwise must set shape in the component
         # itself.
-        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
-        ivc.add_output('y', val=np.ones(y_shape))
+        xshape = (222, 333)
+        yshape = (333, 444)
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(xshape)))
+        ivc.add_output('y', val=np.ones(yshape))
         p.model.add_subsystem('comp', MyCompJax1(derivs_method='jax'))
         p.model.connect('ivc.x', 'comp.x')
         p.model.connect('ivc.y', 'comp.y')
 
-        p.setup(mode='rev')
+        p.setup(mode='rev', force_alloc_complex=True)
 
-        x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
-        y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
+        x = np.arange(1,np.prod(xshape)+1).reshape(xshape) * 2.0
+        y = np.arange(1,np.prod(yshape)+1).reshape(yshape)* 3.0
         p.set_val('ivc.x', x)
         p.set_val('ivc.y', y)
         p.final_setup()
         p.run_model()
 
         assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
-        p.check_totals(of=['comp.z'], wrt=['comp.x', 'comp.y'], method='fd', show_only_incorrect=True)
+        p.check_totals(of=['comp.z'], wrt=['comp.x', 'comp.y'], method='cs', show_only_incorrect=True)
         p.check_partials(show_only_incorrect=True)
 
     def test_jax_explicit_comp2(self):
@@ -488,9 +491,10 @@ class TestJaxGroup(unittest.TestCase):
                                              wrt=['ivc.x', 'comp2.y'], method='fd', show_only_incorrect=True))
 
 
-    # TODO: test with discrete vars
-    # TODO: test with options
     # TODO: test with mixed np and jnp in compute
 
 if __name__ == '__main__':
-    unittest.main()
+    # unittest.main()
+
+    result = benchmark_component(MyCompJax2Shaped, methods=('jax', 'cs'),
+                                 repeats=10, table_format='tabulator', xshape=(44, 330), yshape=(330, 55))

@@ -1804,7 +1804,7 @@ class Group(System):
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
             self._discrete_outputs = _DictValues(self._var_discrete['output'])
         else:
-            self._discrete_inputs = self._discrete_outputs = ()
+            self._discrete_inputs = self._discrete_outputs = {}
 
         self._vars_to_gather = self._find_vars_to_gather()
 
@@ -2366,6 +2366,8 @@ class Group(System):
         If jax is active, jaxify this group and all subgroups.
 
         Any Components directly or indirectly within this group will also be jaxified.
+
+        This is still experimental and may not work in all cases.
         """
         if jax is None:
             return

@@ -304,7 +304,7 @@ class Component(System):
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
             self._discrete_outputs = _DictValues(self._var_discrete['output'])
         else:
-            self._discrete_inputs = self._discrete_outputs = ()
+            self._discrete_inputs = self._discrete_outputs = {}
 
         self._serial_idxs = None
         self._inconsistent_keys = set()
@@ -1029,7 +1029,6 @@ class Component(System):
             meta = info[abs_key]
             meta['method'] = method
             meta.update(kwargs)
-            info[abs_key] = meta
 
     def declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None,
                          method='exact', step=None, form=None, step_calc=None, minimum_step=None):

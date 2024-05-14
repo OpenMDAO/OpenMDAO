@@ -415,7 +415,7 @@ class System(object):
         self.options.declare('assembled_jac_type', values=['csc', 'dense'], default='csc',
                              desc='Linear solver(s) in this group or implicit component, '
                                   'if using an assembled jacobian, will use this type.')
-        self.options.declare('derivs_method', default=None, values=['jax', 'complex_step'],
+        self.options.declare('derivs_method', default=None, values=['jax', 'cs', 'fd', None],
                              desc='The method to use for computing derivatives')
 
         # Case recording options

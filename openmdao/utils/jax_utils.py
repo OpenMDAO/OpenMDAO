@@ -9,6 +9,9 @@ from itertools import chain
 import networkx as nx
 import numpy as np
 
+from openmdao.utils.om_warnings import issue_warning
+from openmdao.visualization.tables.table_builder import generate_table
+
 
 def jit_stub(f, *args, **kwargs):
     """
@@ -35,10 +38,11 @@ try:
     import jax
     jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
     import jax.numpy as jnp
-    from jax import jit as jjit
+    from jax import jit
 except ImportError:
     jax = None
-    jjit = jit_stub
+    jnp = np
+    jit = jit_stub
 
 
 def register_jax_component(comp_class):
@@ -88,7 +92,7 @@ def register_jax_component(comp_class):
     return comp_class
 
 
-def examine_jaxpr(closed_jaxpr):
+def dump_jaxpr(closed_jaxpr):
     """
     Print out the contents of a Jaxpr.
 
@@ -240,7 +244,10 @@ class Compute2Jax(ast.NodeTransformer):
 
     def __init__(self, comp):  # noqa: D107
         func = comp.compute
+        if 'jnp' not in comp.compute.__globals__:
+            comp.compute.__globals__['jnp'] = jnp
         namespace = comp.compute.__globals__.copy()
+
         self._orig_args = list(inspect.signature(func).parameters)
 
         # ensure that ordering of args and returns exactly matches the order of the inputs and
@@ -253,16 +260,16 @@ class Compute2Jax(ast.NodeTransformer):
         node = self.visit(ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec'))
         self._new_ast = ast.fix_missing_locations(node)
 
-        # check that inputs/outputs referenced in the function match those declared in the component
-        if set(self._dict_keys['inputs']) != set(comp._var_rel_names['input']):
-            raise RuntimeError(f"{comp.msginfo}: The inputs referenced in the compute method "
-                               f"{sorted(self._dict_keys['inputs'])} do not match the inputs "
-                               f"declared in the component {sorted(comp._var_rel_names['input'])}.")
-        if set(self._dict_keys['outputs']) != set(comp._var_rel_names['output']):
-            raise RuntimeError(f"{comp.msginfo}: The outputs referenced in the compute method "
-                               f"{sorted(self._dict_keys['outputs'])} do not match the outputs "
-                               f"declared in the component {sorted(comp._var_rel_names['output'])}."
-                               )
+        # # check that inputs/outputs referenced in the function match those declared in the component
+        # if set(self._dict_keys[self._orig_args[0]]) != set(comp._var_rel_names['input']):
+        #     issue_warning(f"{comp.msginfo}: The inputs referenced in the compute method "
+        #                        f"{sorted(self._dict_keys['inputs'])} do not match the inputs "
+        #                        f"declared in the component {sorted(comp._var_rel_names['input'])}.")
+        # if set(self._dict_keys[self._orig_args[1]]) != set(comp._var_rel_names['output']):
+        #     issue_warning(f"{comp.msginfo}: The outputs referenced in the compute method "
+        #                        f"{sorted(self._dict_keys['outputs'])} do not match the outputs "
+        #                        f"declared in the component {sorted(comp._var_rel_names['output'])}."
+        #                        )
 
         code = compile(self._new_ast, '<ast>', 'exec')
         exec(code, namespace)
@@ -287,7 +294,7 @@ class Compute2Jax(ast.NodeTransformer):
         """
         if use_jit:
             if self._jitted is None:
-                self._jitted = jjit(self._transformed, static_argnums=self._static_argnums)
+                self._jitted = jit(self._transformed, static_argnums=self._static_argnums)
             return self._jitted
         return self._transformed
 
@@ -418,7 +425,98 @@ class Compute2Jax(ast.NodeTransformer):
         return self.generic_visit(node)
 
 
+def benchmark_component(comp_class, methods=(None, 'cs', 'jax'), initial_vals=None, repeats=2,
+                        mode='auto', table_format='simple_grid', **kwargs):
+    """
+    Benchmark the performance of a Component using different methods for computing derivatives.
+
+    Parameters
+    ----------
+    comp_class : class
+        The class of the Component to be benchmarked.
+    methods : tuple of str
+        The methods to be benchmarked. Options are 'cs', 'jax', and None.
+    initial_vals : dict or None
+        Initial values for the input variables.
+    repeats : int
+        The number of times to run compute/compute_partials.
+    mode : str
+        The preferred derivative direction for the Problem.
+    table_format : str or None
+        If not None, the format of the table to be displayed.
+    **kwargs : dict
+        Additional keyword arguments to be passed to the Component.
+
+    Returns
+    -------
+    dict
+        A dictionary containing the benchmark results.
+    """
+    import time
+
+    from openmdao.core.problem import Problem
+    from openmdao.devtools.memory import mem_usage
+
+    verbose = table_format is not None
+    results = []
+    for method in methods:
+        mem_start = mem_usage()
+        p = Problem()
+        comp = p.model.add_subsystem('comp', comp_class(**kwargs))
+        comp.options['derivs_method'] = method
+        if method in ('cs', 'fd'):
+            comp._has_approx = True
+            comp._get_approx_scheme(method)
+
+        if initial_vals:
+            for name, val in initial_vals.items():
+                p.model.set_val('comp.' + name, val)
+
+        p.setup(mode=mode, force_alloc_complex='cs' in methods)
+        p.run_model()
+
+        model_mem = mem_usage
+        model_diff_mem = model_mem - mem_start
+
+        if verbose:
+            print(f"\nModel memory usage: {model_mem} MB")
+            print(f"\nTiming {repeats} compute calls for {comp_class.__name__} using "
+                  f"{method} method.")
+        start = time.perf_counter()
+        for n in range(repeats):
+            comp.compute(comp._inputs, comp._outputs)
+            if verbose:
+                print('.', end='', flush=True)
+        results.append([method, 'compute', n, time.perf_counter() - start, None])
+
+        diff_mem = mem_usage() - mem_start
+        results[-1][-1] = diff_mem
+
+        if verbose:
+            print(f"\n\nTiming {repeats} compute_partials calls for {comp_class.__name__} using "
+                  f"{method} method.")
+        start = time.perf_counter()
+        for n in range(repeats):
+            p.model._linearize(None)
+            if verbose:
+                print('.', end='', flush=True)
+        results.append([method, 'compute_partials', n, time.perf_counter() - start, None])
+
+        diff_mem = mem_usage() - model_mem
+        results[-1][-1] = diff_mem
+
+        del p
+
+    if verbose:
+        print('\n')
+        headers = ['Method', 'Function', 'Iterations', 'Time (s)', 'Memory (MB)']
+        generate_table(results, tablefmt=table_format, headers=headers).display()
+
+    return results
+
+
 if __name__ == '__main__':
+    import openmdao.api as om
 
     def func(x, y):  # noqa: D103
         z = jnp.sin(x) * y
@@ -431,13 +529,22 @@ if __name__ == '__main__':
     y = jnp.ones(shape) * 2.0
     jaxpr = jax.make_jaxpr(func)(x, y)
 
-    examine_jaxpr(jaxpr)
+    dump_jaxpr(jaxpr)
 
     print(list(get_partials_deps(func, ('z', 'zz'), x, y)))
 
     jac_func = jax.jacfwd(func)
 
     jaxpr = jax.make_jaxpr(jac_func)(x, y)
-    examine_jaxpr(jaxpr)
+    dump_jaxpr(jaxpr)
 
     print(list(get_partials_deps(jac_func, ('z', 'zz'), x, y)))
+
+    p = om.Problem()
+    comp = p.model.add_subsystem('comp', om.ExecComp('y = 2.0*x', x=np.ones(3), y=np.ones(3)))
+    comp.derivs_method='jax'
+    p.setup()
+    p.run_model()
+
+    print(p.compute_totals(of=['comp.y'], wrt=['comp.x']))
+

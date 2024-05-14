@@ -12,7 +12,7 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE, _UNDEFINED
-from openmdao.utils.jax_utils import jax, Compute2Jax, get_partials_deps
+from openmdao.utils.jax_utils import jax, jit, Compute2Jax, get_partials_deps
 
 
 class ExplicitComponent(Component):
@@ -121,7 +121,20 @@ class ExplicitComponent(Component):
         """
         Call setup_partials in components.
         """
-        super()._setup_partials()
+        if self.options['derivs_method'] in ('cs', 'fd'):
+            self._has_approx = True
+            method = self.options['derivs_method']
+            if not self._declared_partials_patterns:
+                # declare all partials as 'cs'
+                self.declare_partials('*', '*', method=method)
+                super()._setup_partials()
+            else:
+                super()._setup_partials()
+                # declare only those partials that have been declared
+                for of, wrt in self._declared_partials_patterns:
+                    self._approx_partials(of, wrt, method=method)
+        else:
+            super()._setup_partials()
 
         if self.matrix_free:
             return
@@ -130,19 +143,13 @@ class ExplicitComponent(Component):
         # call the super version of setup_partials. This is still in the final setup.
         for out_abs, meta in self._var_abs2meta['output'].items():
 
-            # No need to FD outputs wrt other outputs
-            abs_key = (out_abs, out_abs)
-            if abs_key in self._subjacs_info:
-                if 'method' in self._subjacs_info[abs_key]:
-                    del self._subjacs_info[abs_key]['method']
-
             size = meta['size']
-
-            # ExplicitComponent jacobians have -1 on the diagonal.
             if size > 0:
+
+                # ExplicitComponent jacobians have -1 on the diagonal.
                 arange = np.arange(size, dtype=INT_DTYPE)
 
-                self._subjacs_info[abs_key] = {
+                self._subjacs_info[out_abs, out_abs] = {
                     'rows': arange,
                     'cols': arange,
                     'shape': (size, size),
@@ -501,18 +508,32 @@ class ExplicitComponent(Component):
         """
         Compute outputs given inputs. The model is assumed to be in an unscaled state.
 
+        An inherited component may choose to either override this function or to define a
+        compute_primal function.
+
+
         Parameters
         ----------
         inputs : Vector
             Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
             Unscaled, dimensional output variables read via outputs[key].
-        discrete_inputs : dict or None
-            If not None, dict containing discrete input values.
-        discrete_outputs : dict or None
-            If not None, dict containing discrete output values.
+        discrete_inputs : dict like or None
+            If not None, dict like object containing discrete input values.
+        discrete_outputs : dict like or None
+            If not None, dict like object containing discrete output values.
         """
-        pass
+        if discrete_inputs is None:
+            returns = self.compute_primal(*inputs.values())
+        else:
+            ins = list(chain(self._discrete_inputs.values(), inputs.values()))
+            returns = self.compute_primal(*ins)
+
+        if discrete_outputs is None:
+            outputs.set_vals(returns)
+        else:
+            self._discrete_outputs.set_vals(returns[:len(self._discrete_outputs)])
+            outputs.set_vals(returns[len(self._discrete_outputs):])
 
     def compute_partials(self, inputs, partials, discrete_inputs=None):
         """
@@ -565,22 +586,9 @@ class ExplicitComponent(Component):
         return True
 
     def _setup_jax(self):
-        # replacement for the original compute method which calls compute_primal, the original
-        # compute method converted to a simple function taking inputs as args and returning
-        # outputs as a tuple
-        def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
-            if discrete_inputs is None:
-                returns = self.compute_primal(*inputs.values())
-            else:
-                ins = list(chain(self._discrete_inputs.values(), inputs.values()))
-                returns = self.compute_primal(*ins)
-
-            if discrete_outputs is None:
-                outputs.set_vals(returns)
-            else:
-                self._discrete_outputs.set_vals(returns[:len(self._discrete_outputs)])
-                outputs.set_vals(returns[len(self._discrete_outputs):])
-
+        # we define compute_partials here instead of making this the base class version as we
+        # did with compute, because the existence of a compute_partials method that is not the
+        # base class method is used to determine if a given component computes its own partials.
         def compute_partials(self, inputs, partials, discrete_inputs=None):
             if discrete_inputs is None:
                 deriv_vals = self._get_jac_func()(*inputs.values())
@@ -589,10 +597,9 @@ class ExplicitComponent(Component):
                 ins.extend(inputs.values())
                 deriv_vals = self._get_jac_func()(*ins)
 
-            for ofidx, ofname in enumerate(chain(self._discrete_outputs,
-                                                 self._var_rel_names['output'])):
-                if ofname in self._discrete_outputs:
-                    continue
+            ofidx = len(self._discrete_outputs) - 1
+            for ofname in self._var_rel_names['output']:
+                ofidx += 1
                 ofmeta = self._var_rel2meta[ofname]
                 for wrtidx, wrtname in enumerate(self._var_rel_names['input']):
                     wrtmeta = self._var_rel2meta[wrtname]
@@ -601,9 +608,10 @@ class ExplicitComponent(Component):
 
         compute_info = Compute2Jax(self)
         # to see the transformed function, uncomment the next line
-        print(compute_info.get_new_source())
+        print(f"\n{compute_info.get_new_source()}")
+
         self.compute_primal = MethodType(compute_info.get_new_func(), self)
-        self.compute = MethodType(compute, self)
+        self.compute = MethodType(ExplicitComponent.compute, self)
         self.compute_partials = MethodType(compute_partials, self)
         self._has_compute_partials = True
 
@@ -612,7 +620,9 @@ class ExplicitComponent(Component):
             fjax = jax.jacfwd if self.best_deriv_direction() == 'fwd' else jax.jacrev
             ndiscrete = len(self._discrete_inputs)
             wrt_idxs = list(range(ndiscrete, len(self._var_abs2meta['input']) + ndiscrete))
-            self._jac_func_ = fjax(self.compute_primal, argnums=wrt_idxs)
+            static_argnums = tuple(range(ndiscrete))
+            self._jac_func_ = jit(fjax(self.compute_primal, argnums=wrt_idxs),
+                                  static_argnums=static_argnums)
             # print(list(get_partials_deps(self.compute_primal,
             #                              tuple(chain(self._discrete_outputs,
             #                                          self._var_rel_names['output'])),
