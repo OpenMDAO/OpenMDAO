@@ -332,7 +332,7 @@ class DifferentialEvolutionDriver(Driver):
             self.set_design_var(name, val)
 
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-            model.run_solve_nonlinear()
+            self._run_solve_nonlinear()
             rec.abs = 0.0
             rec.rel = 0.0
         self.iter_count += 1
@@ -442,7 +442,7 @@ class DifferentialEvolutionDriver(Driver):
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             self.iter_count += 1
             try:
-                model.run_solve_nonlinear()
+                self._run_solve_nonlinear()
 
             # Tell the optimizer that this is a bad point.
             except AnalysisError:

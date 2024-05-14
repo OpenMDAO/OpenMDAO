@@ -224,7 +224,7 @@ class DOEDriver(Driver):
 
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             try:
-                self._problem().model.run_solve_nonlinear()
+                self._run_solve_nonlinear()
                 metadata['success'] = 1
                 metadata['msg'] = ''
             except AnalysisError:
@@ -313,25 +313,3 @@ class DOEDriver(Driver):
         """
         self._metadata['name'] = case_name
         return self._metadata
-
-    def get_driver_objective_calls(self):
-        """
-        Return the number of times the model was evaluated during run.
-
-        Returns
-        -------
-        int
-            The number of calls to model.solve_nonlinear.
-        """
-        return self._num_model_evals
-
-    def get_driver_derivative_calls(self):
-        """
-        Return the number of times the total derivatives were evaluated during the run.
-
-        Returns
-        -------
-        int
-            The number of calls to _compute_totals.
-        """
-        return self._num_deriv_evals

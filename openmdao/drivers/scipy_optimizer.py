@@ -241,34 +241,6 @@ class ScipyOptimizeDriver(Driver):
                     self._cons[name]['linear'] = True
                     self._cons[name]['alias'] = None
 
-    def get_driver_objective_calls(self):
-        """
-        Return number of objective evaluations made during a driver run.
-
-        Returns
-        -------
-        int
-            Number of objective evaluations made during a driver run.
-        """
-        if self._scipy_optimize_result and hasattr(self._scipy_optimize_result, 'nfev'):
-            return self._scipy_optimize_result.nfev
-        else:
-            return None
-
-    def get_driver_derivative_calls(self):
-        """
-        Return number of derivative evaluations made during a driver run.
-
-        Returns
-        -------
-        int
-            Number of derivative evaluations made during a driver run.
-        """
-        if self._scipy_optimize_result and hasattr(self._scipy_optimize_result, 'njev'):
-            return self._scipy_optimize_result.njev
-        else:
-            return None
-
     def run(self):
         """
         Optimize the problem using selected Scipy optimizer.
@@ -291,7 +263,7 @@ class ScipyOptimizeDriver(Driver):
         # Initial Run
         with RecordingDebugging(self._get_name(), self.iter_count, self):
             with model._relevance.nonlinear_active('iter'):
-                model.run_solve_nonlinear()
+                self._run_solve_nonlinear()
             self.iter_count += 1
 
         self._con_cache = self.get_constraint_values()
@@ -657,7 +629,7 @@ class ScipyOptimizeDriver(Driver):
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 self.iter_count += 1
                 with model._relevance.nonlinear_active('iter'):
-                    model.run_solve_nonlinear()
+                    self._run_solve_nonlinear()
 
             # Get the objective function evaluations
             for obj in self.get_objective_values().values():

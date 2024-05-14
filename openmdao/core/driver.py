@@ -1,4 +1,5 @@
 """Define a base class for all Drivers in OpenMDAO."""
+import functools
 from itertools import chain
 import pprint
 import sys
@@ -692,7 +693,7 @@ class Driver(object):
         if self.supports['optimization'] and problem.options['group_by_pre_opt_post']:
             if model._pre_components:
                 with model._relevance.nonlinear_active('pre'):
-                    model.run_solve_nonlinear()
+                    self._run_solve_nonlinear()
 
             with SaveOptResult(self):
                 with model._relevance.nonlinear_active('iter'):
@@ -700,7 +701,7 @@ class Driver(object):
 
             if model._post_components:
                 with model._relevance.nonlinear_active('post'):
-                    model.run_solve_nonlinear()
+                    self._run_solve_nonlinear()
 
         else:
             with SaveOptResult(self):
@@ -833,7 +834,7 @@ class Driver(object):
         int
             Number of objective evaluations made during a driver run.
         """
-        return 0
+        return self.result.obj_calls
 
     def get_driver_derivative_calls(self):
         """
@@ -844,7 +845,7 @@ class Driver(object):
         int
             Number of derivative evaluations made during a driver run.
         """
-        return 0
+        return self.result.deriv_calls
 
     def get_design_var_values(self, get_remote=True, driver_scaling=True):
         """
@@ -1129,7 +1130,7 @@ class Driver(object):
             Failure flag; True if failed to converge, False is successful.
         """
         with RecordingDebugging(self._get_name(), self.iter_count, self):
-            self._problem().model.run_solve_nonlinear()
+            self._run_solve_nonlinear()
 
         self.iter_count += 1
 
@@ -1139,6 +1140,11 @@ class Driver(object):
     def _recording_iter(self):
         return self._problem()._metadata['recording_iter']
 
+    @DriverResult.track_stats(kind='obj')
+    def _run_solve_nonlinear(self):
+        return self._problem().model.run_solve_nonlinear()
+
+    @DriverResult.track_stats(kind='deriv')
     def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', driver_scaling=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
@@ -1585,8 +1591,6 @@ class SaveOptResult(object):
         # The standard driver results
         driver.result.runtime = time.perf_counter() - self._start_time
         driver.result.iter_count = driver.iter_count
-        driver.result.obj_calls = driver.get_driver_objective_calls()
-        driver.result.deriv_calls = driver.get_driver_derivative_calls()
         driver.result.exit_status = driver.get_exit_status()
 
         # The custom driver results

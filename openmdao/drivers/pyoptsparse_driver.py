@@ -342,28 +342,6 @@ class pyOptSparseDriver(Driver):
         self._model_ran = False
         self._setup_tot_jac_sparsity()
 
-    def get_driver_objective_calls(self):
-        """
-        Return number of objective evaluations made during a driver run.
-
-        Returns
-        -------
-        int
-            Number of objective evaluations made during a driver run.
-        """
-        return self.pyopt_solution.userObjCalls if self.pyopt_solution else None
-
-    def get_driver_derivative_calls(self):
-        """
-        Return number of derivative evaluations made during a driver run.
-
-        Returns
-        -------
-        int
-            Number of derivative evaluations made during a driver run.
-        """
-        return self.pyopt_solution.userSensCalls if self.pyopt_solution else None
-
     def run(self):
         """
         Excute pyOptsparse.
@@ -400,7 +378,7 @@ class pyOptSparseDriver(Driver):
         model_ran = False
         if optimizer in run_required or linear_constraints:
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-                model.run_solve_nonlinear()
+                self._run_solve_nonlinear()
                 rec.abs = 0.0
                 rec.rel = 0.0
                 model_ran = True
@@ -663,7 +641,7 @@ class pyOptSparseDriver(Driver):
 
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             try:
-                model.run_solve_nonlinear()
+                self._run_solve_nonlinear()
             except AnalysisError:
                 model._clear_iprint()
 
@@ -753,7 +731,7 @@ class pyOptSparseDriver(Driver):
                     # deactivate the relevance if we haven't run the full model yet, so that
                     # the full model will run at least once.
                     with model._relevance.nonlinear_active('iter', active=self._model_ran):
-                        model.run_solve_nonlinear()
+                        self._run_solve_nonlinear()
                         self._model_ran = True
 
                 # Let the optimizer try to handle the error
