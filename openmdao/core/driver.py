@@ -120,7 +120,7 @@ class DriverResult():
         This decorator should be applied to the _objfunc or _gradfunc (or equivalent) methods
         of drivers. It will either accumulated the elapsed time in driver.result.obj_time or
         driver.result.deriv_time, based on the value of time_type.
-
+ort
         Parameters
         ----------
         kind : str
@@ -128,6 +128,7 @@ class DriverResult():
         """
         if kind not in ('obj', 'deriv'):
             raise AttributeError('time_type must be one of "obj" or "deriv".')
+
         def _track_time(func):
             @functools.wraps(func)
             def wrapper(*args, **kwargs):

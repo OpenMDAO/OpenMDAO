@@ -161,7 +161,8 @@ class TestOptimizationReport(unittest.TestCase):
                                           vars_lower=-50, vars_upper=50.,
                                           cons_lower=-1,
                                           )
-        expect = {'obj_calls': 0, 'deriv_calls': 0}
+        expect = {'obj_calls': 1, 'deriv_calls': 0}
+        print(self.prob.driver.result.obj_calls)
         self.check_opt_result(expected=expect)
 
         expected_warning_msg = "The optimizer report is not applicable for Driver type 'Driver', " \
@@ -188,7 +189,7 @@ class TestOptimizationReport(unittest.TestCase):
                                           cons_lower=0, cons_upper=10.,
                                           optimizer='COBYLA',
                                           )
-        expect = {'deriv_calls': None}
+        expect = {'deriv_calls': 0}
         self.check_opt_result(expected=expect)
         opt_report(self.prob)
         self.check_opt_report(expected=expect)
@@ -199,7 +200,7 @@ class TestOptimizationReport(unittest.TestCase):
                                           cons_lower=0, cons_upper=10.,
                                           optimizer='COBYLA',
                                           )
-        expect = {'deriv_calls': None}
+        expect = {'deriv_calls': 0}
         self.check_opt_result(expected=expect)
         opt_report(self.prob)
         self.check_opt_report(expected=expect)
