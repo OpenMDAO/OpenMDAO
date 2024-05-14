@@ -3958,6 +3958,253 @@ class System(object):
 
         return result
 
+    def list_vars(self,
+                  explicit=True, implicit=True,
+                  val=True,
+                  prom_name=True,
+                  residuals=False,
+                  residuals_tol=None,
+                  units=False,
+                  shape=False,
+                  global_shape=False,
+                  bounds=False,
+                  scaling=False,
+                  desc=False,
+                  print_arrays=False,
+                  tags=None,
+                  includes=None,
+                  excludes=None,
+                  is_indep_var=None,
+                  is_design_var=None,
+                  all_procs=False,
+                  list_autoivcs=False,
+                  out_stream=_DEFAULT_OUT_STREAM,
+                  print_min=False,
+                  print_max=False,
+                  return_format='list'):
+        """
+        Write a list of output names and other optional information to a specified stream.
+
+        Parameters
+        ----------
+        explicit : bool, optional
+            Include outputs from explicit components. Default is True.
+        implicit : bool, optional
+            Include outputs from implicit components. Default is True.
+        val : bool, optional
+            When True, display output values. Default is True.
+        prom_name : bool, optional
+            When True, display the promoted name of the variable.
+            Default is True.
+        residuals : bool, optional
+            When True, display residual values. Default is False.
+        residuals_tol : float, optional
+            If set, limits the output of list_outputs to only variables where
+            the norm of the resids array is greater than the given 'residuals_tol'.
+            Default is None.
+        units : bool, optional
+            When True, display units. Default is False.
+        shape : bool, optional
+            When True, display/return the shape of the value. Default is False.
+        global_shape : bool, optional
+            When True, display/return the global shape of the value. Default is False.
+        bounds : bool, optional
+            When True, display/return bounds (lower and upper). Default is False.
+        scaling : bool, optional
+            When True, display/return scaling (ref, ref0, and res_ref). Default is False.
+        desc : bool, optional
+            When True, display/return description. Default is False.
+        print_arrays : bool, optional
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format  is affected
+            by the values set with numpy.set_printoptions
+            Default is False.
+        tags : str or list of strs
+            User defined tags that can be used to filter what gets listed. Only outputs with the
+            given tags will be listed.
+            Default is None, which means there will be no filtering based on tags.
+        includes : None, str, or iter of str
+            Collection of glob patterns for pathnames of variables to include. Default is None,
+            which includes all output variables.
+        excludes : None, str, or iter of str
+            Collection of glob patterns for pathnames of variables to exclude. Default is None.
+        is_indep_var : bool or None
+            If None (the default), do no additional filtering of the inputs.
+            If True, list only outputs tagged `openmdao:indep_var`.
+            If False, list only outputs that are _not_ tagged `openmdao:indep_var`.
+        is_design_var : bool or None
+            If None (the default), do no additional filtering of the inputs.
+            If True, list only inputs connected to outputs that are driver design variables.
+            If False, list only inputs _not_ connected to outputs that are driver design variables.
+        all_procs : bool, optional
+            When True, display output on all processors. Default is False.
+        list_autoivcs : bool
+            If True, include auto_ivc outputs in the listing.  Defaults to False.
+        out_stream : file-like
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+        print_min : bool
+            When true, if the output value is an array, print its smallest value.
+        print_max : bool
+            When true, if the output value is an array, print its largest value.
+        return_format : str
+            Indicates the desired format of the return value. Can have value of 'list' or 'dict'.
+            If 'list', the return value is a list of (name, metadata) tuples.
+            if 'dict', the return value is a dictionary mapping {name: metadata}.
+
+        Returns
+        -------
+        list of (name, metadata) or dict of {name: metadata}
+            List or dict of output names and other optional information about those outputs.
+        """
+        if (self._problem_meta is None or
+                self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP) and val:
+            issue_warning("Calling `list_vars` before `final_setup` will only "
+                          "display the default values of variables and will not show the result of "
+                          "any `set_val` calls.")
+
+        if return_format not in ('list', 'dict'):
+            badarg = f"'{return_format}'" if isinstance(return_format, str) else f"{return_format}"
+            raise ValueError(f"Invalid value ({badarg}) for return_format, "
+                             "must be a string value of 'list' or 'dict'")
+
+        keynames = ['val', 'units', 'shape', 'global_shape', 'desc', 'tags']
+        keyflags = [val, units, shape, global_shape, desc, tags]
+
+        keys = [name for i, name in enumerate(keynames) if keyflags[i]]
+
+        if bounds:
+            keys.extend(('lower', 'upper'))
+        if scaling:
+            keys.extend(('ref', 'ref0', 'res_ref'))
+
+        outputs = self.get_io_metadata(('output',), keys, includes, excludes,
+                                       is_indep_var, is_design_var, tags,
+                                       get_remote=True,
+                                       rank=None if all_procs or val or residuals else 0,
+                                       return_rel_names=False)
+
+        metavalues = val and self._inputs is None
+
+        keyvals = [metavalues, units, shape, global_shape, desc, tags is not None]
+        keys = [n for i, n in enumerate(keynames) if keyvals[i]]
+
+        inputs = self.get_io_metadata(('input',), keys, includes, excludes,
+                                      is_indep_var, is_design_var, tags,
+                                      get_remote=True,
+                                      rank=None if all_procs or val else 0,
+                                      return_rel_names=False)
+
+        # filter auto_ivcs if requested
+        if outputs and not list_autoivcs:
+            outputs = {n: m for n, m in outputs.items() if not n.startswith('_auto_ivc.')}
+
+        # get values & resids
+        if self._outputs is not None and (val or residuals or residuals_tol):
+            to_remove = []
+            print_options = np.get_printoptions()
+            np_precision = print_options['precision']
+
+            for name, meta in outputs.items():
+                if val:
+                    # we want value from the input vector, not from the metadata
+                    meta['val'] = self._abs_get_val(name, get_remote=True,
+                                                    rank=None if all_procs else 0, kind='output')
+
+                    if isinstance(meta['val'], np.ndarray):
+                        if print_min:
+                            meta['min'] = np.round(np.min(meta['val']), np_precision)
+
+                        if print_max:
+                            meta['max'] = np.round(np.max(meta['val']), np_precision)
+
+                if residuals or residuals_tol:
+                    resids = self._abs_get_val(name, get_remote=True,
+                                               rank=None if all_procs else 0,
+                                               kind='residual')
+                    if residuals_tol and np.linalg.norm(resids) < residuals_tol:
+                        to_remove.append(name)
+                    elif residuals:
+                        meta['resids'] = resids
+
+            # remove any outputs that don't pass the residuals_tol filter
+            for name in to_remove:
+                del outputs[name]
+
+        if val and self._inputs is not None:
+            # we want value from the input vector, not from the metadata
+            print_options = np.get_printoptions()
+            np_precision = print_options['precision']
+
+            for n, meta in inputs.items():
+                meta['val'] = self._abs_get_val(n, get_remote=True,
+                                                rank=None if all_procs else 0, kind='input')
+                if isinstance(meta['val'], np.ndarray):
+                    if print_min:
+                        meta['min'] = np.round(np.min(meta['val']), np_precision)
+
+                    if print_max:
+                        meta['max'] = np.round(np.max(meta['val']), np_precision)
+
+        # NOTE: calls to _abs_get_val() above are collective calls and must be done on all procs
+        if not (outputs and inputs) or (not all_procs and self.comm.rank != 0):
+            return []
+
+        # remove metadata we don't want to show/return
+        to_remove = ['discrete']
+        if tags:
+            to_remove.append('tags')
+        if not prom_name:
+            to_remove.append('prom_name')
+        for _, meta in outputs.items():
+            for key in to_remove:
+                del meta[key]
+        for _, meta in inputs.items():
+            for key in to_remove:
+                del meta[key]
+
+        variables = set(outputs.keys()).union(set(inputs.keys()))
+        var_list = []
+        var_dict = {}
+
+        real_vars = self._var_allprocs_abs2meta
+        disc_vars = self._var_allprocs_discrete
+
+        if self._subsystems_allprocs:
+            from openmdao.core.component import Component
+            for subsys in self.system_iter(recurse=True, typ=Component):
+                prefix = subsys.pathname + '.'
+                for var_name in chain(real_vars['input'], real_vars['output'],
+                                      disc_vars['input'], disc_vars['output']):
+                    if var_name in variables:
+                        if var_name.startswith(prefix):
+                            var_list.append(var_name)
+                            if var_name in outputs:
+                                var_dict[var_name] = outputs[var_name]
+                                var_dict[var_name]['io'] = 'output'
+                            else:
+                                var_dict[var_name] = inputs[var_name]
+                                var_dict[var_name]['io'] = 'input'
+        else:
+            # For components with no children, self._subsystems_allprocs is empty.
+            for var_name in chain(real_vars['input'], real_vars['output'],
+                                  disc_vars['input'], disc_vars['output']):
+                if var_name in variables:
+                    var_list.append(var_name)
+                    if var_name in outputs:
+                        var_dict[var_name] = outputs[var_name]
+                        var_dict[var_name]['io'] = 'output'
+                    else:
+                        var_dict[var_name] = inputs[var_name]
+                        var_dict[var_name]['io'] = 'input'
+
+        if all_procs or self.comm.rank == 0:
+            write_var_table(self.pathname, var_list, 'all', var_dict,
+                            True, '', print_arrays, out_stream)
+
+        return var_dict
+
     def list_inputs(self,
                     val=True,
                     prom_name=True,

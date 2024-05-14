@@ -155,6 +155,35 @@ class ExplCompTestCase(unittest.TestCase):
         assert_near_equal(prob['comp1.area'], 6.)
         assert_near_equal(prob['comp2.area'], 6.)
 
+        expected = {'comp1.area': {'io': 'output',
+                                   'prom_name': 'comp1.area',
+                                   'units': None,
+                                   'val': np.array([6.])},
+                    'comp1.length': {'io': 'input',
+                                     'prom_name': 'length',
+                                     'units': None,
+                                     'val': np.array([3.])},
+                    'comp1.width': {'io': 'input',
+                                    'prom_name': 'width',
+                                    'units': None,
+                                    'val': np.array([2.])},
+                    'comp2.area': {'io': 'output',
+                                   'prom_name': 'comp2.area',
+                                   'units': None,
+                                   'val': np.array([6.])},
+                    'comp2.length': {'io': 'input',
+                                     'prom_name': 'length',
+                                     'units': None,
+                                     'val': np.array([3.])},
+                    'comp2.width': {'io': 'input',
+                                    'prom_name': 'width',
+                                    'units': None,
+                                    'val': np.array([2.])}}
+
+        # Unit test for list_vars basic functionality.
+        io_vars = prob.model.list_vars(units=True, out_stream=None)
+        self.assertEqual(dict(io_vars), expected)
+
         # total derivs
         total_derivs = prob.compute_totals(
             wrt=['length', 'width'],
