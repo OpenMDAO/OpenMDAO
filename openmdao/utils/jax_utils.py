@@ -226,14 +226,12 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         The argument names of the compute_primal function.
     _compute_primal_returns : list
         The names of the outputs from the new function.
-    _compute_primal : function
+    compute_primal : function
         The compute_primal function created from the original compute function.
-    _jitted_compute_primal: function or None
-        The jitted version of the compute_primal function.
-    _compute_primal_src : str or None
-        The source code of the transformed compute function.
     _compute_args : list
         The original argument names of the compute function.
+    _new_ast : ast node
+        The new ast node created from the original compute function.
     """
 
     # these ops require static objects so their args should not be traced.  Traced array ops should
@@ -264,7 +262,6 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         exec(code, namespace)
         self.compute_primal = namespace['compute_primal']
 
-        self._compute_primal_src = None
         if verbose:
             print(f"\n{self.get_new_source()}\n")
 
@@ -282,21 +279,29 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         str
             The source code of the transformed function.
         """
-        if self._compute_primal_src is None:
-            self._compute_primal_src = ast.unparse(self._new_ast)
-        return self._compute_primal_src
+        return ast.unparse(self._new_ast)
 
-    def get_partials_dependencies(self):
+    def _get_arg_values(self):
+        discrete_inputs = self._comp()._discrete_inputs
+        yield from discrete_inputs.values()
+        if self._comp()._inputs is None:
+            for name, meta in self._comp()._var_rel2meta['input'].items():
+                if name not in discrete_inputs:
+                    yield meta['value']
+        else:
+            yield from self._comp()._inputs.values()
+
+    def compute_dependency_iter(self):
         """
         Get (output, input) pairs where the output depends on the input for the compute function.
 
-        Returns
-        -------
-        list
-            A list of tuples of the form (output, input) where the output depends on the input.
+        Yields
+        ------
+        tuple
+            A tuple of the form (output, input), where output depends on the input.
         """
-        return list(get_partials_deps(self.compute_primal, self._compute_primal_returns,
-                                       *self._compute_primal_args))
+        yield from get_partials_deps(self.compute_primal, self._compute_primal_returns,
+                                     *self._get_arg_values())
 
     def _get_new_args(self):
         new_args = [ast.arg('self', annotation=None)]

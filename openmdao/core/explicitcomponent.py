@@ -134,6 +134,9 @@ class ExplicitComponent(Component):
                 for of, wrt in self._declared_partials_patterns:
                     self._approx_partials(of, wrt, method=method)
         else:
+            if not self._declared_partials_patterns and self.options['derivs_method'] == 'jax':
+                for of, wrt in self._jaxifier._get_partials_deps():
+                    self.declare_partials(of=of, wrt=wrt)
             super()._setup_partials()
 
         if self.matrix_free:
@@ -608,9 +611,9 @@ class ExplicitComponent(Component):
                     partials[ofname, wrtname] = \
                         deriv_vals[ofidx][wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
 
-        compute_info = ExplicitCompJaxify(self)
+        self._jaxifier = ExplicitCompJaxify(self)
 
-        self.compute_primal = MethodType(compute_info.compute_primal, self)
+        self.compute_primal = MethodType(self._jaxifier.compute_primal, self)
         self.compute = MethodType(ExplicitComponent.compute, self)
         self.compute_partials = MethodType(compute_partials, self)
         self._has_compute_partials = True
@@ -623,11 +626,6 @@ class ExplicitComponent(Component):
             static_argnums = tuple(range(ndiscrete))
             self._jac_func_ = jit(fjax(self.compute_primal, argnums=wrt_idxs),
                                   static_argnums=static_argnums)
-            # print(list(get_partials_deps(self.compute_primal,
-            #                              tuple(chain(self._discrete_outputs,
-            #                                          self._var_rel_names['output'])),
-            #                              *chain(self._discrete_inputs.values(),
-            #                                     self._inputs.values()))))
         return self._jac_func_
 
     def get_compute_sparsity(self):

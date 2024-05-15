@@ -449,7 +449,7 @@ class Component(System):
     def _promoted_wrt_iter(self):
         yield from self._get_partials_wrts()
 
-    def _update_subjac_sparsity(self, sparsity):
+    def _update_subjac_sparsity(self, sparsity_iter):
         """
         Update subjac sparsity info based on the given coloring.
 
@@ -460,19 +460,15 @@ class Component(System):
 
         Parameters
         ----------
-        sparsity : dict
-            A nested dict of the form dct[of][wrt] = (rows, cols, shape)
+        sparsity_iter : iter of tuple
+            Tuple of the form (of, wrt, rows, cols, shape).
         """
         # sparsity uses relative names, so we need to convert to absolute
         prefix = self.pathname + '.'
-        for of, sub in sparsity.items():
-            of = prefix + of
-            for wrt, tup in sub.items():
-                wrt = prefix + wrt
-                abs_key = (of, wrt)
-                if abs_key in self._subjacs_info:
-                    # add sparsity info to existing partial info
-                    self._subjacs_info[abs_key]['sparsity'] = tup
+        for of, wrt, rows, cols, shape in sparsity_iter:
+            abs_key = (prefix + of, prefix + wrt)
+            if abs_key in self._subjacs_info:
+                self._subjacs_info[abs_key]['sparsity'] = (rows, cols, shape)
 
     def add_input(self, name, val=1.0, shape=None, units=None, desc='', tags=None,
                   shape_by_conn=False, copy_shape=None, compute_shape=None, distributed=None):
@@ -1696,7 +1692,7 @@ class Component(System):
             if coloring_mod._use_partial_sparsity:
                 coloring = self._get_coloring()
                 if coloring is not None:
-                    self._update_subjac_sparsity(coloring.get_subjac_sparsity())
+                    self._update_subjac_sparsity(coloring._subjac_sparsity_iter())
                 if self._jacobian is not None:
                     self._jacobian._restore_approx_sparsity()
 

@@ -9,7 +9,7 @@ from math import isclose
 import numpy as np
 from numpy.linalg import norm
 
-from scipy.sparse import coo_matrix
+from scipy.sparse import coo_array, csr_array, csc_array
 
 from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.omnumba import numba
@@ -303,7 +303,7 @@ def tile_sparse_jac(data, rows, cols, nrow, ncol, num_nodes):
     """
     Assemble arrays necessary to define a COO sparse jacobian for a vectorized component.
 
-    These arrays can also be passed to csc_matrix or csr_matrix to create CSC and CSR sparse
+    These arrays can also be passed to csc_array or csr_array to create CSC and CSR sparse
     matrices.
 
     Parameters
@@ -548,7 +548,7 @@ def rand_sparsity(shape, density_ratio, dtype=bool):
 
     Returns
     -------
-    coo_matrix
+    coo_array
         A COO matrix with approximately the nonzero density desired.
     """
     assert len(shape) == 2, f"shape must be a size 2 tuple but {shape} was given"
@@ -561,7 +561,7 @@ def rand_sparsity(shape, density_ratio, dtype=bool):
     rows = np.random.randint(0, nrows, nnz)
     cols = np.random.randint(0, ncols, nnz)
 
-    coo = coo_matrix((data, (rows, cols)), shape=shape)
+    coo = coo_array((data, (rows, cols)), shape=shape)
 
     # get rid of dup rows/cols
     coo.sum_duplicates()
@@ -912,3 +912,48 @@ else:
             if a[i] != 0.:
                 return False
         return True
+
+
+def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, shape):
+    """
+    Yield the sparsity of each submatrix, based on variable names and sizes.
+
+    Parameters
+    ----------
+    row_var_size_iter : iterator of (name, size)
+        Iterator of row variable names and sizes.
+    col_var_size_iter : iterator of (name, size)
+        Iterator of column variable names and sizes.
+    nzrows : ndarray
+        Row indices of nonzero entries in the full matrix.
+    nzcols : ndarray
+        Column indices of nonzero entries in the full matrix.
+    shape : tuple
+        Shape of the full matrix.
+
+    Yields
+    ------
+    tuple
+        (row_varname, col_varname, nonzero rows, nonzero cols, shape)
+    """
+    row_start = row_end = 0
+
+    data = np.ones(nzrows.size, dtype=bool)
+    csr = csr_array((data, (nzrows, nzcols)), shape=shape)
+    col_iter = list(col_var_size_iter)  # need to iterate over multiple times
+
+    for of, of_size in row_var_size_iter:
+        row_end += of_size
+        rowslice = csr[row_start:row_end, :]
+        row_start = row_end
+
+        csc = rowslice.tocsc()
+        col_start = col_end = 0
+        for wrt, wrt_size in col_iter:
+            col_end += wrt_size
+            submat = csc[:, col_start:col_end].tocoo()
+            col_start = col_end
+
+            if submat.row.size > 0:  # only yield if nonzero
+                yield (of, wrt, submat.row, submat.col, submat.shape)
+

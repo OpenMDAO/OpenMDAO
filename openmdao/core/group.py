@@ -1055,6 +1055,9 @@ class Group(System):
         """
         if self._use_derivatives:
             # must call this before vector setup because it determines if we need to alloc commplex
+            # TODO: we could figure out if we need alloc complex by setting a flag when partials
+            # are declared if method='cs' is used, then percolate that result up the system tree
+            # at _setup_var_data time.  Then we could move _setup_partials to later in the stack.
             self._setup_partials()
 
         self._fd_rev_xfer_correction_dist = {}
