@@ -123,7 +123,7 @@ class DriverResult():
         Decorate methods to tracks either the objective the deriv time and call count for a Driver.
 
         This decorator should be applied to the _objfunc or _gradfunc (or equivalent) methods
-        of drivers. It will either accumulated the elapsed time in driver.result.obj_time or
+        of drivers. It will either accumulate the elapsed time in driver.result.obj_time or
         driver.result.deriv_time, based on the value of time_type.
 
         Parameters
