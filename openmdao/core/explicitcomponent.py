@@ -12,7 +12,9 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE, _UNDEFINED
-from openmdao.utils.jax_utils import jax, jit, Compute2Jax, get_partials_deps
+from openmdao.utils.jax_utils import jax, jit, ExplicitCompJaxify, get_partials_deps
+
+from openmdao.devtools.memory import diff_mem
 
 
 class ExplicitComponent(Component):
@@ -476,6 +478,7 @@ class ExplicitComponent(Component):
                 else:
                     self.compute_partials(self._inputs, self._jacobian)
 
+    @diff_mem
     def _linearize(self, jac=None, sub_do_ln=False):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
@@ -583,6 +586,7 @@ class ExplicitComponent(Component):
         """
         return True
 
+    @diff_mem
     def _setup_jax(self):
         # we define compute_partials here instead of making this the base class version as we
         # did with compute, because the existence of a compute_partials method that is not the
@@ -591,9 +595,9 @@ class ExplicitComponent(Component):
             if discrete_inputs is None:
                 deriv_vals = self._get_jac_func()(*inputs.values())
             else:
-                ins = list(self._discrete_inputs.values())
-                ins.extend(inputs.values())
-                deriv_vals = self._get_jac_func()(*ins)
+
+                deriv_vals = self._get_jac_func()(*chain(self._discrete_inputs.values(),
+                                                         inputs.values()))
 
             ofidx = len(self._discrete_outputs) - 1
             for ofname in self._var_rel_names['output']:
@@ -604,11 +608,9 @@ class ExplicitComponent(Component):
                     partials[ofname, wrtname] = \
                         deriv_vals[ofidx][wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
 
-        compute_info = Compute2Jax(self)
-        # to see the transformed function, uncomment the next line
-        print(f"\n{compute_info.get_new_source()}")
+        compute_info = ExplicitCompJaxify(self)
 
-        self.compute_primal = MethodType(compute_info.get_new_func(), self)
+        self.compute_primal = MethodType(compute_info.compute_primal, self)
         self.compute = MethodType(ExplicitComponent.compute, self)
         self.compute_partials = MethodType(compute_partials, self)
         self._has_compute_partials = True

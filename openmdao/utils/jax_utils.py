@@ -4,6 +4,7 @@ Utilities for the use of jax in combination with OpenMDAO.
 import ast
 import textwrap
 import inspect
+import weakref
 from itertools import chain
 from types import MethodType
 
@@ -156,11 +157,6 @@ def get_func_graph(func, *args, **kwargs):
                             i += 1
                         graph.add_edge(n2index[inp], n2index[out])
 
-    # show the function graph visually
-    # from openmdao.visualization.graph_viewer import write_graph, _to_pydot_graph
-    # G = _to_pydot_graph(graph)
-    # write_graph(G)
-
     return graph
 
 
@@ -188,6 +184,12 @@ def get_partials_deps(func, outputs, *args, **kwargs):
         A tuple of the form (output, input).
     """
     graph = get_func_graph(func, *args, **kwargs)
+
+    # show the function graph visually
+    # from openmdao.visualization.graph_viewer import write_graph, _to_pydot_graph
+    # G = _to_pydot_graph(graph)
+    # write_graph(G)
+
     inputs = list(inspect.signature(func).parameters)
     n2index = {n: i for i, n in enumerate(chain(inputs, outputs))}
     for inp in inputs:
@@ -197,7 +199,7 @@ def get_partials_deps(func, outputs, *args, **kwargs):
                 yield (out, inp)
 
 
-class Compute2Jax(ast.NodeTransformer):
+class ExplicitCompJaxify(ast.NodeTransformer):
     """
     An ast.NodeTransformer that transforms a compute function definition to jax compatible form.
 
@@ -218,22 +220,20 @@ class Compute2Jax(ast.NodeTransformer):
 
     Attributes
     ----------
-    _args : list
-        The argument names of the original compute function.
-    _dict_keys : dict
-        A dictionary that maps each argument name to a list of subscript values.
-    _transformed : function
-        The transformed compute function.
-    _transformed_src : str or None
-        The source code of the transformed compute function.
-    _jitted: function or None
-        The jitted version of the transformed compute function.
-    _discrete_outs : list
-        The names of the discrete outputs.
-    _orig_args : list
-        The original argument names of the compute function.
-    _returns : list
+    _comp : weakref.ref
+        A weak reference to the Component whose compute function is being transformed.
+    _compute_primal_args : list
+        The argument names of the compute_primal function.
+    _compute_primal_returns : list
         The names of the outputs from the new function.
+    _compute_primal : function
+        The compute_primal function created from the original compute function.
+    _jitted_compute_primal: function or None
+        The jitted version of the compute_primal function.
+    _compute_primal_src : str or None
+        The source code of the transformed compute function.
+    _compute_args : list
+        The original argument names of the compute function.
     """
 
     # these ops require static objects so their args should not be traced.  Traced array ops should
@@ -241,61 +241,37 @@ class Compute2Jax(ast.NodeTransformer):
     _static_ops = {'reshape'}
     _np_names = {'np', 'numpy'}
 
-    def __init__(self, comp):  # noqa: D107
+    def __init__(self, comp, use_jit=True, verbose=False):  # noqa: D107
+        self._comp = weakref.ref(comp)
         func = comp.compute
         if 'jnp' not in comp.compute.__globals__:
             comp.compute.__globals__['jnp'] = jnp
         namespace = comp.compute.__globals__.copy()
 
-        self._orig_args = list(inspect.signature(func).parameters)
+        self._compute_args = list(inspect.signature(func).parameters)
 
         # ensure that ordering of args and returns exactly matches the order of the inputs and
         # outputs vectors.
-        self._args = [n for n in chain(comp._discrete_inputs, comp._var_rel_names['input'])]
-        self._returns = [n for n in chain(comp._discrete_outputs, comp._var_rel_names['output'])]
-        self._discrete_outs = list(comp._discrete_outputs)
+        self._compute_primal_args = \
+            [n for n in chain(comp._discrete_inputs, comp._var_rel_names['input'])]
+        self._compute_primal_returns = \
+            [n for n in chain(comp._discrete_outputs, comp._var_rel_names['output'])]
 
-        self._dict_keys = {arg: set() for arg in self._orig_args}
         node = self.visit(ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec'))
         self._new_ast = ast.fix_missing_locations(node)
 
-        # # check that inputs/outputs referenced in the function match those declared in the component
-        # if set(self._dict_keys[self._orig_args[0]]) != set(comp._var_rel_names['input']):
-        #     issue_warning(f"{comp.msginfo}: The inputs referenced in the compute method "
-        #                        f"{sorted(self._dict_keys['inputs'])} do not match the inputs "
-        #                        f"declared in the component {sorted(comp._var_rel_names['input'])}.")
-        # if set(self._dict_keys[self._orig_args[1]]) != set(comp._var_rel_names['output']):
-        #     issue_warning(f"{comp.msginfo}: The outputs referenced in the compute method "
-        #                        f"{sorted(self._dict_keys['outputs'])} do not match the outputs "
-        #                        f"declared in the component {sorted(comp._var_rel_names['output'])}."
-        #                        )
-
         code = compile(self._new_ast, '<ast>', 'exec')
         exec(code, namespace)
-        self._transformed = namespace['compute_primal']
-        self._static_argnums = tuple(range(len(comp._var_discrete['input']) + 1))
-        self._jitted = None
-        self._transformed_src = None
+        self.compute_primal = namespace['compute_primal']
 
-    def get_new_func(self, use_jit=True):
-        """
-        Return the transformed function.
+        self._compute_primal_src = None
+        if verbose:
+            print(f"\n{self.get_new_source()}\n")
 
-        Parameters
-        ----------
-        use_jit : bool
-            If True, return the jitted function.
-
-        Returns
-        -------
-        function
-            The transformed function.
-        """
         if use_jit:
-            if self._jitted is None:
-                self._jitted = jit(self._transformed, static_argnums=self._static_argnums)
-            return self._jitted
-        return self._transformed
+            static_argnums = tuple(range(len(comp._var_discrete['input']) + 1))
+            self.compute_primal = \
+                    jit(self.compute_primal, static_argnums=static_argnums)
 
     def get_new_source(self):
         """
@@ -306,23 +282,35 @@ class Compute2Jax(ast.NodeTransformer):
         str
             The source code of the transformed function.
         """
-        if self._transformed_src is None:
-            self._transformed_src = ast.unparse(self._new_ast)
-        return self._transformed_src
+        if self._compute_primal_src is None:
+            self._compute_primal_src = ast.unparse(self._new_ast)
+        return self._compute_primal_src
+
+    def get_partials_dependencies(self):
+        """
+        Get (output, input) pairs where the output depends on the input for the compute function.
+
+        Returns
+        -------
+        list
+            A list of tuples of the form (output, input) where the output depends on the input.
+        """
+        return list(get_partials_deps(self.compute_primal, self._compute_primal_returns,
+                                       *self._compute_primal_args))
 
     def _get_new_args(self):
         new_args = [ast.arg('self', annotation=None)]
-        for arg_name in self._args:
+        for arg_name in self._compute_primal_args:
             new_args.append(ast.arg(arg=arg_name, annotation=None))
         return ast.arguments(args=new_args, posonlyargs=[], vararg=None, kwonlyargs=[],
                              kw_defaults=[], kwarg=None, defaults=[])
 
     def _get_pre_body(self):
-        if not self._discrete_outs:
+        if not self._comp()._discrete_outputs:
             return []
 
         # add a statement to pull individual values out of the discrete outputs
-        elts = [ast.Name(id=name, ctx=ast.Store()) for name in self._discrete_outs]
+        elts = [ast.Name(id=name, ctx=ast.Store()) for name in self._comp()._discrete_outputs]
         return [
             ast.Assign(targets=[ast.Tuple(elts=elts, ctx=ast.Store())],
                        value=ast.Call(
@@ -334,11 +322,11 @@ class Compute2Jax(ast.NodeTransformer):
                                       args=[], keywords=[]))]
 
     def _get_post_body(self):
-        if not self._discrete_outs:
+        if not self._comp()._discrete_outputs:
             return []
 
         # add a statement to set the values of self._discrete outputs
-        elts = [ast.Name(id=name, ctx=ast.Load()) for name in self._discrete_outs]
+        elts = [ast.Name(id=name, ctx=ast.Load()) for name in self._comp()._discrete_outputs]
         args = [ast.Tuple(elts=elts, ctx=ast.Load())]
         return [ast.Expr(value=ast.Call(func=ast.Attribute(
             value=ast.Attribute(value=ast.Name(id='self', ctx=ast.Load()),
@@ -346,7 +334,8 @@ class Compute2Jax(ast.NodeTransformer):
                                 attr='set_vals', ctx=ast.Load()), args=args, keywords=[]))]
 
     def _make_return(self):
-        val = ast.Tuple([ast.Name(id=n, ctx=ast.Load()) for n in self._returns], ctx=ast.Load())
+        val = ast.Tuple([ast.Name(id=n, ctx=ast.Load()) for n in self._compute_primal_returns],
+                        ctx=ast.Load())
         return ast.Return(val)
 
     def visit_FunctionDef(self, node):
@@ -395,9 +384,8 @@ class Compute2Jax(ast.NodeTransformer):
             The transformed node.
         """
         # if we encounter a subscript of any of the input args, then replace arg['name'] with name.
-        if (isinstance(node.value, ast.Name) and node.value.id in self._orig_args and
+        if (isinstance(node.value, ast.Name) and node.value.id in self._compute_args and
                 isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str)):
-            self._dict_keys[node.value.id].add(node.slice.value)
             return ast.copy_location(ast.Name(id=node.slice.value, ctx=node.ctx), node)
 
         return self.generic_visit(node)

@@ -13,7 +13,7 @@ if jax is not None:
     jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
     import jax.numpy as jnp
     from openmdao.jax import act_tanh, smooth_abs, smooth_max, smooth_min, ks_max, ks_min
-    from openmdao.utils.jax_utils import Compute2Jax
+    from openmdao.utils.jax_utils import ExplicitCompJaxify
     from openmdao.utils.jax_utils import benchmark_component
 
 
@@ -238,7 +238,7 @@ class TestJaxAST(unittest.TestCase):
         p.setup()
         p.final_setup()
 
-        converter = Compute2Jax(comp)
+        converter = ExplicitCompJaxify(comp)
 
         expected = """
 def compute_primal(self, in_scalar, in_array, in_array2):
@@ -256,7 +256,7 @@ def compute_primal(self, in_scalar, in_array, in_array2):
         p.setup()
         p.final_setup()
 
-        converter = Compute2Jax(comp)
+        converter = ExplicitCompJaxify(comp)
 
         expected = """
 def compute_primal(self, disc_in, in_scalar, in_array, in_array2):
