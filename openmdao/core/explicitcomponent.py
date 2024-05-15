@@ -71,8 +71,6 @@ class ExplicitComponent(Component):
         """
         Configure this system to assign children settings and detect if matrix_free.
         """
-        new_jacvec_prod = getattr(self, 'compute_jacvec_product', None)
-
         if self.matrix_free == _UNDEFINED:
             self.matrix_free = overrides_method('compute_jacvec_product', self, ExplicitComponent)
 
@@ -629,3 +627,32 @@ class ExplicitComponent(Component):
             #                              *chain(self._discrete_inputs.values(),
             #                                     self._inputs.values()))))
         return self._jac_func_
+
+    def get_compute_sparsity(self):
+        """
+        Return sparsity pattern of the compute function.
+
+        Returns
+        -------
+        tuple
+            Tuple of (rows, cols) where rows and cols are lists of integers.
+        """
+        inarr = self._inputs.asarray()
+        outarr = self._outputs.asarray()
+
+        rows = []
+        cols = []
+
+        for i in range(len(inarr)):
+            old = inarr[i]
+            inarr[i] = np.nan
+            self.compute(self._inputs, self._outputs)
+            irows = np.where(np.isnan(outarr))[0]
+            rows.append(irows)
+            cols.append(np.full(irows.size, i))
+            inarr[i] = old
+
+        rows = np.concatenate(rows)
+        cols = np.concatenate(cols)
+
+        return rows, cols

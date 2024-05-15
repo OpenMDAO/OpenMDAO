@@ -5,33 +5,12 @@ import ast
 import textwrap
 import inspect
 from itertools import chain
+from types import MethodType
 
 import networkx as nx
 import numpy as np
 
-from openmdao.utils.om_warnings import issue_warning
 from openmdao.visualization.tables.table_builder import generate_table
-
-
-def jit_stub(f, *args, **kwargs):
-    """
-    Provide a dummy jit decorator for use if jax is not available.
-
-    Parameters
-    ----------
-    f : Callable
-        The function or method to be wrapped.
-    *args : list
-        Positional arguments.
-    **kwargs : dict
-        Keyword arguments.
-
-    Returns
-    -------
-    Callable
-        The decorated function.
-    """
-    return f
 
 
 try:
@@ -42,7 +21,27 @@ try:
 except ImportError:
     jax = None
     jnp = np
-    jit = jit_stub
+
+    def jit(f, *args, **kwargs):
+        """
+        Provide a dummy jit decorator for use if jax is not available.
+
+        Parameters
+        ----------
+        f : Callable
+            The function or method to be wrapped.
+        *args : list
+            Positional arguments.
+        **kwargs : dict
+            Keyword arguments.
+
+        Returns
+        -------
+        Callable
+            The decorated function.
+        """
+        return f
+
 
 
 def register_jax_component(comp_class):

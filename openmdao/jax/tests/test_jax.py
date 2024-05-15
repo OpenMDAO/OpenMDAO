@@ -286,8 +286,8 @@ class TestJaxComp(unittest.TestCase):
         p = om.Problem()
         # create an IVC manually so we can set the shapes.  Otherwise must set shape in the component
         # itself.
-        xshape = (222, 333)
-        yshape = (333, 444)
+        xshape = x_shape
+        yshape = y_shape
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(xshape)))
         ivc.add_output('y', val=np.ones(yshape))
         p.model.add_subsystem('comp', MyCompJax1(derivs_method='jax'))
