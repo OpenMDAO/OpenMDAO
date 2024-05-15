@@ -219,7 +219,7 @@ class Driver(object):
         Cached total jacobian handling object.
     _total_jac_linear : _TotalJacInfo or None
         Cached linear total jacobian handling object.
-    result : dict
+    result : DriverResult
         DriverResult object containing information for use in the optimization report.
     _has_scaling : bool
         If True, scaling has been set for this driver.
