@@ -3983,7 +3983,7 @@ class System(object):
                   print_max=False,
                   return_format='list'):
         """
-        Write a list of output names and other optional information to a specified stream.
+        Write a list of inputs and outputs sorted by component in execution order.
 
         Parameters
         ----------
