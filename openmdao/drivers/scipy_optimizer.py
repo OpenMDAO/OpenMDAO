@@ -835,13 +835,12 @@ class ScipyOptimizeDriver(Driver):
         if meta['linear']:
             grad = self._lincongrad_cache
         else:
-            if self._grad_cache is not None:
-                grad = self._grad_cache
-            else:
+            if self._grad_cache is None:
                 # _gradfunc has not been called, meaning gradients are not
                 # used for the objective but are needed for the constraints
-                grad = self._compute_totals(of=self._obj_and_nlcons, wrt=self._dvlist,
-                                            return_format=self._total_jac_format)
+                self._gradfunc(x_new)
+            grad = self._grad_cache
+
         grad_idx = self._con_idx[name] + idx
 
         # print("Constraint Gradient returned")

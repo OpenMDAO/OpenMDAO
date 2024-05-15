@@ -3327,7 +3327,7 @@ class System(object):
             and ref0.
         scaler : float or ndarray, optional
             Value to multiply the model value to get the scaled value for the driver. scaler
-            is second in precedence. adder and scaler are an alterantive to using ref
+            is second in precedence. adder and scaler are an alternative to using ref
             and ref0.
         units : str, optional
             Units to convert to before applying scaling.
