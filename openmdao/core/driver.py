@@ -120,12 +120,12 @@ class DriverResult():
     @staticmethod
     def track_stats(kind):
         """
-        Decorator which tracks either the objective the deriv time and call count for a Driver.
+        Decorate methods to tracks either the objective the deriv time and call count for a Driver.
 
         This decorator should be applied to the _objfunc or _gradfunc (or equivalent) methods
         of drivers. It will either accumulated the elapsed time in driver.result.obj_time or
         driver.result.deriv_time, based on the value of time_type.
-ort
+
         Parameters
         ----------
         kind : str
