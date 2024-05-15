@@ -130,6 +130,12 @@ class DriverResult():
         ----------
         kind : str
             One of 'obj' or 'deriv', specifying which statistics should be accumulated.
+
+        Returns
+        -------
+        Callable
+            A wrapped version of the decorated function such that it accumulates the time and
+            call count for either the objective or derivatives.
         """
         if kind not in ('obj', 'deriv'):
             raise AttributeError('time_type must be one of "obj" or "deriv".')
