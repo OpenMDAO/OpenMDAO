@@ -39,8 +39,12 @@ class DriverResult():
         The number of iterations used by the optimizer.
     obj_calls : int
         The number of times the objective function was evaluated (model solve_nonlinear calls).
+    obj_time : float
+        The time spent in model solve_nonlinear evaluations.
     deriv_calls : int
         The number of times the total jacobian was computed.
+    deriv_time : float
+        The time spent computing the total jacobian.
     exit_status : str
         A string that may provide more detail about the results of the driver run.
     success : bool
@@ -54,23 +58,24 @@ class DriverResult():
         self.runtime = 0.0
         self.iter_count = 0
         self.obj_calls = 0
+        self.obj_time = 0.0
         self.deriv_calls = 0
+        self.deriv_time = 0.0
         self.exit_status = 'NOT_RUN'
         self.success = False
 
-        self.obj_time = 0.0
-        self.deriv_time = 0.0
-
     def reset(self):
+        """
+        Set the driver result attributes back to their default value.
+        """
         self.runtime = 0.0
         self.iter_count = 0
         self.obj_calls = 0
+        self.obj_time = 0.0
         self.deriv_calls = 0
+        self.deriv_time = 0.0
         self.exit_status = 'NOT_RUN'
         self.success = False
-
-        self._obj_time = 0.0
-        self._deriv_time = 0.0
 
     def __getitem__(self, s):
         """
@@ -1130,6 +1135,7 @@ class Driver(object):
         bool
             Failure flag; True if failed to converge, False is successful.
         """
+        self.result.reset()
         with RecordingDebugging(self._get_name(), self.iter_count, self):
             self._run_solve_nonlinear()
 

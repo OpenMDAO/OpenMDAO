@@ -354,6 +354,7 @@ class pyOptSparseDriver(Driver):
         bool
             Failure flag; True if failed to converge, False is successful.
         """
+        self.result.reset()
         problem = self._problem()
         model = problem.model
         relevance = model._relevance
