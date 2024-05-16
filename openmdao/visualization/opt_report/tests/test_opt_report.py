@@ -162,7 +162,7 @@ class TestOptimizationReport(unittest.TestCase):
                                           cons_lower=-1,
                                           )
         expect = {'obj_calls': 1, 'deriv_calls': 0}
-        print(self.prob.driver.result.obj_calls)
+        print(self.prob.driver.result.model_evals)
         self.check_opt_result(expected=expect)
 
         expected_warning_msg = "The optimizer report is not applicable for Driver type 'Driver', " \

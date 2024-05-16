@@ -44,13 +44,13 @@ class DriverResult():
         The time required to execute the driver, in seconds.
     iter_count : int
         The number of iterations used by the optimizer.
-    obj_calls : int
+    model_evals : int
         The number of times the objective function was evaluated (model solve_nonlinear calls).
-    obj_time : float
+    model_eval_time : float
         The time spent in model solve_nonlinear evaluations.
-    deriv_calls : int
+    deriv_evals : int
         The number of times the total jacobian was computed.
-    deriv_time : float
+    deriv_eval_time : float
         The time spent computing the total jacobian.
     exit_status : str
         A string that may provide more detail about the results of the driver run.
@@ -65,9 +65,9 @@ class DriverResult():
         self._driver = weakref.ref(driver)
         self.runtime = 0.0
         self.iter_count = 0
-        self.obj_calls = 0
-        self.obj_time = 0.0
-        self.deriv_calls = 0
+        self.model_evals = 0
+        self.model_time = 0.0
+        self.deriv_evals = 0
         self.deriv_time = 0.0
         self.exit_status = 'NOT_RUN'
         self.success = False
@@ -78,9 +78,9 @@ class DriverResult():
         """
         self.runtime = 0.0
         self.iter_count = 0
-        self.obj_calls = 0
-        self.obj_time = 0.0
-        self.deriv_calls = 0
+        self.model_evals = 0
+        self.model_time = 0.0
+        self.deriv_evals = 0
         self.deriv_time = 0.0
         self.exit_status = 'NOT_RUN'
         self.success = False
@@ -120,9 +120,9 @@ class DriverResult():
              f'  success     : {self.success}\n'
              f'  iterations  : {self.iter_count}\n'
              f'  runtime     : {self.runtime:-10.4E} s\n'
-             f'  obj_calls   : {self.obj_calls}\n'
-             f'  obj_time    : {self.obj_time:-10.4E} s\n'
-             f'  deriv_calls : {self.deriv_calls}\n'
+             f'  model_evals : {self.model_evals}\n'
+             f'  model_time  : {self.model_time:-10.4E} s\n'
+             f'  deriv_evals : {self.deriv_evals}\n'
              f'  deriv_time  : {self.deriv_time:-10.4E} s\n'
              f'  exit_status : {self.exit_status}')
         return s
@@ -160,7 +160,7 @@ class DriverResult():
         Parameters
         ----------
         kind : str
-            One of 'obj' or 'deriv', specifying which statistics should be accumulated.
+            One of 'model' or 'deriv', specifying which statistics should be accumulated.
 
         Returns
         -------
@@ -168,8 +168,8 @@ class DriverResult():
             A wrapped version of the decorated function such that it accumulates the time and
             call count for either the objective or derivatives.
         """
-        if kind not in ('obj', 'deriv'):
-            raise AttributeError('time_type must be one of "obj" or "deriv".')
+        if kind not in ('model', 'deriv'):
+            raise AttributeError('time_type must be one of "model" or "deriv".')
 
         def _track_time(func):
             @functools.wraps(func)
@@ -179,12 +179,12 @@ class DriverResult():
                 end_time = time.perf_counter()
                 result = args[0].result
 
-                if kind == 'obj':
-                    result.obj_time += end_time - start_time
-                    result.obj_calls += 1
+                if kind == 'model':
+                    result.model_time += end_time - start_time
+                    result.model_evals += 1
                 else:
                     result.deriv_time += end_time - start_time
-                    result.deriv_calls += 1
+                    result.deriv_evals += 1
                 return ret
             return wrapper
         return _track_time
@@ -877,7 +877,7 @@ class Driver(object):
         int
             Number of objective evaluations made during a driver run.
         """
-        return self.result.obj_calls
+        return self.result.model_evals
 
     def get_driver_derivative_calls(self):
         """
@@ -888,7 +888,7 @@ class Driver(object):
         int
             Number of derivative evaluations made during a driver run.
         """
-        return self.result.deriv_calls
+        return self.result.deriv_evals
 
     def get_design_var_values(self, get_remote=True, driver_scaling=True):
         """
@@ -1184,7 +1184,7 @@ class Driver(object):
     def _recording_iter(self):
         return self._problem()._metadata['recording_iter']
 
-    @DriverResult.track_stats(kind='obj')
+    @DriverResult.track_stats(kind='model')
     def _run_solve_nonlinear(self):
         return self._problem().model.run_solve_nonlinear()
 

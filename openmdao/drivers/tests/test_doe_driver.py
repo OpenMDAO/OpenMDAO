@@ -1533,8 +1533,8 @@ class TestDOEDriver(unittest.TestCase):
 
         self.assertGreater(result.runtime, 1.0E-16)
         self.assertEqual(result.iter_count, 9)
-        self.assertEqual(result.obj_calls, 9)
-        self.assertEqual(result.deriv_calls, 9)
+        self.assertEqual(result.model_evals, 9)
+        self.assertEqual(result.deriv_evals, 9)
         self.assertEqual(result.success, True)
         self.assertEqual(result.exit_status, 'SUCCESS')
 
