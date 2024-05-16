@@ -304,10 +304,24 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed =  not prob.run_driver().success
+        result =  prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed, info = " +
-                                 str(prob.driver.pyopt_solution.optInform))
+        self.assertTrue(result.success, "Optimization failed, info = " +
+                         str(prob.driver.pyopt_solution.optInform))
+
+        # Test the result __repr__
+        pattern = (r'Problem:\s*\w+\s*' '\n'
+                   r'Driver:\s*pyOptSparseDriver\s*' '\n'
+                   r'\s*success\s*:\s*(True|False)\s*' '\n'
+                   r'\s*iterations\s*:\s*\d+\s*' '\n'
+                   r'\s*runtime\s*:\s*[\d.E-]+\s*s\s*' '\n'
+                   r'\s*obj_calls\s*:\s*\d+\s*' '\n'
+                   r'\s*obj_time\s*:\s*[\d.E-]+\s*s\s*' '\n'
+                   r'\s*deriv_calls\s*:\s*\d+\s*' '\n'
+                   r'\s*deriv_time\s*:\s*[\d.E-]+\s*s\s*' '\n'
+                   r'\s*exit_status\s*:\s*SUCCESS\s*')
+
+        self.assertRegex(str(result), pattern)
 
         # Minimum should be at (7.166667, -7.833334)
         assert_near_equal(prob['x'], 7.16667, 1e-6)

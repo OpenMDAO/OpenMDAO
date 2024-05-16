@@ -31,8 +31,15 @@ class DriverResult():
     """
     A container that stores information pertaining to the result of a driver execution.
 
+    Parameters
+    ----------
+    driver : Driver
+        The Driver associated with this DriverResult.
+
     Attributes
     ----------
+    _driver : weakref to Driver
+        A weakref to the Driver associated with this DriverResult.
     runtime : float
         The time required to execute the driver, in seconds.
     iter_count : int
@@ -51,10 +58,11 @@ class DriverResult():
         A boolean that dictates whether or not the driver was successful.
     """
 
-    def __init__(self):
+    def __init__(self, driver):
         """
         Initialize the DriverResult object.
         """
+        self._driver = weakref.ref(driver)
         self.runtime = 0.0
         self.iter_count = 0
         self.obj_calls = 0
@@ -95,6 +103,29 @@ class DriverResult():
             The value of the attribute
         """
         return getattr(self, s)
+
+    def __repr__(self):
+        """
+        Return a string representation of the DriverResult.
+
+        Returns
+        -------
+        str
+            A string-representation of the DriverResult object
+        """
+        driver = self._driver()
+        prob = driver._problem()
+        s = (f'Problem: {prob._name}\n'
+             f'Driver:  {driver.__class__.__name__}\n'
+             f'  success     : {self.success}\n'
+             f'  iterations  : {self.iter_count}\n'
+             f'  runtime     : {self.runtime:-10.4E} s\n'
+             f'  obj_calls   : {self.obj_calls}\n'
+             f'  obj_time    : {self.obj_time:-10.4E} s\n'
+             f'  deriv_calls : {self.deriv_calls}\n'
+             f'  deriv_time  : {self.deriv_time:-10.4E} s\n'
+             f'  exit_status : {self.exit_status}')
+        return s
 
     def __bool__(self):
         """
@@ -315,7 +346,7 @@ class Driver(object):
 
         self._declare_options()
         self.options.update(kwargs)
-        self.result = DriverResult()
+        self.result = DriverResult(self)
         self._has_scaling = False
 
     def _get_inst_id(self):

@@ -37,10 +37,6 @@ class DOEDriver(Driver):
         List of design variables, used to compute derivatives.
     _quantities : list
         Contains the objectives plus nonlinear constraints, used to compute derivatives.
-    _num_model_evals : int
-        The number of times the Driver called model.solve_nonlinear.
-    _num_deriv_evals : int
-        The number of times the Driver called Driver._compute_totals.
     """
 
     def __init__(self, generator=None, **kwargs):
@@ -77,8 +73,6 @@ class DOEDriver(Driver):
         self._name = ''
         self._problem_comm = None
         self._color = None
-        self._num_model_evals = 0
-        self._num_deriv_evals = 0
 
         self._indep_list = []
         self._quantities = []
@@ -235,8 +229,6 @@ class DOEDriver(Driver):
                 metadata['success'] = 0
                 metadata['msg'] = traceback.format_exc()
                 print(metadata['msg'])
-            finally:
-                self._num_model_evals += 1
 
             # save reference to metadata for use in record_iteration
             self._metadata = metadata
@@ -246,7 +238,6 @@ class DOEDriver(Driver):
                                  wrt=self._indep_list,
                                  return_format=self._total_jac_format,
                                  driver_scaling=False)
-            self._num_deriv_evals += 1
 
     def _parallel_generator(self, design_vars, model=None):
         """
