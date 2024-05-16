@@ -151,8 +151,7 @@ class DriverResult():
     @staticmethod
     def track_stats(kind):
         """
-        Decorate methods to track either the model solve_nonlinear time the deriv time
-        and call count for a Driver.
+        Decorate methods to track the model solve_nonlinear or deriv time and count.
 
         This decorator should be applied to the _objfunc or _gradfunc (or equivalent) methods
         of drivers. It will either accumulate the elapsed time in driver.result.model_time or
