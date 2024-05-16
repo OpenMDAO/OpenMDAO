@@ -117,9 +117,9 @@ class TestOptimizationReport(unittest.TestCase):
 
         check_rows = {
             # 'runtime': 'Wall clock run time:',
-            'iter_count':  'Number of driver iterations:',
-            'model_evals':   'Number of objective calls:',
-            'deriv_evals': 'Number of derivative calls:',
+            'iter_count': 'Number of driver iterations:',
+            'model_evals': 'Number of model evals:',
+            'deriv_evals': 'Number of deriv evals:',
             'exit_status': 'Exit status:'
         }
 
@@ -162,7 +162,7 @@ class TestOptimizationReport(unittest.TestCase):
                                           cons_lower=-1,
                                           )
         expect = {'model_evals': 1, 'deriv_evals': 0}
-        print(self.prob.driver.result.model_evals)
+
         self.check_opt_result(expected=expect)
 
         expected_warning_msg = "The optimizer report is not applicable for Driver type 'Driver', " \
