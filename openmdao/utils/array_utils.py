@@ -914,7 +914,8 @@ else:
         return True
 
 
-def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, shape):
+def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, shape,
+                         dense_pct=75.):
     """
     Yield the sparsity of each submatrix, based on variable names and sizes.
 
@@ -930,6 +931,9 @@ def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, s
         Column indices of nonzero entries in the full matrix.
     shape : tuple
         Shape of the full matrix.
+    dense_pct : float
+        Percentage of nonzero entries in a submatrix that will treat it as
+        dense, yielding None for rows and cols.
 
     Yields
     ------
@@ -937,6 +941,7 @@ def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, s
         (row_varname, col_varname, nonzero rows, nonzero cols, shape)
     """
     row_start = row_end = 0
+    dense_pct /= 100.
 
     data = np.ones(nzrows.size, dtype=bool)
     csr = csr_array((data, (nzrows, nzcols)), shape=shape)
@@ -955,5 +960,9 @@ def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, s
             col_start = col_end
 
             if submat.row.size > 0:  # only yield if nonzero
-                yield (of, wrt, submat.row, submat.col, submat.shape)
+                if submat.nnz / (submat.shape[0] * submat.shape[1]) >= dense_pct:
+                    # treat submatrix as dense and return None for rows and cols
+                    yield (of, wrt, None, None, submat.shape)
+                else:
+                    yield (of, wrt, submat.row, submat.col, submat.shape)
 

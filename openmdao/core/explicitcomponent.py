@@ -13,6 +13,8 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE, _UNDEFINED
 from openmdao.utils.jax_utils import jax, jit, ExplicitCompJaxify, get_partials_deps
+from openmdao.utils.array_utils import submat_sparsity_iter
+from openmdao.utils.om_warnings import issue_warning
 
 from openmdao.devtools.memory import diff_mem
 
@@ -93,7 +95,7 @@ class ExplicitComponent(Component):
         Yields
         ------
         str
-            Name of 'wrt' variable.
+            Absolute name of 'wrt' variable.
         int
             Starting index.
         int
@@ -632,13 +634,19 @@ class ExplicitComponent(Component):
         """
         Return sparsity pattern of the compute function.
 
+        The compute function is executed once for each entry in the inputs array.  It's possible
+        that the returned sparsity pattern could be slightly more conservative than the actual
+        sparsity pattern.
+
         Returns
         -------
         tuple
-            Tuple of (rows, cols) where rows and cols are lists of integers.
+            Tuple of (rows, cols) where rows and cols are index arrays indicating nonzero locations
+            in the jacobian.
         """
         inarr = self._inputs.asarray()
         outarr = self._outputs.asarray()
+        outsave = outarr.copy()
 
         rows = []
         cols = []
@@ -655,4 +663,50 @@ class ExplicitComponent(Component):
         rows = np.concatenate(rows)
         cols = np.concatenate(cols)
 
+        # restore old output values
+        self._outputs.set_val(outsave)
+
         return rows, cols
+
+    def _check_subjac_sparsity(self, update=False):
+        """
+        Check the declared sparsity of the sub-jacobians.
+
+        Parameters
+        ----------
+        update : bool
+            If True, update subjac sparsity based on the computed sparsity.
+        """
+        full_nzrows, full_nzcols = self.get_compute_sparsity()
+
+        def row_size_iter():
+            for of, start, end, _, _ in self._jac_of_iter():
+                yield of, end - start
+
+        def col_size_iter():
+            for wrt, start, end, _, _, _ in self._jac_wrt_iter():
+                yield wrt, end - start
+
+        for of, wrt, sjrows, sjcols, _ in submat_sparsity_iter(row_size_iter(), col_size_iter(),
+                                                               full_nzrows, full_nzcols,
+                                                               (len(self._outputs),
+                                                                len(self._inputs))):
+            if (of, wrt) in self._subjacs_info:
+                if update:
+                    meta = self._subjacs_info[of, wrt]
+                    if meta['rows'] is None:
+                        issue_warning(f"Sparsity pattern for {of} wrt {wrt} was declared with "
+                                      "rows=None, but a sparsity pattern has been computed.  "
+                                      f"Automatically updating rows to {sjrows} and "
+                                      f"cols to {sjcols}.")
+                        meta['rows'] = sjrows
+                        meta['cols'] = sjcols
+                    else:
+                        pass
+            else:
+                msg = ''
+                if update:
+                    msg = (f" Automatically adding missing partial with "
+                           f"rows: {sjrows} cols: {sjcols}")
+                    self.declare_partials(of, wrt, rows=sjrows, cols=sjcols)
+                issue_warning(f"Partial for {of} wrt {wrt} was not declared but is nonzero.{msg}.")
