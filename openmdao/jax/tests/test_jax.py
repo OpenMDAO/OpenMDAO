@@ -91,7 +91,7 @@ class MyCompJax1(om.ExplicitComponent):
         self.add_input('y', shape_by_conn=True)
         self.add_output('z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
 
-        self.declare_partials(of='z', wrt=['x', 'y'])
+        # self.declare_partials(of='z', wrt=['x', 'y'])
 
     def compute(self, inputs, outputs):
         outputs['z'] = np.dot(inputs['x'], inputs['y'])
@@ -108,7 +108,7 @@ class MyCompJax1Shaped(om.ExplicitComponent):
         self.add_input('y', shape=self.yshape)
         self.add_output('z', shape=(self.xshape[0], self.yshape[1]))
 
-        self.declare_partials(of='z', wrt=['x', 'y'])
+        # self.declare_partials(of='z', wrt=['x', 'y'])
 
     def compute(self, inputs, outputs):
         outputs['z'] = np.dot(inputs['x'], inputs['y'])
@@ -121,7 +121,7 @@ class MyCompJax2(om.ExplicitComponent):
         self.add_output('z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
         self.add_output('zz', copy_shape='y')
 
-        self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
+        # self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
 
     def compute(self, inputs, outputs):
         outputs['z'] = np.dot(inputs['x'], inputs['y'])
@@ -140,7 +140,7 @@ class MyCompJax2Shaped(om.ExplicitComponent):
         self.add_output('z', shape=(self.xshape[0], self.yshape[1]))
         self.add_output('zz', shape=self.yshape)
 
-        self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
+        # self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
 
     def compute(self, inputs, outputs):
         outputs['z'] = np.dot(inputs['x'], inputs['y'])
@@ -154,7 +154,7 @@ class MyCompJaxWithOption(om.ExplicitComponent):
         self.add_output('z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
         self.add_output('zz', copy_shape='y')
 
-        self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
+        # self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
 
         self.options.declare('mult', default=2.5, desc='multiplier', types=(float,))
 
@@ -172,7 +172,7 @@ class MyCompJaxWithDiscrete(om.ExplicitComponent):
         self.add_output('zz', copy_shape='y')
         self.add_discrete_output('disc_out', val=3)
 
-        self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
+        # self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
 
     def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
         if discrete_inputs['disc_in'] > 0:

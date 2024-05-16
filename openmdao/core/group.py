@@ -1053,6 +1053,8 @@ class Group(System):
 
         This part of setup is called automatically at the start of run_model or run_driver.
         """
+        self._setup_vectors(self._get_root_vectors())
+
         if self._use_derivatives:
             # must call this before vector setup because it determines if we need to alloc commplex
             # TODO: we could figure out if we need alloc complex by setting a flag when partials
@@ -1077,8 +1079,6 @@ class Group(System):
                 self._update_dataflow_graph(responses)
 
         self._problem_meta['relevance'] = get_relevance(self, responses, desvars)
-
-        self._setup_vectors(self._get_root_vectors())
 
         # Transfers do not require recursion, but they have to be set up after the vector setup.
         self._setup_transfers()

@@ -943,7 +943,7 @@ def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, s
     row_start = row_end = 0
     dense_pct /= 100.
 
-    data = np.ones(nzrows.size, dtype=bool)
+    data = np.ones(nzrows.size, dtype=np.int8)
     csr = csr_array((data, (nzrows, nzcols)), shape=shape)
     col_iter = list(col_var_size_iter)  # need to iterate over multiple times
 

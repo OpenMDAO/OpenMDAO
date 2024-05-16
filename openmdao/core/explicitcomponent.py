@@ -137,8 +137,7 @@ class ExplicitComponent(Component):
                     self._approx_partials(of, wrt, method=method)
         else:
             if not self._declared_partials_patterns and self.options['derivs_method'] == 'jax':
-                for of, wrt in self._jaxifier._get_partials_deps():
-                    self.declare_partials(of=of, wrt=wrt)
+                self._check_subjac_sparsity(update=True)
             super()._setup_partials()
 
         if self.matrix_free:
@@ -610,8 +609,15 @@ class ExplicitComponent(Component):
                 ofmeta = self._var_rel2meta[ofname]
                 for wrtidx, wrtname in enumerate(self._var_rel_names['input']):
                     wrtmeta = self._var_rel2meta[wrtname]
-                    partials[ofname, wrtname] = \
-                        deriv_vals[ofidx][wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
+                    sjmeta = partials.get_metadata((ofname, wrtname))
+                    rows = sjmeta['rows']
+                    cols = sjmeta['cols']
+                    if rows is None:
+                        partials[ofname, wrtname] = \
+                            deriv_vals[ofidx][wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
+                    else:
+                        partials[ofname, wrtname] = \
+                            deriv_vals[ofidx][wrtidx].reshape(ofmeta['size'], wrtmeta['size'])[rows, cols]
 
         self._jaxifier = ExplicitCompJaxify(self)
 
@@ -660,8 +666,12 @@ class ExplicitComponent(Component):
             cols.append(np.full(irows.size, i))
             inarr[i] = old
 
-        rows = np.concatenate(rows)
-        cols = np.concatenate(cols)
+        if rows:
+            rows = np.concatenate(rows)
+            cols = np.concatenate(cols)
+        else:
+            rows = np.zeros(0, dtype=INT_DTYPE)
+            cols = np.zeros(0, dtype=INT_DTYPE)
 
         # restore old output values
         self._outputs.set_val(outsave)
@@ -678,6 +688,8 @@ class ExplicitComponent(Component):
             If True, update subjac sparsity based on the computed sparsity.
         """
         full_nzrows, full_nzcols = self.get_compute_sparsity()
+        print("fullrows:", full_nzrows)
+        print("fullcols:", full_nzcols)
 
         def row_size_iter():
             for of, start, end, _, _ in self._jac_of_iter():
@@ -687,6 +699,7 @@ class ExplicitComponent(Component):
             for wrt, start, end, _, _, _ in self._jac_wrt_iter():
                 yield wrt, end - start
 
+        prefix_len = len(self.pathname) + 1
         for of, wrt, sjrows, sjcols, _ in submat_sparsity_iter(row_size_iter(), col_size_iter(),
                                                                full_nzrows, full_nzcols,
                                                                (len(self._outputs),
@@ -694,7 +707,7 @@ class ExplicitComponent(Component):
             if (of, wrt) in self._subjacs_info:
                 if update:
                     meta = self._subjacs_info[of, wrt]
-                    if meta['rows'] is None:
+                    if meta['rows'] is None and sjrows is not None:
                         issue_warning(f"Sparsity pattern for {of} wrt {wrt} was declared with "
                                       "rows=None, but a sparsity pattern has been computed.  "
                                       f"Automatically updating rows to {sjrows} and "
@@ -708,5 +721,5 @@ class ExplicitComponent(Component):
                 if update:
                     msg = (f" Automatically adding missing partial with "
                            f"rows: {sjrows} cols: {sjcols}")
-                    self.declare_partials(of, wrt, rows=sjrows, cols=sjcols)
+                    self.declare_partials(of[prefix_len:], wrt[prefix_len:], rows=sjrows, cols=sjcols)
                 issue_warning(f"Partial for {of} wrt {wrt} was not declared but is nonzero.{msg}.")

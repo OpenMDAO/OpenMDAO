@@ -1,12 +1,12 @@
 """
 Utilities for the use of jax in combination with OpenMDAO.
 """
+import re
 import ast
 import textwrap
 import inspect
 import weakref
 from itertools import chain
-from types import MethodType
 
 import networkx as nx
 import numpy as np
@@ -391,7 +391,7 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         # if we encounter a subscript of any of the input args, then replace arg['name'] with name.
         if (isinstance(node.value, ast.Name) and node.value.id in self._compute_args and
                 isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str)):
-            return ast.copy_location(ast.Name(id=node.slice.value, ctx=node.ctx), node)
+            return ast.copy_location(ast.Name(id=_fixname(node.slice.value), ctx=node.ctx), node)
 
         return self.generic_visit(node)
 
@@ -415,6 +415,31 @@ class ExplicitCompJaxify(ast.NodeTransformer):
                                                        attr=node.attr, ctx=node.ctx), node)
 
         return self.generic_visit(node)
+
+
+_replace = set((':', '(', ')', '[', ']', '{', '}', ' ', '-',
+                '+', '*', '/', '^', '%', '!', '<', '>', '='))
+
+
+def _fixname(name):
+    """
+    Ensure that the given name is a valid Python variable name.
+
+    Parameters
+    ----------
+    name : str
+        The name to be fixed.
+
+    Returns
+    -------
+    str
+        The fixed name.
+    """
+    intr = _replace.intersection(name)
+    if intr:
+        for c in intr:
+            name = name.replace(c, '_')
+    return name
 
 
 def benchmark_component(comp_class, methods=(None, 'cs', 'jax'), initial_vals=None, repeats=2,
