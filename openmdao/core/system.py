@@ -6106,9 +6106,9 @@ class System(object):
 
         try:
             hash = hashlib.md5(str(data).encode(),
-                               usedforsecurity=False).hexdigest() # nosec: content not sensitive
+                               usedforsecurity=False).hexdigest()  # nosec: content not sensitive
         except TypeError:
-            hash = hashlib.md5(str(data).encode()).hexdigest() # nosec: content not sensitive
+            hash = hashlib.md5(str(data).encode()).hexdigest()  # nosec: content not sensitive
 
         return hash
 
