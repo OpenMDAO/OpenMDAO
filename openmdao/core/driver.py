@@ -46,11 +46,11 @@ class DriverResult():
         The number of iterations used by the optimizer.
     model_evals : int
         The number of times the objective function was evaluated (model solve_nonlinear calls).
-    model_eval_time : float
+    model_time : float
         The time spent in model solve_nonlinear evaluations.
     deriv_evals : int
         The number of times the total jacobian was computed.
-    deriv_eval_time : float
+    deriv_time : float
         The time spent computing the total jacobian.
     exit_status : str
         A string that may provide more detail about the results of the driver run.
