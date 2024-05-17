@@ -621,10 +621,12 @@ class ExplicitComponent(Component):
                         partials[ofname, wrtname] = \
                             deriv_vals[ofidx][wrtidx].reshape(ofmeta['size'], wrtmeta['size'])[rows, cols]
 
-        self._jaxifier = ExplicitCompJaxify(self)
+        if not hasattr(self, 'compute_primal'):
+            self._jaxifier = ExplicitCompJaxify(self, use_jit=False, verbose=True)
 
-        self.compute_primal = MethodType(self._jaxifier.compute_primal, self)
-        self.compute = MethodType(ExplicitComponent.compute, self)
+            self.compute_primal = MethodType(self._jaxifier.compute_primal, self)
+            self.compute = MethodType(ExplicitComponent.compute, self)
+
         self.compute_partials = MethodType(compute_partials, self)
         self._has_compute_partials = True
 

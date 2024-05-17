@@ -1,4 +1,5 @@
 import unittest
+from functools import partial
 
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
@@ -147,7 +148,7 @@ class MyCompJax2Shaped(om.ExplicitComponent):
         outputs['zz'] = inputs['y'] * 2.5
 
 
-class MyCompJaxWithOption(om.ExplicitComponent):
+class MyCompJax2Primal(om.ExplicitComponent):
     def setup(self):
         self.add_input('x', shape_by_conn=True)
         self.add_input('y', shape_by_conn=True)
@@ -156,7 +157,24 @@ class MyCompJaxWithOption(om.ExplicitComponent):
 
         # self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
 
+    @partial(jax.jit, static_argnums=(0,))
+    def compute_primal(self, x, y):
+        z = jnp.dot(x, y)
+        zz = y * 2.5
+        return z, zz
+
+
+class MyCompJaxWithOption(om.ExplicitComponent):
+    def initialize(self):
         self.options.declare('mult', default=2.5, desc='multiplier', types=(float,))
+
+    def setup(self):
+        self.add_input('x', shape_by_conn=True)
+        self.add_input('y', shape_by_conn=True)
+        self.add_output('z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
+        self.add_output('zz', copy_shape='y')
+
+        # self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
 
     def compute(self, inputs, outputs):
         outputs['z'] = np.dot(inputs['x'], inputs['y'])
@@ -329,11 +347,12 @@ class TestJaxComp(unittest.TestCase):
         p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'], method='fd', show_only_incorrect=True)
         p.check_partials(show_only_incorrect=True)
 
-    def test_jax_explicit_comp_with_option(self):
+    def test_jax_explicit_comp2primal(self):
+        # this component defines its own compute_primal method
         p = om.Problem()
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
         ivc.add_output('y', val=np.ones(y_shape))
-        p.model.add_subsystem('comp', MyCompJaxWithOption(derivs_method='jax'))
+        p.model.add_subsystem('comp', MyCompJax2Primal(derivs_method='jax'))
         p.model.connect('ivc.x', 'comp.x')
         p.model.connect('ivc.y', 'comp.y')
 
@@ -350,6 +369,33 @@ class TestJaxComp(unittest.TestCase):
         assert_near_equal(p.get_val('comp.zz'), y * 2.5)
         p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'], method='fd', show_only_incorrect=True)
         p.check_partials(show_only_incorrect=True)
+
+    def test_jax_explicit_comp_with_option(self):
+        p = om.Problem()
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
+        ivc.add_output('y', val=np.ones(y_shape))
+        comp = p.model.add_subsystem('comp', MyCompJaxWithOption(mult=1.7, derivs_method='jax'))
+        p.model.connect('ivc.x', 'comp.x')
+        p.model.connect('ivc.y', 'comp.y')
+
+        p.setup(mode='rev')
+
+        x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
+        y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
+        p.set_val('ivc.x', x)
+        p.set_val('ivc.y', y)
+        p.final_setup()
+        p.run_model()
+
+        assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
+        assert_near_equal(p.get_val('comp.zz'), y * 1.7)
+        p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'], method='fd', show_only_incorrect=True)
+        p.check_partials(show_only_incorrect=True)
+
+        comp.options['mult'] = 5.
+        p.run_model()
+        assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
+        assert_near_equal(p.get_val('comp.zz'), y * 5.)
 
     def test_jax_explicit_comp_with_discrete(self):
         p = om.Problem()

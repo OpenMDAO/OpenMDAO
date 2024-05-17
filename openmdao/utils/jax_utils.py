@@ -269,6 +269,9 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         # don't jit the function if it has discrete inputs, because it will cause the function
         # to be recompiled whenever the discrete inputs change.
         if use_jit:
+            # TODO: add checking here for any self.* references in the compute function, because
+            # if it has those we can't jit it without having mutations of self generate incorrect
+            # results.
             if comp._discrete_inputs:
                 issue_warning("Jitting a function with discrete inputs can cause the function to "
                               "be recompiled whenever the discrete inputs change.  This can be "
