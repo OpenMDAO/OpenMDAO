@@ -199,11 +199,8 @@ class ParallelGroup(Group):
             True if this is an explicit component.
         """
         if self._is_explicit is None:
-            expl = super().is_explicit()
+            self._is_explicit = super().is_explicit()
             if self.comm.size > 1:
-                for e in self.comm.allgather(expl):
-                    if not e:
-                        self._is_explicit = False
-                        break
+                self._is_explicit = self.comm.allreduce(int(self._is_explicit)) > 0
 
         return self._is_explicit

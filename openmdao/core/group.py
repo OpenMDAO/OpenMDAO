@@ -202,7 +202,7 @@ class Group(System):
         from all ranks will be added together to get the correct input values when derivatives
         in the larger model are being solved using reverse mode.
     _is_explicit : bool or None
-        True if this Group contains only explicit systems and has no cycles.
+        True if neither this Group nor any of its descendants contains implicit systems or cycles.
     _ivcs : dict
         Dict containing metadata for each independent variable.
     """
@@ -1056,10 +1056,6 @@ class Group(System):
         self._setup_vectors(self._get_root_vectors())
 
         if self._use_derivatives:
-            # must call this before vector setup because it determines if we need to alloc commplex
-            # TODO: we could figure out if we need alloc complex by setting a flag when partials
-            # are declared if method='cs' is used, then percolate that result up the system tree
-            # at _setup_var_data time.  Then we could move _setup_partials to later in the stack.
             self._setup_partials()
 
         self._fd_rev_xfer_correction_dist = {}
@@ -2296,7 +2292,7 @@ class Group(System):
         Returns
         -------
         set
-            Set of inputs connected to sources outside of this Group.
+            Set of absolute inputs connected to sources outside of this Group.
         """
         inputs = self._var_abs2meta['input'] if local else self._var_allprocs_abs2meta['input']
         return set(inputs).difference(self._conn_global_abs_in2out)
@@ -2327,6 +2323,7 @@ class Group(System):
         return ins
 
     def _get_compute_primal_outputs(self):
+        # return all outputs that are not indep vars
         return {n: m for n, m in self._var_abs2meta['output'].items()
                 if 'openmdao:indep_var' not in m['tags']}
 
@@ -2413,6 +2410,7 @@ class Group(System):
                 continue
 
             if system.compute_primal is None:
+                system.options['derivs_method'] = 'jax'
                 system._setup_jax()
 
             ins = []
@@ -2493,14 +2491,18 @@ class Group(System):
                 if key in jdict:
                     wrt_size = shape_to_len(wtup[0])
                     shaped_val = deriv_vals[ofidx][wrtidx].reshape(of_size, wrt_size)
-                    # print('deriv_val', key)
-                    # print(shaped_val)
                     if total:
                         self._tot_jac[key] = shaped_val
                     else:
-                        meta = self._subjacs_info[key]
+                        meta = jdict[key]
+                        rows = meta['rows']
+                        if rows is not None:
+                            cols = meta['cols']
+                            shaped_val = shaped_val[rows, cols]
+
                         if meta['val'] is None:
-                            meta['val'] = np.array(shaped_val)
+                            meta['val'] = np.array(shaped_val)  # convert back from jnp to np
+
                         partials[ofname, wrtname] = shaped_val
 
     def _setup_jax_derivs(self):

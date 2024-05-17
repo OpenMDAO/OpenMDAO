@@ -127,7 +127,7 @@ class ExplicitComponent(Component):
             self._has_approx = True
             method = self.options['derivs_method']
             if not self._declared_partials_patterns:
-                # declare all partials as 'cs'
+                # declare all partials as 'cs' or 'fd'
                 self.declare_partials('*', '*', method=method)
                 super()._setup_partials()
             else:
@@ -528,13 +528,12 @@ class ExplicitComponent(Component):
         discrete_outputs : dict like or None
             If not None, dict like object containing discrete output values.
         """
-        if discrete_inputs is None:
+        if not discrete_inputs:
             returns = self.compute_primal(*inputs.values())
         else:
-            ins = list(chain(self._discrete_inputs.values(), inputs.values()))
-            returns = self.compute_primal(*ins)
+            returns = self.compute_primal(*chain(self._discrete_inputs.values(), inputs.values()))
 
-        if discrete_outputs is None:
+        if not discrete_outputs:
             outputs.set_vals(returns)
         else:
             self._discrete_outputs.set_vals(returns[:len(self._discrete_outputs)])
@@ -609,7 +608,10 @@ class ExplicitComponent(Component):
                 ofmeta = self._var_rel2meta[ofname]
                 for wrtidx, wrtname in enumerate(self._var_rel_names['input']):
                     wrtmeta = self._var_rel2meta[wrtname]
-                    sjmeta = partials.get_metadata((ofname, wrtname))
+                    key = (ofname, wrtname)
+                    if key not in partials:
+                        continue
+                    sjmeta = partials.get_metadata(key)
                     rows = sjmeta['rows']
                     cols = sjmeta['cols']
                     if rows is None:
@@ -642,7 +644,7 @@ class ExplicitComponent(Component):
 
         The compute function is executed once for each entry in the inputs array.  It's possible
         that the returned sparsity pattern could be slightly more conservative than the actual
-        sparsity pattern.
+        jacobian sparsity pattern.
 
         Returns
         -------
@@ -660,7 +662,7 @@ class ExplicitComponent(Component):
         for i in range(len(inarr)):
             old = inarr[i]
             inarr[i] = np.nan
-            self.compute(self._inputs, self._outputs)
+            self.compute(self._inputs, self._outputs, self._discrete_inputs, self._discrete_outputs)
             irows = np.where(np.isnan(outarr))[0]
             rows.append(irows)
             cols.append(np.full(irows.size, i))
@@ -688,8 +690,6 @@ class ExplicitComponent(Component):
             If True, update subjac sparsity based on the computed sparsity.
         """
         full_nzrows, full_nzcols = self.get_compute_sparsity()
-        print("fullrows:", full_nzrows)
-        print("fullcols:", full_nzcols)
 
         def row_size_iter():
             for of, start, end, _, _ in self._jac_of_iter():
@@ -722,4 +722,5 @@ class ExplicitComponent(Component):
                     msg = (f" Automatically adding missing partial with "
                            f"rows: {sjrows} cols: {sjcols}")
                     self.declare_partials(of[prefix_len:], wrt[prefix_len:], rows=sjrows, cols=sjcols)
-                issue_warning(f"Partial for {of} wrt {wrt} was not declared but is nonzero.{msg}.")
+                issue_warning(f"{self.msginfo}: Partial for {of[prefix_len:]} wrt "
+                              f"{wrt[prefix_len:]} was not declared but is nonzero.{msg}.")

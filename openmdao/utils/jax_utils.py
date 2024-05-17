@@ -1,17 +1,18 @@
 """
 Utilities for the use of jax in combination with OpenMDAO.
 """
-import re
 import ast
 import textwrap
 import inspect
 import weakref
 from itertools import chain
+from types import MethodType
 
 import networkx as nx
 import numpy as np
 
 from openmdao.visualization.tables.table_builder import generate_table
+from openmdao.utils.om_warnings import issue_warning
 
 
 try:
@@ -265,10 +266,19 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         if verbose:
             print(f"\n{self.get_new_source()}\n")
 
+        # don't jit the function if it has discrete inputs, because it will cause the function
+        # to be recompiled whenever the discrete inputs change.
         if use_jit:
-            static_argnums = tuple(range(len(comp._var_discrete['input']) + 1))
-            self.compute_primal = \
-                    jit(self.compute_primal, static_argnums=static_argnums)
+            if comp._discrete_inputs:
+                issue_warning("Jitting a function with discrete inputs can cause the function to "
+                              "be recompiled whenever the discrete inputs change.  This can be "
+                              "very slow if the discrete inputs change often. For this reason, "
+                              f"the compute_primal function in component '{comp.pathname}' will not"
+                              " be jitted.")
+            else:
+                static_argnums = tuple(range(len(comp._var_discrete['input']) + 1))
+                self.compute_primal = \
+                        jit(self.compute_primal, static_argnums=static_argnums)
 
     def get_new_source(self):
         """
@@ -417,8 +427,8 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         return self.generic_visit(node)
 
 
-_replace = set((':', '(', ')', '[', ']', '{', '}', ' ', '-',
-                '+', '*', '/', '^', '%', '!', '<', '>', '='))
+_replace = frozenset((':', '(', ')', '[', ']', '{', '}', ' ', '-',
+                      '+', '*', '/', '^', '%', '!', '<', '>', '='))
 
 
 def _fixname(name):
