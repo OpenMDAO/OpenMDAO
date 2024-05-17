@@ -3,6 +3,7 @@
 import sys
 import os
 import sys
+import types
 import unittest
 
 from io import StringIO
@@ -3054,6 +3055,95 @@ class TestSqliteCaseReader(unittest.TestCase):
         assert_near_equal(cons['exec.z'], con_vals['exec.z'])
         assert_near_equal(cons['ALIAS_TEST'], con_vals['ALIAS_TEST'])
         assert_near_equal(cons['con|with->scaling'], con_vals['con|with->scaling'])
+
+    def test_reading_non_importable_objects_in_system_options(self):
+        # A test to see if a case recorder file can read as much information
+        # as possible from the metadata, even if some cannot be read since the 
+        # recording was done with a module that is not available while doing the 
+        # reading of the case recorder file
+        
+        module_path = 'mymodule.py'  # the module file that will exist while recording but not reading
+        
+        def create_case_recording_file():
+            # Define the module content as a string
+            module_content = """
+class DummyClass(object):
+    pass
+            """
+            # Write the content to the file to create the module
+            with open(module_path, 'w') as file:
+                file.write(module_content)
+
+            # import the newly created module
+            import mymodule
+            
+            class ParaboloidWithDummyMetadata(om.ExplicitComponent):
+                def setup(self):
+                    self.add_input('x', val=0.0)
+                    self.add_input('y', val=0.0)
+                    self.add_output('f_xy', val=0.0)
+                def setup_partials(self):
+                    self.declare_partials('*', '*', method='fd')
+                def compute(self, inputs, outputs):
+                    x = inputs['x']
+                    y = inputs['y']
+                    outputs['f_xy'] = (x - 3.0)**2 + x * y + (y + 4.0)**2 - 3.0
+                def initialize(self):
+                    self.options.declare('dummy', types=mymodule.DummyClass, default=mymodule.DummyClass())
+           
+            prob = om.Problem()
+            recorder = om.SqliteRecorder('cases.sql')
+            prob.add_recorder(recorder)
+
+            prob.model.add_subsystem('parab_with_dummy_metadata', ParaboloidWithDummyMetadata(), 
+                                     promotes_inputs=['x', 'y'])
+            prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
+            prob.model.set_input_defaults('x', 3.0)
+            prob.model.set_input_defaults('y', -4.0)
+            prob.driver = om.ScipyOptimizeDriver()
+            prob.driver.options['optimizer'] = 'COBYLA'
+            prob.model.add_design_var('x', lower=-50, upper=50)
+            prob.model.add_design_var('y', lower=-50, upper=50)
+            prob.model.add_objective('parab_with_dummy_metadata.f_xy')
+            prob.model.add_constraint('const.g', lower=0, upper=10.)
+            prob.setup()
+            prob.run_driver()
+            prob.record('final')
+            
+            prob.cleanup()
+            
+            # Really remove the module!
+            del sys.modules['mymodule']
+            os.remove(module_path)
+
+        # need to do this because the use_tempdirs decorator does not 
+        #  update the python path and so "." is not included and this 
+        #  module being created cannot be found
+        syspath_save = sys.path[:]
+        current_dir = os.getcwd()
+        if current_dir not in sys.path:
+            sys.path.append(current_dir)
+
+        try:
+            create_case_recording_file()
+        finally:
+            sys.path = syspath_save
+
+        # check to see if the case file can be read even though one item in the
+        # metadata will not be able to be read because the definition of the class
+        # for the instance is not available since the module containing it was removed
+        
+        # need to check for warning being issued about not being able to read it
+        with assert_warning(RuntimeWarning, "While reading system options from case recorder, the following errors occurred: No module named 'mymodule'"):
+            cr = om.CaseReader('cases.sql')
+            
+        # Check to see that all the component options for the DummyClass are retrievable from the case recorder file
+        parab_component_options = cr._system_options['parab_with_dummy_metadata']['component_options']
+        component_options_names = [name for name in parab_component_options]
+        from openmdao.recorders.sqlite_reader import UnknownType
+        self.assertEqual(['always_opt', 'distributed', 'dummy', 'run_root_only'], 
+                         sorted(component_options_names))
+        self.assertTrue(isinstance(parab_component_options['dummy'], UnknownType))
 
 
 @use_tempdirs

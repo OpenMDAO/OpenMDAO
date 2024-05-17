@@ -40,8 +40,8 @@ def write_var_table(pathname, var_list, var_type, var_dict,
         Pathname to be printed. If None, defaults to 'model'.
     var_list : list of str
         List of variable names in the order they are to be written.
-    var_type : 'input', 'explicit' or 'implicit'
-        Indicates type of variables, input or explicit/implicit output.
+    var_type : 'input', 'explicit', 'implicit', or 'all'
+        Indicates type of variables, input or explicit/implicit output, or all for all vars.
     var_dict : dict
         Dict storing vals and metadata for each var name.
     hierarchical : bool
@@ -77,6 +77,8 @@ def write_var_table(pathname, var_list, var_type, var_dict,
 
     if var_type == 'input':
         header = "%d Input(s) in '%s'" % (count, pathname)
+    elif var_type == 'all':
+        header = "%d %s Variables(s) in '%s'" % (count, var_type.capitalize(), pathname)
     else:
         header = "%d %s Output(s) in '%s'" % (count, var_type.capitalize(), pathname)
 
@@ -90,6 +92,9 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     #  so that we do the column output in the correct order
     if var_type == 'input':
         out_types = ('val', 'units', 'shape', 'global_shape', 'prom_name', 'desc', 'min', 'max')
+    elif var_type == 'all':
+        out_types = ('val', 'io', 'resids', 'units', 'shape', 'global_shape', 'lower', 'upper',
+                     'ref', 'ref0', 'res_ref', 'prom_name', 'desc', 'min', 'max')
     else:
         out_types = ('val', 'resids', 'units', 'shape', 'global_shape', 'lower', 'upper',
                      'ref', 'ref0', 'res_ref', 'prom_name', 'desc', 'min', 'max')
