@@ -2395,7 +2395,7 @@ class TestFDRelative(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             prob.check_partials()
 
-        msg = "<model> <class Group>: Option 'directional' is not supported when 'step_calc' is set to 'rel_element.'"
+        msg = "'comp' <class FDComp>: Option 'directional' is not supported when 'step_calc' is set to 'rel_element.'"
         self.assertEqual(cm.exception.args[0], msg)
 
     def test_check_settings_on_comp(self):
