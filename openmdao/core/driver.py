@@ -24,7 +24,7 @@ from openmdao.utils.array_utils import sizes2offsets
 from openmdao.vectors.vector import _full_slice, _flat_full_indexer
 from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, \
-    DriverWarning, OMDeprecationWarning
+    DriverWarning, OMDeprecationWarning, warn_deprecation
 
 
 class DriverResult():
@@ -877,6 +877,8 @@ class Driver(object):
         int
             Number of objective evaluations made during a driver run.
         """
+        warn_deprecation('get_driver_objective_calls is deprecated. '
+                         'Use `driver.result.model_evals`')
         return self.result.model_evals
 
     def get_driver_derivative_calls(self):
@@ -888,6 +890,8 @@ class Driver(object):
         int
             Number of derivative evaluations made during a driver run.
         """
+        warn_deprecation('get_driver_derivative_calls is deprecated. '
+                         'Use `driver.result.deriv_evals`')
         return self.result.deriv_evals
 
     def get_design_var_values(self, get_remote=True, driver_scaling=True):
