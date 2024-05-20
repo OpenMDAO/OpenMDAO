@@ -1119,16 +1119,8 @@ class Component(System):
                                  f'will raise an error.')
 
             if rows is not None:
-                # If using `np.array(obj, copy=False)` replace it with `np.asarray(obj)`
-                # to allow a copy when needed (no behavior change in NumPy 1.x).
-                # For more details, see https://numpy.org/devdocs/numpy_2_0_migration_guide.html
-                # #adapting-to-changes-in-the-copy-keyword.
-                if np.__version__[0] == '2':
-                    rows = np.asarray(rows, dtype=INT_DTYPE)
-                    cols = np.asarray(cols, dtype=INT_DTYPE)
-                else:
-                    rows = np.array(rows, dtype=INT_DTYPE, copy=False)
-                    cols = np.array(cols, dtype=INT_DTYPE, copy=False)
+                rows = np.asarray(rows, dtype=INT_DTYPE)
+                cols = np.asarray(cols, dtype=INT_DTYPE)
 
                 # Check the length of rows and cols to catch this easy mistake and give a
                 # clear message.
