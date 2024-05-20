@@ -621,10 +621,10 @@ class ExplicitComponent(Component):
                         partials[ofname, wrtname] = \
                             deriv_vals[ofidx][wrtidx].reshape(ofmeta['size'], wrtmeta['size'])[rows, cols]
 
-        if not hasattr(self, 'compute_primal'):
-            self._jaxifier = ExplicitCompJaxify(self, use_jit=False, verbose=True)
+        if self.compute_primal is None:
+            jaxifier = ExplicitCompJaxify(self, use_jit=True, verbose=True)
 
-            self.compute_primal = MethodType(self._jaxifier.compute_primal, self)
+            self.compute_primal = MethodType(jaxifier.compute_primal, self)
             self.compute = MethodType(ExplicitComponent.compute, self)
 
         self.compute_partials = MethodType(compute_partials, self)
@@ -664,7 +664,10 @@ class ExplicitComponent(Component):
         for i in range(len(inarr)):
             old = inarr[i]
             inarr[i] = np.nan
-            self.compute(self._inputs, self._outputs, self._discrete_inputs, self._discrete_outputs)
+            if self._discrete_inputs or self._discrete_outputs:
+                self.compute(self._inputs, self._outputs, self._discrete_inputs, self._discrete_outputs)
+            else:
+                self.compute(self._inputs, self._outputs)
             irows = np.where(np.isnan(outarr))[0]
             rows.append(irows)
             cols.append(np.full(irows.size, i))
@@ -726,3 +729,14 @@ class ExplicitComponent(Component):
                     self.declare_partials(of[prefix_len:], wrt[prefix_len:], rows=sjrows, cols=sjcols)
                 issue_warning(f"{self.msginfo}: Partial for {of[prefix_len:]} wrt "
                               f"{wrt[prefix_len:]} was not declared but is nonzero.{msg}.")
+
+    def get_static_jax_data(self):
+        """
+        Return static data needed by the jaxified methods.
+
+        Returns
+        -------
+        dict
+            Dictionary containing static data.
+        """
+        return {'options': self.options}

@@ -193,6 +193,7 @@ class MyCompJaxWithDiscrete(om.ExplicitComponent):
         # self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
 
     def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+        discrete_outputs['disc_out'] = -discrete_inputs['disc_in']
         if discrete_inputs['disc_in'] > 0:
             outputs['z'] = np.dot(inputs['x'], inputs['y'])
         else:
@@ -417,6 +418,13 @@ class TestJaxComp(unittest.TestCase):
         p.run_model()
 
         assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
+        assert_near_equal(p.get_val('comp.zz'), y * 3.0)
+        p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'], method='fd', show_only_incorrect=True)
+        p.check_partials(show_only_incorrect=True)
+        
+        p.set_val('ivc.disc_out', -2)
+        p.run_model()
+        assert_near_equal(p.get_val('comp.z'), -np.dot(x, y))
         assert_near_equal(p.get_val('comp.zz'), y * 2.5)
         p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'], method='fd', show_only_incorrect=True)
         p.check_partials(show_only_incorrect=True)

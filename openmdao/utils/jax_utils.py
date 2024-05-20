@@ -266,22 +266,18 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         if verbose:
             print(f"\n{self.get_new_source()}\n")
 
-        # don't jit the function if it has discrete inputs, because it will cause the function
+        # warn if jitting a function that has discrete inputs, because it will cause the function
         # to be recompiled whenever the discrete inputs change.
         if use_jit:
-            # TODO: add checking here for any self.* references in the compute function, because
-            # if it has those we can't jit it without having mutations of self generate incorrect
-            # results.
             if comp._discrete_inputs:
                 issue_warning("Jitting a function with discrete inputs can cause the function to "
                               "be recompiled whenever the discrete inputs change.  This can be "
-                              "very slow if the discrete inputs change often. For this reason, "
-                              f"the compute_primal function in component '{comp.pathname}' will not"
-                              " be jitted.")
-            else:
-                static_argnums = tuple(range(len(comp._var_discrete['input']) + 1))
-                self.compute_primal = \
-                        jit(self.compute_primal, static_argnums=static_argnums)
+                              "slow if the discrete inputs change often. You may want to consider "
+                              "'use_jit=False' for component '{comp.pathname}' if performance "
+                              "issues arise.")
+            static_argnums = tuple(range(len(comp._var_discrete['input']) + 1))
+            self.compute_primal = \
+                    jit(self.compute_primal, static_argnums=static_argnums)
 
     def get_new_source(self):
         """
@@ -428,6 +424,29 @@ class ExplicitCompJaxify(ast.NodeTransformer):
                                                        attr=node.attr, ctx=node.ctx), node)
 
         return self.generic_visit(node)
+
+
+class _SystemJaxWrapper(object):
+    owned = frozenset(('_static_info_',))
+
+    def __init__(self, static_info=((), {})):
+        self._static_info_ = static_info
+
+    def __getattr__(self, name):
+        return getattr(self._system, name)
+
+    def __setattr(self, name, value):
+        if name in _SystemJaxWrapper.owned:
+            object.__setattr__(self, name, value)
+        else:
+            setattr(self._system, name, value)
+
+
+#if jax is not None:
+    #jax.tree_util.register_pytree_node(_SystemJaxWrapper,
+                                       #_SystemJaxWrapper._tree_flatten,
+                                       #_SystemJaxWrapper._tree_unflatten)
+
 
 
 _replace = frozenset((':', '(', ')', '[', ']', '{', '}', ' ', '-',
