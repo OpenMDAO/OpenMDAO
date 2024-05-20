@@ -465,7 +465,6 @@ class TestSubmodelCompMPI(unittest.TestCase):
         p.run_model()
         assert_check_partials(p.check_partials(method='cs', out_stream=None))
 
-    # @unittest.skip("Unskip this after vars under ParallelGroups work with SubmodelComp")
     def test_submodel_with_parallel_group(self):
         p = om.Problem()
 

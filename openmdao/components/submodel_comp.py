@@ -275,10 +275,7 @@ class SubmodelComp(ExplicitComponent):
 
         p.final_setup()
 
-        nproc = p.comm.size
-
         abs2meta_out = p.model._var_allprocs_abs2meta['output']
-        abs2meta_in = p.model._var_allprocs_abs2meta['input']
         abs2meta_local = p.model._var_abs2meta['output']
         prom2abs_in = p.model._var_allprocs_prom2abs_list['input']
         prom2abs_out = p.model._var_allprocs_prom2abs_list['output']
