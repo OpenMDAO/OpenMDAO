@@ -161,6 +161,7 @@ class DOEDriver(Driver):
         bool
             Failure flag; True if failed to converge, False is successful.
         """
+        self.result.reset()
         self.iter_count = 0
         self._quantities = []
 
@@ -218,7 +219,7 @@ class DOEDriver(Driver):
 
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             try:
-                self._problem().model.run_solve_nonlinear()
+                self._run_solve_nonlinear()
                 metadata['success'] = 1
                 metadata['msg'] = ''
             except AnalysisError:

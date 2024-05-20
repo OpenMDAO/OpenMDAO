@@ -1275,7 +1275,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         prob.setup(mode='fwd')
 
-        failed = prob.run_driver()
+        prob.run_driver()
 
         totals = prob.check_totals(out_stream=None)
 
@@ -1309,8 +1309,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         prob.setup(mode='rev')
 
-        failed = prob.run_driver()
-        print(failed)
+        result = prob.run_driver()
 
         totals = prob.check_totals(out_stream=None)
 
