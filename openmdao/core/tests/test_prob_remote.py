@@ -350,7 +350,7 @@ class ProbRemote4TestCase(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         all_failed = comm.allgather(failed)
         if any(all_failed):

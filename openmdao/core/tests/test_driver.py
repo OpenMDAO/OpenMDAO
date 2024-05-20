@@ -793,7 +793,7 @@ class TestDriver(unittest.TestCase):
         prob.set_val('sub.x', 50.)
         prob.set_val('sub.y', 50.)
 
-        failed = prob.run_driver()
+        result = prob.run_driver()
 
         assert_near_equal(prob['sub.x'], 6.66666667, 1e-6)
         assert_near_equal(prob['sub.y'], -7.3333333, 1e-6)
@@ -918,7 +918,7 @@ class TestCheckRelevance(unittest.TestCase):
 
         # add constraint that does not depend on a design var
         prob.model.add_constraint('bad', equals=-15.0)
-        
+
         prob.driver.options['singular_jac_behavior'] = 'error'
 
         prob.setup()
