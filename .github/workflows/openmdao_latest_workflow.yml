@@ -177,9 +177,6 @@ jobs:
         run: |
           source .github/scripts/install_latest_deps.sh
 
-          echo "Install latest dev version of testflo for deprecations fix"
-          pip install git+https://github.com/OpenMDAO/testflo
-
       - name: Install pyOptSparse
         if: ${{ matrix.PYOPTSPARSE }}
         run: |
