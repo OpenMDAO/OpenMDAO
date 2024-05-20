@@ -203,10 +203,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Fetch tags
-        run: |
-          git fetch --prune --unshallow --tags
-
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v3
         with:
@@ -233,6 +229,15 @@ jobs:
           else
             python -m pip install .${{ matrix.OPTIONAL }}
           fi
+
+      - name: Check NumPy 2.0 Compatibility
+        run: |
+          echo "============================================================="
+          echo "Check OpenMDAO code for NumPy 2.0 compatibility"
+          echo "See: https://numpy.org/devdocs/numpy_2_0_migration_guide.html"
+          echo "============================================================="
+          python -m pip install ruff
+          ruff check . --select NPY201
 
       - name: Install MacOS-specific dependencies
         if: matrix.OS == 'macos-13'
@@ -485,6 +490,11 @@ jobs:
             echo "Install version of openssl compatible with hosting service"
             echo "============================================================="
             conda install -c conda-forge 'openssl=3.0'
+
+            echo "============================================================="
+            echo "Fetch tags to get docs version"
+            echo "============================================================="
+            git fetch --prune --unshallow --tags
 
             echo "============================================================="
             echo "Publish docs"

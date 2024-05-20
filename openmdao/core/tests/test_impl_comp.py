@@ -508,7 +508,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         prob['pc.c'] = 3.
 
         # Making sure that guess_nonlinear is called early enough to eradicate this.
-        prob['comp2.x'] = np.NaN
+        prob['comp2.x'] = np.nan
 
         prob.run_model()
         assert_near_equal(prob['comp2.x'], 3.)

@@ -12,6 +12,7 @@ from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJa
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.general_utils import printoptions
 from openmdao.utils.mpi import MPI
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -32,7 +33,7 @@ class NanComp(om.ExplicitComponent):
     def compute_partials(self, inputs, partials):
         """Intentionally incorrect derivative."""
         J = partials
-        J['y', 'x'] = np.NaN
+        J['y', 'x'] = np.nan
 
 
 class SingularComp(om.ImplicitComponent):
@@ -64,7 +65,7 @@ class NanComp2(om.ExplicitComponent):
     def compute_partials(self, inputs, partials):
         """Intentionally incorrect derivative."""
         J = partials
-        J['y', 'x'] = np.NaN
+        J['y', 'x'] = np.nan
         J['y2', 'x'] = 2.0
 
 class DupPartialsComp(om.ExplicitComponent):
@@ -260,8 +261,9 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
         model.linear_solver = om.DirectSolver(assemble_jac=True)
 
-        with self.assertRaises(Exception) as cm:
-            prob.setup()
+        with printoptions(legacy='1.21'):
+            with self.assertRaises(Exception) as cm:
+                prob.setup()
 
         expected_msg = "'dupcomp' <class DupPartialsComp>: d(x)/d(c): declare_partials has been called with rows and cols that specify the following duplicate subjacobian entries: [(4, 11), (10, 2)]."
 

@@ -22,7 +22,7 @@ from openmdao.utils.coloring import _compute_coloring, compute_total_coloring, C
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.testing_utils import use_tempdirs, set_env_vars
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder
-from openmdao.utils.general_utils import run_driver
+from openmdao.utils.general_utils import run_driver, printoptions
 
 import openmdao.test_suite
 
@@ -1328,7 +1328,8 @@ class SimulColoringVarOutputTestClass(unittest.TestCase):
 
         p.setup(check=False)
 
-        failed, output = run_driver(p)
+        with printoptions(legacy='1.21'):
+            failed, output = run_driver(p)
 
         self.assertFalse(failed, "Optimization failed.")
 
