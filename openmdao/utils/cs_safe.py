@@ -4,6 +4,11 @@ collection of complex-step safe functions to replace standard numpy operations.
 
 import numpy as np
 
+if np.__version__[0] == '2':
+    NumPy2 = True
+else:
+    NumPy2 = False
+
 
 def abs(x):
     """
@@ -24,7 +29,7 @@ def abs(x):
         # 1.x: For complex inputs, the sign function returns sign(x.real) + 0j if x.real != 0
         #      else sign(x.imag) + 0j.
         # 2.0: For complex inputs, the sign function returns x / abs(x), and 0 if x==0.
-        if np.__version__[0] == '2' and np.any(np.iscomplex(x)):
+        if NumPy2 and np.any(np.iscomplex(x)):
             # replicate NumPy 1.x behavior for complex arrays
             z0_idx = x.real == 0
             nz_idx = x.real != 0
