@@ -556,7 +556,8 @@ class Component(System):
             if distributed is None:
                 distributed = False
             # using ._dict below to avoid tons of deprecation warnings
-            distributed = distributed or self.options._dict['distributed']['val']
+            distributed = distributed or ('distributed' in self.options and
+                                          self.options._dict['distributed']['val'])
 
         metadata = {}
 
@@ -797,7 +798,8 @@ class Component(System):
             if distributed is None:
                 distributed = False
             # using ._dict below to avoid tons of deprecation warnings
-            distributed = distributed or self.options._dict['distributed']['val']
+            distributed = distributed or ('distributed' in self.options and
+                                          self.options._dict['distributed']['val'])
 
         if copy_shape and compute_shape:
             raise ValueError(f"{self.msginfo}: Only one of 'copy_shape' or 'compute_shape' can "
