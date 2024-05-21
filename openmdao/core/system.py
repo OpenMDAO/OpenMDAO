@@ -3609,7 +3609,7 @@ class System(object):
             key = src_name
 
         meta['source'] = src_name
-        meta['distributed'] = \
+        meta['distributed'] = dist = \
             src_name in abs2meta_out and abs2meta_out[src_name]['distributed']
 
         if get_size:
@@ -3626,7 +3626,10 @@ class System(object):
                     indices = indices.shaped_instance()
                     meta['size'] = meta['global_size'] = indices.indexed_src_size
                 else:
-                    meta['size'] = sizes[owning_rank[src_name], abs2idx[src_name]]
+                    if dist:
+                        meta['size'] = sizes[self.comm.rank, abs2idx[src_name]]
+                    else:
+                        meta['size'] = sizes[owning_rank[src_name], abs2idx[src_name]]
                     meta['global_size'] = out_meta['global_size']
             else:
                 meta['size'] = meta['global_size'] = 0  # discrete var, don't know size
@@ -5004,7 +5007,7 @@ class System(object):
             if self._assembled_jac:
                 self._assembled_jac.set_complex_step_mode(active)
 
-        for sub in self.system_iter(include_self=False, recurse=True):
+        for sub in self._subsystems_myproc:
             sub._set_complex_step_mode(active)
 
     def cleanup(self):
@@ -6104,7 +6107,13 @@ class System(object):
         for key in sorted(self._conn_global_abs_in2out):
             data.append(self._conn_global_abs_in2out[key])
 
-        return hashlib.md5(str(data).encode()).hexdigest()  # nosec: content not sensitive
+        try:
+            hash = hashlib.md5(str(data).encode(),
+                               usedforsecurity=False).hexdigest()  # nosec: content not sensitive
+        except TypeError:
+            hash = hashlib.md5(str(data).encode()).hexdigest()  # nosec: content not sensitive
+
+        return hash
 
     def _get_full_dist_shape(self, abs_name, local_shape):
         """
