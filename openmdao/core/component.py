@@ -1119,8 +1119,8 @@ class Component(System):
                                  f'will raise an error.')
 
             if rows is not None:
-                rows = np.array(rows, dtype=INT_DTYPE, copy=False)
-                cols = np.array(cols, dtype=INT_DTYPE, copy=False)
+                rows = np.asarray(rows, dtype=INT_DTYPE)
+                cols = np.asarray(cols, dtype=INT_DTYPE)
 
                 # Check the length of rows and cols to catch this easy mistake and give a
                 # clear message.

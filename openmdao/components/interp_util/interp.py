@@ -326,7 +326,7 @@ class InterpND(object):
             for i, p in enumerate(xi.T):
                 if np.isnan(p).any():
                     raise OutOfBoundsError("One of the requested xi contains a NaN",
-                                           i, np.NaN, self.grid[i][0], self.grid[i][-1])
+                                           i, np.nan, self.grid[i][0], self.grid[i][-1])
 
                 eps = 1e-14 * self.grid[i][-1]
                 if np.any(p < self.grid[i][0] - eps) or np.any(p > self.grid[i][-1] + eps):

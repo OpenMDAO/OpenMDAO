@@ -20,7 +20,7 @@ from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.test_suite.components.simple_comps import NonSquareArrayComp
 from openmdao.test_suite.groups.sin_fitter import SineFitter
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
-from openmdao.utils.general_utils import run_driver
+from openmdao.utils.general_utils import run_driver, printoptions
 from openmdao.utils.testing_utils import set_env_vars_context, use_tempdirs
 from openmdao.utils.mpi import MPI
 from openmdao.utils.om_warnings import OMDeprecationWarning
@@ -2127,8 +2127,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        with self.assertRaises(RuntimeError) as msg:
-            prob.run_driver()
+        with printoptions(legacy='1.21'):
+            with self.assertRaises(RuntimeError) as msg:
+                prob.run_driver()
 
         self.assertEqual(str(msg.exception),
                          "Design variables [('z', inds=[0])] have no impact on the constraints or objective.")
@@ -2185,8 +2186,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         msg = "Constraints or objectives [('parab.z', inds=[0])] cannot be impacted by the design variables of the problem."
 
-        with assert_warning(UserWarning, msg):
-            prob.run_driver()
+        with printoptions(legacy='1.21'):
+            with assert_warning(UserWarning, msg):
+                prob.run_driver()
 
     def test_singular_jac_desvars_multidim_indices_dv(self):
         expected_msg = "Design variables [('z', inds=[(0, 1, 0), (1, 0, 1), (1, 1, 0)])] " \
@@ -2219,16 +2221,17 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
                 prob.setup()
 
-                # run the optimization
-                if option == 'error':
-                    with self.assertRaises(RuntimeError) as ctx:
+                with printoptions(legacy='1.21'):
+                    # run the optimization
+                    if option == 'error':
+                        with self.assertRaises(RuntimeError) as ctx:
+                            prob.run_driver()
+                        self.assertEqual(str(ctx.exception), expected_msg)
+                    elif option == 'warn':
+                        with assert_warning(om.DerivativesWarning, expected_msg):
+                            prob.run_driver()
+                    else:
                         prob.run_driver()
-                    self.assertEqual(str(ctx.exception), expected_msg)
-                elif option == 'warn':
-                    with assert_warning(om.DerivativesWarning, expected_msg):
-                        prob.run_driver()
-                else:
-                    prob.run_driver()
 
     def test_singular_jac_error_desvars_multidim_indices_con(self):
         prob = om.Problem()
@@ -2257,8 +2260,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        with self.assertRaises(RuntimeError) as msg:
-            prob.run_driver()
+        with printoptions(legacy='1.21'):
+            with self.assertRaises(RuntimeError) as msg:
+                prob.run_driver()
 
         self.assertEqual(str(msg.exception),
                          "Constraints or objectives [('parab.f_z', inds=[(1, 1, 0)])] cannot be impacted by the design variables of the problem.")
