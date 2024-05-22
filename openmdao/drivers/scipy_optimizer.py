@@ -14,7 +14,7 @@ from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.core.group import Group
 from openmdao.utils.class_util import WeakMethodWrapper
 from openmdao.utils.mpi import MPI
-from openmdao.core.analysis_error import AnalysisError
+
 
 # Optimizers in scipy.minimize
 _optimizers = {'Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
@@ -33,8 +33,11 @@ if Version(scipy_version) >= Version("1.11"):
     _bounds_optimizers |= {'COBYLA'}
 
 _constraint_optimizers = {'COBYLA', 'SLSQP', 'trust-constr', 'shgo'}
-
 _constraint_grad_optimizers = _gradient_optimizers & _constraint_optimizers
+if Version(scipy_version) >= Version("1.4"):
+    _constraint_optimizers.add('differential_evolution')
+    _constraint_grad_optimizers.add('differential_evolution')
+
 _eq_constraint_optimizers = {'SLSQP', 'trust-constr'}
 _global_optimizers = {'differential_evolution', 'basinhopping'}
 if Version(scipy_version) >= Version("1.2"):  # Only available in newer versions
@@ -53,6 +56,8 @@ _unsupported_optimizers = {'dogleg', 'trust-ncg'}
 # In principle now everything can work with "old-style"
 # These settings have no effect to the optimizers implemented before SciPy 1.1
 _supports_new_style = {'trust-constr'}
+if Version(scipy_version) >= Version("1.4"):
+    _supports_new_style.add('differential_evolution')
 _use_new_style = True  # Recommended to set to True
 
 CITATIONS = """
@@ -96,7 +101,7 @@ class ScipyOptimizeDriver(Driver):
         Flag that indicates failure of most recent optimization.
     iter_count : int
         Counter for function evaluations.
-    result : OptimizeResult
+    _scipy_optimize_result : OptimizeResult
         Result returned from scipy.optimize call.
     opt_settings : dict
         Dictionary of solver-specific options. See the scipy.optimize.minimize documentation.
@@ -146,7 +151,7 @@ class ScipyOptimizeDriver(Driver):
         # The user places optimizer-specific settings in here.
         self.opt_settings = {}
 
-        self.result = None
+        self._scipy_optimize_result = None
         self._grad_cache = None
         self._con_cache = None
         self._con_idx = {}
@@ -236,34 +241,6 @@ class ScipyOptimizeDriver(Driver):
                     self._cons[name]['linear'] = True
                     self._cons[name]['alias'] = None
 
-    def get_driver_objective_calls(self):
-        """
-        Return number of objective evaluations made during a driver run.
-
-        Returns
-        -------
-        int
-            Number of objective evaluations made during a driver run.
-        """
-        if self.result and hasattr(self.result, 'nfev'):
-            return self.result.nfev
-        else:
-            return None
-
-    def get_driver_derivative_calls(self):
-        """
-        Return number of derivative evaluations made during a driver run.
-
-        Returns
-        -------
-        int
-            Number of derivative evaluations made during a driver run.
-        """
-        if self.result and hasattr(self.result, 'njev'):
-            return self.result.njev
-        else:
-            return None
-
     def run(self):
         """
         Optimize the problem using selected Scipy optimizer.
@@ -273,6 +250,7 @@ class ScipyOptimizeDriver(Driver):
         bool
             Failure flag; True if failed to converge, False is successful.
         """
+        self.result.reset()
         prob = self._problem()
         opt = self.options['optimizer']
         model = prob.model
@@ -286,7 +264,7 @@ class ScipyOptimizeDriver(Driver):
         # Initial Run
         with RecordingDebugging(self._get_name(), self.iter_count, self):
             with model._relevance.nonlinear_active('iter'):
-                model.run_solve_nonlinear()
+                self._run_solve_nonlinear()
             self.iter_count += 1
 
         self._con_cache = self.get_constraint_values()
@@ -360,6 +338,19 @@ class ScipyOptimizeDriver(Driver):
         self._obj_and_nlcons = list(self._objs)
 
         if opt in _constraint_optimizers:
+            # get list of linear constraints and precalculate gradients for them (if any)
+            if opt in _constraint_grad_optimizers:
+                lincons = [name for name, meta in self._cons.items() if meta.get('linear')]
+            else:
+                lincons = []
+
+            if lincons:
+                lincongrad = self._lincongrad_cache = \
+                    self._compute_totals(of=lincons, wrt=self._dvlist, return_format='array')
+            else:
+                self._lincongrad_cache = None
+
+            # map constraints to index and instantiate constraints for scipy
             for name, meta in self._cons.items():
                 if meta['indices'] is not None:
                     meta['size'] = size = meta['indices'].indexed_src_size
@@ -368,8 +359,9 @@ class ScipyOptimizeDriver(Driver):
                 upper = meta['upper']
                 lower = meta['lower']
                 equals = meta['equals']
-                if opt in _gradient_optimizers and 'linear' in meta and meta['linear']:
-                    lincons.append(name)
+                linear = name in lincons
+
+                if linear:
                     self._con_idx[name] = lin_i
                     lin_i += size
                 else:
@@ -379,10 +371,10 @@ class ScipyOptimizeDriver(Driver):
 
                 # In scipy constraint optimizers take constraints in two separate formats
 
-                # Type of constraints is list of NonlinearConstraint
                 if opt in _supports_new_style and _use_new_style:
+                    # Type of constraints is list of NonlinearConstraint and/or LinearConstraint
                     try:
-                        from scipy.optimize import NonlinearConstraint
+                        from scipy.optimize import NonlinearConstraint, LinearConstraint
                     except ImportError:
                         msg = ('The "trust-constr" optimizer is supported for SciPy 1.1.0 and'
                                'above. The installed version is {}')
@@ -393,20 +385,31 @@ class ScipyOptimizeDriver(Driver):
                     else:
                         lb = lower
                         ub = upper
-                    # Loop over every index separately,
-                    # because scipy calls each constraint by index.
-                    for j in range(size):
-                        # Double-sided constraints are accepted by the algorithm
-                        args = [name, False, j]
-                        # TODO linear constraint if meta['linear']
-                        # TODO add option for Hessian
-                        con = NonlinearConstraint(
-                            fun=signature_extender(WeakMethodWrapper(self, '_con_val_func'),
-                                                   args),
-                            lb=lb, ub=ub,
-                            jac=signature_extender(WeakMethodWrapper(self, '_congradfunc'), args))
-                        constraints.append(con)
-                else:  # Type of constraints is list of dict
+
+                    if linear:
+                        # LinearConstraint
+                        con = LinearConstraint(A=lincongrad[self._con_idx[name]],
+                                               lb=lower, ub=upper, keep_feasible=True)
+                    else:
+                        # NonlinearConstraint
+                        # Loop over every index separately,
+                        # because scipy calls each constraint by index.
+                        for j in range(size):
+                            # TODO add option for Hessian
+                            # Double-sided constraints are accepted by the algorithm
+                            args = [name, False, j]
+                            con = NonlinearConstraint(
+                                fun=signature_extender(
+                                    WeakMethodWrapper(self, '_con_val_func'), args),
+                                lb=lb, ub=ub,
+                                jac=signature_extender(
+                                    WeakMethodWrapper(self, '_congradfunc'), args)
+                            )
+
+                    constraints.append(con)
+                else:
+                    # Type of constraints is list of dict
+
                     # Loop over every index separately,
                     # because scipy calls each constraint by index.
                     for j in range(size):
@@ -438,13 +441,6 @@ class ScipyOptimizeDriver(Driver):
                                 dcon_dict['jac'] = WeakMethodWrapper(self, '_congradfunc')
                             dcon_dict['args'] = [name, True, j]
                             constraints.append(dcon_dict)
-
-            # precalculate gradients of linear constraints
-            if lincons:
-                self._lincongrad_cache = self._compute_totals(of=lincons, wrt=self._dvlist,
-                                                              return_format=self._total_jac_format)
-            else:
-                self._lincongrad_cache = None
 
         # Provide gradients for optimizers that support it
         if opt in _gradient_optimizers:
@@ -526,7 +522,9 @@ class ScipyOptimizeDriver(Driver):
                 from scipy.optimize import differential_evolution
                 # There is no "options" param, so "opt_settings" can be used to set the (many)
                 # keyword arguments
-                result = differential_evolution(self._objfunc, bounds=bounds, **self.opt_settings)
+                result = differential_evolution(self._objfunc, bounds=bounds,
+                                                constraints=constraints,
+                                                **self.opt_settings)
             elif opt == 'shgo':
                 from scipy.optimize import shgo
                 kwargs = dict()
@@ -555,13 +553,12 @@ class ScipyOptimizeDriver(Driver):
             if self._exc_info is None:
                 raise
         finally:
-            total_jac = self._total_jac  # used later if this is the final iter
             self._total_jac = None
 
         if self._exc_info is not None:
             self._reraise()
 
-        self.result = result
+        self._scipy_optimize_result = result
 
         if hasattr(result, 'success'):
             self.fail = not result.success
@@ -633,7 +630,7 @@ class ScipyOptimizeDriver(Driver):
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 self.iter_count += 1
                 with model._relevance.nonlinear_active('iter'):
-                    model.run_solve_nonlinear()
+                    self._run_solve_nonlinear()
 
             # Get the objective function evaluations
             for obj in self.get_objective_values().values():
@@ -677,6 +674,10 @@ class ScipyOptimizeDriver(Driver):
         float
             Value of the constraint function.
         """
+        if self.options['optimizer'] == 'differential_evolution':
+            # the DE opt will not have called this, so we do it here to update DV/resp values
+            self._objfunc(x_new)
+
         return self._con_cache[name][idx]
 
     def _confunc(self, x_new, name, dbl, idx):
@@ -807,7 +808,12 @@ class ScipyOptimizeDriver(Driver):
         if meta['linear']:
             grad = self._lincongrad_cache
         else:
+            if self._grad_cache is None:
+                # _gradfunc has not been called, meaning gradients are not
+                # used for the objective but are needed for the constraints
+                self._gradfunc(x_new)
             grad = self._grad_cache
+
         grad_idx = self._con_idx[name] + idx
 
         # print("Constraint Gradient returned")

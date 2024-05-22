@@ -121,7 +121,10 @@ class KrigingSurrogate(SurrogateModel):
         cache = self.options['training_cache']
 
         if cache:
-            data_hash = md5()  # nosec: hashed content not sensitive
+            try:
+                data_hash = md5(usedforsecurity=False)  # nosec: hashed content not sensitive
+            except TypeError:
+                data_hash = md5()  # nosec: hashed content not sensitive
             data_hash.update(x.flatten())
             data_hash.update(y.flatten())
             training_data_hash = data_hash.hexdigest()

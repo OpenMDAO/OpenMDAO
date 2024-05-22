@@ -254,7 +254,7 @@ class pyOptSparseDriver(Driver):
                              desc='Title of this optimization run')
         self.options.declare('print_opt_prob', types=bool, default=False,
                              desc='Print the opt problem summary before running the optimization')
-        self.options.declare('print_results', types=bool, default=True,
+        self.options.declare('print_results', types=(bool, str), default=True,
                              desc='Print pyOpt results if True')
         self.options.declare('gradient_method', default='openmdao',
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},
@@ -307,7 +307,7 @@ class pyOptSparseDriver(Driver):
         """
         warn_deprecation("The 'hotstart_file' attribute is deprecated. "
                          "Use the 'hotstart_file' option instead.")
-        return self.options['hist_file']
+        return self.options['hotstart_file']
 
     @hotstart_file.setter
     def hotstart_file(self, file_name):
@@ -343,28 +343,6 @@ class pyOptSparseDriver(Driver):
         self._model_ran = False
         self._setup_tot_jac_sparsity()
 
-    def get_driver_objective_calls(self):
-        """
-        Return number of objective evaluations made during a driver run.
-
-        Returns
-        -------
-        int
-            Number of objective evaluations made during a driver run.
-        """
-        return self.pyopt_solution.userObjCalls if self.pyopt_solution else None
-
-    def get_driver_derivative_calls(self):
-        """
-        Return number of derivative evaluations made during a driver run.
-
-        Returns
-        -------
-        int
-            Number of derivative evaluations made during a driver run.
-        """
-        return self.pyopt_solution.userSensCalls if self.pyopt_solution else None
-
     def run(self):
         """
         Excute pyOptsparse.
@@ -377,6 +355,7 @@ class pyOptSparseDriver(Driver):
         bool
             Failure flag; True if failed to converge, False is successful.
         """
+        self.result.reset()
         problem = self._problem()
         model = problem.model
         relevance = model._relevance
@@ -401,7 +380,7 @@ class pyOptSparseDriver(Driver):
         model_ran = False
         if optimizer in run_required or linear_constraints:
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-                model.run_solve_nonlinear()
+                self._run_solve_nonlinear()
                 rec.abs = 0.0
                 rec.rel = 0.0
                 model_ran = True
@@ -647,7 +626,14 @@ class pyOptSparseDriver(Driver):
         # Print results
         if self.options['print_results']:
             if not MPI or model.comm.rank == 0:
-                print(sol)
+                if self.options['print_results'] == 'minimal':
+                    if hasattr(sol, 'summary_str'):
+                        print(sol.summary_str(minimal_print=True))
+                    else:
+                        print('minimal_print is not available for this solution')
+                        print(sol)
+                else:
+                    print(sol)
 
         # Pull optimal parameters back into framework and re-run, so that
         # framework is left in the right final state
@@ -657,7 +643,7 @@ class pyOptSparseDriver(Driver):
 
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             try:
-                model.run_solve_nonlinear()
+                self._run_solve_nonlinear()
             except AnalysisError:
                 model._clear_iprint()
 
@@ -676,8 +662,10 @@ class pyOptSparseDriver(Driver):
             if optimizer == 'IPOPT':
                 if exit_status not in {0, 1}:
                     self.fail = True
-            elif exit_status > 2:
-                self.fail = True
+            else:
+                # exit status may be the empty string for optimizers that don't support it
+                if exit_status and exit_status > 2:
+                    self.fail = True
 
         except KeyError:
             # optimizers other than pySNOPT may not populate this dict
@@ -745,7 +733,7 @@ class pyOptSparseDriver(Driver):
                     # deactivate the relevance if we haven't run the full model yet, so that
                     # the full model will run at least once.
                     with model._relevance.nonlinear_active('iter', active=self._model_ran):
-                        model.run_solve_nonlinear()
+                        self._run_solve_nonlinear()
                         self._model_ran = True
 
                 # Let the optimizer try to handle the error

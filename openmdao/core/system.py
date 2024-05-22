@@ -34,7 +34,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, \
-    DerivativesWarning, PromotionWarning, UnusedOptionWarning, UnitsWarning
+    DerivativesWarning, PromotionWarning, UnusedOptionWarning, UnitsWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, all_ancestors, make_set, match_prom_or_abs, \
     ensure_compatible, env_truthy, make_traceback, _is_slicer_op
@@ -1022,7 +1022,7 @@ class System(object):
         Parameters
         ----------
         name : str
-            Name of the response variable in the system.
+            Name of the response variable in the system, or alias if given.
         ref : float or ndarray, optional
             Value of response variable that scales to 1.0 in the driver.
         ref0 : float or ndarray, optional
@@ -1050,6 +1050,12 @@ class System(object):
             raise TypeError('{}: The name argument should be a string, '
                             'got {}'.format(self.msginfo, name))
 
+        if alias is not _UNDEFINED:
+            warn_deprecation("Option 'alias' of set_constraint_options is deprecated. "
+                             "If the constraint has an alias, provide that as the "
+                             "'name' argument to set_constraint_options.")
+            name = alias
+
         are_new_bounds = equals is not _UNDEFINED or lower is not _UNDEFINED or upper is not \
             _UNDEFINED
         are_new_scaling = scaler is not _UNDEFINED or adder is not _UNDEFINED or \
@@ -1065,26 +1071,16 @@ class System(object):
             msg = "{}: Constraint '{}' cannot be both equality and inequality."
             raise ValueError(msg.format(self.msginfo, name))
 
-        if self._static_mode:
+        if self._static_mode and self._static_responses:
             responses = self._static_responses
         else:
             responses = self._responses
 
-        # Look through responses to see if there are multiple responses with that name
-        aliases = [resp['alias'] for resp in responses.values() if resp['name'] == name]
-        if len(aliases) > 1 and alias is _UNDEFINED:
-            msg = "{}: set_constraint_options called with constraint variable '{}' that has " \
-                  "multiple aliases: {}. Call set_objective_options with the 'alias' argument " \
-                  "set to one of those aliases."
-            raise RuntimeError(msg.format(self.msginfo, name, aliases))
-
-        if len(aliases) == 0:
-            msg = "{}: set_constraint_options called with constraint variable '{}' that does not " \
-                  "exist."
-            raise RuntimeError(msg.format(self.msginfo, name))
-
-        if alias is not _UNDEFINED:
-            name = alias
+        if name not in responses:
+            msg = f"{self.msginfo}: set_constraint_options called with " \
+                f"constraint '{name}' that does not exist. If the constraint was provided " \
+                f"an alias, use that in place of its name for set_constraint_options."
+            raise RuntimeError(msg)
 
         existing_cons_meta = responses[name]
         are_existing_scaling = existing_cons_meta['scaler'] is not None or \
@@ -1217,7 +1213,7 @@ class System(object):
         Parameters
         ----------
         name : str
-            Name of the response variable in the system.
+            Name of the response variable in the system, or alias if given.
         ref : float or ndarray, optional
             Value of response variable that scales to 1.0 in the driver.
         ref0 : float or ndarray, optional
@@ -1231,40 +1227,38 @@ class System(object):
             is second in precedence. adder and scaler are an alterantive to using ref
             and ref0.
         alias : str
-            Alias for this response. Necessary when adding multiple objectives on different
-            indices or slices of a single variable.
+            Alias for this response. Used to disambiguate variable names when adding
+            multiple objectives on different indices or slices of a single variable. Deprecated.
         """
         # Check inputs
         # Name must be a string
         if not isinstance(name, str):
-            raise TypeError('{}: The name argument should be a string, got {}'.format(self.msginfo,
-                                                                                      name))
+            raise TypeError(f'{self.msginfo}: The name argument should be a string, got {name}')
+
+        if alias is not _UNDEFINED:
+            warn_deprecation("Option 'alias' of set_objective_options is deprecated. "
+                             "If the objective has an alias, provide that as the 'name' "
+                             "argument to set_objective_options.")
+            name = alias
+
         # At least one of the scaling parameters must be set or function does nothing
         if scaler is _UNDEFINED and adder is _UNDEFINED and ref is _UNDEFINED and ref0 == \
                 _UNDEFINED:
             raise RuntimeError(
                 'Must set a value for at least one argument in call to set_objective_options.')
 
-        if self._static_mode:
+        if self._static_mode and self._static_responses:
             responses = self._static_responses
         else:
             responses = self._responses
 
-        # Look through responses to see if there are multiple responses with that name
-        aliases = [resp['alias'] for resp in responses.values() if resp['name'] == name]
-        if len(aliases) > 1 and alias is _UNDEFINED:
-            msg = "{}: set_objective_options called with objective variable '{}' that has " \
-                  "multiple aliases: {}. Call set_objective_options with the 'alias' argument " \
-                  "set to one of those aliases."
-            raise RuntimeError(msg.format(self.msginfo, name, aliases))
-
-        if len(aliases) == 0:
-            msg = "{}: set_objective_options called with objective variable '{}' that does not " \
-                  "exist."
-            raise RuntimeError(msg.format(self.msginfo, name))
-
-        if alias is not _UNDEFINED:
-            name = alias
+        # If the name is not in responses, which are keyed by alias, then it was given
+        # as the actual variable name but the variable has a different alias.
+        if name not in responses:
+            msg = f"{self.msginfo}: set_objective_options called with " \
+                f"objective '{name}' that does not exist. If the objective was provided " \
+                f"an alias, use that in place of its name for set_objective_options."
+            raise RuntimeError(msg)
 
         # Since one or more of these are being set by the incoming arguments, the
         #   ones that are not being set should be set to None since they will be re-computed below
@@ -1379,6 +1373,20 @@ class System(object):
             return model._conn_global_abs_in2out[name]
 
         raise KeyError(f"{self.msginfo}: source for '{name}' not found.")
+
+    def _get_graph_node_meta(self):
+        """
+        Return metadata to add to this system's graph node.
+
+        Returns
+        -------
+        dict
+            Metadata for this system's graph node.
+        """
+        return {
+            'classname': type(self).__name__,
+            'implicit': not self.is_explicit(),
+        }
 
     def _setup_check(self):
         """
@@ -3319,7 +3327,7 @@ class System(object):
             and ref0.
         scaler : float or ndarray, optional
             Value to multiply the model value to get the scaled value for the driver. scaler
-            is second in precedence. adder and scaler are an alterantive to using ref
+            is second in precedence. adder and scaler are an alternative to using ref
             and ref0.
         units : str, optional
             Units to convert to before applying scaling.
@@ -3601,7 +3609,7 @@ class System(object):
             key = src_name
 
         meta['source'] = src_name
-        meta['distributed'] = \
+        meta['distributed'] = dist = \
             src_name in abs2meta_out and abs2meta_out[src_name]['distributed']
 
         if get_size:
@@ -3618,7 +3626,10 @@ class System(object):
                     indices = indices.shaped_instance()
                     meta['size'] = meta['global_size'] = indices.indexed_src_size
                 else:
-                    meta['size'] = sizes[owning_rank[src_name], abs2idx[src_name]]
+                    if dist:
+                        meta['size'] = sizes[self.comm.rank, abs2idx[src_name]]
+                    else:
+                        meta['size'] = sizes[owning_rank[src_name], abs2idx[src_name]]
                     meta['global_size'] = out_meta['global_size']
             else:
                 meta['size'] = meta['global_size'] = 0  # discrete var, don't know size
@@ -3949,6 +3960,253 @@ class System(object):
                         result[abs_name] = ret_meta
 
         return result
+
+    def list_vars(self,
+                  explicit=True, implicit=True,
+                  val=True,
+                  prom_name=True,
+                  residuals=False,
+                  residuals_tol=None,
+                  units=False,
+                  shape=False,
+                  global_shape=False,
+                  bounds=False,
+                  scaling=False,
+                  desc=False,
+                  print_arrays=False,
+                  tags=None,
+                  includes=None,
+                  excludes=None,
+                  is_indep_var=None,
+                  is_design_var=None,
+                  all_procs=False,
+                  list_autoivcs=False,
+                  out_stream=_DEFAULT_OUT_STREAM,
+                  print_min=False,
+                  print_max=False,
+                  return_format='list'):
+        """
+        Write a list of inputs and outputs sorted by component in execution order.
+
+        Parameters
+        ----------
+        explicit : bool, optional
+            Include outputs from explicit components. Default is True.
+        implicit : bool, optional
+            Include outputs from implicit components. Default is True.
+        val : bool, optional
+            When True, display output values. Default is True.
+        prom_name : bool, optional
+            When True, display the promoted name of the variable.
+            Default is True.
+        residuals : bool, optional
+            When True, display residual values. Default is False.
+        residuals_tol : float, optional
+            If set, limits the output of list_outputs to only variables where
+            the norm of the resids array is greater than the given 'residuals_tol'.
+            Default is None.
+        units : bool, optional
+            When True, display units. Default is False.
+        shape : bool, optional
+            When True, display/return the shape of the value. Default is False.
+        global_shape : bool, optional
+            When True, display/return the global shape of the value. Default is False.
+        bounds : bool, optional
+            When True, display/return bounds (lower and upper). Default is False.
+        scaling : bool, optional
+            When True, display/return scaling (ref, ref0, and res_ref). Default is False.
+        desc : bool, optional
+            When True, display/return description. Default is False.
+        print_arrays : bool, optional
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format  is affected
+            by the values set with numpy.set_printoptions
+            Default is False.
+        tags : str or list of strs
+            User defined tags that can be used to filter what gets listed. Only outputs with the
+            given tags will be listed.
+            Default is None, which means there will be no filtering based on tags.
+        includes : None, str, or iter of str
+            Collection of glob patterns for pathnames of variables to include. Default is None,
+            which includes all output variables.
+        excludes : None, str, or iter of str
+            Collection of glob patterns for pathnames of variables to exclude. Default is None.
+        is_indep_var : bool or None
+            If None (the default), do no additional filtering of the inputs.
+            If True, list only outputs tagged `openmdao:indep_var`.
+            If False, list only outputs that are _not_ tagged `openmdao:indep_var`.
+        is_design_var : bool or None
+            If None (the default), do no additional filtering of the inputs.
+            If True, list only inputs connected to outputs that are driver design variables.
+            If False, list only inputs _not_ connected to outputs that are driver design variables.
+        all_procs : bool, optional
+            When True, display output on all processors. Default is False.
+        list_autoivcs : bool
+            If True, include auto_ivc outputs in the listing.  Defaults to False.
+        out_stream : file-like
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+        print_min : bool
+            When true, if the output value is an array, print its smallest value.
+        print_max : bool
+            When true, if the output value is an array, print its largest value.
+        return_format : str
+            Indicates the desired format of the return value. Can have value of 'list' or 'dict'.
+            If 'list', the return value is a list of (name, metadata) tuples.
+            if 'dict', the return value is a dictionary mapping {name: metadata}.
+
+        Returns
+        -------
+        list of (name, metadata) or dict of {name: metadata}
+            List or dict of output names and other optional information about those outputs.
+        """
+        if (self._problem_meta is None or
+                self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP) and val:
+            issue_warning("Calling `list_vars` before `final_setup` will only "
+                          "display the default values of variables and will not show the result of "
+                          "any `set_val` calls.")
+
+        if return_format not in ('list', 'dict'):
+            badarg = f"'{return_format}'" if isinstance(return_format, str) else f"{return_format}"
+            raise ValueError(f"Invalid value ({badarg}) for return_format, "
+                             "must be a string value of 'list' or 'dict'")
+
+        keynames = ['val', 'units', 'shape', 'global_shape', 'desc', 'tags']
+        keyflags = [val, units, shape, global_shape, desc, tags]
+
+        keys = [name for i, name in enumerate(keynames) if keyflags[i]]
+
+        if bounds:
+            keys.extend(('lower', 'upper'))
+        if scaling:
+            keys.extend(('ref', 'ref0', 'res_ref'))
+
+        outputs = self.get_io_metadata(('output',), keys, includes, excludes,
+                                       is_indep_var, is_design_var, tags,
+                                       get_remote=True,
+                                       rank=None if all_procs or val or residuals else 0,
+                                       return_rel_names=False)
+
+        metavalues = val and self._inputs is None
+
+        keyvals = [metavalues, units, shape, global_shape, desc, tags is not None]
+        keys = [n for i, n in enumerate(keynames) if keyvals[i]]
+
+        inputs = self.get_io_metadata(('input',), keys, includes, excludes,
+                                      is_indep_var, is_design_var, tags,
+                                      get_remote=True,
+                                      rank=None if all_procs or val else 0,
+                                      return_rel_names=False)
+
+        # filter auto_ivcs if requested
+        if outputs and not list_autoivcs:
+            outputs = {n: m for n, m in outputs.items() if not n.startswith('_auto_ivc.')}
+
+        # get values & resids
+        if self._outputs is not None and (val or residuals or residuals_tol):
+            to_remove = []
+            print_options = np.get_printoptions()
+            np_precision = print_options['precision']
+
+            for name, meta in outputs.items():
+                if val:
+                    # we want value from the input vector, not from the metadata
+                    meta['val'] = self._abs_get_val(name, get_remote=True,
+                                                    rank=None if all_procs else 0, kind='output')
+
+                    if isinstance(meta['val'], np.ndarray):
+                        if print_min:
+                            meta['min'] = np.round(np.min(meta['val']), np_precision)
+
+                        if print_max:
+                            meta['max'] = np.round(np.max(meta['val']), np_precision)
+
+                if residuals or residuals_tol:
+                    resids = self._abs_get_val(name, get_remote=True,
+                                               rank=None if all_procs else 0,
+                                               kind='residual')
+                    if residuals_tol and np.linalg.norm(resids) < residuals_tol:
+                        to_remove.append(name)
+                    elif residuals:
+                        meta['resids'] = resids
+
+            # remove any outputs that don't pass the residuals_tol filter
+            for name in to_remove:
+                del outputs[name]
+
+        if val and self._inputs is not None:
+            # we want value from the input vector, not from the metadata
+            print_options = np.get_printoptions()
+            np_precision = print_options['precision']
+
+            for n, meta in inputs.items():
+                meta['val'] = self._abs_get_val(n, get_remote=True,
+                                                rank=None if all_procs else 0, kind='input')
+                if isinstance(meta['val'], np.ndarray):
+                    if print_min:
+                        meta['min'] = np.round(np.min(meta['val']), np_precision)
+
+                    if print_max:
+                        meta['max'] = np.round(np.max(meta['val']), np_precision)
+
+        # NOTE: calls to _abs_get_val() above are collective calls and must be done on all procs
+        if not (outputs and inputs) or (not all_procs and self.comm.rank != 0):
+            return []
+
+        # remove metadata we don't want to show/return
+        to_remove = ['discrete']
+        if tags:
+            to_remove.append('tags')
+        if not prom_name:
+            to_remove.append('prom_name')
+        for _, meta in outputs.items():
+            for key in to_remove:
+                del meta[key]
+        for _, meta in inputs.items():
+            for key in to_remove:
+                del meta[key]
+
+        variables = set(outputs.keys()).union(set(inputs.keys()))
+        var_list = []
+        var_dict = {}
+
+        real_vars = self._var_allprocs_abs2meta
+        disc_vars = self._var_allprocs_discrete
+
+        if self._subsystems_allprocs:
+            from openmdao.core.component import Component
+            for subsys in self.system_iter(recurse=True, typ=Component):
+                prefix = subsys.pathname + '.'
+                for var_name in chain(real_vars['input'], real_vars['output'],
+                                      disc_vars['input'], disc_vars['output']):
+                    if var_name in variables:
+                        if var_name.startswith(prefix):
+                            var_list.append(var_name)
+                            if var_name in outputs:
+                                var_dict[var_name] = outputs[var_name]
+                                var_dict[var_name]['io'] = 'output'
+                            else:
+                                var_dict[var_name] = inputs[var_name]
+                                var_dict[var_name]['io'] = 'input'
+        else:
+            # For components with no children, self._subsystems_allprocs is empty.
+            for var_name in chain(real_vars['input'], real_vars['output'],
+                                  disc_vars['input'], disc_vars['output']):
+                if var_name in variables:
+                    var_list.append(var_name)
+                    if var_name in outputs:
+                        var_dict[var_name] = outputs[var_name]
+                        var_dict[var_name]['io'] = 'output'
+                    else:
+                        var_dict[var_name] = inputs[var_name]
+                        var_dict[var_name]['io'] = 'input'
+
+        if all_procs or self.comm.rank == 0:
+            write_var_table(self.pathname, var_list, 'all', var_dict,
+                            True, '', print_arrays, out_stream)
+
+        return var_dict
 
     def list_inputs(self,
                     val=True,
@@ -4743,13 +5001,13 @@ class System(object):
             if self.linear_solver:
                 self.linear_solver._set_complex_step_mode(active)
 
-            if self._owns_approx_jac and isinstance(self._jacobian, Jacobian):
+            if isinstance(self._jacobian, Jacobian):
                 self._jacobian.set_complex_step_mode(active)
 
             if self._assembled_jac:
                 self._assembled_jac.set_complex_step_mode(active)
 
-        for sub in self.system_iter(include_self=False, recurse=True):
+        for sub in self._subsystems_myproc:
             sub._set_complex_step_mode(active)
 
     def cleanup(self):
@@ -5849,7 +6107,13 @@ class System(object):
         for key in sorted(self._conn_global_abs_in2out):
             data.append(self._conn_global_abs_in2out[key])
 
-        return hashlib.md5(str(data).encode()).hexdigest()  # nosec: content not sensitive
+        try:
+            hash = hashlib.md5(str(data).encode(),
+                               usedforsecurity=False).hexdigest()  # nosec: content not sensitive
+        except TypeError:
+            hash = hashlib.md5(str(data).encode()).hexdigest()  # nosec: content not sensitive
+
+        return hash
 
     def _get_full_dist_shape(self, abs_name, local_shape):
         """

@@ -5,6 +5,7 @@ import os
 import sys
 
 from openmdao.solvers.solver import LinearSolver
+from openmdao.solvers.linear.linear_rhs_checker import LinearRHSChecker
 from openmdao.utils.mpi import check_mpi_env
 
 use_mpi = check_mpi_env()
@@ -179,6 +180,8 @@ class PETScKrylov(LinearSolver):
         Preconditioner for linear solve. Default is None for no preconditioner.
     _ksp : dist
         Dictionary of KSP instances (keyed on vector name).
+    _lin_rhs_checker : LinearRHSChecker or None
+        Object for checking the right-hand side of the linear solve.
     """
 
     SOLVER = 'LN: PETScKrylov'
@@ -193,11 +196,9 @@ class PETScKrylov(LinearSolver):
             raise RuntimeError(f"{self.msginfo}: PETSc is not available. "
                                "Set shell variable OPENMDAO_USE_MPI=1 to detect earlier.")
 
-        # initialize dictionary of KSP instances (keyed on vector name)
         self._ksp = None
-
-        # initialize preconditioner to None
         self.precon = None
+        self._lin_rhs_checker = None
 
     def _declare_options(self):
         """
@@ -214,6 +215,13 @@ class PETScKrylov(LinearSolver):
 
         self.options.declare('precon_side', default='right', values=['left', 'right'],
                              desc='Preconditioner side, default is right.')
+
+        self.options.declare('rhs_checking', types=(bool, dict),
+                             default=False,
+                             desc="If True, check RHS vs. cache and/or zero to avoid some solves."
+                             "Can also be set to a dict of options for the LinearRHSChecker to "
+                             "allow finer control over it. Allowed options are: "
+                             f"{LinearRHSChecker.options}")
 
         # changing the default maxiter from the base class
         self.options['maxiter'] = 100
@@ -254,6 +262,9 @@ class PETScKrylov(LinearSolver):
 
         if self.precon is not None:
             self.precon._setup_solvers(self._system(), self._depth + 1)
+
+        self._lin_rhs_checker = LinearRHSChecker.create(self._system(),
+                                                        self.options['rhs_checking'])
 
     def _set_solver_print(self, level=2, type_='all'):
         """
@@ -335,6 +346,9 @@ class PETScKrylov(LinearSolver):
         if self.precon is not None:
             self.precon._linearize()
 
+        if self._lin_rhs_checker is not None:
+            self._lin_rhs_checker.clear()
+
     def solve(self, mode, rel_systems=None):
         """
         Solve the linear system for the problem in self._system().
@@ -369,9 +383,17 @@ class PETScKrylov(LinearSolver):
             x_vec = system._dresiduals
             b_vec = system._doutputs
 
-        # create numpy arrays to interface with PETSc
-        sol_array = x_vec.asarray(copy=True)
+            if self._lin_rhs_checker is not None:
+                sol_array, is_zero = self._lin_rhs_checker.get_solution(b_vec.asarray(), system)
+                if is_zero:
+                    x_vec.set_val(0.0)
+                    return
+                if sol_array is not None:
+                    x_vec.set_val(sol_array)
+                    return
+
         rhs_array = b_vec.asarray(copy=True)
+        sol_array = x_vec.asarray(copy=True)
 
         # create PETSc vectors from numpy arrays
         sol_petsc_vec = PETSc.Vec().createWithArray(sol_array, comm=system.comm)
@@ -394,6 +416,9 @@ class PETScKrylov(LinearSolver):
             self._convergence_failure()
 
         sol_petsc_vec = rhs_petsc_vec = None
+
+        if not system.under_complex_step and self._lin_rhs_checker is not None and mode == 'rev':
+            self._lin_rhs_checker.add_solution(rhs_array, sol_array, copy=False)
 
     def apply(self, mat, in_vec, result):
         """

@@ -4,6 +4,7 @@ Class definitions for Relevance and related classes.
 
 from contextlib import contextmanager
 from collections import defaultdict
+import atexit
 
 import numpy as np
 
@@ -115,6 +116,9 @@ class Relevance(object):
         Cache of relevance arrays stored by array hash.
     _no_dv_responses : list
         List of responses that have no relevant design variables.
+    _redundant_adjoint_systems : set or None
+        Set of systems that may benefit from caching RHS arrays and solutions to avoid some linear
+        solves.
     _seed_cache : dict
         Maps seed variable names to the source of the seed.
     _rel_array_cache : dict
@@ -132,6 +136,7 @@ class Relevance(object):
         self._graph = model._dataflow_graph
         self._rel_array_cache = {}
         self._no_dv_responses = []
+        self._redundant_adjoint_systems = None
         self._seed_cache = {}
 
         # seed var(s) for the current derivative operation
@@ -528,6 +533,37 @@ class Relevance(object):
         self._no_dv_responses = \
             [rsrc for rsrc in self._single_seed2relvars['rev'] if rsrc not in found]
 
+    def get_redundant_adjoint_systems(self):
+        """
+        Find any systems that depend on responses that depend on other responses.
+
+        If any are found, it may be worthwhile to cache RHS arrays and solutions in order to avoid
+        some linear solves.
+
+        Returns
+        -------
+        dict
+            Mapping of systems to the set of adjoints that can cause unnecessary linear solves.
+        """
+        if self._redundant_adjoint_systems is None:
+            self._redundant_adjoint_systems = defaultdict(set)
+            resp2resp_deps = set()
+            for rsrc, arr1 in self._single_seed2relvars['rev'].items():
+                for rsrc2 in self._single_seed2relvars['rev']:
+                    if rsrc2 != rsrc:
+                        if arr1[self._var2idx[rsrc2]]:
+                            # add dependent pairs of responses
+                            resp2resp_deps.add((rsrc, rsrc2))
+
+            if resp2resp_deps:
+                fsystems = self._seed_sys_map[self._all_seed_vars['fwd']]
+                for rsrc, rsrc2 in resp2resp_deps:
+                    relarr = fsystems[rsrc] & fsystems[rsrc2]  # intersection
+                    for relevant_system in self._rel_names_iter(relarr, self._sys2idx):
+                        self._redundant_adjoint_systems[relevant_system].update((rsrc, rsrc2))
+
+        return self._redundant_adjoint_systems
+
     @contextmanager
     def active(self, active):
         """
@@ -697,7 +733,6 @@ class Relevance(object):
         self._seed_vars['fwd'] = fwd_seeds
         self._seed_vars['rev'] = rev_seeds
 
-        # if fwd_seeds and rev_seeds:
         self._current_rel_varray = self._get_rel_array(self._seed_var_map,
                                                        self._single_seed2relvars,
                                                        fwd_seeds, rev_seeds)

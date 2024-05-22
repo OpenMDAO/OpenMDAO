@@ -1003,6 +1003,7 @@ class Problem(object):
             'group_by_pre_opt_post': self.options['group_by_pre_opt_post'],  # see option
             'relevance_cache': {},  # cache of relevance objects
             'rel_array_cache': {},  # cache of relevance arrays
+            'ncompute_totals': 0,  # number of times compute_totals has been called
         }
 
         if _prob_setup_stack:
@@ -1553,7 +1554,7 @@ class Problem(object):
                     # prevent adding multiple approxs with same wrt (and confusing users with
                     # warnings)
                     if abs_key[1] not in added_wrts:
-                        approximations[fd_options['method']].add_approximation(abs_key, self.model,
+                        approximations[fd_options['method']].add_approximation(abs_key, comp,
                                                                                fd_options,
                                                                                vector=vector)
                         added_wrts.add(abs_key[1])

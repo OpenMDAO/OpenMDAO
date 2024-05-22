@@ -45,7 +45,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Setup conda
-        uses: conda-incubator/setup-miniconda@v2
+        uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: 3.11
           conda-version: "*"
@@ -111,17 +111,17 @@ jobs:
           echo "Scan environment for pypi packages with known vulnerabilities"
           echo "found in the Python Packaging Advisory Database"
           echo "======================================================================="
-          python -m pip_audit -s pypi --ignore-vuln GHSA-hcpj-qp55-gfph
+          python -m pip_audit -s pypi
 
           echo "======================================================================="
           echo "Scan environment for packages with known vulnerabilities"
           echo "found in the Open Source Vulnerability database"
           echo "======================================================================="
-          python -m pip_audit -s osv --ignore-vuln GHSA-hcpj-qp55-gfph
+          python -m pip_audit -s osv
 
       - name: Notify slack
         uses: act10ns/slack@v2.0.0
         with:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
           status: ${{ job.status }}
         if: failure()

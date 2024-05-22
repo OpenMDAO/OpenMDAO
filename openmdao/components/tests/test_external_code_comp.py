@@ -278,7 +278,8 @@ class ParaboloidExternalCodeComp(om.ExternalCodeComp):
         #     sys.executable, 'extcode_paraboloid.py', self.input_file, self.output_file
         # ]
 
-        self.options['command'] = ('python extcode_paraboloid.py {} {}').format(self.input_file, self.output_file)
+        self.options['command'] = ('{} extcode_paraboloid.py {} {}').format(
+                                   sys.executable, self.input_file, self.output_file)
 
     def compute(self, inputs, outputs):
         x = inputs['x'].item()

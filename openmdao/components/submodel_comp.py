@@ -1,16 +1,15 @@
 """Define the SubmodelComp class for evaluating OpenMDAO systems within components."""
-from collections import defaultdict, Counter
 
-from openmdao.core.constants import _SetupStatus, INF_BOUND
+import numpy as np
+
+from openmdao.core.constants import _SetupStatus
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.utils.general_utils import pattern_filter
 from openmdao.utils.reports_system import clear_reports
 from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.coloring import compute_total_coloring, ColoringMeta
-from openmdao.utils.om_warnings import warn_deprecation
 from openmdao.utils.indexer import ranges2indexer
-from openmdao.utils.iter_utils import size2range_iter, meta2item_iter
 from openmdao.utils.relevance import get_relevance
 
 
@@ -75,9 +74,9 @@ class SubmodelComp(ExplicitComponent):
     _subprob : <Problem>
         Instantiated problem used to run the model.
     _submodel_inputs : dict
-        Mapping of inner promoted input names to outer input names and kwargs.
+        Mapping of inner promoted input names to outer input names.
     _submodel_outputs : dict
-        Mapping of inner promoted output names to outer output names and kwargs.
+        Mapping of inner promoted output names to outer output names.
     _static_submodel_inputs : dict
         Mapping of inner promoted input names to outer input names and kwargs that is populated
         outside of setup. These must be bookkept separately from submodel inputs added during setup
@@ -88,12 +87,16 @@ class SubmodelComp(ExplicitComponent):
         because setup can be called multiple times and the submodel outputs dict is reset each time.
     _sub_coloring_info : ColoringMeta
         The coloring information for the submodel.
-    _input_xfer_idxs : ndarray
+    _ins2sub_outs_idxs : ndarray
         Index array that maps our input array into parts of the output array of the submodel.
-    _output_xfer_idxs : ndarray
-        Index array that maps our output array into parts of the output array of the submodel.
+    _sub_outs_idxs : ndarray
+        Index array that maps parts of the output array of the submodel into our output array.
     _zero_partials : set
         Set of (output, input) pairs that should have zero partials.
+    _totjacinfo : _TotalJacInfo or None
+        Object that computes the total jacobian for the submodel.
+    _do_opt : bool
+        True if the submodel has an optimizer.
     """
 
     def __init__(self, problem, inputs=None, outputs=None, reports=False, **kwargs):
@@ -110,8 +113,8 @@ class SubmodelComp(ExplicitComponent):
 
         self._submodel_inputs = {}
         self._submodel_outputs = {}
-        self._input_xfer_idxs = None
-        self._output_xfer_idxs = None
+        self._ins2sub_outs_idxs = None
+        self._sub_outs_idxs = None
         self._zero_partials = set()
 
         self._static_submodel_inputs = {
@@ -126,7 +129,7 @@ class SubmodelComp(ExplicitComponent):
         Declare options.
         """
         super()._declare_options()
-        self.options.declare('do_coloring', types=bool, default=True,
+        self.options.declare('do_coloring', types=bool, default=False,
                              desc='If True, attempt to compute a total coloring for the submodel.')
 
     def _add_static_input(self, inner_prom_name_or_pattern, outer_name=None, **kwargs):
@@ -135,11 +138,15 @@ class SubmodelComp(ExplicitComponent):
     def _add_static_output(self, inner_prom_name_or_pattern, outer_name=None, **kwargs):
         self._static_submodel_outputs[inner_prom_name_or_pattern] = (outer_name, kwargs)
 
-    def _to_outer_output(self, inner_name):
-        return self._submodel_outputs[inner_name][0]
+    def _to_outer_output(self, inner_name, absolute=False):
+        if absolute:
+            return self.pathname + '.' + self._submodel_outputs[inner_name]
+        return self._submodel_outputs[inner_name]
 
-    def _to_outer_input(self, inner_name):
-        return self._submodel_inputs[inner_name][0]
+    def _to_outer_input(self, inner_name, absolute=False):
+        if absolute:
+            return self.pathname + '.' + self._submodel_inputs[inner_name]
+        return self._submodel_inputs[inner_name]
 
     def _make_valid_name(self, name):
         """
@@ -156,6 +163,18 @@ class SubmodelComp(ExplicitComponent):
             The converted name.
         """
         return name.replace('.', ':')
+
+    @property
+    def problem(self):
+        """
+        Allow user read-only access to the sub-problem.
+
+        Returns
+        -------
+        <Problem>
+            Instantiated problem used to run the model.
+        """
+        return self._subprob
 
     def add_input(self, prom_in, name=None, **kwargs):
         """
@@ -179,18 +198,21 @@ class SubmodelComp(ExplicitComponent):
             raise NameError(f"Can't add input using wildcard '{prom_in}' during setup. "
                             "Use add_static_input outside of setup instead.")
 
-        # if we get here, our internal setup() is complete, so we can add the input to the
-        # submodel immediately.
-
-        if name is None:
-            name = self._make_valid_name(prom_in)
-
-        self._submodel_inputs[prom_in] = (name, kwargs)
+        # if we get here, our internal setup() is complete, so we can add the input immediately.
 
         if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
             raise Exception('Cannot call add_input after configure.')
 
-        super().add_input(name, **kwargs)
+        if prom_in not in self.indep_vars:
+            raise NameError(f"'{prom_in}' is not an independent variable in the submodel or an "
+                            "unconnected input variable.")
+
+        if name is None:
+            name = self._make_valid_name(prom_in)
+
+        self._submodel_inputs[prom_in] = name
+
+        super().add_input(name, **self._get_input_kwargs(prom_in, kwargs))
 
     def add_output(self, prom_out, name=None, **kwargs):
         """
@@ -220,12 +242,12 @@ class SubmodelComp(ExplicitComponent):
         if name is None:
             name = self._make_valid_name(prom_out)
 
-        self._submodel_outputs[prom_out] = (name, kwargs)
+        self._submodel_outputs[prom_out] = name
 
         if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
             raise Exception('Cannot call add_output after configure.')
 
-        super().add_output(name, **kwargs)
+        super().add_output(name, **self._get_output_kwargs(prom_out, kwargs))
 
     def setup(self):
         """
@@ -253,110 +275,162 @@ class SubmodelComp(ExplicitComponent):
 
         p.final_setup()
 
-        abs2meta = p.model._var_allprocs_abs2meta['output']
+        abs2meta_out = p.model._var_allprocs_abs2meta['output']
         abs2meta_local = p.model._var_abs2meta['output']
         prom2abs_in = p.model._var_allprocs_prom2abs_list['input']
         prom2abs_out = p.model._var_allprocs_prom2abs_list['output']
         abs2prom_out = p.model._var_allprocs_abs2prom['output']
 
-        # store indep vars by promoted name, excluding _auto_ivc vars because later we'll
-        # add the inputs connected to _auto_ivc vars as indep vars (because that's how the user
-        # would expect them to be named)
-        self.indep_vars = {}
-        for src, meta in abs2meta.items():
+        # indep vars is a dict containing promoted names of all indep vars belonging to
+        # IndepVarComps in the submodel, along with all inputs connected to _auto_ivc vars.
+        # All SubmodelComp inputs must come from the indep_vars dict, because any other inputs
+        # in the submodel are dependent on other outputs and would be overwritten when the
+        # submodel runs, erasing any values set by the SubmodelComp.
+        self.indep_vars = indep_vars = {}
+        for src, meta in abs2meta_out.items():
             if src.startswith('_auto_ivc.'):
                 continue
             prom = abs2prom_out[src]
-            if prom not in self.indep_vars and 'openmdao:indep_var' in meta['tags']:
+            if prom not in indep_vars and 'openmdao:indep_var' in meta['tags']:
                 if src in abs2meta_local:
                     meta = abs2meta_local[src]  # get local metadata if we have it
-                self.indep_vars[prom] = (src, meta)
+                indep_vars[prom] = (src, meta)
 
-        # add any inputs connected to _auto_ivc vars as indep vars
+        # add any inputs connected to auto_ivc vars as indep vars.  Their name will be the
+        # promoted name of the input that connects to the actual indep var.
         for prom in prom2abs_in:
             src = p.model.get_source(prom)
-            if not src.startswith('_auto_ivc.'):
-                continue
-            if src in abs2meta_local:
-                meta = abs2meta_local[src]  # get local metadata if we have it
-            else:
-                meta = abs2meta[src]
-            self.indep_vars[prom] = (src, meta)
+            if src.startswith('_auto_ivc.'):
+                if src in abs2meta_local:
+                    meta = abs2meta_local[src]  # get local metadata if we have it
+                else:
+                    meta = abs2meta_out[src]
+                indep_vars[prom] = (src, meta)
 
-        self._submodel_inputs = {}
-        self._submodel_outputs = {}
-
+        submodel_inputs = {}
         for inner_prom, (outer_name, kwargs) in self._static_submodel_inputs.items():
+            # outer_name could still be None here
             if _is_glob(inner_prom):
-                found = False
-                for match in pattern_filter(inner_prom, self.indep_vars):
-                    self._submodel_inputs[match] = (match, kwargs.copy())
-                    found = True
-                if not found:
+                matches = list(pattern_filter(inner_prom, indep_vars))
+                if not matches:
                     raise NameError(f"Pattern '{inner_prom}' doesn't match any independent "
                                     "variables in the submodel.")
-            elif inner_prom in self.indep_vars:
-                self._submodel_inputs[inner_prom] = (outer_name, kwargs.copy())
+            elif inner_prom in indep_vars:
+                matches = [inner_prom]
             else:
                 raise NameError(f"'{inner_prom}' is not an independent variable in the submodel.")
 
+            for match in matches:
+                iname = self._make_valid_name(match if outer_name is None else outer_name)
+                submodel_inputs[match] = iname
+
+                super().add_input(iname, **self._get_input_kwargs(match, kwargs))
+
+                if 'val' in kwargs:  # val in kwargs overrides internal value
+                    self._subprob.set_val(match, kwargs['val'])
+
+        self._submodel_inputs = dict(sorted(submodel_inputs.items(), key=lambda x: x[0]))
+
+        submodel_outputs = {}
         for inner_prom, (outer_name, kwargs) in self._static_submodel_outputs.items():
+            # outer_name could still be None here
             if _is_glob(inner_prom):
-                found = False
+                matches = []
                 for match in pattern_filter(inner_prom, prom2abs_out):
-                    if match.startswith('_auto_ivc.'):
+                    if match.startswith('_auto_ivc.') or match in self._submodel_inputs:
                         continue
-                    self._submodel_outputs[match] = (match, kwargs.copy())
-                    found = True
-                if not found:
+                    matches.append(match)
+                if not matches:
                     raise NameError(f"Pattern '{inner_prom}' doesn't match any outputs in the "
                                     "submodel.")
             elif inner_prom in prom2abs_out:
-                self._submodel_outputs[inner_prom] = (outer_name, kwargs.copy())
+                matches = [inner_prom]
             else:
                 raise NameError(f"'{inner_prom}' is not an output in the submodel.")
 
-        for inner_prom, (outer_name, kwargs) in sorted(self._submodel_inputs.items(),
-                                                       key=lambda x: x[0]):
+            for match in matches:
+
+                oname = self._make_valid_name(match if outer_name is None else outer_name)
+                submodel_outputs[match] = oname
+
+                super().add_output(oname, **self._get_output_kwargs(match, kwargs))
+
+                if 'val' in kwargs:  # val in kwargs overrides internal value
+                    self._subprob.set_val(inner_prom, kwargs['val'])
+
+        self._submodel_outputs = dict(sorted(submodel_outputs.items(), key=lambda x: x[0]))
+
+    def _get_output_kwargs(self, prom, kwargs):
+        """
+        Get updated kwargs based on metadata from the submodel for the given promoted output.
+
+        Parameters
+        ----------
+        prom : str
+            Promoted name of the output.
+        kwargs : dict
+            Keyword arguments for the add_output call.
+
+        Returns
+        -------
+        dict
+            Updated kwargs.
+        """
+        prom2abs = self._subprob.model._var_allprocs_prom2abs_list['output']
+
+        try:
+            # look for local metadata first, in case it sets 'val'
+            meta = self._subprob.model._var_abs2meta['output'][prom2abs[prom][0]]
+        except KeyError:
             try:
-                _, meta = self.indep_vars[inner_prom]
+                # just use global metadata
+                meta = self._subprob.model._var_allprocs_abs2meta['output'][prom2abs[prom][0]]
             except KeyError:
-                raise KeyError(f"Independent variable '{inner_prom}' not found in model")
+                raise KeyError(f"Output '{prom}' not found in model")
 
-            final_kwargs = {n: v for n, v in meta.items() if n in _allowed_add_input_args}
-            final_kwargs.update(kwargs)
-            if outer_name is None:
-                outer_name = inner_prom
+        self._check_var_allowed(prom2abs[prom], meta)
 
-            outer_name = self._make_valid_name(outer_name)
-            self._submodel_inputs[inner_prom] = (outer_name, kwargs)  # in case outer_name was None
+        final_kwargs = {n: v for n, v in meta.items() if n in _allowed_add_output_args}
+        final_kwargs.update(kwargs)
+        return final_kwargs
 
-            super().add_input(outer_name, **final_kwargs)
-            if 'val' in kwargs:  # val in kwargs overrides internal value
-                self._subprob.set_val(inner_prom, kwargs['val'])
+    def _get_input_kwargs(self, prom, kwargs):
+        """
+        Get updated kwargs based on metadata from the submodel for the given promoted input.
 
-        for inner_prom, (outer_name, kwargs) in sorted(self._submodel_outputs.items(),
-                                                       key=lambda x: x[0]):
-            try:
-                # look for metadata locally first, then use allprocs data if we have to
-                meta = abs2meta_local[prom2abs_out[inner_prom][0]]
-            except KeyError:
-                try:
-                    meta = abs2meta[prom2abs_out[inner_prom][0]]
-                except KeyError:
-                    raise KeyError(f"Output '{inner_prom}' not found in model")
+        Parameters
+        ----------
+        prom : str
+            Promoted name of the input.
+        kwargs : dict
+            Keyword arguments for the add_input call.
 
-            final_kwargs = {n: v for n, v in meta.items() if n in _allowed_add_output_args}
-            final_kwargs.update(kwargs)
-            if outer_name is None:
-                outer_name = inner_prom
+        Returns
+        -------
+        dict
+            Updated kwargs.
+        """
+        src, meta = self.indep_vars[prom]
+        self._check_var_allowed(src, meta)
+        final_kwargs = {n: v for n, v in meta.items() if n in _allowed_add_input_args}
+        final_kwargs.update(kwargs)
+        return final_kwargs
 
-            outer_name = self._make_valid_name(outer_name)
-            self._submodel_outputs[inner_prom] = (outer_name, kwargs)  # in case outer_name was None
+    def _check_var_allowed(self, abs_name, meta):
+        """
+        Raise an exception if the variable is not allowed in a SubmodelComp.
 
-            super().add_output(outer_name, **final_kwargs)
-            if 'val' in kwargs:  # val in kwargs overrides internal value
-                self._subprob.set_val(inner_prom, kwargs['val'])
+        Parameters
+        ----------
+        abs_name : str
+            Absolute name of the variable.
+        meta : dict
+            Metadata for the variable.
+        """
+        if self._subprob.comm.size > 1:
+            if meta['distributed']:
+                raise RuntimeError(f"Variable '{abs_name}' is distributed, and  distributed "
+                                   "variables are not currently supported in SubmodelComp.")
 
     def setup_partials(self):
         """
@@ -373,8 +447,6 @@ class SubmodelComp(ExplicitComponent):
         of_metadata, wrt_metadata, _ = p.model._get_totals_metadata(driver=p.driver,
                                                                     of=ofs, wrt=wrts)
 
-        self._setup_transfer_idxs(of_metadata, wrt_metadata)
-
         if len(inputs) == 0 or len(outputs) == 0:
             return
 
@@ -389,7 +461,7 @@ class SubmodelComp(ExplicitComponent):
 
         # save the _TotJacInfo object so we can use it in future calls to compute_partials
         self._totjacinfo = _TotalJacInfo(p, of=self._submodel_outputs, wrt=self._submodel_inputs,
-                                         return_format='flat_dict',
+                                         return_format='flat_dict', get_remote=True,
                                          approx=p.model._owns_approx_jac,
                                          coloring_info=coloring_info,
                                          driver=False)
@@ -424,6 +496,18 @@ class SubmodelComp(ExplicitComponent):
                                       wrt=self._to_outer_input(wrt),
                                       rows=nzrows, cols=nzcols)
 
+    def _setup_vectors(self, root_vectors):
+        """
+        Compute all vectors for all vec names and assign excluded variables lists.
+
+        Parameters
+        ----------
+        root_vectors : dict of dict of Vector
+            Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        """
+        super()._setup_vectors(root_vectors)
+        self._setup_transfer_idxs()
+
     def _set_complex_step_mode(self, active):
         super()._set_complex_step_mode(active)
         self._subprob.set_complex_step_mode(active)
@@ -446,11 +530,11 @@ class SubmodelComp(ExplicitComponent):
         """
         p = self._subprob
 
-        # set our inputs and outputs into the submodel
-        p.model._outputs.set_val(self._inputs.asarray(), idxs=self._input_xfer_idxs())
-
-        inner_idxs = self._output_xfer_idxs()
-        p.model._outputs.set_val(self._outputs.asarray(), idxs=inner_idxs)
+        # set our inputs into the submodel outputs. We don't set into the submodel inputs
+        # because they are all connected to outputs which would overwrite our values when the
+        # submodel runs. So the only inputs we allow from outside are those that are connected to
+        # indep vars, which are outputs in the submodel that are not dependent on anything else.
+        p.model._outputs.set_val(inputs.asarray()[self._ins_idxs()], idxs=self._ins2sub_outs_idxs())
 
         if self._do_opt:
             p.run_driver()
@@ -458,7 +542,12 @@ class SubmodelComp(ExplicitComponent):
             p.run_model()
 
         # collect outputs from the submodel
-        self._outputs.set_val(p.model._outputs.asarray()[inner_idxs])
+        self._outputs.set_val(0.0)
+        self._outputs.set_val(p.model._outputs.asarray()[self._sub_outs_idxs()],
+                              idxs=self._outs_idxs())
+
+        if self.comm.size > 1:
+            self._outputs.set_val(self.comm.allreduce(self._outputs.asarray(), op=MPI.SUM))
 
     def compute_partials(self, inputs, partials):
         """
@@ -474,8 +563,6 @@ class SubmodelComp(ExplicitComponent):
         if self._do_opt:
             raise RuntimeError("Can't compute partial derivatives of a SubmodelComp with "
                                "an internal optimizer.")
-
-        p = self._subprob
 
         # we don't need to set our inputs into the submodel here because we've already done it
         # in compute.
@@ -493,32 +580,43 @@ class SubmodelComp(ExplicitComponent):
                 partials[(self._to_outer_output(of), self._to_outer_input(wrt))] = \
                     tots[of, wrt][nzrows, nzcols].ravel()
 
-    def _setup_transfer_idxs(self, of_metadata, wrt_metadata):
+    def _setup_transfer_idxs(self):
         """
         Set up the transfer indices for input and output variables.
 
         These map parts of our input and output arrays to the input and output arrays of the
         submodel.
         """
-        abs2meta = self._subprob.model._var_allprocs_abs2meta['output']
-        prom2abs = self._subprob.model._var_allprocs_prom2abs_list['output']
+        submod = self._subprob.model
+        sub_slices = submod._outputs.get_slice_dict()
+        slices = self._inputs.get_slice_dict()
+        prefix = self.pathname + '.'
 
-        full_inner_map = {}
-        for name, rng in size2range_iter(meta2item_iter(abs2meta.items(), 'size')):
-            full_inner_map[name] = rng
+        input_ranges = []
+        sub_out_ranges = []
+        for inner_prom, outer_name in self._submodel_inputs.items():
+            sub_src = submod.get_source(inner_prom)
+            if submod._owned_size(sub_src) > 0:
+                sub_slc = sub_slices[sub_src]
+                sub_out_ranges.append((sub_slc.start, sub_slc.stop))
+                slc = slices[prefix + outer_name]
+                input_ranges.append((slc.start, slc.stop))
 
-        full_shape = (rng[1],) if full_inner_map else (0,)
+        self._ins_idxs = ranges2indexer(input_ranges, src_shape=(len(self._inputs),))
+        self._ins2sub_outs_idxs = ranges2indexer(sub_out_ranges, src_shape=(len(submod._outputs),))
 
-        # get ranges for subodel outputs corresponding to our inputs
-        inp_ranges = []
-        for inner_prom in self._submodel_inputs:
-            src, _ = self.indep_vars[inner_prom]
-            inp_ranges.append(full_inner_map[src])
-
-        # get ranges for submodel outputs corresponding to our outputs
+        prom2abs = submod._var_allprocs_prom2abs_list['output']
+        slices = self._outputs.get_slice_dict()
+        sub_out_ranges = []
         out_ranges = []
-        for inner_prom in self._submodel_outputs:
-            out_ranges.append(full_inner_map[prom2abs[inner_prom][0]])
 
-        self._input_xfer_idxs = ranges2indexer(inp_ranges, src_shape=full_shape)
-        self._output_xfer_idxs = ranges2indexer(out_ranges, src_shape=full_shape)
+        for inner_prom, outer_name in self._submodel_outputs.items():
+            sub_src = prom2abs[inner_prom][0]
+            if submod._owned_size(sub_src) > 0:
+                sub_slc = sub_slices[sub_src]
+                slc = slices[prefix + outer_name]
+                out_ranges.append((slc.start, slc.stop))
+                sub_out_ranges.append((sub_slc.start, sub_slc.stop))
+
+        self._outs_idxs = ranges2indexer(out_ranges, src_shape=(len(self._outputs),))
+        self._sub_outs_idxs = ranges2indexer(sub_out_ranges, src_shape=(len(submod._outputs),))

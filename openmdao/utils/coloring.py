@@ -236,7 +236,7 @@ class ColoringMeta(object):
             if self.show_summary:
                 self.coloring.summary()
             if self.show_sparsity:
-                self.coloring.display_bokeh()
+                self.coloring.display_bokeh(show=True)
 
     def __iter__(self):
         """
@@ -2899,17 +2899,17 @@ def _total_coloring_cmd(options, user_args):
                 coloring_info.orders = options.orders
             if options.num_jacs is not None:
                 coloring_info.num_full_jacs = options.num_jacs
+            if options.show_sparsity:
+                coloring_info.show_sparsity = options.show_sparsity
 
             with profiling('coloring_profile.out') if options.profile else do_nothing_context():
-                coloring = compute_total_coloring(prob,
-                                                  num_full_jacs=coloring_info.num_full_jacs,
-                                                  tol=coloring_info.tol,
-                                                  orders=coloring_info.orders,
-                                                  setup=False, run_model=True, fname=outfile,
-                                                  driver=prob.driver)
+                coloring_info.coloring = \
+                    compute_total_coloring(prob, num_full_jacs=coloring_info.num_full_jacs,
+                                           tol=coloring_info.tol, orders=coloring_info.orders,
+                                           setup=False, run_model=True, fname=outfile,
+                                           driver=prob.driver)
 
-            if coloring is not None:
-                coloring_info.display()
+            coloring_info.display()
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
 
@@ -3011,7 +3011,7 @@ def _partial_coloring_cmd(options, user_args):
             print('\n')
 
         if options.show_sparsity and not coloring._meta.get('show_sparsity'):
-            coloring.display()
+            coloring.display_bokeh(show=True)
             print('\n')
 
         if not coloring._meta.get('show_summary'):

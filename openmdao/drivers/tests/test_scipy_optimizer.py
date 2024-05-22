@@ -9,6 +9,8 @@ from packaging.version import Version
 import numpy as np
 from scipy import __version__ as scipy_version
 
+ScipyVersion = Version(scipy_version)
+
 import openmdao.api as om
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense, TestExplCompArraySparse, TestExplCompArrayJacVec
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -21,6 +23,7 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_warning, asser
 from openmdao.utils.general_utils import run_driver
 from openmdao.utils.testing_utils import set_env_vars_context, use_tempdirs
 from openmdao.utils.mpi import MPI
+from openmdao.utils.om_warnings import OMDeprecationWarning
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -28,8 +31,6 @@ try:
 except ImportError:
     vector_class = om.DefaultVector
     PETScVector = None
-
-rosenbrock_size = 6  # size of the design variable
 
 def rosenbrock(x):
     x_0 = x[:-1]
@@ -39,8 +40,11 @@ def rosenbrock(x):
 
 class Rosenbrock(om.ExplicitComponent):
 
+    def initialize(self):
+        self.options.declare('vec_size', default=6, desc='Size of input vector.')
+
     def setup(self):
-        self.add_input('x', np.ones(rosenbrock_size))
+        self.add_input('x', np.ones(self.options['vec_size']))
         self.add_output('f', 0.0)
 
     def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
@@ -224,7 +228,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         self.assertEqual(exception.args[0], msg)
 
-    def test_compute_totals_basic_return_array(self):
+    def test_boolean_driver_return_deprecation(self):
         # Make sure 'array' return_format works.
 
         prob = om.Problem()
@@ -243,6 +247,34 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob.set_solver_print(level=0)
 
         failed = prob.run_driver()
+
+        expected_warning = ('boolean evaluation of DriverResult is temporarily '
+                            'implemented to mimick the previous `failed` return '
+                            'behavior of run_driver.\nUse the `success` attribute '
+                            'of the returned DriverResult object to test for '
+                            'successful driver completion.')
+        with assert_warning(OMDeprecationWarning, expected_warning):
+            self.assertFalse(failed, "Optimization failed.")
+
+    def test_compute_totals_basic_return_array(self):
+        # Make sure 'array' return_format works.
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.set_input_defaults('x', val=0.)
+        model.set_input_defaults('y', val=0.)
+
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed.")
 
@@ -280,7 +312,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup(check=False, mode='auto')
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed.")
 
@@ -311,7 +343,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed.")
 
@@ -345,10 +377,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob.set_val('x', 50.)
         prob.set_val('y', 50.)
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         assert_near_equal(prob['x'], 6.66666667, 1e-6)
         assert_near_equal(prob['y'], -7.3333333, 1e-6)
@@ -372,10 +404,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         assert_near_equal(prob['x'], 6.66666667, 1e-6)
         assert_near_equal(prob['y'], -7.3333333, 1e-6)
@@ -399,10 +431,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         assert_near_equal(prob['x'], 6.66666667, 1e-6)
         assert_near_equal(prob['y'], -7.3333333, 1e-6)
@@ -429,10 +461,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_near_equal(prob['x'], 7.16667, 1e-6)
@@ -461,10 +493,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_near_equal(prob['x'], 7.16667, 1e-6)
@@ -492,10 +524,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         # Minimum should be at (7.166667, -7.833334)
         # (Note, loose tol because of appveyor py3.4 machine.)
@@ -684,10 +716,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         assert_near_equal(prob['y'] - prob['x'], -11.0, 1e-6)
 
@@ -713,10 +745,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
@@ -743,10 +775,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         obj = prob['o']
         assert_near_equal(obj, 20.0, 1e-6)
@@ -771,10 +803,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         obj = prob['o']
         assert_near_equal(obj, 41.5, 1e-6)
@@ -799,10 +831,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         obj = prob['o']
         assert_near_equal(obj, 41.5, 1e-6)
@@ -827,10 +859,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         obj = prob['o']
         assert_near_equal(obj, 41.5, 1e-6)
@@ -855,10 +887,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         con = prob['areas']
         assert_near_equal(con, np.array([[24.0, 21.0], [3.5, 17.5]]), 1e-6)
@@ -883,10 +915,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         obj = prob['o']
         assert_near_equal(obj, 20.0, 1e-6)
@@ -913,10 +945,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         obj = prob['o']
         assert_near_equal(obj, 20.0, 1e-6)
@@ -942,10 +974,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup(check=False, mode='fwd')
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
@@ -971,10 +1003,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
@@ -999,10 +1031,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup(check=False, mode='fwd')
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
@@ -1027,10 +1059,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup(check=False, mode='fwd')
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
@@ -1055,10 +1087,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
@@ -1078,10 +1110,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         assert_near_equal(prob['z'][0], 1.9776, 1e-3)
         assert_near_equal(prob['z'][1], 0.0, 1e-3)
@@ -1171,10 +1203,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_near_equal(prob['x'], 7.16667, 1e-6)
@@ -1200,10 +1232,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA', tol=1e-9, disp=False)
         prob.setup()
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_near_equal(prob['indep.xy'], [-1, 7.16667, -7.833334, -1], 1e-6)
@@ -1224,16 +1256,16 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         assert_near_equal(prob['z'][0], 1.9776, 1e-3)
         assert_near_equal(prob['z'][1], 0.0, 1e-3)
         assert_near_equal(prob['x'], 0.0, 1e-3)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.1"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.1"),
                          "scipy >= 1.1 is required.")
     def test_trust_constr(self):
 
@@ -1275,7 +1307,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertTrue(prob['c'] < 10)
         self.assertTrue(prob['c'] > 0)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.1"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.1"),
                          "scipy >= 1.1 is required.")
     def test_trust_constr_hess_option(self):
 
@@ -1318,7 +1350,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertTrue(prob['c'] < 10)
         self.assertTrue(prob['c'] > 0)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.1"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.1"),
                          "scipy >= 1.1 is required.")
     def test_trust_constr_equality_con(self):
 
@@ -1359,7 +1391,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         assert_near_equal(prob['con.c'], 1., 1e-3)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.2"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.2"),
                          "scipy >= 1.2 is required.")
     def test_trust_constr_inequality_con(self):
 
@@ -1397,7 +1429,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         assert_near_equal(prob['c'], 1.0, 1e-2)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.2"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.2"),
                          "scipy >= 1.2 is required.")
     def test_trust_constr_bounds(self):
         class Rosenbrock(om.ExplicitComponent):
@@ -1454,10 +1486,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_near_equal(prob['x'], 7.16667, 1e-6)
@@ -1486,10 +1518,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, result =\n" +
-                                 str(prob.driver.result))
+                                 str(prob.driver._scipy_optimize_result))
 
         # Minimum should be at (7.166667, -7.833334)
         assert_near_equal(prob['x'], 7.16667, 1e-6)
@@ -1547,9 +1579,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup(check=False, mode='fwd')
 
-        failed, output = run_driver(prob)
+        fail, output = run_driver(prob)
 
-        self.assertFalse(failed, "Optimization failed.")
+        self.assertFalse(fail, "Optimization failed.")
 
         self.assertTrue('In mode: fwd.' in output)
         self.assertTrue("('x', [0])" in output)
@@ -1579,7 +1611,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         failed, output = run_driver(prob)
 
-        self.assertFalse(failed, "Optimization failed.")
+        self.assertFalse(False, "Optimization failed.")
 
         output = output.split('\n')
 
@@ -1618,7 +1650,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         assert_near_equal(prob['z'][0], 1.9776, 1e-3)
         assert_near_equal(prob['z'][1], 0.0, 1e-3)
@@ -1651,10 +1683,11 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        expected_msg = \
-            "Problem .*: run_model must be called before total derivatives can be checked\."
-        with self.assertRaisesRegex(RuntimeError, expected_msg):
-            totals = prob.check_totals(method='fd', out_stream=False)
+        with self.assertRaises(RuntimeError) as cm:
+            prob.check_totals(method='fd', out_stream=False)
+
+        self.assertEqual(str(cm.exception), f"Problem {prob._get_inst_id()}: "
+                         "run_model must be called before total derivatives can be checked.")
 
     def test_cobyla_linear_constraint(self):
         # Bug where ScipyOptimizeDriver tried to compute and cache the constraint derivatives for the
@@ -1792,7 +1825,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['x'], np.array([0.234171, -0.1000]), 1e-3)
         assert_near_equal(prob['f'], -0.907267, 1e-3)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.2"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.2"),
                          "scipy >= 1.2 is required.")
     def test_dual_annealing_rastrigin(self):
         # Example from the Scipy documentation
@@ -1832,7 +1865,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
     def test_differential_evolution(self):
         # Source of example:
-        # https://scipy.github.io/devdocs/generated/scipy.optimize.dual_annealing.html
+        # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.differential_evolution.html
         np.random.seed(6)
 
         size = 3  # size of the design variable
@@ -1900,7 +1933,112 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['x'], -np.ones(size), 1e-2)
         assert_near_equal(prob['f'], 3.0, 1e-2)
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.2"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.4"),
+                         "scipy >= 1.4 is required.")
+    def test_differential_evolution_constrained_linear(self):
+        # Source of example:
+        # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.differential_evolution.html
+        # In this example the minimum is not the unbounded global minimum.
+
+        size = 2
+
+        model = om.Group()
+
+        model.add_subsystem('rosenbrock', Rosenbrock(vec_size=size), promotes=['*'])
+
+        model.add_design_var('x', lower=0, upper=2)
+        model.add_objective('f')
+
+        # We add the constraint that the sum of x[0] and x[1] must be less than or equal to 1.9.
+        model.add_subsystem('constraint_comp',
+                            om.ExecComp('con = sum(x)', con={'shape': (1,)}, x={'shape': (size)}),
+                            promotes=['*'])
+        model.add_constraint('con', upper=1.9, scaler=2, linear=True)
+
+        driver = om.ScipyOptimizeDriver(optimizer='differential_evolution', disp=False)
+        driver.opt_settings['seed'] = 1
+
+        prob = om.Problem(model, driver)
+        prob.setup()
+        failed = not prob.run_driver().success
+
+        self.assertFalse(failed, f"Optimization failed, result = \n{prob.driver.result}")
+
+        assert_near_equal(prob['con'], 1.8999999, 1e-5)
+        assert_near_equal(prob['x'], [0.96632622, 0.93367155], 1e-3)
+        assert_near_equal(prob['f'], 0.0011352416852625719, 1e-3)
+
+    @unittest.skipUnless(ScipyVersion >= Version("1.4"),
+                         "scipy >= 1.4 is required.")
+    def test_differential_evolution_constrained_nonlinear(self):
+        # Source of example:
+        # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.differential_evolution.html
+        # In this example the minimum is not the unbounded global minimum.
+
+        size = 2
+
+        model = om.Group()
+
+        model.add_subsystem('rosenbrock', Rosenbrock(vec_size=size), promotes=['*'])
+
+        # We add the constraint that the sum of x[0] and x[1] must be less than or equal to 1.9.
+        model.add_subsystem('constraint_comp',
+                            om.ExecComp('con = sum(x)', con={'shape': (1,)}, x={'shape': (size)}),
+                            promotes=['*'])
+
+        model.add_design_var('x', lower=0, upper=1)
+        model.add_constraint('con', upper=1.9, scaler=2, linear=False)
+        model.add_objective('f')
+
+        driver = om.ScipyOptimizeDriver(optimizer='differential_evolution', disp=False)
+        driver.opt_settings['seed'] = 1
+
+        prob = om.Problem(model, driver)
+        prob.setup()
+        failed = not prob.run_driver().success
+
+        self.assertFalse(failed, f"Optimization failed, result = \n{prob.driver.result}")
+
+        assert_near_equal(prob['con'], 1.8999999, 1e-5)
+        assert_near_equal(prob['x'], [0.96632622, 0.93367155], 1e-3)
+        assert_near_equal(prob['f'], 0.0011352416852625719, 1e-3)
+
+    @unittest.skipUnless(ScipyVersion >= Version("1.4"),
+                         "scipy >= 1.4 is required.")
+    def test_differential_evolution_constrained_linear_nonlinear(self):
+        # test of the differential evolution optimizer with both
+        # a linear and a nonlinear constraint
+
+        size = 2
+
+        model = om.Group()
+
+        model.add_subsystem('rosenbrock', Rosenbrock(vec_size=size), promotes=['*'])
+
+        # We add the constraint that the sum of x[0] and x[1] must be less than or equal to 1.9.
+        model.add_subsystem('constraint_comp',
+                            om.ExecComp('con = sum(x)',
+                                        con={'shape': (1,)}, x={'shape': (size)}),
+                            promotes=['*'])
+
+        model.add_design_var('x', lower=0, upper=1)
+        model.add_constraint('con', upper=1.9, linear=True)
+        model.add_constraint('x', indices=[0], upper=.95, linear=False)
+        model.add_objective('f')
+
+        driver = om.ScipyOptimizeDriver(optimizer='differential_evolution', disp=False)
+        driver.opt_settings['seed'] = 1
+
+        prob = om.Problem(model, driver)
+        prob.setup()
+        failed = not prob.run_driver().success
+
+        self.assertFalse(failed, f"Optimization failed, result = \n{prob.driver.result}")
+
+        assert_near_equal(prob['x'], [0.94999253, 0.90250721], 1e-2)
+        assert_near_equal(prob['f'], 0.00250079, 1e-2)
+
+    @unittest.skipUnless(ScipyVersion >= Version("1.2"),
                          "scipy >= 1.2 is required.")
     def test_shgo_rosenbrock(self):
         # Source of example:
@@ -1909,8 +2047,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
+        rosenbrock_size = 6  # size of the design variable
+
         model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(rosenbrock_size)), promotes=['*'])
-        model.add_subsystem('rosen', Rosenbrock(), promotes=['*'])
+        model.add_subsystem('rosen', Rosenbrock(vec_size=rosenbrock_size), promotes=['*'])
 
         prob.driver = driver = om.ScipyOptimizeDriver()
         driver.options['optimizer'] = 'shgo'
@@ -2123,7 +2263,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertEqual(str(msg.exception),
                          "Constraints or objectives [('parab.f_z', inds=[(1, 1, 0)])] cannot be impacted by the design variables of the problem.")
 
-    @unittest.skipUnless(Version(scipy_version) >= Version("1.2"),
+    @unittest.skipUnless(ScipyVersion >= Version("1.2"),
                          "scipy >= 1.2 is required.")
     def test_feature_shgo_rastrigin(self):
         # Source of example: https://stefan-endres.github.io/shgo/

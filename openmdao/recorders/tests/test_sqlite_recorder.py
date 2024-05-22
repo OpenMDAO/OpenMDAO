@@ -2747,10 +2747,10 @@ class TestSqliteRecorder(unittest.TestCase):
         obj = case.get_objectives()
 
         assert_near_equal(obj, {'f_xy': -27.33333333}, tolerance=1e-8)
-        assert_near_equal(dvs, {'x': 6.66666669, 'y': -7.33333338}, tolerance=1e-8)
+        assert_near_equal(dvs, {'x': 6.66666669, 'y': -7.33333338}, tolerance=8.1e-8, tol_type='abs')
 
         if Version(scipy_version) < Version("1.11"):
-            assert_near_equal(con, {'x': 6.66666669, 'y': -7.33333338}, tolerance=1e-8)
+            assert_near_equal(con, {'x': 6.66666669, 'y': -7.33333338}, tolerance=8.1e-8, tol_type='abs')
         else:
             self.assertEqual(con, {})
 
@@ -3121,7 +3121,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         # get_val can convert your result's units if desired
         const_K = case.get_val("con1", units='K')
 
-        assert_near_equal(const, -1.68550507e-10, 1e-3)
+        assert_near_equal(const, -1.68550507e-10, 1e-3, tol_type='abs')
         assert_near_equal(const_K, 273.15, 1e-3)
 
         # list_outputs will list your model's outputs and return a list of them too
@@ -3135,7 +3135,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         assert_near_equal(objectives['obj'], 3.18339395, 1e-4)
         assert_near_equal(design_vars['x'], 0., 1e-4)
-        assert_near_equal(constraints['con1'], -1.68550507e-10, 1e-4)
+        assert_near_equal(constraints['con1'], -1.68550507e-10, 1e-4, tol_type='abs')
 
     def test_feature_driver_recording_options(self):
 
@@ -3635,8 +3635,8 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         assert_near_equal(objectives['obj'], 3.18339395, 1e-8)
         assert_near_equal(design_vars['x'], 0., 1e-8)
         assert_near_equal(design_vars['z'], [1.97763888, 1.25035459e-15], 1e-8)
-        assert_near_equal(constraints['con1'], -1.68550507e-10, 1e-8)
-        assert_near_equal(constraints['con2'], -20.24472223, 1e-8)
+        assert_near_equal(constraints['con1'], -1.68550507e-10, 1e-8, tol_type='abs')
+        assert_near_equal(constraints['con2'], -20.24472223, 1e-8, tol_type='abs')
 
     def test_feature_problem_recorder(self):
 

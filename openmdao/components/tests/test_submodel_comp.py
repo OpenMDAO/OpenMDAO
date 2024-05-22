@@ -5,7 +5,7 @@ import openmdao.api as om
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, \
      assert_check_totals
-from openmdao.test_suite.groups.parallel_groups import FanIn, FanOut
+from openmdao.test_suite.groups.parallel_groups import FanInGrouped, FanOutGrouped
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -53,11 +53,13 @@ class TestSubmodelComp(unittest.TestCase):
                                promotes_inputs=['x', 'y'],
                                promotes_outputs=['z'])
 
-        p.model.add_subsystem('sub1', build_submodelcomp1(inputs=['r', 'theta'], outputs=['x']),
+        p.model.add_subsystem('sub1', build_submodelcomp1(inputs=['r', 'theta'], outputs=['x'],
+                              do_coloring=True),
                               promotes_inputs=['r','theta'],
                               promotes_outputs=['x'])
 
-        p.model.add_subsystem('sub2', build_submodelcomp2(inputs=['r', 'theta'], outputs=['y']),
+        p.model.add_subsystem('sub2', build_submodelcomp2(inputs=['r', 'theta'], outputs=['y'],
+                              do_coloring=True),
                               promotes_inputs=['r','theta'],
                               promotes_outputs=['y'])
 
@@ -82,8 +84,8 @@ class TestSubmodelComp(unittest.TestCase):
                             promotes_inputs=['x', 'y'],
                             promotes_outputs=['z'])
 
-        p.model.add_subsystem('sub1', build_submodelcomp1())
-        p.model.add_subsystem('sub2', build_submodelcomp2())
+        p.model.add_subsystem('sub1', build_submodelcomp1(do_coloring=True))
+        p.model.add_subsystem('sub2', build_submodelcomp2(do_coloring=True))
         p.model.add_subsystem('supModel', model, promotes_inputs=['x','y'], promotes_outputs=['z'])
 
         p.setup(force_alloc_complex=True)
@@ -103,7 +105,7 @@ class TestSubmodelComp(unittest.TestCase):
         subprob.model.add_subsystem('submodel', model)
         subcomp = om.SubmodelComp(problem=subprob,
                                   inputs=[('submodel.subsys.x', 'a'), ('submodel.subsys.y', 'b')],
-                                  outputs=[('submodel.subsys.z', 'c')])
+                                  outputs=[('submodel.subsys.z', 'c')], do_coloring=True)
 
         p.model.add_subsystem('subcomp', subcomp, promotes_inputs=['a', 'b'], promotes_outputs=['c'])
         p.setup()
@@ -139,7 +141,7 @@ class TestSubmodelComp(unittest.TestCase):
 
         comp = om.SubmodelComp(problem=subprob,
                                inputs=[('submodel.x1Comp.x', 'x'), ('submodel.x2Comp.x', 'y')],
-                               outputs=[('submodel.model.z', 'z')])
+                               outputs=[('submodel.model.z', 'z')], do_coloring=True)
 
         p.model.add_subsystem('comp', comp)
 
@@ -164,17 +166,21 @@ class TestSubmodelComp(unittest.TestCase):
         p = om.Problem()
         model = om.Group()
 
-        model.add_subsystem('sub', om.ExecComp('z = x1**2 + x2**2 + x3**2'), promotes=['*'])
+        model.add_subsystem('sub', om.ExecComp(['z = foo**2 + bar**2 + baz**2',
+                                                'out = bgd - xyz*foo + baz',
+                                                'result = -foo*bgd + bar*xyz']), promotes=['*'])
         subprob = om.Problem()
         subprob.model.add_subsystem('submodel', model, promotes=['*'])
-        comp = om.SubmodelComp(problem=subprob, inputs=['x*'], outputs=['*'])
+        comp = om.SubmodelComp(problem=subprob, inputs=['x*'], outputs=['*'], do_coloring=True)
 
         p.model.add_subsystem('comp', comp, promotes_inputs=['*'], promotes_outputs=['*'])
         p.setup()
 
-        p.set_val('x1', 1)
-        p.set_val('x2', 2)
-        p.set_val('x3', 3)
+        p.set_val('foo', 1)
+        p.set_val('bar', 2)
+        p.set_val('baz', 3)
+        p.set_val('bgd', 4)
+        p.set_val('xyz', 5)
 
         p.run_model()
 
@@ -184,10 +190,12 @@ class TestSubmodelComp(unittest.TestCase):
         inputs = {inputs[i][0]: inputs[i][1]['val'] for i in range(len(inputs))}
         outputs = {outputs[i][0]: outputs[i][1]['val'] for i in range(len(outputs))}
 
-        assert_near_equal(inputs['x1'], 1)
-        assert_near_equal(inputs['x2'], 2)
-        assert_near_equal(inputs['x3'], 3)
+        assert_near_equal(inputs['foo'], 1)
+        assert_near_equal(inputs['bar'], 2)
+        assert_near_equal(inputs['baz'], 3)
         assert_near_equal(outputs['z'], 14)
+
+        assert_check_partials(p.check_partials(out_stream=None), atol=2e-6)
 
     def test_add_io_before_setup(self):
         p = om.Problem()
@@ -197,8 +205,8 @@ class TestSubmodelComp(unittest.TestCase):
                             promotes_inputs=['x', 'y'],
                             promotes_outputs=['z'])
 
-        comp1 = build_submodelcomp1(promote=False)
-        comp2 = build_submodelcomp2(promote=False)
+        comp1 = build_submodelcomp1(promote=False, do_coloring=True)
+        comp2 = build_submodelcomp2(promote=False, do_coloring=True)
 
         comp1.add_input('subComp1.r', name='r')
         comp1.add_input('subComp1.theta', name='theta')
@@ -221,7 +229,7 @@ class TestSubmodelComp(unittest.TestCase):
         p.setup(force_alloc_complex=True)
 
         p.run_model()
-        cpd = p.check_partials(method='cs', out_stream=None)
+        assert_check_partials(p.check_partials(out_stream=None))
 
         assert_near_equal(p.get_val('z'), 1.0)
 
@@ -234,7 +242,7 @@ class TestSubmodelComp(unittest.TestCase):
                                     promotes_outputs=['x'])
                 subprob = om.Problem(); subprob.model.add_subsystem('model', model)
                 subprob.model.promotes('model', any=['*'])
-                self.add_subsystem('submodel1', om.SubmodelComp(problem=subprob))
+                self.add_subsystem('submodel1', om.SubmodelComp(problem=subprob, do_coloring=True))
 
             def configure(self):
                 self._get_subsystem('submodel1').add_input('r')
@@ -251,7 +259,7 @@ class TestSubmodelComp(unittest.TestCase):
                                     promotes_outputs=['y'])
                 subprob = om.Problem(); subprob.model.add_subsystem('model', model)
                 subprob.model.promotes('model', any=['*'])
-                self.add_subsystem('submodel2', om.SubmodelComp(problem=subprob))
+                self.add_subsystem('submodel2', om.SubmodelComp(problem=subprob, do_coloring=True))
 
             def configure(self):
                 self._get_subsystem('submodel2').add_input('r')
@@ -280,7 +288,7 @@ class TestSubmodelComp(unittest.TestCase):
         p.set_val('theta', np.pi)
 
         p.run_model()
-        cpd = p.check_partials(method='cs', out_stream=None)
+        assert_check_partials(p.check_partials(method='cs', out_stream=None))
 
         assert_near_equal(p.get_val('z'), 1)
 
@@ -292,8 +300,8 @@ class TestSubmodelComp(unittest.TestCase):
                             promotes_inputs=['x', 'y'],
                             promotes_outputs=['z'])
 
-        comp1 = build_submodelcomp1()
-        comp2 = build_submodelcomp2()
+        comp1 = build_submodelcomp1(do_coloring=True)
+        comp2 = build_submodelcomp2(do_coloring=True)
 
         comp1.add_input('psi')
 
@@ -322,7 +330,7 @@ class TestSubmodelComp(unittest.TestCase):
         subprob = om.Problem()
         subprob.model.add_subsystem('submodel', submodel, promotes=['*'])
 
-        comp = om.SubmodelComp(problem=subprob)
+        comp = om.SubmodelComp(problem=subprob, do_coloring=True)
         comp.add_input('z')
         comp.add_output('x')
 
@@ -356,7 +364,7 @@ class TestSubmodelComp(unittest.TestCase):
         subprob = om.Problem()
         subprob.model.add_subsystem('submodel', submodel, promotes=['*'])
 
-        comp = om.SubmodelComp(problem=subprob)
+        comp = om.SubmodelComp(problem=subprob, do_coloring=True)
         comp.add_input('z')
         comp.add_output('x')
 
@@ -369,7 +377,7 @@ class TestSubmodelComp(unittest.TestCase):
         p = om.Problem()
         subprob = om.Problem()
         subprob.model.add_subsystem('comp', om.ExecComp('x = r*cos(theta)'), promotes=['*'])
-        submodel = om.SubmodelComp(problem=subprob)
+        submodel = om.SubmodelComp(problem=subprob, do_coloring=True)
 
         submodel.add_input('r', name='new_r', val=20)
         submodel.add_input('theta', name='new_theta', val=0.5)
@@ -388,7 +396,7 @@ class TestSubmodelComp(unittest.TestCase):
         p = om.Problem()
         subprob = om.Problem()
         subprob.model.add_subsystem('comp', om.ExecComp('x = r*cos(theta)'), promotes=['*'])
-        submodel = om.SubmodelComp(problem=subprob)
+        submodel = om.SubmodelComp(problem=subprob, do_coloring=True)
 
         submodel.add_input('r', name='new_r', val=20)
         submodel.add_input('theta', name='new_theta', val=0.5)
@@ -404,7 +412,7 @@ class TestSubmodelComp(unittest.TestCase):
         p = om.Problem()
         subprob = om.Problem()
         subprob.model.add_subsystem('comp', om.ExecComp('x = r*cos(theta)'), promotes=['*'])
-        submodel = om.SubmodelComp(problem=subprob)
+        submodel = om.SubmodelComp(problem=subprob, do_coloring=True)
 
         submodel.add_input('r', name='new_r', val=20)
         submodel.add_input('theta', name='new_theta', val=0.5)
@@ -422,6 +430,18 @@ class TestSubmodelComp(unittest.TestCase):
         totals = p.check_totals(method='cs')
         assert_check_totals(totals, atol=1e-11, rtol=1e-11)
 
+    def test_problem_property(self):
+        """Tests the problem property of SubmodelComp"""
+        p = om.Problem()
+        submodel = om.SubmodelComp(problem=p, do_coloring=True)
+        subprob = submodel.problem
+
+        self.assertIsInstance(subprob, om.Problem) # make sure it returns a problem
+        self.assertEqual(subprob, p) # make sure it returns correct problem
+
+        with self.assertRaises(AttributeError): # make sure it cannot be assigned
+            submodel.problem = om.Problem()
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestSubmodelCompMPI(unittest.TestCase):
@@ -434,15 +454,81 @@ class TestSubmodelCompMPI(unittest.TestCase):
 
         par = model.add_subsystem('par', om.ParallelGroup())
 
-        par.add_subsystem('subprob1', om.SubmodelComp(problem=om.Problem(model=FanOut()),
-                                                      inputs=['p.x'], outputs=['comp2.y', 'comp3.y']))
-        par.add_subsystem('subprob2', om.SubmodelComp(problem=om.Problem(model=FanIn()),
-                                                      inputs=['p1.x1', 'p2.x2'], outputs=['comp3.y']))
+        par.add_subsystem('subprob1', om.SubmodelComp(problem=om.Problem(model=FanOutGrouped()),
+                                                      inputs=['iv.x'], outputs=['c2.y', 'c3.y'],
+                                                      do_coloring=True))
+        par.add_subsystem('subprob2', om.SubmodelComp(problem=om.Problem(model=FanInGrouped()),
+                                                      inputs=['*'], outputs=['c3.y'],
+                                                      do_coloring=True))
 
         p.setup(force_alloc_complex=True)
         p.run_model()
-        cpd = p.check_partials(method='cs', out_stream=None)
-        assert_check_partials(cpd)
+        assert_check_partials(p.check_partials(method='cs', out_stream=None))
+
+    def test_submodel_with_parallel_group(self):
+        p = om.Problem()
+
+        model = p.model
+
+        G = model.add_subsystem('G', om.Group())
+
+        psub = om.Problem()
+        par = psub.model.add_subsystem('par', om.ParallelGroup())
+        par.add_subsystem('fanout1', FanOutGrouped())
+        par.add_subsystem('fanout2', FanOutGrouped())
+        G.add_subsystem('subprob1', om.SubmodelComp(problem=psub, inputs=['*'], outputs=['*'],
+                                                    do_coloring=False))
+
+        p.setup(force_alloc_complex=True)
+        p.run_model()
+
+        assert_near_equal(psub.get_val('par.fanout1.c2.y', get_remote=True), -6.0)
+        assert_near_equal(psub.get_val('par.fanout2.c2.y', get_remote=True), -6.0)
+        assert_near_equal(psub.get_val('par.fanout1.c3.y', get_remote=True), 15.0)
+        assert_near_equal(psub.get_val('par.fanout2.c3.y', get_remote=True), 15.0)
+
+        assert_check_partials(psub.check_partials(method='cs', show_only_incorrect=True)) #, out_stream=None))
+        assert_check_partials(p.check_partials(method='cs', show_only_incorrect=True)) #, out_stream=None))
+
+    @unittest.skip("Unskip this after distributed vars work with SubmodelComp")
+    def test_submodel_distrib(self):
+        p = om.Problem()
+
+        model = p.model
+
+        G = model.add_subsystem('G', om.Group())
+
+        size = 3
+        xstart = (np.arange(size) + 1.0) * 5.0
+        ystart = (np.arange(size) + 1.0) * 3.0
+
+        psub = om.Problem()
+        ivc = psub.model.add_subsystem('ivc', om.IndepVarComp('x', xstart))
+        ivc.add_output('y', ystart)
+
+        psub.model.add_subsystem('distcomp1', DistribCompDerivs(size=size))
+        psub.model.add_subsystem('distcomp2', DistribCompDerivs(size=size))
+        psub.model.connect('ivc.x', 'distcomp1.invec')
+        psub.model.connect('ivc.y', 'distcomp2.invec')
+        G.add_subsystem('subprob1', om.SubmodelComp(problem=psub, inputs=['*'], outputs=['*'],
+                                                    do_coloring=False))
+
+        p.setup(force_alloc_complex=True)
+        p.run_model()
+
+        if p.comm.rank == 0:
+            assert_near_equal(psub.get_val('distcomp1.outvec', get_remote=False), [10.0, 20.0])
+            assert_near_equal(psub.get_val('distcomp2.outvec', get_remote=False), [6.0, 12.0])
+        else:
+            assert_near_equal(psub.get_val('distcomp1.outvec', get_remote=False), [-45.0])
+            assert_near_equal(psub.get_val('distcomp2.outvec', get_remote=False), [-27.0])
+
+        assert_near_equal(psub.get_val('distcomp1.outvec', get_remote=True), [10.0, 20.0, -45.0])
+        assert_near_equal(psub.get_val('distcomp2.outvec', get_remote=True), [6.0, 12.0, -27.0])
+
+        assert_check_partials(psub.check_partials(method='cs', show_only_incorrect=False)) #, out_stream=None))
+
+        assert_check_partials(p.check_partials(method='cs', show_only_incorrect=False)) #, out_stream=None))
 
 
 class IncompleteRelevanceGroup(om.Group):
@@ -471,7 +557,8 @@ class TestSubmodelColoring(unittest.TestCase):
 
 
         model.add_subsystem('sub', om.SubmodelComp(problem=om.Problem(model=IncompleteRelevanceGroup(3)),
-                                                    inputs=['C1.x', 'C2.x'], outputs=['C3.y', 'C4.y', 'C5.y']))
+                                                    inputs=['C1.x', 'C2.x'], outputs=['C3.y', 'C4.y', 'C5.y'],
+                                                    do_coloring=True))
 
         p.setup(force_alloc_complex=True)
         p.run_model()
@@ -491,7 +578,8 @@ class TestSubmodelColoring(unittest.TestCase):
 
 
         model.add_subsystem('sub', om.SubmodelComp(problem=om.Problem(model=IncompleteRelevanceGroup(3)),
-                                                    inputs=['C1.x', 'C2.x'], outputs=['C3.y', 'C4.y', 'C5.y']))
+                                                    inputs=['C1.x', 'C2.x'], outputs=['C3.y', 'C4.y', 'C5.y'],
+                                                    do_coloring=True))
 
         p.driver = om.ScipyOptimizeDriver(optimizer='SLSQP')
         p.driver.declare_coloring(show_summary=True)
@@ -532,9 +620,11 @@ class TestSubmodelColoringMultiSubmodelComps(unittest.TestCase):
         par = model.add_subsystem('par', om.ParallelGroup(), promotes=['*'])
 
         par.add_subsystem('sub1', om.SubmodelComp(problem=om.Problem(model=IncompleteRelevanceGroup(3)),
-                                                  inputs=['C1.x', 'C2.x'], outputs=['C3.y', 'C4.y', 'C5.y']))
+                                                  inputs=['C1.x', 'C2.x'], outputs=['C3.y', 'C4.y', 'C5.y'],
+                                                  do_coloring=True))
         par.add_subsystem('sub2', om.SubmodelComp(problem=om.Problem(model=IncompleteRelevanceGroup(3)),
-                                                  inputs=['C1.x', 'C2.x'], outputs=['C3.y', 'C4.y', 'C5.y']))
+                                                  inputs=['C1.x', 'C2.x'], outputs=['C3.y', 'C4.y', 'C5.y'],
+                                                  do_coloring=True))
 
         p.driver = om.ScipyOptimizeDriver(optimizer='SLSQP')
         p.driver.declare_coloring(show_summary=True)
@@ -601,6 +691,65 @@ class TestSubmodelOpt(unittest.TestCase):
         self.assertEqual(cm.exception.args[0],
                          "'submodel' <class SubmodelComp>: Error calling compute_partials(), Can't compute partial "
                          "derivatives of a SubmodelComp with an internal optimizer.")
+
+
+def build_submodel(subsystem_name):
+    p = om.Problem()
+    supmodel = om.Group()
+    supmodel.add_subsystem('supComp', om.ExecComp('diameter = r * theta'),
+                            promotes_inputs=['*'],
+                            promotes_outputs=['*', ('diameter', 'aircraft:fuselage:diameter')])
+
+    subprob1 = om.Problem()
+    submodel1 = subprob1.model.add_subsystem('submodel1', om.Group(), promotes=['*'])
+
+    submodel1.add_subsystem(subsystem_name, om.ExecComp('x = diameter * 2 * r * theta'),
+                            promotes=['*', ('diameter', 'aircraft:fuselage:diameter')])
+    submodel1.add_subsystem('b', om.ExecComp('y = mass * donkey_kong'),
+                            promotes=['*', ('mass', 'dynamic:mission:mass'),
+                                      ('donkey_kong', 'aircraft:engine:donkey_kong')])
+
+    p.model.add_subsystem('supModel', supmodel, promotes_inputs=['*'],
+                            promotes_outputs=['*'])
+
+
+    submodel = om.SubmodelComp(problem=subprob1, inputs=['*'], outputs=['*'], do_coloring=True)
+    p.model.add_subsystem('sub1', submodel,
+                            promotes_inputs=['*'],
+                            promotes_outputs=['*'])
+
+    p.model.set_input_defaults('r', 1.25)
+    p.model.set_input_defaults('theta', np.pi)
+
+    p.setup(force_alloc_complex=True)
+
+    p.set_val('r', 1.25)
+    p.set_val('theta', 0.5)
+    p.set_val('dynamic:mission:mass', 2.0)
+    p.set_val('aircraft:engine:donkey_kong', 3.0)
+    p.set_val('aircraft:fuselage:diameter', 3.5)
+
+    return p
+
+
+class TestSubModelBug(unittest.TestCase):
+
+    def test_submodel_bug1(self):
+        p = build_submodel(subsystem_name='a')
+
+        p.run_model()
+
+        assert_near_equal(p.get_val('y'), 2.0 * 3.0)
+        assert_check_partials(p.check_partials(method='cs', out_stream=None))
+
+
+    def test_submodel_bug2(self):
+        p = build_submodel(subsystem_name='c')
+
+        p.run_model()
+
+        assert_near_equal(p.get_val('y'), 2.0 * 3.0)
+        assert_check_partials(p.check_partials(method='cs', out_stream=None))
 
 
 if __name__ == '__main__':
