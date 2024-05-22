@@ -6,13 +6,14 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.core.tests.test_distrib_derivs import DistribExecComp
+
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
 from openmdao.test_suite.components.sellar import SellarStateConnection, SellarDerivatives, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.scripts.circuit_analysis import Circuit
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.array_utils import evenly_distrib_idxs
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -751,14 +752,58 @@ class TestBryoden(unittest.TestCase):
 #     N_PROCS = 2
 
 #     def test_distributed_comp(self):
+#         class Y1Comp(om.ExplicitComponent):
+#             def __init__(self, arr_size=11, **kwargs):
+#                 super().__init__(**kwargs)
+#                 self.arr_size = arr_size
+#                 self.options['distributed'] = True
+
+#             def setup(self):
+#                 comm = self.comm
+#                 rank = comm.rank
+
+#                 sizes, _ = evenly_distrib_idxs(comm.size, self.arr_size)
+
+#                 self.add_input('y2', np.ones(sizes[rank]))
+#                 self.add_output('y1', np.ones(sizes[rank]))
+
+#                 self.declare_partials(of='y1', wrt='y2', method='cs')
+
+#             def compute(self, inputs, outputs):
+#                 if self.comm.rank == 0:
+#                     outputs['y1'] = 28. - .2 * inputs['y2']
+#                 else:
+#                     outputs['y1'] = 18. - .2 * inputs['y2']
+
+#         class Y2Comp(om.ExplicitComponent):
+#             def __init__(self, arr_size=11, **kwargs):
+#                 super().__init__(**kwargs)
+#                 self.arr_size = arr_size
+#                 self.options['distributed'] = True
+
+#             def setup(self):
+#                 comm = self.comm
+#                 rank = comm.rank
+
+#                 sizes, _ = evenly_distrib_idxs(comm.size, self.arr_size)
+
+#                 self.add_input('y1', np.ones(sizes[rank]))
+#                 self.add_output('y2', np.ones(sizes[rank]))
+
+#                 self.declare_partials(of='y2', wrt='y1', method='cs')
+
+#             def compute(self, inputs, outputs):
+#                 if self.comm.rank == 0:
+#                     outputs['y2'] = inputs['y1'] ** .5 + 7.
+#                 else:
+#                     outputs['y2'] = inputs['y1'] ** .5 - 3.
+
 #         prob = om.Problem()
 #         model = prob.model
 #         sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
 
-#         sub.add_subsystem('d1', DistribExecComp(['y1 = 28 - 0.2*y2', 'y1 = 18 - 0.2*y2'], arr_size=2),
-#                           promotes=['y1', 'y2'])
-#         sub.add_subsystem('d2', DistribExecComp(['y2 = y1**.5 + 7', 'y2 = y1**.5 - 3'], arr_size=2),
-#                           promotes=['y1', 'y2'])
+#         sub.add_subsystem('d1', Y1Comp(arr_size=2), promotes=['y1', 'y2'])
+#         sub.add_subsystem('d2', Y2Comp(arr_size=2), promotes=['y1', 'y2'])
 
 #         sub.nonlinear_solver = om.BroydenSolver()
 #         sub.linear_solver = om.LinearBlockGS()
