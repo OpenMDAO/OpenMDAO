@@ -1554,7 +1554,7 @@ class Problem(object):
                     # prevent adding multiple approxs with same wrt (and confusing users with
                     # warnings)
                     if abs_key[1] not in added_wrts:
-                        approximations[fd_options['method']].add_approximation(abs_key, self.model,
+                        approximations[fd_options['method']].add_approximation(abs_key, comp,
                                                                                fd_options,
                                                                                vector=vector)
                         added_wrts.add(abs_key[1])

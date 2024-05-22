@@ -88,14 +88,14 @@ class TestOptimizationReport(unittest.TestCase):
         Check that the data in the opt_result dict is valid for the run.
         """
         if opt_result is None:
-            opt_result = self.prob.driver.opt_result
+            opt_result = self.prob.driver.result
         if expected is None:
             expected = {}
 
         self.assertTrue(opt_result['runtime'] > 0.0,
                         f"Unexpected value for runtime: {opt_result['runtime']} (should be > 0.0)")
 
-        for key in ['iter_count', 'obj_calls', 'deriv_calls']:
+        for key in ['iter_count', 'model_evals', 'deriv_evals']:
             if key in expected:
                 self.assertTrue( opt_result[key] == expected[key] ,
                     f"Unexpected value for {key}: {opt_result[key]}. Expected {expected[key]}")
@@ -117,9 +117,9 @@ class TestOptimizationReport(unittest.TestCase):
 
         check_rows = {
             # 'runtime': 'Wall clock run time:',
-            'iter_count':  'Number of driver iterations:',
-            'obj_calls':   'Number of objective calls:',
-            'deriv_calls': 'Number of derivative calls:',
+            'iter_count': 'Number of driver iterations:',
+            'model_evals': 'Number of model evals:',
+            'deriv_evals': 'Number of deriv evals:',
             'exit_status': 'Exit status:'
         }
 
@@ -161,7 +161,8 @@ class TestOptimizationReport(unittest.TestCase):
                                           vars_lower=-50, vars_upper=50.,
                                           cons_lower=-1,
                                           )
-        expect = {'obj_calls': 0, 'deriv_calls': 0}
+        expect = {'model_evals': 1, 'deriv_evals': 0}
+
         self.check_opt_result(expected=expect)
 
         expected_warning_msg = "The optimizer report is not applicable for Driver type 'Driver', " \
@@ -188,7 +189,7 @@ class TestOptimizationReport(unittest.TestCase):
                                           cons_lower=0, cons_upper=10.,
                                           optimizer='COBYLA',
                                           )
-        expect = {'deriv_calls': None}
+        expect = {'deriv_evals': 0}
         self.check_opt_result(expected=expect)
         opt_report(self.prob)
         self.check_opt_report(expected=expect)
@@ -199,7 +200,7 @@ class TestOptimizationReport(unittest.TestCase):
                                           cons_lower=0, cons_upper=10.,
                                           optimizer='COBYLA',
                                           )
-        expect = {'deriv_calls': None}
+        expect = {'deriv_evals': 0}
         self.check_opt_result(expected=expect)
         opt_report(self.prob)
         self.check_opt_report(expected=expect)
@@ -249,7 +250,7 @@ class TestOptimizationReport(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        self.check_opt_result(prob.driver.opt_result, expected={'obj_calls': 0, 'deriv_calls': 0})
+        self.check_opt_result(prob.driver.result, expected={'model_evals': 5, 'deriv_evals': 0})
 
         expected_warning_msg = "The optimizer report is not applicable for Driver type 'DOEDriver', " \
                                "which does not support optimization"
@@ -264,7 +265,7 @@ class TestOptimizationReport(unittest.TestCase):
                                           vars_lower=-50, vars_upper=50.,
                                           cons_lower=0, cons_upper=10.,
                                           )
-        expect = {'deriv_calls': 0}
+        expect = {'deriv_evals': 0}
         self.check_opt_result(expected=expect)
         opt_report(self.prob)
         self.check_opt_report(expected=expect)
@@ -295,8 +296,8 @@ class TestOptimizationReport(unittest.TestCase):
 
         prob.run_driver()
 
-        expect = {'deriv_calls': 0}
-        self.check_opt_result(prob.driver.opt_result, expected=expect)
+        expect = {'deriv_evals': 0}
+        self.check_opt_result(prob.driver.result, expected=expect)
         opt_report(prob)
         self.check_opt_report(prob, expected=expect)
 

@@ -2001,11 +2001,12 @@ class Group(System):
             for io in ('input', 'output'):
                 sizes = self._var_sizes[io]
                 for name, meta in abs2meta[io].items():
+                    dist = meta['distributed']
                     i = abs2idx[name]
                     for rank in range(self.comm.size):
                         if sizes[rank, i] > 0:
                             owns[name] = rank
-                            if io == 'output' and not meta['distributed']:
+                            if not dist and io == 'output':
                                 self._owned_sizes[rank + 1:, i] = 0  # zero out all dups
                             break
 
@@ -2020,6 +2021,22 @@ class Group(System):
                             owns[n] = rank
         else:
             self._owned_sizes = self._var_sizes['output']
+
+    def _owned_size(self, abs_name):
+        """
+        Return the size of the variable on the owning rank.
+
+        Parameters
+        ----------
+        abs_name : str
+            The absolute name of the variable.
+
+        Returns
+        -------
+        int
+            The size of the variable on this rank, 0 if this is not the owning rank.
+        """
+        return self._owned_sizes[self.comm.rank, self._var_allprocs_abs2idx[abs_name]]
 
     def _setup_global_connections(self, parent_conns=None):
         """

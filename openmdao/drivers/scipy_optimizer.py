@@ -101,7 +101,7 @@ class ScipyOptimizeDriver(Driver):
         Flag that indicates failure of most recent optimization.
     iter_count : int
         Counter for function evaluations.
-    result : OptimizeResult
+    _scipy_optimize_result : OptimizeResult
         Result returned from scipy.optimize call.
     opt_settings : dict
         Dictionary of solver-specific options. See the scipy.optimize.minimize documentation.
@@ -151,7 +151,7 @@ class ScipyOptimizeDriver(Driver):
         # The user places optimizer-specific settings in here.
         self.opt_settings = {}
 
-        self.result = None
+        self._scipy_optimize_result = None
         self._grad_cache = None
         self._con_cache = None
         self._con_idx = {}
@@ -241,34 +241,6 @@ class ScipyOptimizeDriver(Driver):
                     self._cons[name]['linear'] = True
                     self._cons[name]['alias'] = None
 
-    def get_driver_objective_calls(self):
-        """
-        Return number of objective evaluations made during a driver run.
-
-        Returns
-        -------
-        int
-            Number of objective evaluations made during a driver run.
-        """
-        if self.result and hasattr(self.result, 'nfev'):
-            return self.result.nfev
-        else:
-            return None
-
-    def get_driver_derivative_calls(self):
-        """
-        Return number of derivative evaluations made during a driver run.
-
-        Returns
-        -------
-        int
-            Number of derivative evaluations made during a driver run.
-        """
-        if self.result and hasattr(self.result, 'njev'):
-            return self.result.njev
-        else:
-            return None
-
     def run(self):
         """
         Optimize the problem using selected Scipy optimizer.
@@ -278,6 +250,7 @@ class ScipyOptimizeDriver(Driver):
         bool
             Failure flag; True if failed to converge, False is successful.
         """
+        self.result.reset()
         prob = self._problem()
         opt = self.options['optimizer']
         model = prob.model
@@ -291,7 +264,7 @@ class ScipyOptimizeDriver(Driver):
         # Initial Run
         with RecordingDebugging(self._get_name(), self.iter_count, self):
             with model._relevance.nonlinear_active('iter'):
-                model.run_solve_nonlinear()
+                self._run_solve_nonlinear()
             self.iter_count += 1
 
         self._con_cache = self.get_constraint_values()
@@ -585,7 +558,7 @@ class ScipyOptimizeDriver(Driver):
         if self._exc_info is not None:
             self._reraise()
 
-        self.result = result
+        self._scipy_optimize_result = result
 
         if hasattr(result, 'success'):
             self.fail = not result.success
@@ -657,7 +630,7 @@ class ScipyOptimizeDriver(Driver):
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 self.iter_count += 1
                 with model._relevance.nonlinear_active('iter'):
-                    model.run_solve_nonlinear()
+                    self._run_solve_nonlinear()
 
             # Get the objective function evaluations
             for obj in self.get_objective_values().values():
@@ -835,13 +808,12 @@ class ScipyOptimizeDriver(Driver):
         if meta['linear']:
             grad = self._lincongrad_cache
         else:
-            if self._grad_cache is not None:
-                grad = self._grad_cache
-            else:
+            if self._grad_cache is None:
                 # _gradfunc has not been called, meaning gradients are not
                 # used for the objective but are needed for the constraints
-                grad = self._compute_totals(of=self._obj_and_nlcons, wrt=self._dvlist,
-                                            return_format=self._total_jac_format)
+                self._gradfunc(x_new)
+            grad = self._grad_cache
+
         grad_idx = self._con_idx[name] + idx
 
         # print("Constraint Gradient returned")
