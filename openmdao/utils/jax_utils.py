@@ -428,6 +428,44 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         return self.generic_visit(node)
 
 
+class SelfAttrFinder(ast.NodeVisitor):
+    """
+    An ast.NodeVisitor that collects all attribute names that are accessed on `self`.
+
+    Parameters
+    ----------
+    method : method
+        The method to be analyzed.
+
+    Attributes
+    ----------
+    _attributes : set
+        The set of attribute names accessed on `self`.
+    """
+
+    def __init__(self, method):
+        self._in_call = False
+        self._attributes = set()
+        self.visit(ast.parse(textwrap.dedent(inspect.getsource(method)), mode='exec'))
+
+    def visit_Attribute(self, node):
+        if self._in_call:
+            if isinstance(node.value, ast.Attribute):
+                if isinstance(node.value.value, ast.Name) and node.value.value.id == 'self':
+                    self._attributes.add(node.value.attr)
+        elif isinstance(node.value, ast.Name) and node.value.id == 'self':
+            self._attributes.add(node.attr)
+        self.generic_visit(node)
+
+    def visit_Call(self, node):
+        self._in_call = True
+        self.visit(node.func)
+        self._in_call = False
+        for arg in node.args:
+            self.visit(arg)
+
+
+
 _replace = frozenset((':', '(', ')', '[', ']', '{', '}', ' ', '-',
                       '+', '*', '/', '^', '%', '!', '<', '>', '='))
 
@@ -546,33 +584,38 @@ def benchmark_component(comp_class, methods=(None, 'cs', 'jax'), initial_vals=No
 if __name__ == '__main__':
     import openmdao.api as om
 
-    def func(x, y):  # noqa: D103
-        z = jnp.sin(x) * y
-        q = x * 1.5
-        zz = q + x * 1.5
-        return z, zz
+    # def func(x, y):  # noqa: D103
+    #     z = jnp.sin(x) * y
+    #     q = x * 1.5
+    #     zz = q + x * 1.5
+    #     return z, zz
 
-    shape = (3, 2)
-    x = jnp.ones(shape)
-    y = jnp.ones(shape) * 2.0
-    jaxpr = jax.make_jaxpr(func)(x, y)
+    # shape = (3, 2)
+    # x = jnp.ones(shape)
+    # y = jnp.ones(shape) * 2.0
+    # jaxpr = jax.make_jaxpr(func)(x, y)
 
-    dump_jaxpr(jaxpr)
+    # dump_jaxpr(jaxpr)
 
-    print(list(get_partials_deps(func, ('z', 'zz'), x, y)))
+    # print(list(get_partials_deps(func, ('z', 'zz'), x, y)))
 
-    jac_func = jax.jacfwd(func)
+    # jac_func = jax.jacfwd(func)
 
-    jaxpr = jax.make_jaxpr(jac_func)(x, y)
-    dump_jaxpr(jaxpr)
+    # jaxpr = jax.make_jaxpr(jac_func)(x, y)
+    # dump_jaxpr(jaxpr)
 
-    print(list(get_partials_deps(jac_func, ('z', 'zz'), x, y)))
+    # print(list(get_partials_deps(jac_func, ('z', 'zz'), x, y)))
 
-    p = om.Problem()
-    comp = p.model.add_subsystem('comp', om.ExecComp('y = 2.0*x', x=np.ones(3), y=np.ones(3)))
-    comp.derivs_method='jax'
-    p.setup()
-    p.run_model()
+    # p = om.Problem()
+    # comp = p.model.add_subsystem('comp', om.ExecComp('y = 2.0*x', x=np.ones(3), y=np.ones(3)))
+    # comp.derivs_method='jax'
+    # p.setup()
+    # p.run_model()
 
-    print(p.compute_totals(of=['comp.y'], wrt=['comp.x']))
+    # print(p.compute_totals(of=['comp.y'], wrt=['comp.x']))
 
+    c = om.ExecComp('y = 2.0*x', x=np.ones(3), y=np.ones(3))
+
+    sf = SelfAttrFinder(c.compute)
+
+    print("attrs:", sf._attributes)
