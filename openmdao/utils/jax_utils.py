@@ -6,6 +6,7 @@ import textwrap
 import inspect
 import weakref
 from itertools import chain
+from collections import defaultdict
 from types import MethodType
 
 import networkx as nx
@@ -13,6 +14,7 @@ import numpy as np
 
 from openmdao.visualization.tables.table_builder import generate_table
 from openmdao.utils.om_warnings import issue_warning
+from openmdao.utils.code_utils import _get_long_name
 
 
 def jit_stub(f, *args, **kwargs):
@@ -444,23 +446,36 @@ class SelfAttrFinder(ast.NodeVisitor):
     """
 
     def __init__(self, method):
-        self._in_call = False
         self._attributes = set()
+        self._funcs = set()
+        self._dcts = defaultdict(set)
         self.visit(ast.parse(textwrap.dedent(inspect.getsource(method)), mode='exec'))
 
     def visit_Attribute(self, node):
-        if self._in_call:
-            if isinstance(node.value, ast.Attribute):
-                if isinstance(node.value.value, ast.Name) and node.value.value.id == 'self':
-                    self._attributes.add(node.value.attr)
-        elif isinstance(node.value, ast.Name) and node.value.id == 'self':
-            self._attributes.add(node.attr)
-        self.generic_visit(node)
+        name = _get_long_name(node)
+        if name is None:
+            return
+        if name.startswith('self.'):
+            self._attributes.add(name.partition('.')[2])
+
+    def visit_Subscript(self, node):
+        name = _get_long_name(node.value)
+        if name is None:
+            return
+        if name.startswith('self.'):
+            if isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
+                self._dcts[name.partition('.')[2]].add(node.slice.value)
+            else:
+                self._attributes.add(name.partition('.')[2])
+        self.visit(node.slice)
 
     def visit_Call(self, node):
-        self._in_call = True
-        self.visit(node.func)
-        self._in_call = False
+        name = _get_long_name(node.func)
+        if name is not None and name.startswith('self.'):
+            parts = name.split('.')
+            if len(parts) > 2:
+                self._attributes.add('.'.join(parts[1:-1]))
+
         for arg in node.args:
             self.visit(arg)
 
@@ -616,6 +631,26 @@ if __name__ == '__main__':
 
     c = om.ExecComp('y = 2.0*x', x=np.ones(3), y=np.ones(3))
 
+    class MC(om.ExplicitComponent):
+        def compute(self, inputs, outputs):
+            """
+            Compute the cross product of inputs `a` and `b` using np.cross.
+
+            Parameters
+            ----------
+            inputs : Vector
+                Unscaled, dimensional input variables read via inputs[key].
+            outputs : Vector
+                Unscaled, dimensional output variables read via outputs[key].
+            """
+            for product in self._products:
+                a = inputs[self.options['a_name']]
+                b = inputs[product['b_name']]
+                outputs[product['c_name']] = np.cross(a, b)
+
+    c = MC()
+
     sf = SelfAttrFinder(c.compute)
 
     print("attrs:", sf._attributes)
+    print('dicts:', sf._dcts)
