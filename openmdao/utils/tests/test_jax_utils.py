@@ -108,9 +108,16 @@ class TestJaxUtils(unittest.TestCase):
                 return cls(*children, **aux_data)
 
         p = om.Problem()
-        p.model.add_subsystem('c', PowComp(vec_size=11, pow=2))
+        powcomp = p.model.add_subsystem('c', PowComp(vec_size=11, pow=2))
         p.setup(force_alloc_complex=True)
-        p.set_val('c.x', np.linspace(0, 10, 11))
+        c_x = np.linspace(0, 10, 11)
+        p.set_val('c.x', c_x)
         p.run_model()
-        assert_near_equal(np.sqrt(p.get_val('c.f')), p.get_val('c.x'))
+        assert_near_equal(p.get_val('c.f'), c_x ** 2)
+        assert_check_partials(p.check_partials(method='cs', compact_print=True, out_stream=None))
+
+        p.set_val('c.x', c_x)
+        powcomp.options['pow'] = 3
+        p.run_model()
+        assert_near_equal(p.get_val('c.f'), c_x ** 3)
         assert_check_partials(p.check_partials(method='cs', compact_print=True, out_stream=None))

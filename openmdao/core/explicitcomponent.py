@@ -1,6 +1,5 @@
 """Define the ExplicitComponent class."""
 
-import sys
 from itertools import chain
 
 import numpy as np
@@ -12,7 +11,7 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE, _UNDEFINED
-from openmdao.utils.jax_utils import jax, jit, ExplicitCompJaxify, get_partials_deps
+from openmdao.utils.jax_utils import jax, jit, ExplicitCompJaxify
 from openmdao.utils.array_utils import submat_sparsity_iter
 from openmdao.utils.om_warnings import issue_warning
 
@@ -729,14 +728,3 @@ class ExplicitComponent(Component):
                     self.declare_partials(of[prefix_len:], wrt[prefix_len:], rows=sjrows, cols=sjcols)
                 issue_warning(f"{self.msginfo}: Partial for {of[prefix_len:]} wrt "
                               f"{wrt[prefix_len:]} was not declared but is nonzero.{msg}.")
-
-    def get_static_jax_data(self):
-        """
-        Return static data needed by the jaxified methods.
-
-        Returns
-        -------
-        dict
-            Dictionary containing static data.
-        """
-        return {'options': self.options}

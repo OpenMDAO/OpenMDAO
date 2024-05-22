@@ -15,6 +15,27 @@ from openmdao.visualization.tables.table_builder import generate_table
 from openmdao.utils.om_warnings import issue_warning
 
 
+def jit_stub(f, *args, **kwargs):
+    """
+    Provide a dummy jit decorator for use if jax is not available.
+
+    Parameters
+    ----------
+    f : Callable
+        The function or method to be wrapped.
+    *args : list
+        Positional arguments.
+    **kwargs : dict
+        Keyword arguments.
+
+    Returns
+    -------
+    Callable
+        The decorated function.
+    """
+    return f
+
+
 try:
     import jax
     jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
@@ -24,26 +45,7 @@ except ImportError:
     jax = None
     jnp = np
 
-    def jit(f, *args, **kwargs):
-        """
-        Provide a dummy jit decorator for use if jax is not available.
-
-        Parameters
-        ----------
-        f : Callable
-            The function or method to be wrapped.
-        *args : list
-            Positional arguments.
-        **kwargs : dict
-            Keyword arguments.
-
-        Returns
-        -------
-        Callable
-            The decorated function.
-        """
-        return f
-
+    jit = jit_stub
 
 
 def register_jax_component(comp_class):
@@ -424,29 +426,6 @@ class ExplicitCompJaxify(ast.NodeTransformer):
                                                        attr=node.attr, ctx=node.ctx), node)
 
         return self.generic_visit(node)
-
-
-class _SystemJaxWrapper(object):
-    owned = frozenset(('_static_info_',))
-
-    def __init__(self, static_info=((), {})):
-        self._static_info_ = static_info
-
-    def __getattr__(self, name):
-        return getattr(self._system, name)
-
-    def __setattr(self, name, value):
-        if name in _SystemJaxWrapper.owned:
-            object.__setattr__(self, name, value)
-        else:
-            setattr(self._system, name, value)
-
-
-#if jax is not None:
-    #jax.tree_util.register_pytree_node(_SystemJaxWrapper,
-                                       #_SystemJaxWrapper._tree_flatten,
-                                       #_SystemJaxWrapper._tree_unflatten)
-
 
 
 _replace = frozenset((':', '(', ')', '[', ']', '{', '}', ' ', '-',

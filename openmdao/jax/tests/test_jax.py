@@ -393,10 +393,12 @@ class TestJaxComp(unittest.TestCase):
         p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'], method='fd', show_only_incorrect=True)
         p.check_partials(show_only_incorrect=True)
 
-        comp.options['mult'] = 5.
+        p.set_val('ivc.x', x)
+        p.set_val('ivc.y', y)
+        comp.options['mult'] = 1.9
         p.run_model()
         assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
-        assert_near_equal(p.get_val('comp.zz'), y * 5.)
+        assert_near_equal(p.get_val('comp.zz'), y * 1.9)
 
     def test_jax_explicit_comp_with_discrete(self):
         p = om.Problem()
@@ -421,7 +423,7 @@ class TestJaxComp(unittest.TestCase):
         assert_near_equal(p.get_val('comp.zz'), y * 3.0)
         p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'], method='fd', show_only_incorrect=True)
         p.check_partials(show_only_incorrect=True)
-        
+
         p.set_val('ivc.disc_out', -2)
         p.run_model()
         assert_near_equal(p.get_val('comp.z'), -np.dot(x, y))
