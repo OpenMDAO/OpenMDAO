@@ -445,6 +445,10 @@ class SelfAttrFinder(ast.NodeVisitor):
         The set of attribute names accessed on `self`.
     """
 
+    # TODO: need to support intermediate variables, e.g., foo = self.options,   x = foo['blah']
+    # TODO: need to support self.options[var], where var is an attr, not a string.
+    # TODO: even if we can't handle the above, at least detect and flag them and warn that auto-converter
+    #       can't handle them.
     def __init__(self, method):
         self._attributes = set()
         self._funcs = set()
@@ -557,7 +561,6 @@ def benchmark_component(comp_class, methods=(None, 'cs', 'jax'), initial_vals=No
         p.run_model()
 
         model_mem = mem_usage
-        model_diff_mem = model_mem - mem_start
 
         if verbose:
             print(f"\nModel memory usage: {model_mem} MB")
@@ -629,26 +632,9 @@ if __name__ == '__main__':
 
     # print(p.compute_totals(of=['comp.y'], wrt=['comp.x']))
 
-    c = om.ExecComp('y = 2.0*x', x=np.ones(3), y=np.ones(3))
+    from openmdao.components.mux_comp import MuxComp
 
-    class MC(om.ExplicitComponent):
-        def compute(self, inputs, outputs):
-            """
-            Compute the cross product of inputs `a` and `b` using np.cross.
-
-            Parameters
-            ----------
-            inputs : Vector
-                Unscaled, dimensional input variables read via inputs[key].
-            outputs : Vector
-                Unscaled, dimensional output variables read via outputs[key].
-            """
-            for product in self._products:
-                a = inputs[self.options['a_name']]
-                b = inputs[product['b_name']]
-                outputs[product['c_name']] = np.cross(a, b)
-
-    c = MC()
+    c = MuxComp()
 
     sf = SelfAttrFinder(c.compute)
 
