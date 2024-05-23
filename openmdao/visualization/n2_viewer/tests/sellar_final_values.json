@@ -555,7 +555,6 @@
                 }
             ],
             "options": {
-                "distributed": false,
                 "run_root_only": false,
                 "always_opt": false,
                 "has_diag_partials": false,
@@ -625,7 +624,6 @@
                 }
             ],
             "options": {
-                "distributed": false,
                 "run_root_only": false,
                 "always_opt": false,
                 "has_diag_partials": false,
@@ -695,7 +693,6 @@
                 }
             ],
             "options": {
-                "distributed": false,
                 "run_root_only": false,
                 "always_opt": false,
                 "has_diag_partials": false,

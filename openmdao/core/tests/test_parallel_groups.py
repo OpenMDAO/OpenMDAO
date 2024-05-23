@@ -25,8 +25,6 @@ except ImportError:
 from openmdao.test_suite.groups.parallel_groups import \
     FanOutGrouped, FanInGrouped2, Diamond, ConvergeDiverge
 
-from openmdao.core.tests.test_distrib_derivs import DistribExecComp
-
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.utils.array_utils import evenly_distrib_idxs
@@ -222,6 +220,30 @@ class TestParallelGroupsMPI2(TestParallelGroups):
 
     @parameterized.expand(['fwd', 'rev'], name_func=_test_func_name)
     def test_par_with_only_1_subsystem(self, mode):
+
+        class DistribComp(om.ExplicitComponent):
+            def __init__(self, arr_size=11, **kwargs):
+                super().__init__(**kwargs)
+                self.arr_size = arr_size
+                self.options['distributed'] = True
+
+            def setup(self):
+                comm = self.comm
+                rank = comm.rank
+
+                sizes, _ = evenly_distrib_idxs(comm.size, self.arr_size)
+
+                self.add_input('x', np.ones(sizes[rank]))
+                self.add_output('y', np.ones(sizes[rank]))
+
+                self.declare_partials(of='y', wrt='x', method='cs')
+
+            def compute(self, inputs, outputs):
+                if self.comm.rank == 0:
+                    outputs['y'] = 5.0 * inputs['x']
+                else:
+                    outputs['y'] = 7.0 * inputs['x']
+
         p = om.Problem()
         model = p.model
 
@@ -229,7 +251,7 @@ class TestParallelGroupsMPI2(TestParallelGroups):
         par = model.add_subsystem('par', om.ParallelGroup())
         G = par.add_subsystem('G', om.Group())
         G.add_subsystem('c1', om.ExecComp('y=2.0*x', shape=3))
-        G.add_subsystem('c2', DistribExecComp(['y=5.0*x', 'y=7.0*x'], arr_size=3))
+        G.add_subsystem('c2', DistribComp(arr_size=3))
         model.add_subsystem('c2', om.ExecComp('y=3.0*x', shape=3))
 
         model.connect('p1.x', 'par.G.c1.x')

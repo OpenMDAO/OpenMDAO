@@ -38,61 +38,6 @@ else:
     rank = 0
 
 
-class DistribExecComp(om.ExecComp):
-    """
-    An ExecComp that uses N procs and takes input var slices.  Unlike a normal
-    ExecComp, it only supports a single expression per proc.  If you give it
-    multiple expressions, it will use a different one in each proc, repeating
-    the last one in any remaining procs.
-    """
-
-    def __init__(self, exprs, arr_size=11, **kwargs):
-        super().__init__(exprs, **kwargs)
-        self.arr_size = arr_size
-        self.options['distributed'] = True
-
-    def setup(self):
-        outs = set()
-        allvars = set()
-        exprs = self._exprs
-        kwargs = self._kwargs
-
-        comm = self.comm
-        rank = comm.rank
-
-        if len(self._exprs) > comm.size:
-            raise RuntimeError("DistribExecComp only supports up to 1 expression per MPI process.")
-
-        if len(self._exprs) < comm.size:
-            # repeat the last expression for any leftover procs
-            self._exprs.extend([self._exprs[-1]] * (comm.size - len(self._exprs)))
-
-        self._exprs = [self._exprs[rank]]
-
-        # find all of the variables and which ones are outputs
-        for expr in exprs:
-            lhs, _ = expr.split('=', 1)
-            outs.update(self._parse_for_out_vars(lhs))
-            v, _ = self._parse_for_names(expr)
-            allvars.update(v)
-
-        sizes, offsets = evenly_distrib_idxs(comm.size, self.arr_size)
-
-        for name in outs:
-            if name not in kwargs or not isinstance(kwargs[name], dict):
-                kwargs[name] = {}
-            kwargs[name]['val'] = np.ones(sizes[rank], float)
-
-        for name in allvars:
-            if name not in outs:
-                if name not in kwargs or not isinstance(kwargs[name], dict):
-                    kwargs[name] = {}
-                meta = kwargs[name]
-                meta['val'] = np.ones(sizes[rank], float)
-
-        super().setup()
-
-
 class DistribCoordComp(om.ExplicitComponent):
 
     def setup(self):
@@ -396,18 +341,40 @@ class MPITests2(unittest.TestCase):
         assert_near_equal(prob['total.y'], final)
 
     def test_two_simple(self):
+
+        class DistribComp(om.ExplicitComponent):
+            def __init__(self, arr_size=11, **kwargs):
+                super().__init__(**kwargs)
+                self.arr_size = arr_size
+                self.options['distributed'] = True
+
+            def setup(self):
+                comm = self.comm
+                rank = comm.rank
+
+                sizes, _ = evenly_distrib_idxs(comm.size, self.arr_size)
+
+                self.add_input('x', np.ones(sizes[rank]))
+                self.add_output('y', np.ones(sizes[rank]))
+
+                self.declare_partials(of='y', wrt='x', method='cs')
+
+            def compute(self, inputs, outputs):
+                if self.comm.rank == 0:
+                    outputs['y'] = 2.0 * inputs['x']
+                else:
+                    outputs['y'] = 3.0 * inputs['x']
+
         size = 3
         group = om.Group()
 
         group.add_subsystem('P', om.IndepVarComp('x', np.arange(size)),
                             promotes_outputs=['x'])
-        group.add_subsystem('C1', DistribExecComp(['y=2.0*x', 'y=3.0*x'], arr_size=size,
-                                                  x=np.zeros(size),
-                                                  y=np.zeros(size)),
+        group.add_subsystem('C1', DistribComp(arr_size=size),
                             promotes_inputs=['x'])
         group.add_subsystem('C2', om.ExecComp(['z=3.0*y'],
-                                           y=np.zeros(size),
-                                           z=np.zeros(size)))
+                                              y=np.zeros(size),
+                                              z=np.zeros(size)))
 
         prob = om.Problem()
         prob.model = group
@@ -430,27 +397,49 @@ class MPITests2(unittest.TestCase):
     @parameterized.expand(itertools.product([om.NonlinearRunOnce, om.NonlinearBlockGS]),
                           name_func=_test_func_name)
     def test_fan_out_grouped(self, nlsolver):
+
+        class DistribComp(om.ExplicitComponent):
+            def __init__(self, arr_size=11, **kwargs):
+                super().__init__(**kwargs)
+                self.arr_size = arr_size
+                self.options['distributed'] = True
+
+            def setup(self):
+                comm = self.comm
+                rank = comm.rank
+
+                sizes, _ = evenly_distrib_idxs(comm.size, self.arr_size)
+
+                self.add_input('x', np.ones(sizes[rank]))
+                self.add_output('y', np.ones(sizes[rank]))
+
+                self.declare_partials(of='y', wrt='x', method='cs')
+
+            def compute(self, inputs, outputs):
+                if self.comm.rank > 0:
+                    outputs['y'] = 2.0 * inputs['x']
+                else:
+                    outputs['y'] = 3.0 * inputs['x']
+
         size = 3
         prob = om.Problem()
         prob.model = root = om.Group()
         root.add_subsystem('P', om.IndepVarComp('x', np.ones(size, dtype=float)))
-        root.add_subsystem('C1', DistribExecComp(['y=3.0*x', 'y=2.0*x'], arr_size=size,
-                                                 x=np.zeros(size, dtype=float),
-                                                 y=np.zeros(size, dtype=float)))
+        root.add_subsystem('C1', DistribComp(arr_size=size))
         sub = root.add_subsystem('sub', om.ParallelGroup())
         sub.add_subsystem('C2', om.ExecComp('y=1.5*x',
-                                         x=np.zeros(size),
-                                         y=np.zeros(size)))
+                                            x=np.zeros(size),
+                                            y=np.zeros(size)))
         sub.add_subsystem('C3', om.ExecComp(['y=5.0*x'],
-                                         x=np.zeros(size, dtype=float),
-                                         y=np.zeros(size, dtype=float)))
+                                            x=np.zeros(size, dtype=float),
+                                            y=np.zeros(size, dtype=float)))
 
         root.add_subsystem('C2', om.ExecComp(['y=x'],
-                                          x=np.zeros(size, dtype=float),
-                                          y=np.zeros(size, dtype=float)))
+                                             x=np.zeros(size, dtype=float),
+                                             y=np.zeros(size, dtype=float)))
         root.add_subsystem('C3', om.ExecComp(['y=x'],
-                                          x=np.zeros(size, dtype=float),
-                                          y=np.zeros(size, dtype=float)))
+                                             x=np.zeros(size, dtype=float),
+                                             y=np.zeros(size, dtype=float)))
         root.connect('sub.C2.y', 'C2.x')
         root.connect('sub.C3.y', 'C3.x')
 
@@ -486,6 +475,31 @@ class MPITests2(unittest.TestCase):
     @parameterized.expand(itertools.product([om.NonlinearRunOnce, om.NonlinearBlockGS]),
                           name_func=_test_func_name)
     def test_fan_in_grouped(self, nlsolver):
+
+        class DistribComp(om.ExplicitComponent):
+            def __init__(self, arr_size=11, **kwargs):
+                super().__init__(**kwargs)
+                self.arr_size = arr_size
+                self.options['distributed'] = True
+
+            def setup(self):
+                comm = self.comm
+                rank = comm.rank
+
+                sizes, _ = evenly_distrib_idxs(comm.size, self.arr_size)
+
+                self.add_input('x1', np.ones(sizes[rank]))
+                self.add_input('x2', np.ones(sizes[rank]))
+                self.add_output('y', np.ones(sizes[rank]))
+
+                self.declare_partials(of='y', wrt='x*', method='cs')
+
+            def compute(self, inputs, outputs):
+                if self.comm.rank == 0:
+                    outputs['y'] = 3.0 * inputs['x1'] + 7.0 * inputs['x2']
+                else:
+                    outputs['y'] = 1.5 * inputs['x1'] + 3.5 * inputs['x2']
+
         size = 3
 
         prob = om.Problem()
@@ -493,22 +507,19 @@ class MPITests2(unittest.TestCase):
 
         root.add_subsystem('P1', om.IndepVarComp('x', np.ones(size, dtype=float)))
         root.add_subsystem('P2', om.IndepVarComp('x', np.ones(size, dtype=float)))
-        sub = root.add_subsystem('sub', om.ParallelGroup())
 
+        sub = root.add_subsystem('sub', om.ParallelGroup())
         sub.add_subsystem('C1', om.ExecComp(['y=-2.0*x'],
-                                         x=np.zeros(size, dtype=float),
-                                         y=np.zeros(size, dtype=float)))
+                                            x=np.zeros(size, dtype=float),
+                                            y=np.zeros(size, dtype=float)))
         sub.add_subsystem('C2', om.ExecComp(['y=5.0*x'],
-                                         x=np.zeros(size, dtype=float),
-                                         y=np.zeros(size, dtype=float)))
-        root.add_subsystem('C3', DistribExecComp(['y=3.0*x1+7.0*x2', 'y=1.5*x1+3.5*x2'],
-                                                 arr_size=size,
-                                                 x1=np.zeros(size, dtype=float),
-                                                 x2=np.zeros(size, dtype=float),
-                                                 y=np.zeros(size, dtype=float)))
+                                            x=np.zeros(size, dtype=float),
+                                            y=np.zeros(size, dtype=float)))
+
+        root.add_subsystem('C3', DistribComp(arr_size=size))
         root.add_subsystem('C4', om.ExecComp(['y=x'],
-                                          x=np.zeros(size, dtype=float),
-                                          y=np.zeros(size, dtype=float)))
+                                             x=np.zeros(size, dtype=float),
+                                             y=np.zeros(size, dtype=float)))
 
         root.connect("sub.C1.y", "C3.x1")
         root.connect("sub.C2.y", "C3.x2")

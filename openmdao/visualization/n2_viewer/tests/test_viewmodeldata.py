@@ -101,7 +101,7 @@ class TestViewerData(unittest.TestCase):
                     val = np.asarray(tree[key])
                     try:
                         assert_near_equal(expected_val, val, tolerance=val_tol)
-                    except Error as e:
+                    except Exception as e:
                         raise AssertionError(f'{_path + [key]} did not match to expected value')
 
         for i, key in enumerate(expected_tree.keys()):
