@@ -508,6 +508,23 @@ class ExplicitComponent(Component):
                 # We used to negate the jacobian here, and then re-negate after the hook.
                 self._compute_partials_wrapper()
 
+    def get_static_args(self):
+        """
+        Override this in derived classes if compute_primal references static values.
+
+        Do NOT include self._discrete_inputs in the returned tuple.s
+
+        Returns
+        -------
+        tuple
+            Tuple containing all static values required by compute_primal, in the order that they
+            should appear in the compute_primal arg list.
+        """
+        return ()
+
+    def _get_compute_primal_inputs(self, inputs):
+        return chain(self.get_static_args(), self._discrete_inputs.values(), inputs.values())
+
     def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
         """
         Compute outputs given inputs. The model is assumed to be in an unscaled state.
@@ -527,10 +544,7 @@ class ExplicitComponent(Component):
         discrete_outputs : dict like or None
             If not None, dict like object containing discrete output values.
         """
-        if not discrete_inputs:
-            returns = self.compute_primal(*inputs.values())
-        else:
-            returns = self.compute_primal(*chain(self._discrete_inputs.values(), inputs.values()))
+        returns = self.compute_primal(*self._get_compute_primal_inputs(inputs))
 
         if not discrete_outputs:
             outputs.set_vals(returns)
@@ -594,12 +608,7 @@ class ExplicitComponent(Component):
         # did with compute, because the existence of a compute_partials method that is not the
         # base class method is used to determine if a given component computes its own partials.
         def compute_partials(self, inputs, partials, discrete_inputs=None):
-            if discrete_inputs is None:
-                deriv_vals = self._get_jac_func()(*inputs.values())
-            else:
-
-                deriv_vals = self._get_jac_func()(*chain(self._discrete_inputs.values(),
-                                                         inputs.values()))
+            deriv_vals = self._get_jac_func()(*self._get_compute_primal_inputs(inputs))
 
             ofidx = len(self._discrete_outputs) - 1
             for ofname in self._var_rel_names['output']:
@@ -632,9 +641,9 @@ class ExplicitComponent(Component):
     def _get_jac_func(self):
         if self._jac_func_ is None:
             fjax = jax.jacfwd if self.best_deriv_direction() == 'fwd' else jax.jacrev
-            ndiscrete = len(self._discrete_inputs)
-            wrt_idxs = list(range(ndiscrete, len(self._var_abs2meta['input']) + ndiscrete))
-            static_argnums = tuple(range(ndiscrete))
+            nstatic = len(self.get_static_args()) + len(self._discrete_inputs)
+            wrt_idxs = list(range(nstatic, len(self._var_abs2meta['input']) + nstatic))
+            static_argnums = tuple(range(nstatic))
             self._jac_func_ = jit(fjax(self.compute_primal, argnums=wrt_idxs),
                                   static_argnums=static_argnums)
         return self._jac_func_

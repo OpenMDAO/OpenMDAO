@@ -260,6 +260,7 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         self._compute_primal_returns = \
             [n for n in chain(comp._discrete_outputs, comp._var_rel_names['output'])]
 
+        saf = SelfAttrFinder(func)
         node = self.visit(ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec'))
         self._new_ast = ast.fix_missing_locations(node)
 
