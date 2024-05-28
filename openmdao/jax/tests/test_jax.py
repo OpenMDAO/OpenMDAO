@@ -183,7 +183,7 @@ class MyCompJax2PrimalOption(om.ExplicitComponent):
     @partial(jax.jit, static_argnums=(0,1))
     def compute_primal(self, mult, x, y):
         z = jnp.dot(x, y)
-        zz = y * mult
+        zz = y * self.options['mult']
         return z, zz
 
 

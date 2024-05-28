@@ -7,7 +7,6 @@ import inspect
 import weakref
 from itertools import chain
 from collections import defaultdict
-from types import MethodType
 
 import networkx as nx
 import numpy as np
@@ -261,6 +260,8 @@ class ExplicitCompJaxify(ast.NodeTransformer):
             [n for n in chain(comp._discrete_outputs, comp._var_rel_names['output'])]
 
         saf = SelfAttrFinder(func)
+        static_attrs = sorted(saf._attrs)
+        static_dcts = [tup for tup in sorted(saf._dcts.items(), key=lambda x: x[0])]
         node = self.visit(ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec'))
         self._new_ast = ast.fix_missing_locations(node)
 
@@ -442,7 +443,7 @@ class SelfAttrFinder(ast.NodeVisitor):
 
     Attributes
     ----------
-    _attributes : set
+    _attrs : set
         The set of attribute names accessed on `self`.
     """
 
@@ -451,7 +452,7 @@ class SelfAttrFinder(ast.NodeVisitor):
     # TODO: even if we can't handle the above, at least detect and flag them and warn that auto-converter
     #       can't handle them.
     def __init__(self, method):
-        self._attributes = set()
+        self._attrs = set()
         self._funcs = set()
         self._dcts = defaultdict(set)
         self.visit(ast.parse(textwrap.dedent(inspect.getsource(method)), mode='exec'))
@@ -461,7 +462,7 @@ class SelfAttrFinder(ast.NodeVisitor):
         if name is None:
             return
         if name.startswith('self.'):
-            self._attributes.add(name.partition('.')[2])
+            self._attrs.add(name.partition('.')[2])
 
     def visit_Subscript(self, node):
         name = _get_long_name(node.value)
@@ -471,15 +472,17 @@ class SelfAttrFinder(ast.NodeVisitor):
             if isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
                 self._dcts[name.partition('.')[2]].add(node.slice.value)
             else:
-                self._attributes.add(name.partition('.')[2])
+                self._attrs.add(name.partition('.')[2])
         self.visit(node.slice)
 
     def visit_Call(self, node):
         name = _get_long_name(node.func)
         if name is not None and name.startswith('self.'):
             parts = name.split('.')
-            if len(parts) > 2:
-                self._attributes.add('.'.join(parts[1:-1]))
+            if len(parts) == 2:
+                self._funcs.add(parts[1])
+            else:
+                self._attrs.add('.'.join(parts[1:-1]))
 
         for arg in node.args:
             self.visit(arg)
@@ -639,5 +642,5 @@ if __name__ == '__main__':
 
     sf = SelfAttrFinder(c.compute)
 
-    print("attrs:", sf._attributes)
+    print("attrs:", sf._attrs)
     print('dicts:', sf._dcts)
