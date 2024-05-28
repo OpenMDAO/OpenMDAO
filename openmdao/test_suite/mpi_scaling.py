@@ -67,7 +67,7 @@ class ExplicitSleepComp(om.ExplicitComponent):
     def compute_partials(self, inputs, partials):
         if debug: print(f"compute partials for {self.pathname}")
         self.sleep(self.compute_partials_delay)
-        val = np.eye(np.product(self.varshape, dtype=int))
+        val = np.eye(np.prod(self.varshape, dtype=int))
         for iname, oname in zip(self.inames, self.onames):
             partials[oname, iname] = val
 
