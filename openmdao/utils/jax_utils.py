@@ -489,13 +489,13 @@ class SelfAttrFinder(ast.NodeVisitor):
 
 
 
-_replace = frozenset((':', '(', ')', '[', ']', '{', '}', ' ', '-',
+_invalid = frozenset((':', '(', ')', '[', ']', '{', '}', ' ', '-',
                       '+', '*', '/', '^', '%', '!', '<', '>', '='))
 
 
 def _fixname(name):
     """
-    Ensure that the given name is a valid Python variable name.
+    Convert (if necessary) the given name into a valid Python variable name.
 
     Parameters
     ----------
@@ -507,7 +507,7 @@ def _fixname(name):
     str
         The fixed name.
     """
-    intr = _replace.intersection(name)
+    intr = _invalid.intersection(name)
     if intr:
         for c in intr:
             name = name.replace(c, '_')
