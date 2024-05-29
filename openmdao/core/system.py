@@ -5369,7 +5369,7 @@ class System(object):
         try:
             ginputs = self._group_inputs
         except AttributeError:
-            ginputs = {}  # could happen if top level system is not a Group
+            ginputs = {}  # could happen if this system is not a Group
 
         if post_setup:
             abs_names = name2abs_names(self, name)
