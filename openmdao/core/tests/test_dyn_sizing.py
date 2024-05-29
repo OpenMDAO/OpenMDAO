@@ -1074,6 +1074,36 @@ class TestComputeShape(unittest.TestCase):
 
 
 
+@unittest.skipUnless(MPI and  PETScVector, "MPI and PETSc are required.")
+class TestLambdaPickle(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_lambda_compute_shape(self):
+        # this test passes if it doesn't raise an exception
+        class Comp1(om.ExplicitComponent):
+            def setup(self):
+                self.add_output('a', np.zeros((2,3)), distributed=True)
+
+        class Comp2(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('a', distributed=True, shape_by_conn=True)
+                self.add_output('b', compute_shape=lambda shapes: (shapes['a'][1],), distributed=True)
+
+        class Group1(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', Comp1(), promotes=['*'])
+                self.add_subsystem('comp2', Comp2(), promotes=['*'])
+
+        class Group2(om.ParallelGroup):
+            def setup(self):
+                self.add_subsystem('group11', Group1())
+                self.add_subsystem('group12', Group1())
+
+        prob = om.Problem()
+        prob.model.add_subsystem('par', Group2())
+        prob.setup(mode='rev')
+        prob.run_model()
+
 
 
 if __name__ == "__main__":
