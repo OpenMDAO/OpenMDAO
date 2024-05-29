@@ -437,6 +437,10 @@ class LambdaPickleWrapper(object):
     def _getsrc(self):
         if self._src is None:
             self._src = _LambdaSrcFinder(self._func).src
+            if self._src is None:
+                raise RuntimeError("The fix for pickling lambda functions only works for python "
+                                   "3.9 and above. Try updating to a newer python version or "
+                                   "replacing the lambda with a regular function.")
         return self._src
 
 
@@ -457,7 +461,11 @@ class _LambdaSrcFinder(ast.NodeVisitor):
             # if we find more than one.
             raise RuntimeError("Only one lambda function is allowed per line when using "
                                "_LambdaWrapper.")
-        self.src = ast.unparse(node)
+        try:
+            self.src = ast.unparse(node)
+        except AttributeError:
+            # ast.unparse was added in python 3.9
+            self.src = None
 
 
 if __name__ == '__main__':
