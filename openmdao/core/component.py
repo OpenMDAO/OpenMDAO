@@ -343,7 +343,7 @@ class Component(System):
                 else:
                     varmsg = "Variables have not been declared in the same order on all ranks."
 
-                msg = (f"{self.msginfo}: {varmsg} A component must declare the same variables in "
+                msg = (f"{self.msginfo}: {varmsg} A component must declare all variables in "
                        "the same order on all ranks, even if the size of the variable is 0 on "
                        "some ranks.")
                 break
