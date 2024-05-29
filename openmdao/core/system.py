@@ -5367,9 +5367,9 @@ class System(object):
         n_proms = 0  # if nonzero, name given was promoted input name w/o a matching prom output
 
         try:
-            ginputs = model._group_inputs
+            ginputs = self._group_inputs
         except AttributeError:
-            ginputs = {}  # could happen if top level system is not a Group
+            ginputs = {}  # could happen if this system is not a Group
 
         if post_setup:
             abs_names = name2abs_names(self, name)
