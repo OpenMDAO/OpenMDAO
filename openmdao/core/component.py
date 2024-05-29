@@ -306,8 +306,48 @@ class Component(System):
         else:
             self._discrete_inputs = self._discrete_outputs = ()
 
+        if self.comm.size > 1:
+            # check that same variables are declared on all procs
+            vnames = (list(self._var_rel_names['output']), list(self._var_rel_names['input']))
+            allnames = self.comm.gather(vnames, root=0)
+            if self.comm.rank == 0:
+                outset, inset = vnames
+                msg = ''
+                for oset, iset in allnames:
+                    if iset != inset or oset != outset:
+                        msg = self._missing_vars_error(allnames)
+                        break
+                self.comm.bcast(msg, root=0)
+            else:
+                msg = self.comm.bcast(None, root=0)
+
+            if msg:
+                raise RuntimeError(msg)
+
         self._serial_idxs = None
         self._inconsistent_keys = set()
+
+    def _missing_vars_error(self, allnames):
+        msg = ''
+        outset, inset = allnames[0]
+        for rank, (olist, ilist) in enumerate(allnames):
+            if rank != 0 and (olist != outset or ilist != inset):
+                idiff = set(inset).symmetric_difference(ilist)
+                odiff = set(outset).symmetric_difference(olist)
+                if idiff or odiff:
+                    varnames = sorted(idiff | odiff)
+                    if len(varnames) == 1:
+                        varmsg = f"Variable '{varnames[0]}' exists on some ranks and not others."
+                    else:
+                        varmsg = f"Variables {varnames} exist on some ranks and not others."
+                else:
+                    varmsg = "Variables have not been declared in the same order on all ranks."
+
+                msg = (f"{self.msginfo}: {varmsg} A component must declare all variables in "
+                       "the same order on all ranks, even if the size of the variable is 0 on "
+                       "some ranks.")
+                break
+        return msg
 
     @collect_errors
     def _setup_var_sizes(self):
