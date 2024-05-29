@@ -3499,7 +3499,7 @@ class System(object):
 
         return key
 
-    def _check_voi_meta_sizes(self, typename, meta, names):
+    def _check_voi_meta_sizes(self, typename, name, meta, names):
         """
         Check that sizes of named metadata agree with meta['size'].
 
@@ -3507,6 +3507,8 @@ class System(object):
         ----------
         typename : str
             'design var', 'objective', or 'constraint'
+        name : str
+            The name of the variable.  May be an alias.
         meta : dict
             Metadata dictionary.
         names : list of str
@@ -3517,7 +3519,7 @@ class System(object):
             for mname in names:
                 val = meta[mname]
                 if isinstance(val, np.ndarray) and size != val.size:
-                    raise ValueError(f"{self.msginfo}: When adding {typename} '{meta['name']}',"
+                    raise ValueError(f"{self.msginfo}: When adding {typename} '{name}',"
                                      f" {mname} should have size {size} but instead has size "
                                      f"{val.size}.")
 
@@ -3546,7 +3548,7 @@ class System(object):
         """
         out = {}
         try:
-            for data in self._design_vars.values():
+            for name, data in self._design_vars.items():
                 if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
                     self._problem_meta['has_par_deriv_color'] = True
 
@@ -3554,7 +3556,8 @@ class System(object):
                                            use_prom_ivc=use_prom_ivc)
                 if get_sizes and data['source'] in self._var_allprocs_abs2idx:
                     self._check_voi_meta_sizes(
-                        'design var', data, ['ref', 'ref0', 'scaler', 'adder', 'upper', 'lower'])
+                        'design var', name, data,
+                        ['ref', 'ref0', 'scaler', 'adder', 'upper', 'lower'])
 
                 out[key] = data
 
@@ -3664,17 +3667,17 @@ class System(object):
         out = {}
         try:
             # keys of self._responses are the alias or the promoted name
-            for data in self._responses.values():
-                if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
+            for name, meta in self._responses.items():
+                if 'parallel_deriv_color' in meta and meta['parallel_deriv_color'] is not None:
                     self._problem_meta['has_par_deriv_color'] = True
 
-                key = self._update_response_meta(data, get_size=get_sizes,
+                key = self._update_response_meta(meta, get_size=get_sizes,
                                                  use_prom_ivc=use_prom_ivc)
                 if get_sizes:
                     self._check_voi_meta_sizes(
-                        resp_types[data['type']], data, resp_size_checks[data['type']])
+                        resp_types[meta['type']], name, meta, resp_size_checks[meta['type']])
 
-                out[key] = data
+                out[key] = meta
 
         except KeyError as err:
             raise RuntimeError(f"{self.msginfo}: Output not found for response {err}.")

@@ -1097,7 +1097,8 @@ class Driver(object):
                 cons[name] = data
             else:
                 objs[name] = data
-            response_size += data['global_size']
+            if not ('linear' in data and data['linear']):
+                response_size += data['global_size']
 
         # Gather up the information for design vars. _designvars are keyed by the promoted name
         self._designvars = designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
@@ -1146,8 +1147,8 @@ class Driver(object):
         bad = {n for n in self._problem().model._relevance._no_dv_responses
                if n not in self._designvars}
         if bad:
-            bad_conns = [m['name'] for m in self._cons.values() if m['source'] in bad]
-            bad_objs = [m['name'] for m in self._objs.values() if m['source'] in bad]
+            bad_conns = [n for n, m in self._cons.items() if m['source'] in bad]
+            bad_objs = [n for n, m in self._objs.items() if m['source'] in bad]
             badmsg = []
             if bad_conns:
                 badmsg.append(f"constraint(s) {bad_conns}")

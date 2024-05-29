@@ -114,7 +114,7 @@ def assert_warnings(expected_warnings):
 
 
 @contextmanager
-def assert_no_warning(category, msg=None):
+def assert_no_warning(category, msg=None, contains=False):
     """
     Context manager asserting that a warning is not issued.
 
@@ -124,6 +124,8 @@ def assert_no_warning(category, msg=None):
         The class of the warning.
     msg : str or None
         The text of the warning. If None then only the warning class will be checked.
+    contains : bool
+        If True, check that the warning text contains msg, rather than checking equality.
 
     Yields
     ------
@@ -143,6 +145,9 @@ def assert_no_warning(category, msg=None):
         if issubclass(warn.category, category):
             if msg is None:
                 raise AssertionError(f"Found warning: {category} {str(warn.message)}")
+            elif contains:
+                if msg in str(warn.message):
+                    raise AssertionError(f"Found warning: {category} containing '{msg}'")
             elif str(warn.message) == msg:
                 raise AssertionError(f"Found warning: {category} {msg}")
 
