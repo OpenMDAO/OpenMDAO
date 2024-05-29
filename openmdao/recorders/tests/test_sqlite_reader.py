@@ -3,7 +3,6 @@
 import sys
 import os
 import sys
-import types
 import unittest
 
 from io import StringIO
@@ -3058,12 +3057,12 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     def test_reading_non_importable_objects_in_system_options(self):
         # A test to see if a case recorder file can read as much information
-        # as possible from the metadata, even if some cannot be read since the 
-        # recording was done with a module that is not available while doing the 
+        # as possible from the metadata, even if some cannot be read since the
+        # recording was done with a module that is not available while doing the
         # reading of the case recorder file
-        
+
         module_path = 'mymodule.py'  # the module file that will exist while recording but not reading
-        
+
         def create_case_recording_file():
             # Define the module content as a string
             module_content = """
@@ -3076,7 +3075,7 @@ class DummyClass(object):
 
             # import the newly created module
             import mymodule
-            
+
             class ParaboloidWithDummyMetadata(om.ExplicitComponent):
                 def setup(self):
                     self.add_input('x', val=0.0)
@@ -3090,12 +3089,12 @@ class DummyClass(object):
                     outputs['f_xy'] = (x - 3.0)**2 + x * y + (y + 4.0)**2 - 3.0
                 def initialize(self):
                     self.options.declare('dummy', types=mymodule.DummyClass, default=mymodule.DummyClass())
-           
+
             prob = om.Problem()
             recorder = om.SqliteRecorder('cases.sql')
             prob.add_recorder(recorder)
 
-            prob.model.add_subsystem('parab_with_dummy_metadata', ParaboloidWithDummyMetadata(), 
+            prob.model.add_subsystem('parab_with_dummy_metadata', ParaboloidWithDummyMetadata(),
                                      promotes_inputs=['x', 'y'])
             prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
             prob.model.set_input_defaults('x', 3.0)
@@ -3109,15 +3108,15 @@ class DummyClass(object):
             prob.setup()
             prob.run_driver()
             prob.record('final')
-            
+
             prob.cleanup()
-            
+
             # Really remove the module!
             del sys.modules['mymodule']
             os.remove(module_path)
 
-        # need to do this because the use_tempdirs decorator does not 
-        #  update the python path and so "." is not included and this 
+        # need to do this because the use_tempdirs decorator does not
+        #  update the python path and so "." is not included and this
         #  module being created cannot be found
         syspath_save = sys.path[:]
         current_dir = os.getcwd()
@@ -3132,18 +3131,57 @@ class DummyClass(object):
         # check to see if the case file can be read even though one item in the
         # metadata will not be able to be read because the definition of the class
         # for the instance is not available since the module containing it was removed
-        
+
         # need to check for warning being issued about not being able to read it
         with assert_warning(RuntimeWarning, "While reading system options from case recorder, the following errors occurred: No module named 'mymodule'"):
             cr = om.CaseReader('cases.sql')
-            
+
         # Check to see that all the component options for the DummyClass are retrievable from the case recorder file
         parab_component_options = cr._system_options['parab_with_dummy_metadata']['component_options']
         component_options_names = [name for name in parab_component_options]
         from openmdao.recorders.sqlite_reader import UnknownType
-        self.assertEqual(['always_opt', 'distributed', 'dummy', 'run_root_only'], 
+        self.assertEqual(['always_opt', 'distributed', 'dummy', 'run_root_only'],
                          sorted(component_options_names))
         self.assertTrue(isinstance(parab_component_options['dummy'], UnknownType))
+
+    def test_voi_not_included(self):
+
+        class MyGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('dvs', om.IndepVarComp(), promotes=['*'])
+                self.add_subsystem('my_comp', MyComponent(), promotes=['*'])
+                self.dvs.add_output('x', val=np.ones(10))
+                self.add_design_var('x', lower=0.0, upper=1.0)
+                self.add_constraint('y_0', equals=0)
+                self.add_constraint('y_1', equals=0)
+                self.add_objective('z')
+
+        class MyComponent(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', val=np.ones(10))
+                self.add_output('y_0', val=np.ones(3))
+                self.add_output('y_1', val=np.ones(7))
+                self.add_output('z', val=1.0, shape=1)
+
+        prob = om.Problem(model=MyGroup(),
+                          driver=om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False, maxiter=1))
+
+        prob.model.recording_options['includes'] = ['x', 'y_0', 'z']
+        prob.model.add_recorder(om.SqliteRecorder('cases.sql'))
+
+        prob.setup(mode='rev')
+        prob.run_driver()
+
+        case = om.CaseReader('cases.sql').get_case(0)
+
+        dvs = case.get_design_vars()
+        self.assertEqual(set(dvs.keys()), {'x'})
+
+        cons = case.get_constraints()
+        self.assertEqual(set(cons.keys()), {'y_0'})  # NOTE: constraint 'y_1' was not recorded
+
+        objs = case.get_objectives()
+        self.assertEqual(set(objs.keys()), {'z'})
 
 
 @use_tempdirs

@@ -867,7 +867,6 @@ class Case(object):
         auto_ivc_map = self._auto_ivc_map
 
         ret_vars = {}
-        update_vals = scaled or use_indices
 
         for name, meta in self._var_info.items():
             # FIXME: _var_info contains dvs, responses, and 'execution_order'. It
@@ -877,10 +876,15 @@ class Case(object):
             # separating them will prevent needing the following kludge.
             if name == 'execution_order':
                 continue
+
             src = meta['source']
 
             if var_type in abs2meta[src]['type']:
-                val = self.outputs[src].copy()
+                try:
+                    val = self.outputs[src].copy()
+                except KeyError:
+                    # not recorded
+                    continue
                 if use_indices and meta['indices'] is not None:
                     val = val[meta['indices']]
                 if scaled:
