@@ -1074,7 +1074,7 @@ class TestComputeShape(unittest.TestCase):
 
 
 
-@unittest.skipUnless(MPI and  PETScVector, "MPI, PETSc, and python 3.9+ are required." and sys.version_info >= (3, 9))
+@unittest.skipUnless(MPI and  PETScVector and sys.version_info >= (3, 9), "MPI, PETSc, and python 3.9+ are required.")
 class TestLambdaPickle(unittest.TestCase):
     N_PROCS = 2
 
