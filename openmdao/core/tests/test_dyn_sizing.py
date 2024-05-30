@@ -1,5 +1,5 @@
 import unittest
-from collections import defaultdict
+import sys
 
 import numpy as np
 
@@ -1074,7 +1074,7 @@ class TestComputeShape(unittest.TestCase):
 
 
 
-@unittest.skipUnless(MPI and  PETScVector, "MPI and PETSc are required.")
+@unittest.skipUnless(MPI and  PETScVector, "MPI, PETSc, and python 3.9+ are required." and sys.version_info >= (3, 9))
 class TestLambdaPickle(unittest.TestCase):
     N_PROCS = 2
 

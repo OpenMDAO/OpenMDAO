@@ -386,6 +386,14 @@ class LambdaPickleWrapper(object):
     """
 
     def __init__(self, lambda_func):
+        """
+        Initialize the wrapper.
+
+        Parameters
+        ----------
+        lambda_func : function
+            The lambda function to be wrapped.
+        """
         self._func = lambda_func
         self._src = None
 
@@ -448,6 +456,7 @@ class _LambdaSrcFinder(ast.NodeVisitor):
     """
     Given a lambda function, isolate the lambda function source from any surrounding code.
     """
+
     def __init__(self, func):
         super().__init__()
         self.src = None
