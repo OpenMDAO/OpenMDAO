@@ -2,6 +2,7 @@
 
 import sys
 import types
+from types import LambdaType
 from collections import defaultdict
 from collections.abc import Iterable
 from itertools import product
@@ -25,6 +26,8 @@ from openmdao.utils.indexer import Indexer, indexer
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
     DerivativesWarning, warn_deprecation
+from openmdao.utils.code_utils import is_lambda, LambdaPickleWrapper
+
 
 _forbidden_chars = {'.', '*', '?', '!', '[', ']'}
 _whitespace = {' ', '\t', '\r', '\n'}
@@ -599,9 +602,10 @@ class Component(System):
             distributed = distributed or ('distributed' in self.options and
                                           self.options._dict['distributed']['val'])
 
-        metadata = {}
+        if compute_shape is not None and is_lambda(compute_shape):
+            compute_shape = LambdaPickleWrapper(compute_shape)
 
-        metadata.update({
+        metadata = {
             'val': val,
             'shape': shape,
             'size': shape_to_len(shape),
@@ -614,7 +618,7 @@ class Component(System):
             'shape_by_conn': shape_by_conn,
             'compute_shape': compute_shape,
             'copy_shape': copy_shape,
-        })
+        }
 
         # this will get reset later if comm size is 1
         self._has_distrib_vars |= metadata['distributed']
@@ -853,9 +857,10 @@ class Component(System):
             raise TypeError(f"{self.msginfo}: The compute_shape argument should be a function but "
                             f"a '{type(compute_shape).__name__}' was given.")
 
-        metadata = {}
+        if compute_shape is not None and is_lambda(compute_shape):
+            compute_shape = LambdaPickleWrapper(compute_shape)
 
-        metadata.update({
+        metadata = {
             'val': val,
             'shape': shape,
             'size': shape_to_len(shape),
@@ -872,7 +877,7 @@ class Component(System):
             'shape_by_conn': shape_by_conn,
             'compute_shape': compute_shape,
             'copy_shape': copy_shape,
-        })
+        }
 
         # this will get reset later if comm size is 1
         self._has_distrib_vars |= metadata['distributed']
