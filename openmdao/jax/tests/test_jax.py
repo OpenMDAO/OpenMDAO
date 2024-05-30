@@ -168,6 +168,7 @@ class MyCompJax2Primal(om.ExplicitComponent):
 class MyCompJax2PrimalOption(om.ExplicitComponent):
     def initialize(self):
         self.options.declare('mult', default=1.0, types=float, allow_none=False)
+        self.stat = 2.
 
     def setup(self):
         self.add_input('x', shape_by_conn=True)
@@ -181,9 +182,9 @@ class MyCompJax2PrimalOption(om.ExplicitComponent):
         return (self.options['mult'],)
 
     @partial(jax.jit, static_argnums=(0,1))
-    def compute_primal(self, mult, x, y):
+    def compute_primal(self, _self_statics_, x, y):
         z = jnp.dot(x, y)
-        zz = y * self.options['mult']
+        zz = y * self.options['mult'] * self.stat
         return z, zz
 
 
@@ -291,7 +292,7 @@ def compute_primal(self, in_scalar, in_array, in_array2):
     return (out_scalar, out_array, out_array2)
 """.strip()
 
-        self.assertEqual(converter.get_new_source().strip(), expected)
+        self.assertEqual(converter.get_compute_primal_src().strip(), expected)
 
     def test_ast_discrete(self):
         p = om.Problem()
@@ -319,7 +320,7 @@ def compute_primal(self, disc_in, in_scalar, in_array, in_array2):
     return (disc_out, out_scalar, out_array, out_array2)
 """.strip()
 
-        self.assertEqual(converter.get_new_source().strip(), expected)
+        self.assertEqual(converter.get_compute_primal_src().strip(), expected)
 
 
 @unittest.skipIf(jax is None, 'jax is not available.')
@@ -414,7 +415,7 @@ class TestJaxComp(unittest.TestCase):
         p.run_model()
 
         assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
-        assert_near_equal(p.get_val('comp.zz'), y * 1.5)
+        assert_near_equal(p.get_val('comp.zz'), y * 3.0)
         p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'], method='fd', show_only_incorrect=True)
         p.check_partials(show_only_incorrect=True)
 
@@ -424,7 +425,7 @@ class TestJaxComp(unittest.TestCase):
         p.run_model()
 
         assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
-        assert_near_equal(p.get_val('comp.zz'), y * 3.5)
+        assert_near_equal(p.get_val('comp.zz'), y * 7.0)
         p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'], method='fd', show_only_incorrect=True)
         p.check_partials(show_only_incorrect=True)
 

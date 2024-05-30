@@ -13,7 +13,7 @@ import numpy as np
 
 from openmdao.visualization.tables.table_builder import generate_table
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.code_utils import _get_long_name
+from openmdao.utils.code_utils import _get_long_name, replace_method
 
 
 def jit_stub(f, *args, **kwargs):
@@ -250,18 +250,24 @@ class ExplicitCompJaxify(ast.NodeTransformer):
             comp.compute.__globals__['jnp'] = jnp
         namespace = comp.compute.__globals__.copy()
 
+        static_attrs, static_dcts = get_self_static_attrs(func)
+        self_statics = ['_self_statics_'] if static_attrs or static_dcts else []
+        if self_statics:
+            self.get_static_args = self._get_static_args_func(static_attrs, static_dcts)
+        else:
+            self.get_static_args = None
+        print("static_attrs:", static_attrs)
+        print("static_dcts:", static_dcts)
+
         self._compute_args = list(inspect.signature(func).parameters)
 
         # ensure that ordering of args and returns exactly matches the order of the inputs and
         # outputs vectors.
-        self._compute_primal_args = \
+        self._compute_primal_args = self_statics + \
             [n for n in chain(comp._discrete_inputs, comp._var_rel_names['input'])]
         self._compute_primal_returns = \
             [n for n in chain(comp._discrete_outputs, comp._var_rel_names['output'])]
 
-        saf = SelfAttrFinder(func)
-        static_attrs = sorted(saf._attrs)
-        static_dcts = [tup for tup in sorted(saf._dcts.items(), key=lambda x: x[0])]
         node = self.visit(ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec'))
         self._new_ast = ast.fix_missing_locations(node)
 
@@ -270,7 +276,7 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         self.compute_primal = namespace['compute_primal']
 
         if verbose:
-            print(f"\n{self.get_new_source()}\n")
+            print(f"\n{self.get_compute_primal_src()}\n")
 
         # warn if jitting a function that has discrete inputs, because it will cause the function
         # to be recompiled whenever the discrete inputs change.
@@ -281,11 +287,11 @@ class ExplicitCompJaxify(ast.NodeTransformer):
                               "slow if the discrete inputs change often. You may want to consider "
                               "'use_jit=False' for component '{comp.pathname}' if performance "
                               "issues arise.")
-            static_argnums = tuple(range(len(comp._var_discrete['input']) + 1))
+            static_argnums = tuple(range(len(comp._var_discrete['input']) + 1 + len(self_statics)))
             self.compute_primal = \
                     jit(self.compute_primal, static_argnums=static_argnums)
 
-    def get_new_source(self):
+    def get_compute_primal_src(self):
         """
         Return the source code of the transformed function.
 
@@ -295,6 +301,17 @@ class ExplicitCompJaxify(ast.NodeTransformer):
             The source code of the transformed function.
         """
         return ast.unparse(self._new_ast)
+
+    def get_class_src(self):
+        """
+        Return the source code of the class containing the transformed function.
+
+        Returns
+        -------
+        str
+            The source code of the class containing the transformed function.
+        """
+        return replace_method(self._comp().__class__, 'compute', self.get_compute_primal_src())
 
     def _get_arg_values(self):
         discrete_inputs = self._comp()._discrete_inputs
@@ -317,6 +334,22 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         """
         yield from get_partials_deps(self.compute_primal, self._compute_primal_returns,
                                      *self._get_arg_values())
+
+    def _get_static_args_func(self, static_attrs, static_dcts):
+        fsrc = ['def get_static_args(self):']
+        tupargs = []
+        for attr in static_attrs:
+            tupargs.append(f"self.{attr}")
+        for name, entries in static_dcts:
+            for entry in entries:
+                tupargs.append(f"self.{name}['{entry}']")
+            if len(entries) == 1:
+                tupargs.append('')
+        fsrc.append(f'    return ({", ".join(tupargs)})')
+        fsrc = '\n'.join(fsrc)
+        namespace = self._comp().compute.__globals__.copy()
+        exec(fsrc, namespace)
+        return namespace['get_static_args']
 
     def _get_new_args(self):
         new_args = [ast.arg('self', annotation=None)]
@@ -487,6 +520,28 @@ class SelfAttrFinder(ast.NodeVisitor):
         for arg in node.args:
             self.visit(arg)
 
+
+def get_self_static_attrs(method):
+    """
+    Get the set of attribute names accessed on `self` in the given method.
+
+    Parameters
+    ----------
+    method : method
+        The method to be analyzed.
+
+    Returns
+    -------
+    set
+        The set of attribute names accessed on `self`.
+    dict
+        The set of attribute names accessed on `self` that are subscripted with a string.
+    """
+    saf = SelfAttrFinder(method)
+    static_attrs = sorted(saf._attrs)
+    static_dcts = [(name, sorted(eset)) for name, eset in sorted(saf._dcts.items(), key=lambda x: x[0])]
+
+    return static_attrs, static_dcts
 
 
 _invalid = frozenset((':', '(', ')', '[', ']', '{', '}', ' ', '-',

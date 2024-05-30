@@ -512,18 +512,22 @@ class ExplicitComponent(Component):
         """
         Override this in derived classes if compute_primal references static values.
 
-        Do NOT include self._discrete_inputs in the returned tuple.s
+        Do NOT include self._discrete_inputs in the returned tuple.  Return value MUST be a tuple.
 
         Returns
         -------
         tuple
-            Tuple containing all static values required by compute_primal, in the order that they
-            should appear in the compute_primal arg list.
+            Tuple containing all static values required by compute_primal.
         """
         return ()
 
     def _get_compute_primal_inputs(self, inputs):
-        return chain(self.get_static_args(), self._discrete_inputs.values(), inputs.values())
+        # treat all static args as a single tuple argument
+        stargs = self.get_static_args()
+        if stargs:
+            yield stargs
+        yield from self._discrete_inputs.values()
+        yield from inputs.values()
 
     def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
         """
@@ -632,7 +636,11 @@ class ExplicitComponent(Component):
         if self.compute_primal is None:
             jaxifier = ExplicitCompJaxify(self, use_jit=True, verbose=True)
 
+            print(jaxifier.get_class_src())
+
             self.compute_primal = MethodType(jaxifier.compute_primal, self)
+            if jaxifier.get_static_args:
+                self.get_static_args = MethodType(jaxifier.get_static_args, self)
             self.compute = MethodType(ExplicitComponent.compute, self)
 
         self.compute_partials = MethodType(compute_partials, self)

@@ -9,6 +9,8 @@ import ast
 import textwrap
 import importlib
 from collections import defaultdict, OrderedDict
+from tokenize import tokenize, untokenize, NAME, OP, INDENT, DEDENT
+from io import BytesIO
 
 import networkx as nx
 
@@ -348,6 +350,37 @@ def get_class_attributes(fname, class_dict=None):
         visitor = _AttrCollector(class_dict)
         visitor.visit(node)
         return visitor.get_attributes()
+
+
+def replace_method(obj, method_name, new_method_src):
+    """
+    Replace the source code for an existing method with new source code.
+
+    Parameters
+    ----------
+    obj : object
+        The object containing the method to be replaced.
+    method_name : str
+        The name of the method to be replaced.
+    new_method_src : str
+        The new source code for the method.
+
+    Returns
+    -------
+    str
+        The modified class definition for the given instance.
+    """
+    method = getattr(obj, method_name)
+    method_src = textwrap.indent(textwrap.dedent(inspect.getsource(method)), ' ' * 4)
+    new_method_src = textwrap.indent(textwrap.dedent(new_method_src), ' ' * 4)
+
+    try:
+        class_src = textwrap.dedent(inspect.getsource(obj))
+    except Exception:
+        raise RuntimeError(f"Couldn't obtain class source so can't replace method '{method_name}'.")
+
+
+    return class_src.replace(method_src, new_method_src)
 
 
 if __name__ == '__main__':
