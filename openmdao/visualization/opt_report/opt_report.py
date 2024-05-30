@@ -61,7 +61,7 @@ _plot_value_linewidth = 0.5
 _equality_constraint_dot_size = 3
 
 # overall image parameters and layout
-_sparkline_figsize = (3, .5)
+_sparkline_figsize = (3, 0.8)
 _scalar_visual_figsize = (2.0, .2)
 _plot_dpi = 150
 _plot_pad_inches = 0
