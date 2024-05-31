@@ -56,6 +56,7 @@ jobs:
             PETSc: True
             PYOPTSPARSE: true
             SNOPT: true
+            BANDIT: true
             BUILD_DOCS: true
 
           # test latest versions on ubuntu
@@ -353,6 +354,7 @@ jobs:
           grep '^0 unique deprecation warnings' $RPT_FILE
 
       - name: Scan for security issues
+        if: matrix.BANDIT
         id: bandit
         continue-on-error: true
         run: |
