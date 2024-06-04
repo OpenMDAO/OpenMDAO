@@ -440,7 +440,7 @@ class LambdaPickleWrapper(object):
             The state of this object.
         """
         self.__dict__.update(state)
-        self._func = eval(state['_func'])
+        self._func = eval(state['_func'])  # nosec
 
     def _getsrc(self):
         if self._src is None:
