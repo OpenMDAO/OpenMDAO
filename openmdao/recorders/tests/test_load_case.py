@@ -280,7 +280,7 @@ class TestLoadCase(unittest.TestCase):
         model = prob.model
         model.nonlinear_solver.add_recorder(self.recorder)
 
-        fail = prob.run_driver()
+        fail = not prob.run_driver().success
         prob.cleanup()
 
         self.assertFalse(fail, 'Problem failed to converge')
@@ -323,7 +323,7 @@ class TestLoadCase(unittest.TestCase):
         prob.set_solver_print(0)
 
         prob.setup()
-        fail = prob.run_driver()
+        fail = not prob.run_driver().success
         prob.cleanup()
 
         self.assertFalse(fail, 'Problem failed to converge')

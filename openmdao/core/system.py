@@ -3510,7 +3510,7 @@ class System(object):
 
         return key
 
-    def _check_voi_meta_sizes(self, typename, meta, names):
+    def _check_voi_meta_sizes(self, typename, name, meta, names):
         """
         Check that sizes of named metadata agree with meta['size'].
 
@@ -3518,6 +3518,8 @@ class System(object):
         ----------
         typename : str
             'design var', 'objective', or 'constraint'
+        name : str
+            The name of the variable.  May be an alias.
         meta : dict
             Metadata dictionary.
         names : list of str
@@ -3528,7 +3530,7 @@ class System(object):
             for mname in names:
                 val = meta[mname]
                 if isinstance(val, np.ndarray) and size != val.size:
-                    raise ValueError(f"{self.msginfo}: When adding {typename} '{meta['name']}',"
+                    raise ValueError(f"{self.msginfo}: When adding {typename} '{name}',"
                                      f" {mname} should have size {size} but instead has size "
                                      f"{val.size}.")
 
@@ -3557,7 +3559,7 @@ class System(object):
         """
         out = {}
         try:
-            for data in self._design_vars.values():
+            for name, data in self._design_vars.items():
                 if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
                     self._problem_meta['has_par_deriv_color'] = True
 
@@ -3565,7 +3567,8 @@ class System(object):
                                            use_prom_ivc=use_prom_ivc)
                 if get_sizes and data['source'] in self._var_allprocs_abs2idx:
                     self._check_voi_meta_sizes(
-                        'design var', data, ['ref', 'ref0', 'scaler', 'adder', 'upper', 'lower'])
+                        'design var', name, data,
+                        ['ref', 'ref0', 'scaler', 'adder', 'upper', 'lower'])
 
                 out[key] = data
 
@@ -3620,7 +3623,7 @@ class System(object):
             key = src_name
 
         meta['source'] = src_name
-        meta['distributed'] = \
+        meta['distributed'] = dist = \
             src_name in abs2meta_out and abs2meta_out[src_name]['distributed']
 
         if get_size:
@@ -3637,7 +3640,10 @@ class System(object):
                     indices = indices.shaped_instance()
                     meta['size'] = meta['global_size'] = indices.indexed_src_size
                 else:
-                    meta['size'] = sizes[owning_rank[src_name], abs2idx[src_name]]
+                    if dist:
+                        meta['size'] = sizes[self.comm.rank, abs2idx[src_name]]
+                    else:
+                        meta['size'] = sizes[owning_rank[src_name], abs2idx[src_name]]
                     meta['global_size'] = out_meta['global_size']
             else:
                 meta['size'] = meta['global_size'] = 0  # discrete var, don't know size
@@ -3672,17 +3678,17 @@ class System(object):
         out = {}
         try:
             # keys of self._responses are the alias or the promoted name
-            for data in self._responses.values():
-                if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
+            for name, meta in self._responses.items():
+                if 'parallel_deriv_color' in meta and meta['parallel_deriv_color'] is not None:
                     self._problem_meta['has_par_deriv_color'] = True
 
-                key = self._update_response_meta(data, get_size=get_sizes,
+                key = self._update_response_meta(meta, get_size=get_sizes,
                                                  use_prom_ivc=use_prom_ivc)
                 if get_sizes:
                     self._check_voi_meta_sizes(
-                        resp_types[data['type']], data, resp_size_checks[data['type']])
+                        resp_types[meta['type']], name, meta, resp_size_checks[meta['type']])
 
-                out[key] = data
+                out[key] = meta
 
         except KeyError as err:
             raise RuntimeError(f"{self.msginfo}: Output not found for response {err}.")
@@ -5016,7 +5022,7 @@ class System(object):
             if self._assembled_jac:
                 self._assembled_jac.set_complex_step_mode(active)
 
-        for sub in self.system_iter(include_self=False, recurse=True):
+        for sub in self._subsystems_myproc:
             sub._set_complex_step_mode(active)
 
     def cleanup(self):
@@ -5376,9 +5382,9 @@ class System(object):
         n_proms = 0  # if nonzero, name given was promoted input name w/o a matching prom output
 
         try:
-            ginputs = model._group_inputs
+            ginputs = self._group_inputs
         except AttributeError:
-            ginputs = {}  # could happen if top level system is not a Group
+            ginputs = {}  # could happen if this system is not a Group
 
         if post_setup:
             abs_names = name2abs_names(self, name)
@@ -6116,7 +6122,13 @@ class System(object):
         for key in sorted(self._conn_global_abs_in2out):
             data.append(self._conn_global_abs_in2out[key])
 
-        return hashlib.md5(str(data).encode()).hexdigest()  # nosec: content not sensitive
+        try:
+            hash = hashlib.md5(str(data).encode(),
+                               usedforsecurity=False).hexdigest()  # nosec: content not sensitive
+        except TypeError:
+            hash = hashlib.md5(str(data).encode()).hexdigest()  # nosec: content not sensitive
+
+        return hash
 
     def _get_full_dist_shape(self, abs_name, local_shape):
         """
@@ -6159,12 +6171,13 @@ class System(object):
             # to avoid a confusing KeyError
             return (0,)
         high_dims = shape[1:]
+        sz = shape_to_len(shape)
         with multi_proc_exception_check(self.comm):
             if high_dims:
                 high_size = shape_to_len(high_dims)
 
                 dim_size_match = bool(global_size % high_size == 0)
-                if dim_size_match is False:
+                if dim_size_match is False and sz > 0:
                     raise RuntimeError(f"{self.msginfo}: All but the first dimension of the "
                                        "shape's local parts in a distributed variable must match "
                                        f"across processes. For output '{abs_name}', local shape "

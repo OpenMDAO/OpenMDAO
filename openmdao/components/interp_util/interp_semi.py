@@ -159,7 +159,7 @@ class InterpNDSemi(object):
             for i, p in enumerate(xi.T):
                 if np.isnan(p).any():
                     raise OutOfBoundsError("One of the requested xi contains a NaN",
-                                           i, np.NaN, self.grid[i][0], self.grid[i][-1])
+                                           i, np.nan, self.grid[i][0], self.grid[i][-1])
 
         if self._compute_d_dvalues:
             # If the table grid or values are component inputs, then we need to create a new table

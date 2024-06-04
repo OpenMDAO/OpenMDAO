@@ -354,9 +354,9 @@ class TestSemiTotalsNumCalls(unittest.TestCase):
             feather = 0.6362159381168669
             prob.set_val("omega", omega, units="rad/s")
             prob.set_val("feather", feather, units="deg")
-            fail = prob.run_driver()
+            result = prob.run_driver()
 
-            self.assertEqual(fail, False)
+            self.assertTrue(result.success)
 
 
 if __name__ == '__main__':

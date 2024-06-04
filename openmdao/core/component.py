@@ -2,6 +2,7 @@
 
 import sys
 import types
+from types import LambdaType
 from collections import defaultdict
 from collections.abc import Iterable
 from itertools import product
@@ -25,6 +26,8 @@ from openmdao.utils.indexer import Indexer, indexer
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
     DerivativesWarning, warn_deprecation
+from openmdao.utils.code_utils import is_lambda, LambdaPickleWrapper
+
 
 _forbidden_chars = {'.', '*', '?', '!', '[', ']'}
 _whitespace = {' ', '\t', '\r', '\n'}
@@ -306,6 +309,24 @@ class Component(System):
         else:
             self._discrete_inputs = self._discrete_outputs = {}
 
+        if self.comm.size > 1:
+            # check that same variables are declared on all procs
+            vnames = (list(self._var_rel_names['output']), list(self._var_rel_names['input']))
+            allnames = self.comm.gather(vnames, root=0)
+            if self.comm.rank == 0:
+                outset, inset = vnames
+                msg = ''
+                for oset, iset in allnames:
+                    if iset != inset or oset != outset:
+                        msg = self._missing_vars_error(allnames)
+                        break
+                self.comm.bcast(msg, root=0)
+            else:
+                msg = self.comm.bcast(None, root=0)
+
+            if msg:
+                raise RuntimeError(msg)
+
         self._serial_idxs = None
         self._inconsistent_keys = set()
 
@@ -314,6 +335,28 @@ class Component(System):
 
     def _setup_jax(self):
         pass
+
+    def _missing_vars_error(self, allnames):
+        msg = ''
+        outset, inset = allnames[0]
+        for rank, (olist, ilist) in enumerate(allnames):
+            if rank != 0 and (olist != outset or ilist != inset):
+                idiff = set(inset).symmetric_difference(ilist)
+                odiff = set(outset).symmetric_difference(olist)
+                if idiff or odiff:
+                    varnames = sorted(idiff | odiff)
+                    if len(varnames) == 1:
+                        varmsg = f"Variable '{varnames[0]}' exists on some ranks and not others."
+                    else:
+                        varmsg = f"Variables {varnames} exist on some ranks and not others."
+                else:
+                    varmsg = "Variables have not been declared in the same order on all ranks."
+
+                msg = (f"{self.msginfo}: {varmsg} A component must declare all variables in "
+                       "the same order on all ranks, even if the size of the variable is 0 on "
+                       "some ranks.")
+                break
+        return msg
 
     @collect_errors
     def _setup_var_sizes(self):
@@ -557,11 +600,13 @@ class Component(System):
             if distributed is None:
                 distributed = False
             # using ._dict below to avoid tons of deprecation warnings
-            distributed = distributed or self.options._dict['distributed']['val']
+            distributed = distributed or ('distributed' in self.options and
+                                          self.options._dict['distributed']['val'])
 
-        metadata = {}
+        if compute_shape is not None and is_lambda(compute_shape):
+            compute_shape = LambdaPickleWrapper(compute_shape)
 
-        metadata.update({
+        metadata = {
             'val': val,
             'shape': shape,
             'size': shape_to_len(shape),
@@ -574,7 +619,7 @@ class Component(System):
             'shape_by_conn': shape_by_conn,
             'compute_shape': compute_shape,
             'copy_shape': copy_shape,
-        })
+        }
 
         # this will get reset later if comm size is 1
         self._has_distrib_vars |= metadata['distributed']
@@ -798,7 +843,8 @@ class Component(System):
             if distributed is None:
                 distributed = False
             # using ._dict below to avoid tons of deprecation warnings
-            distributed = distributed or self.options._dict['distributed']['val']
+            distributed = distributed or ('distributed' in self.options and
+                                          self.options._dict['distributed']['val'])
 
         if copy_shape and compute_shape:
             raise ValueError(f"{self.msginfo}: Only one of 'copy_shape' or 'compute_shape' can "
@@ -812,9 +858,10 @@ class Component(System):
             raise TypeError(f"{self.msginfo}: The compute_shape argument should be a function but "
                             f"a '{type(compute_shape).__name__}' was given.")
 
-        metadata = {}
+        if compute_shape is not None and is_lambda(compute_shape):
+            compute_shape = LambdaPickleWrapper(compute_shape)
 
-        metadata.update({
+        metadata = {
             'val': val,
             'shape': shape,
             'size': shape_to_len(shape),
@@ -831,7 +878,7 @@ class Component(System):
             'shape_by_conn': shape_by_conn,
             'compute_shape': compute_shape,
             'copy_shape': copy_shape,
-        })
+        }
 
         # this will get reset later if comm size is 1
         self._has_distrib_vars |= metadata['distributed']
@@ -1119,8 +1166,8 @@ class Component(System):
                                  f'will raise an error.')
 
             if rows is not None:
-                rows = np.array(rows, dtype=INT_DTYPE, copy=False)
-                cols = np.array(cols, dtype=INT_DTYPE, copy=False)
+                rows = np.asarray(rows, dtype=INT_DTYPE)
+                cols = np.asarray(cols, dtype=INT_DTYPE)
 
                 # Check the length of rows and cols to catch this easy mistake and give a
                 # clear message.

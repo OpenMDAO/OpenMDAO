@@ -565,7 +565,7 @@ def run_driver(prob):
 
     sys.stdout = strout
     try:
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
     finally:
         sys.stdout = stdout
 

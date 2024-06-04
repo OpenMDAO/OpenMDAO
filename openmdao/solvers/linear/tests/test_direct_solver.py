@@ -5,13 +5,15 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.core.tests.test_distrib_derivs import DistribExecComp
+
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
+from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.general_utils import printoptions
 from openmdao.utils.mpi import MPI
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -32,7 +34,7 @@ class NanComp(om.ExplicitComponent):
     def compute_partials(self, inputs, partials):
         """Intentionally incorrect derivative."""
         J = partials
-        J['y', 'x'] = np.NaN
+        J['y', 'x'] = np.nan
 
 
 class SingularComp(om.ImplicitComponent):
@@ -64,7 +66,7 @@ class NanComp2(om.ExplicitComponent):
     def compute_partials(self, inputs, partials):
         """Intentionally incorrect derivative."""
         J = partials
-        J['y', 'x'] = np.NaN
+        J['y', 'x'] = np.nan
         J['y2', 'x'] = 2.0
 
 class DupPartialsComp(om.ExplicitComponent):
@@ -81,6 +83,30 @@ class DupPartialsComp(om.ExplicitComponent):
 
     def compute_partials(self, inputs, partials):
         pass
+
+
+class DistribComp(om.ExplicitComponent):
+    def __init__(self, arr_size=11, **kwargs):
+        super().__init__(**kwargs)
+        self.arr_size = arr_size
+        self.options['distributed'] = True
+
+    def setup(self):
+        comm = self.comm
+        rank = comm.rank
+
+        sizes, _ = evenly_distrib_idxs(comm.size, self.arr_size)
+
+        self.add_input('x', np.ones(sizes[rank]))
+        self.add_output('y', np.ones(sizes[rank]))
+
+        self.declare_partials(of='y', wrt='x', method='cs')
+
+    def compute(self, inputs, outputs):
+        if self.comm.rank == 0:
+            outputs['y'] = 2.0 * inputs['x']
+        else:
+            outputs['y'] = 3.0 * inputs['x']
 
 
 class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
@@ -260,8 +286,9 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
         model.linear_solver = om.DirectSolver(assemble_jac=True)
 
-        with self.assertRaises(Exception) as cm:
-            prob.setup()
+        with printoptions(legacy='1.21'):
+            with self.assertRaises(Exception) as cm:
+                prob.setup()
 
         expected_msg = "'dupcomp' <class DupPartialsComp>: d(x)/d(c): declare_partials has been called with rows and cols that specify the following duplicate subjacobian entries: [(4, 11), (10, 2)]."
 
@@ -916,12 +943,10 @@ class TestDirectSolverRemoteErrors(unittest.TestCase):
         group = om.Group()
 
         group.add_subsystem('P', om.IndepVarComp('x', np.arange(size)))
-        group.add_subsystem('C1', DistribExecComp(['y=2.0*x', 'y=3.0*x'], arr_size=size,
-                                                  x=np.zeros(size),
-                                                  y=np.zeros(size)))
+        group.add_subsystem('C1', DistribComp(arr_size=size))
         group.add_subsystem('C2', om.ExecComp(['z=3.0*y'],
-                                           y=np.zeros(size),
-                                           z=np.zeros(size)))
+                                              y=np.zeros(size),
+                                              z=np.zeros(size)))
 
         prob = om.Problem()
         prob.model = group
@@ -946,9 +971,7 @@ class TestDirectSolverRemoteErrors(unittest.TestCase):
         group.add_subsystem('P', om.IndepVarComp('x', np.arange(size)))
         sub = group.add_subsystem('sub', om.Group())
 
-        sub.add_subsystem('C1', DistribExecComp(['y=2.0*x', 'y=3.0*x'], arr_size=size,
-                                                x=np.zeros(size),
-                                                y=np.zeros(size)))
+        sub.add_subsystem('C1', DistribComp(arr_size=size))
         sub.add_subsystem('C2', om.ExecComp(['z=3.0*y'],
                                             y=np.zeros(size),
                                             z=np.zeros(size)))

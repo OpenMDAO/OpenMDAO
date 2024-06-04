@@ -1615,6 +1615,20 @@ class TestGroup(unittest.TestCase):
 
         np.testing.assert_array_equal(p['x'], np.ones(5))
 
+    def test_set_input_defaults_set_val(self):
+        class MyGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('ec1', om.ExecComp('y=x', x={'units': 'm'}), promotes_inputs=['x'])
+                self.add_subsystem('ec2', om.ExecComp('z=x**2', x={'units': 'ft'}), promotes_inputs=['x'])
+                self.set_input_defaults('x', val=1.0, units='m')
+
+        p = om.Problem(om.Group())
+        comp = p.model.add_subsystem('comp', MyGroup())
+        p.setup()
+        p.run_model()
+        comp.set_val('x', 3.5, units='m')
+        assert_near_equal(comp.get_val('x'), 3.5)
+
 
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestGroupMPISlice(unittest.TestCase):

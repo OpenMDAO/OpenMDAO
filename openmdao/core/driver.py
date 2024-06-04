@@ -1,4 +1,5 @@
 """Define a base class for all Drivers in OpenMDAO."""
+import functools
 from itertools import chain
 import pprint
 import sys
@@ -22,7 +23,171 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import sizes2offsets
 from openmdao.vectors.vector import _full_slice, _flat_full_indexer
 from openmdao.utils.indexer import indexer
-from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, DriverWarning
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, \
+    DriverWarning, OMDeprecationWarning, warn_deprecation
+
+
+class DriverResult():
+    """
+    A container that stores information pertaining to the result of a driver execution.
+
+    Parameters
+    ----------
+    driver : Driver
+        The Driver associated with this DriverResult.
+
+    Attributes
+    ----------
+    _driver : weakref to Driver
+        A weakref to the Driver associated with this DriverResult.
+    runtime : float
+        The time required to execute the driver, in seconds.
+    iter_count : int
+        The number of iterations used by the optimizer.
+    model_evals : int
+        The number of times the objective function was evaluated (model solve_nonlinear calls).
+    model_time : float
+        The time spent in model solve_nonlinear evaluations.
+    deriv_evals : int
+        The number of times the total jacobian was computed.
+    deriv_time : float
+        The time spent computing the total jacobian.
+    exit_status : str
+        A string that may provide more detail about the results of the driver run.
+    success : bool
+        A boolean that dictates whether or not the driver was successful.
+    """
+
+    def __init__(self, driver):
+        """
+        Initialize the DriverResult object.
+        """
+        self._driver = weakref.ref(driver)
+        self.runtime = 0.0
+        self.iter_count = 0
+        self.model_evals = 0
+        self.model_time = 0.0
+        self.deriv_evals = 0
+        self.deriv_time = 0.0
+        self.exit_status = 'NOT_RUN'
+        self.success = False
+
+    def reset(self):
+        """
+        Set the driver result attributes back to their default value.
+        """
+        self.runtime = 0.0
+        self.iter_count = 0
+        self.model_evals = 0
+        self.model_time = 0.0
+        self.deriv_evals = 0
+        self.deriv_time = 0.0
+        self.exit_status = 'NOT_RUN'
+        self.success = False
+
+    def __getitem__(self, s):
+        """
+        Provide key access to the attributes of DriverResult.
+
+        This is included for backward compatibility with some
+        tests which require dictionary-like access.
+
+        Parameters
+        ----------
+        s : str
+            The name of the attribute.
+
+        Returns
+        -------
+        object
+            The value of the attribute
+        """
+        return getattr(self, s)
+
+    def __repr__(self):
+        """
+        Return a string representation of the DriverResult.
+
+        Returns
+        -------
+        str
+            A string-representation of the DriverResult object
+        """
+        driver = self._driver()
+        prob = driver._problem()
+        s = (f'Problem: {prob._name}\n'
+             f'Driver:  {driver.__class__.__name__}\n'
+             f'  success     : {self.success}\n'
+             f'  iterations  : {self.iter_count}\n'
+             f'  runtime     : {self.runtime:-10.4E} s\n'
+             f'  model_evals : {self.model_evals}\n'
+             f'  model_time  : {self.model_time:-10.4E} s\n'
+             f'  deriv_evals : {self.deriv_evals}\n'
+             f'  deriv_time  : {self.deriv_time:-10.4E} s\n'
+             f'  exit_status : {self.exit_status}')
+        return s
+
+    def __bool__(self):
+        """
+        Mimick the behavior of the previous `failed` return value of run_driver.
+
+        The return value is True if the driver was NOT successful.
+        An OMDeprecationWarning is currently issued so users know to change their code.
+        Users should utilize the `success` attribute to test for driver success.
+
+        Returns
+        -------
+        bool
+            True if the Driver was NOT successful.
+
+        """
+        issue_warning(msg='boolean evaluation of DriverResult is temporarily implemented '
+                      'to mimick the previous `failed` return behavior of run_driver.\n'
+                      'Use the `success` attribute of the returned DriverResult '
+                      'object to test for successful driver completion.',
+                      category=OMDeprecationWarning)
+        return not self.success
+
+    @staticmethod
+    def track_stats(kind):
+        """
+        Decorate methods to track the model solve_nonlinear or deriv time and count.
+
+        This decorator should be applied to the _objfunc or _gradfunc (or equivalent) methods
+        of drivers. It will either accumulate the elapsed time in driver.result.model_time or
+        driver.result.deriv_time, based on the value of kind.
+
+        Parameters
+        ----------
+        kind : str
+            One of 'model' or 'deriv', specifying which statistics should be accumulated.
+
+        Returns
+        -------
+        Callable
+            A wrapped version of the decorated function such that it accumulates the time and
+            call count for either the objective or derivatives.
+        """
+        if kind not in ('model', 'deriv'):
+            raise AttributeError('time_type must be one of "model" or "deriv".')
+
+        def _track_time(func):
+            @functools.wraps(func)
+            def wrapper(*args, **kwargs):
+                start_time = time.perf_counter()
+                ret = func(*args, **kwargs)
+                end_time = time.perf_counter()
+                result = args[0].result
+
+                if kind == 'model':
+                    result.model_time += end_time - start_time
+                    result.model_evals += 1
+                else:
+                    result.deriv_time += end_time - start_time
+                    result.deriv_evals += 1
+                return ret
+            return wrapper
+        return _track_time
 
 
 class Driver(object):
@@ -36,8 +201,6 @@ class Driver(object):
 
     Attributes
     ----------
-    fail : bool
-        Reports whether the driver ran successfully.
     iter_count : int
         Keep track of iterations for case recording.
     options : <OptionsDictionary>
@@ -87,8 +250,8 @@ class Driver(object):
         Cached total jacobian handling object.
     _total_jac_linear : _TotalJacInfo or None
         Cached linear total jacobian handling object.
-    opt_result : dict
-        Dictionary containing information for use in the optimization report.
+    result : DriverResult
+        DriverResult object containing information for use in the optimization report.
     _has_scaling : bool
         If True, scaling has been set for this driver.
     """
@@ -181,19 +344,9 @@ class Driver(object):
         self._total_jac = None
         self._total_jac_linear = None
 
-        self.fail = False
-
         self._declare_options()
         self.options.update(kwargs)
-
-        self.opt_result = {
-            'runtime': 0.0,
-            'iter_count': 0,
-            'obj_calls': 0,
-            'deriv_calls': 0,
-            'exit_status': 'NOT_RUN'
-        }
-
+        self.result = DriverResult(self)
         self._has_scaling = False
 
     def _get_inst_id(self):
@@ -574,8 +727,8 @@ class Driver(object):
 
         Returns
         -------
-        bool
-            Failure flag; True if failed to converge, False is successful.
+        DriverResult
+            DriverResult object, containing information about the run.
         """
         problem = self._problem()
         model = problem.model
@@ -583,20 +736,21 @@ class Driver(object):
         if self.supports['optimization'] and problem.options['group_by_pre_opt_post']:
             if model._pre_components:
                 with model._relevance.nonlinear_active('pre'):
-                    model.run_solve_nonlinear()
+                    self._run_solve_nonlinear()
 
             with SaveOptResult(self):
                 with model._relevance.nonlinear_active('iter'):
-                    result = self.run()
+                    self.result.success = not self.run()
 
             if model._post_components:
                 with model._relevance.nonlinear_active('post'):
-                    model.run_solve_nonlinear()
+                    self._run_solve_nonlinear()
 
-            return result
         else:
             with SaveOptResult(self):
-                return self.run()
+                self.result.success = not self.run()
+
+        return self.result
 
     def _get_voi_val(self, name, meta, remote_vois, driver_scaling=True,
                      get_remote=True, rank=None):
@@ -723,7 +877,9 @@ class Driver(object):
         int
             Number of objective evaluations made during a driver run.
         """
-        return 0
+        warn_deprecation('get_driver_objective_calls is deprecated. '
+                         'Use `driver.result.model_evals`')
+        return self.result.model_evals
 
     def get_driver_derivative_calls(self):
         """
@@ -734,7 +890,9 @@ class Driver(object):
         int
             Number of derivative evaluations made during a driver run.
         """
-        return 0
+        warn_deprecation('get_driver_derivative_calls is deprecated. '
+                         'Use `driver.result.deriv_evals`')
+        return self.result.deriv_evals
 
     def get_design_var_values(self, get_remote=True, driver_scaling=True):
         """
@@ -939,7 +1097,8 @@ class Driver(object):
                 cons[name] = data
             else:
                 objs[name] = data
-            response_size += data['global_size']
+            if not ('linear' in data and data['linear']):
+                response_size += data['global_size']
 
         # Gather up the information for design vars. _designvars are keyed by the promoted name
         self._designvars = designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
@@ -958,7 +1117,7 @@ class Driver(object):
         str
             String indicating result of driver run.
         """
-        return 'FAIL' if self.fail else 'SUCCESS'
+        return 'SUCCESS' if self.result.success else 'FAIL'
 
     def check_relevance(self):
         """
@@ -988,8 +1147,8 @@ class Driver(object):
         bad = {n for n in self._problem().model._relevance._no_dv_responses
                if n not in self._designvars}
         if bad:
-            bad_conns = [m['name'] for m in self._cons.values() if m['source'] in bad]
-            bad_objs = [m['name'] for m in self._objs.values() if m['source'] in bad]
+            bad_conns = [n for n, m in self._cons.items() if m['source'] in bad]
+            bad_objs = [n for n, m in self._objs.items() if m['source'] in bad]
             badmsg = []
             if bad_conns:
                 badmsg.append(f"constraint(s) {bad_conns}")
@@ -1018,8 +1177,9 @@ class Driver(object):
         bool
             Failure flag; True if failed to converge, False is successful.
         """
+        self.result.reset()
         with RecordingDebugging(self._get_name(), self.iter_count, self):
-            self._problem().model.run_solve_nonlinear()
+            self._run_solve_nonlinear()
 
         self.iter_count += 1
 
@@ -1029,6 +1189,11 @@ class Driver(object):
     def _recording_iter(self):
         return self._problem()._metadata['recording_iter']
 
+    @DriverResult.track_stats(kind='model')
+    def _run_solve_nonlinear(self):
+        return self._problem().model.run_solve_nonlinear()
+
+    @DriverResult.track_stats(kind='deriv')
     def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', driver_scaling=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
@@ -1414,6 +1579,12 @@ class Driver(object):
 
             return self._coloring_info.coloring
 
+    def _update_result(self, result):
+        """
+        Set additional attributes and information to the DriverResult.
+        """
+        pass
+
 
 class SaveOptResult(object):
     """
@@ -1465,13 +1636,14 @@ class SaveOptResult(object):
             Solver recording requires extra args.
         """
         driver = self._driver
-        driver.opt_result = {
-            'runtime': time.perf_counter() - self._start_time,
-            'iter_count': driver.iter_count,
-            'obj_calls': driver.get_driver_objective_calls(),
-            'deriv_calls': driver.get_driver_derivative_calls(),
-            'exit_status': driver.get_exit_status()
-        }
+
+        # The standard driver results
+        driver.result.runtime = time.perf_counter() - self._start_time
+        driver.result.iter_count = driver.iter_count
+        driver.result.exit_status = driver.get_exit_status()
+
+        # The custom driver results
+        driver._update_result(driver.result)
 
 
 class RecordingDebugging(Recording):
