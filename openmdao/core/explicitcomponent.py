@@ -1,7 +1,5 @@
 """Define the ExplicitComponent class."""
 
-from itertools import chain
-
 import numpy as np
 from types import MethodType
 
@@ -14,8 +12,6 @@ from openmdao.core.constants import INT_DTYPE, _UNDEFINED
 from openmdao.utils.jax_utils import jax, jit, ExplicitCompJaxify, jax_deriv_shape
 from openmdao.utils.array_utils import submat_sparsity_iter
 from openmdao.utils.om_warnings import issue_warning
-
-from openmdao.devtools.memory import diff_mem
 
 
 class ExplicitComponent(Component):
@@ -613,7 +609,6 @@ class ExplicitComponent(Component):
         def compute_partials(self, inputs, partials, discrete_inputs=None):
             deriv_vals = self._get_jac_func()(*self._get_compute_primal_inputs(inputs,
                                                                                discrete_inputs))
-            # print("deriv shape:", jax_deriv_shape(deriv_vals))
             # jax is inconsistent in the form of the derivative values it returns, so we need to
             # handle the single wrt case differently from the multiple wrt case. In the single
             # wrt case, the derivative values are returned as a 1D array within a tuple sized by
@@ -626,29 +621,23 @@ class ExplicitComponent(Component):
                 ofidx += 1
                 ofmeta = self._var_rel2meta[ofname]
                 for wrtidx, wrtname in enumerate(self._var_rel_names['input']):
-                    wrtmeta = self._var_rel2meta[wrtname]
                     key = (ofname, wrtname)
                     if key not in partials:
+                        # FIXME: this means that we computed a derivative that we didn't need
                         continue
+
+                    wrtmeta = self._var_rel2meta[wrtname]
+                    if nwrt > 1:  # index by ofidx and wrtidx
+                        dvals = deriv_vals[ofidx][wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
+                    else:  # only index by ofidx
+                        dvals = deriv_vals[ofidx].reshape(ofmeta['size'], wrtmeta['size'])
+
                     sjmeta = partials.get_metadata(key)
                     rows = sjmeta['rows']
-                    cols = sjmeta['cols']
                     if rows is None:
-                        if nwrt > 1:  # index by ofidx and wrtidx
-                            partials[ofname, wrtname] = \
-                                deriv_vals[ofidx][wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
-                        else:  # only index by ofidx
-                            partials[ofname, wrtname] = \
-                                deriv_vals[ofidx].reshape(ofmeta['size'], wrtmeta['size'])
+                        partials[ofname, wrtname] = dvals
                     else:
-                        if nwrt > 1:  # index by ofidx and wrtidx
-                            partials[ofname, wrtname] = \
-                                deriv_vals[ofidx][wrtidx].reshape(ofmeta['size'],
-                                                                  wrtmeta['size'])[rows, cols]
-                        else: # only index by ofidx
-                            partials[ofname, wrtname] = \
-                                deriv_vals[ofidx].reshape(ofmeta['size'],
-                                                          wrtmeta['size'])[rows, cols]
+                        partials[ofname, wrtname] = dvals[rows, sjmeta['cols']]
 
         if self.compute_primal is None:
             jaxifier = ExplicitCompJaxify(self, use_jit=True, verbose=True)
@@ -664,6 +653,8 @@ class ExplicitComponent(Component):
         self._has_compute_partials = True
 
     def _get_jac_func(self):
+        # TODO: modify this to use relevance and possibly compile multiple jac functions depending
+        # on DV/response so that we don't compute any derivatives that are always zero.
         if self._jac_func_ is None:
             fjax = jax.jacfwd if self.best_deriv_direction() == 'fwd' else jax.jacrev
             if len(self.get_static_args()) > 0:
