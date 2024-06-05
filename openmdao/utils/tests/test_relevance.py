@@ -43,3 +43,21 @@ class TestDerivsWithoutDVs(unittest.TestCase):
         prob.run_model()
         chk = prob.check_totals(of='b', wrt='a', show_only_incorrect=True)
         assert_check_totals(chk)
+
+class TestRelevanceEmptyGroups(unittest.TestCase):
+    def test_emptygroup(self):
+        '''Tests that relevance checks do not error if empty groups are present'''
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('empy_group', om.Group(), promotes=['*'])
+        grp2: om.Group = model.add_subsystem('non_empty_group', om.Group(), promotes=['*'])
+        grp2.add_subsystem('idv', om.IndepVarComp('x', val=1), promotes=['*'])
+        grp2.add_subsystem('comp', om.ExecComp('y=2*x**2'), promotes=['*'])
+        model.add_design_var('x')
+        model.add_objective('y')
+
+        prob.driver = om.ScipyOptimizeDriver()
+
+        prob.setup()
+        prob.run_driver()

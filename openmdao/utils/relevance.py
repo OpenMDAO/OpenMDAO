@@ -796,7 +796,8 @@ class Relevance(object):
 
     def is_relevant_system(self, name):
         """
-        Return True if the given named system is relevant.
+        Return True if the given named system is relevant. Returns False if
+        system has no subsystems with outputs
 
         Parameters
         ----------
@@ -810,6 +811,9 @@ class Relevance(object):
         """
         if not self._active:
             return True
+        
+        if name not in self._sys2idx:
+            return False
 
         return self._current_rel_sarray[self._sys2idx[name]]
 
