@@ -2,7 +2,7 @@ import unittest
 
 import openmdao.api as om
 from openmdao.utils.relevance import _vars2systems
-from openmdao.utils.assert_utils import assert_check_totals
+from openmdao.utils.assert_utils import assert_check_totals, assert_check_partials
 
 
 class TestRelevance(unittest.TestCase):
@@ -10,6 +10,25 @@ class TestRelevance(unittest.TestCase):
         names = ['abc.def.g', 'xyz.pdq.bbb', 'aaa.xxx', 'foobar.y']
         expected = {'abc', 'abc.def', 'xyz', 'xyz.pdq', 'aaa', 'foobar', ''}
         self.assertEqual(_vars2systems(names), expected)
+
+    def test_empty_group(self):
+        prob = om.Problem()
+        model = prob.model
+
+        grp1: om.Group = model.add_subsystem('empy_group', om.Group(), promotes=['*'])
+        grp2: om.Group = model.add_subsystem('non_empty_group', om.Group(), promotes=['*'])
+        grp2.add_subsystem('idv', om.IndepVarComp('x', val=1), promotes=['*'])
+        grp2.add_subsystem('comp', om.ExecComp('y=2*x**2'), promotes=['*'])
+        model.add_design_var('x')
+        model.add_objective('y')
+
+        prob.driver = om.ScipyOptimizeDriver()
+
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+
+        assert_check_partials(prob.check_partials(method='cs', out_stream=None))
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
 
 
 class TestDerivsWithoutDVs(unittest.TestCase):
