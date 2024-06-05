@@ -93,7 +93,7 @@ class MyCompJax1(om.ExplicitComponent):
         self.add_input('y', shape_by_conn=True)
         self.add_output('z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
 
-        # self.declare_partials(of='z', wrt=['x', 'y'])
+        self.declare_partials(of='z', wrt=['x', 'y'])
 
     def compute(self, inputs, outputs):
         outputs['z'] = np.dot(inputs['x'], inputs['y'])
@@ -110,7 +110,7 @@ class MyCompJax1Shaped(om.ExplicitComponent):
         self.add_input('y', shape=self.yshape)
         self.add_output('z', shape=(self.xshape[0], self.yshape[1]))
 
-        # self.declare_partials(of='z', wrt=['x', 'y'])
+        self.declare_partials(of='z', wrt=['x', 'y'])
 
     def compute(self, inputs, outputs):
         outputs['z'] = np.dot(inputs['x'], inputs['y'])
@@ -123,7 +123,7 @@ class MyCompJax2(om.ExplicitComponent):
         self.add_output('z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
         self.add_output('zz', copy_shape='y')
 
-        # self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
+        self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
 
     def compute(self, inputs, outputs):
         outputs['z'] = np.dot(inputs['x'], inputs['y'])
@@ -142,7 +142,7 @@ class MyCompJax2Shaped(om.ExplicitComponent):
         self.add_output('z', shape=(self.xshape[0], self.yshape[1]))
         self.add_output('zz', shape=self.yshape)
 
-        # self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
+        self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
 
     def compute(self, inputs, outputs):
         outputs['z'] = np.dot(inputs['x'], inputs['y'])
@@ -156,7 +156,7 @@ class MyCompJax2Primal(om.ExplicitComponent):
         self.add_output('z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
         self.add_output('zz', copy_shape='y')
 
-        # self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
+        self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
 
     @partial(jax.jit, static_argnums=(0,))
     def compute_primal(self, x, y):
@@ -166,9 +166,12 @@ class MyCompJax2Primal(om.ExplicitComponent):
 
 
 class MyCompJax2PrimalOption(om.ExplicitComponent):
+    def __init__(self, stat=2., **kwargs):
+        super().__init__(**kwargs)
+        self.stat = stat
+
     def initialize(self):
         self.options.declare('mult', default=1.0, types=float, allow_none=False)
-        self.stat = 2.
 
     def setup(self):
         self.add_input('x', shape_by_conn=True)
@@ -176,10 +179,10 @@ class MyCompJax2PrimalOption(om.ExplicitComponent):
         self.add_output('z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
         self.add_output('zz', copy_shape='y')
 
-        # self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
+        self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
 
     def get_static_args(self):
-        return (self.options['mult'],)
+        return (self.options['mult'], self.stat)
 
     @partial(jax.jit, static_argnums=(0,1))
     def compute_primal(self, _self_statics_, x, y):
@@ -199,7 +202,7 @@ class MyCompJaxWithOption(om.ExplicitComponent):
         self.add_output('z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
         self.add_output('zz', copy_shape='y')
 
-        # self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
+        self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
 
     def compute(self, inputs, outputs):
         outputs['z'] = np.dot(inputs['x'], inputs['y'])
@@ -215,7 +218,7 @@ class MyCompJaxWithDiscrete(om.ExplicitComponent):
         self.add_output('zz', copy_shape='y')
         self.add_discrete_output('disc_out', val=3)
 
-        # self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
+        self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
 
     def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
         discrete_outputs['disc_out'] = -discrete_inputs['disc_in']
@@ -402,6 +405,7 @@ class TestJaxComp(unittest.TestCase):
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
         ivc.add_output('y', val=np.ones(y_shape))
         comp = p.model.add_subsystem('comp', MyCompJax2PrimalOption(derivs_method='jax', mult=1.5))
+        # deriv shape: [[(2, 4, 2, 3), (2, 4, 3, 4)], [(3, 4, 2, 3), (3, 4, 3, 4)]]
         p.model.connect('ivc.x', 'comp.x')
         p.model.connect('ivc.y', 'comp.y')
 
@@ -426,6 +430,16 @@ class TestJaxComp(unittest.TestCase):
 
         assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
         assert_near_equal(p.get_val('comp.zz'), y * 7.0)
+        p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'], method='fd', show_only_incorrect=True)
+        p.check_partials(show_only_incorrect=True)
+
+        comp.stat = 1./3.5
+        p.set_val('ivc.x', x)
+        p.set_val('ivc.y', y)
+        p.run_model()
+
+        assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
+        assert_near_equal(p.get_val('comp.zz'), y)
         p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'], method='fd', show_only_incorrect=True)
         p.check_partials(show_only_incorrect=True)
 

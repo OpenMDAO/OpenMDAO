@@ -380,7 +380,6 @@ def replace_method(obj, method_name, new_method_src):
     except Exception:
         raise RuntimeError(f"Couldn't obtain class source so can't replace method '{method_name}'.")
 
-
     return class_src.replace(method_src, new_method_src)
 
 

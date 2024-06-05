@@ -965,4 +965,3 @@ def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, s
                     yield (of, wrt, None, None, submat.shape)
                 else:
                     yield (of, wrt, submat.row, submat.col, submat.shape)
-

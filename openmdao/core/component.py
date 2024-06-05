@@ -509,6 +509,8 @@ class Component(System):
         # sparsity uses relative names, so we need to convert to absolute
         prefix = self.pathname + '.'
         for of, wrt, rows, cols, shape in sparsity_iter:
+            if rows is None:
+                continue
             abs_key = (prefix + of, prefix + wrt)
             if abs_key in self._subjacs_info:
                 self._subjacs_info[abs_key]['sparsity'] = (rows, cols, shape)

@@ -146,14 +146,14 @@ def get_func_graph(func, *args, **kwargs):
 
     for eqn in jaxpr.eqns:
         for inp in eqn.invars:
-            if type(inp) == jax._src.core.Var:
+            if type(inp) is jax._src.core.Var:
                 inp = str(inp)
                 if inp not in n2index:
                     n2index[inp] = i
                     graph.add_node(i, label=inp)
                     i += 1
                 for out in eqn.outvars:
-                    if type(out) == jax._src.core.Var:
+                    if type(out) is jax._src.core.Var:
                         out = str(out)
                         if out not in n2index:
                             n2index[out] = i
@@ -236,6 +236,8 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         The original argument names of the compute function.
     _new_ast : ast node
         The new ast node created from the original compute function.
+    get_static_args : function
+        A function that returns the static args for the Component.
     """
 
     # these ops require static objects so their args should not be traced.  Traced array ops should
@@ -256,8 +258,6 @@ class ExplicitCompJaxify(ast.NodeTransformer):
             self.get_static_args = self._get_static_args_func(static_attrs, static_dcts)
         else:
             self.get_static_args = None
-        print("static_attrs:", static_attrs)
-        print("static_dcts:", static_dcts)
 
         self._compute_args = list(inspect.signature(func).parameters)
 
@@ -288,8 +288,7 @@ class ExplicitCompJaxify(ast.NodeTransformer):
                               "'use_jit=False' for component '{comp.pathname}' if performance "
                               "issues arise.")
             static_argnums = tuple(range(len(comp._var_discrete['input']) + 1 + len(self_statics)))
-            self.compute_primal = \
-                    jit(self.compute_primal, static_argnums=static_argnums)
+            self.compute_primal = jit(self.compute_primal, static_argnums=static_argnums)
 
     def get_compute_primal_src(self):
         """
@@ -478,12 +477,16 @@ class SelfAttrFinder(ast.NodeVisitor):
     ----------
     _attrs : set
         The set of attribute names accessed on `self`.
+    _funcs : set
+        The set of method names accessed on `self`.
+    _dcts : dict
+        The set of attribute names accessed on `self` that are subscripted.
     """
 
     # TODO: need to support intermediate variables, e.g., foo = self.options,   x = foo['blah']
     # TODO: need to support self.options[var], where var is an attr, not a string.
-    # TODO: even if we can't handle the above, at least detect and flag them and warn that auto-converter
-    #       can't handle them.
+    # TODO: even if we can't handle the above, at least detect and flag them and warn that
+    #       auto-converter can't handle them.
     def __init__(self, method):
         self._attrs = set()
         self._funcs = set()
@@ -491,6 +494,16 @@ class SelfAttrFinder(ast.NodeVisitor):
         self.visit(ast.parse(textwrap.dedent(inspect.getsource(method)), mode='exec'))
 
     def visit_Attribute(self, node):
+        """
+        Visit an Attribute node.
+
+        If the attribute is accessed on `self`, add the attribute name to the set of attributes.
+
+        Parameters
+        ----------
+        node : ast.Attribute
+            The Attribute node being visited.
+        """
         name = _get_long_name(node)
         if name is None:
             return
@@ -498,6 +511,16 @@ class SelfAttrFinder(ast.NodeVisitor):
             self._attrs.add(name.partition('.')[2])
 
     def visit_Subscript(self, node):
+        """
+        Visit a Subscript node.
+
+        If the subscript is accessed on `self`, add the attribute name to the set of attributes.
+
+        Parameters
+        ----------
+        node : ast.Subscript
+            The Subscript node being visited.
+        """
         name = _get_long_name(node.value)
         if name is None:
             return
@@ -509,6 +532,16 @@ class SelfAttrFinder(ast.NodeVisitor):
         self.visit(node.slice)
 
     def visit_Call(self, node):
+        """
+        Visit a Call node.
+
+        If the function is accessed on `self`, add the function name to the set of functions.
+
+        Parameters
+        ----------
+        node : ast.Call
+            The Call node being visited.
+        """
         name = _get_long_name(node.func)
         if name is not None and name.startswith('self.'):
             parts = name.split('.')
@@ -539,7 +572,8 @@ def get_self_static_attrs(method):
     """
     saf = SelfAttrFinder(method)
     static_attrs = sorted(saf._attrs)
-    static_dcts = [(name, sorted(eset)) for name, eset in sorted(saf._dcts.items(), key=lambda x: x[0])]
+    static_dcts = [(name, sorted(eset)) for name, eset in sorted(saf._dcts.items(),
+                                                                 key=lambda x: x[0])]
 
     return static_attrs, static_dcts
 
@@ -658,6 +692,27 @@ def benchmark_component(comp_class, methods=(None, 'cs', 'jax'), initial_vals=No
     return results
 
 
+def jax_deriv_shape(derivs):
+    """
+    Get the shape of the derivatives from a jax derivative calculation.
+
+    Parameters
+    ----------
+    derivs : tuple
+        The tuple of derivatives.
+    """
+    dims = []
+    if isinstance(derivs, jnp.ndarray):
+        dims.append(derivs.shape)
+    else:   # tuple
+        for d in derivs:
+            if isinstance(d, jnp.ndarray):
+                dims.append(d.shape)
+            else:
+                dims.append(jax_deriv_shape(d))
+    return dims
+
+
 if __name__ == '__main__':
     import openmdao.api as om
 
@@ -696,6 +751,3 @@ if __name__ == '__main__':
     c = MuxComp()
 
     sf = SelfAttrFinder(c.compute)
-
-    print("attrs:", sf._attrs)
-    print('dicts:', sf._dcts)

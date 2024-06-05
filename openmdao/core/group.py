@@ -1053,10 +1053,10 @@ class Group(System):
 
         This part of setup is called automatically at the start of run_model or run_driver.
         """
-        self._setup_vectors(self._get_root_vectors())
-
         if self._use_derivatives:
             self._setup_partials()
+
+        self._setup_vectors(self._get_root_vectors())
 
         self._fd_rev_xfer_correction_dist = {}
 

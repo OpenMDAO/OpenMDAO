@@ -88,8 +88,12 @@ class TestSubmatSparsityIter(unittest.TestCase):
             of, wrt, rows, cols, shape = tup
             self.assertEqual(of, exof)
             self.assertEqual(wrt, exwrt)
-            self.assertTrue(np.all(rows == exrows))
-            self.assertTrue(np.all(cols == excols))
+            if exrows is None:
+                self.assertEqual(exrows, rows)
+                self.assertEqual(excols, cols)
+            else:
+                self.assertTrue(np.all(rows == exrows))
+                self.assertTrue(np.all(cols == excols))
             self.assertEqual(shape, exshape)
 
     def test_empty_matrix(self):
@@ -108,7 +112,7 @@ class TestSubmatSparsityIter(unittest.TestCase):
         nzcols = np.array([0])
         shape = (1, 1)
         result = list(submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, shape))
-        expected =  [('a', 'b', np.array([0]), np.array([0]), (1, 1))]
+        expected =  [('a', 'b', None, None, (1, 1))]
         self._check_results(expected, result)
 
     def test_multiple_elements_matrix(self):

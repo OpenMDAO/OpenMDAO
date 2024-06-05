@@ -11,7 +11,7 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE, _UNDEFINED
-from openmdao.utils.jax_utils import jax, jit, ExplicitCompJaxify
+from openmdao.utils.jax_utils import jax, jit, ExplicitCompJaxify, jax_deriv_shape
 from openmdao.utils.array_utils import submat_sparsity_iter
 from openmdao.utils.om_warnings import issue_warning
 
@@ -135,8 +135,6 @@ class ExplicitComponent(Component):
                 for of, wrt in self._declared_partials_patterns:
                     self._approx_partials(of, wrt, method=method)
         else:
-            if not self._declared_partials_patterns and self.options['derivs_method'] == 'jax':
-                self._check_subjac_sparsity(update=True)
             super()._setup_partials()
 
         if self.matrix_free:
@@ -481,7 +479,6 @@ class ExplicitComponent(Component):
                 else:
                     self.compute_partials(self._inputs, self._jacobian)
 
-    @diff_mem
     def _linearize(self, jac=None, sub_do_ln=False):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
@@ -521,12 +518,13 @@ class ExplicitComponent(Component):
         """
         return ()
 
-    def _get_compute_primal_inputs(self, inputs):
+    def _get_compute_primal_inputs(self, inputs, discrete_inputs):
         # treat all static args as a single tuple argument
         stargs = self.get_static_args()
         if stargs:
             yield stargs
-        yield from self._discrete_inputs.values()
+        if discrete_inputs:
+            yield from discrete_inputs.values()
         yield from inputs.values()
 
     def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
@@ -535,7 +533,6 @@ class ExplicitComponent(Component):
 
         An inherited component may choose to either override this function or to define a
         compute_primal function.
-
 
         Parameters
         ----------
@@ -548,7 +545,10 @@ class ExplicitComponent(Component):
         discrete_outputs : dict like or None
             If not None, dict like object containing discrete output values.
         """
-        returns = self.compute_primal(*self._get_compute_primal_inputs(inputs))
+        if self.compute_primal is None:
+            return
+
+        returns = self.compute_primal(*self._get_compute_primal_inputs(inputs, discrete_inputs))
 
         if not discrete_outputs:
             outputs.set_vals(returns)
@@ -606,14 +606,21 @@ class ExplicitComponent(Component):
         """
         return True
 
-    @diff_mem
     def _setup_jax(self):
         # we define compute_partials here instead of making this the base class version as we
         # did with compute, because the existence of a compute_partials method that is not the
         # base class method is used to determine if a given component computes its own partials.
         def compute_partials(self, inputs, partials, discrete_inputs=None):
-            deriv_vals = self._get_jac_func()(*self._get_compute_primal_inputs(inputs))
-
+            deriv_vals = self._get_jac_func()(*self._get_compute_primal_inputs(inputs,
+                                                                               discrete_inputs))
+            # print("deriv shape:", jax_deriv_shape(deriv_vals))
+            # jax is inconsistent in the form of the derivative values it returns, so we need to
+            # handle the single wrt case differently from the multiple wrt case. In the single
+            # wrt case, the derivative values are returned as a 1D array within a tuple sized by
+            # the number of 'of' variables, while in the multiple wrt case, each entry in the
+            # 'of' tuple contains another tuple sized by the number of wrt variables, requiring
+            # an extra level of indexing.
+            nwrt = len(self._var_rel_names['input'])
             ofidx = len(self._discrete_outputs) - 1
             for ofname in self._var_rel_names['output']:
                 ofidx += 1
@@ -627,11 +634,21 @@ class ExplicitComponent(Component):
                     rows = sjmeta['rows']
                     cols = sjmeta['cols']
                     if rows is None:
-                        partials[ofname, wrtname] = \
-                            deriv_vals[ofidx][wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
+                        if nwrt > 1:  # index by ofidx and wrtidx
+                            partials[ofname, wrtname] = \
+                                deriv_vals[ofidx][wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
+                        else:  # only index by ofidx
+                            partials[ofname, wrtname] = \
+                                deriv_vals[ofidx].reshape(ofmeta['size'], wrtmeta['size'])
                     else:
-                        partials[ofname, wrtname] = \
-                            deriv_vals[ofidx][wrtidx].reshape(ofmeta['size'], wrtmeta['size'])[rows, cols]
+                        if nwrt > 1:  # index by ofidx and wrtidx
+                            partials[ofname, wrtname] = \
+                                deriv_vals[ofidx][wrtidx].reshape(ofmeta['size'],
+                                                                  wrtmeta['size'])[rows, cols]
+                        else: # only index by ofidx
+                            partials[ofname, wrtname] = \
+                                deriv_vals[ofidx].reshape(ofmeta['size'],
+                                                          wrtmeta['size'])[rows, cols]
 
         if self.compute_primal is None:
             jaxifier = ExplicitCompJaxify(self, use_jit=True, verbose=True)
@@ -649,7 +666,11 @@ class ExplicitComponent(Component):
     def _get_jac_func(self):
         if self._jac_func_ is None:
             fjax = jax.jacfwd if self.best_deriv_direction() == 'fwd' else jax.jacrev
-            nstatic = len(self.get_static_args()) + len(self._discrete_inputs)
+            if len(self.get_static_args()) > 0:
+                nselfstatic = 1
+            else:
+                nselfstatic = 0
+            nstatic = nselfstatic + len(self._discrete_inputs)
             wrt_idxs = list(range(nstatic, len(self._var_abs2meta['input']) + nstatic))
             static_argnums = tuple(range(nstatic))
             self._jac_func_ = jit(fjax(self.compute_primal, argnums=wrt_idxs),
@@ -681,7 +702,8 @@ class ExplicitComponent(Component):
             old = inarr[i]
             inarr[i] = np.nan
             if self._discrete_inputs or self._discrete_outputs:
-                self.compute(self._inputs, self._outputs, self._discrete_inputs, self._discrete_outputs)
+                self.compute(self._inputs, self._outputs, self._discrete_inputs,
+                             self._discrete_outputs)
             else:
                 self.compute(self._inputs, self._outputs)
             irows = np.where(np.isnan(outarr))[0]
@@ -701,14 +723,9 @@ class ExplicitComponent(Component):
 
         return rows, cols
 
-    def _check_subjac_sparsity(self, update=False):
+    def _check_subjac_sparsity(self):
         """
-        Check the declared sparsity of the sub-jacobians.
-
-        Parameters
-        ----------
-        update : bool
-            If True, update subjac sparsity based on the computed sparsity.
+        Check the declared sparsity of the sub-jacobians vs. the computed sparsity.
         """
         full_nzrows, full_nzcols = self.get_compute_sparsity()
 
@@ -726,22 +743,19 @@ class ExplicitComponent(Component):
                                                                (len(self._outputs),
                                                                 len(self._inputs))):
             if (of, wrt) in self._subjacs_info:
-                if update:
-                    meta = self._subjacs_info[of, wrt]
-                    if meta['rows'] is None and sjrows is not None:
-                        issue_warning(f"Sparsity pattern for {of} wrt {wrt} was declared with "
-                                      "rows=None, but a sparsity pattern has been computed.  "
-                                      f"Automatically updating rows to {sjrows} and "
-                                      f"cols to {sjcols}.")
-                        meta['rows'] = sjrows
-                        meta['cols'] = sjcols
-                    else:
-                        pass
+                meta = self._subjacs_info[of, wrt]
+                if meta['rows'] is None and sjrows is not None:
+                    issue_warning(f"Sparsity pattern for {of} wrt {wrt} was declared with "
+                                  "rows=None, but a sparsity pattern has been computed.\n"
+                                  f"rows = {sjrows}\ncols = {sjcols}\n")
+                elif not np.all(np.asarray(meta['rows']) == sjrows):
+                    issue_warning(f"Sparsity pattern for {of} wrt {wrt} was declared with "
+                                  f"rows={meta['rows']} and col={meta['cols']}, but a different "
+                                  "sparsity pattern has been computed:\n"
+                                  f"rows = {sjrows}\ncols = {sjcols}\n"
+                                  f"Note: The sparsity pattern is computed based on the compute "
+                                  "function, and may be more conservative than the true pattern.\n")
             else:
-                msg = ''
-                if update:
-                    msg = (f" Automatically adding missing partial with "
-                           f"rows: {sjrows} cols: {sjcols}")
-                    self.declare_partials(of[prefix_len:], wrt[prefix_len:], rows=sjrows, cols=sjcols)
                 issue_warning(f"{self.msginfo}: Partial for {of[prefix_len:]} wrt "
-                              f"{wrt[prefix_len:]} was not declared but is nonzero.{msg}.")
+                              f"{wrt[prefix_len:]} was not declared but is nonzero.\n"
+                              f"rows = {sjrows}\ncols = {sjcols}\n")
