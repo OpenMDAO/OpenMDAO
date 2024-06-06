@@ -69,13 +69,13 @@ class Paraboloid(om.ExplicitComponent):
 
         if self.invalid_x and self.func == 'compute':
             beg, end =  self.invalid_x
-            if x > beg and x < end:
+            if x >= beg and x <= end:
                 self.raised_eval_errors.append(self.eval_count)
                 raise om.AnalysisError(f'Invalid x: {beg} < {x.item():8.4f} < {end}).')
 
         if self.invalid_y and self.func == 'compute':
             beg, end =  self.invalid_y
-            if y > beg and y < end:
+            if y >= beg and y <= end:
                 self.raised_eval_errors.append(self.eval_count)
                 raise om.AnalysisError(f'Invalid y: {beg} < {y.item():8.4f} < {end}).')
 
