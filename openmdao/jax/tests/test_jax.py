@@ -180,7 +180,7 @@ class MyCompJax2PrimalOption(om.JaxExplicitComponent):
 
         self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
 
-    def get_static_args(self):
+    def get_static_arg(self):
         return (self.options['mult'], self.stat)
 
     # doesn't seem to mind if compute_primal is already jitted (JaxExplicitComponent by default

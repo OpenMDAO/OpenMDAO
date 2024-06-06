@@ -49,7 +49,7 @@ class TestJaxUtils(unittest.TestCase):
             self.skipTest('jax is not available but required for this test.')
         import numpy as np
 
-        class PowComp(om.ExplicitComponent):
+        class PowComp(om.JaxExplicitComponent):
 
             def initialize(self):
                 self.options.declare('vec_size', types=(int,))
@@ -65,10 +65,9 @@ class TestJaxUtils(unittest.TestCase):
                 ar = None # np.arange(n, dtype=int)
                 self.declare_partials(of='f', wrt='x', rows=ar, cols=ar)
 
-            def get_static_args(self):
+            def get_static_arg(self):
                 return (self.options['pow'],)
 
-            @partial(jax.jit, static_argnums=(0, 1))
             def compute_primal(self, self_statics, x):
                 return x**self.options['pow']
 

@@ -234,8 +234,8 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         The original argument names of the compute function.
     _new_ast : ast node
         The new ast node created from the original compute function.
-    get_static_args : function
-        A function that returns the static args for the Component.
+    get_static_arg : function
+        A function that returns the static args for the Component as a single tuple.
     """
 
     # these ops require static objects so their args should not be traced.  Traced array ops should
@@ -253,9 +253,9 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         static_attrs, static_dcts = get_self_static_attrs(func)
         self_statics = ['_self_statics_'] if static_attrs or static_dcts else []
         if self_statics:
-            self.get_static_args = self._get_static_args_func(static_attrs, static_dcts)
+            self.get_static_arg = self._get_static_arg_func(static_attrs, static_dcts)
         else:
-            self.get_static_args = None
+            self.get_static_arg = None
 
         self._compute_args = list(inspect.signature(func).parameters)
 
@@ -332,8 +332,8 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         yield from get_partials_deps(self.compute_primal, self._compute_primal_returns,
                                      *self._get_arg_values())
 
-    def _get_static_args_func(self, static_attrs, static_dcts):
-        fsrc = ['def get_static_args(self):']
+    def _get_static_arg_func(self, static_attrs, static_dcts):
+        fsrc = ['def get_static_arg(self):']
         tupargs = []
         for attr in static_attrs:
             tupargs.append(f"self.{attr}")
@@ -346,7 +346,7 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         fsrc = '\n'.join(fsrc)
         namespace = self._comp().compute.__globals__.copy()
         exec(fsrc, namespace)
-        return namespace['get_static_args']
+        return namespace['get_static_arg']
 
     def _get_new_args(self):
         new_args = [ast.arg('self', annotation=None)]
