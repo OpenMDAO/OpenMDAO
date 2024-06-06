@@ -61,3 +61,5 @@ class TestRelevanceEmptyGroups(unittest.TestCase):
 
         prob.setup()
         prob.run_driver()
+
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))

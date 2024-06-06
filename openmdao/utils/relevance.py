@@ -811,11 +811,11 @@ class Relevance(object):
         """
         if not self._active:
             return True
-        
-        if name not in self._sys2idx:
-            return False
 
-        return self._current_rel_sarray[self._sys2idx[name]]
+        try:
+            return self._current_rel_sarray[self._sys2idx[name]]
+        except KeyError:
+            return False
 
     def filter(self, systems, relevant=True):
         """
