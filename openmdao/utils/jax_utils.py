@@ -217,8 +217,6 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         The Component whose compute function is to be transformed. This NodeTransformer may only
         be used after the Component has had its _setup_var_data method called, because that
         determines the ordering of the inputs and outputs.
-    use_jit : bool
-        If True, the transformed function will be jitted.
     verbose : bool
         If True, the transformed function will be printed to stdout.
 
@@ -245,7 +243,7 @@ class ExplicitCompJaxify(ast.NodeTransformer):
     _static_ops = {'reshape'}
     _np_names = {'np', 'numpy'}
 
-    def __init__(self, comp, use_jit=True, verbose=False):  # noqa: D107
+    def __init__(self, comp, verbose=False):  # noqa: D107
         self._comp = weakref.ref(comp)
         func = comp.compute
         if 'jnp' not in comp.compute.__globals__:
@@ -280,7 +278,7 @@ class ExplicitCompJaxify(ast.NodeTransformer):
 
         # warn if jitting a function that has discrete inputs, because it will cause the function
         # to be recompiled whenever the discrete inputs change.
-        if use_jit:
+        if 'use_jit' in comp.options and comp.options['use_jit'] is True:
             if comp._discrete_inputs:
                 issue_warning("Jitting a function with discrete inputs can cause the function to "
                               "be recompiled whenever the discrete inputs change.  This can be "
@@ -435,7 +433,11 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         ast.Any
             The transformed node.
         """
-        # if we encounter a subscript of any of the input args, then replace arg['name'] with name.
+        # if we encounter a subscript of any of the input args, then replace arg['name'] or
+        # arg["name"] with name.
+
+        # NOTE: this will only work if the subscript is a string constant. If the subscript is a
+        # variable or some other expression, then we don't modify it.
         if (isinstance(node.value, ast.Name) and node.value.id in self._compute_args and
                 isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str)):
             return ast.copy_location(ast.Name(id=_fixname(node.slice.value), ctx=node.ctx), node)
@@ -700,6 +702,11 @@ def jax_deriv_shape(derivs):
     ----------
     derivs : tuple
         The tuple of derivatives.
+
+    Returns
+    -------
+    list
+        The shape of the derivatives.
     """
     dims = []
     if isinstance(derivs, jnp.ndarray):

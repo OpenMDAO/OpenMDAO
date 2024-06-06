@@ -640,7 +640,7 @@ class ExplicitComponent(Component):
                         partials[ofname, wrtname] = dvals[rows, sjmeta['cols']]
 
         if self.compute_primal is None:
-            jaxifier = ExplicitCompJaxify(self, use_jit=True, verbose=True)
+            jaxifier = ExplicitCompJaxify(self, verbose=True)
 
             print(jaxifier.get_class_src())
 
@@ -648,9 +648,26 @@ class ExplicitComponent(Component):
             if jaxifier.get_static_args:
                 self.get_static_args = MethodType(jaxifier.get_static_args, self)
             self.compute = MethodType(ExplicitComponent.compute, self)
+        elif 'use_jit' in self.options and self.options['use_jit']:
+            static_argnums = tuple(range(len(self._var_discrete['input']) +
+                                         int(self._has_self_static_args())))
+            self.compute_primal = jit(self.compute_primal, static_argnums=static_argnums)
 
         self.compute_partials = MethodType(compute_partials, self)
         self._has_compute_partials = True
+
+    def _has_self_static_args(self):
+        """
+        Return True if this component has self static args that are specific to this instance.
+
+        Note this doesn't include discrete inputs.
+
+        Returns
+        -------
+        bool
+            True if this component has self static args that are specific to this instance.
+        """
+        return len(self.get_static_args()) > 0
 
     def _get_jac_func(self):
         # TODO: modify this to use relevance and possibly compile multiple jac functions depending

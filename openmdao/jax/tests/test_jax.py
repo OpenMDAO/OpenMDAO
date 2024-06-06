@@ -149,7 +149,7 @@ class MyCompJax2Shaped(om.ExplicitComponent):
         outputs['zz'] = inputs['y'] * 2.5
 
 
-class MyCompJax2Primal(om.ExplicitComponent):
+class MyCompJax2Primal(om.JaxExplicitComponent):
     def setup(self):
         self.add_input('x', shape_by_conn=True)
         self.add_input('y', shape_by_conn=True)
@@ -158,14 +158,13 @@ class MyCompJax2Primal(om.ExplicitComponent):
 
         self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
 
-    @partial(jax.jit, static_argnums=(0,))
     def compute_primal(self, x, y):
         z = jnp.dot(x, y)
         zz = y * 2.5
         return z, zz
 
 
-class MyCompJax2PrimalOption(om.ExplicitComponent):
+class MyCompJax2PrimalOption(om.JaxExplicitComponent):
     def __init__(self, stat=2., **kwargs):
         super().__init__(**kwargs)
         self.stat = stat
@@ -184,9 +183,12 @@ class MyCompJax2PrimalOption(om.ExplicitComponent):
     def get_static_args(self):
         return (self.options['mult'], self.stat)
 
+    # doesn't seem to mind if compute_primal is already jitted (JaxExplicitComponent by default
+    # jits compute_primal)
     @partial(jax.jit, static_argnums=(0,1))
     def compute_primal(self, _self_statics_, x, y):
         z = jnp.dot(x, y)
+        print(x)
         zz = y * self.options['mult'] * self.stat
         return z, zz
 
