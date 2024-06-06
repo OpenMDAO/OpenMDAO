@@ -229,14 +229,14 @@ class IndepVarComp(ExplicitComponent):
 
     def compute_primal(self):
         """
-        Compute the primal part of the derivative.
+        Compute the outputs.
 
         Returns
         -------
         tuple
-            A tuple containing the output derivative for each output.
+            A tuple containing the output values.
         """
-        return self._outputs.values()
+        return tuple(self._outputs.values())
 
     def _apply_nonlinear(self):
         """

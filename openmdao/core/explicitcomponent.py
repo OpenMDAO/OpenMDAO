@@ -675,7 +675,7 @@ class ExplicitComponent(Component):
         # TODO: modify this to use relevance and possibly compile multiple jac functions depending
         # on DV/response so that we don't compute any derivatives that are always zero.
         if self._jac_func_ is None:
-            fjax = jax.jacfwd if self.best_deriv_direction() == 'fwd' else jax.jacrev
+            fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
             if len(self.get_static_arg()) > 0:
                 nselfstatic = 1
             else:

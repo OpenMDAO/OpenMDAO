@@ -2523,7 +2523,7 @@ class Group(System):
                         partials[ofname, wrtname] = shaped_val
 
     def _setup_jax_derivs(self):
-        fjax = jax.jacfwd if self.best_deriv_direction() == 'fwd' else jax.jacrev
+        fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
         wrt_idxs = list(range(len(self._compute_primal_ins)))
         self._jac_func_ = fjax(self.compute_primal, argnums=wrt_idxs)
         self._subjac_key_map = {}

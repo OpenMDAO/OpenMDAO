@@ -246,7 +246,7 @@ def _get_tangents(vals, direction, coloring=None, argnums=None, trans=None):
 
 def _ensure_iter(val):
     """
-    Yield (value, size) tuples for the given value.
+    Turn the given value into an iterator if it is not already.
 
     Parameters
     ----------

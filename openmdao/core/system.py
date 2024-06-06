@@ -6272,14 +6272,14 @@ class System(object):
         """
         return False
 
-    def best_deriv_direction(self):
+    def best_partial_deriv_direction(self):
         """
-        Return the best direction for derivative calculations based on sizes of inputs and outputs.
+        Return the best direction for partial deriv calculations based on input and output sizes.
 
         Returns
         -------
         str
-            The best direction for derivative calculations.
+            The best direction for derivative calculations, 'fwd' or 'rev'.
         """
         if len(self._outputs) > len(self._inputs):
             return 'fwd'
