@@ -1,22 +1,18 @@
 import unittest
 from functools import partial
-from itertools import chain
 
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
 import openmdao.api as om
 
-try:
-    import jax
-except (ImportError, ModuleNotFoundError):
-    jax = None
+from openmdao.utils.jax_utils import jax, jnp, ExplicitCompJaxify
 
-if jax is not None:
-    jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
-    import jax.numpy as jnp
+if jax is None:
+    def jjit(f, *args, **kwargs):
+        return f
+else:
     from openmdao.jax import act_tanh, smooth_abs, smooth_max, smooth_min, ks_max, ks_min
-    from openmdao.utils.jax_utils import ExplicitCompJaxify
-    from openmdao.utils.jax_utils import benchmark_component
+    jjit = jax.jit
 
 
 @unittest.skipIf(jax is None, 'jax is not available.')
@@ -185,7 +181,7 @@ class MyCompJax2PrimalOption(om.JaxExplicitComponent):
 
     # doesn't seem to mind if compute_primal is already jitted (JaxExplicitComponent by default
     # jits compute_primal)
-    @partial(jax.jit, static_argnums=(0,1))
+    @partial(jjit, static_argnums=(0,1))
     def compute_primal(self, _self_statics_, x, y):
         z = jnp.dot(x, y)
         print(x)
@@ -624,7 +620,8 @@ class TestJaxGroup(unittest.TestCase):
     # TODO: test with mixed np and jnp in compute
 
 if __name__ == '__main__':
-    # unittest.main()
+    unittest.main()
 
-    result = benchmark_component(MyCompJax2Shaped, methods=('jax', 'cs'),
-                                 repeats=10, table_format='tabulator', xshape=(44, 330), yshape=(330, 55))
+    # from openmdao.utils.jax_utils import benchmark_component
+    # result = benchmark_component(MyCompJax2Shaped, methods=('jax', 'cs'),
+    #                              repeats=10, table_format='tabulator', xshape=(44, 330), yshape=(330, 55))

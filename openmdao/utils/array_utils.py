@@ -9,7 +9,7 @@ from math import isclose
 import numpy as np
 from numpy.linalg import norm
 
-from scipy.sparse import coo_array, csr_array, csc_array
+from scipy.sparse import coo_matrix, csr_matrix, csc_matrix
 
 from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.omnumba import numba
@@ -303,7 +303,7 @@ def tile_sparse_jac(data, rows, cols, nrow, ncol, num_nodes):
     """
     Assemble arrays necessary to define a COO sparse jacobian for a vectorized component.
 
-    These arrays can also be passed to csc_array or csr_array to create CSC and CSR sparse
+    These arrays can also be passed to csc_matrix or csr_matrix to create CSC and CSR sparse
     matrices.
 
     Parameters
@@ -548,7 +548,7 @@ def rand_sparsity(shape, density_ratio, dtype=bool):
 
     Returns
     -------
-    coo_array
+    coo_matrix
         A COO matrix with approximately the nonzero density desired.
     """
     assert len(shape) == 2, f"shape must be a size 2 tuple but {shape} was given"
@@ -561,7 +561,7 @@ def rand_sparsity(shape, density_ratio, dtype=bool):
     rows = np.random.randint(0, nrows, nnz)
     cols = np.random.randint(0, ncols, nnz)
 
-    coo = coo_array((data, (rows, cols)), shape=shape)
+    coo = coo_matrix((data, (rows, cols)), shape=shape)
 
     # get rid of dup rows/cols
     coo.sum_duplicates()
@@ -944,7 +944,7 @@ def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, s
     dense_pct /= 100.
 
     data = np.ones(nzrows.size, dtype=np.int8)
-    csr = csr_array((data, (nzrows, nzcols)), shape=shape)
+    csr = csr_matrix((data, (nzrows, nzcols)), shape=shape)
     col_iter = list(col_var_size_iter)  # need to iterate over multiple times
 
     for of, of_size in row_var_size_iter:

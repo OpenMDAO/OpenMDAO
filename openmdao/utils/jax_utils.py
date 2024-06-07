@@ -207,9 +207,16 @@ class ExplicitCompJaxify(ast.NodeTransformer):
     """
     An ast.NodeTransformer that transforms a compute function definition to jax compatible form.
 
-    So compute(self, inputs, outputs) becomes f(self, *args) where args are the input values
-    in the order they are stored in inputs.  The new function will return a tuple of the
-    output values in the order they are stored in outputs.
+    So compute(self, inputs, outputs) becomes compute_primal(self, arg1, arg2, ...) where args are
+    the input values in the order they are stored in inputs.  The new function will return a tuple
+    of the output values in the order they are stored in outputs.
+
+    If the component has discrete inputs, they will be passed individually into compute_primal
+    *before* the continuous inputs.  If the component has discrete outputs, they will be assigned
+    to local variables of the same name within the function and set back into the discrete
+    outputs dict just prior to the return from the function.  If the component has any other
+    attributes that are accessed in the compute function, they will be combined into a single
+    tuple and passed as the first argument to the function after 'self'.
 
     Parameters
     ----------
