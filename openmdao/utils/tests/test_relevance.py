@@ -59,7 +59,7 @@ class TestRelevanceEmptyGroups(unittest.TestCase):
 
         prob.driver = om.ScipyOptimizeDriver()
 
-        prob.setup()
+        prob.setup(force_alloc_complex=True)
         prob.run_driver()
 
         assert_check_totals(prob.check_totals(method='cs', out_stream=None))
