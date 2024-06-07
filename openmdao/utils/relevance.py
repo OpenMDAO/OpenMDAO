@@ -796,8 +796,9 @@ class Relevance(object):
 
     def is_relevant_system(self, name):
         """
-        Return True if the given named system is relevant. Returns False if
-        system has no subsystems with outputs
+        Return True if the given named system is relevant.
+
+        Returns False if system has no subsystems with outputs.
 
         Parameters
         ----------
