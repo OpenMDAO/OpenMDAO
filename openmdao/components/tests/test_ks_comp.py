@@ -6,7 +6,7 @@ import numpy as np
 import openmdao.api as om
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_stress import MultipointBeamGroup
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.utils.testing_utils import force_check_partials
 
 
@@ -320,6 +320,67 @@ class TestKSFunctionFeatures(unittest.TestCase):
 
         assert_near_equal(prob.get_val('ks.KS', indices=0), np.amax(prob.get_val('x')), tolerance=1e-8)
 
+    def test_minimum(self):
+
+        n = 10
+
+        model = om.Group()
+
+        model.add_subsystem('ks', om.KSComp(width=n, minimum=True), promotes_inputs=[('g', 'x')])
+        model.set_input_defaults('x', range(n))
+
+        prob = om.Problem(model=model)
+        prob.setup()
+        prob.run_model()
+
+        assert_near_equal(prob.get_val('ks.KS', indices=0), np.amin(prob.get_val('x')), tolerance=1e-8)
+
+    def test_minimum_partials(self):
+
+        n = 10
+
+        model = om.Group()
+
+        model.add_subsystem('ks', om.KSComp(width=n, minimum=True), promotes_inputs=[('g', 'x')])
+        model.set_input_defaults('x', range(n))
+
+        prob = om.Problem(model=model)
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+
+        partials = force_check_partials(prob, includes=['ks'], out_stream=None, method="cs", step=1e-200)
+        assert_check_partials(partials)
+
+    def test_minimum_and_lower_flag(self):
+
+        n = 10
+
+        model = om.Group()
+
+        model.add_subsystem('ks', om.KSComp(width=n, minimum=True, lower_flag=True), promotes_inputs=[('g', 'x')])
+        model.set_input_defaults('x', range(n))
+
+        prob = om.Problem(model=model)
+        prob.setup()
+        prob.run_model()
+
+        assert_near_equal(prob.get_val('ks.KS', indices=0), -np.amax(prob.get_val('x')), tolerance=1e-8)
+
+    def test_minimum_and_lower_flag_partials(self):
+
+        n = 10
+
+        model = om.Group()
+
+        model.add_subsystem('ks', om.KSComp(width=n, minimum=True, lower_flag=True), promotes_inputs=[('g', 'x')])
+        model.set_input_defaults('x', range(n))
+
+        prob = om.Problem(model=model)
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+
+        partials = force_check_partials(prob, includes=['ks'], out_stream=None, method="cs", step=1e-200)
+        assert_check_partials(partials)
 
 if __name__ == "__main__":
     unittest.main()
