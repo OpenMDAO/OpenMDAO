@@ -400,10 +400,10 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         Transform the compute function definition.
 
         The function will be transformed from compute(self, inputs, outputs) to
-        compute_primal(self, *args) where args are the input values in the order they are stored in
-        inputs.  All subscript accesses into the input args will be replaced with the name of the
-        key being accessed, e.g., inputs['foo'] becomes foo. The new function will return a tuple
-        of the output values in the order they are stored in outputs.  If compute has the
+        compute_primal(self, arg1, arg2, ...) where args are the input values in the order they are
+        stored in inputs.  All subscript accesses into the input args will be replaced with the name
+        of the key being accessed, e.g., inputs['foo'] becomes foo. The new function will return a
+        tuple of the output values in the order they are stored in outputs.  If compute has the
         additional args discrete_inputs and discrete_outputs, they will be handled similarly.
 
         Parameters

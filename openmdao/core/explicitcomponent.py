@@ -644,8 +644,6 @@ class ExplicitComponent(Component):
         if self.compute_primal is None:
             jaxifier = ExplicitCompJaxify(self, verbose=False)
 
-            print(jaxifier.get_class_src())
-
             self.compute_primal = MethodType(jaxifier.compute_primal, self)
             if jaxifier.get_static_arg:
                 self.get_static_arg = MethodType(jaxifier.get_static_arg, self)
