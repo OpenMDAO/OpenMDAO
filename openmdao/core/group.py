@@ -38,6 +38,7 @@ from openmdao.utils.relevance import get_relevance
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     PromotionWarning, MPIWarning, DerivativesWarning
 from openmdao.utils.class_util import overrides_method
+from openmdao.core.total_jac import _TotalJacInfo
 
 # regex to check for valid names.
 import re
@@ -3435,6 +3436,29 @@ class Group(System):
                         return self
                     return None
         return system
+
+    def run_linearize(self, sub_do_ln=True, driver=None):
+        """
+        Compute jacobian / factorization.
+
+        This calls _linearize, but with the model assumed to be in an unscaled state.
+
+        Parameters
+        ----------
+        sub_do_ln : bool
+            Flag indicating if the children should call linearize on their linear solvers.
+        driver : Driver or None
+            If this system is the top level system and approx derivatives have not been
+            initialized, the driver for this model must be supplied in order to properly
+            initialize the approximations.
+        """
+        if driver is not None and self.pathname == '' and self._owns_approx_jac:
+            self._tot_jac = _TotalJacInfo(driver._problem(), None, None, 'flat_dict', approx=True)
+
+        try:
+            super().run_linearize(sub_do_ln=sub_do_ln)
+        finally:
+            self._tot_jac = None
 
     def _apply_nonlinear(self):
         """

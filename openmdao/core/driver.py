@@ -223,6 +223,10 @@ class Driver(object):
         typically promoted name or an alias. Values are (local indices, local sizes).
     _cons : dict
         Contains all constraint info.
+    _linear_cons : dict
+        Contains all linear constraint info.
+    _nl_cons : dict
+        Contains all nonlinear constraint info.
     _objs : dict
         Contains all objective info.
     _responses : dict
@@ -266,6 +270,8 @@ class Driver(object):
         self._designvars = None
         self._designvars_discrete = []
         self._cons = None
+        self._linear_cons = None
+        self._nl_cons = None
         self._objs = None
         self._responses = None
 
@@ -1036,17 +1042,19 @@ class Driver(object):
         """
         con_dict = {}
         for name, meta in self._cons.items():
-            if lintype == 'linear' and not meta['linear']:
-                continue
-
             if lintype == 'nonlinear' and meta['linear']:
                 continue
 
-            if ctype == 'eq' and meta['equals'] is None:
+            if lintype == 'linear' and not meta['linear']:
                 continue
 
-            if ctype == 'ineq' and meta['equals'] is not None:
-                continue
+            if ctype != 'all':
+                if meta['equals'] is None:
+                    if ctype == 'eq':
+                        continue
+                else:
+                    if ctype == 'ineq':
+                        continue
 
             con_dict[name] = self._get_voi_val(name, meta, self._remote_cons,
                                                driver_scaling=driver_scaling)
@@ -1070,7 +1078,7 @@ class Driver(object):
                      if not ('linear' in meta and meta['linear']))
         return order
 
-    def _update_voi_meta(self, model):
+    def _update_voi_meta(self, model, responses, desvars):
         """
         Collect response and design var metadata from the model and size desvars and responses.
 
@@ -1078,6 +1086,10 @@ class Driver(object):
         ----------
         model : System
             The System that represents the entire model.
+        responses : dict
+            Response metadata dictionary.
+        desvars : dict
+            Design variable metadata dictionary.
 
         Returns
         -------
@@ -1088,21 +1100,26 @@ class Driver(object):
         """
         self._objs = objs = {}
         self._cons = cons = {}
+        self._linear_cons = linear_cons = {}
+        self._nl_cons = nl_cons = {}
+
+        self._responses = responses
+        self._designvars = desvars
 
         # driver _responses are keyed by either the alias or the promoted name
         response_size = 0
-        self._responses = resps = model.get_responses(recurse=True, use_prom_ivc=True)
-        for name, data in resps.items():
-            if data['type'] == 'con':
-                cons[name] = data
+        for name, meta in responses.items():
+            if meta['type'] == 'con':
+                cons[name] = meta
             else:
-                objs[name] = data
-            if not ('linear' in data and data['linear']):
-                response_size += data['global_size']
+                objs[name] = meta
+            if 'linear' in meta and meta['linear']:
+                linear_cons[name] = meta
+            else:
+                nl_cons[name] = meta
+                response_size += meta['global_size']
 
-        # Gather up the information for design vars. _designvars are keyed by the promoted name
-        self._designvars = designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
-        desvar_size = sum(data['global_size'] for data in designvars.values())
+        desvar_size = sum(meta['global_size'] for meta in desvars.values())
 
         self._has_scaling = model._setup_driver_units()
 
@@ -1236,7 +1253,7 @@ class Driver(object):
                                       debug_print=debug_print,
                                       driver_scaling=driver_scaling)
 
-            if total_jac.has_lin_cons:
+            if total_jac.has_lin_cons and self.supports['linear_constraints']:
                 # if we're doing a scaling report, cache the linear total jacobian so we
                 # don't have to recreate it
                 if problem._has_active_report('scaling'):

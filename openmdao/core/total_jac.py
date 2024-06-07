@@ -153,12 +153,12 @@ class _TotalJacInfo(object):
         ofsize = sum(meta['global_size'] for meta in of_metadata.values())
         wrtsize = sum(meta['global_size'] for meta in wrt_metadata.values())
 
-        for meta in of_metadata.values():
-            if 'linear' in meta and meta['linear']:
-                has_lin_cons = True
-                break
-        else:
-            has_lin_cons = False
+        has_lin_cons = False
+        if driver and driver.supports['linear_constraints']:
+            for meta in of_metadata.values():
+                if 'linear' in meta and meta['linear']:
+                    has_lin_cons = True
+                    break
 
         if self._orig_mode == 'auto':
             if has_lin_cons:
@@ -177,9 +177,6 @@ class _TotalJacInfo(object):
         self._dist_driver_vars = driver._dist_driver_vars if driver else {}
 
         all_abs2meta_out = model._var_allprocs_abs2meta['output']
-
-        if not driver or not driver.supports['linear_constraints']:
-            has_lin_cons = False
 
         self.has_lin_cons = has_lin_cons
         self.dist_input_range_map = {}
