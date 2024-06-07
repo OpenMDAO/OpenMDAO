@@ -1,3 +1,6 @@
+"""
+An ExplicitComponent that uses JAX for derivatives.
+"""
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.jax_utils import jax
@@ -15,7 +18,7 @@ class JaxExplicitComponent(ExplicitComponent):
         Additional arguments to be passed to the base class.
     """
 
-    def __init__(self, fallback_deriv_method='fd', **kwargs):
+    def __init__(self, fallback_deriv_method='fd', **kwargs):  # noqa: D107
         super().__init__(**kwargs)
         self.options['derivs_method'] = 'jax' if jax else fallback_deriv_method
         self.options.declare('use_jit', types=bool, default=True,

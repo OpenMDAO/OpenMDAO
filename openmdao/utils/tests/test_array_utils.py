@@ -83,7 +83,11 @@ class TestArrayUtils(unittest.TestCase):
 class TestSubmatSparsityIter(unittest.TestCase):
 
     def _check_results(self, expected, result):
-        for extup, tup in zip(expected, result, strict=True):
+        expected = list(expected)
+        result = list(result)
+        self.assertEqual(len(expected), len(result))
+
+        for extup, tup in zip(expected, result):
             exof, exwrt, exrows, excols, exshape = extup
             of, wrt, rows, cols, shape = tup
             self.assertEqual(of, exof)

@@ -642,7 +642,7 @@ class ExplicitComponent(Component):
                         partials[ofname, wrtname] = dvals[rows, sjmeta['cols']]
 
         if self.compute_primal is None:
-            jaxifier = ExplicitCompJaxify(self, verbose=True)
+            jaxifier = ExplicitCompJaxify(self, verbose=False)
 
             print(jaxifier.get_class_src())
 

@@ -1,4 +1,5 @@
 import unittest
+import sys
 from functools import partial
 
 import numpy as np
@@ -275,7 +276,7 @@ class ASTDiscreteCompTester(om.ExplicitComponent):
             outputs['out_array2'] *= 3.0
 
 
-@unittest.skipIf(jax is None, 'jax is not available.')
+@unittest.skipIf(jax is None or sys.version_info < (3, 9), 'jax is not available or python < 3.9.')
 class TestJaxAST(unittest.TestCase):
     def test_ast_continuous(self):
         p = om.Problem()
