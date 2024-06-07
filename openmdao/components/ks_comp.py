@@ -159,8 +159,13 @@ class KSComp(ExplicitComponent):
         self.options.declare('width', types=int, default=1, desc='Width of constraint vector.')
         self.options.declare('vec_size', types=int, default=1,
                              desc='The number of rows to independently aggregate.')
+        self.options.declare('minimum', types=bool, default=False,
+                             desc='Return the minimum instead of the maximum by multiplying both '
+                                  'the inputs and output by -1. It is not recommended to use both '
+                                  'this option and the lower_flag option (it will return the '
+                                  'negative of the aggregated max.)')
         self.options.declare('lower_flag', types=bool, default=False,
-                             desc="Set to True to reverse sign of input constraints.")
+                             desc='Set to True to reverse sign of input constraints.')
         self.options.declare('rho', 50.0, desc="Constraint Aggregation Factor.")
         self.options.declare('upper', 0.0, desc="Upper bound for constraint, default is zero.")
         self.options.declare('add_constraint', types=bool, default=False,
@@ -229,8 +234,15 @@ class KSComp(ExplicitComponent):
         con_val = inputs['g'] - opt['upper']
         if opt['lower_flag']:
             con_val = -con_val
+        if opt['minimum']:
+            con_val = -con_val
 
-        outputs['KS'] = KSfunction.compute(con_val, opt['rho'])
+        ks_val = KSfunction.compute(con_val, opt['rho'])
+
+        if opt['minimum']:
+            ks_val = -ks_val
+
+        outputs['KS'] = ks_val
 
     def compute_partials(self, inputs, partials):
         """
@@ -244,10 +256,11 @@ class KSComp(ExplicitComponent):
             Sub-jac components written to partials[output_name, input_name].
         """
         opt = self.options
-        width = opt['width']
 
         con_val = inputs['g'] - opt['upper']
         if opt['lower_flag']:
+            con_val = -con_val
+        if opt['minimum']:
             con_val = -con_val
 
         derivs = KSfunction.derivatives(con_val, opt['rho'])[0]
