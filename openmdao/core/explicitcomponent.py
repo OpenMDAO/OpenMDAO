@@ -9,9 +9,12 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE, _UNDEFINED
-from openmdao.utils.jax_utils import jax, jit, ExplicitCompJaxify, jax_deriv_shape
+from openmdao.utils.jax_utils import jax, jit, ExplicitCompJaxify
 from openmdao.utils.array_utils import submat_sparsity_iter
 from openmdao.utils.om_warnings import issue_warning
+
+
+_tuplist = (tuple, list)
 
 
 class ExplicitComponent(Component):
@@ -543,10 +546,16 @@ class ExplicitComponent(Component):
         discrete_outputs : dict like or None
             If not None, dict like object containing discrete output values.
         """
+        global _tuplist
+
         if self.compute_primal is None:
             return
 
-        returns = self.compute_primal(*self._get_compute_primal_inputs(inputs, discrete_inputs))
+        returns = \
+            self.compute_primal(*self._get_compute_primal_inputs(inputs, discrete_inputs))
+
+        if not isinstance(returns, _tuplist):
+            returns = (returns,)
 
         if not discrete_outputs:
             outputs.set_vals(returns)
@@ -611,13 +620,10 @@ class ExplicitComponent(Component):
         def compute_partials(self, inputs, partials, discrete_inputs=None):
             deriv_vals = self._get_jac_func()(*self._get_compute_primal_inputs(inputs,
                                                                                discrete_inputs))
-            # jax is inconsistent in the form of the derivative values it returns, so we need to
-            # handle the single wrt case differently from the multiple wrt case. In the single
-            # wrt case, the derivative values are returned as a 1D array within a tuple sized by
-            # the number of 'of' variables, while in the multiple wrt case, each entry in the
-            # 'of' tuple contains another tuple sized by the number of wrt variables, requiring
-            # an extra level of indexing.
-            nwrt = len(self._var_rel_names['input'])
+            nested_tup = isinstance(deriv_vals, tuple) and len(deriv_vals) > 0 and \
+                isinstance(deriv_vals[0], tuple)
+
+            nof = len(self._var_rel_names['output'])
             ofidx = len(self._discrete_outputs) - 1
             for ofname in self._var_rel_names['output']:
                 ofidx += 1
@@ -629,10 +635,14 @@ class ExplicitComponent(Component):
                         continue
 
                     wrtmeta = self._var_rel2meta[wrtname]
-                    if nwrt > 1:  # index by ofidx and wrtidx
-                        dvals = deriv_vals[ofidx][wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
-                    else:  # only index by ofidx
-                        dvals = deriv_vals[ofidx].reshape(ofmeta['size'], wrtmeta['size'])
+                    dvals = deriv_vals
+                    # if there's only one 'of' value, we only take the indexed value if the
+                    # return value of compute_primal is single entry tuple. If a single array or
+                    # scalar is returned, we don't apply the 'of' index.
+                    if nof > 1 or nested_tup:
+                        dvals = dvals[ofidx]
+
+                    dvals = dvals[wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
 
                     sjmeta = partials.get_metadata(key)
                     rows = sjmeta['rows']

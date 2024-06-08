@@ -10,8 +10,6 @@ import textwrap
 import importlib
 from types import LambdaType
 from collections import defaultdict, OrderedDict
-from tokenize import tokenize, untokenize, NAME, OP, INDENT, DEDENT
-from io import BytesIO
 
 import networkx as nx
 

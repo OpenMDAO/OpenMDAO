@@ -1,12 +1,19 @@
 import unittest
 import sys
 from functools import partial
+import itertools
+from collections.abc import Iterable
 
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
 import openmdao.api as om
 
 from openmdao.utils.jax_utils import jax, jnp, ExplicitCompJaxify
+
+try:
+    from parameterized import parameterized
+except ImportError:
+    from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 if jax is None:
     def jjit(f, *args, **kwargs):
@@ -617,6 +624,147 @@ class TestJaxGroup(unittest.TestCase):
         assert_check_totals(p.check_totals(of=['comp.z','comp2.z', 'comp2.zz'],
                                              wrt=['ivc.x', 'comp2.y'], method='fd', show_only_incorrect=True))
 
+
+class CompRetValue(om.JaxExplicitComponent):
+    def __init__(self, shape, nins=1, nouts=1, **kwargs):
+        super().__init__(**kwargs)
+        self.shape = shape
+        self.nins = nins
+        self.nouts = nouts
+
+    def setup(self):
+        if self.shape == ():
+            for i in range(self.nins):
+                self.add_input(f'x{i}', val=0.)
+            for i in range(self.nouts):
+                self.add_output(f'y{i}', val=0.)
+        else:
+            for i in range(self.nins):
+                self.add_input(f'x{i}', val=jnp.zeros(self.shape))
+            for i in range(self.nouts):
+                self.add_output(f'y{i}', val=jnp.zeros(self.shape))
+
+        self.compute_primal = getattr(self, f'compute_primal_{self.nins}_{self.nouts}')
+
+    def setup_partials(self):
+        self.declare_partials('*', '*')
+
+    def compute_primal_1_1(self, x0):
+        return x0**2
+
+    def compute_primal_2_1(self, x0, x1):
+        return x0**2 + x1**2
+
+    def compute_primal_1_2(self, x0):
+        return x0**2, x0*2
+
+    def compute_primal_2_2(self, x0, x1):
+        return x0**2, x1**2
+
+class CompRetTuple(om.JaxExplicitComponent):
+    def __init__(self, shape, nins=1, nouts=1, **kwargs):
+        super().__init__(**kwargs)
+        self.shape = shape
+        self.nins = nins
+        self.nouts = nouts
+
+    def setup(self):
+        if self.shape == ():
+            for i in range(self.nins):
+                self.add_input(f'x{i}', val=0.)
+            for i in range(self.nouts):
+                self.add_output(f'y{i}', val=0.)
+        else:
+            for i in range(self.nins):
+                self.add_input(f'x{i}', val=jnp.zeros(self.shape))
+            for i in range(self.nouts):
+                self.add_output(f'y{i}', val=jnp.zeros(self.shape))
+
+        self.compute_primal = getattr(self, f'compute_primal_{self.nins}_{self.nouts}')
+
+    def setup_partials(self):
+        self.declare_partials('*', '*')
+
+    def compute_primal_1_1(self, x0):
+        return (x0**2,)
+
+    def compute_primal_2_1(self, x0, x1):
+        return (x0**2 + x1**2,)
+
+    def compute_primal_1_2(self, x0):
+        return x0**2, x0*2
+
+    def compute_primal_2_2(self, x0, x1):
+        return x0**2, x1**2
+
+
+
+class TopGrp(om.Group):
+    def __init__(self, shape, ret_tuple=False, nins=1, nouts=1, **kwargs):
+        super().__init__(**kwargs)
+        self.shape = shape
+        self.ret_tuple = ret_tuple
+        self.nins = nins
+        self.nouts = nouts
+
+    def setup(self):
+        self.add_subsystem('ivc', om.IndepVarComp())
+        if self.shape == ():
+            for i in range(self.nins):
+                self.ivc.add_output(f'x{i}', 0.)
+
+            if self.ret_tuple:
+                self.add_subsystem('comp', CompRetTuple(shape=self.shape, nins=self.nins, nouts=self.nouts))
+            else:
+                self.add_subsystem('comp', CompRetValue(shape=self.shape, nins=self.nins, nouts=self.nouts))
+        else:
+            for i in range(self.nins):
+                self.ivc.add_output(f'x{i}', np.zeros(self.shape))
+            if self.ret_tuple:
+                self.add_subsystem('comp', CompRetTuple(shape=self.shape, nins=self.nins, nouts=self.nouts))
+            else:
+                self.add_subsystem('comp', CompRetValue(shape=self.shape, nins=self.nins, nouts=self.nouts))
+
+        for io in range(self.nouts):
+            for ii in range(self.nins):
+                if ii == io:
+                    self.connect(f'ivc.x{io}', f'comp.x{ii}')
+
+
+def _test_func_name(func, num, param):
+    args = []
+    for p in param.args:
+        if isinstance(p, str) or not isinstance(p, Iterable):
+            p = [p]
+        for item in p:
+            try:
+                arg = item.__name__
+            except:
+                arg = str(item)
+            args.append(arg)
+    return func.__name__ + '_' + '_'.join(args)
+
+
+@unittest.skipIf(jax is None, 'jax is not available.')
+class TestJaxShapesAndReturns(unittest.TestCase):
+    @parameterized.expand(itertools.product([(), (2,), (2,3)], [(1, 1), (2, 2), (1, 2), (2, 1)],[True, False]),
+                          name_func=_test_func_name)
+    def test_compute_primal_return_shapes(self, shape, sizetup, ret_tuple):
+        nins, nouts = sizetup
+        prob = om.Problem()
+        prob.model = model = TopGrp(shape=shape, ret_tuple=ret_tuple, nins=nins, nouts=nouts)
+
+        prob.set_solver_print(level=0)
+
+        ofs = [f'comp.y{i}' for i in range(nouts)]
+        wrts = [f'ivc.x{i}' for i in range(nins)]
+
+        prob.setup(force_alloc_complex=True, check=False, mode='fwd')
+        prob.final_setup()
+        prob.compute_totals(of=ofs, wrt=wrts)
+
+        assert_check_partials(prob.check_partials(method='cs', out_stream=None), atol=1e-5)
+        assert_check_totals(prob.check_totals(of=ofs, wrt=wrts, method='cs', out_stream=None), atol=1e-5)
 
     # TODO: test with mixed np and jnp in compute
 
