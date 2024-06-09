@@ -2458,7 +2458,7 @@ class Group(System):
 
         # compile the function
         namespace = {}
-        exec(compile(src, '<string>', 'exec'), namespace)
+        exec(compile(src, '<string>', 'exec'), namespace)  # nosec trusted input
         compute_primal = namespace['compute_primal']
         compute_primal = jax.jit(compute_primal, static_argnums=[0])
         self.compute_primal = MethodType(compute_primal, self)

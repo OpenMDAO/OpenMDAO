@@ -332,7 +332,7 @@ def compute_primal(self, disc_in, in_scalar, in_array, in_array2):
         self.assertEqual(converter.get_compute_primal_src().strip(), expected)
 
 
-@unittest.skipIf(jax is None, 'jax is not available.')
+@unittest.skipIf(jax is None or sys.version_info < (3, 9), 'jax is not available or python < 3.9.')
 class TestJaxComp(unittest.TestCase):
 
     def test_jax_explicit_comp(self):
@@ -510,7 +510,7 @@ class TestJaxComp(unittest.TestCase):
         p.check_partials(show_only_incorrect=True)
 
 
-@unittest.skipIf(jax is None, 'jax is not available.')
+@unittest.skipIf(jax is None or sys.version_info < (3, 9), 'jax is not available or python < 3.9.')
 class TestJaxGroup(unittest.TestCase):
     def test_jax_group_outer_ivc(self):
         p = om.Problem()
@@ -625,127 +625,129 @@ class TestJaxGroup(unittest.TestCase):
                                              wrt=['ivc.x', 'comp2.y'], method='fd', show_only_incorrect=True))
 
 
-class CompRetValue(om.JaxExplicitComponent):
-    def __init__(self, shape, nins=1, nouts=1, **kwargs):
-        super().__init__(**kwargs)
-        self.shape = shape
-        self.nins = nins
-        self.nouts = nouts
+if sys.version_info >= (3, 9):
 
-    def setup(self):
-        if self.shape == ():
-            for i in range(self.nins):
-                self.add_input(f'x{i}', val=0.)
-            for i in range(self.nouts):
-                self.add_output(f'y{i}', val=0.)
-        else:
-            for i in range(self.nins):
-                self.add_input(f'x{i}', val=jnp.zeros(self.shape))
-            for i in range(self.nouts):
-                self.add_output(f'y{i}', val=jnp.zeros(self.shape))
+    class CompRetValue(om.JaxExplicitComponent):
+        def __init__(self, shape, nins=1, nouts=1, **kwargs):
+            super().__init__(**kwargs)
+            self.shape = shape
+            self.nins = nins
+            self.nouts = nouts
 
-        self.compute_primal = getattr(self, f'compute_primal_{self.nins}_{self.nouts}')
-
-    def setup_partials(self):
-        self.declare_partials('*', '*')
-
-    def compute_primal_1_1(self, x0):
-        return x0**2
-
-    def compute_primal_2_1(self, x0, x1):
-        return x0**2 + x1**2
-
-    def compute_primal_1_2(self, x0):
-        return x0**2, x0*2
-
-    def compute_primal_2_2(self, x0, x1):
-        return x0**2, x1**2
-
-class CompRetTuple(om.JaxExplicitComponent):
-    def __init__(self, shape, nins=1, nouts=1, **kwargs):
-        super().__init__(**kwargs)
-        self.shape = shape
-        self.nins = nins
-        self.nouts = nouts
-
-    def setup(self):
-        if self.shape == ():
-            for i in range(self.nins):
-                self.add_input(f'x{i}', val=0.)
-            for i in range(self.nouts):
-                self.add_output(f'y{i}', val=0.)
-        else:
-            for i in range(self.nins):
-                self.add_input(f'x{i}', val=jnp.zeros(self.shape))
-            for i in range(self.nouts):
-                self.add_output(f'y{i}', val=jnp.zeros(self.shape))
-
-        self.compute_primal = getattr(self, f'compute_primal_{self.nins}_{self.nouts}')
-
-    def setup_partials(self):
-        self.declare_partials('*', '*')
-
-    def compute_primal_1_1(self, x0):
-        return (x0**2,)
-
-    def compute_primal_2_1(self, x0, x1):
-        return (x0**2 + x1**2,)
-
-    def compute_primal_1_2(self, x0):
-        return x0**2, x0*2
-
-    def compute_primal_2_2(self, x0, x1):
-        return x0**2, x1**2
-
-
-
-class TopGrp(om.Group):
-    def __init__(self, shape, ret_tuple=False, nins=1, nouts=1, **kwargs):
-        super().__init__(**kwargs)
-        self.shape = shape
-        self.ret_tuple = ret_tuple
-        self.nins = nins
-        self.nouts = nouts
-
-    def setup(self):
-        self.add_subsystem('ivc', om.IndepVarComp())
-        if self.shape == ():
-            for i in range(self.nins):
-                self.ivc.add_output(f'x{i}', 0.)
-
-            if self.ret_tuple:
-                self.add_subsystem('comp', CompRetTuple(shape=self.shape, nins=self.nins, nouts=self.nouts))
+        def setup(self):
+            if self.shape == ():
+                for i in range(self.nins):
+                    self.add_input(f'x{i}', val=0.)
+                for i in range(self.nouts):
+                    self.add_output(f'y{i}', val=0.)
             else:
-                self.add_subsystem('comp', CompRetValue(shape=self.shape, nins=self.nins, nouts=self.nouts))
-        else:
-            for i in range(self.nins):
-                self.ivc.add_output(f'x{i}', np.zeros(self.shape))
-            if self.ret_tuple:
-                self.add_subsystem('comp', CompRetTuple(shape=self.shape, nins=self.nins, nouts=self.nouts))
+                for i in range(self.nins):
+                    self.add_input(f'x{i}', val=jnp.zeros(self.shape))
+                for i in range(self.nouts):
+                    self.add_output(f'y{i}', val=jnp.zeros(self.shape))
+
+            self.compute_primal = getattr(self, f'compute_primal_{self.nins}_{self.nouts}')
+
+        def setup_partials(self):
+            self.declare_partials('*', '*')
+
+        def compute_primal_1_1(self, x0):
+            return x0**2
+
+        def compute_primal_2_1(self, x0, x1):
+            return x0**2 + x1**2
+
+        def compute_primal_1_2(self, x0):
+            return x0**2, x0*2
+
+        def compute_primal_2_2(self, x0, x1):
+            return x0**2, x1**2
+
+    class CompRetTuple(om.JaxExplicitComponent):
+        def __init__(self, shape, nins=1, nouts=1, **kwargs):
+            super().__init__(**kwargs)
+            self.shape = shape
+            self.nins = nins
+            self.nouts = nouts
+
+        def setup(self):
+            if self.shape == ():
+                for i in range(self.nins):
+                    self.add_input(f'x{i}', val=0.)
+                for i in range(self.nouts):
+                    self.add_output(f'y{i}', val=0.)
             else:
-                self.add_subsystem('comp', CompRetValue(shape=self.shape, nins=self.nins, nouts=self.nouts))
+                for i in range(self.nins):
+                    self.add_input(f'x{i}', val=jnp.zeros(self.shape))
+                for i in range(self.nouts):
+                    self.add_output(f'y{i}', val=jnp.zeros(self.shape))
 
-        for io in range(self.nouts):
-            for ii in range(self.nins):
-                if ii == io:
-                    self.connect(f'ivc.x{io}', f'comp.x{ii}')
+            self.compute_primal = getattr(self, f'compute_primal_{self.nins}_{self.nouts}')
+
+        def setup_partials(self):
+            self.declare_partials('*', '*')
+
+        def compute_primal_1_1(self, x0):
+            return (x0**2,)
+
+        def compute_primal_2_1(self, x0, x1):
+            return (x0**2 + x1**2,)
+
+        def compute_primal_1_2(self, x0):
+            return x0**2, x0*2
+
+        def compute_primal_2_2(self, x0, x1):
+            return x0**2, x1**2
 
 
-def _test_func_name(func, num, param):
-    args = []
-    for p in param.args:
-        if isinstance(p, str) or not isinstance(p, Iterable):
-            p = [p]
-        for item in p:
-            try:
-                arg = item.__name__
-            except:
-                arg = str(item)
-            args.append(arg)
-    return func.__name__ + '_' + '_'.join(args)
+
+    class TopGrp(om.Group):
+        def __init__(self, shape, ret_tuple=False, nins=1, nouts=1, **kwargs):
+            super().__init__(**kwargs)
+            self.shape = shape
+            self.ret_tuple = ret_tuple
+            self.nins = nins
+            self.nouts = nouts
+
+        def setup(self):
+            self.add_subsystem('ivc', om.IndepVarComp())
+            if self.shape == ():
+                for i in range(self.nins):
+                    self.ivc.add_output(f'x{i}', 0.)
+
+                if self.ret_tuple:
+                    self.add_subsystem('comp', CompRetTuple(shape=self.shape, nins=self.nins, nouts=self.nouts))
+                else:
+                    self.add_subsystem('comp', CompRetValue(shape=self.shape, nins=self.nins, nouts=self.nouts))
+            else:
+                for i in range(self.nins):
+                    self.ivc.add_output(f'x{i}', np.zeros(self.shape))
+                if self.ret_tuple:
+                    self.add_subsystem('comp', CompRetTuple(shape=self.shape, nins=self.nins, nouts=self.nouts))
+                else:
+                    self.add_subsystem('comp', CompRetValue(shape=self.shape, nins=self.nins, nouts=self.nouts))
+
+            for io in range(self.nouts):
+                for ii in range(self.nins):
+                    if ii == io:
+                        self.connect(f'ivc.x{io}', f'comp.x{ii}')
 
 
-@unittest.skipIf(jax is None, 'jax is not available.')
+    def _test_func_name(func, num, param):
+        args = []
+        for p in param.args:
+            if isinstance(p, str) or not isinstance(p, Iterable):
+                p = [p]
+            for item in p:
+                try:
+                    arg = item.__name__
+                except:
+                    arg = str(item)
+                args.append(arg)
+        return func.__name__ + '_' + '_'.join(args)
+
+
+@unittest.skipIf(jax is None or sys.version_info < (3, 9), 'jax is not available or python < 3.9.')
 class TestJaxShapesAndReturns(unittest.TestCase):
     @parameterized.expand(itertools.product([(), (2,), (2,3)], [(1, 1), (2, 2), (1, 2), (2, 1)],[True, False]),
                           name_func=_test_func_name)

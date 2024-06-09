@@ -277,7 +277,7 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         self._new_ast = ast.fix_missing_locations(node)
 
         code = compile(self._new_ast, '<ast>', 'exec')
-        exec(code, namespace)
+        exec(code, namespace)    # nosec
         self.compute_primal = namespace['compute_primal']
 
         if verbose:
@@ -352,7 +352,7 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         fsrc.append(f'    return ({", ".join(tupargs)})')
         fsrc = '\n'.join(fsrc)
         namespace = self._comp().compute.__globals__.copy()
-        exec(fsrc, namespace)
+        exec(fsrc, namespace)  # nosec
         return namespace['get_static_arg']
 
     def _get_new_args(self):
