@@ -1,10 +1,58 @@
 ***********************************
+# Release Notes for OpenMDAO 3.33.0
+
+June 07, 2024
+
+OpenMDAO 3.33.0 adds a new DriverResult object which is returned by the drivers. This replaces the previous "failed" flag that users often found confusing because a value of False indicated successful optimization. This object contains a `success` attribute for tracking whether the optimization was successful.
+
+Pyoptsparse print_results can be set to `minimal` to show only violated constraints. This requires a recent version of pyoptsparse to function, but will not cause errors in its absense.
+
+Users on FIPS-enabled sytems reported that OpenMDAO could not be used due to the use of `hashlib.md5` for non-security related purposes. We now pass the `usedforsecurity=False` argument that allows this behavior.
+
+Finally, a `list_vars` method has been added that lists all variables in component execution order, regardless of whether they are inputs or outputs.
+
+## New Features
+
+- Changed return of `prob.run_driver()` from a bool to an object containing information about the Driver execution. [#3214](https://github.com/OpenMDAO/OpenMDAO/pull/3214)
+- Added ability to set pyoptsparse driver print_results to "minimal" [#3216](https://github.com/OpenMDAO/OpenMDAO/pull/3216)
+- Moved get_free_port function to utils directory file [#3224](https://github.com/OpenMDAO/OpenMDAO/pull/3224)
+- Added `minimum` option to KSComp. [#3229](https://github.com/OpenMDAO/OpenMDAO/pull/3229)
+- Added `usedforsecurity=False` flag to hashlib.md5 uses for FIPS-enabled systems. [#3237](https://github.com/OpenMDAO/OpenMDAO/pull/3237)
+- Add a new `list_vars` method to list all variables by component in execution order. [#3233](https://github.com/OpenMDAO/OpenMDAO/pull/3233)
+
+## Bug Fixes
+
+- Updated `pyoptsparse_driver` to address change in `pyoptsparse v2.11.0` [#3218](https://github.com/OpenMDAO/OpenMDAO/pull/3218)
+- Added ability to handle reading case recorder files with class instances when the associated class cannot be imported [#3228](https://github.com/OpenMDAO/OpenMDAO/pull/3228)
+- A couple of fixes for 'om total_coloring' and 'om partial_coloring' [#3234](https://github.com/OpenMDAO/OpenMDAO/pull/3234)
+- Fix Cut&Paste error in docstring for `list_vars`. [#3238](https://github.com/OpenMDAO/OpenMDAO/pull/3238)
+- Fix for SubmodelComp indexing bug. [#3239](https://github.com/OpenMDAO/OpenMDAO/pull/3239)
+- Removed the 'distributed' option from ExecComp [#3245](https://github.com/OpenMDAO/OpenMDAO/pull/3245)
+- Fix for group set_val when using set_input_defaults [#3248](https://github.com/OpenMDAO/OpenMDAO/pull/3248)
+- Fixed error message when a component has an inconsistent set of variables across ranks. [#3254](https://github.com/OpenMDAO/OpenMDAO/pull/3254)
+- Fix for incorrect warning about response size vs. dv size [#3255](https://github.com/OpenMDAO/OpenMDAO/pull/3255)
+- Fixed a bug in Case when a VOI is not recorded [#3256](https://github.com/OpenMDAO/OpenMDAO/pull/3256)
+- Fix the sparkline plots in the optimization report - height was too small [#3258](https://github.com/OpenMDAO/OpenMDAO/pull/3258)
+- Added a wrapper for lambda functions to allow pickling. [#3259](https://github.com/OpenMDAO/OpenMDAO/pull/3259)
+- Fixed relevance check for empty groups. [#3265](https://github.com/OpenMDAO/OpenMDAO/pull/3265)
+
+## Miscellaneous
+
+- Added minimum version requirements to address vulnerable dependencies [#3227](https://github.com/OpenMDAO/OpenMDAO/pull/3227)
+- Updated tests for constrained differential evolution [#3232](https://github.com/OpenMDAO/OpenMDAO/pull/3232)
+- Updates for NumPy 2.0 compatibility and testing [#3241](https://github.com/OpenMDAO/OpenMDAO/pull/3241)
+- Fixed a NumPy 2.0 compatibility issue in the test suite [#3251](https://github.com/OpenMDAO/OpenMDAO/pull/3251)
+- Adjusted the CS step size in an approx_totals test for compatibility with SciPy 1.13 [#3257](https://github.com/OpenMDAO/OpenMDAO/pull/3257)
+- Updated the test workflow to fail if a security issue is found [#3261](https://github.com/OpenMDAO/OpenMDAO/pull/3261)
+- Removed unnecessary setup() from doc page [#3263](https://github.com/OpenMDAO/OpenMDAO/pull/3263)
+
+
+***********************************
 # Release Notes for OpenMDAO 3.32.0
 
 May 03, 2024
 
-OpenMDAO 3.32.0 is a regular update with a few new features and several bug fixes. We're continuing to refine our submodel implementation, and now we give the user explicit access to the subproblem so that they can interact with it
-using the `Problem` API.
+OpenMDAO 3.32.0 is a regular update with a few new features and several bug fixes. We're continuing to refine our submodel implementation, and now we give the user explicit access to the subproblem so that they can interact with it using the `Problem` API.
 
 POEM 093 is implemented, which allows caching of the linear solution which can improve performance in some situations.
 
