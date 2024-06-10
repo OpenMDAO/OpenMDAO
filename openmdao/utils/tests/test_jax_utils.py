@@ -42,7 +42,6 @@ class TestJaxUtils(unittest.TestCase):
         assert_near_equal(result**2, x)
         self.assertIsInstance(result, jaxlib.xla_extension.ArrayImpl)
 
-    unittest.skipIf(sys.version_info < (3, 9), "JaxExplicitComponent requires Python 3.9+")
     def test_jax_component_option(self):
         """Test that the registration of jax-compatible components works."""
         try:
@@ -50,6 +49,9 @@ class TestJaxUtils(unittest.TestCase):
         except ImportError:
             self.skipTest('jax is not available but required for this test.')
         import numpy as np
+
+        if sys.version_info < (3, 9):
+            self.skipTest('JaxExplicitComponent requires Python 3.9+')
 
         class PowComp(om.JaxExplicitComponent):
 
