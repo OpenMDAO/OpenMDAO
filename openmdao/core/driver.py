@@ -268,7 +268,6 @@ class Driver(object):
         self._designvars = None
         self._designvars_discrete = []
         self._cons = None
-        self._nl_cons = None
         self._objs = None
         self._responses = None
 
@@ -1092,7 +1091,6 @@ class Driver(object):
         """
         self._objs = objs = {}
         self._cons = cons = {}
-        self._nl_cons = nl_cons = {}
 
         self._responses = responses
         self._designvars = desvars
@@ -1104,8 +1102,6 @@ class Driver(object):
                 cons[name] = meta
                 if meta['linear']:
                     continue  # don't add to response size
-                else:
-                    nl_cons[name] = meta
             else:
                 objs[name] = meta
 
