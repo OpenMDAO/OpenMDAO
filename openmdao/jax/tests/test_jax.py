@@ -733,18 +733,18 @@ if sys.version_info >= (3, 9):
                         self.connect(f'ivc.x{io}', f'comp.x{ii}')
 
 
-    def _test_func_name(func, num, param):
-        args = []
-        for p in param.args:
-            if isinstance(p, str) or not isinstance(p, Iterable):
-                p = [p]
-            for item in p:
-                try:
-                    arg = item.__name__
-                except:
-                    arg = str(item)
-                args.append(arg)
-        return func.__name__ + '_' + '_'.join(args)
+def _test_func_name(func, num, param):
+    args = []
+    for p in param.args:
+        if isinstance(p, str) or not isinstance(p, Iterable):
+            p = [p]
+        for item in p:
+            try:
+                arg = item.__name__
+            except:
+                arg = str(item)
+            args.append(arg)
+    return func.__name__ + '_' + '_'.join(args)
 
 
 @unittest.skipIf(jax is None or sys.version_info < (3, 9), 'jax is not available or python < 3.9.')
