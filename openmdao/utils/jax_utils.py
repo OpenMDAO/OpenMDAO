@@ -496,7 +496,7 @@ class SelfAttrFinder(ast.NodeVisitor):
     # TODO: need to support self.options[var], where var is an attr, not a string.
     # TODO: even if we can't handle the above, at least detect and flag them and warn that
     #       auto-converter can't handle them.
-    def __init__(self, method):
+    def __init__(self, method):  # noqa: D107
         self._attrs = set()
         self._funcs = set()
         self._dcts = defaultdict(set)
