@@ -1,3 +1,4 @@
+import sys
 from functools import partial
 import unittest
 
@@ -41,6 +42,7 @@ class TestJaxUtils(unittest.TestCase):
         assert_near_equal(result**2, x)
         self.assertIsInstance(result, jaxlib.xla_extension.ArrayImpl)
 
+    unittest.skipIf(sys.version_info < (3, 9), "JaxExplicitComponent requires Python 3.9+")
     def test_jax_component_option(self):
         """Test that the registration of jax-compatible components works."""
         try:
@@ -62,7 +64,7 @@ class TestJaxUtils(unittest.TestCase):
 
                 # The partials are a dense row in this case (1 row x N inputs)
                 # There is no need to specify a sparsity pattern.
-                ar = None # np.arange(n, dtype=int)
+                ar = np.arange(n, dtype=int)
                 self.declare_partials(of='f', wrt='x', rows=ar, cols=ar)
 
             def get_static_arg(self):
