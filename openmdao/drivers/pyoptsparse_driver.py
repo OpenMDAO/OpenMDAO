@@ -24,7 +24,7 @@ except Exception as err:
 
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_REPORTS_DIR, _ReprClass
 from openmdao.core.analysis_error import AnalysisError
-from openmdao.core.driver import Driver, RecordingDebugging
+from openmdao.core.driver import Driver, RecordingDebugging, filter_by_meta
 from openmdao.core.group import Group
 from openmdao.utils.class_util import WeakMethodWrapper
 from openmdao.utils.mpi import FakeComm, MPI
@@ -948,10 +948,7 @@ class pyOptSparseDriver(Driver):
 
         use_approx = self._problem().model._owns_approx_of is not None
 
-        for con, conmeta in self._cons.items():
-            if conmeta['linear']:
-                continue  # skip linear constraints because they're not in the coloring
-
+        for con, conmeta in filter_by_meta(self._cons.items(), 'linear'):
             self._con_subjacs[con] = {}
             consrc = conmeta['source']
             for dv, dvmeta in self._designvars.items():

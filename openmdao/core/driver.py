@@ -223,8 +223,6 @@ class Driver(object):
         typically promoted name or an alias. Values are (local indices, local sizes).
     _cons : dict
         Contains all constraint info.
-    _linear_cons : dict
-        Contains all linear constraint info.
     _nl_cons : dict
         Contains all nonlinear constraint info.
     _objs : dict
@@ -270,7 +268,6 @@ class Driver(object):
         self._designvars = None
         self._designvars_discrete = []
         self._cons = None
-        self._linear_cons = None
         self._nl_cons = None
         self._objs = None
         self._responses = None
@@ -1041,21 +1038,17 @@ class Driver(object):
            Dictionary containing values of each constraint.
         """
         con_dict = {}
-        for name, meta in self._cons.items():
-            if lintype == 'nonlinear' and meta['linear']:
-                continue
+        it = self._cons.items()
+        if lintype == 'linear':
+            it = pass_by_meta(it, 'linear')
+        elif lintype == 'nonlinear':
+            it = filter_by_meta(it, 'linear')
+        if ctype == 'eq':
+            it = pass_by_meta(it, 'equals', chk_none=True)
+        elif ctype == 'ineq':
+            it = filter_by_meta(it, 'equals', chk_none=True)
 
-            if lintype == 'linear' and not meta['linear']:
-                continue
-
-            if ctype != 'all':
-                if meta['equals'] is None:
-                    if ctype == 'eq':
-                        continue
-                else:
-                    if ctype == 'ineq':
-                        continue
-
+        for name, meta in it:
             con_dict[name] = self._get_voi_val(name, meta, self._remote_cons,
                                                driver_scaling=driver_scaling)
 
@@ -1074,8 +1067,7 @@ class Driver(object):
             The nonlinear response names in order.
         """
         order = list(self._objs)
-        order.extend(n for n, meta in self._cons.items()
-                     if not ('linear' in meta and meta['linear']))
+        order.extend(n for n, meta in self._cons.items() if not meta['linear'])
         return order
 
     def _update_voi_meta(self, model, responses, desvars):
@@ -1100,7 +1092,6 @@ class Driver(object):
         """
         self._objs = objs = {}
         self._cons = cons = {}
-        self._linear_cons = linear_cons = {}
         self._nl_cons = nl_cons = {}
 
         self._responses = responses
@@ -1111,13 +1102,14 @@ class Driver(object):
         for name, meta in responses.items():
             if meta['type'] == 'con':
                 cons[name] = meta
+                if meta['linear']:
+                    continue  # don't add to response size
+                else:
+                    nl_cons[name] = meta
             else:
                 objs[name] = meta
-            if 'linear' in meta and meta['linear']:
-                linear_cons[name] = meta
-            else:
-                nl_cons[name] = meta
-                response_size += meta['global_size']
+
+            response_size += meta['global_size']
 
         desvar_size = sum(meta['global_size'] for meta in desvars.values())
 
@@ -1761,3 +1753,62 @@ def record_iteration(requester, prob, case_name):
             data['rel'] = norm / norm0
 
     rec_mgr.record_iteration(requester, data, requester._get_recorder_metadata(case_name))
+
+
+def pass_by_meta(metadict_items, key, chk_none=False):
+    """
+    Yield only items with meta[key] of True or not None, depending on chk_none.
+
+    Parameters
+    ----------
+    metadict_items : iter of (name, meta)
+        Iterable of (name, meta) tuples.
+    key : str
+        Metadata key.
+    chk_none : bool
+        If True, yield items where meta[key] is not None. If False, yield items where meta[key] is
+        True.
+
+    Yields
+    ------
+    tuple
+        Tuple of the form (name, meta) for each item in metadict_items where meta[key] is True
+        or not None, depending on chk_none.
+    """
+    if chk_none:
+        for tup in metadict_items:
+            if tup[1][key] is not None:
+                yield tup
+    else:
+        for tup in metadict_items:
+            if tup[1][key]:
+                yield tup
+
+
+def filter_by_meta(metadict_items, key, chk_none=False):
+    """
+    Yield only items where meta[key] is not True.
+
+    Parameters
+    ----------
+    metadict_items : iter of (name, meta)
+        Iterable of (name, meta) tuples.
+    key : str
+        Metadata key.
+    chk_none : bool
+        If True, yield items where meta[key] is not None. If False, yield items where meta[key] is
+        not True.
+
+    Yields
+    ------
+    tuple
+        Tuple of the form (name, meta) for each item in metadict_items where meta[key] is False.
+    """
+    if chk_none:
+        for tup in metadict_items:
+            if tup[1][key] is None:
+                yield tup
+    else:
+        for tup in metadict_items:
+            if not tup[1][key]:
+                yield tup

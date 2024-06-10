@@ -1767,8 +1767,7 @@ class Problem(object):
             if not self.driver._responses:
                 raise RuntimeError("Driver is not providing any response variables "
                                    "for compute_totals.")
-            lcons = [n for n, meta in self.driver._cons.items()
-                     if ('linear' in meta and meta['linear'])]
+            lcons = [n for n, meta in self.driver._cons.items() if meta['linear']]
             if lcons:
                 # if driver has linear constraints, construct a full list of driver responses
                 # in order to avoid using any driver coloring that won't include the linear
