@@ -19,7 +19,7 @@ class JaxExplicitComponent(ExplicitComponent):
         Additional arguments to be passed to the base class.
     """
 
-    def __init__(self, fallback_deriv_method='fd', **kwargs):  # noqa: D107
+    def __init__(self, fallback_deriv_method='fd', **kwargs):  # noqa
         if sys.version_info < (3, 9):
             raise RuntimeError("JaxExplicitComponent requires Python 3.9 or newer.")
         super().__init__(**kwargs)

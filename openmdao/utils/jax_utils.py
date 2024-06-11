@@ -250,7 +250,7 @@ class ExplicitCompJaxify(ast.NodeTransformer):
     _static_ops = {'reshape'}
     _np_names = {'np', 'numpy'}
 
-    def __init__(self, comp, verbose=False):  # noqa: D107
+    def __init__(self, comp, verbose=False):  # noqa
         self._comp = weakref.ref(comp)
         func = comp.compute
         if 'jnp' not in comp.compute.__globals__:
@@ -496,7 +496,7 @@ class SelfAttrFinder(ast.NodeVisitor):
     # TODO: need to support self.options[var], where var is an attr, not a string.
     # TODO: even if we can't handle the above, at least detect and flag them and warn that
     #       auto-converter can't handle them.
-    def __init__(self, method):  # noqa: D107
+    def __init__(self, method):  # noqa
         self._attrs = set()
         self._funcs = set()
         self._dcts = defaultdict(set)
