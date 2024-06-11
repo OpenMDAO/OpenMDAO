@@ -361,16 +361,16 @@ class _TotalJacInfo(object):
         if model._var_allprocs_discrete['output']:
             # discrete_outs at the model level are absolute names
             discrete_outs = set(model._var_allprocs_discrete['output'])
-            piter = self.relevance.iter_seed_pair_relevance
-            for seed, rseed, rels in piter([m['source'] for m in self.input_meta['fwd'].values()],
-                                           [m['source'] for m in self.input_meta['rev'].values()],
-                                           outputs=True):
-                inter = discrete_outs.intersection(rels)
-                if inter:
-                    inp = seed if self.mode == 'fwd' else rseed
-                    kind = 'of' if self.mode == 'rev' else 'with respect to'
-                    raise RuntimeError("Total derivative %s '%s' depends upon "
-                                       "discrete output variables %s." % (kind, inp, sorted(inter)))
+
+            relevance = model._relevance
+            for dv, dvmeta in self.input_meta['fwd'].items():
+                for resp, rmeta in self.output_meta['fwd'].items():
+                    relarr = relevance._seed_var_map[dvmeta['source']][rmeta['source']]
+                    depdisc = [d for d in discrete_outs if relarr[relevance._var2idx[d]]]
+                    if depdisc:
+                        raise RuntimeError(f"Total derivative of '{resp}' with respect to "
+                                           f"'{dv}' depends upon discrete output variables "
+                                           f"{sorted(depdisc)}.")
 
     @property
     def msginfo(self):

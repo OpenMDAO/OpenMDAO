@@ -661,7 +661,7 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             J = prob.compute_totals()
         self.assertEqual(str(ctx.exception),
-                         "Total derivative with respect to 'indep.x' depends upon discrete output variables ['G.G1.C1.y'].")
+                         "Total derivative of 'C3.y' with respect to 'x' depends upon discrete output variables ['G.G1.C1.y'].")
 
     def test_connection_to_output(self):
         prob = om.Problem(name='connection_to_output')
@@ -776,7 +776,7 @@ class DiscreteTestCase(unittest.TestCase):
 
         assert_near_equal(prob.model.get_io_metadata(includes='comp.*'), {
                           'comp.a': {'copy_shape': None,
-                                     'compute_shape': None, 
+                                     'compute_shape': None,
                                      'desc': '',
                                      'discrete': False,
                                      'distributed': False,
@@ -790,7 +790,7 @@ class DiscreteTestCase(unittest.TestCase):
                                      'tags': set(),
                                      'units': None},
                           'comp.b': {'copy_shape': None,
-                                     'compute_shape': None, 
+                                     'compute_shape': None,
                                      'desc': '',
                                      'discrete': False,
                                      'distributed': False,
