@@ -444,6 +444,36 @@ class Driver(object):
             msg += '.'.join(self._designvars_discrete)
             raise RuntimeError(msg)
 
+        # Determine which design vars are relevant to linear constraints and which are relevant to
+        # nonlinear constraints or objectives.
+        lin_dvs = set()
+        nl_dvs = set()
+        lin_cons = {name: meta for name, meta in self._cons.items() if meta['linear']}
+        nl_resps = {name: meta for name, meta in self._cons.items() if not meta['linear']}
+        nl_resps.update(self._objs)
+
+        relevance = model._relevance
+        revsrcs = relevance._single_seed2relvars['rev']
+        with relevance.seeds_active():
+            for dv, dvmeta in self._designvars.items():
+                dvarr = relevance._single_seed2relvars['fwd'][dvmeta['source']]
+                for linmeta in lin_cons.values():
+                    linarr = revsrcs[linmeta['source']]
+                    if dvarr & linarr:
+                        lin_dvs.add(dv)
+                        break
+
+                for nlmeta in nl_resps.values():
+                    nlarr = revsrcs[nlmeta['source']]
+                    if dvarr & nlarr:
+                        nl_dvs.add(dv)
+                        break
+
+        # save names of DVs that are only relevant to linear constraints so we know which total
+        # jacobian (linear and/or nonlinear) to include them in.
+        self._lin_only_dvs = lin_dvs - nl_dvs
+        self._nl_dvs = nl_dvs
+
         self._remote_dvs = remote_dv_dict = {}
         self._remote_cons = remote_con_dict = {}
         self._dist_driver_vars = dist_dict = {}

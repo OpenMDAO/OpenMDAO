@@ -372,7 +372,7 @@ class pyOptSparseDriver(Driver):
         self._check_for_invalid_desvar_values()
         self._check_jac = self.options['singular_jac_behavior'] in ['error', 'warn']
 
-        linear_constraints = [key for (key, con) in self._cons.items() if con['linear']]
+        linear_constraints = [key for key, con in self._cons.items() if con['linear']]
 
         # Only need initial run if we have linear constraints or if we are using an optimizer that
         # doesn't perform one initially.
@@ -449,7 +449,7 @@ class pyOptSparseDriver(Driver):
         # # compute dynamic simul deriv coloring
         problem.get_total_coloring(self._coloring_info, run_model=not model_ran)
 
-        bad_resps = [n for n in model._relevance._no_dv_responses if n in self._cons]
+        bad_resps = [n for n in relevance._no_dv_responses if n in self._cons]
         bad_cons = [n for n, m in self._cons.items() if m['source'] in bad_resps]
 
         if bad_cons:
