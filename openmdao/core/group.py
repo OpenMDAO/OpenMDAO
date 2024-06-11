@@ -2391,10 +2391,9 @@ class Group(System):
 
         from openmdao.core.indepvarcomp import IndepVarComp
 
-        for subgroup in self._subgroups_myproc:
-            subgroup._setup_ad()
-
         if not self.options['derivs_method'] == 'jax':
+            for subgroup in self._subgroups_myproc:
+                subgroup._setup_ad()
             return
 
         if self._contains_parallel_group or self._mpi_proc_allocator.parallel:
@@ -2430,7 +2429,7 @@ class Group(System):
                 system.options['derivs_method'] = 'jax'
                 system._setup_jax()
 
-            ins = []
+            ins = [f"self.{system.pathname[pathlen:]}"]
             for n in system._var_abs2meta['input']:
                 if n in self._conn_global_abs_in2out:
                     ins.append(goutput_map[self._conn_global_abs_in2out[n]])
@@ -2443,18 +2442,14 @@ class Group(System):
             if len(system._var_abs2meta['output']) == 1:
                 outs += ','
             src.append(f"    {outs} = self.{system.pathname[pathlen:]}.compute_primal({ins})")
-            # src.append(f"    print('{system.pathname[pathlen:]}')")
-            # src.append(f"    print('takes:', {ins})")
-            # src.append(f"    print('returns:', {outs})")
 
-        # src.append(f"    print('returns:', {', '.join(goutput_map.values())})")
         src.append('    return ' + ', '.join([goutput_map[n] for n in self._compute_primal_outs]))
         if len(goutput_map) == 1:
             src[-1] += ','  # make the output a tuple
 
         src = '\n'.join(src)
 
-        print(f"{self.msginfo} compute_primal:\n" + src)
+        # print(f"{self.msginfo} compute_primal:\n" + src)
 
         # compile the function
         namespace = {}

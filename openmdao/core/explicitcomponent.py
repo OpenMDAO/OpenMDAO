@@ -9,7 +9,7 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE, _UNDEFINED
-from openmdao.utils.jax_utils import jax, jit, ExplicitCompJaxify
+from openmdao.utils.jax_utils import jax, jit, ExplicitCompJaxify, JaxCompPyTreeWrapper
 from openmdao.utils.array_utils import submat_sparsity_iter
 from openmdao.utils.om_warnings import issue_warning
 
@@ -521,9 +521,10 @@ class ExplicitComponent(Component):
 
     def _get_compute_primal_inputs(self, inputs, discrete_inputs):
         # treat all static args as a single tuple argument
-        starg = self.get_static_arg()
-        if starg:
-            yield starg
+        # starg = self.get_static_arg()
+        # if starg:
+        #     yield starg
+        yield JaxCompPyTreeWrapper(self)
         if discrete_inputs:
             yield from discrete_inputs.values()
         yield from inputs.values()
@@ -654,13 +655,14 @@ class ExplicitComponent(Component):
         if self.compute_primal is None:
             jaxifier = ExplicitCompJaxify(self, verbose=False)
 
-            self.compute_primal = MethodType(jaxifier.compute_primal, self)
+            self.compute_primal = jaxifier.compute_primal
             if jaxifier.get_static_arg:
                 self.get_static_arg = MethodType(jaxifier.get_static_arg, self)
             self.compute = MethodType(ExplicitComponent.compute, self)
         elif 'use_jit' in self.options and self.options['use_jit']:
-            static_argnums = tuple(range(len(self._var_discrete['input']) +
-                                         int(self._has_self_static_arg())))
+            static_argnums = tuple(range(len(self._var_discrete['input']))) # +
+                                         # int(self._has_self_static_arg())))
+            self.compute_primal = self.compute_primal.__func__
             self.compute_primal = jit(self.compute_primal, static_argnums=static_argnums)
 
         self.compute_partials = MethodType(compute_partials, self)
@@ -684,10 +686,11 @@ class ExplicitComponent(Component):
         # on DV/response so that we don't compute any derivatives that are always zero.
         if self._jac_func_ is None:
             fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
-            if len(self.get_static_arg()) > 0:
-                nselfstatic = 1
-            else:
-                nselfstatic = 0
+            # if len(self.get_static_arg()) > 0:
+            #     nselfstatic = 1
+            # else:
+            #     nselfstatic = 0
+            nselfstatic = 1
             nstatic = nselfstatic + len(self._discrete_inputs)
             wrt_idxs = list(range(nstatic, len(self._var_abs2meta['input']) + nstatic))
             static_argnums = tuple(range(nstatic))

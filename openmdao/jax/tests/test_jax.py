@@ -187,12 +187,8 @@ class MyCompJax2PrimalOption(om.JaxExplicitComponent):
     def get_static_arg(self):
         return (self.options['mult'], self.stat)
 
-    # doesn't seem to mind if compute_primal is already jitted (JaxExplicitComponent by default
-    # jits compute_primal)
-    @partial(jjit, static_argnums=(0,1))
-    def compute_primal(self, _self_statics_, x, y):
+    def compute_primal(self, x, y):
         z = jnp.dot(x, y)
-        print(x)
         zz = y * self.options['mult'] * self.stat
         return z, zz
 
@@ -634,6 +630,8 @@ if sys.version_info >= (3, 9):
             self.nins = nins
             self.nouts = nouts
 
+            self.compute_primal = getattr(self, f'compute_primal_{self.nins}_{self.nouts}')
+
         def setup(self):
             if self.shape == ():
                 for i in range(self.nins):
@@ -645,8 +643,6 @@ if sys.version_info >= (3, 9):
                     self.add_input(f'x{i}', val=jnp.zeros(self.shape))
                 for i in range(self.nouts):
                     self.add_output(f'y{i}', val=jnp.zeros(self.shape))
-
-            self.compute_primal = getattr(self, f'compute_primal_{self.nins}_{self.nouts}')
 
         def setup_partials(self):
             self.declare_partials('*', '*')
@@ -670,6 +666,8 @@ if sys.version_info >= (3, 9):
             self.nins = nins
             self.nouts = nouts
 
+            self.compute_primal = getattr(self, f'compute_primal_{self.nins}_{self.nouts}')
+
         def setup(self):
             if self.shape == ():
                 for i in range(self.nins):
@@ -681,8 +679,6 @@ if sys.version_info >= (3, 9):
                     self.add_input(f'x{i}', val=jnp.zeros(self.shape))
                 for i in range(self.nouts):
                     self.add_output(f'y{i}', val=jnp.zeros(self.shape))
-
-            self.compute_primal = getattr(self, f'compute_primal_{self.nins}_{self.nouts}')
 
         def setup_partials(self):
             self.declare_partials('*', '*')
@@ -698,7 +694,6 @@ if sys.version_info >= (3, 9):
 
         def compute_primal_2_2(self, x0, x1):
             return x0**2, x1**2
-
 
 
     class TopGrp(om.Group):

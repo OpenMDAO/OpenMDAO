@@ -72,7 +72,7 @@ class TestJaxUtils(unittest.TestCase):
             def get_static_arg(self):
                 return (self.options['pow'],)
 
-            def compute_primal(self, self_statics, x):
+            def compute_primal(self, x):
                 return x**self.options['pow']
 
         p = om.Problem()

@@ -41,7 +41,7 @@ try:
     import jax
     jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
     import jax.numpy as jnp
-    from jax import jit
+    from jax import jit, tree_util
 except ImportError:
     jax = None
     jnp = np
@@ -268,7 +268,7 @@ class ExplicitCompJaxify(ast.NodeTransformer):
 
         # ensure that ordering of args and returns exactly matches the order of the inputs and
         # outputs vectors.
-        self._compute_primal_args = self_statics + \
+        self._compute_primal_args = \
             [n for n in chain(comp._discrete_inputs, comp._var_rel_names['input'])]
         self._compute_primal_returns = \
             [n for n in chain(comp._discrete_outputs, comp._var_rel_names['output'])]
@@ -561,6 +561,43 @@ class SelfAttrFinder(ast.NodeVisitor):
 
         for arg in node.args:
             self.visit(arg)
+
+
+if jax is None:
+    def JaxCompPyTreeWrapper(comp):
+        """
+        A dummy function that returns the given Component.
+
+        Parameters
+        ----------
+        comp : Component
+            The Component to be wrapped.
+
+        Returns
+        -------
+        Component
+            The given Component.
+        """
+        return comp
+else:
+    class JaxCompPyTreeWrapper(object):
+        def __init__(self, comp):
+            self._comp = comp
+
+        def __getattr__(self, name):
+            return getattr(self._comp, name)
+
+        def _tree_flatten(self):
+            return ((), {'_comp_': self._comp, '_self_statics_': self._comp.get_static_arg()})
+
+        @staticmethod
+        def _tree_unflatten(aux_data, children):
+            return JaxCompPyTreeWrapper(aux_data['_comp_'])
+
+
+    tree_util.register_pytree_node(JaxCompPyTreeWrapper,
+                                   JaxCompPyTreeWrapper._tree_flatten,
+                                   JaxCompPyTreeWrapper._tree_unflatten)
 
 
 def get_self_static_attrs(method):
