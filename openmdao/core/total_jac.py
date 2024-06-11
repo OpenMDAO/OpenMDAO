@@ -360,17 +360,18 @@ class _TotalJacInfo(object):
         # raise an exception if we depend on any discrete outputs
         if model._var_allprocs_discrete['output']:
             # discrete_outs at the model level are absolute names
-            discrete_outs = set(model._var_allprocs_discrete['output'])
+            disc_arr = relevance._vars2rel_array(model._var_allprocs_discrete['output'])
 
             relevance = model._relevance
-            for dv, dvmeta in self.input_meta['fwd'].items():
-                for resp, rmeta in self.output_meta['fwd'].items():
-                    relarr = relevance._seed_var_map[dvmeta['source']][rmeta['source']]
-                    depdisc = [d for d in discrete_outs if relarr[relevance._var2idx[d]]]
-                    if depdisc:
-                        raise RuntimeError(f"Total derivative of '{resp}' with respect to "
-                                           f"'{dv}' depends upon discrete output variables "
-                                           f"{sorted(depdisc)}.")
+            for resp, rmeta in self.output_meta['fwd'].items():
+                if np.any(disc_arr & self._single_seed2relvars['rev'][rmeta['source']]):
+                    for dv, dvmeta in self.input_meta['fwd'].items():
+                        relarr = relevance._seed_var_map[dvmeta['source']][rmeta['source']]
+                        depdisc = [d for d in discrete_outs if relarr[relevance._var2idx[d]]]
+                        if depdisc:
+                            raise RuntimeError(f"Total derivative of '{resp}' with respect to "
+                                            f"'{dv}' depends upon discrete output variables "
+                                            f"{sorted(depdisc)}.")
 
     @property
     def msginfo(self):

@@ -256,8 +256,8 @@ class Relevance(object):
         if post_systems:
             post_systems.add('')
 
-        pre_array = self._names2rel_array(pre_systems, self._sys2idx)
-        post_array = self._names2rel_array(post_systems, self._sys2idx)
+        pre_array = self._sys2rel_array(pre_systems)
+        post_array = self._sys2rel_array(post_systems)
 
         if model._iterated_components is _contains_all:
             iter_array = np.ones(len(self._all_systems), dtype=bool)
@@ -268,7 +268,7 @@ class Relevance(object):
             if iter_systems:
                 iter_systems.add('')
 
-            iter_array = self._names2rel_array(iter_systems, self._sys2idx)
+            iter_array = self._sys2rel_array(iter_systems)
 
         self._nonlinear_sets = {'pre': pre_array, 'iter': iter_array, 'post': post_array}
 
@@ -319,8 +319,39 @@ class Relevance(object):
             rel_systems = _vars2systems(depnodes)
             rel_vars = depnodes - all_systems
 
-            yield (src, local, self._names2rel_array(rel_vars, self._var2idx),
-                   self._names2rel_array(rel_systems, self._sys2idx))
+            yield (src, local, self._vars2rel_array(rel_vars), self._sys2rel_array(rel_systems))
+
+    def _vars2rel_array(self, vars):
+        """
+        Return a relevance array for the given variables.
+
+        Parameters
+        ----------
+        vars : iter of str
+            Iterator over variable names.
+
+        Returns
+        -------
+        ndarray
+            Boolean relevance array.  True means name is relevant.
+        """
+        return self._names2rel_array(vars, self._var2idx)
+
+    def _sys2rel_array(self, systems):
+        """
+        Return a relevance array for the given systems.
+
+        Parameters
+        ----------
+        systems : iter of str
+            Iterator over system names.
+
+        Returns
+        -------
+        ndarray
+            Boolean relevance array.  True means name is relevant.
+        """
+        return self._names2rel_array(systems, self._sys2idx)
 
     def _names2rel_array(self, names, names2inds):
         """
