@@ -584,15 +584,15 @@ else:
         """
         A component wrapper that is a pytree for use with jax.
 
-        Attributes
-        ----------
-        _comp : Component
-            The Component being wrapped.
-
         Parameters
         ----------
         comp : Component
             The Component to be wrapped.
+
+        Attributes
+        ----------
+        _comp : Component
+            The Component being wrapped.
         """
 
         def __init__(self, comp):  # noqa
