@@ -223,8 +223,6 @@ class Driver(object):
         typically promoted name or an alias. Values are (local indices, local sizes).
     _cons : dict
         Contains all constraint info.
-    _nl_cons : dict
-        Contains all nonlinear constraint info.
     _objs : dict
         Contains all objective info.
     _responses : dict
@@ -445,34 +443,27 @@ class Driver(object):
             raise RuntimeError(msg)
 
         # Determine which design vars are relevant to linear constraints and which are relevant to
-        # nonlinear constraints or objectives.
-        lin_dvs = set()
-        nl_dvs = set()
-        lin_cons = {name: meta for name, meta in self._cons.items() if meta['linear']}
-        nl_resps = {name: meta for name, meta in self._cons.items() if not meta['linear']}
-        nl_resps.update(self._objs)
+        # nonlinear constraints or objectives so we know which jacobian (linear and/or nonlinear) to
+        # include them in.
+        lin_cons = tuple([meta['source'] for meta in self._cons.values() if meta['linear']])
+        if lin_cons:
+            relevance = model._relevance
+            dvs = tuple([meta['source'] for meta in self._designvars.values()])
 
-        relevance = model._relevance
-        revsrcs = relevance._single_seed2relvars['rev']
-        with relevance.seeds_active():
-            for dv, dvmeta in self._designvars.items():
-                dvarr = relevance._single_seed2relvars['fwd'][dvmeta['source']]
-                for linmeta in lin_cons.values():
-                    linarr = revsrcs[linmeta['source']]
-                    if dvarr & linarr:
-                        lin_dvs.add(dv)
-                        break
+            with relevance.seeds_active(fwd_seeds=dvs, rev_seeds=lin_cons):
+                self._lin_dvs = {dv: meta for dv, meta in self._designvars.items()
+                                 if relevance.is_relevant(meta['source'])}
 
-                for nlmeta in nl_resps.values():
-                    nlarr = revsrcs[nlmeta['source']]
-                    if dvarr & nlarr:
-                        nl_dvs.add(dv)
-                        break
+            nl_resps = [meta['source'] for meta in self._cons.values() if not meta['linear']]
+            nl_resps.extend([meta['source'] for meta in self._objs.values()])
 
-        # save names of DVs that are only relevant to linear constraints so we know which total
-        # jacobian (linear and/or nonlinear) to include them in.
-        self._lin_only_dvs = lin_dvs - nl_dvs
-        self._nl_dvs = nl_dvs
+            with relevance.seeds_active(fwd_seeds=dvs, rev_seeds=tuple(nl_resps)):
+                self._nl_dvs = {dv: meta for dv, meta in self._designvars.items()
+                                if relevance.is_relevant(meta['source'])}
+
+        else:
+            self._lin_dvs = {}
+            self._nl_dvs = self._designvars
 
         self._remote_dvs = remote_dv_dict = {}
         self._remote_cons = remote_con_dict = {}

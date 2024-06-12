@@ -117,7 +117,7 @@ def _compute_jac_view_info(totals, data, dv_vals, response_vals, coloring):
 
     nonempty_submats = set()  # submats with any nonzero values
 
-    var_matrix = np.zeros((len(data['ofslices']), len(data['wrtslices'])))
+    var_matrix = np.zeros((len(response_vals), len(dv_vals)))
 
     matrix = np.abs(totals)
 
@@ -198,6 +198,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
     obj_table = []
 
     dv_vals = driver.get_design_var_values(get_remote=True)
+    lin_dv_vals = {n: v for n, v in dv_vals.items() if n in driver._lin_dvs}
     obj_vals = driver.get_objective_values(driver_scaling=True)
     con_vals = driver.get_constraint_values(driver_scaling=True)
 
@@ -402,7 +403,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
 
         data['linear'] = lindata = {}
         lindata['oflabels'] = [n for n, meta in driver._cons.items() if meta['linear']]
-        lindata['wrtlabels'] = data['wrtlabels']  # needs to mimic data structure
+        lindata['wrtlabels'] = [n for n in data['wrtlabels'] if n in driver._lin_dvs]
 
         # check for separation of linear constraints
         if lindata['oflabels']:
@@ -434,7 +435,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
             else:
                 lintotals = driver._total_jac_linear.J
 
-            _compute_jac_view_info(lintotals, lindata, dv_vals, lin_response_vals, None)
+            _compute_jac_view_info(lintotals, lindata, lin_dv_vals, lin_response_vals, None)
 
     if driver._problem().comm.rank == 0:
 

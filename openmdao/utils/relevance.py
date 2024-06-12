@@ -322,6 +322,56 @@ class Relevance(object):
             yield (src, local, self._names2rel_array(rel_vars, self._var2idx),
                    self._names2rel_array(rel_systems, self._sys2idx))
 
+    def _is_var_relevant2arr(self, var, arr):
+        """
+        Return True if the given variable is relevant according to the given relevance array.
+
+        Parameters
+        ----------
+        var : str
+            Variable name.
+        arr : ndarray
+            Boolean relevance array.
+
+        Returns
+        -------
+        bool
+            True if the given variable is relevant.
+        """
+        return arr[self._var2idx[var]]
+
+    def _vars2rel_array(self, vars):
+        """
+        Return a relevance array for the given variables.
+
+        Parameters
+        ----------
+        vars : iter of str
+            Iterator over variable names.
+
+        Returns
+        -------
+        ndarray
+            Boolean relevance array.  True means name is relevant.
+        """
+        return self._names2rel_array(vars, self._var2idx)
+
+    def _sys2rel_array(self, systems):
+        """
+        Return a relevance array for the given systems.
+
+        Parameters
+        ----------
+        systems : iter of str
+            Iterator over system names.
+
+        Returns
+        -------
+        ndarray
+            Boolean relevance array.  True means name is relevant.
+        """
+        return self._names2rel_array(systems, self._sys2idx)
+
     def _names2rel_array(self, names, names2inds):
         """
         Return a relevance array for the given names.

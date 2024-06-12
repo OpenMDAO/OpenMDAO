@@ -5093,13 +5093,22 @@ class Group(System):
         has_custom_derivs = False
         list_wrt = list(wrt) if wrt is not None else []
 
-        driver_wrt = list(driver._designvars)
         if wrt is None:
+            lincons = [d for d, meta in driver._cons.items() if meta['linear']]
+            if lincons:
+                if len(lincons) == len(driver._cons):  # all constraints are linear
+                    driver_wrt = list(driver._lin_dvs)
+                else:  # mixed linear and nonlinear constraints
+                    driver_wrt = list(driver._designvars)
+            else:
+                driver_wrt = list(driver._nl_dvs)
+
             wrt = driver_wrt
             if not wrt:
                 raise RuntimeError("No design variables were passed to compute_totals and "
                                    "the driver is not providing any.")
         else:
+            driver_wrt = list(driver._designvars)
             wrt_src_names = [m['source'] for m in driver._designvars.values()]
             if list_wrt != driver_wrt and list_wrt != wrt_src_names:
                 has_custom_derivs = True

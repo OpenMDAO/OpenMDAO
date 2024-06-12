@@ -1165,6 +1165,8 @@ class BlockLinearSolver(LinearSolver):
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
+        if self._rhs_vec is None:
+            self._create_rhs_vec()
         if active:
             self._rhs_vec = self._rhs_vec.astype(complex)
         else:

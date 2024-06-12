@@ -10,6 +10,7 @@ import sys
 import json
 import signal
 from packaging.version import Version
+from itertools import chain
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -174,9 +175,7 @@ class pyOptSparseDriver(Driver):
     _in_user_function :bool
         This is set to True at the start of a pyoptsparse callback to _objfunc and _gradfunc, and
         restored to False at the finish of each callback.
-    _indep_list : list
-        List of design variables.
-    _quantities : list
+    _nl_responses : list
         Contains the objectives plus nonlinear constraints.
     _signal_cache : <Function>
         Cached function pointer that was assigned as handler for signal defined in option
@@ -229,8 +228,7 @@ class pyOptSparseDriver(Driver):
         # the fail flag (e.g. IPOPT) to recognize a bad point and respond accordingly
         self._fill_NANs = False
 
-        self._indep_list = []
-        self._quantities = []
+        self._nl_responses = []
         self.fail = False
         self._signal_cache = None
         self._user_termination_flag = False
@@ -362,7 +360,7 @@ class pyOptSparseDriver(Driver):
         self.pyopt_solution = None
         self._total_jac = None
         self.iter_count = 0
-        self._quantities = []
+        self._nl_responses = []
 
         optimizer = self.options['optimizer']
 
@@ -392,16 +390,10 @@ class pyOptSparseDriver(Driver):
         opt_prob = Optimization(self.options['title'], WeakMethodWrapper(self, '_objfunc'),
                                 comm=comm)
 
-        # Add all design variables
-        self._indep_list = indep_list = list(self._designvars)
-        self._indep_list_prom = indep_list_prom = []
-
         input_vals = self.get_design_var_values()
 
         for name, meta in self._designvars.items():
             # translate absolute var names to promoted names for pyoptsparse
-            indep_list_prom.append(name)
-
             size = meta['global_size'] if meta['distributed'] else meta['size']
             if pyoptsparse_version is None or pyoptsparse_version < Version('2.6.1'):
                 opt_prob.addVarGroup(name, size, type='c',
@@ -421,11 +413,11 @@ class pyOptSparseDriver(Driver):
         objs = self.get_objective_values()
         for name in objs:
             opt_prob.addObj(model._get_prom_name(name))
-            self._quantities.append(name)
+            self._nl_responses.append(name)
 
         # Calculate and save derivatives for any linear constraints.
         if linear_constraints:
-            _lin_jacs = self._compute_totals(of=linear_constraints, wrt=indep_list,
+            _lin_jacs = self._compute_totals(of=linear_constraints, wrt=list(self._lin_dvs),
                                              return_format=self._total_jac_format)
             _con_vals = self.get_constraint_values(lintype='linear')
             # convert all of our linear constraint jacs to COO format. Otherwise pyoptsparse will
@@ -462,23 +454,26 @@ class pyOptSparseDriver(Driver):
 
         eqcons = {n: m for n, m in self._cons.items() if m['equals'] is not None}
         if eqcons:
-            # set equality constraints as reverse seeds to see what dvs are relevant
-            with relevance.seeds_active(rev_seeds=tuple([m['source'] for m in eqcons.values()])):
-                # Add all equality constraints
-                for name, meta in eqcons.items():
-                    size = meta['global_size'] if meta['distributed'] else meta['size']
-                    lower = upper = meta['equals']
-                    with relevance.seeds_active(rev_seeds=(meta['source'],)):
-                        wrts = [v for v in indep_list
-                                if relevance.is_relevant(self._designvars[v]['source'])]
+            # Add all equality constraints
+            for name, meta in eqcons.items():
+                size = meta['global_size'] if meta['distributed'] else meta['size']
+                lower = upper = meta['equals']
+
+                # set equality constraints as reverse seeds to see what dvs are relevant
+                with relevance.seeds_active(rev_seeds=meta['source']):
 
                     if meta['linear']:
+                        wrts = [v for v in self._lin_dvs
+                                if relevance.is_relevant(self._lin_dvs[v]['source'])]
                         jac = {w: _lin_jacs[name][w] for w in wrts}
                         opt_prob.addConGroup(name, size,
                                              lower=lower - _y_intercepts[name],
                                              upper=upper - _y_intercepts[name],
                                              linear=True, wrt=wrts, jac=jac)
                     else:
+                        wrts = [v for v in self._nl_dvs
+                                if relevance.is_relevant(self._nl_dvs[v]['source'])]
+
                         if name in self._con_subjacs:
                             resjac = self._con_subjacs[name]
                             jac = {n: resjac[n] for n in wrts}
@@ -487,39 +482,41 @@ class pyOptSparseDriver(Driver):
 
                         opt_prob.addConGroup(name, size, lower=lower, upper=upper, wrt=wrts,
                                              jac=jac)
-                        self._quantities.append(name)
+                        self._nl_responses.append(name)
 
         ineqcons = {n: m for n, m in self._cons.items() if m['equals'] is None}
         if ineqcons:
-            # set inequality constraints as reverse seeds to see what dvs are relevant
-            with relevance.seeds_active(rev_seeds=tuple([m['source'] for m in ineqcons.values()])):
-                # Add all inequality constraints
-                for name, meta in ineqcons.items():
-                    size = meta['global_size'] if meta['distributed'] else meta['size']
+            # Add all inequality constraints
+            for name, meta in ineqcons.items():
+                size = meta['global_size'] if meta['distributed'] else meta['size']
 
-                    # Bounds - double sided is supported
-                    lower = meta['lower']
-                    upper = meta['upper']
+                # Bounds - double sided is supported
+                lower = meta['lower']
+                upper = meta['upper']
 
-                    with relevance.seeds_active(rev_seeds=(meta['source'],)):
-                        wrts = [v for v in indep_list
-                                if relevance.is_relevant(self._designvars[v]['source'])]
+                # set inequality constraints as reverse seeds to see what dvs are relevant
+                with relevance.seeds_active(rev_seeds=(meta['source'],)):
 
                     if meta['linear']:
+                        wrts = [v for v in self._lin_dvs
+                                if relevance.is_relevant(self._lin_dvs[v]['source'])]
                         jac = {w: _lin_jacs[name][w] for w in wrts}
                         opt_prob.addConGroup(name, size,
                                              upper=upper - _y_intercepts[name],
                                              lower=lower - _y_intercepts[name],
                                              linear=True, wrt=wrts, jac=jac)
                     else:
+                        wrts = [v for v in self._nl_dvs
+                                if relevance.is_relevant(self._nl_dvs[v]['source'])]
                         if name in self._con_subjacs:
                             resjac = self._con_subjacs[name]
                             jac = {n: resjac[n] for n in wrts}
                         else:
                             jac = None
+
                         opt_prob.addConGroup(name, size, upper=upper, lower=lower,
                                              wrt=wrts, jac=jac)
-                        self._quantities.append(name)
+                        self._nl_responses.append(name)
 
         # Instantiate the requested optimizer
         try:
@@ -637,7 +634,7 @@ class pyOptSparseDriver(Driver):
         # Pull optimal parameters back into framework and re-run, so that
         # framework is left in the right final state
         dv_dict = sol.getDVs()
-        for name in indep_list:
+        for name in chain(self._lin_dvs, self._nl_dvs):
             self.set_design_var(name, dv_dict[model._get_prom_name(name)])
 
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
@@ -710,7 +707,7 @@ class pyOptSparseDriver(Driver):
             signal.signal(sigusr, self._signal_handler)
 
         try:
-            for name in self._indep_list:
+            for name in self._nl_dvs:
                 self.set_design_var(name, dv_dict[model._get_prom_name(name)])
 
             # print("Setting DV")
@@ -809,8 +806,8 @@ class pyOptSparseDriver(Driver):
 
             try:
                 self._in_user_function = True
-                sens_dict = self._compute_totals(of=self._quantities,
-                                                 wrt=self._indep_list,
+                sens_dict = self._compute_totals(of=self._nl_responses,
+                                                 wrt=self._nl_dvs,
                                                  return_format=self._total_jac_format)
 
                 # First time through, check for zero row/col.
@@ -841,9 +838,9 @@ class pyOptSparseDriver(Driver):
                 new_sens = {}
                 con_subjacs = self._con_subjacs
 
-                for okey in self._quantities:
+                for okey in self._nl_responses:
                     new_sens[okey] = newdv = {}
-                    for ikey in self._designvars.keys():
+                    for ikey in self._nl_dvs.keys():
                         if okey in con_subjacs and ikey in con_subjacs[okey]:
                             arr = sens_dict[okey][ikey]
                             coo = con_subjacs[okey][ikey]
@@ -862,7 +859,7 @@ class pyOptSparseDriver(Driver):
         if fail > 0:
             # We need to cobble together a sens_dict of the correct size.
             # Best we can do is return zeros or NaNs.
-            for okey in self._quantities:
+            for okey in self._nl_responses:
                 if okey not in sens_dict:
                     sens_dict[okey] = {}
                 oval = func_dict[model._get_prom_name(okey)]
@@ -948,6 +945,7 @@ class pyOptSparseDriver(Driver):
 
         use_approx = self._problem().model._owns_approx_of is not None
 
+        # exclude linear cons
         for con, conmeta in filter_by_meta(self._cons.items(), 'linear'):
             self._con_subjacs[con] = {}
             consrc = conmeta['source']
