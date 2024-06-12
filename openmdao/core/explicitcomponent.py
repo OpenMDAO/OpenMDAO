@@ -504,7 +504,7 @@ class ExplicitComponent(Component):
                 # We used to negate the jacobian here, and then re-negate after the hook.
                 self._compute_partials_wrapper()
 
-    def get_static_arg(self):
+    def get_self_statics(self):
         """
         Override this in derived classes if compute_primal references static values.
 
@@ -520,10 +520,6 @@ class ExplicitComponent(Component):
         return ()
 
     def _get_compute_primal_inputs(self, inputs, discrete_inputs):
-        # treat all static args as a single tuple argument
-        # starg = self.get_static_arg()
-        # if starg:
-        #     yield starg
         yield JaxCompPyTreeWrapper(self)
         if discrete_inputs:
             yield from discrete_inputs.values()
@@ -656,8 +652,8 @@ class ExplicitComponent(Component):
             jaxifier = ExplicitCompJaxify(self, verbose=False)
 
             self.compute_primal = jaxifier.compute_primal
-            if jaxifier.get_static_arg:
-                self.get_static_arg = MethodType(jaxifier.get_static_arg, self)
+            if jaxifier.get_self_statics:
+                self.get_self_statics = MethodType(jaxifier.get_self_statics, self)
             self.compute = MethodType(ExplicitComponent.compute, self)
         elif 'use_jit' in self.options and self.options['use_jit']:
             static_argnums = tuple(range(len(self._var_discrete['input']))) # +
@@ -679,14 +675,14 @@ class ExplicitComponent(Component):
         bool
             True if this component has self static args that are specific to this instance.
         """
-        return len(self.get_static_arg()) > 0
+        return len(self.get_self_statics()) > 0
 
     def _get_jac_func(self):
         # TODO: modify this to use relevance and possibly compile multiple jac functions depending
         # on DV/response so that we don't compute any derivatives that are always zero.
         if self._jac_func_ is None:
             fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
-            # if len(self.get_static_arg()) > 0:
+            # if len(self.get_self_statics()) > 0:
             #     nselfstatic = 1
             # else:
             #     nselfstatic = 0

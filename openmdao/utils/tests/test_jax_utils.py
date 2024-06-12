@@ -69,7 +69,7 @@ class TestJaxUtils(unittest.TestCase):
                 ar = np.arange(n, dtype=int)
                 self.declare_partials(of='f', wrt='x', rows=ar, cols=ar)
 
-            def get_static_arg(self):
+            def get_self_statics(self):
                 return (self.options['pow'],)
 
             def compute_primal(self, x):

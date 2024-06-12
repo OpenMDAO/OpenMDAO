@@ -794,7 +794,7 @@ class Group(System):
         # the connections.
         self._setup_global_connections()
         self._setup_dynamic_shapes()
-        self._setup_ad()
+        self._setup_jax()
 
         self._top_level_post_connections()
 
@@ -2378,7 +2378,7 @@ class Group(System):
 
         return ins
 
-    def _setup_ad(self):
+    def _setup_jax(self):
         """
         If jax is active, jaxify this group and all subgroups.
 
@@ -2393,7 +2393,7 @@ class Group(System):
 
         if not self.options['derivs_method'] == 'jax':
             for subgroup in self._subgroups_myproc:
-                subgroup._setup_ad()
+                subgroup._setup_jax()
             return
 
         if self._contains_parallel_group or self._mpi_proc_allocator.parallel:

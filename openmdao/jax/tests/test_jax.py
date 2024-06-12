@@ -184,7 +184,7 @@ class MyCompJax2PrimalOption(om.JaxExplicitComponent):
 
         self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
 
-    def get_static_arg(self):
+    def get_self_statics(self):
         return (self.options['mult'], self.stat)
 
     def compute_primal(self, x, y):

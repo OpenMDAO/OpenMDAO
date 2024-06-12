@@ -241,7 +241,7 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         The original argument names of the compute function.
     _new_ast : ast node
         The new ast node created from the original compute function.
-    get_static_arg : function
+    get_self_statics : function
         A function that returns the static args for the Component as a single tuple.
     """
 
@@ -260,9 +260,9 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         static_attrs, static_dcts = get_self_static_attrs(func)
         self_statics = ['_self_statics_'] if static_attrs or static_dcts else []
         if self_statics:
-            self.get_static_arg = self._get_static_arg_func(static_attrs, static_dcts)
+            self.get_self_statics = self._get_self_statics_func(static_attrs, static_dcts)
         else:
-            self.get_static_arg = None
+            self.get_self_statics = None
 
         self._compute_args = list(inspect.signature(func).parameters)
 
@@ -339,8 +339,8 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         yield from get_partials_deps(self.compute_primal, self._compute_primal_returns,
                                      *self._get_arg_values())
 
-    def _get_static_arg_func(self, static_attrs, static_dcts):
-        fsrc = ['def get_static_arg(self):']
+    def _get_self_statics_func(self, static_attrs, static_dcts):
+        fsrc = ['def get_self_statics(self):']
         tupargs = []
         for attr in static_attrs:
             tupargs.append(f"self.{attr}")
@@ -353,7 +353,7 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         fsrc = '\n'.join(fsrc)
         namespace = self._comp().compute.__globals__.copy()
         exec(fsrc, namespace)  # nosec
-        return namespace['get_static_arg']
+        return namespace['get_self_statics']
 
     def _get_new_args(self):
         new_args = [ast.arg('self', annotation=None)]
@@ -581,17 +581,57 @@ if jax is None:
         return comp
 else:
     class JaxCompPyTreeWrapper(object):
-        def __init__(self, comp):
+        """
+        A component wrapper that is a pytree for use with jax.
+
+        Parameters
+        ----------
+        comp : Component
+            The Component to be wrapped.
+        """
+
+        def __init__(self, comp):  # noqa
             self._comp = comp
 
         def __getattr__(self, name):
+            """
+            Get the attribute with the given name from the underlying Component.
+
+            Parameters
+            ----------
+            name : str
+                The name of the attribute to be retrieved.
+
+            Returns
+            -------
+            object
+                The attribute with the given name.
+            """
             return getattr(self._comp, name)
 
         def _tree_flatten(self):
-            return ((), {'_comp_': self._comp, '_self_statics_': self._comp.get_static_arg()})
+            """
+            Get the flattened representation of this object.
+
+            Returns
+            -------
+            tuple (tuple, dict)
+                The flattened representation of this object.
+            """
+            return ((), {'_comp_': self._comp, '_self_statics_': self._comp.get_self_statics()})
 
         @staticmethod
         def _tree_unflatten(aux_data, children):
+            """
+            Reconstruct this object from the given data.
+
+            Parameters
+            ----------
+            aux_data : tuple
+                The auxiliary (static) data.
+            children : dict
+                The children of this object. This should always be empty for this class.
+            """
             return JaxCompPyTreeWrapper(aux_data['_comp_'])
 
 
