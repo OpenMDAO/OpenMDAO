@@ -656,8 +656,7 @@ class ExplicitComponent(Component):
                 self.get_self_statics = MethodType(jaxifier.get_self_statics, self)
             self.compute = MethodType(ExplicitComponent.compute, self)
         elif 'use_jit' in self.options and self.options['use_jit']:
-            static_argnums = tuple(range(len(self._var_discrete['input']))) # +
-                                         # int(self._has_self_static_arg())))
+            static_argnums = tuple(range(len(self._var_discrete['input'])))
             self.compute_primal = self.compute_primal.__func__
             self.compute_primal = jit(self.compute_primal, static_argnums=static_argnums)
 

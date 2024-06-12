@@ -584,6 +584,11 @@ else:
         """
         A component wrapper that is a pytree for use with jax.
 
+        Attributes
+        ----------
+        _comp : Component
+            The Component being wrapped.
+
         Parameters
         ----------
         comp : Component
@@ -633,7 +638,6 @@ else:
                 The children of this object. This should always be empty for this class.
             """
             return JaxCompPyTreeWrapper(aux_data['_comp_'])
-
 
     tree_util.register_pytree_node(JaxCompPyTreeWrapper,
                                    JaxCompPyTreeWrapper._tree_flatten,
