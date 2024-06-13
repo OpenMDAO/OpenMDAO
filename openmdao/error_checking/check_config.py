@@ -55,7 +55,10 @@ def _check_cycles(group, infos=None):
               for s in sccs if len(s) > 1]
 
     if cycles and infos is not None:
-        infos.append("   Group '%s' has the following cycles: %s\n" % (group.pathname, cycles))
+        infos.append(f"   Group '{group.pathname}' has the following cycles:")
+        for cycle in cycles:
+            infos.append(f"      {cycle}")
+        infos.append('')
 
     return cycles
 

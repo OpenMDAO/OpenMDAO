@@ -409,6 +409,24 @@ class Relevance(object):
 
         return np.zeros(0, dtype=bool) if combined is None else self._get_cached_array(combined)
 
+    def rel_vars_iter(self, rel_array, relevant=True):
+        """
+        Return an iterator of relevant variable names.
+
+        Parameters
+        ----------
+        rel_array : ndarray
+            Boolean relevance array.  True means name is relevant.
+        relevant : bool
+            If True, return only relevant names.  If False, return only irrelevant names.
+
+        Yields
+        ------
+        str
+            Name of the relevant variable.
+        """
+        return self._rel_names_iter(rel_array, self._var2idx, relevant)
+
     def _rel_names_iter(self, rel_array, all_names, relevant=True):
         """
         Return an iterator of names from the given relevance array.
@@ -824,6 +842,28 @@ class Relevance(object):
             return True
 
         return self._current_rel_varray[self._var2idx[name]]
+
+    def any_relevant(self, names):
+        """
+        Return True if any of the given variables are relevant.
+
+        Parameters
+        ----------
+        names : iter of str
+            Iterator over variable names.
+
+        Returns
+        -------
+        bool
+            True if any of the given variables are relevant.
+        """
+        if not self._active:
+            return True
+
+        for n in names:
+            if self._current_rel_varray[self._var2idx[n]]:
+                return True
+        return False
 
     def is_relevant_system(self, name):
         """

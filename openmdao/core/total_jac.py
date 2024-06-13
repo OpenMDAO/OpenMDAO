@@ -360,18 +360,21 @@ class _TotalJacInfo(object):
         # raise an exception if we depend on any discrete outputs
         if model._var_allprocs_discrete['output']:
             # discrete_outs at the model level are absolute names
-            disc_arr = relevance._vars2rel_array(model._var_allprocs_discrete['output'])
-
             relevance = model._relevance
-            for resp, rmeta in self.output_meta['fwd'].items():
-                if np.any(disc_arr & self._single_seed2relvars['rev'][rmeta['source']]):
-                    for dv, dvmeta in self.input_meta['fwd'].items():
-                        relarr = relevance._seed_var_map[dvmeta['source']][rmeta['source']]
-                        depdisc = [d for d in discrete_outs if relarr[relevance._var2idx[d]]]
-                        if depdisc:
-                            raise RuntimeError(f"Total derivative of '{resp}' with respect to "
-                                            f"'{dv}' depends upon discrete output variables "
-                                            f"{sorted(depdisc)}.")
+            discrete_outs = model._var_allprocs_discrete['output']
+            disc_arr = relevance._vars2rel_array(discrete_outs)
+
+            with relevance.all_seeds_active():
+                if relevance.any_relevant(discrete_outs):
+                    for resp, rmeta in self.output_meta['fwd'].items():
+                        for dv, dvmeta in self.input_meta['fwd'].items():
+                            relarr = relevance._seed_var_map[dvmeta['source']][rmeta['source']]
+                            depdisc = disc_arr & relarr
+                            if np.any(depdisc):
+                                discnames = relevance.rel_vars_iter(depdisc)
+                                raise RuntimeError(f"Total derivative of '{resp}' with respect to "
+                                                   f"'{dv}' depends upon discrete output variables "
+                                                   f"{sorted(discnames)}.")
 
     @property
     def msginfo(self):
