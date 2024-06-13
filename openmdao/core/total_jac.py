@@ -140,6 +140,7 @@ class _TotalJacInfo(object):
         self.initialize = True
         self.approx = approx
         self.coloring_info = coloring_info
+        self._linear_only_dvs = set(driver._lin_dvs).difference(driver._nl_dvs)
 
         orig_of = of
         orig_wrt = wrt
@@ -1637,7 +1638,9 @@ class _TotalJacInfo(object):
         if np.any(row):  # there's at least 1 col that's zero across all rows
             zero_cols = []
             for n, meta in self.input_meta['fwd'].items():
-
+                # don't flag zero cols for linear only dvs
+                if n in self._linear_only_dvs:
+                    continue
                 zero_idxs = self._get_zero_inds(meta, row)
 
                 if zero_idxs[0].size > 0:
