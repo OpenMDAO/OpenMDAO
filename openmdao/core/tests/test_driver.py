@@ -19,7 +19,7 @@ from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
 from openmdao.utils.om_warnings import OpenMDAOWarning
 from openmdao.utils.mpi import MPI
-from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
+from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver, pyoptsparse
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -1145,9 +1145,10 @@ class TestLinearOnlyDVs(unittest.TestCase):
         model.add_constraint('c', lower=15.0, linear=True)
 
         prob.setup()
-        
+
         return prob
 
+    @unittest.skipIf(pyoptsparse is None, "pyoptsparse is required.")
     def test_pyoptsparse(self):
         OPTIMIZER = set_pyoptsparse_opt('SLSQP')[1]
 
