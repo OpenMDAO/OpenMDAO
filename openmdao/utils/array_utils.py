@@ -9,10 +9,10 @@ from math import isclose
 import numpy as np
 from numpy.linalg import norm
 
-from scipy.sparse import coo_matrix
+from scipy.sparse import coo_matrix, csr_matrix, csc_matrix
 
 from openmdao.core.constants import INT_DTYPE
-from openmdao.utils.numba import numba
+from openmdao.utils.omnumba import numba
 
 
 if sys.version_info >= (3, 8):
@@ -912,3 +912,56 @@ else:
             if a[i] != 0.:
                 return False
         return True
+
+
+def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, shape,
+                         dense_pct=75.):
+    """
+    Yield the sparsity of each submatrix, based on variable names and sizes.
+
+    Parameters
+    ----------
+    row_var_size_iter : iterator of (name, size)
+        Iterator of row variable names and sizes.
+    col_var_size_iter : iterator of (name, size)
+        Iterator of column variable names and sizes.
+    nzrows : ndarray
+        Row indices of nonzero entries in the full matrix.
+    nzcols : ndarray
+        Column indices of nonzero entries in the full matrix.
+    shape : tuple
+        Shape of the full matrix.
+    dense_pct : float
+        Percentage of nonzero entries in a submatrix that will treat it as
+        dense, yielding None for rows and cols.
+
+    Yields
+    ------
+    tuple
+        (row_varname, col_varname, nonzero rows, nonzero cols, shape)
+    """
+    row_start = row_end = 0
+    dense_pct /= 100.
+
+    data = np.ones(nzrows.size, dtype=np.int8)
+    csr = csr_matrix((data, (nzrows, nzcols)), shape=shape)
+    col_iter = list(col_var_size_iter)  # need to iterate over multiple times
+
+    for of, of_size in row_var_size_iter:
+        row_end += of_size
+        rowslice = csr[row_start:row_end, :]
+        row_start = row_end
+
+        csc = rowslice.tocsc()
+        col_start = col_end = 0
+        for wrt, wrt_size in col_iter:
+            col_end += wrt_size
+            submat = csc[:, col_start:col_end].tocoo()
+            col_start = col_end
+
+            if submat.row.size > 0:  # only yield if nonzero
+                if submat.nnz / (submat.shape[0] * submat.shape[1]) >= dense_pct:
+                    # treat submatrix as dense and return None for rows and cols
+                    yield (of, wrt, None, None, submat.shape)
+                else:
+                    yield (of, wrt, submat.row, submat.col, submat.shape)

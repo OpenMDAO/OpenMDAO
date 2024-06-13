@@ -8,13 +8,12 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.constants import INT_DTYPE
 import openmdao.func_api as omf
 from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore, _add_options, \
-    jac_forward, jac_reverse, _get_tangents
+    jac_forward, jac_reverse, _get_tangents, _ensure_iter
 from openmdao.utils.array_utils import shape_to_len
 
 try:
     import jax
     from jax import jit
-    import jax.numpy as jnp
     jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
 except Exception:
     _, err, tb = sys.exc_info()
@@ -252,7 +251,7 @@ class ExplicitFuncComp(ExplicitComponent):
         outputs : Vector
             Unscaled, dimensional output variables.
         """
-        outputs.set_vals(self._compute(*self._func_values(inputs)))
+        outputs.set_vals(_ensure_iter(self._compute(*self._func_values(inputs))))
 
     def _setup_partials(self):
         """

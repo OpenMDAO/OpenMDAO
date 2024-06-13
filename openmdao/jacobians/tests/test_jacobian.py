@@ -16,6 +16,7 @@ from openmdao.utils.array_utils import rand_sparsity
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.api import ScipyOptimizeDriver
 
+
 try:
     from parameterized import parameterized
 except ImportError:
@@ -1122,6 +1123,7 @@ class OverlappingPartialsTestCase(unittest.TestCase):
                                                  [ 0., 13., -1.]]))
 
     def test_multi_inputs_same_src_dense_comp(self):
+
         p = Problem(allow_post_setup_reorder=False)
         p.model.add_subsystem('indeps', IndepVarComp('x', np.ones(2)))
 

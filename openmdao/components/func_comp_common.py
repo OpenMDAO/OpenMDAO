@@ -6,6 +6,7 @@ import sys
 import traceback
 import re
 from functools import partial
+from collections.abc import Iterable
 
 import numpy as np
 try:
@@ -25,10 +26,6 @@ except Exception:
     if not isinstance(err, ImportError):
         traceback.print_tb(tb)
     jax = None
-
-from openmdao.utils.om_warnings import issue_warning
-from openmdao.vectors.vector import Vector
-from openmdao.core.constants import INT_DTYPE
 
 
 # regex to check for variable names.
@@ -245,3 +242,21 @@ def _get_tangents(vals, direction, coloring=None, argnums=None, trans=None):
         tangents = tangents[0]
 
     return tangents
+
+
+def _ensure_iter(val):
+    """
+    Turn the given value into an iterator if it is not already.
+
+    Parameters
+    ----------
+    val : object
+        The value to be iterated over.
+
+    Returns
+    -------
+    tuple or iterable
+    """
+    if isinstance(val, Iterable):
+        return val
+    return val,

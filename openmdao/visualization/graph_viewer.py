@@ -12,7 +12,6 @@ import networkx as nx
 
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
-from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.general_utils import all_ancestors
 from openmdao.utils.file_utils import _load_and_exec
 import openmdao.utils.hooks as hooks

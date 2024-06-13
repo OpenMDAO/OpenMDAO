@@ -289,7 +289,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         prob.run_model()
         model.run_linearize(driver=prob.driver)
 
-        Jfd = model._jacobian
+        Jfd = model._jacobian.J_dict
         assert_near_equal(Jfd['comp.y1', 'p1.x1'], comp.JJ[0:2, 0:2], 1e-6)
         assert_near_equal(Jfd['comp.y1', 'p2.x2'], comp.JJ[0:2, 2:4], 1e-6)
         assert_near_equal(Jfd['comp.y2', 'p1.x1'], comp.JJ[2:4, 0:2], 1e-6)
@@ -1093,7 +1093,7 @@ class TestGroupComplexStep(unittest.TestCase):
         prob.run_model()
         model.run_linearize(driver=prob.driver)
 
-        Jfd = model._jacobian
+        Jfd = model._jacobian.J_dict
         assert_near_equal(Jfd['comp.y1', 'p1.x1'], comp.JJ[0:2, 0:2], 1e-6)
         assert_near_equal(Jfd['comp.y1', 'p2.x2'], comp.JJ[0:2, 2:4], 1e-6)
         assert_near_equal(Jfd['comp.y2', 'p1.x1'], comp.JJ[2:4, 0:2], 1e-6)

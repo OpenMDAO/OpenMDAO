@@ -8,12 +8,12 @@ from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.constants import INT_DTYPE
 import openmdao.func_api as omf
 from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore, _add_options, \
-    jac_forward, jac_reverse, _get_tangents
+    jac_forward, jac_reverse, _get_tangents, _ensure_iter
 from openmdao.utils.array_utils import shape_to_len
 
 try:
     import jax
-    from jax import jit, jacfwd, jacrev
+    from jax import jit
     jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
 except Exception:
     _, err, tb = sys.exc_info()
@@ -196,14 +196,15 @@ class ImplicitFuncComp(ImplicitComponent):
         discrete_outputs : _DictValues or None
             Dict-like object containing discrete outputs.
         """
-        residuals.set_vals(self._apply_nonlinear_func(*self._ordered_func_invals(inputs, outputs)))
+        residuals.set_vals(_ensure_iter(
+            self._apply_nonlinear_func(*self._ordered_func_invals(inputs, outputs))))
 
     def _user_solve_nonlinear(self, inputs, outputs):
         """
         Compute outputs. The model is assumed to be in a scaled state.
         """
-        self._outputs.set_vals(self._solve_nonlinear_func(*self._ordered_func_invals(inputs,
-                                                                                     outputs)))
+        self._outputs.set_vals(_ensure_iter(
+            self._solve_nonlinear_func(*self._ordered_func_invals(inputs, outputs))))
 
     def _linearize(self, jac=None, sub_do_ln=False):
         """
@@ -317,11 +318,12 @@ class ImplicitFuncComp(ImplicitComponent):
             Derivative solution direction, either 'fwd' or 'rev'.
         """
         if mode == 'fwd':
-            d_outputs.set_vals(self._solve_linear_func(*chain(d_residuals.values(),
-                                                              (mode, self._linearize_info))))
+            d_outputs.set_vals(_ensure_iter(
+                self._solve_linear_func(*chain(d_residuals.values(),
+                                               (mode, self._linearize_info)))))
         else:  # rev
-            d_residuals.set_vals(self._solve_linear_func(*chain(d_outputs.values(),
-                                                                (mode, self._linearize_info))))
+            d_residuals.set_vals(_ensure_iter(
+                self._solve_linear_func(*chain(d_outputs.values(), (mode, self._linearize_info)))))
 
     def _ordered_func_invals(self, inputs, outputs):
         """

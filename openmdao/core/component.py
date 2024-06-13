@@ -307,7 +307,7 @@ class Component(System):
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
             self._discrete_outputs = _DictValues(self._var_discrete['output'])
         else:
-            self._discrete_inputs = self._discrete_outputs = ()
+            self._discrete_inputs = self._discrete_outputs = {}
 
         if self.comm.size > 1:
             # check that same variables are declared on all procs
@@ -329,6 +329,12 @@ class Component(System):
 
         self._serial_idxs = None
         self._inconsistent_keys = set()
+
+        if self.options['derivs_method'] == 'jax':
+            self._setup_jax()
+
+    def _setup_jax(self):
+        raise NotImplementedError("JAX support is not yet implemented for this component.")
 
     def _missing_vars_error(self, allnames):
         msg = ''
@@ -486,7 +492,7 @@ class Component(System):
     def _promoted_wrt_iter(self):
         yield from self._get_partials_wrts()
 
-    def _update_subjac_sparsity(self, sparsity):
+    def _update_subjac_sparsity(self, sparsity_iter):
         """
         Update subjac sparsity info based on the given coloring.
 
@@ -497,19 +503,17 @@ class Component(System):
 
         Parameters
         ----------
-        sparsity : dict
-            A nested dict of the form dct[of][wrt] = (rows, cols, shape)
+        sparsity_iter : iter of tuple
+            Tuple of the form (of, wrt, rows, cols, shape).
         """
         # sparsity uses relative names, so we need to convert to absolute
         prefix = self.pathname + '.'
-        for of, sub in sparsity.items():
-            of = prefix + of
-            for wrt, tup in sub.items():
-                wrt = prefix + wrt
-                abs_key = (of, wrt)
-                if abs_key in self._subjacs_info:
-                    # add sparsity info to existing partial info
-                    self._subjacs_info[abs_key]['sparsity'] = tup
+        for of, wrt, rows, cols, shape in sparsity_iter:
+            if rows is None:
+                continue
+            abs_key = (prefix + of, prefix + wrt)
+            if abs_key in self._subjacs_info:
+                self._subjacs_info[abs_key]['sparsity'] = (rows, cols, shape)
 
     def add_input(self, name, val=1.0, shape=None, units=None, desc='', tags=None,
                   shape_by_conn=False, copy_shape=None, compute_shape=None, distributed=None):
@@ -582,12 +586,11 @@ class Component(System):
             raise TypeError(f"{self.msginfo}: The compute_shape argument should be a function but "
                             f"a '{type(compute_shape).__name__}' was given.")
 
-        if (shape_by_conn or copy_shape or compute_shape):
+        if shape_by_conn or copy_shape or compute_shape:
             if shape is not None or ndim(val) > 0:
-                raise ValueError("%s: If shape is to be set dynamically using 'shape_by_conn', "
-                                 "'copy_shape', or 'compute_shape', 'shape' and 'val' should be a "
-                                 "scalar, but shape of '%s' and val of '%s' was given for variable"
-                                 " '%s'." % (self.msginfo, shape, val, name))
+                raise ValueError("%s: If shape is to be set dynamically, 'shape' and 'val' should "
+                                 "be a scalar, but shape of '%s' and val of '%s' was given for "
+                                 "variable '%s'." % (self.msginfo, shape, val, name))
         else:
             # value, shape: based on args, making sure they are compatible
             val, shape = ensure_compatible(name, val, shape)
@@ -1071,7 +1074,6 @@ class Component(System):
             meta = info[abs_key]
             meta['method'] = method
             meta.update(kwargs)
-            info[abs_key] = meta
 
     def declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None,
                          method='exact', step=None, form=None, step_calc=None, minimum_step=None):
@@ -1739,7 +1741,7 @@ class Component(System):
             if coloring_mod._use_partial_sparsity:
                 coloring = self._get_coloring()
                 if coloring is not None:
-                    self._update_subjac_sparsity(coloring.get_subjac_sparsity())
+                    self._update_subjac_sparsity(coloring._subjac_sparsity_iter())
                 if self._jacobian is not None:
                     self._jacobian._restore_approx_sparsity()
 
@@ -1900,5 +1902,21 @@ class _DictValues(object):
     def __len__(self):
         return len(self._dict)
 
+    def __iter__(self):
+        return iter(self._dict)
+
+    def __bool__(self):
+        return bool(self._dict)
+
+    def keys(self):
+        return self._dict.keys()
+
     def items(self):
-        return [(key, self._dict[key]['val']) for key in self._dict]
+        return [(key, meta['val']) for key, meta in self._dict.items()]
+
+    def values(self):
+        return [meta['val'] for meta in self._dict.values()]
+
+    def set_vals(self, vals):
+        for key, val in zip(self._dict, vals):
+            self[key] = val

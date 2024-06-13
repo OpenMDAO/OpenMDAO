@@ -6,13 +6,6 @@ from openmdao.utils.entry_points import list_installed, _filtered_ep_iter, _allo
     compute_entry_points, _epgroup_bases, split_ep
 from openmdao.utils.assert_utils import assert_no_warning
 
-from openmdao.api import Group, SurrogateModel
-from openmdao.core.component import Component
-from openmdao.core.driver import Driver
-from openmdao.solvers.solver import LinearSolver, NonlinearSolver
-from openmdao.recorders.case_recorder import CaseRecorder
-from openmdao.recorders.base_case_reader import BaseCaseReader
-
 
 _ep_bases = tuple(_epgroup_bases)
 
