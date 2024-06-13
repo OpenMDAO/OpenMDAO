@@ -140,7 +140,10 @@ class _TotalJacInfo(object):
         self.initialize = True
         self.approx = approx
         self.coloring_info = coloring_info
-        self._linear_only_dvs = set(driver._lin_dvs).difference(driver._nl_dvs)
+        try:
+            self._linear_only_dvs = set(driver._lin_dvs).difference(driver._nl_dvs)
+        except AttributeError:
+            self._linear_only_dvs = set()
 
         orig_of = of
         orig_wrt = wrt
