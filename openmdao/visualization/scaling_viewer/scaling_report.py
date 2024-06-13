@@ -420,7 +420,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
 
         _compute_jac_view_info(totals, data, dv_vals, response_vals, coloring)
 
-        if lindata['oflabels']:
+        if lindata['oflabels'] and lindata['wrtlabels']:
             lin_response_vals = {n: full_response_vals[n] for n in lindata['oflabels']}
 
             if driver._total_jac_linear is None:
