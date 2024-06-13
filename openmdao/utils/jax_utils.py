@@ -582,7 +582,7 @@ if jax is None:
 else:
     class JaxCompPyTreeWrapper(object):
         """
-        A component wrapper that is a pytree for use with jax.
+        Wraps a component in a pytree for use with jax.
 
         Parameters
         ----------
