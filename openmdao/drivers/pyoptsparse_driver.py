@@ -10,7 +10,6 @@ import sys
 import json
 import signal
 from packaging.version import Version
-from itertools import chain
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -634,7 +633,7 @@ class pyOptSparseDriver(Driver):
         # Pull optimal parameters back into framework and re-run, so that
         # framework is left in the right final state
         dv_dict = sol.getDVs()
-        for name in chain(self._lin_dvs, self._nl_dvs):
+        for name in self._designvars:
             self.set_design_var(name, dv_dict[model._get_prom_name(name)])
 
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:

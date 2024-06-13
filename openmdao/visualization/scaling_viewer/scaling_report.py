@@ -103,21 +103,23 @@ def _add_child_rows(row, mval, dval, scaler=None, adder=None, ref=None, ref0=Non
 def _compute_jac_view_info(totals, data, dv_vals, response_vals, coloring):
     start = end = 0
     data['ofslices'] = slices = {}
-    for n, v in response_vals.items():
+    for n in data['oflabels']:
+        v = response_vals[n]
         end += v.size
         slices[n] = [start, end]
         start = end
 
     start = end = 0
     data['wrtslices'] = slices = {}
-    for n, v in dv_vals.items():
+    for n in data['wrtlabels']:
+        v = dv_vals[n]
         end += v.size
         slices[n] = [start, end]
         start = end
 
     nonempty_submats = set()  # submats with any nonzero values
 
-    var_matrix = np.zeros((len(response_vals), len(dv_vals)))
+    var_matrix = np.zeros((len(data['oflabels']), len(data['wrtlabels'])))
 
     matrix = np.abs(totals)
 
@@ -125,9 +127,9 @@ def _compute_jac_view_info(totals, data, dv_vals, response_vals, coloring):
         mask = np.zeros(totals.shape, dtype=bool)
         mask[coloring._nzrows, coloring._nzcols] = 1
 
-    for i, of in enumerate(response_vals):
+    for i, of in enumerate(data['oflabels']):
         ofstart, ofend = data['ofslices'][of]
-        for j, wrt in enumerate(dv_vals):
+        for j, wrt in enumerate(data['wrtlabels']):
             wrtstart, wrtend = data['wrtslices'][wrt]
             # use max of abs value here instead of norm to keep coloring consistent between
             # top level jac and subjacs
@@ -403,7 +405,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
 
         data['linear'] = lindata = {}
         lindata['oflabels'] = [n for n, meta in driver._cons.items() if meta['linear']]
-        lindata['wrtlabels'] = [n for n in data['wrtlabels'] if n in driver._lin_dvs]
+        lindata['wrtlabels'] = [n for n in dv_vals if n in driver._lin_dvs]
 
         # check for separation of linear constraints
         if lindata['oflabels']:
@@ -428,7 +430,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
 
                 try:
                     lintotals = driver._compute_totals(of=lindata['oflabels'],
-                                                       wrt=data['wrtlabels'],
+                                                       wrt=lindata['wrtlabels'],
                                                        return_format='array')
                 finally:
                     driver._total_jac = save

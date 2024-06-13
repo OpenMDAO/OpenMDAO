@@ -442,28 +442,7 @@ class Driver(object):
             msg += '.'.join(self._designvars_discrete)
             raise RuntimeError(msg)
 
-        # Determine which design vars are relevant to linear constraints and which are relevant to
-        # nonlinear constraints or objectives so we know which jacobian (linear and/or nonlinear) to
-        # include them in.
-        lin_cons = tuple([meta['source'] for meta in self._cons.values() if meta['linear']])
-        if lin_cons:
-            relevance = model._relevance
-            dvs = tuple([meta['source'] for meta in self._designvars.values()])
-
-            with relevance.seeds_active(fwd_seeds=dvs, rev_seeds=lin_cons):
-                self._lin_dvs = {dv: meta for dv, meta in self._designvars.items()
-                                 if relevance.is_relevant(meta['source'])}
-
-            nl_resps = [meta['source'] for meta in self._cons.values() if not meta['linear']]
-            nl_resps.extend([meta['source'] for meta in self._objs.values()])
-
-            with relevance.seeds_active(fwd_seeds=dvs, rev_seeds=tuple(nl_resps)):
-                self._nl_dvs = {dv: meta for dv, meta in self._designvars.items()
-                                if relevance.is_relevant(meta['source'])}
-
-        else:
-            self._lin_dvs = {}
-            self._nl_dvs = self._designvars
+        self._split_dvs(model)
 
         self._remote_dvs = remote_dv_dict = {}
         self._remote_cons = remote_con_dict = {}
@@ -592,6 +571,38 @@ class Driver(object):
                 if not problem.model._use_derivatives:
                     issue_warning("Derivatives are turned off.  Skipping simul deriv coloring.",
                                   category=DerivativesWarning)
+
+    def _split_dvs(self, model):
+        """
+        Determine which design vars are relevant to linear constraints vs nonlinear constraints.
+
+        For some optimizers, this information will be used to determine the columns of the total
+        linear jacobian vs. the total nonlinear jacobian.
+
+        Parameters
+        ----------
+        model : <Group>
+            The model being used in the optimization problem.
+        """
+        lin_cons = tuple([meta['source'] for meta in self._cons.values() if meta['linear']])
+        if lin_cons:
+            relevance = model._relevance
+            dvs = tuple([meta['source'] for meta in self._designvars.values()])
+
+            with relevance.seeds_active(fwd_seeds=dvs, rev_seeds=lin_cons):
+                self._lin_dvs = {dv: meta for dv, meta in self._designvars.items()
+                                 if relevance.is_relevant(meta['source'])}
+
+            nl_resps = [meta['source'] for meta in self._cons.values() if not meta['linear']]
+            nl_resps.extend([meta['source'] for meta in self._objs.values()])
+
+            with relevance.seeds_active(fwd_seeds=dvs, rev_seeds=tuple(nl_resps)):
+                self._nl_dvs = {dv: meta for dv, meta in self._designvars.items()
+                                if relevance.is_relevant(meta['source'])}
+
+        else:
+            self._lin_dvs = {}
+            self._nl_dvs = self._designvars
 
     def _check_for_missing_objective(self):
         """
