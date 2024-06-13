@@ -566,7 +566,7 @@ class SelfAttrFinder(ast.NodeVisitor):
 if jax is None:
     def JaxCompPyTreeWrapper(comp):
         """
-        A dummy function that returns the given Component.
+        Return the given Component.
 
         Parameters
         ----------
