@@ -32,8 +32,43 @@ def _reset_all_hooks():
     _hooks = {}
 
 
+def _hook_meta_factory(pre, pass_args, pass_return):
+    """
+    Return classes for hook functions that accept different arguments.
+
+    Parameters
+    ----------
+    pre : bool
+        If True, create a pre-hook class.
+    pass_args : bool
+        If True, create a class that passes args to the hook function.
+    pass_return : bool
+        If True, create a class that passes the return value of the hooked function to the hook
+        function. Only valid for post hooks.
+
+    Returns
+    -------
+    class
+        A class that handles calling a hook function.
+    """
+    if pre:
+        if pass_args:
+            return _PreHookMetaPassArgs
+    else:  # post
+        if pass_return:
+            if pass_args:
+                return _PostHookMetaPassArgsPassReturn
+            else:
+                return _PostHookMetaPassRet
+        elif pass_args:
+            return _PostHookMetaPassArgs
+
+    return _HookMeta
+
+
 class _HookMeta(object):
-    def __init__(self, class_name, inst_id, hook, ncalls=None, exit=False, **kwargs):
+    def __init__(self, class_name, inst_id, hook, ncalls=None, exit=False, pass_args=False,
+                 pass_return=False, **kwargs):
         global _hook_counter
         self._stamp = _hook_counter
         _hook_counter += 1
@@ -43,6 +78,8 @@ class _HookMeta(object):
         self.hook = hook
         self.ncalls = ncalls
         self.exit = exit
+        self.pass_args = pass_args
+        self.pass_return = pass_return
         self.kwargs = kwargs
         self.children = []  # if we're a 'None' inst_id hook, keep track of our child hooks
 
@@ -50,21 +87,26 @@ class _HookMeta(object):
         return f"<_HookMeta {self.class_name} {self.inst_id} {self.hook} {self.ncalls} "\
                f"{self.exit} {self.kwargs}>"
 
-    def __call__(self, inst):
+    def __call__(self, inst, args, kwargs, ret=None):
         if self.ncalls is None:
-            self.hook(inst, **self.kwargs)
-            if self.exit:
-                sys.exit()
+            ret = self._call_hook(inst, args, kwargs, ret)
+        elif self.ncalls > 0:
+            self.ncalls -= 1
+            ret = self._call_hook(inst, args, kwargs, ret)
         else:
-            if self.ncalls > 0:
-                self.ncalls -= 1
-                self.hook(inst, **self.kwargs)
-                if self.exit:
-                    sys.exit()
+            return
+
+        if self.exit:
+            sys.exit()
+
+        return ret
+
+    def _call_hook(self, inst, args, kwargs, ret):
+        return self.hook(inst, **self.kwargs)
 
     def copy(self):
-        hm = _HookMeta(self.class_name, self.inst_id, self.hook, self.ncalls,
-                       self.exit, **self.kwargs)
+        hm = self.__class__(self.class_name, self.inst_id, self.hook, self.ncalls,
+                            self.exit, self.pass_args, self.pass_return, **self.kwargs)
         # keep the same stamp so that the order of hooks doesn't change
         hm._stamp = self._stamp
         if self.inst_id is None:
@@ -76,6 +118,27 @@ class _HookMeta(object):
         self.ncalls = 0
         for child in self.children:
             child.deactivate()
+
+
+class _PreHookMetaPassArgs(_HookMeta):
+    def _call_hook(self, inst, args, kwargs, ret):
+        return self.hook(inst, args, kwargs, **self.kwargs)
+
+
+class _PostHookMetaPassRet(_HookMeta):
+    def __call__(self, inst, args, kwargs, ret):
+        return self.hook(inst, ret, **self.kwargs)
+
+
+class _PostHookMetaPassArgs(_HookMeta):
+    def __call__(self, inst, args, kwargs, ret):
+        return self.hook(inst, args, kwargs, **self.kwargs)
+
+
+class _PostHookMetaPassArgsPassReturn(_HookMeta):
+    def __call__(self, inst, args, kwargs, ret):
+        return self.hook(inst, args, kwargs, ret, **self.kwargs)
+
 
 
 class _HookDecorator(object):
@@ -113,7 +176,7 @@ class _HookDecorator(object):
         self.pre_hooks = sorted(self.pre_hooks, key=lambda x: x._stamp)
         self.post_hooks = sorted(self.post_hooks, key=lambda x: x._stamp)
 
-    def _run_hooks(self, hooks):
+    def _run_hooks(self, hooks, args, kwargs, ret=None):
         """
         Run the given list of hooks.
 
@@ -129,7 +192,7 @@ class _HookDecorator(object):
             return
 
         for hook in hooks:
-            hook(inst)
+            hook(inst, args, kwargs, ret)
 
     def __call__(self, *args, **kwargs):
         """
@@ -147,9 +210,9 @@ class _HookDecorator(object):
         object
             The return value of the function.
         """
-        self._run_hooks(self.pre_hooks)
+        self._run_hooks(self.pre_hooks, args, kwargs)
         ret = self.func(*args, **kwargs)
-        self._run_hooks(self.post_hooks)
+        self._run_hooks(self.post_hooks, args, kwargs, ret)
         return ret
 
 
@@ -210,7 +273,7 @@ def _setup_hooks(obj):
 
 
 def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=None, exit=False,
-                   **kwargs):
+                   pass_args=False, pass_return=False, **kwargs):
     """
     Register a hook function.
 
@@ -236,6 +299,10 @@ def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=
     exit : bool
         If True, run sys.exit() after calling the hook function.  If post is registered, this
         affects only post, else it will affect pre.
+    pass_args : bool
+        If True, pass the arguments to the hook function.
+    pass_return : bool
+        If True, pass the return value to the hook function.  Only valid for post hooks.
     **kwargs : dict of keyword arguments
         Keyword arguments that will be passed to the hook function.
     """
@@ -260,12 +327,14 @@ def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=
         pre_hook = None
     else:
         pre_exit = exit if post is None else False
-        pre_hook = _HookMeta(class_name, inst_id, pre, ncalls, pre_exit, **kwargs)
+        klass = _hook_meta_factory(True, pass_args, pass_return)
+        pre_hook = klass(class_name, inst_id, pre, ncalls, pre_exit, **kwargs)
 
     if post is None:
         post_hook = None
     else:
-        post_hook = _HookMeta(class_name, inst_id, post, ncalls, exit, **kwargs)
+        klass = _hook_meta_factory(False, pass_args, pass_return)
+        post_hook = klass(class_name, inst_id, post, ncalls, exit, **kwargs)
 
     imeta[fname].append((pre_hook, post_hook))
 
