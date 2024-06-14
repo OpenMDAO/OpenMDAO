@@ -14,7 +14,7 @@ def make_hook(name):
 
 
 def make_hook_pass_args(name):
-    def hook_func(obj, *args, **kwargs):
+    def hook_func(obj, args, kwargs, **kw):
         obj.calls.append((name, args, kwargs))
     return hook_func
 
@@ -26,8 +26,8 @@ def make_hook_pass_return(name):
 
 
 def make_hook_pass_args_pass_return(name):
-    def hook_func(obj, ret, *args, **kwargs):
-        obj.calls.append((name, ret, args, kwargs))
+    def hook_func(obj, args, kwargs, ret, **kw):
+        obj.calls.append((name, args, kwargs, ret))
     return hook_func
 
 
@@ -294,7 +294,42 @@ class HooksTestCase(unittest.TestCase):
         self.assertEqual(prob.calls[1][0], 'post_totals')
         assert_near_equal(prob.calls[1][1], J)
 
+    @hooks_active
+    def test_problem_hooks_pass_args(self):
 
+        hooks._register_hook('compute_totals', 'Problem',
+                             pre=make_hook_pass_args('pre_totals'), post=make_hook_pass_args('post_totals'),
+                             pass_args=True)
+
+        prob = self.build_model()
+
+        prob.run_model()
+
+        of=['comp.f_xy']
+        wrt=['p1.x', 'p2.y']
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='array')
+        self.assertEqual(len(prob.calls), 2)
+        self.assertEqual(prob.calls[0],  ('pre_totals', (), {'of': ['comp.f_xy'], 'wrt': ['p1.x', 'p2.y'], 'return_format': 'array'}))
+        self.assertEqual(prob.calls[1],  ('post_totals', (), {'of': ['comp.f_xy'], 'wrt': ['p1.x', 'p2.y'], 'return_format': 'array'}))
+
+    @hooks_active
+    def test_problem_hooks_pass_args_ret(self):
+
+        hooks._register_hook('compute_totals', 'Problem',
+                             pre=make_hook_pass_args('pre_totals'), post=make_hook_pass_args_pass_return('post_totals'),
+                             pass_args=True, pass_return=True)
+
+        prob = self.build_model()
+
+        prob.run_model()
+
+        of=['comp.f_xy']
+        wrt=['p1.x', 'p2.y']
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='array')
+        self.assertEqual(len(prob.calls), 2)
+        self.assertEqual(prob.calls[0],  ('pre_totals', (), {'of': ['comp.f_xy'], 'wrt': ['p1.x', 'p2.y'], 'return_format': 'array'}))
+        self.assertEqual(prob.calls[1][:3],  ('post_totals', (), {'of': ['comp.f_xy'], 'wrt': ['p1.x', 'p2.y'], 'return_format': 'array'}))
+        assert_near_equal(prob.calls[1][3], J)
 
     @hooks_active
     def test_inherited_class_hooks(self):
