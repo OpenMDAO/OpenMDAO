@@ -945,7 +945,7 @@ class pyOptSparseDriver(Driver):
         use_approx = self._problem().model._owns_approx_of is not None
 
         # exclude linear cons
-        for con, conmeta in filter_by_meta(self._cons.items(), 'linear'):
+        for con, conmeta in filter_by_meta(self._cons.items(), 'linear', exclude=True):
             self._con_subjacs[con] = {}
             consrc = conmeta['source']
             for dv, dvmeta in self._designvars.items():

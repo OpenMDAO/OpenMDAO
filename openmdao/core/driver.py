@@ -226,6 +226,10 @@ class Driver(object):
         Contains all objective info.
     _responses : dict
         Contains all response info.
+    _lin_dvs : dict
+        Contains design variables relevant to linear constraints.
+    _nl_dvs : dict
+        Contains design variables relevant to nonlinear constraints.
     _remote_dvs : dict
         Dict of design variables that are remote on at least one proc. Values are
         (owning rank, size).
@@ -267,6 +271,8 @@ class Driver(object):
         self._cons = None
         self._objs = None
         self._responses = None
+        self._lin_dvs = None
+        self._nl_dvs = None
 
         # Driver options
         self.options = OptionsDictionary(parent_name=type(self).__name__)
@@ -1070,13 +1076,13 @@ class Driver(object):
         con_dict = {}
         it = self._cons.items()
         if lintype == 'linear':
-            it = pass_by_meta(it, 'linear')
-        elif lintype == 'nonlinear':
             it = filter_by_meta(it, 'linear')
+        elif lintype == 'nonlinear':
+            it = filter_by_meta(it, 'linear', exclude=True)
         if ctype == 'eq':
-            it = pass_by_meta(it, 'equals', chk_none=True)
-        elif ctype == 'ineq':
             it = filter_by_meta(it, 'equals', chk_none=True)
+        elif ctype == 'ineq':
+            it = filter_by_meta(it, 'equals', chk_none=True, exclude=True)
 
         for name, meta in it:
             con_dict[name] = self._get_voi_val(name, meta, self._remote_cons,
@@ -1782,9 +1788,9 @@ def record_iteration(requester, prob, case_name):
     rec_mgr.record_iteration(requester, data, requester._get_recorder_metadata(case_name))
 
 
-def pass_by_meta(metadict_items, key, chk_none=False):
+def filter_by_meta(metadict_items, key, chk_none=False, exclude=False):
     """
-    Yield only items with meta[key] of True or not None, depending on chk_none.
+    Filter metadata items based on their value.
 
     Parameters
     ----------
@@ -1793,49 +1799,27 @@ def pass_by_meta(metadict_items, key, chk_none=False):
     key : str
         Metadata key.
     chk_none : bool
-        If True, yield items where meta[key] is not None. If False, yield items where meta[key] is
-        True.
+        If True, compare items to None. If False, check if items are truthy.
+    exclude : bool
+        If True, exclude matching items rather than yielding them.
 
     Yields
     ------
     tuple
-        Tuple of the form (name, meta) for each item in metadict_items where meta[key] is True
-        or not None, depending on chk_none.
+        Tuple of the form (name, meta) for each item in metadict_items that satisfies the condition.
     """
     if chk_none:
         for tup in metadict_items:
-            if tup[1][key] is not None:
+            none = tup[1][key] is None
+            if exclude:
+                if none:
+                    yield tup
+            elif not none:
                 yield tup
     else:
         for tup in metadict_items:
-            if tup[1][key]:
-                yield tup
-
-
-def filter_by_meta(metadict_items, key, chk_none=False):
-    """
-    Yield only items where meta[key] is not True.
-
-    Parameters
-    ----------
-    metadict_items : iter of (name, meta)
-        Iterable of (name, meta) tuples.
-    key : str
-        Metadata key.
-    chk_none : bool
-        If True, yield items where meta[key] is not None. If False, yield items where meta[key] is
-        not True.
-
-    Yields
-    ------
-    tuple
-        Tuple of the form (name, meta) for each item in metadict_items where meta[key] is False.
-    """
-    if chk_none:
-        for tup in metadict_items:
-            if tup[1][key] is None:
-                yield tup
-    else:
-        for tup in metadict_items:
-            if not tup[1][key]:
+            if exclude:
+                if not tup[1][key]:
+                    yield tup
+            elif tup[1][key]:
                 yield tup
