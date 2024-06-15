@@ -134,6 +134,8 @@ class Relevance(object):
         self._active = None  # allow relevance to be turned on later
         self._rel_array_cache = rel_array_cache
         self._graph = model._dataflow_graph
+        # from openmdao.visualization.graph_viewer import _to_pydot_graph, write_graph
+        # write_graph(self._graph, prog='dot')
         self._rel_array_cache = {}
         self._no_dv_responses = []
         self._redundant_adjoint_systems = None
