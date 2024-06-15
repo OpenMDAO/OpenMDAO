@@ -441,7 +441,7 @@ class Component(System):
         keyset = self._subjacs_info
         mset = set()
         for of in self._var_allprocs_abs2meta['output']:
-            for wrt in self._var_allprocs_abs2prom['input']:
+            for wrt in self._var_allprocs_abs2meta['input']:
                 if (of, wrt) not in keyset:
                     mset.add((of, wrt))
 
