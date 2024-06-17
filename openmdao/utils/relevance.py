@@ -425,7 +425,7 @@ class Relevance(object):
         str
             Name of the relevant variable.
         """
-        return self._rel_names_iter(rel_array, self._var2idx, relevant)
+        yield from self._rel_names_iter(rel_array, self._var2idx, relevant)
 
     def _rel_names_iter(self, rel_array, all_names, relevant=True):
         """

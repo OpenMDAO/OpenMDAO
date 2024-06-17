@@ -132,12 +132,14 @@ def _check_cycles_prob(prob, logger):
         The object that manages logging output.
 
     """
-    infos = ["The following groups contain cycles:\n"]
+    infos = ["The following groups contain cycles:"]
     for group in prob.model.system_iter(include_self=True, recurse=True, typ=Group):
         _check_cycles(group, infos)
 
     if len(infos) > 1:
-        logger.info(''.join(infos[:1] + sorted(infos[1:])))
+        logger.info(infos[0])
+        for i in range(1, len(infos)):
+            logger.info(infos[i])
 
 
 def _check_ubcs_prob(prob, logger):

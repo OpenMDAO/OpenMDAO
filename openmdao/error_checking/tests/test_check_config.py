@@ -59,7 +59,10 @@ class TestCheckConfig(unittest.TestCase):
             "   System 'C3' executes out-of-order with respect to its source systems ['C4']\n"
         )
 
-        testlogger.find_in('info', expected_info)
+        msg = '\n'.join(testlogger._msgs['info'])
+        testlogger.find_in('info', "The following groups contain cycles:")
+        testlogger.find_in('info', "   Group '' has the following cycles:")
+        testlogger.find_in('info', "      ['C1', 'C2', 'C4']")
         testlogger.find_in('warning', expected_warning)
 
     def test_parallel_group_order(self):
@@ -218,8 +221,9 @@ class TestCheckConfig(unittest.TestCase):
         p.final_setup()
 
         expected_info = (
-            "The following groups contain cycles:\n"
-            "   Group '' has the following cycles: [['G1', 'C4']]\n"
+            "The following groups contain cycles:", 
+            "   Group '' has the following cycles:", 
+            "      ['G1', 'C4']"
         )
 
         expected_warning = (
@@ -228,7 +232,8 @@ class TestCheckConfig(unittest.TestCase):
             "   System 'C3' executes out-of-order with respect to its source systems ['C4']\n"
         )
 
-        testlogger.find_in('info', expected_info)
+        for msg in expected_info:
+            testlogger.find_in('info', msg)
         testlogger.find_in('warning', expected_warning)
 
         # test comps_only cycle check
@@ -366,9 +371,11 @@ class TestCheckConfig(unittest.TestCase):
         p.final_setup()
 
         expected_info = (
-            "The following groups contain cycles:\n"
-            "   Group 'G1' has the following cycles: "
-            "[['C13', 'C12', 'C11'], ['C23', 'C22', 'C21'], ['C3', 'C2', 'C1']]\n"
+            "The following groups contain cycles:", 
+            "   Group 'G1' has the following cycles:", 
+            "      ['C13', 'C12', 'C11']",
+            "      ['C23', 'C22', 'C21']",
+            "      ['C3', 'C2', 'C1']"
         )
 
         expected_warning_1 = (
@@ -377,7 +384,8 @@ class TestCheckConfig(unittest.TestCase):
             "   In System 'G1', subsystem 'C3' executes out-of-order with respect to its source systems ['C11']\n"
         )
 
-        testlogger.find_in('info', expected_info)
+        for msg in expected_info:
+            testlogger.find_in('info', msg)
         testlogger.find_in('warning', expected_warning_1)
 
     def test_unconnected_auto_ivc(self):
