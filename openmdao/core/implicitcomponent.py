@@ -2,6 +2,7 @@
 
 from scipy.sparse import coo_matrix
 import numpy as np
+from types import MethodType
 
 from openmdao.core.component import Component, _allowed_types
 from openmdao.core.constants import _UNDEFINED, _SetupStatus
@@ -13,6 +14,10 @@ from openmdao.utils.general_utils import format_as_float_or_array, _subjac_meta2
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.utils.om_warnings import issue_warning
+from openmdao.utils.jax_utils import jax, jit, JaxCompPyTreeWrapper
+
+
+_tuplist = (tuple, list)
 
 
 def _get_slice_shape_dict(name_shape_iter):
@@ -728,8 +733,23 @@ class ImplicitComponent(Component):
         discrete_outputs : dict or None
             If not None, dict containing discrete output values.
         """
-        raise NotImplementedError('ImplicitComponent.apply_nonlinear() must be overridden '
-                                  'by the child class.')
+        global _tuplist
+
+        if self.compute_primal is None:
+            return
+
+        returns = \
+            self.compute_primal(*self._get_compute_primal_inputs(inputs, outputs, discrete_inputs))
+
+        if not isinstance(returns, _tuplist):
+            returns = (returns,)
+
+        if discrete_outputs:
+            ndiscrete_outs = len(self._discrete_outputs)
+            self._discrete_outputs.set_vals(returns[:ndiscrete_outs])
+            residuals.set_vals(returns[ndiscrete_outs:])
+        else:
+            residuals.set_vals(returns)
 
     def solve_nonlinear(self, inputs, outputs):
         """
@@ -866,6 +886,75 @@ class ImplicitComponent(Component):
             List of all states.
         """
         return self._list_states()
+
+    def _get_compute_primal_inputs(self, inputs, outputs, discrete_inputs):
+        yield JaxCompPyTreeWrapper(self)
+        if discrete_inputs:
+            yield from discrete_inputs.values()
+        yield from inputs.values()
+        yield from outputs.values()
+
+    def _setup_jax(self):
+        # we define linearize here instead of making this the base class version as we
+        # did with apply_nonlinear, because the existence of a linearize method that is not the
+        # base class method is used to determine if a given component computes its own partials.
+        def linearize(self, inputs, outputs, partials, discrete_inputs, discrete_outputs):
+            deriv_vals = self._get_jac_func()(*self._get_compute_primal_inputs(inputs, outputs,
+                                                                               discrete_inputs))
+            nested_tup = isinstance(deriv_vals, tuple) and len(deriv_vals) > 0 and \
+                isinstance(deriv_vals[0], tuple)
+
+            nof = len(self._var_rel_names['output'])
+            ofidx = len(self._discrete_outputs) - 1
+            for ofname in self._var_rel_names['output']:
+                ofidx += 1
+                ofmeta = self._var_rel2meta[ofname]
+                for wrtidx, wrtname in enumerate(self._var_rel_names['input']):
+                    key = (ofname, wrtname)
+                    if key not in partials:
+                        # FIXME: this means that we computed a derivative that we didn't need
+                        continue
+
+                    wrtmeta = self._var_rel2meta[wrtname]
+                    dvals = deriv_vals
+                    # if there's only one 'of' value, we only take the indexed value if the
+                    # return value of compute_primal is single entry tuple. If a single array or
+                    # scalar is returned, we don't apply the 'of' index.
+                    if nof > 1 or nested_tup:
+                        dvals = dvals[ofidx]
+
+                    dvals = dvals[wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
+
+                    sjmeta = partials.get_metadata(key)
+                    rows = sjmeta['rows']
+                    if rows is None:
+                        partials[ofname, wrtname] = dvals
+                    else:
+                        partials[ofname, wrtname] = dvals[rows, sjmeta['cols']]
+
+        if self.compute_primal is None:
+            raise RuntimeError("Automatic conversion of the apply_nonlinear method to a JAX "
+                               "compatible compute_primal method is not currently supported for "
+                               "ImplicitComponent. You must provide a compute_primal method.")
+        elif 'use_jit' in self.options and self.options['use_jit']:
+            static_argnums = tuple(range(len(self._var_discrete['input'])))
+            self.compute_primal = self.compute_primal.__func__
+            self.compute_primal = jit(self.compute_primal, static_argnums=static_argnums)
+
+        self.linearize = MethodType(linearize, self)
+
+    def _get_jac_func(self):
+        # TODO: modify this to use relevance and possibly compile multiple jac functions depending
+        # on DV/response so that we don't compute any derivatives that are always zero.
+        if self._jac_func_ is None:
+            fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
+            nstatic = len(self._discrete_inputs) + 1
+            wrt_idxs = list(range(nstatic, len(self._var_abs2meta['input']) +
+                                  len(self._var_abs2meta['output']) + nstatic))
+            static_argnums = tuple(range(nstatic))
+            self._jac_func_ = jit(fjax(self.compute_primal, argnums=wrt_idxs),
+                                  static_argnums=static_argnums)
+        return self._jac_func_
 
 
 def meta2range_iter(meta_dict, names=None, shp_name='shape'):

@@ -1881,6 +1881,21 @@ class Component(System):
         meta['base'] = 'ExplicitComponent' if self.is_explicit() else 'ImplicitComponent'
         return meta
 
+    def get_self_statics(self):
+        """
+        Override this in derived classes if compute_primal references static values.
+
+        Do NOT include self._discrete_inputs in the returned tuple.
+        Return value MUST be a tuple.
+        Return value MUST be hashable.
+
+        Returns
+        -------
+        tuple
+            Tuple containing all static values required by compute_primal.
+        """
+        return ()
+
 
 class _DictValues(object):
     """

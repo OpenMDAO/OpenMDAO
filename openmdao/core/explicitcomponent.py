@@ -504,27 +504,6 @@ class ExplicitComponent(Component):
                 # We used to negate the jacobian here, and then re-negate after the hook.
                 self._compute_partials_wrapper()
 
-    def get_self_statics(self):
-        """
-        Override this in derived classes if compute_primal references static values.
-
-        Do NOT include self._discrete_inputs in the returned tuple.
-        Return value MUST be a tuple.
-        Return value MUST be hashable.
-
-        Returns
-        -------
-        tuple
-            Tuple containing all static values required by compute_primal.
-        """
-        return ()
-
-    def _get_compute_primal_inputs(self, inputs, discrete_inputs):
-        yield JaxCompPyTreeWrapper(self)
-        if discrete_inputs:
-            yield from discrete_inputs.values()
-        yield from inputs.values()
-
     def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
         """
         Compute outputs given inputs. The model is assumed to be in an unscaled state.
@@ -610,6 +589,12 @@ class ExplicitComponent(Component):
         """
         return True
 
+    def _get_compute_primal_inputs(self, inputs, discrete_inputs):
+        yield JaxCompPyTreeWrapper(self)
+        if discrete_inputs:
+            yield from discrete_inputs.values()
+        yield from inputs.values()
+
     def _setup_jax(self):
         # we define compute_partials here instead of making this the base class version as we
         # did with compute, because the existence of a compute_partials method that is not the
@@ -663,28 +648,11 @@ class ExplicitComponent(Component):
         self.compute_partials = MethodType(compute_partials, self)
         self._has_compute_partials = True
 
-    def _has_self_static_arg(self):
-        """
-        Return True if this component has self static args that are specific to this instance.
-
-        Note this doesn't include discrete inputs.
-
-        Returns
-        -------
-        bool
-            True if this component has self static args that are specific to this instance.
-        """
-        return len(self.get_self_statics()) > 0
-
     def _get_jac_func(self):
         # TODO: modify this to use relevance and possibly compile multiple jac functions depending
         # on DV/response so that we don't compute any derivatives that are always zero.
         if self._jac_func_ is None:
             fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
-            # if len(self.get_self_statics()) > 0:
-            #     nselfstatic = 1
-            # else:
-            #     nselfstatic = 0
             nselfstatic = 1
             nstatic = nselfstatic + len(self._discrete_inputs)
             wrt_idxs = list(range(nstatic, len(self._var_abs2meta['input']) + nstatic))
