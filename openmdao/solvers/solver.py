@@ -1135,8 +1135,7 @@ class BlockLinearSolver(LinearSolver):
             depth of the current system (already incremented).
         """
         super()._setup_solvers(system, depth)
-        if system._use_derivatives:
-            self._create_rhs_vec()
+        self._rhs_vec = None
 
     def _create_rhs_vec(self):
         system = self._system()
@@ -1146,6 +1145,9 @@ class BlockLinearSolver(LinearSolver):
             self._rhs_vec = system._doutputs.asarray(True)
 
     def _update_rhs_vec(self):
+        if self._rhs_vec is None:
+            self._create_rhs_vec()
+
         if self._mode == 'fwd':
             self._rhs_vec[:] = self._system()._dresiduals.asarray()
         else:
@@ -1163,6 +1165,8 @@ class BlockLinearSolver(LinearSolver):
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
+        if self._rhs_vec is None:
+            self._create_rhs_vec()
         if active:
             self._rhs_vec = self._rhs_vec.astype(complex)
         else:

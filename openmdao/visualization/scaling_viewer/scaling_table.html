@@ -638,7 +638,7 @@ function startup() {
                 .append("svg")
                 .classed("heatmap", true);
 
-            heatmap(data.linear.oflabels, data.wrtlabels, data.linear.var_mat_list, "#linear-jac", true);
+            heatmap(data.linear.oflabels, data.linear.wrtlabels, data.linear.var_mat_list, "#linear-jac", true);
         }
         else {
             d3.select("#varjac-button").html("responses wrt DVs");

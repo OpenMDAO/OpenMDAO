@@ -2044,9 +2044,10 @@ class TestProblem(unittest.TestCase):
         model = prob.model
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
-        msg = "Problem .*: 'x' Cannot call set_val before setup."
-        with self.assertRaisesRegex(RuntimeError, msg):
+        msg = "<class Group>: Called set_val(x, ...) before setup completes."
+        with self.assertRaises(RuntimeError) as cm:
             prob.set_val('x', 0.)
+        self.assertEqual(str(cm.exception), msg)
 
     def test_design_var_connected_to_output_as_input_err(self):
         prob = om.Problem(name='output_as_input_err')
@@ -2063,8 +2064,8 @@ class TestProblem(unittest.TestCase):
                                        promotes_inputs=['x'])
 
         c1.add_design_var('x', lower=0, upper=5)
-        prob.setup()
 
+        prob.setup()
         with self.assertRaises(Exception) as cm:
             prob.final_setup()
 
