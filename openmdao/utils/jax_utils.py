@@ -203,44 +203,44 @@ def get_partials_deps(func, outputs, *args, **kwargs):
                 yield (out, inp)
 
 
-class ExplicitCompJaxify(ast.NodeTransformer):
+class CompJaxifyBase(ast.NodeTransformer):
     """
-    An ast.NodeTransformer that transforms a compute function definition to jax compatible form.
+    An ast.NodeTransformer that transforms a function definition to jax compatible form.
 
-    So compute(self, inputs, outputs) becomes compute_primal(self, arg1, arg2, ...) where args are
-    the input values in the order they are stored in inputs.  The new function will return a tuple
-    of the output values in the order they are stored in outputs.
+    So original func becomes compute_primal(self, arg1, arg2, ...).
 
     If the component has discrete inputs, they will be passed individually into compute_primal
     *before* the continuous inputs.  If the component has discrete outputs, they will be assigned
     to local variables of the same name within the function and set back into the discrete
-    outputs dict just prior to the return from the function.  If the component has any other
-    attributes that are accessed in the compute function, they will be combined into a single
-    tuple and passed as the first argument to the function after 'self'.
+    outputs dict just prior to the return from the function.
 
     Parameters
     ----------
-    comp : ExplicitComponent
-        The Component whose compute function is to be transformed. This NodeTransformer may only
+    comp : Component
+        The Component whose function is to be transformed. This NodeTransformer may only
         be used after the Component has had its _setup_var_data method called, because that
         determines the ordering of the inputs and outputs.
+    funcname : str
+        The name of the function to be transformed.
     verbose : bool
         If True, the transformed function will be printed to stdout.
 
     Attributes
     ----------
     _comp : weakref.ref
-        A weak reference to the Component whose compute function is being transformed.
+        A weak reference to the Component whose function is being transformed.
+    _funcname : str
+        The name of the function being transformed.
     _compute_primal_args : list
         The argument names of the compute_primal function.
     _compute_primal_returns : list
         The names of the outputs from the new function.
     compute_primal : function
-        The compute_primal function created from the original compute function.
-    _compute_args : list
-        The original argument names of the compute function.
+        The compute_primal function created from the original function.
+    _orig_args : list
+        The original argument names of the original function.
     _new_ast : ast node
-        The new ast node created from the original compute function.
+        The new ast node created from the original function.
     get_self_statics : function
         A function that returns the static args for the Component as a single tuple.
     """
@@ -250,12 +250,13 @@ class ExplicitCompJaxify(ast.NodeTransformer):
     _static_ops = {'reshape'}
     _np_names = {'np', 'numpy'}
 
-    def __init__(self, comp, verbose=False):  # noqa
+    def __init__(self, comp, funcname, verbose=False):  # noqa
         self._comp = weakref.ref(comp)
-        func = comp.compute
-        if 'jnp' not in comp.compute.__globals__:
-            comp.compute.__globals__['jnp'] = jnp
-        namespace = comp.compute.__globals__.copy()
+        self._funcname = funcname
+        func = getattr(comp, funcname)
+        if 'jnp' not in func.__globals__:
+            func.__globals__['jnp'] = jnp
+        namespace = func.__globals__.copy()
 
         static_attrs, static_dcts = get_self_static_attrs(func)
         self_statics = ['_self_statics_'] if static_attrs or static_dcts else []
@@ -264,14 +265,12 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         else:
             self.get_self_statics = None
 
-        self._compute_args = list(inspect.signature(func).parameters)
+        self._orig_args = list(inspect.signature(func).parameters)
 
         # ensure that ordering of args and returns exactly matches the order of the inputs and
         # outputs vectors.
-        self._compute_primal_args = \
-            [n for n in chain(comp._discrete_inputs, comp._var_rel_names['input'])]
-        self._compute_primal_returns = \
-            [n for n in chain(comp._discrete_outputs, comp._var_rel_names['output'])]
+        self._compute_primal_args = self._get_compute_primal_args()
+        self._compute_primal_returns = self._get_compute_primal_returns()
 
         node = self.visit(ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec'))
         self._new_ast = ast.fix_missing_locations(node)
@@ -315,17 +314,7 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         str
             The source code of the class containing the transformed function.
         """
-        return replace_method(self._comp().__class__, 'compute', self.get_compute_primal_src())
-
-    def _get_arg_values(self):
-        discrete_inputs = self._comp()._discrete_inputs
-        yield from discrete_inputs.values()
-        if self._comp()._inputs is None:
-            for name, meta in self._comp()._var_rel2meta['input'].items():
-                if name not in discrete_inputs:
-                    yield meta['value']
-        else:
-            yield from self._comp()._inputs.values()
+        return replace_method(self._comp().__class__, self._funcname, self.get_compute_primal_src())
 
     def compute_dependency_iter(self):
         """
@@ -354,13 +343,6 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         namespace = self._comp().compute.__globals__.copy()
         exec(fsrc, namespace)  # nosec
         return namespace['get_self_statics']
-
-    def _get_new_args(self):
-        new_args = [ast.arg('self', annotation=None)]
-        for arg_name in self._compute_primal_args:
-            new_args.append(ast.arg(arg=arg_name, annotation=None))
-        return ast.arguments(args=new_args, posonlyargs=[], vararg=None, kwonlyargs=[],
-                             kw_defaults=[], kwarg=None, defaults=[])
 
     def _get_pre_body(self):
         if not self._comp()._discrete_outputs:
@@ -394,6 +376,13 @@ class ExplicitCompJaxify(ast.NodeTransformer):
         val = ast.Tuple([ast.Name(id=n, ctx=ast.Load()) for n in self._compute_primal_returns],
                         ctx=ast.Load())
         return ast.Return(val)
+
+    def _get_new_args(self):
+        new_args = [ast.arg('self', annotation=None)]
+        for arg_name in self._compute_primal_args:
+            new_args.append(ast.arg(arg=arg_name, annotation=None))
+        return ast.arguments(args=new_args, posonlyargs=[], vararg=None, kwonlyargs=[],
+                             kw_defaults=[], kwarg=None, defaults=[])
 
     def visit_FunctionDef(self, node):
         """
@@ -445,7 +434,7 @@ class ExplicitCompJaxify(ast.NodeTransformer):
 
         # NOTE: this will only work if the subscript is a string constant. If the subscript is a
         # variable or some other expression, then we don't modify it.
-        if (isinstance(node.value, ast.Name) and node.value.id in self._compute_args and
+        if (isinstance(node.value, ast.Name) and node.value.id in self._orig_args and
                 isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str)):
             return ast.copy_location(ast.Name(id=_fixname(node.slice.value), ctx=node.ctx), node)
 
@@ -471,6 +460,53 @@ class ExplicitCompJaxify(ast.NodeTransformer):
                                                        attr=node.attr, ctx=node.ctx), node)
 
         return self.generic_visit(node)
+
+
+class ExplicitCompJaxify(CompJaxifyBase):
+    """
+    An ast.NodeTransformer that transforms a compute function definition to jax compatible form.
+
+    So compute(self, inputs, outputs) becomes compute_primal(self, arg1, arg2, ...) where args are
+    the input values in the order they are stored in inputs.  The new function will return a tuple
+    of the output values in the order they are stored in outputs.
+
+    If the component has discrete inputs, they will be passed individually into compute_primal
+    *before* the continuous inputs.  If the component has discrete outputs, they will be assigned
+    to local variables of the same name within the function and set back into the discrete
+    outputs dict just prior to the return from the function.  If the component has any other
+    attributes that are accessed in the compute function, they will be combined into a single
+    tuple and passed as the first argument to the function after 'self'.
+
+    Parameters
+    ----------
+    comp : ExplicitComponent
+        The Component whose compute function is to be transformed. This NodeTransformer may only
+        be used after the Component has had its _setup_var_data method called, because that
+        determines the ordering of the inputs and outputs.
+    verbose : bool
+        If True, the transformed function will be printed to stdout.
+    """
+
+    def __init__(self, comp, verbose=False):  # noqa
+        super().__init__(comp, 'compute', verbose)
+
+    def _get_arg_values(self):
+        discrete_inputs = self._comp()._discrete_inputs
+        yield from discrete_inputs.values()
+        if self._comp()._inputs is None:
+            for name, meta in self._comp()._var_rel2meta['input'].items():
+                if name not in discrete_inputs:
+                    yield meta['value']
+        else:
+            yield from self._comp()._inputs.values()
+
+    def _get_compute_primal_args(self):
+        # ensure that ordering of args and returns exactly matches the order of the inputs and
+        # outputs vectors.
+        return [n for n in chain(self._comp()._discrete_inputs, self._comp()._var_rel_names['input'])]
+
+    def _get_compute_primal_returns(self):
+        return [n for n in chain(self._comp()._discrete_outputs, self._comp()._var_rel_names['output'])]
 
 
 class SelfAttrFinder(ast.NodeVisitor):
@@ -809,7 +845,7 @@ def jax_deriv_shape(derivs):
 
 
 if __name__ == '__main__':
-    import openmdao.api as om
+    # import openmdao.api as om
 
     # def func(x, y):  # noqa: D103
     #     z = jnp.sin(x) * y
