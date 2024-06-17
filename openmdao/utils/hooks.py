@@ -140,7 +140,6 @@ class _PostHookMetaPassArgsPassReturn(_HookMeta):
         return self.hook(inst, args, kwargs, ret, **self.kwargs)
 
 
-
 class _HookDecorator(object):
     def __init__(self, inst, func, hooks):
         self.__name__ = func.__name__
