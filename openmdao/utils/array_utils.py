@@ -820,7 +820,6 @@ def convert_ndarray_to_support_nans_in_json(val):
 
 if numba is None:
     allclose = np.allclose
-    any = np.any
 
     def allzero(a):
         """
