@@ -153,12 +153,14 @@ class _TotalJacInfo(object):
         ofsize = sum(meta['global_size'] for meta in of_metadata.values())
         wrtsize = sum(meta['global_size'] for meta in wrt_metadata.values())
 
+        all_lin_cons = True
+        has_lin_cons = False
         for meta in of_metadata.values():
             if 'linear' in meta and meta['linear']:
                 has_lin_cons = True
-                break
-        else:
-            has_lin_cons = False
+                continue
+
+            all_lin_cons = False
 
         if self._orig_mode == 'auto':
             if has_lin_cons:
@@ -188,7 +190,8 @@ class _TotalJacInfo(object):
 
         self.relevance = get_relevance(model, of_metadata, wrt_metadata)
 
-        self._check_discrete_dependence()
+        if not all_lin_cons:
+            self._check_discrete_dependence()
 
         if approx:
             coloring_mod._initialize_model_approx(model, driver, of_metadata, wrt_metadata)
