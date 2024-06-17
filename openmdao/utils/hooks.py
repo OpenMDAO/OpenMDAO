@@ -126,17 +126,17 @@ class _PreHookMetaPassArgs(_HookMeta):
 
 
 class _PostHookMetaPassRet(_HookMeta):
-    def __call__(self, inst, args, kwargs, ret):
+    def _call_hook(self, inst, args, kwargs, ret):
         return self.hook(inst, ret, **self.kwargs)
 
 
 class _PostHookMetaPassArgs(_HookMeta):
-    def __call__(self, inst, args, kwargs, ret):
+    def _call_hook(self, inst, args, kwargs, ret):
         return self.hook(inst, args, kwargs, **self.kwargs)
 
 
 class _PostHookMetaPassArgsPassReturn(_HookMeta):
-    def __call__(self, inst, args, kwargs, ret):
+    def _call_hook(self, inst, args, kwargs, ret):
         return self.hook(inst, args, kwargs, ret, **self.kwargs)
 
 
