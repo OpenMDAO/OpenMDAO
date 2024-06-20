@@ -113,7 +113,6 @@ class Vector(object):
         # set of variables relevant to the current matvec product.
         self._names = self._views
 
-        self._root_vector = None
         self._data = None
         self._slices = None
         self._root_offset = 0

@@ -11,7 +11,7 @@ from openmdao.api import IndepVarComp, Group, Problem, \
                          ExplicitComponent, ImplicitComponent, ExecComp, \
                          NewtonSolver, ScipyKrylov, \
                          LinearBlockGS, DirectSolver
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
 from openmdao.utils.array_utils import rand_sparsity
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.api import ScipyOptimizeDriver
@@ -1168,15 +1168,13 @@ class OverlappingPartialsTestCase(unittest.TestCase):
         p.model.linear_solver = DirectSolver(assemble_jac=True)
 
         p.model.connect('indeps.x', ('C1.x', 'C1.y'))
-        p.setup()
+        p.setup(force_alloc_complex=True)
         p.run_model()
 
+        assert_check_partials(p.check_partials(method='cs', show_only_incorrect=True))
+        assert_check_totals(p.check_totals(of=['C1.z'], wrt=['indeps.x'], method='cs', show_only_incorrect=True))
         J = p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
-        np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix.toarray(),
-                                       np.array([[-1.,  0.,  9.,  8.],
-                                                 [ 0., -1.,  5., 10.],
-                                                 [ 0.,  0., -1.,  0.],
-                                                 [ 0.,  0.,  0., -1.]]))
+
 
 
 class MaskingTestCase(unittest.TestCase):

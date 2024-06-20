@@ -150,8 +150,7 @@ class Group(System):
     _proc_info : dict of subsys_name: (min_procs, max_procs, weight, proc_group)
         Information used to determine MPI process allocation to subsystems.
     _subgroups_myproc : list
-        List of local subgroups, (sorted by name if Problem option allow_post_setup_reorder is
-        True).
+        List of local subgroups.
     _manual_connections : dict
         Dictionary of input_name: (output_name, src_indices) connections.
     _group_inputs : dict
@@ -511,7 +510,7 @@ class Group(System):
         self.matrix_free = False
         self._has_guess = overrides_method('guess_nonlinear', self, Group)
 
-        for subsys in self._sorted_sys_iter():
+        for subsys in self._subsystems_myproc:
             subsys._configure()
             subsys._setup_var_data()
 
@@ -639,8 +638,6 @@ class Group(System):
 
         # build a list of local subgroups to speed up later loops
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
-        if prob_meta['allow_post_setup_reorder']:
-            self._subgroups_myproc.sort(key=lambda x: x.name)
 
         if nproc > 1 and self._mpi_proc_allocator.parallel:
             self._problem_meta['parallel_groups'].append(self.pathname)
@@ -679,7 +676,7 @@ class Group(System):
             List of all states.
         """
         states = []
-        for subsys in self._sorted_sys_iter():
+        for subsys in self._subsystems_myproc:
             states.extend(subsys._list_states())
 
         return sorted(states)
@@ -1151,13 +1148,11 @@ class Group(System):
 
         # If any proc's local systems need a complex vector, then all procs need it.
         if self.comm.size > 1:
-            all_nl_alloc_complex = self.comm.allgather(nl_alloc_complex)
-            if np.any(all_nl_alloc_complex):
-                nl_alloc_complex = True
-
-            all_ln_alloc_complex = self.comm.allgather(ln_alloc_complex)
-            if np.any(all_ln_alloc_complex):
-                ln_alloc_complex = True
+            for nl, lin in self.comm.allgather((nl_alloc_complex, ln_alloc_complex)):
+                if nl:
+                    nl_alloc_complex = True
+                if lin:
+                    ln_alloc_complex = True
 
         for vec_name in vectypes:
             if vec_name == 'nonlinear':
@@ -1241,6 +1236,24 @@ class Group(System):
         self._problem_meta['prom2abs'] = self._get_all_promotes()
         self._check_prom_masking()
         self._check_order()
+
+        if self._problem_meta['reordered']:
+            ordered = {path: ([], []) for path in self._get_ordered_components()}
+            for ioidx, iotype in enumerate(('input', 'output')):
+                for vpath in self._var_allprocs_abs2meta[iotype]:
+                    cpath = vpath.rsplit('.', 1)[0]
+                    ordered[cpath][ioidx].append(vpath)
+
+            order = {'input': {}, 'output': {}}
+            idxs = [0, 0]
+            for tup in ordered.values():
+                for ioidx, iotype in enumerate(('input', 'output')):
+                    for vpath in tup[ioidx]:
+                        order[iotype][vpath] = idxs[ioidx]
+                        idxs[ioidx] += 1
+
+            self._order_data_structures(order)
+            self._problem_meta['reordered'] = False
 
     def _check_prom_masking(self):
         """
@@ -1341,14 +1354,7 @@ class Group(System):
                 for s in strongcomp:
                     new_order.append(s)
 
-        if self._problem_meta['allow_post_setup_reorder']:
-            self.set_order(new_order)
-        else:
-            issue_warning(f"{self.msginfo}: A new execution order {new_order} is recommended, but "
-                          "auto ordering has been disabled because the Problem option "
-                          "'allow_post_setup_reorder' is False. It is recommended to either set "
-                          "`allow_post_setup_reorder` to True or to manually set the execution "
-                          "order to the recommended order using `set_order`.")
+        self.set_order(new_order)
 
     def _check_nondist_sizes(self):
         # verify that nondistributed variables have same size across all procs
@@ -1620,7 +1626,7 @@ class Group(System):
         # sort the subsystems alphabetically in order to make the ordering
         # of vars in vectors and other data structures independent of the
         # execution order.
-        for subsys in self._sorted_sys_iter():
+        for subsys in self._subsystems_myproc:
             self._has_output_scaling |= subsys._has_output_scaling
             self._has_output_adder |= subsys._has_output_adder
             self._has_resid_scaling |= subsys._has_resid_scaling
@@ -1960,7 +1966,7 @@ class Group(System):
             'output': np.zeros((self.comm.size, len(all_abs2meta['output'])), dtype=INT_DTYPE),
         }
 
-        for subsys in self._sorted_sys_iter():
+        for subsys in self._subsystems_myproc:
             subsys._setup_var_sizes()
 
         iproc = self.comm.rank
@@ -2246,6 +2252,54 @@ class Group(System):
 
         for inp in src_ind_inputs:
             allprocs_abs2meta_in[inp]['has_src_indices'] = True
+
+    def _order_data_structures(self, ordered):
+        """
+        Order some variable-related data structures by their parent system's execution order.
+
+        This ensures that layout of vectors across all systems is consistent.
+
+        Parameters
+        ----------
+        ordered : dict of the form {'inputs': dict, 'outputs': dict}
+            Dictionary mapping var absolute path to its ordered index. It has the form
+            {'inputs': ({'inpath1': 0, 'inpath2': 1, ...}, 'outputs': {'outpath1': 0, ...})}
+        """
+        old_abs2meta = self._var_abs2meta
+        old_allprocs_abs2meta = self._var_allprocs_abs2meta
+
+        self._var_abs2meta = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
+
+        for io in ('input', 'output'):
+            sortdct = ordered[io]
+            abs2meta = self._var_abs2meta[io]
+            allprocs_abs2meta = self._var_allprocs_abs2meta[io]
+            old = old_abs2meta[io]
+            old_allprocs = old_allprocs_abs2meta[io]
+            for vabs in sorted(old_allprocs, key=lambda x: sortdct[x]):
+                allprocs_abs2meta[vabs] = old_allprocs[vabs]
+                if vabs in old:
+                    abs2meta[vabs] = old[vabs]
+
+        for subsystem in self._subsystems_myproc:
+            if isinstance(subsystem, Group):
+                subsystem._order_data_structures(ordered)
+
+    def _get_ordered_components(self):
+        """
+        Yield components (leaf nodes) in this part of the system tree in order of execution.
+
+        Yields
+        ------
+        str
+            Pathname of the component.
+        """
+        for system in self._subsystems_myproc:
+            if isinstance(system, Group):
+                yield from system._get_ordered_components()
+            else:
+                yield system.pathname
 
     def _setup_dynamic_shapes(self):
         """
@@ -2751,7 +2805,7 @@ class Group(System):
         allprocs_discrete_in = self._var_allprocs_discrete['input']
         allprocs_discrete_out = self._var_allprocs_discrete['output']
 
-        for subsys in self._sorted_sys_iter():
+        for subsys in self._subsystems_myproc:
             subsys._setup_connections()
 
         path_dot = pathname + '.' if pathname else ''
@@ -3357,12 +3411,8 @@ class Group(System):
         new_order : list of str
             List of system names in desired new execution order.
         """
-        if self._problem_meta is not None and not self._problem_meta['allow_post_setup_reorder'] \
-                and self._problem_meta['setup_status'] == _SetupStatus.POST_CONFIGURE:
-            raise RuntimeError(f"{self.msginfo}: Cannot call set_order in the configure method.")
-
         # Make sure the new_order is valid. It must contain all subsystems
-        # in this model.
+        # in this Group.
         newset = set(new_order)
         if self._static_mode:
             olddict = self._static_subsystems_allprocs
@@ -3406,9 +3456,8 @@ class Group(System):
             self._subsystems_myproc = [s for s, _ in self._subsystems_allprocs.values()]
 
         self._order_set = True
-        if self._problem_meta is not None and not self._problem_meta['allow_post_setup_reorder']:
-            # order has been changed so we need a new full setup
-            self._problem_meta['setup_status'] = _SetupStatus.PRE_SETUP
+        if self._problem_meta is not None:
+            self._problem_meta['reordered'] = True
 
     def _get_subsystem(self, name):
         """
@@ -3799,7 +3848,7 @@ class Group(System):
         """
         self._subjacs_info = info = {}
 
-        for subsys in self._sorted_sys_iter():
+        for subsys in self._subsystems_myproc:
             subsys._setup_partials()
             info.update(subsys._subjacs_info)
 
@@ -4571,15 +4620,15 @@ class Group(System):
             allsubs[name] = s
             s.index = i + 1
 
-        self._subsystems_myproc = [auto_ivc] + self._subsystems_myproc
+        self._subsystems_myproc = [s for s, _ in allsubs.values()]
 
         io = 'output'  # auto_ivc has only output vars
-        old = self._var_allprocs_prom2abs_list[io]
-        p2abs = {}
+        # old = self._var_allprocs_prom2abs_list[io]
+        p2abs = self._var_allprocs_prom2abs_list[io]
         for name in auto_ivc._var_allprocs_abs2meta[io]:
             p2abs[name] = [name]
-        p2abs.update(old)
-        self._var_allprocs_prom2abs_list[io] = p2abs
+        # p2abs.update(old)
+        # self._var_allprocs_prom2abs_list[io] = p2abs
 
         # auto_ivc never promotes anything
         self._var_abs2prom[io].update({n: n for n in auto_ivc._var_abs2prom[io]})
@@ -4722,40 +4771,6 @@ class Group(System):
             else:
                 yield s.pathname
 
-    def _sorted_sys_iter(self):
-        """
-        Yield subsystems in sorted order if Problem option allow_post_setup_reorder is True.
-
-        Otherwise, yield subsystems in the order they were added to their parent group.
-
-        Yields
-        ------
-        System
-            A subsystem.
-        """
-        if self._problem_meta['allow_post_setup_reorder']:
-            for s in sorted(self._subsystems_myproc, key=lambda s: s.name):
-                yield s
-        else:
-            yield from self._subsystems_myproc
-
-    def _sorted_sys_iter_all_procs(self):
-        """
-        Yield subsystem names in sorted order if Problem option allow_post_setup_reorder is True.
-
-        Otherwise, yield subsystem names in the order they were added to their parent group.
-
-        Yields
-        ------
-        System
-            A subsystem.
-        """
-        if self._problem_meta['allow_post_setup_reorder']:
-            for s in sorted(self._subsystems_allprocs):
-                yield s
-        else:
-            yield from self._subsystems_allprocs
-
     def _all_subsystem_iter(self):
         """
         Iterate over all subsystems, local and nonlocal.
@@ -4897,7 +4912,7 @@ class Group(System):
                 # assembled in the same order under mpi as for serial runs.
                 out_by_sys = {}
 
-                for subsys in self._sorted_sys_iter():
+                for subsys in self._subsystems_myproc:
                     sub_out = {}
                     name = subsys.name
                     dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
@@ -4926,14 +4941,14 @@ class Group(System):
                     for name, meta in outs.items():
                         all_outs_by_sys[name] = meta
 
-                for subsys_name in self._sorted_sys_iter_all_procs():
+                for subsys_name in self._subsystems_allprocs:
                     for name, meta in all_outs_by_sys[subsys_name].items():
                         if name not in out:
                             out[name] = meta
 
             else:
 
-                for subsys in self._sorted_sys_iter():
+                for subsys in self._subsystems_myproc:
                     dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
                                                  use_prom_ivc=use_prom_ivc)
                     if use_prom_ivc:
@@ -5002,7 +5017,7 @@ class Group(System):
                 # assembled in the same order under mpi as for serial runs.
                 out_by_sys = {}
 
-                for subsys in self._sorted_sys_iter():
+                for subsys in self._subsystems_myproc:
                     name = subsys.name
                     sub_out = {}
 
@@ -5040,12 +5055,12 @@ class Group(System):
                     for name, meta in outs.items():
                         all_outs_by_sys[name] = meta
 
-                for subsys_name in self._sorted_sys_iter_all_procs():
+                for subsys_name in self._subsystems_allprocs:
                     for name, meta in all_outs_by_sys[subsys_name].items():
                         out[name] = meta
 
             else:
-                for subsys in self._sorted_sys_iter():
+                for subsys in self._subsystems_myproc:
                     resps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
                                                  use_prom_ivc=use_prom_ivc)
                     if use_prom_ivc:

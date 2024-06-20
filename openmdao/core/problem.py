@@ -995,7 +995,6 @@ class Problem(object):
             'saved_errors': [],  # store setup errors here until after final_setup
             'checking': False,  # True if check_totals or check_partials is running
             'model_options': self.model_options,  # A dict of options passed to all systems in tree
-            'allow_post_setup_reorder': self.options['allow_post_setup_reorder'],  # see option
             'singular_jac_behavior': 'warn',  # How to handle singular jac conditions
             'parallel_deriv_color': None,  # None unless derivatives involving a parallel deriv
                                            # colored dv/response are currently being computed.
@@ -1008,6 +1007,7 @@ class Problem(object):
             'relevance_cache': {},  # cache of relevance objects
             'rel_array_cache': {},  # cache of relevance arrays
             'ncompute_totals': 0,  # number of times compute_totals has been called
+            'reordered': False,  # True if the model has been reordered
         }
 
         if _prob_setup_stack:
@@ -1090,10 +1090,6 @@ class Problem(object):
                           f"problem with {desvar_size} design variables and {response_size} "
                           "response variables (objectives and nonlinear constraints).",
                           category=DerivativesWarning)
-
-        if (not self._metadata['allow_post_setup_reorder'] and
-                self._metadata['setup_status'] == _SetupStatus.PRE_SETUP and self.model._order_set):
-            raise RuntimeError(f"{self.msginfo}: Cannot call set_order without calling setup after")
 
         # set up recording, including any new recorders since last setup
         if self._metadata['setup_status'] >= _SetupStatus.POST_SETUP:

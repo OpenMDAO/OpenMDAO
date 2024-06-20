@@ -188,3 +188,28 @@ class ParallelGroup(Group):
                 always_opt_comps.update(a)
         else:
             super()._get_relevance_modifiers(grad_groups, always_opt_comps)
+
+    def _get_ordered_components(self):
+        """
+        Yield components (leaf nodes) in this part of the system tree in order of execution.
+
+        Yields
+        ------
+        str
+            Pathname of the component.
+        """
+        if self.comm.size > 1:
+            if self._gather_full_data():
+                lst = list(super()._get_ordered_components())
+                gathered = self.comm.allgather(lst)
+            else:
+                gathered = self.comm.allgather([])
+
+            seen = set()
+            for ranklist in gathered:
+                for name in ranklist:
+                    if name not in seen:
+                        yield name
+                        seen.add(name)
+        else:
+            yield from super()._get_ordered_components()

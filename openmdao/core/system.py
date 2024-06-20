@@ -2251,7 +2251,7 @@ class System(object):
             self._doutputs = vectors['output']['linear']
             self._dresiduals = vectors['residual']['linear']
 
-        for subsys in self._sorted_sys_iter():
+        for subsys in self._subsystems_myproc:
             subsys._scale_factors = self._scale_factors
             subsys._setup_vectors(root_vectors)
 
@@ -2916,8 +2916,7 @@ class System(object):
             if typ is None or isinstance(s, typ):
                 yield s
             if recurse:
-                for sub in s.system_iter(recurse=True, typ=typ):
-                    yield sub
+                yield from s.system_iter(recurse=True, typ=typ)
 
     def _all_subsystem_iter(self):
         """
@@ -6393,9 +6392,6 @@ class System(object):
 
         # return regular dict sorted by system pathname
         return {spath: data for spath, data in sorted(sys_prom_map.items(), key=lambda x: x[0])}
-
-    def _sorted_sys_iter(self):
-        yield from ()
 
     def load_case(self, case):
         """

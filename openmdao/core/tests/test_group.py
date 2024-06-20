@@ -3,7 +3,6 @@ Unit tests for Group.
 """
 import itertools
 import unittest
-from collections import defaultdict
 
 import numpy as np
 
@@ -15,11 +14,11 @@ except ImportError:
 import openmdao.api as om
 from openmdao.test_suite.components.sellar import SellarDis2
 from openmdao.utils.mpi import MPI
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_no_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_no_warning, assert_check_totals, assert_check_partials
 from openmdao.utils.logger_utils import TestLogger
-from openmdao.utils.om_warnings import PromotionWarning, OMDeprecationWarning
+from openmdao.utils.om_warnings import PromotionWarning
 from openmdao.utils.name_maps import name2abs_names
-from openmdao.utils.testing_utils import set_env_vars_context
+from openmdao.utils.testing_utils import set_env_vars_context, force_check_partials
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -1397,10 +1396,13 @@ class TestGroup(unittest.TestCase):
         model.connect('C2.y', 'C3.x')
         model.options['auto_order'] = True
 
-        p.setup()
+        p.setup(force_alloc_complex=True)
         p.run_model()
 
         self.assertEqual([s.name for s in model._subsystems_myproc], ['_auto_ivc', 'C1', 'C2', 'C3'])
+
+        assert_check_totals(p.check_totals(of=['C3.y'], wrt=['C1.x'], method='cs'))
+        assert_check_partials(force_check_partials(p, out_stream=None), atol=1e-5, rtol=1e-5)
 
     def test_auto_order_off(self):
         p = om.Problem(allow_post_setup_reorder=False)
@@ -1431,10 +1433,13 @@ class TestGroup(unittest.TestCase):
         sub.connect('C3.z', 'C5.x1')
         sub.options['auto_order'] = True
 
-        p.setup()
+        p.setup(force_alloc_complex=True)
         p.run_model()
 
         self.assertEqual([s.name for s in sub._subsystems_myproc], ['C1', 'C2', 'C4', 'C3', 'C5'])
+        assert_check_totals(p.check_totals(of=['sub.C5.y', 'sub.C1.y', 'sub.C2.y', 'sub.C3.y', 'sub.C4.y'],
+                                           wrt=['sub.C1.x'], method='cs'))
+        assert_check_partials(force_check_partials(p, out_stream=None), atol=1e-5, rtol=1e-5)
 
     def test_promote_units_and_none(self):
         p = om.Problem(name='promote_units_and_none')
