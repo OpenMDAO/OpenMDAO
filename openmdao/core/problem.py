@@ -648,23 +648,22 @@ class Problem(object):
             If True and model has been run previously, reset all iteration counters.
         """
         if not self.model._have_output_solver_options_been_applied():
-            raise RuntimeError(self.msginfo +
-                               ": Before calling `run_model`, the `setup` method must be called "
-                               "if set_output_solver_options has been called.")
+            raise RuntimeError(f"{self.msginfo}: Before calling `run_model`, the `setup` method "
+                               "must be called if set_output_solver_options has been called.")
 
         if self._metadata['setup_status'] < _SetupStatus.POST_SETUP:
-            if self.model._order_set:
-                raise RuntimeError(f"{self.msginfo}: Cannot call set_order without calling setup "
-                                   "after")
-            else:
-                raise RuntimeError(self.msginfo +
-                                   ": The `setup` method must be called before `run_model`.")
+            raise RuntimeError(
+                f"{self.msginfo}: The `setup` method must be called before `run_model`.")
+
+        if self._metadata['reordered']:
+            raise RuntimeError(f"{self.msginfo}: Execution order has been changed since last "
+                               "call to setup. Call setup() again to reinitialize.")
 
         old_prefix = self._recording_iter.prefix
 
         if case_prefix is not None:
             if not isinstance(case_prefix, str):
-                raise TypeError(self.msginfo + ": The 'case_prefix' argument should be a string.")
+                raise TypeError(f"{self.msginfo}: The 'case_prefix' argument should be a string.")
             self._recording_iter.prefix = case_prefix
 
         try:

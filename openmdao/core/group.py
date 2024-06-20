@@ -178,8 +178,6 @@ class Group(System):
     _contains_parallel_group : bool
         If True, this Group contains a ParallelGroup. Only used to determine if a parallel
         group or distributed component is below a DirectSolver so that we can raise an exception.
-    _order_set : bool
-        Flag to check if set_order has been called.
     _auto_ivc_warnings : list
         List of Auto IVC warnings to be raised later.
     _shapes_graph : nx.Graph
@@ -222,7 +220,6 @@ class Group(System):
         self._discrete_transfers = {}
         self._setup_procs_finished = False
         self._contains_parallel_group = False
-        self._order_set = False
         self._shapes_graph = None
         self._pre_components = None
         self._post_components = None
@@ -518,7 +515,6 @@ class Group(System):
             self._has_bounds |= subsys._has_bounds
             self.matrix_free |= subsys.matrix_free
 
-        self._problem_meta['setup_status'] = _SetupStatus.POST_CONFIGURE
         self.configure()
 
         # if our configure() has added or promoted any variables, we have to call
@@ -1238,7 +1234,7 @@ class Group(System):
         self._check_order()
 
         if self._problem_meta['reordered']:
-            ordered = {path: ([], []) for path in self._get_ordered_components()}
+            ordered = {path: ([], []) for path in self._get_ordered_component_names()}
             for ioidx, iotype in enumerate(('input', 'output')):
                 for vpath in self._var_allprocs_abs2meta[iotype]:
                     cpath = vpath.rsplit('.', 1)[0]
@@ -1289,8 +1285,8 @@ class Group(System):
         Parameters
         ----------
         reorder : bool
-            If True, reorder the subsystems based on the computed order.  Otherwise
-            just return the out-of-order connections.
+            If True and options['auto_order'] is True, reorder the subsystems based on the computed
+            order.  Otherwise just return the out-of-order connections.
         recurse : bool
             If True, call this method on all subgroups.
         out_of_order : dict or None
@@ -1319,8 +1315,8 @@ class Group(System):
                         tgts[v] = []
                     tgts[v].append(u)
 
-                for t in tgts:
-                    tgts[t] = sorted(tgts[t])
+                for lst in tgts.values():
+                    lst.sort()
 
                 out_of_order[self.pathname] = tgts
                 if reorder:
@@ -2286,7 +2282,7 @@ class Group(System):
             if isinstance(subsystem, Group):
                 subsystem._order_data_structures(ordered)
 
-    def _get_ordered_components(self):
+    def _get_ordered_component_names(self):
         """
         Yield components (leaf nodes) in this part of the system tree in order of execution.
 
@@ -2297,7 +2293,7 @@ class Group(System):
         """
         for system in self._subsystems_myproc:
             if isinstance(system, Group):
-                yield from system._get_ordered_components()
+                yield from system._get_ordered_component_names()
             else:
                 yield system.pathname
 
@@ -3455,7 +3451,6 @@ class Group(System):
         if not self._static_mode:
             self._subsystems_myproc = [s for s, _ in self._subsystems_allprocs.values()]
 
-        self._order_set = True
         if self._problem_meta is not None:
             self._problem_meta['reordered'] = True
 

@@ -1310,27 +1310,36 @@ class TestGroup(unittest.TestCase):
         for val in totals.values():
             assert_near_equal(val['rel error'][0], 0.0, 1e-15)
 
-    def test_set_order_in_config_error(self):
+    def test_set_order_in_config(self):
 
         class SimpleGroup(om.Group):
             def setup(self):
-                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
                 self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+                self.add_subsystem('comp1', om.IndepVarComp('x'))
+                self.connect('comp1.x', 'comp2.a')
 
             def configure(self):
-                self.set_order(['C2', 'C1'])
+                self.set_order(['comp1', 'comp2'])
 
         prob = om.Problem(allow_post_setup_reorder=False)
         model = prob.model
 
         model.add_subsystem('C1', SimpleGroup())
         model.add_subsystem('C2', SimpleGroup())
+        model.add_subsystem('summer', om.ExecComp('result = a + b'))
+        model.connect('C1.comp2.b', 'summer.a')
+        model.connect('C2.comp2.b', 'summer.b')
 
-        msg = "'C1' <class SimpleGroup>: Cannot call set_order in the configure method."
-        with self.assertRaises(RuntimeError) as cm:
-            prob.setup()
+        prob.setup(force_alloc_complex=True)
 
-        self.assertEqual(str(cm.exception), msg)
+        prob['C1.comp1.x'] = 2.0
+        prob['C2.comp1.x'] = 3.0
+
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(of=['summer.result'], wrt=['C1.comp1.x', 'C2.comp1.x'],
+                                              method='cs', show_only_incorrect=True))
+        assert_check_partials(force_check_partials(prob, method='cs', show_only_incorrect=True))
 
     def test_set_order_after_setup(self):
 
@@ -1348,9 +1357,11 @@ class TestGroup(unittest.TestCase):
         prob.setup()
         prob.model.set_order(['C2', 'C1'])
 
-        msg = "Problem .*: Cannot call set_order without calling setup after"
-        with self.assertRaisesRegex(RuntimeError, msg):
+        msg = ": Execution order has been changed since last call to setup. Call setup() again to reinitialize."
+        with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
+
+        self.assertTrue(msg in cm.exception.args[0])
 
     def test_set_order_normal(self):
 
@@ -1403,19 +1414,6 @@ class TestGroup(unittest.TestCase):
 
         assert_check_totals(p.check_totals(of=['C3.y'], wrt=['C1.x'], method='cs'))
         assert_check_partials(force_check_partials(p, out_stream=None), atol=1e-5, rtol=1e-5)
-
-    def test_auto_order_off(self):
-        p = om.Problem(allow_post_setup_reorder=False)
-        model = p.model
-        model.add_subsystem('C2', om.ExecComp('y=3.0*x'))
-        model.add_subsystem('C1', om.ExecComp('y=2.0*x'))
-        model.add_subsystem('C3', om.ExecComp('y=5.0*x'))
-        model.connect('C1.y', 'C2.x')
-        model.connect('C2.y', 'C3.x')
-        model.options['auto_order'] = True
-
-        with assert_warning(om.OpenMDAOWarning, "<model> <class Group>: A new execution order ['_auto_ivc', 'C1', 'C2', 'C3'] is recommended, but auto ordering has been disabled because the Problem option 'allow_post_setup_reorder' is False. It is recommended to either set `allow_post_setup_reorder` to True or to manually set the execution order to the recommended order using `set_order`."):
-            p.setup()
 
     def test_auto_order2(self):
         p = om.Problem()

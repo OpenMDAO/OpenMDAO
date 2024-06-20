@@ -74,8 +74,8 @@ class ParallelGroup(Group):
         Parameters
         ----------
         reorder : bool
-            If True, reorder the subsystems based on the new order.  Otherwise
-            just return the out-of-order connections.
+            If True and options['auto_order'] is True, reorder the subsystems based on the new
+            order.  Otherwise just return the out-of-order connections.
         recurse : bool
             If True, call this method on all subgroups.
         out_of_order : dict
@@ -189,7 +189,7 @@ class ParallelGroup(Group):
         else:
             super()._get_relevance_modifiers(grad_groups, always_opt_comps)
 
-    def _get_ordered_components(self):
+    def _get_ordered_component_names(self):
         """
         Yield components (leaf nodes) in this part of the system tree in order of execution.
 
@@ -200,7 +200,7 @@ class ParallelGroup(Group):
         """
         if self.comm.size > 1:
             if self._gather_full_data():
-                lst = list(super()._get_ordered_components())
+                lst = list(super()._get_ordered_component_names())
                 gathered = self.comm.allgather(lst)
             else:
                 gathered = self.comm.allgather([])
@@ -212,4 +212,4 @@ class ParallelGroup(Group):
                         yield name
                         seen.add(name)
         else:
-            yield from super()._get_ordered_components()
+            yield from super()._get_ordered_component_names()
