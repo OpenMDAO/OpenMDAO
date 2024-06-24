@@ -356,7 +356,11 @@ class Problem(object):
         reports_dirpath = pathlib.Path(get_reports_dir()).joinpath(f'{self._name}')
         if self.comm.rank == 0:
             if os.path.isdir(reports_dirpath):
-                shutil.rmtree(reports_dirpath)
+                try:
+                    shutil.rmtree(reports_dirpath)
+                except FileNotFoundError:
+                    # Folder already removed by another proccess
+                    pass
 
         # register hooks for any reports
         activate_reports(self._reports, self)
