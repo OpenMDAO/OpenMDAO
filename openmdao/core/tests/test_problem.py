@@ -2143,7 +2143,7 @@ class TestProblem(unittest.TestCase):
         with self.assertRaises(ValueError) as e:
             om.Problem(name='prob_name2')
 
-        self.assertEqual(str(e.exception), "The problem name 'prob_name' already exists")
+        self.assertEqual(str(e.exception), "The problem name 'prob_name2' already exists")
 
 
 @use_tempdirs
