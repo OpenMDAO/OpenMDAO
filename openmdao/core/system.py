@@ -4957,7 +4957,7 @@ class System(object):
     def get_outputs_dir(self, *subdirs, mkdir=True):
         """
         Get the path under which all output files of this system are to be placed.
-        
+
         Parameters
         ----------
         *subdirs : str
@@ -4965,6 +4965,7 @@ class System(object):
             To create {prob_output_dir}/a/b one would pass `system.get_outputs_dir('a', 'b')`.
         mkdir : bool
             If True, attempt to create this directory if it does not exist.
+
         Returns
         -------
         pathlib.Path

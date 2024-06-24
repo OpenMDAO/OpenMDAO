@@ -685,7 +685,7 @@ class TestSystem(unittest.TestCase):
         with self.assertRaises(RuntimeError) as e:
             model.get_outputs_dir()
 
-        self.assertEqual('The problem output directory cannot be accessed before setup.',
+        self.assertEqual('The output directory cannot be accessed before setup.',
                          str(e.exception))
 
         prob.setup()

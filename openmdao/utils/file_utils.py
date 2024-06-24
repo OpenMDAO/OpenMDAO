@@ -462,15 +462,16 @@ def _get_outputs_dir(obj=None, *subdirs, mkdir=True):
     elif isinstance(obj, Solver):
         system = obj._system
         if system is None:
-            raise RuntimeError('The output directory for Solvers cannot be accessed before final_setup.')
+            raise RuntimeError('The output directory for Solvers cannot be accessed '
+                               'before final_setup.')
         prob_meta = system()._problem_meta
         comm = system().comm
     else:
         raise RuntimeError(f'Cannot get problem metadata for object: {obj}')
-            
+
     if prob_meta is None or prob_meta['setup_status'] == _SetupStatus.PRE_SETUP:
         raise RuntimeError('The output directory cannot be accessed before setup.')
-    
+
     prob_pathname = prob_meta['pathname']
 
     dirpath = pathlib.Path(*[f'{p}_out'

@@ -2525,6 +2525,7 @@ class Problem(object):
             To create {prob_output_dir}/a/b one would pass `prob.get_outputs_dir('a', 'b')`.
         mkdir : bool
             If True, attempt to create this directory if it does not exist.
+            
         Returns
         -------
         pathlib.Path
