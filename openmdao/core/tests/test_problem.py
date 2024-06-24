@@ -27,6 +27,7 @@ except ImportError:
     from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 
+@use_tempdirs
 class TestProblem(unittest.TestCase):
     def test_simple_component_model_with_units(self):
         class TestComp(om.ExplicitComponent):
