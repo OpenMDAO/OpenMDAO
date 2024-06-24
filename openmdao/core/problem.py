@@ -1026,18 +1026,24 @@ class Problem(object):
                 raise AttributeError(f'{self.msginfo}Expected an instance of Problem, System, '
                                      'or Solver for `parent` but got {parent}.')
 
-        if _prob_setup_stack:
-            self._metadata['pathname'] = _prob_setup_stack[-1]._metadata['pathname'] + '/' + \
-                self._name
+        if parent:
+            if isinstance(parent, Problem):
+                parent_prob_meta = parent._metadata
+            elif isinstance(parent, System):
+                parent_prob_meta = parent._problem_meta
+            else:
+                raise ValueError('Problem parent must be another Problem or System instance.')
+        else:
+            parent_prob_meta = None
+
+        if parent_prob_meta and parent_prob_meta['pathname']:
+            self._metadata['pathname'] = parent_prob_meta['pathname'] + f'/{self._name}'
         else:
             self._metadata['pathname'] = self._name
 
-        # _prob_setup_stack.append(self) # TODO
         try:
             model._setup(model_comm, self._metadata)
         finally:
-            # _prob_setup_stack.pop() # TODO
-
             # whenever we're outside of model._setup, static mode should be True so that anything
             # added outside of _setup will persist.
             self._metadata['static_mode'] = True
