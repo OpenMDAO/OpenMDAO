@@ -2138,10 +2138,10 @@ class TestProblem(unittest.TestCase):
 
     def test_duplicate_prob_name(self):
 
-        om.Problem(name='prob_name')
+        om.Problem(name='prob_name2')
 
         with self.assertRaises(ValueError) as e:
-            om.Problem(name='prob_name')
+            om.Problem(name='prob_name2')
 
         self.assertEqual(str(e.exception), "The problem name 'prob_name' already exists")
 
@@ -2353,25 +2353,34 @@ class NestedProblemTestCase(unittest.TestCase):
 
     def test_nested_prob(self):
 
+        self_test = self
+
         class _ProblemSolver(om.NonlinearRunOnce):
+
+            def __init__(self, parent=None, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self._parent = parent
+
             def solve(self):
                 # create a simple subproblem and run it to test for global solver_info bug
-                p = om.Problem()
+                p = om.Problem(name='bar')
                 p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
                 p.model.add_subsystem('comp', om.ExecComp('y=2*x'))
                 p.model.connect('indep.x', 'comp.x')
-                p.setup()
+                p.setup(parent=self._parent)
+                self_test.assertEqual('foo/bar', p._metadata['pathname'])
                 p.run_model()
-
                 return super().solve()
 
-        p = om.Problem()
+        p = om.Problem(name='foo')
         p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
         G = p.model.add_subsystem('G', om.Group())
         G.add_subsystem('comp', om.ExecComp('y=2*x'))
-        G.nonlinear_solver = _ProblemSolver()
+        G.nonlinear_solver = _ProblemSolver(parent=p)
         p.model.connect('indep.x', 'G.comp.x')
         p.setup()
+        self.assertEqual('foo', p._metadata['pathname'])
+
         p.run_model()
 
     def test_cs_across_nested(self):
