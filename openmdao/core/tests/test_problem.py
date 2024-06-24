@@ -2114,6 +2114,36 @@ class TestProblem(unittest.TestCase):
         except RuntimeError:
             self.fail("'setup raised RuntimeError unexpectedly")
 
+    def test_get_outputs_dir(self):
+
+        prob = om.Problem(name='prob_name')
+        model = prob.model
+
+        model.add_subsystem('comp', Paraboloid())
+
+        model.set_input_defaults('comp.x', 3.0)
+        model.set_input_defaults('comp.y', -4.0)
+
+        with self.assertRaises(RuntimeError) as e:
+            prob.get_outputs_dir()
+
+        self.assertEqual('The output directory cannot be accessed before setup.',
+                         str(e.exception))
+
+        prob.setup()
+
+        d = prob.get_outputs_dir('subdir')
+        self.assertEqual(str(pathlib.Path('prob_name_out', 'subdir')), str(d))
+
+    def test_duplicate_prob_name(self):
+
+        om.Problem(name='prob_name')
+
+        with self.assertRaises(ValueError) as e:
+            om.Problem(name='prob_name')
+
+        self.assertEqual(str(e.exception), "The problem name 'prob_name' already exists")
+
 
 @use_tempdirs
 class RelevanceTestCase(unittest.TestCase):
@@ -2471,27 +2501,6 @@ class NestedProblemTestCase(unittest.TestCase):
 
         self.assertEqual(p._get_inst_id(), defname + '2')
         self.assertEqual(G.nonlinear_solver._problem._get_inst_id(),  defname + '2.1')
-
-    def test_get_outputs_dir(self):
-
-        prob = om.Problem(name='prob_name')
-        model = prob.model
-
-        model.add_subsystem('comp', Paraboloid())
-
-        model.set_input_defaults('comp.x', 3.0)
-        model.set_input_defaults('comp.y', -4.0)
-
-        with self.assertRaises(RuntimeError) as e:
-            prob.get_outputs_dir()
-
-        self.assertEqual('The output directory cannot be accessed before setup.',
-                         str(e.exception))
-
-        prob.setup()
-
-        d = prob.get_outputs_dir('subdir')
-        self.assertEqual(str(pathlib.Path('prob_name_out', 'subdir')), str(d))
 
 
 class SystemInTwoProblemsTestCase(unittest.TestCase):
