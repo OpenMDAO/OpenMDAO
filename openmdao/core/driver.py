@@ -14,7 +14,6 @@ from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import INT_DTYPE, _SetupStatus
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
-from openmdao.utils.hooks import _setup_hooks
 from openmdao.utils.record_util import create_local_meta, check_path, has_match
 from openmdao.utils.general_utils import _src_name_iter
 from openmdao.utils.mpi import MPI
@@ -227,6 +226,10 @@ class Driver(object):
         Contains all objective info.
     _responses : dict
         Contains all response info.
+    _lin_dvs : dict
+        Contains design variables relevant to linear constraints.
+    _nl_dvs : dict
+        Contains design variables relevant to nonlinear constraints.
     _remote_dvs : dict
         Dict of design variables that are remote on at least one proc. Values are
         (owning rank, size).
@@ -268,6 +271,8 @@ class Driver(object):
         self._cons = None
         self._objs = None
         self._responses = None
+        self._lin_dvs = None
+        self._nl_dvs = None
 
         # Driver options
         self.options = OptionsDictionary(parent_name=type(self).__name__)
@@ -442,6 +447,8 @@ class Driver(object):
             msg += '.'.join(self._designvars_discrete)
             raise RuntimeError(msg)
 
+        self._split_dvs(model)
+
         self._remote_dvs = remote_dv_dict = {}
         self._remote_cons = remote_con_dict = {}
         self._dist_driver_vars = dist_dict = {}
@@ -569,6 +576,38 @@ class Driver(object):
                 if not problem.model._use_derivatives:
                     issue_warning("Derivatives are turned off.  Skipping simul deriv coloring.",
                                   category=DerivativesWarning)
+
+    def _split_dvs(self, model):
+        """
+        Determine which design vars are relevant to linear constraints vs nonlinear constraints.
+
+        For some optimizers, this information will be used to determine the columns of the total
+        linear jacobian vs. the total nonlinear jacobian.
+
+        Parameters
+        ----------
+        model : <Group>
+            The model being used in the optimization problem.
+        """
+        lin_cons = tuple([meta['source'] for meta in self._cons.values() if meta['linear']])
+        if lin_cons:
+            relevance = model._relevance
+            dvs = tuple([meta['source'] for meta in self._designvars.values()])
+
+            with relevance.seeds_active(fwd_seeds=dvs, rev_seeds=lin_cons):
+                self._lin_dvs = {dv: meta for dv, meta in self._designvars.items()
+                                 if relevance.is_relevant(meta['source'])}
+
+            nl_resps = [meta['source'] for meta in self._cons.values() if not meta['linear']]
+            nl_resps.extend([meta['source'] for meta in self._objs.values()])
+
+            with relevance.seeds_active(fwd_seeds=dvs, rev_seeds=tuple(nl_resps)):
+                self._nl_dvs = {dv: meta for dv, meta in self._designvars.items()
+                                if relevance.is_relevant(meta['source'])}
+
+        else:
+            self._lin_dvs = {}
+            self._nl_dvs = self._designvars
 
     def _check_for_missing_objective(self):
         """
@@ -1035,19 +1074,17 @@ class Driver(object):
            Dictionary containing values of each constraint.
         """
         con_dict = {}
-        for name, meta in self._cons.items():
-            if lintype == 'linear' and not meta['linear']:
-                continue
+        it = self._cons.items()
+        if lintype == 'linear':
+            it = filter_by_meta(it, 'linear')
+        elif lintype == 'nonlinear':
+            it = filter_by_meta(it, 'linear', exclude=True)
+        if ctype == 'eq':
+            it = filter_by_meta(it, 'equals', chk_none=True)
+        elif ctype == 'ineq':
+            it = filter_by_meta(it, 'equals', chk_none=True, exclude=True)
 
-            if lintype == 'nonlinear' and meta['linear']:
-                continue
-
-            if ctype == 'eq' and meta['equals'] is None:
-                continue
-
-            if ctype == 'ineq' and meta['equals'] is not None:
-                continue
-
+        for name, meta in it:
             con_dict[name] = self._get_voi_val(name, meta, self._remote_cons,
                                                driver_scaling=driver_scaling)
 
@@ -1066,11 +1103,10 @@ class Driver(object):
             The nonlinear response names in order.
         """
         order = list(self._objs)
-        order.extend(n for n, meta in self._cons.items()
-                     if not ('linear' in meta and meta['linear']))
+        order.extend(n for n, meta in self._cons.items() if not meta['linear'])
         return order
 
-    def _update_voi_meta(self, model):
+    def _update_voi_meta(self, model, responses, desvars):
         """
         Collect response and design var metadata from the model and size desvars and responses.
 
@@ -1078,6 +1114,10 @@ class Driver(object):
         ----------
         model : System
             The System that represents the entire model.
+        responses : dict
+            Response metadata dictionary.
+        desvars : dict
+            Design variable metadata dictionary.
 
         Returns
         -------
@@ -1089,20 +1129,22 @@ class Driver(object):
         self._objs = objs = {}
         self._cons = cons = {}
 
+        self._responses = responses
+        self._designvars = desvars
+
         # driver _responses are keyed by either the alias or the promoted name
         response_size = 0
-        self._responses = resps = model.get_responses(recurse=True, use_prom_ivc=True)
-        for name, data in resps.items():
-            if data['type'] == 'con':
-                cons[name] = data
+        for name, meta in responses.items():
+            if meta['type'] == 'con':
+                cons[name] = meta
+                if meta['linear']:
+                    continue  # don't add to response size
             else:
-                objs[name] = data
-            if not ('linear' in data and data['linear']):
-                response_size += data['global_size']
+                objs[name] = meta
 
-        # Gather up the information for design vars. _designvars are keyed by the promoted name
-        self._designvars = designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
-        desvar_size = sum(data['global_size'] for data in designvars.values())
+            response_size += meta['global_size']
+
+        desvar_size = sum(meta['global_size'] for meta in desvars.values())
 
         self._has_scaling = model._setup_driver_units()
 
@@ -1236,7 +1278,7 @@ class Driver(object):
                                       debug_print=debug_print,
                                       driver_scaling=driver_scaling)
 
-            if total_jac.has_lin_cons:
+            if total_jac.has_lin_cons and self.supports['linear_constraints']:
                 # if we're doing a scaling report, cache the linear total jacobian so we
                 # don't have to recreate it
                 if problem._has_active_report('scaling'):
@@ -1744,3 +1786,40 @@ def record_iteration(requester, prob, case_name):
             data['rel'] = norm / norm0
 
     rec_mgr.record_iteration(requester, data, requester._get_recorder_metadata(case_name))
+
+
+def filter_by_meta(metadict_items, key, chk_none=False, exclude=False):
+    """
+    Filter metadata items based on their value.
+
+    Parameters
+    ----------
+    metadict_items : iter of (name, meta)
+        Iterable of (name, meta) tuples.
+    key : str
+        Metadata key.
+    chk_none : bool
+        If True, compare items to None. If False, check if items are truthy.
+    exclude : bool
+        If True, exclude matching items rather than yielding them.
+
+    Yields
+    ------
+    tuple
+        Tuple of the form (name, meta) for each item in metadict_items that satisfies the condition.
+    """
+    if chk_none:
+        for tup in metadict_items:
+            none = tup[1][key] is None
+            if exclude:
+                if none:
+                    yield tup
+            elif not none:
+                yield tup
+    else:
+        for tup in metadict_items:
+            if exclude:
+                if not tup[1][key]:
+                    yield tup
+            elif tup[1][key]:
+                yield tup

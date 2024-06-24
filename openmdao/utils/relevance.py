@@ -527,8 +527,9 @@ class Relevance(object):
         found = set()
         for fsrc, farr in self._single_seed2relvars['fwd'].items():
             for rsrc, rarr in self._single_seed2relvars['rev'].items():
-                if (farr & rarr)[self._var2idx[fsrc]]:
-                    found.add(rsrc)
+                if rsrc not in found:
+                    if (farr & rarr)[self._var2idx[fsrc]]:
+                        found.add(rsrc)
 
         self._no_dv_responses = \
             [rsrc for rsrc in self._single_seed2relvars['rev'] if rsrc not in found]
@@ -798,6 +799,8 @@ class Relevance(object):
         """
         Return True if the given named system is relevant.
 
+        Returns False if system has no subsystems with outputs.
+
         Parameters
         ----------
         name : str
@@ -811,7 +814,10 @@ class Relevance(object):
         if not self._active:
             return True
 
-        return self._current_rel_sarray[self._sys2idx[name]]
+        try:
+            return self._current_rel_sarray[self._sys2idx[name]]
+        except KeyError:
+            return False
 
     def filter(self, systems, relevant=True):
         """
@@ -1069,7 +1075,7 @@ class Relevance(object):
         responses : dict
             A dict of all responses from the model.
         """
-        # don't redo this if it's already been done
+        # don't redo this if it's already done
         if model._pre_components is not None:
             return
 

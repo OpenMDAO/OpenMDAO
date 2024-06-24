@@ -140,6 +140,10 @@ class _TotalJacInfo(object):
         self.initialize = True
         self.approx = approx
         self.coloring_info = coloring_info
+        try:
+            self._linear_only_dvs = set(driver._lin_dvs).difference(driver._nl_dvs)
+        except AttributeError:
+            self._linear_only_dvs = set()
 
         orig_of = of
         orig_wrt = wrt
@@ -153,12 +157,12 @@ class _TotalJacInfo(object):
         ofsize = sum(meta['global_size'] for meta in of_metadata.values())
         wrtsize = sum(meta['global_size'] for meta in wrt_metadata.values())
 
-        for meta in of_metadata.values():
-            if 'linear' in meta and meta['linear']:
-                has_lin_cons = True
-                break
-        else:
-            has_lin_cons = False
+        has_lin_cons = False
+        if driver and driver.supports['linear_constraints']:
+            for meta in of_metadata.values():
+                if 'linear' in meta and meta['linear']:
+                    has_lin_cons = True
+                    break
 
         if self._orig_mode == 'auto':
             if has_lin_cons:
@@ -177,9 +181,6 @@ class _TotalJacInfo(object):
         self._dist_driver_vars = driver._dist_driver_vars if driver else {}
 
         all_abs2meta_out = model._var_allprocs_abs2meta['output']
-
-        if not driver or not driver.supports['linear_constraints']:
-            has_lin_cons = False
 
         self.has_lin_cons = has_lin_cons
         self.dist_input_range_map = {}
@@ -1640,7 +1641,9 @@ class _TotalJacInfo(object):
         if np.any(row):  # there's at least 1 col that's zero across all rows
             zero_cols = []
             for n, meta in self.input_meta['fwd'].items():
-
+                # don't flag zero cols for linear only dvs
+                if n in self._linear_only_dvs:
+                    continue
                 zero_idxs = self._get_zero_inds(meta, row)
 
                 if zero_idxs[0].size > 0:

@@ -52,7 +52,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
     })
 
     # invalid range chosen to be on the nominal path of the optimizer
-    invalid_range = defaultdict(lambda: {'x': (7.2, 10.2), 'y': (-50., -40.)})
+    invalid_range = defaultdict(lambda: {'x': (7.2, 10.2), 'y': (-50.0001, -40.)})
     invalid_range.update({
         'ParOpt': {'x': (4., 6.), 'y': (-4., -6.)},
     })

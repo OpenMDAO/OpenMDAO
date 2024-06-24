@@ -40,7 +40,6 @@ from openmdao.utils.general_utils import determine_adder_scaler, \
     ensure_compatible, env_truthy, make_traceback, _is_slicer_op
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
-from openmdao.core.total_jac import _TotalJacInfo
 
 _empty_frozen_set = frozenset()
 
@@ -4715,7 +4714,7 @@ class System(object):
         with self._scaled_context_all():
             self._solve_linear(mode)
 
-    def run_linearize(self, sub_do_ln=True, driver=None):
+    def run_linearize(self, sub_do_ln=True):
         """
         Compute jacobian / factorization.
 
@@ -4725,22 +4724,12 @@ class System(object):
         ----------
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
-        driver : Driver or None
-            If this system is the top level system and approx derivatives have not been
-            initialized, the driver for this model must be supplied in order to properly
-            initialize the approximations.
         """
-        if self.pathname == '' and self._owns_approx_jac and driver is not None:
-            self._tot_jac = _TotalJacInfo(driver._problem(), None, None, 'flat_dict', approx=True)
-
-        try:
-            with self._scaled_context_all():
-                self._linearize(self._assembled_jac, sub_do_ln=self._linear_solver is not None and
-                                self._linear_solver._linearize_children())
-                if self._linear_solver is not None and sub_do_ln:
-                    self._linear_solver._linearize()
-        finally:
-            self._tot_jac = None
+        with self._scaled_context_all():
+            self._linearize(self._assembled_jac, sub_do_ln=self._linear_solver is not None and
+                            self._linear_solver._linearize_children())
+            if self._linear_solver is not None and sub_do_ln:
+                self._linear_solver._linearize()
 
     def _apply_nonlinear(self):
         """
@@ -5359,11 +5348,19 @@ class System(object):
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to set.
         """
-        model = self._problem_meta['model_ref']()
-        conns = model._conn_global_abs_in2out
-        post_setup = self._problem_meta['setup_status'] >= _SetupStatus.POST_SETUP
+        post_setup = self._problem_meta is not None and \
+            self._problem_meta['setup_status'] >= _SetupStatus.POST_SETUP
+        if post_setup:
+            abs_names = name2abs_names(self, name)
+        else:
+            raise RuntimeError(f"{self.msginfo}: Called set_val({name}, ...) before setup "
+                               "completes.")
+
         has_vectors = self._problem_meta['setup_status'] >= _SetupStatus.POST_FINAL_SETUP
         value = val
+
+        model = self._problem_meta['model_ref']()
+        conns = model._conn_global_abs_in2out
 
         all_meta = model._var_allprocs_abs2meta
         loc_meta = model._var_abs2meta
@@ -5373,12 +5370,6 @@ class System(object):
             ginputs = self._group_inputs
         except AttributeError:
             ginputs = {}  # could happen if this system is not a Group
-
-        if post_setup:
-            abs_names = name2abs_names(self, name)
-        else:
-            raise RuntimeError(f"{self.msginfo}: Called set_val({name}, ...) before setup "
-                               "completes.")
 
         if abs_names:
             n_proms = len(abs_names)  # for output this will never be > 1
