@@ -8,7 +8,8 @@ import openmdao.api as om
 
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_no_warning
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped
-from openmdao.test_suite.components.double_sellar import DoubleSellar
+from openmdao.test_suite.components.double_sellar import DoubleSellar, SubSellar
+from openmdao.utils.testing_utils import use_tempdirs
 
 
 class TestSolverFeatures(unittest.TestCase):
@@ -263,6 +264,63 @@ class TestSolverFeatures(unittest.TestCase):
         # Message info should still be readible
         info = solver.msginfo
         assert info == type(solver).__name__
+
+    @use_tempdirs
+    def test_solver_get_outputs_dir(self):
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])))
+
+        sub1 = model.add_subsystem('sub1', om.Group())
+        sub2 = sub1.add_subsystem('sub2', om.Group())
+        g1 = sub2.add_subsystem('g1', SubSellar())
+        g2 = model.add_subsystem('g2', SubSellar())
+
+        model.connect('sub1.sub2.g1.y2', 'g2.x')
+        model.connect('g2.y2', 'sub1.sub2.g1.x')
+
+        model.nonlinear_solver = om.NewtonSolver()
+        model.linear_solver = om.ScipyKrylov()
+        model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver.options['max_sub_solves'] = 0
+
+        g1.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        g1.linear_solver = om.LinearBlockGS()
+
+        g2.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        g2.linear_solver = om.ScipyKrylov()
+        g2.linear_solver.precon = om.LinearBlockGS()
+        g2.linear_solver.precon.options['maxiter'] = 2
+
+        prob.set_solver_print(level=-1, type_='all')
+        g2.set_solver_print(level=2, type_='NL')
+
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as e:
+            g1.nonlinear_solver.get_outputs_dir()
+
+        self.assertEqual('The output directory for Solvers cannot be accessed before final_setup.',
+                         str(e.exception))
+
+        prob.final_setup()
+
+        outputs_dir = prob.get_outputs_dir()
+
+        nlg1_dir = g1.nonlinear_solver.get_outputs_dir()
+        lg1_dir = g1.linear_solver.get_outputs_dir()
+
+        nlg2_dir = g2.nonlinear_solver.get_outputs_dir()
+        lg2_dir = g2.linear_solver.get_outputs_dir()
+        lpcg2_dir = g2.linear_solver.precon.get_outputs_dir()
+
+        self.assertEqual(outputs_dir, nlg1_dir)
+        self.assertEqual(outputs_dir, lg1_dir)
+        self.assertEqual(outputs_dir, nlg2_dir)
+        self.assertEqual(outputs_dir, lg2_dir)
+        self.assertEqual(outputs_dir, lpcg2_dir)
 
 
 if __name__ == "__main__":

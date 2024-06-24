@@ -668,6 +668,31 @@ class TestSystem(unittest.TestCase):
         with assert_warnings(expected_warnings):
             prob.final_setup()
 
+    @use_tempdirs
+    def test_get_outputs_dir(self):
+        import pathlib
+        import openmdao.api as om
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = om.Problem(name='prob_name')
+        model = prob.model
+
+        model.add_subsystem('comp', Paraboloid())
+
+        model.set_input_defaults('comp.x', 3.0)
+        model.set_input_defaults('comp.y', -4.0)
+
+        with self.assertRaises(RuntimeError) as e:
+            model.get_outputs_dir()
+
+        self.assertEqual('The problem output directory cannot be accessed before setup.',
+                         str(e.exception))
+
+        prob.setup()
+
+        d = prob.get_outputs_dir('subdir')
+        self.assertEqual(str(pathlib.Path('prob_name_out', 'subdir')), str(d))
+
 
 if __name__ == "__main__":
     unittest.main()

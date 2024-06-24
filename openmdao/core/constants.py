@@ -136,3 +136,10 @@ _DEFAULT_OUT_STREAM = _ReprClass("DEFAULT_OUT_STREAM")
 #  the default directory in the reports directory is what is wanted. Then in the run method,
 #  the actual default directory is used
 _DEFAULT_REPORTS_DIR = _ReprClass("DEFAULT_REPORTS_DIR")
+
+# Used in Problem for coloring dir.
+#  named after the Problem name. But when the declare method in that class is called, the driver
+#  does not have a reference to the Problem so can't get the name. This serves as a flag that
+#  the default directory in the reports directory is what is wanted. Then in the run method,
+#  the actual default directory is used
+_DEFAULT_COLORING_DIR = _ReprClass("DEFAULT_COLORING_DIR")

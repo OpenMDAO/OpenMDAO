@@ -54,6 +54,7 @@ from openmdao.utils.general_utils import pad_name, LocalRangeIterable, \
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.file_utils import _get_outputs_dir
 from openmdao.visualization.tables.table_builder import generate_table
 
 try:
@@ -883,7 +884,7 @@ class Problem(object):
 
     def setup(self, check=False, logger=None, mode='auto', force_alloc_complex=False,
               distributed_vector_class=PETScVector, local_vector_class=DefaultVector,
-              derivatives=True):
+              derivatives=True, parent=None):
         """
         Set up the model hierarchy.
 
@@ -922,6 +923,8 @@ class Problem(object):
             and associated transfers involved in intraprocess communication.
         derivatives : bool
             If True, perform any memory allocations necessary for derivative computation.
+        parent : Problem, System, Solver, or None
+            The "parent" object of this problem instance in a tree of potentially nested problems.
 
         Returns
         -------
@@ -1010,17 +1013,30 @@ class Problem(object):
             'ncompute_totals': 0,  # number of times compute_totals has been called
         }
 
+        if parent is None:
+            self._metadata['pathname'] = self._name
+        elif isinstance(parent, Problem):
+            self._metadata['pathname'] = '/'.join([parent._metadata['pathname'],
+                                                   self._name])
+        else:
+            try:
+                self._metadata['pathname'] = '/'.join([parent._problem_meta['pathname'],
+                                                       self._name])
+            except AttributeError as f:
+                raise AttributeError(f'{self.msginfo}Expected an instance of Problem, System, '
+                                     'or Solver for `parent` but got {parent}.')
+
         if _prob_setup_stack:
             self._metadata['pathname'] = _prob_setup_stack[-1]._metadata['pathname'] + '/' + \
                 self._name
         else:
             self._metadata['pathname'] = self._name
 
-        _prob_setup_stack.append(self)
+        # _prob_setup_stack.append(self) # TODO
         try:
             model._setup(model_comm, self._metadata)
         finally:
-            _prob_setup_stack.pop()
+            # _prob_setup_stack.pop() # TODO
 
             # whenever we're outside of model._setup, static mode should be True so that anything
             # added outside of _setup will persist.
@@ -2497,6 +2513,24 @@ class Problem(object):
             pathlib.Path(reports_dirpath).mkdir(parents=True, exist_ok=True)
 
         return reports_dirpath
+
+    def get_outputs_dir(self, *subdirs, mkdir=True):
+        """
+        Get the path under which all output files of this problem are to be placed.
+
+        Parameters
+        ----------
+        *subdirs : str
+            Subdirectories nested under the relevant problem output directory.
+            To create {prob_output_dir}/a/b one would pass `prob.get_outputs_dir('a', 'b')`.
+        mkdir : bool
+            If True, attempt to create this directory if it does not exist.
+        Returns
+        -------
+        pathlib.Path
+           The path of the outputs directory for the problem.
+        """
+        return _get_outputs_dir(self, *subdirs, mkdir=mkdir)
 
     def list_indep_vars(self, include_design_vars=True, options=None,
                         print_arrays=False, out_stream=_DEFAULT_OUT_STREAM):

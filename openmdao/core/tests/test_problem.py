@@ -1,5 +1,6 @@
 """ Unit tests for the problem interface."""
 
+import pathlib
 import sys
 import unittest
 import itertools
@@ -2470,6 +2471,27 @@ class NestedProblemTestCase(unittest.TestCase):
 
         self.assertEqual(p._get_inst_id(), defname + '2')
         self.assertEqual(G.nonlinear_solver._problem._get_inst_id(),  defname + '2.1')
+
+    def test_get_outputs_dir(self):
+
+        prob = om.Problem(name='prob_name')
+        model = prob.model
+
+        model.add_subsystem('comp', Paraboloid())
+
+        model.set_input_defaults('comp.x', 3.0)
+        model.set_input_defaults('comp.y', -4.0)
+
+        with self.assertRaises(RuntimeError) as e:
+            prob.get_outputs_dir()
+
+        self.assertEqual('The problem output directory cannot be accessed before setup.',
+                         str(e.exception))
+
+        prob.setup()
+
+        d = prob.get_outputs_dir('subdir')
+        self.assertEqual(str(pathlib.Path('prob_name_out', 'subdir')), str(d))
 
 
 class SystemInTwoProblemsTestCase(unittest.TestCase):
