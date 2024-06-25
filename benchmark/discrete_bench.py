@@ -5,6 +5,13 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 
 
 class ManyVarComp(ExplicitComponent):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if self.options['ndiscrete_ins'] > 0 or self.options['ndiscrete_outs'] > 0:
+            self.compute = self.compute_dis
+        else:
+            self.compute = self.compute_nodis
+
     def initialize(self):
         self.options.declare('ndiscrete_ins', types=int)
         self.options.declare('ndiscrete_outs', types=int)
@@ -31,9 +38,13 @@ class ManyVarComp(ExplicitComponent):
         for i in range(nvars):
             self.declare_partials(of=f'out{i}', wrt=f'inp{i}', method='fd')
 
-    def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+    def compute_dis(self, inputs, outputs, discrete_inputs, discrete_outputs):
         for i in range(min(self.options['ndiscrete_outs'], self.options['ndiscrete_ins'])):
             discrete_outputs[f'dout{i}'] = discrete_inputs[f'dinp{i}'] + 1
+        for i in range(min(self.options['nouts'], self.options['nins'])):
+            outputs[f'out{i}'] = inputs[f'inp{i}'] + 1.0
+
+    def compute_nodis(self, inputs, outputs):
         for i in range(min(self.options['nouts'], self.options['nins'])):
             outputs[f'out{i}'] = inputs[f'inp{i}'] + 1.0
 
@@ -78,7 +89,7 @@ def build_model(ncomps=1, ndiscrete_ins=10, ndiscrete_outs=10, nins=10, nouts=10
 
 
 if __name__ == '__main__':
-    p = build_model(ncomps=3, ndiscrete_ins=20, ndiscrete_outs=33, nins=70, nouts=511)
+    p = build_model(ncomps=3, ndiscrete_ins=0, ndiscrete_outs=0, nins=70, nouts=511)
 
     import time
     start = time.time()
