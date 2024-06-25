@@ -352,13 +352,6 @@ class Problem(object):
                                        desc='Patterns for vars to exclude in recording '
                                             '(processed post-includes). Uses fnmatch wildcards')
 
-        # Start a run by deleting any existing reports so that the files
-        #   that are in that directory are all from this run and not a previous run
-        reports_dirpath = pathlib.Path(get_reports_dir()).joinpath(f'{self._name}')
-        if self.comm.rank == 0:
-            if os.path.isdir(reports_dirpath):
-                shutil.rmtree(reports_dirpath)
-
         # register hooks for any reports
         activate_reports(self._reports, self)
 
@@ -994,7 +987,7 @@ class Problem(object):
                                      # a, a.b, and a.b.c, with one of the Nones replaced
                                      # by promotes info.  Dict entries are only created if
                                      # src_indices are applied to the variable somewhere.
-            'reports_dir': self.get_reports_dir(),  # directory where reports will be written
+            'reports_dir': None,  # directory where reports will be written
             'saved_errors': [],  # store setup errors here until after final_setup
             'checking': False,  # True if check_totals or check_partials is running
             'model_options': self.model_options,  # A dict of options passed to all systems in tree
@@ -1013,19 +1006,6 @@ class Problem(object):
             'ncompute_totals': 0,  # number of times compute_totals has been called
         }
 
-        if parent is None:
-            self._metadata['pathname'] = self._name
-        elif isinstance(parent, Problem):
-            self._metadata['pathname'] = '/'.join([parent._metadata['pathname'],
-                                                   self._name])
-        else:
-            try:
-                self._metadata['pathname'] = '/'.join([parent._problem_meta['pathname'],
-                                                       self._name])
-            except AttributeError as f:
-                raise AttributeError(f'{self.msginfo}Expected an instance of Problem, System, '
-                                     'or Solver for `parent` but got {parent}.')
-
         if parent:
             if isinstance(parent, Problem):
                 parent_prob_meta = parent._metadata
@@ -1040,6 +1020,13 @@ class Problem(object):
             self._metadata['pathname'] = parent_prob_meta['pathname'] + f'/{self._name}'
         else:
             self._metadata['pathname'] = self._name
+
+        # Start setup by deleting any existing reports so that the files
+        # that are in that directory are all from this run and not a previous run
+        reports_dirpath = self.get_reports_dir(force=False)
+        if self.comm.rank == 0 and reports_dirpath.exists():
+            shutil.rmtree(reports_dirpath)
+        self._metadata['reports_dir'] = self.get_reports_dir(force=False)
 
         try:
             model._setup(model_comm, self._metadata)
@@ -2510,15 +2497,10 @@ class Problem(object):
 
         Returns
         -------
-        str
+        pathlib.Path
             The path to the directory where reports should be written.
         """
-        reports_dirpath = pathlib.Path(get_reports_dir()).joinpath(f'{self._name}')
-
-        if self.comm.rank == 0 and (force or self._reports):
-            pathlib.Path(reports_dirpath).mkdir(parents=True, exist_ok=True)
-
-        return reports_dirpath
+        return self.get_outputs_dir('reports', mkdir=force or self._reports)
 
     def get_outputs_dir(self, *subdirs, mkdir=True):
         """

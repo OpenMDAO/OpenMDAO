@@ -469,7 +469,7 @@ def _get_outputs_dir(obj=None, *subdirs, mkdir=True):
     else:
         raise RuntimeError(f'Cannot get problem metadata for object: {obj}')
 
-    if prob_meta is None or prob_meta['setup_status'] == _SetupStatus.PRE_SETUP:
+    if prob_meta is None or prob_meta['pathname'] is None:
         raise RuntimeError('The output directory cannot be accessed before setup.')
 
     prob_pathname = prob_meta['pathname']
