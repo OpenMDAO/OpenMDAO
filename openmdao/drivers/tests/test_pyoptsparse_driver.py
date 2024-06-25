@@ -440,13 +440,13 @@ class TestPyoptSparse(unittest.TestCase):
         assert_near_equal(prob['x'], 7.16667, 1e-6)
         assert_near_equal(prob['y'], -7.833334, 1e-6)
 
-        self.assertEqual(prob.driver._quantities, ['f_xy'])
+        self.assertEqual(prob.driver._nl_responses, ['f_xy'])
 
         # make sure multiple driver runs don't grow the list of _quantities
-        quants = copy.copy(prob.driver._quantities)
+        quants = copy.copy(prob.driver._nl_responses)
         for i in range(5):
             prob.run_driver()
-            self.assertEqual(quants, prob.driver._quantities)
+            self.assertEqual(quants, prob.driver._nl_responses)
 
     def test_simple_paraboloid_equality(self):
 
