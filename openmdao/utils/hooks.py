@@ -104,6 +104,7 @@ class _HookMeta(object):
     children : list
         If we're a 'None' inst_id hook, keep track of our child hooks.
     """
+
     def __init__(self, class_name, inst_id, hook, ncalls=None, exit=False, pass_args=False,
                  pass_return=False, **kwargs):
         global _hook_counter
@@ -212,6 +213,7 @@ class _HookMetaPassRet(_HookMeta):
     """
     A _HookMeta whose hook functions accept the return value of the hooked function.
     """
+
     def _call_hook(self, inst, args, kwargs, ret):
         return self.hook(inst, ret, **self.kwargs)
 
@@ -220,15 +222,16 @@ class _HookMetaPassArgs(_HookMeta):
     """
     A _HookMeta whose hook functions accept positional and keyword arguments of the hooked function.
     """
+
     def _call_hook(self, inst, args, kwargs, ret):
         return self.hook(inst, args, kwargs, **self.kwargs)
 
 
 class _HookMetaPassArgsPassReturn(_HookMeta):
     """
-    A _HookMeta whose hook functions accept positional and keyword arguments and the return value
-    of the hooked function.
+    A _HookMeta whose hook functions accept arguments and the return value of the hooked function.
     """
+
     def _call_hook(self, inst, args, kwargs, ret):
         return self.hook(inst, args, kwargs, ret, **self.kwargs)
 
@@ -246,6 +249,7 @@ class _HookDecorator(object):
     hooks : list
         List of hook data.
     """
+
     def __init__(self, inst, func, hooks):
         self.__name__ = func.__name__
         self.__doc__ = func.__doc__
