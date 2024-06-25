@@ -89,9 +89,27 @@ def build_model(ncomps=1, ndiscrete_ins=10, ndiscrete_outs=10, nins=10, nouts=10
 
 
 if __name__ == '__main__':
-    p = build_model(ncomps=3, ndiscrete_ins=0, ndiscrete_outs=0, nins=70, nouts=511)
-
+    import argparse
     import time
+
+    parser = argparse.ArgumentParser(description="Benchmark a connected series of components with "
+                                     "specified numbers of inputs, outputs, and discrete inputs and outputs.")
+    parser.add_argument('--comps', action='store', default=1, type=int, dest='comps',
+                        help='Number of connected components (default is 1).')
+    parser.add_argument('--ins', action='store', default=10, type=int, dest='ins',
+                        help="Number of continuous inputs (default is 10).")
+    parser.add_argument('--outs', action='store', default=10, type=int, dest='outs',
+                        help="Number of continuous outputs (default is 10).")
+    parser.add_argument('--dins', action='store', default=10, type=int, dest='dins',
+                        help="Number of discrete inputs (default is 10).")
+    parser.add_argument('--douts', action='store', default=10, type=int, dest='douts',
+                        help="Number of discrete outputs (default is 10).")
+
+    options = parser.parse_args()
+
+    p = build_model(ncomps=options.comps, ndiscrete_ins=options.dins, ndiscrete_outs=options.douts,
+                    nins=options.ins, nouts=options.outs)
+
     start = time.time()
 
     p.setup()
