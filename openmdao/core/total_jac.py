@@ -165,6 +165,8 @@ class _TotalJacInfo(object):
                     has_lin_cons = True
                     continue
 
+                all_lin_cons = False
+        else:
             all_lin_cons = False
 
         if self._orig_mode == 'auto':
