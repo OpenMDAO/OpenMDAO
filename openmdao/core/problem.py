@@ -282,7 +282,7 @@ class Problem(object):
 
         self.comm = comm
 
-        self._metadata = None
+        self._metadata = {'setup_status': _SetupStatus.PRE_SETUP}
         self._run_counter = -1
         self._rec_mgr = RecordingManager()
 
@@ -469,7 +469,7 @@ class Problem(object):
         bool
             True if the named system or variable is local to this process.
         """
-        if self._metadata is None:
+        if self._metadata['setup_status'] < _SetupStatus.POST_SETUP:
             raise RuntimeError(f"{self.msginfo}: is_local('{name}') was called before setup() "
                                "completed.")
 
@@ -652,9 +652,13 @@ class Problem(object):
                                ": Before calling `run_model`, the `setup` method must be called "
                                "if set_output_solver_options has been called.")
 
-        if self._mode is None:
-            raise RuntimeError(self.msginfo +
-                               ": The `setup` method must be called before `run_model`.")
+        if self._metadata['setup_status'] < _SetupStatus.POST_SETUP:
+            if self.model._order_set:
+                raise RuntimeError(f"{self.msginfo}: Cannot call set_order without calling setup "
+                                   "after")
+            else:
+                raise RuntimeError(self.msginfo +
+                                   ": The `setup` method must be called before `run_model`.")
 
         old_prefix = self._recording_iter.prefix
 
@@ -699,7 +703,7 @@ class Problem(object):
         model = self.model
         driver = self.driver
 
-        if self._mode is None:
+        if self._metadata['setup_status'] < _SetupStatus.POST_SETUP:
             raise RuntimeError(self.msginfo +
                                ": The `setup` method must be called before `run_driver`.")
 
@@ -1044,7 +1048,13 @@ class Problem(object):
         """
         driver = self.driver
 
-        response_size, desvar_size = driver._update_voi_meta(self.model)
+        responses = self.model.get_responses(recurse=True, use_prom_ivc=True)
+        designvars = self.model.get_design_vars(recurse=True, use_prom_ivc=True)
+
+        if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
+            self.model._final_setup()
+
+        response_size, desvar_size = driver._update_voi_meta(self.model, responses, designvars)
 
         # update mode if it's been set to 'auto'
         if self._orig_mode == 'auto':
@@ -1053,9 +1063,6 @@ class Problem(object):
             mode = self._orig_mode
 
         self._metadata['mode'] = mode
-
-        if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-            self.model._final_setup()
 
         # If set_solver_print is called after an initial run, in a multi-run scenario,
         #  this part of _final_setup still needs to happen so that change takes effect
@@ -1760,8 +1767,7 @@ class Problem(object):
             if not self.driver._responses:
                 raise RuntimeError("Driver is not providing any response variables "
                                    "for compute_totals.")
-            lcons = [n for n, meta in self.driver._cons.items()
-                     if ('linear' in meta and meta['linear'])]
+            lcons = [n for n, meta in self.driver._cons.items() if meta['linear']]
             if lcons:
                 # if driver has linear constraints, construct a full list of driver responses
                 # in order to avoid using any driver coloring that won't include the linear
