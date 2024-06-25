@@ -2579,7 +2579,7 @@ class System(object):
                     vec.scale_to_phys()
 
     @contextmanager
-    def _matvec_context(self, scope_out, scope_in, mode, clear=True):
+    def _matvec_context(self, scope_out, scope_in, mode):
         """
         Context manager for vectors.
 
@@ -2597,9 +2597,6 @@ class System(object):
         mode : str
             Key for specifying derivative direction. Values are 'fwd'
             or 'rev'.
-        clear : bool(True)
-            If True, zero out residuals (in fwd mode) or inputs and outputs
-            (in rev mode).
 
         Yields
         ------
@@ -2612,14 +2609,13 @@ class System(object):
         d_outputs = self._doutputs
         d_residuals = self._dresiduals
 
-        if clear:
-            if mode == 'fwd':
-                d_residuals.set_val(0.0)
-            else:  # rev
-                d_inputs.set_val(0.0)
-                d_outputs.set_val(0.0)
+        if mode == 'fwd':
+            d_residuals.set_val(0.0)
+        else:  # rev
+            d_inputs.set_val(0.0)
+            d_outputs.set_val(0.0)
 
-        if scope_out is None and scope_in is None:
+        if scope_in is None:
             yield d_inputs, d_outputs, d_residuals
         else:
             old_ins = d_inputs._names
