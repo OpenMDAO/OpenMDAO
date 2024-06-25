@@ -1,8 +1,10 @@
 
-import openmdao.api as om
+from openmdao.core.problem import Problem
+from openmdao.core.indepvarcomp import IndepVarComp
+from openmdao.core.explicitcomponent import ExplicitComponent
 
 
-class ManyVarComp(om.ExplicitComponent):
+class ManyVarComp(ExplicitComponent):
     def initialize(self):
         self.options.declare('ndiscrete_ins', types=int)
         self.options.declare('ndiscrete_outs', types=int)
@@ -37,9 +39,9 @@ class ManyVarComp(om.ExplicitComponent):
 
 
 def build_model(ncomps=1, ndiscrete_ins=10, ndiscrete_outs=10, nins=10, nouts=10):
-    p = om.Problem()
+    p = Problem()
     model = p.model
-    ivc = model.add_subsystem('ivc', om.IndepVarComp())
+    ivc = model.add_subsystem('ivc', IndepVarComp())
     for i in range(ndiscrete_ins):
         ivc.add_discrete_output(f'dout{i}', i)
     for i in range(nins):
