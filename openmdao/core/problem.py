@@ -2448,9 +2448,8 @@ class Problem(object):
             return
 
         if logger is None:
-            logger = get_logger('check_config',
-                                out_file=self.get_outputs_dir() / out_file,
-                                use_format=True)
+            check_file_path = None if out_file is None else str(self.get_outputs_dir() / out_file)
+            logger = get_logger('check_config', out_file=check_file_path, use_format=True)
 
         if checks == 'all':
             checks = sorted(_all_non_redundant_checks)
