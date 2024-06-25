@@ -11,15 +11,15 @@ import numpy as np
 import openmdao.api as om
 from openmdao.core.driver import Driver
 from openmdao.utils.units import convert_units
-from openmdao.utils.assert_utils import assert_near_equal, assert_warnings, assert_check_totals
-from openmdao.utils.general_utils import printoptions
+from openmdao.utils.assert_utils import assert_near_equal, assert_warnings, assert_check_totals, assert_no_warning
+from openmdao.utils.general_utils import printoptions, set_pyoptsparse_opt
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
 from openmdao.utils.om_warnings import OpenMDAOWarning
-
 from openmdao.utils.mpi import MPI
+from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver, pyoptsparse
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -1122,6 +1122,48 @@ class TestDriverMPI(unittest.TestCase):
 
         assert_near_equal(x_star, 6.6666, tolerance=1.0E-3)
         assert_near_equal(y_star, -7.3333, tolerance=1.0E-3)
+
+
+class TestLinearOnlyDVs(unittest.TestCase):
+    def build_model(self, driver):
+
+        prob = om.Problem()
+        model = prob.model
+        prob.driver = driver
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x - y + k'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_design_var('k', lower=-1, upper=1)
+        model.add_objective('f_xy')
+        model.add_constraint('c', lower=15.0, linear=True)
+
+        prob.setup()
+
+        return prob
+
+    @unittest.skipIf(pyoptsparse is None, "pyoptsparse is required.")
+    def test_pyoptsparse(self):
+        OPTIMIZER = set_pyoptsparse_opt('SLSQP')[1]
+
+        driver = pyOptSparseDriver(optimizer=OPTIMIZER, print_results=False)
+        driver.opt_settings['ACC'] = 1e-9
+
+        prob = self.build_model(driver)
+        with assert_no_warning(category=om.DerivativesWarning):
+            prob.run_driver()
+
+    def test_scipy_opt(self):
+        driver = om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False)
+        prob = self.build_model(driver)
+        with assert_no_warning(category=om.DerivativesWarning):
+            prob.run_driver()
 
 
 if __name__ == "__main__":
