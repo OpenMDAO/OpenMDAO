@@ -276,7 +276,7 @@ class pyOptSparseDriver(Driver):
         self.options.declare('output_dir', types=(str, _ReprClass), default=_DEFAULT_REPORTS_DIR,
                              allow_none=True,
                              desc='Directory location of pyopt_sparse output files.'
-                             'Default is ./reports_directory/problem_name.')
+                             'Default is {prob_name}_out/reports.')
 
     @property
     def hist_file(self):
@@ -530,14 +530,11 @@ class pyOptSparseDriver(Driver):
 
         # Need to tell optimizer where to put its .out files
         if self.options['output_dir'] is None:
-            output_dir = "."
+            output_dir = str(self._problem().get_outputs_dir())
         elif self.options['output_dir'] == _DEFAULT_REPORTS_DIR:
-            problem = self._problem()
-            default_output_dir = pathlib.Path(get_reports_dir()).joinpath(problem._name)
-            pathlib.Path(default_output_dir).mkdir(parents=True, exist_ok=True)
-            output_dir = str(default_output_dir)
+            output_dir = str(self._problem().get_reports_dir(force=True))
         else:
-            output_dir = self.options['output_dir']
+            output_dir = str(self.options['output_dir'])
 
         optimizers_and_output_files = {
             # ALPSO uses a single option `filename` to determine name of both output files
