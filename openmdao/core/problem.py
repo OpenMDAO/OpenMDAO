@@ -2393,10 +2393,10 @@ class Problem(object):
                 # auto_ivc output may point to a promoted input name
                 if name in prom2abs_out:
                     prom2abs = prom2abs_out
-                    loc = 'output'
+                    is_output = True
                 else:
                     prom2abs = prom2abs_in
-                    loc = 'input'
+                    is_output = False
 
                 if name in prom2abs:
                     if isinstance(case, dict):
@@ -2407,9 +2407,8 @@ class Problem(object):
                     for abs_name in prom2abs[name]:
                         if set_later(abs_name):
                             continue
-                        
 
-                        if loc == 'output':
+                        if is_output:
                             try:
                                 varmeta = abs2meta_out[abs_name]
                             except KeyError:
@@ -2419,14 +2418,12 @@ class Problem(object):
                                 varmeta = abs2meta_in[abs_name]
                             except KeyError:
                                 varmeta = abs2meta_disc_in[abs_name]
-                        if 'distributed' in varmeta:
-                            if varmeta['distributed'] and model.comm.size > 1:
-                                sizes = model._var_sizes['output'][:, abs2idx[abs_name]]
-                                model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
-                            else:
-                                model.set_val(abs_name, val)
+                        if varmeta.get('distributed') and model.comm.size > 1:
+                            sizes = model._var_sizes['output'][:, abs2idx[abs_name]]
+                            model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
                         else:
                             model.set_val(abs_name, val)
+
                 else:
                     issue_warning(f"{model.msginfo}: Output variable, '{name}', recorded "
                                   "in the case is not found in the model.")
