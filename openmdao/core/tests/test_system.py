@@ -691,7 +691,7 @@ class TestSystem(unittest.TestCase):
         prob.setup()
 
         d = prob.get_outputs_dir('subdir')
-        self.assertEqual(str(pathlib.Path('test_name_out', 'subdir')), str(d))
+        self.assertEqual(str(pathlib.Path('test_prob_name_out', 'subdir')), str(d))
 
 
 if __name__ == "__main__":

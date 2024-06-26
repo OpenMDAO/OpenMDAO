@@ -12,8 +12,8 @@ from openmdao.core.problem import _default_prob_name
 import openmdao.core.problem as probmod
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.utils.reports_system import _reports_dir, register_report, \
-    list_reports, clear_reports, _reset_reports_dir, activate_report, _reports_registry
+from openmdao.utils.reports_system import register_report, \
+    list_reports, clear_reports, activate_report, _reports_registry
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.assert_utils import assert_no_warning
 from openmdao.utils.mpi import MPI
@@ -43,13 +43,11 @@ class TestReportsSystem(unittest.TestCase):
         # set things to a known initial state for all the test runs
         probmod._clear_problem_names()  # need to reset these to simulate separate runs
         os.environ.pop('OPENMDAO_REPORTS', None)
-        os.environ.pop('OPENMDAO_REPORTS_DIR', None)
         # We need to remove the TESTFLO_RUNNING environment variable for these tests to run.
         # The reports code checks to see if TESTFLO_RUNNING is set and will not do anything if set
         # But we need to remember whether it was set so we can restore it
         self.testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
         clear_reports()
-        om.set_reports_dir(_reports_dir)
 
         self.count = 0
 
@@ -58,11 +56,8 @@ class TestReportsSystem(unittest.TestCase):
         if self.testflo_running is not None:
             os.environ['TESTFLO_RUNNING'] = self.testflo_running
 
-    def setup_and_run_simple_problem(self, driver=None, reports=_UNDEFINED, reports_dir=_UNDEFINED):
-        if reports_dir is not _UNDEFINED:
-            om.set_reports_dir(reports_dir)
-
-        prob = om.Problem(reports=reports)
+    def setup_and_run_simple_problem(self, prob_name=None, driver=None, reports=_UNDEFINED):
+        prob = om.Problem(reports=reports, name=prob_name)
         model = prob.model
 
         model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
@@ -85,10 +80,7 @@ class TestReportsSystem(unittest.TestCase):
 
         return prob
 
-    def setup_problem_w_errors(self, prob_name, driver=None, reports=_UNDEFINED, reports_dir=_UNDEFINED):
-        if reports_dir is not _UNDEFINED:
-            om.set_reports_dir(reports_dir)
-
+    def setup_problem_w_errors(self, prob_name=None, driver=None, reports=_UNDEFINED):
         prob = om.Problem(reports=reports, name=prob_name)
         model = prob.model
 
@@ -320,26 +312,6 @@ class TestReportsSystem(unittest.TestCase):
                          f'The optimizer report file, {str(path)}, was found but should not exist.')
 
     @hooks_active
-    def test_report_generation_set_reports_dir_using_env_var(self):
-        # test use of setting a custom reports directory other than the default of "."
-        custom_dir = 'custom_reports_dir'
-        os.environ['OPENMDAO_REPORTS_DIR'] = custom_dir
-        _reset_reports_dir()  # this will use current value of OPENMDAO_REPORTS_DIR
-
-        prob = self.setup_and_run_simple_problem()
-
-        # See if the report files exist and if they have the right names
-        reports_dir = custom_dir
-        problem_reports_dir = prob.get_outputs_dir() / 'reports'
-
-        path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
-        self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
-        path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
-        self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
-        path = pathlib.Path(problem_reports_dir).joinpath(self.optimizer_filename)
-        self.assertTrue(path.is_file(), f'The optimizer report file, {str(path)}, was not found')
-
-    @hooks_active
     def test_report_generation_user_defined_report(self):
         user_report_filename = 'user_report.txt'
         os.environ['OPENMDAO_REPORTS'] = 'User report'
@@ -443,7 +415,7 @@ class TestReportsSystem(unittest.TestCase):
         #    we specifically asked for just the instance of problem2
         self.assertTrue(path.is_file(), f'The n2 report file, {str(path)} was not found')
 
-        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{probname}')
+        problem_reports_dir = f'{probname}_out/reports'
         path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
         self.assertFalse(path.is_file(),
                          f'The N2 report file, {str(path)} was found but should not exist.')
@@ -457,7 +429,7 @@ class TestReportsSystem(unittest.TestCase):
 
         prob = self.setup_and_run_simple_problem()
 
-        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
+        problem_reports_dir = prob.get_reports_dir()
 
         path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
         self.assertFalse(path.is_file(),
@@ -554,12 +526,12 @@ class TestReportsSystem(unittest.TestCase):
 
     @hooks_active
     def test_report_generation_basic_problem_reports_dir_argument(self):
-        custom_reports_dir = 'user_dir'
+        custom_prob_name = 'user_prob'
 
-        prob = self.setup_and_run_simple_problem(reports=False, reports_dir=custom_reports_dir)
+        self.setup_and_run_simple_problem(reports=False, prob_name=custom_prob_name)
 
         # get the path to the problem subdirectory
-        problem_reports_dir = pathlib.Path(custom_reports_dir).joinpath(prob._name)
+        problem_reports_dir = pathlib.Path(custom_prob_name) / 'reports'
         path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
         self.assertFalse(path.is_file(),
                          f'The N2 report file, {str(path)} was found but should not exist.')
