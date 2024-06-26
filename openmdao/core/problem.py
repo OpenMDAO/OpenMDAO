@@ -2351,6 +2351,8 @@ class Problem(object):
         prom2abs_out = model._var_allprocs_prom2abs_list['output']
         abs2meta_in = model._var_allprocs_abs2meta['input']
         abs2meta_out = model._var_allprocs_abs2meta['output']
+        abs2meta_disc_in = model._var_allprocs_discrete['input']
+        abs2meta_disc_out = model._var_allprocs_discrete['output']
 
         if inputs:
             for name in inputs:
@@ -2373,8 +2375,11 @@ class Problem(object):
                                 val = case.inputs[abs_name]
                             else:
                                 val = case.inputs[case_abs_names[0]]
-
-                        varmeta = abs2meta_in[abs_name]
+                        try:
+                            varmeta = abs2meta_in[abs_name]
+                        except KeyError:
+                            # Var may be discrete
+                            varmeta = abs2meta_disc_in[abs_name]
                         if varmeta['distributed'] and model.comm.size > 1:
                             sizes = model._var_sizes['input'][:, abs2idx[abs_name]]
                             model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
@@ -2392,10 +2397,10 @@ class Problem(object):
                 # auto_ivc output may point to a promoted input name
                 if name in prom2abs_out:
                     prom2abs = prom2abs_out
-                    abs2meta = abs2meta_out
+                    is_output = True
                 else:
                     prom2abs = prom2abs_in
-                    abs2meta = abs2meta_in
+                    is_output = False
 
                 if name in prom2abs:
                     if isinstance(case, dict):
@@ -2407,12 +2412,22 @@ class Problem(object):
                         if set_later(abs_name):
                             continue
 
-                        varmeta = abs2meta[abs_name]
-                        if varmeta['distributed'] and model.comm.size > 1:
+                        if is_output:
+                            try:
+                                varmeta = abs2meta_out[abs_name]
+                            except KeyError:
+                                varmeta = abs2meta_disc_out[abs_name]
+                        else:
+                            try:
+                                varmeta = abs2meta_in[abs_name]
+                            except KeyError:
+                                varmeta = abs2meta_disc_in[abs_name]
+                        if varmeta.get('distributed') and model.comm.size > 1:
                             sizes = model._var_sizes['output'][:, abs2idx[abs_name]]
                             model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
                         else:
                             model.set_val(abs_name, val)
+
                 else:
                     issue_warning(f"{model.msginfo}: Output variable, '{name}', recorded "
                                   "in the case is not found in the model.")
