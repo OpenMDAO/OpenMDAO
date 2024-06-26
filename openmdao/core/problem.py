@@ -226,8 +226,7 @@ class Problem(object):
         self._computing_coloring = False
 
         # Set the Problem name so that it can be referenced from command line tools (e.g. check)
-        # that accept a Problem argument, and to name the corresponding reports subdirectory.
-
+        # that accept a Problem argument, and to name the corresponding outputs subdirectory.
         if name:  # if name hasn't been used yet, use it. Otherwise, error
             if name not in _problem_names:
                 self._name = name
@@ -1021,6 +1020,8 @@ class Problem(object):
         else:
             self._metadata['pathname'] = self._name
 
+        # We don't want to delete the outputs directory because we may be using the coloring files
+        # from a previous run.
         # Start setup by deleting any existing reports so that the files
         # that are in that directory are all from this run and not a previous run
         reports_dirpath = self.get_reports_dir(force=False)
