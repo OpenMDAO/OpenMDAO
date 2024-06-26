@@ -448,6 +448,7 @@ def set_reports_dir(reports_dir_path):
     raise RuntimeError('The set_reports_dir function has been removed. Reports are now stored in '
                        'the reports subdirectory under the enclosing problem\'s output directory')
 
+
 # -----------------------------------------
 # TODO: remove these once dymos has been updated to current reports system API
 def _run_n2_report(x):
@@ -476,6 +477,7 @@ def _reset_reports_dir():
     raise RuntimeError('The _reset_reports_dir function in openmdao.api has been removed. '
                        'Reports are now placed in the reports sub-directory of the problem.')
 
+
 def get_reports_dir():
     """
     Get the path to the top level reports directory. Defaults to './reports'.
@@ -487,6 +489,7 @@ def get_reports_dir():
     """
     raise RuntimeError('The get_reports_dir function in openmdao.api has '
                        'been replaced by the get_reports_dir method on Problem and System.')
+
 
 def _reports2list(reports, defaults):
     """
