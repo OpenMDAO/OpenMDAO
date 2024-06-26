@@ -149,10 +149,6 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
 
         elif optimizer == 'IPOPT':
             output_dir = prob.get_outputs_dir()
-            import os
-            print(os.listdir(os.getcwd()))
-            print(os.listdir(output_dir))
-            print(os.listdir(f'{output_dir}/reports'))
             with open(f"{prob.get_outputs_dir()}/IPOPT.out", encoding="utf-8") as f:
                 IPOPT_history = f.read()
 
