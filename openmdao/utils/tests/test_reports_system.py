@@ -554,14 +554,12 @@ class TestReportsSystemMPI(unittest.TestCase):
         probmod._clear_problem_names()  # need to reset these to simulate separate runs
 
         os.environ.pop('OPENMDAO_REPORTS', None)
-        os.environ.pop('OPENMDAO_REPORTS_DIR', None)
         # We need to remove the TESTFLO_RUNNING environment variable for these tests to run.
         # The reports code checks to see if TESTFLO_RUNNING is set and will not do anything
         # if it is set.
         # But we need to remember whether it was set so we can restore it
         self.testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
         clear_reports()
-        om.set_reports_dir(_reports_dir)
 
         self.count = 0  # used to keep a count of reports generated
 
