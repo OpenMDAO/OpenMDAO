@@ -4,12 +4,30 @@ import numpy as np
 import openmdao.api as om
 import openmdao.core.problem
 import openmdao.utils.hooks as hooks
-from openmdao.utils.assert_utils import assert_warning
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 def make_hook(name):
     def hook_func(obj):
         obj.calls.append(name)
+    return hook_func
+
+
+def make_hook_pass_args(name):
+    def hook_func(obj, args, kwargs, **kw):
+        obj.calls.append((name, args, kwargs))
+    return hook_func
+
+
+def make_hook_pass_return(name):
+    def hook_func(obj, ret):
+        obj.calls.append((name, ret))
+    return hook_func
+
+
+def make_hook_pass_args_pass_return(name):
+    def hook_func(obj, args, kwargs, ret, **kw):
+        obj.calls.append((name, args, kwargs, ret))
     return hook_func
 
 
@@ -260,24 +278,77 @@ class HooksTestCase(unittest.TestCase):
         self.assertEqual(prob['comp.y'], y0)
 
     @hooks_active
+    def test_problem_hooks_pass_ret(self):
+
+        hooks._register_hook('compute_totals', 'Problem',
+                             pre=make_hook('pre_totals'), post=make_hook_pass_return('post_totals'),
+                             pass_return=True)
+
+        prob = self.build_model()
+
+        prob.run_model()
+
+        J = prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'], return_format='array')
+        self.assertEqual(len(prob.calls), 2)
+        self.assertEqual(prob.calls[0], 'pre_totals')
+        self.assertEqual(prob.calls[1][0], 'post_totals')
+        assert_near_equal(prob.calls[1][1], J)
+
+    @hooks_active
+    def test_problem_hooks_pass_args(self):
+
+        hooks._register_hook('compute_totals', 'Problem',
+                             pre=make_hook_pass_args('pre_totals'), post=make_hook_pass_args('post_totals'),
+                             pass_args=True)
+
+        prob = self.build_model()
+
+        prob.run_model()
+
+        of=['comp.f_xy']
+        wrt=['p1.x', 'p2.y']
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='array')
+        self.assertEqual(len(prob.calls), 2)
+        self.assertEqual(prob.calls[0],  ('pre_totals', (), {'of': ['comp.f_xy'], 'wrt': ['p1.x', 'p2.y'], 'return_format': 'array'}))
+        self.assertEqual(prob.calls[1],  ('post_totals', (), {'of': ['comp.f_xy'], 'wrt': ['p1.x', 'p2.y'], 'return_format': 'array'}))
+
+    @hooks_active
+    def test_problem_hooks_pass_args_ret(self):
+
+        hooks._register_hook('compute_totals', 'Problem',
+                             pre=make_hook_pass_args('pre_totals'), post=make_hook_pass_args_pass_return('post_totals'),
+                             pass_args=True, pass_return=True)
+
+        prob = self.build_model()
+
+        prob.run_model()
+
+        of=['comp.f_xy']
+        wrt=['p1.x', 'p2.y']
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='array')
+        self.assertEqual(len(prob.calls), 2)
+        self.assertEqual(prob.calls[0],  ('pre_totals', (), {'of': ['comp.f_xy'], 'wrt': ['p1.x', 'p2.y'], 'return_format': 'array'}))
+        self.assertEqual(prob.calls[1][:3],  ('post_totals', (), {'of': ['comp.f_xy'], 'wrt': ['p1.x', 'p2.y'], 'return_format': 'array'}))
+        assert_near_equal(prob.calls[1][3], J)
+
+    @hooks_active
     def test_inherited_class_hooks(self):
         def inherited_hook_pre(prob, **kwargs):
             prob.calls.append('inherited_pre')
-        
+
         def inherited_hook_post(prob, **kwargs):
             prob.calls.append('inherited_post')
-        
+
         def base_hook_pre(prob, **kwargs):
             prob.calls.append('base_pre')
-            
+
         def base_hook_post(prob, **kwargs):
             prob.calls.append('base_post')
 
         hooks._register_hook('final_setup', 'MyProblem', pre=inherited_hook_pre, post=inherited_hook_post)
         hooks._register_hook('final_setup', 'Problem', pre=base_hook_pre, post=base_hook_post)
 
-        prob = MyProblem()
-        self.build_model(prob=prob)
+        prob = self.build_model(prob=MyProblem())
 
         prob.run_model()
         prob.run_model()
@@ -285,7 +356,7 @@ class HooksTestCase(unittest.TestCase):
 
         self.assertEqual(prob.calls, ['inherited_pre', 'base_pre', 'inherited_post', 'base_post', 'inherited_pre',
                                       'base_pre', 'inherited_post', 'base_post', 'inherited_pre', 'base_pre', 'inherited_post', 'base_post'])
-        
+
         hooks._unregister_hook('final_setup', 'Problem', pre=base_hook_pre, post=False)
 
         prob.calls = []

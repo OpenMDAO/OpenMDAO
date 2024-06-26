@@ -1025,8 +1025,13 @@ class Problem(object):
         # Start setup by deleting any existing reports so that the files
         # that are in that directory are all from this run and not a previous run
         reports_dirpath = self.get_reports_dir(force=False)
-        if self.comm.rank == 0 and reports_dirpath.exists():
-            shutil.rmtree(reports_dirpath)
+        if self.comm.rank == 0:
+            if os.path.isdir(reports_dirpath):
+                try:
+                    shutil.rmtree(reports_dirpath)
+                except FileNotFoundError:
+                    # Folder already removed by another proccess
+                    pass
         self._metadata['reports_dir'] = self.get_reports_dir(force=False)
 
         try:
