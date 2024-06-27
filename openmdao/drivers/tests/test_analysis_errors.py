@@ -26,7 +26,7 @@ do_not_test = {
     'PSQP',         # fails nominal with: (4) Maximum constraint value is less than or equal to tolerance
 }
 
-# @use_tempdirs
+@use_tempdirs
 @require_pyoptsparse()
 class TestPyoptSparseAnalysisErrors(unittest.TestCase):
 
