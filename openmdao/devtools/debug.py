@@ -359,7 +359,7 @@ def config_summary(problem, stream=sys.stdout):
 
 
 def _summary_report(prob):
-    path = str(pathlib.Path(prob.get_reports_dir()).joinpath('summary.html'))
+    path = prob.get_reports_dir() / 'summary.html'
     s = StringIO()
     config_summary(prob, s)
     with open(path, 'w') as f:

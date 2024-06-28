@@ -689,7 +689,7 @@ def _run_check_report(prob):
 
     output = s.getvalue()
     if output:
-        path = pathlib.Path(prob.get_reports_dir()).joinpath('checks.html')
+        path = pathlib.Path(prob.get_reports_dir() / 'checks.html')
         with open(path, 'w') as f:
             f.write(text2html(output))
 

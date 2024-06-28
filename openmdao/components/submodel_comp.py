@@ -269,9 +269,9 @@ class SubmodelComp(ExplicitComponent):
         # if subprob.setup is called before the top problem setup, we can't rely
         # on using the problem meta data, so default to False
         if self._problem_meta is None:
-            p.setup(force_alloc_complex=False)
+            p.setup(force_alloc_complex=False, parent=self)
         else:
-            p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'])
+            p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'], parent=self)
 
         p.final_setup()
 
