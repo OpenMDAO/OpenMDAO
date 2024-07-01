@@ -3,7 +3,6 @@ import re
 import time
 from itertools import product
 from contextlib import contextmanager
-from collections import defaultdict
 
 import numpy as np
 from numpy import ndarray, imag, complex128 as npcomplex
@@ -16,6 +15,7 @@ from openmdao.utils.units import valid_units
 from openmdao.utils import cs_safe
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, SetupWarning
 from openmdao.utils.array_utils import get_random_arr
+from openmdao.utils.options_dictionary import check_units
 
 
 # regex to check for variable names.
@@ -30,25 +30,6 @@ _allowed_meta = {'value', 'val', 'shape', 'units', 'res_units', 'desc',
 # Names that are not allowed for input or output variables (keywords for options)
 _disallowed_names = {'has_diag_partials', 'units', 'shape', 'shape_by_conn', 'run_root_only',
                      'constant', 'do_coloring'}
-
-
-def check_option(option, value):
-    """
-    Check option for validity.
-
-    Parameters
-    ----------
-    option : str
-        The name of the option.
-    value : any
-        The value of the option.
-
-    Raises
-    ------
-    ValueError
-    """
-    if option == 'units' and value is not None and not valid_units(value):
-        raise ValueError("The units '%s' are invalid." % value)
 
 
 def array_idx_iter(shape):
@@ -257,7 +238,7 @@ class ExecComp(ExplicitComponent):
                              desc='Units to be assigned to all variables in this component. '
                                   'Default is None, which means units may be provided for variables'
                                   ' individually.',
-                             check_valid=check_option)
+                             check_valid=check_units)
 
         self.options.declare('shape', types=(int, tuple, list), allow_none=True, default=None,
                              desc='Shape to be assigned to all variables in this component. '

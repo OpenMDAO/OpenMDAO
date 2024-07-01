@@ -2701,6 +2701,28 @@ class System(object):
 
         return (self._dinputs, self._doutputs, self._dresiduals)
 
+    def _iter_distrib_vars(self, io, local=False):
+        """
+        Iterate over distributed variables.
+
+        Parameters
+        ----------
+        io : str
+            Either 'input' or 'output'.
+        local : bool
+            If True, iterate only over variables that are local to this processor.
+
+        Yields
+        ------
+        str
+            The name of the distributed variable.
+        """
+        abs2meta = self._var_abs2meta[io] if local else self._var_allprocs_abs2meta[io]
+
+        for abs_name, meta in abs2meta.items():
+            if meta['distributed']:
+                yield abs_name
+
     @property
     def nonlinear_solver(self):
         """

@@ -106,10 +106,10 @@ else:
                     # Here, we find the indices that are not locally owned so that we can
                     # temporarilly zero them out for the norm calculation.
                     dup_inds = []
-                    abs2meta = system._var_allprocs_abs2meta[self._typ]
+                    dist_vars = set(system._iter_distrib_vars(self._typ, local=False))
                     for name, idx_slice in self.get_slice_dict().items():
                         owning_rank = system._owning_rank[name]
-                        if not abs2meta[name]['distributed'] and owning_rank != system.comm.rank:
+                        if name not in dist_vars and owning_rank != system.comm.rank:
                             dup_inds.extend(range(idx_slice.start, idx_slice.stop))
 
                     self._dup_inds = np.array(dup_inds, dtype=INT_DTYPE)

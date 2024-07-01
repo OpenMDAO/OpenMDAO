@@ -2,6 +2,7 @@
 
 from openmdao.core.group import Group
 from openmdao.utils.om_warnings import issue_warning
+from openmdao.utils.graph_utils import get_sccs_topo
 
 
 class ParallelGroup(Group):
@@ -200,8 +201,7 @@ class ParallelGroup(Group):
         """
         if self.comm.size > 1:
             if self._gather_full_data():
-                lst = list(super()._get_ordered_component_names())
-                gathered = self.comm.allgather(lst)
+                gathered = self.comm.allgather(list(super()._get_ordered_component_names()))
             else:
                 gathered = self.comm.allgather([])
 
@@ -213,3 +213,32 @@ class ParallelGroup(Group):
                         seen.add(name)
         else:
             yield from super()._get_ordered_component_names()
+
+    def iter_group_sccs(self, recurse=True):
+        """
+        Yield strongly connected components of the group's subsystem graph.
+
+        Only groups containing 1 or more SCCs with more than one node are included.
+
+        Parameters
+        ----------
+        recurse : bool
+            If True, recurse into subgroups.
+
+        Yields
+        ------
+        str, list of sets of str
+            Group pathname and list of sets of subsystems in any strongly connected components
+            in this Group.
+        """
+        if self.comm.size > 1:
+            if self._gather_full_data():
+                gathered = self.comm.allgather(list(super()._iter_group_sccs(recurse)))
+            else:
+                gathered = self.comm.allgather([])
+
+            for ranklist in gathered:
+                for tup in ranklist:
+                    yield tup
+        else:
+            yield from super().iter_group_sccs(recurse)

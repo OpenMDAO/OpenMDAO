@@ -20,6 +20,7 @@ from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAll
 from openmdao.jacobians.jacobian import SUBJAC_META_DEFAULTS
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.solvers.solver import NonlinearSolver, LinearSolver
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.solvers.linear.direct import DirectSolver
@@ -30,7 +31,7 @@ from openmdao.utils.general_utils import common_subpath, all_ancestors, \
     meta2src_iter, get_rev_conns, _contains_all
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
-from openmdao.utils.graph_utils import get_out_of_order_nodes
+from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
@@ -132,6 +133,42 @@ class _PromotesInfo(object):
                 mismatches.append('src_indices')
 
         return mismatches
+
+
+def check_auto_solvers(name, slvlist):
+    """
+    Check auto solver list for validity.
+
+    Parameters
+    ----------
+    name : str
+        The name of the option.
+    slvlist : list of tuples
+        List of tuples of the form [(nl_solver, lin_solver), ...].
+
+    Raises
+    ------
+    ValueError
+    """
+    try:
+        for nl, lin in slvlist:
+            if inspect.is_class(nl):
+                raise ValueError(f"The first entry in each tuple in the '{name}' option should be "
+                                 "an instance of a nonlinear solver, but a class was found.")
+            if inspect.is_class(lin):
+                raise ValueError(f"The second entry in each tuple in the '{name}' option should be "
+                                 "an instance of a linear solver, but a class was found.")
+            if not isinstance(nl, NonlinearSolver):
+                raise ValueError(f"The first entry in each tuple in the '{name}' option should be "
+                                 f"an instance of a nonlinear solver, but a {nl.__class__.__name__}"
+                                 " was found.")
+            if not isinstance(lin, LinearSolver):
+                raise ValueError(f"The second entry in each tuple in the '{name}' option should be "
+                                 f"an instance of a linear solver, but a {lin.__class__.__name__}"
+                                 " was found.")
+    except TypeError:
+        raise ValueError(f"The '{name}' option should be a list of tuples of the form "
+                         f"[(nl_solver, lin_solver), ...].")
 
 
 class Group(System):
@@ -238,6 +275,11 @@ class Group(System):
                              desc='If True the order of subsystems is determined automatically '
                              'based on the dependency graph.  It will not break or reorder '
                              'cycles.')
+        self.options.declare('auto_solvers', types=(list, tuple), default=(),
+                             check_valid=check_auto_solvers,
+                             desc='A list of the form [(nl_solver, lin_solver), ...]. These solvers'
+                             ' will be assigned to any cycles of subsystems or implicit components '
+                             'without their own solvers that are found, in order of execution.')
 
     def setup(self):
         """
@@ -3637,7 +3679,7 @@ class Group(System):
                 # system doutput variables, taking into account distributed inputs.
                 # Since the transfers are not correcting for those issues, we need to do it here.
 
-                # If we have a distributed constraint/obj within the FD group and that con/obj is,
+                # If we have a distributed constraint/obj within the FD group and that con/obj is
                 # active, we perform essentially an allreduce on the d_inputs vars that connect to
                 # outside systems so they'll include the contribution from all procs.
                 if self._fd_rev_xfer_correction_dist and mode == 'rev':
@@ -5263,3 +5305,38 @@ class Group(System):
         # inside of the group or its children.
         meta['base'] = 'Group'
         return meta
+
+    def iter_group_sccs(self, recurse=True):
+        """
+        Yield strongly connected components of the group's subsystem graph.
+
+        Only groups containing 1 or more SCCs with more than one node are included.
+
+        Parameters
+        ----------
+        recurse : bool
+            If True, recurse into subgroups.
+
+        Yields
+        ------
+        str, list of sets of str
+            Group pathname and list of sets of subsystems in any strongly connected components
+            in this Group.
+        """
+        sccs = [s for s in get_sccs_topo(self.compute_sys_graph()) if len(s) > 1]
+        # names are relative to this group, but need absolute names
+        if self.pathname:
+            prefix = self.pathname + '.'
+            abs_sccs = []
+            for scc in sccs:
+                abs_sccs.append({prefix + n for n in scc})
+        else:
+            abs_sccs = sccs
+
+        if abs_sccs:
+            yield self.pathname, abs_sccs
+
+        if recurse:
+            for s in self._subsystems_myproc:
+                if isinstance(s, Group):
+                    yield from s.iter_group_sccs(recurse)

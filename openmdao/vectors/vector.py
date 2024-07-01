@@ -39,9 +39,9 @@ class Vector(object):
     kind : str
         The kind of vector, 'input', 'output', or 'residual'.
     system : <System>
-        Pointer to the owning system.
+        The owning system.
     root_vector : <Vector>
-        Pointer to the vector owned by the root system.
+        The vector owned by the root system.
     alloc_complex : bool
         Whether to allocate any imaginary storage to perform complex step. Default is False.
 
@@ -62,7 +62,7 @@ class Vector(object):
     _names : set([str, ...])
         Set of variables that are relevant in the current context.
     _root_vector : Vector
-        Pointer to the vector owned by the root system.
+        The vector owned by the root system.
     _root_offset : int
         Offset of this vector into the root vector.
     _alloc_complex : bool
@@ -279,11 +279,10 @@ class Vector(object):
         listiterator
             iterator over the variable names.
         """
-        system = self._system()
-        path = system.pathname
+        path = self._system().pathname
         idx = len(path) + 1 if path else 0
 
-        return (n[idx:] for n in system._var_abs2meta[self._typ] if n in self._names)
+        return (n[idx:] for n in self._abs_iter() if n in self._names)
 
     def _abs_item_iter(self, flat=True):
         """

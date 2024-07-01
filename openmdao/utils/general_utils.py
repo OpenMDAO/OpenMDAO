@@ -368,7 +368,7 @@ def all_ancestors(pathname, delim='.'):
     Parameters
     ----------
     pathname : str
-        Pathname of starting object.
+        Starting pathname.
     delim : str
         Delimiter used to split the name.
 
