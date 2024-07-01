@@ -218,7 +218,7 @@ class GraphViewer(object):
                 G, _ = self._decorate_graph_for_display(G, exclude=exclude, abs_graph_names=False)
                 G = _to_pydot_graph(G)
 
-        elif gtype == 'cycles':
+        elif gtype == 'cycle':
             Gcomps = group.compute_sys_graph(comps_only=True, add_edge_info=False)
 
             topo = get_sccs_topo(Gcomps)
@@ -256,11 +256,11 @@ class GraphViewer(object):
                                 unique.difference_update(sub_scc)
 
             G, node_info = self._decorate_graph_for_display(Gcomps, exclude=exclude,
-                                                            abs_graph_names=False)
+                                                            abs_graph_names=True)
             G = self._apply_scc_clusters(Gcomps, group_tree_dict, node_info)
         else:
             raise ValueError(f"unrecognized graph type '{gtype}'. Allowed types are ['tree', "
-                             "'dataflow', 'cycles'].")
+                             "'dataflow', 'cycle'].")
 
         if G is None:
             return
@@ -562,12 +562,14 @@ class GraphViewer(object):
     def _add_sub_clusters(self, parent, group_tree_dict, path, idx, node_info, pydot_nodes):
 
         scc, children, unique, _, pidx = group_tree_dict[path][idx]
-        cluster = pydot.Cluster(f"{path}_{pidx}", label=f"{path.rpartition('.')[2]}_{pidx}",
+        lstr = path if path else '<model>'
+        cluster = pydot.Cluster(f"{path}_{pidx}", label=f"{lstr}_{pidx}",
                                 style='filled', fillcolor=_cluster_color(path),
                                 tooltip=node_info[path]['tooltip'])
         parent.add_subgraph(cluster)
         for node in unique:
             kwargs = _filter_meta4dot(node_info[node])
+            kwargs['label'] = f'"{node.rpartition(".")[2]}"'
             pydot_nodes[node] = pydot.Node(node, **kwargs)
             cluster.add_node(pydot_nodes[node])
 
@@ -594,18 +596,23 @@ class GraphViewer(object):
         pydot_graph = pydot.Dot(graph_type='digraph')
         pydot_nodes = {}
 
-        for scc, children, unique, _, pidx in group_tree_dict['']:
-            self._add_sub_clusters(pydot_graph, group_tree_dict, '', pidx, node_info, pydot_nodes)
+        for tup in group_tree_dict['']:
+            self._add_sub_clusters(pydot_graph, group_tree_dict, '', tup[-1], node_info,
+                                   pydot_nodes)
 
         for u, v, meta in G.edges(data=True):
             if u not in pydot_nodes:
-                continue
+                if u.startswith('_auto_ivc'):
+                    continue
                 kwargs = _filter_meta4dot(node_info[u])
+                kwargs['label'] = f'"{u.rpartition(".")[2]}"'
                 pydot_nodes[u] = pydot.Node(u, **kwargs)
                 pydot_graph.add_node(pydot_nodes[u])
             if v not in pydot_nodes:
-                continue
+                if v.startswith('_auto_ivc'):
+                    continue
                 kwargs = _filter_meta4dot(node_info[v])
+                kwargs['label'] = f'"{v.rpartition(".")[2]}"'
                 pydot_nodes[v] = pydot.Node(v, **kwargs)
                 pydot_graph.add_node(pydot_nodes[v])
 
