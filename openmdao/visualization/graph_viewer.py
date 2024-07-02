@@ -13,10 +13,10 @@ import networkx as nx
 
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
-from openmdao.utils.general_utils import all_ancestors
+from openmdao.utils.general_utils import all_ancestors, common_subpath
 from openmdao.utils.file_utils import _load_and_exec
 import openmdao.utils.hooks as hooks
-from openmdao.utils.graph_utils import get_sccs_topo
+from openmdao.utils.graph_utils import get_sccs_topo, get_cycle_tree
 
 
 # mapping of base system type to graph display properties
@@ -219,44 +219,55 @@ class GraphViewer(object):
                 G = _to_pydot_graph(G)
 
         elif gtype == 'cycle':
-            Gcomps = group.compute_sys_graph(comps_only=True, add_edge_info=False)
+            # Gcomps = group.compute_sys_graph(comps_only=True, add_edge_info=False)
 
-            topo = get_sccs_topo(Gcomps)
-            topsccs = [s for s in topo if len(s) > 1]
+            # topo = get_sccs_topo(Gcomps)
+            # topsccs = [s for s in topo if len(s) > 1]
+            # common_paths = [common_subpath(s) for s in topsccs]
+            # cpathdict = {}
+            # for cpath, s in zip(common_paths, topsccs):
+            #     if cpath not in cpathdict:
+            #         cpathdict[cpath] = []
+            #     cpathdict[cpath].append(s)
 
-            group_tree_dict = {'': [(scc, [], set(scc), '', i) for i, scc in enumerate(topsccs)]}
-            for path, _ in sorted(group.iter_group_sccs(), key=lambda x: (x[0].count('.'),
-                                                                              len(x[0]))):
-                for ans in all_ancestors(path):
-                    if ans in group_tree_dict:
-                        parent_tree = group_tree_dict[ans]
-                        break
-                else:
-                    parent_tree = group_tree_dict['']
+            # topname = group.pathname
+            # group_tree_dict = {}
+            # for cpath, cpsccs in cpathdict.items():
+            #     group_tree_dict[cpath] = [(scc, [], set(scc), cpath, i) for i, scc in enumerate(cpsccs)]
+            # for path, _ in sorted(group.iter_group_sccs(), key=lambda x: (x[0].count('.'),
+            #                                                               len(x[0]))):
+            #     for ans in all_ancestors(path):
+            #         if ans in group_tree_dict:
+            #             parent_tree = group_tree_dict[ans]
+            #             break
+            #     else:
+            #         parent_tree = group_tree_dict[topname]
 
-                tree = group_tree_dict[path] if path in group_tree_dict else None
+            #     tree = group_tree_dict[path] if path in group_tree_dict else None
 
-                prefix = path + '.' if path else ''
-                for parent_scc, children, unique, _, _ in parent_tree:
-                    if prefix:
-                        matching_comps = [c for c in parent_scc if c.startswith(prefix)]
-                    else:
-                        matching_comps = parent_scc
+            #     prefix = path + '.' if path else ''
+            #     for parent_scc, children, unique, _, _ in parent_tree:
+            #         if prefix:
+            #             matching_comps = [c for c in parent_scc if c.startswith(prefix)]
+            #         else:
+            #             matching_comps = parent_scc
 
-                    if matching_comps:
-                        subgraph = Gcomps.subgraph(matching_comps)
-                        sub_sccs = [s for s in get_sccs_topo(subgraph) if len(s) > 1]
-                        for sub_scc in sub_sccs:
-                            if not sub_scc.isdisjoint(parent_scc) and sub_scc != parent_scc:
-                                if tree is None:
-                                    group_tree_dict[path] = tree = ([])
-                                tree.append((sub_scc, [], set(sub_scc), path, len(tree)))
-                                children.append(tree[-1])
-                                # remmove the childs scc comps from the parent 'unique' scc
-                                unique.difference_update(sub_scc)
+            #         if matching_comps:
+            #             subgraph = Gcomps.subgraph(matching_comps)
+            #             sub_sccs = [s for s in get_sccs_topo(subgraph) if len(s) > 1]
+            #             for sub_scc in sub_sccs:
+            #                 if not sub_scc.isdisjoint(parent_scc) and sub_scc != parent_scc:
+            #                     if tree is None:
+            #                         group_tree_dict[path] = tree = ([])
+            #                     tree.append((sub_scc, [], set(sub_scc), path, len(tree)))
+            #                     children.append(tree[-1])
+            #                     # remmove the childs scc comps from the parent 'unique' scc
+            #                     unique.difference_update(sub_scc)
 
+            Gcomps, group_tree_dict = get_cycle_tree(group)
             G, node_info = self._decorate_graph_for_display(Gcomps, exclude=exclude,
-                                                            abs_graph_names=True)
+                                                            abs_graph_names=True,
+                                                            display_map=_base_display_map)
             G = self._apply_scc_clusters(Gcomps, group_tree_dict, node_info)
         else:
             raise ValueError(f"unrecognized graph type '{gtype}'. Allowed types are ['tree', "
@@ -447,7 +458,7 @@ class GraphViewer(object):
         return pydot_graph
 
     def _decorate_graph_for_display(self, G, exclude=(), abs_graph_names=True, dvs=None,
-                                    responses=None):
+                                    responses=None, display_map=None):
         """
         Add metadata to the graph for display.
 
@@ -466,13 +477,15 @@ class GraphViewer(object):
             Dict of design var metadata keyed on promoted name.
         responses : list of str
             Dict of response var metadata keyed on promoted name.
+        display_map : dict or None
+            A map of classnames to pydot node attributes.
 
         Returns
         -------
         nx.DiGraph, dict
             The decorated graph and a dict of node metadata keyed by pathname.
         """
-        node_info = self._get_graph_display_info()
+        node_info = self._get_graph_display_info(display_map)
 
         exclude = set(exclude)
 
@@ -561,7 +574,7 @@ class GraphViewer(object):
 
     def _add_sub_clusters(self, parent, group_tree_dict, path, idx, node_info, pydot_nodes):
 
-        scc, children, unique, _, pidx = group_tree_dict[path][idx]
+        children, scc, unique, pidx, _,  _ = group_tree_dict[path][idx]
         lstr = path if path else '<model>'
         cluster = pydot.Cluster(f"{path}_{pidx}", label=f"{lstr}_{pidx}",
                                 style='filled', fillcolor=_cluster_color(path),
@@ -573,8 +586,8 @@ class GraphViewer(object):
             pydot_nodes[node] = pydot.Node(node, **kwargs)
             cluster.add_node(pydot_nodes[node])
 
-        for child in children:
-            self._add_sub_clusters(cluster, group_tree_dict, child[3], child[4], node_info,
+        for _, _, _, pidx, chpath,  _ in children:
+            self._add_sub_clusters(cluster, group_tree_dict, chpath, pidx, node_info,
                                    pydot_nodes)
 
     def _apply_scc_clusters(self, G, group_tree_dict, node_info):
@@ -596,9 +609,11 @@ class GraphViewer(object):
         pydot_graph = pydot.Dot(graph_type='digraph')
         pydot_nodes = {}
 
-        for tup in group_tree_dict['']:
-            self._add_sub_clusters(pydot_graph, group_tree_dict, '', tup[-1], node_info,
-                                   pydot_nodes)
+        for path, lst in group_tree_dict.items():
+            for (_, _, _, idx, _, parpath) in lst:
+                if parpath is None:  # this is a top level scc
+                    self._add_sub_clusters(pydot_graph, group_tree_dict, path, idx, node_info,
+                                           pydot_nodes)
 
         for u, v, meta in G.edges(data=True):
             if u not in pydot_nodes:
