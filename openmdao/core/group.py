@@ -5342,3 +5342,42 @@ class Group(System):
             for s in self._subsystems_myproc:
                 if isinstance(s, Group):
                     yield from s.iter_group_sccs(recurse)
+
+    def _collapse_subsystems(self, subsystems):
+        """
+        Replace the given subsystems with an UnnamedGroup containing those subsystems.
+
+        Parameters
+        ----------
+        subsystems : list of System
+            List of subsystems to collapse.
+        """
+        pass
+
+    def add_linear_solver(self, linear_solver, ident):
+        """
+        Add a linear solver to the Group.
+
+        Parameters
+        ----------
+        linear_solver : LinearSolver
+            The linear solver to be added to an UnnamedGroup within the Group.
+        ident : str
+            The identifier for the cycle associated with this linear solver.
+            (#TODO: make this either a residual name or the name of any system within the cycle)
+        """
+        pass
+
+    def add_nonlinear_solver(self, nonlinear_solver, ident):
+        """
+        Add a nonlinear solver to the Group.
+
+        Parameters
+        ----------
+        nonlinear_solver : NonlinearSolver
+            The nonlinear solver to be added to an UnnamedGroup within the Group.
+        ident : str
+            The identifier for the cycle associated with this nonlinear solver.
+            (#TODO: make this either a residual name or the name of any system within the cycle)
+        """
+        pass
