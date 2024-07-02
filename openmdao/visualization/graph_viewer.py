@@ -219,51 +219,6 @@ class GraphViewer(object):
                 G = _to_pydot_graph(G)
 
         elif gtype == 'cycle':
-            # Gcomps = group.compute_sys_graph(comps_only=True, add_edge_info=False)
-
-            # topo = get_sccs_topo(Gcomps)
-            # topsccs = [s for s in topo if len(s) > 1]
-            # common_paths = [common_subpath(s) for s in topsccs]
-            # cpathdict = {}
-            # for cpath, s in zip(common_paths, topsccs):
-            #     if cpath not in cpathdict:
-            #         cpathdict[cpath] = []
-            #     cpathdict[cpath].append(s)
-
-            # topname = group.pathname
-            # group_tree_dict = {}
-            # for cpath, cpsccs in cpathdict.items():
-            #     group_tree_dict[cpath] = [(scc, [], set(scc), cpath, i) for i, scc in enumerate(cpsccs)]
-            # for path, _ in sorted(group.iter_group_sccs(), key=lambda x: (x[0].count('.'),
-            #                                                               len(x[0]))):
-            #     for ans in all_ancestors(path):
-            #         if ans in group_tree_dict:
-            #             parent_tree = group_tree_dict[ans]
-            #             break
-            #     else:
-            #         parent_tree = group_tree_dict[topname]
-
-            #     tree = group_tree_dict[path] if path in group_tree_dict else None
-
-            #     prefix = path + '.' if path else ''
-            #     for parent_scc, children, unique, _, _ in parent_tree:
-            #         if prefix:
-            #             matching_comps = [c for c in parent_scc if c.startswith(prefix)]
-            #         else:
-            #             matching_comps = parent_scc
-
-            #         if matching_comps:
-            #             subgraph = Gcomps.subgraph(matching_comps)
-            #             sub_sccs = [s for s in get_sccs_topo(subgraph) if len(s) > 1]
-            #             for sub_scc in sub_sccs:
-            #                 if not sub_scc.isdisjoint(parent_scc) and sub_scc != parent_scc:
-            #                     if tree is None:
-            #                         group_tree_dict[path] = tree = ([])
-            #                     tree.append((sub_scc, [], set(sub_scc), path, len(tree)))
-            #                     children.append(tree[-1])
-            #                     # remmove the childs scc comps from the parent 'unique' scc
-            #                     unique.difference_update(sub_scc)
-
             Gcomps, group_tree_dict = get_cycle_tree(group)
             G, node_info = self._decorate_graph_for_display(Gcomps, exclude=exclude,
                                                             abs_graph_names=True,
