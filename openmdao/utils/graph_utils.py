@@ -1,7 +1,9 @@
 """
 Various graph related utilities.
 """
+import sys
 import networkx as nx
+from openmdao.core.constants import _DEFAULT_OUT_STREAM
 from openmdao.utils.general_utils import all_ancestors, common_subpath
 
 
@@ -91,8 +93,8 @@ def get_cycle_tree(group):
         group_tree_dict[cpath] = [([], scc, set(scc), i, cpath, None)
                                   for i, scc in enumerate(cpsccs)]
 
-    for path, _ in sorted(group.iter_group_sccs(), key=lambda x: (x[0].count('.'),
-                                                                    len(x[0]))):
+    for path, _, _, _ in sorted(group.iter_group_sccs(), key=lambda x: (x[0].count('.'),
+                                                                        len(x[0]))):
         for ans in all_ancestors(path):
             if ans in group_tree_dict:
                 parent_tree = group_tree_dict[ans]
@@ -122,3 +124,63 @@ def get_cycle_tree(group):
                         unique.difference_update(sub_scc)
 
     return G, group_tree_dict
+
+
+def print_cycle_tree(group):
+    """
+    Print the tree of cycles for the given group.
+
+    Parameters
+    ----------
+    group : <Group>
+        The specified Group.
+    """
+    G, group_tree_dict = get_cycle_tree(group)
+
+    def _print_tree(node, nscc, indent=''):
+        children, scc, unique, i, path, _ = node
+        print(indent, f"cycle {i+1} of {nscc} for {path}")
+        for u in unique:
+            print(indent, f"  {u}")
+        if children:
+            for tup in children:
+                _print_tree(tup, len(group_tree_dict[tup[4]]), indent + '  ')
+
+    for path, lst in group_tree_dict.items():
+        for _, _, _, idx, _, parpath in lst:
+            if parpath is None:  # this is a top level scc
+                _print_tree(lst[idx], len(lst))
+
+
+def list_groups_with_cycles(group, min_cycles=2, out_stream=_DEFAULT_OUT_STREAM):
+    """
+    List the groups in the tree that contain cycles.
+
+    Parameters
+    ----------
+    group : <Group>
+        The top Group in the tree.
+    min_cycles : int
+        Minimum number of cycles required for a group to be listed.
+    out_stream : file-like
+        Where to send the output. Default is sys.stdout.
+
+    Returns
+    -------
+    list of (str, list of (list of str))
+        A list of group pathnames that contain cycles, along with a list of cycles for each group.
+    """
+    if out_stream is _DEFAULT_OUT_STREAM:
+        out_stream = sys.stdout
+
+    ret = []
+    for path, sccs, lnslv, nlslv in sorted(group.iter_group_sccs(), key=lambda x: x[0]):
+        if len(sccs) >= min_cycles:
+            ret.append((path, sccs))
+            print(f"{path} contains {len(sccs)} cycles (NL: {nlslv}, LN: {lnslv}):",
+                  file=out_stream)
+            for scc in sccs:
+                print(f"  {scc}", file=out_stream)
+            print("", file=out_stream)
+
+    return ret

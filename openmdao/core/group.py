@@ -5334,7 +5334,9 @@ class Group(System):
             abs_sccs = sccs
 
         if abs_sccs:
-            yield self.pathname, abs_sccs
+            lnslvname = self.linear_solver.__class__.__name__ if self.linear_solver else None
+            nlnslvname = self.nonlinear_solver.__class__.__name__ if self.nonlinear_solver else None
+            yield self.pathname, abs_sccs, lnslvname, nlnslvname
 
         if recurse:
             for s in self._subsystems_myproc:

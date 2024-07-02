@@ -2,7 +2,6 @@
 Viewer graphs of a group's model hierarchy and connections.
 """
 from itertools import chain
-from io import StringIO
 
 try:
     import pydot
@@ -13,10 +12,10 @@ import networkx as nx
 
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
-from openmdao.utils.general_utils import all_ancestors, common_subpath
+from openmdao.utils.general_utils import all_ancestors
 from openmdao.utils.file_utils import _load_and_exec
 import openmdao.utils.hooks as hooks
-from openmdao.utils.graph_utils import get_sccs_topo, get_cycle_tree
+from openmdao.utils.graph_utils import get_cycle_tree
 
 
 # mapping of base system type to graph display properties
@@ -531,7 +530,8 @@ class GraphViewer(object):
 
         children, scc, unique, pidx, _,  _ = group_tree_dict[path][idx]
         lstr = path if path else '<model>'
-        cluster = pydot.Cluster(f"{path}_{pidx}", label=f"{lstr}_{pidx}",
+        cluster = pydot.Cluster(f"{path}_{pidx}",
+                                label=f"{lstr} ({pidx + 1} of {len(group_tree_dict[path])})",
                                 style='filled', fillcolor=_cluster_color(path),
                                 tooltip=node_info[path]['tooltip'])
         parent.add_subgraph(cluster)
@@ -565,7 +565,7 @@ class GraphViewer(object):
         pydot_nodes = {}
 
         for path, lst in group_tree_dict.items():
-            for (_, _, _, idx, _, parpath) in lst:
+            for _, _, _, idx, _, parpath in lst:
                 if parpath is None:  # this is a top level scc
                     self._add_sub_clusters(pydot_graph, group_tree_dict, path, idx, node_info,
                                            pydot_nodes)
