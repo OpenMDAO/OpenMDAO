@@ -232,6 +232,9 @@ class TestLoadCase(unittest.TestCase):
             def compute(self, inputs, outputs, d_ins, d_outs):
                 super().compute(inputs, outputs)
 
+            def compute_partials(self, inputs, outputs, d_ins):
+                super().compute_partials(inputs, outputs)
+
 
         # Setup the optimization 
         prob = om.Problem() 
