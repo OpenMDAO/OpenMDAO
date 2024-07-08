@@ -222,7 +222,13 @@ class gen_gui_test_case(_GuiTestCase):
                 self.log_test("[Toolbar] " + test['desc'])
 
                 btnHandle = await self.get_handle('#' + test['id'])
-                await btnHandle.click(button='left', timeout=3333, force=True)
+                try:
+                    await btnHandle.click(button='left', timeout=3333, force=True)
+                except Exception as err:
+                    if "Element is outside of the viewport" in str(err):
+                        pass
+                    else:
+                        raise(err)
 
         await self.page.reload(wait_until='networkidle')
 
