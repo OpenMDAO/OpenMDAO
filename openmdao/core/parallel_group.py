@@ -68,19 +68,19 @@ class ParallelGroup(Group):
         else:
             yield from super()._ordered_comp_name_iter()
 
-    def _check_order(self, reorder=True, recurse=True, out_of_order=None):
+    def _check_order(self, recurse=True, out_of_order=None, reorder=True):
         """
         Check if auto ordering is needed and if so, set the order appropriately.
 
         Parameters
         ----------
-        reorder : bool
-            If True and options['auto_order'] is True, reorder the subsystems based on the new
-            order.  Otherwise just return the out-of-order connections.
         recurse : bool
             If True, call this method on all subgroups.
         out_of_order : dict
             Lists of out-of-order connections keyed by group pathname.
+        reorder : bool
+            If True and options['auto_order'] is True, reorder the subsystems based on the new
+            order.  Otherwise just return the out-of-order connections.
 
         Returns
         -------
@@ -96,7 +96,7 @@ class ParallelGroup(Group):
 
         if recurse:
             for s in self._subgroups_myproc:
-                s._check_order(reorder, recurse, out_of_order)
+                s._check_order(recurse, out_of_order, reorder)
 
         return out_of_order
 
@@ -190,31 +190,45 @@ class ParallelGroup(Group):
         else:
             super()._get_relevance_modifiers(grad_groups, always_opt_comps)
 
-    def _get_ordered_component_names(self):
-        """
-        Yield components (leaf nodes) in this part of the system tree in order of execution.
-
-        Yields
-        ------
-        str
-            Pathname of the component.
-        """
+    def _setup_ordering(self, parent):
+        # for now, we don't allow ParallelGroup to have auto_order or auto_solvers
         if self.comm.size > 1:
             if self._gather_full_data():
-                gathered = self.comm.allgather(list(super()._get_ordered_component_names()))
+                return self.comm.allreduce(super()._setup_ordering(parent))
             else:
-                gathered = self.comm.allgather([])
-
-            seen = set()
-            for ranklist in gathered:
-                for name in ranklist:
-                    if name not in seen:
-                        yield name
-                        seen.add(name)
+                return self.comm.allreduce(False)
         else:
-            yield from super()._get_ordered_component_names()
+            return super()._setup_ordering(parent)
 
-    def iter_group_sccs(self, recurse=True):
+    def _update_data_order(self, parent=None):
+        # need to gather to update var_allprocs* arrays
+        pass
+
+    # def _get_ordered_component_names(self):
+    #     """
+    #     Yield components (leaf nodes) in this part of the system tree in order of execution.
+
+    #     Yields
+    #     ------
+    #     str
+    #         Pathname of the component.
+    #     """
+    #     if self.comm.size > 1:
+    #         if self._gather_full_data():
+    #             gathered = self.comm.allgather(list(super()._get_ordered_component_names()))
+    #         else:
+    #             gathered = self.comm.allgather([])
+
+    #         seen = set()
+    #         for ranklist in gathered:
+    #             for name in ranklist:
+    #                 if name not in seen:
+    #                     yield name
+    #                     seen.add(name)
+    #     else:
+    #         yield from super()._get_ordered_component_names()
+
+    def iter_group_sccs(self, recurse=True, use_abs_names=True):
         """
         Yield strongly connected components of the group's subsystem graph.
 
@@ -224,6 +238,8 @@ class ParallelGroup(Group):
         ----------
         recurse : bool
             If True, recurse into subgroups.
+        use_abs_names : bool
+            If True, return absolute names, otherwise return relative names.
 
         Yields
         ------
@@ -233,7 +249,8 @@ class ParallelGroup(Group):
         """
         if self.comm.size > 1:
             if self._gather_full_data():
-                gathered = self.comm.allgather(list(super()._iter_group_sccs(recurse)))
+                gathered = self.comm.allgather(
+                    list(super()._iter_group_sccs(recurse=recurse, use_abs_names=use_abs_names)))
             else:
                 gathered = self.comm.allgather([])
 
@@ -241,4 +258,4 @@ class ParallelGroup(Group):
                 for tup in ranklist:
                     yield tup
         else:
-            yield from super().iter_group_sccs(recurse)
+            yield from super().iter_group_sccs(recurse=recurse, use_abs_names=use_abs_names)

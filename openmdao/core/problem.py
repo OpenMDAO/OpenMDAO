@@ -298,15 +298,7 @@ class Problem(object):
                              "iterate over the optimization subsystems during optimization.  This "
                              "applies only when the top level nonlinear solver is of type"
                              "NonlinearRunOnce.")
-        self.options.declare('allow_post_setup_reorder', types=bool,
-                             default=True,
-                             desc="If True, the execution order of direct subsystems of any group "
-                             "that sets its 'auto_order' option to True will be automatically "
-                             "ordered according to data dependencies. If this option is False, the "
-                             "'auto_order' option will be ignored and a warning will be issued for "
-                             "each group that has set it to True. Note that subsystems of a Group "
-                             "that form a cycle will never be reordered, regardless of the value of"
-                             " the 'auto_order' option.")
+
         self.options.update(options)
 
         # Options passed to models
@@ -655,7 +647,7 @@ class Problem(object):
             raise RuntimeError(
                 f"{self.msginfo}: The `setup` method must be called before `run_model`.")
 
-        if self._metadata['reordered']:
+        if self.model._reordered:
             raise RuntimeError(f"{self.msginfo}: Execution order has been changed since last "
                                "call to setup. Call setup() again to reinitialize.")
 
@@ -1006,7 +998,6 @@ class Problem(object):
             'relevance_cache': {},  # cache of relevance objects
             'rel_array_cache': {},  # cache of relevance arrays
             'ncompute_totals': 0,  # number of times compute_totals has been called
-            'reordered': False,  # True if the model has been reordered
         }
 
         if _prob_setup_stack:

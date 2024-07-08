@@ -226,13 +226,13 @@ class Solver(object):
         return f"{type(self).__name__} in {self._system().msginfo}"
 
     def _inf_nan_failure(self):
-        msg = (f"Solver '{self.SOLVER}' on system '{self._system().pathname}': "
+        msg = (f"Solver '{self.SOLVER}' on system '{self._system()._user_pathname()}': "
                f"residuals contain 'inf' or 'NaN' after {self._iter_count} iterations.")
         self.report_failure(msg)
 
     def _convergence_failure(self):
-        msg = (f"Solver '{self.SOLVER}' on system '{self._system().pathname}' failed to converge "
-               f"in {self._iter_count} iterations.")
+        msg = (f"Solver '{self.SOLVER}' on system '{self._system()._user_pathname()}' "
+               f"failed to converge in {self._iter_count} iterations.")
         self.report_failure(msg)
 
     def report_failure(self, msg):
@@ -409,7 +409,7 @@ class Solver(object):
         if (self.options['iprint'] > 0 and
                 (self._system().comm.rank == 0 or os.environ.get('USE_PROC_FILES'))):
 
-            pathname = self._system().pathname
+            pathname = self._system()._user_pathname()
             if pathname:
                 eqs = len(pathname) * "="
                 prefix = self._solver_info.prefix
@@ -787,7 +787,7 @@ class NonlinearSolver(Solver):
 
         # solver stalled.
         elif stalled:
-            msg = (f"Solver '{self.SOLVER}' on system '{system.pathname}' stalled after "
+            msg = (f"Solver '{self.SOLVER}' on system '{system._user_pathname()}' stalled after "
                    f"{self._iter_count} iterations.")
             self.report_failure(msg)
 
@@ -857,8 +857,8 @@ class NonlinearSolver(Solver):
         Perform a Gauss-Seidel iteration over this Solver's subsystems.
         """
         system = self._system()
-        for subsys in system._relevance.filter(system._all_subsystem_iter()):
-            system._transfer('nonlinear', 'fwd', subsys.name)
+        for subname, subsys in system._relevance.filter_items(system._all_subsystem_iter()):
+            system._transfer('nonlinear', 'fwd', subname)
 
             if subsys._is_local:
                 try:

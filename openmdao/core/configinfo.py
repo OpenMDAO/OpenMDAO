@@ -47,10 +47,7 @@ class _ConfigInfo(object):
         if group.comm.size > 1 and group._contains_parallel_group:
             mod_pars = set()
             if self._modified_systems:
-                prefix = group.pathname + '.' if group.pathname else ''
-                our_pars = [p for p in group._problem_meta['parallel_groups']
-                            if p.startswith(prefix)]
-                for par in our_pars:
+                for par in group._contained_syspath_iter(group._problem_meta['parallel_groups']):
                     pre = par + '.'
                     for spath in self._modified_systems:
                         if spath.startswith(pre):

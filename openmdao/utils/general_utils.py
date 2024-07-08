@@ -1174,24 +1174,6 @@ def get_connection_owner(system, tgt):
     return system, src, tgt
 
 
-def wing_dbg():
-    """
-    Make import of wingdbstub contingent on value of WING_DBG environment variable.
-
-    Also will import wingdbstub from the WINGHOME directory.
-    """
-    if env_truthy('WING_DBG'):
-        import sys
-        import os
-        save = sys.path
-        new = sys.path[:] + [os.environ['WINGHOME']]
-        sys.path = new
-        try:
-            import wingdbstub
-        finally:
-            sys.path = save
-
-
 class LocalRangeIterable(object):
     """
     Iterable object yielding local indices while iterating over local, distributed, or remote vars.
@@ -1469,3 +1451,28 @@ def vprint(it, end='\n', getter=None, file=None):
         if getter is not None:
             val = getter(val)
         print(val, end=end, file=file)
+
+
+def truncate(s, length=40):
+    """
+    Truncate a string to the given length.
+
+    If the string exceeds 'length' in length, it will be truncated and ' ... ' will be inserted
+    in the middle.
+
+    Parameters
+    ----------
+    s : str
+        The string to be truncated.
+    length : int
+        Maximum length of the string.
+
+    Returns
+    -------
+    str
+        Truncated string.
+    """
+    if len(s) > length:
+        halfish = (length - 5) // 2
+        return s[:halfish] + ' ... ' + s[-halfish:]
+    return s

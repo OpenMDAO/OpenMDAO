@@ -567,6 +567,17 @@ class System(object):
             return f"'{self.name}' <class {type(self).__name__}>"
         return f"<class {type(self).__name__}>"
 
+    def _user_pathname(self):
+        """
+        Return the pathname of this system intended for user facing output.
+
+        Returns
+        -------
+        str
+            The pathname of this system intended for user facing output.
+        """
+        return self.pathname
+
     def _get_inst_id(self):
         return self.pathname if self.pathname is not None else ''
 
@@ -6536,3 +6547,83 @@ class System(object):
             Array of sizes of the variable on all procs.
         """
         return self._var_sizes[io][:, self._var_allprocs_abs2idx[name]]
+
+    def _setup_ordering(self, parent):
+        """
+        Perform ordering setup.  This does nothing in Components.
+
+        Parameters
+        ----------
+        parent : <System>
+            Parent Group or None.
+
+        Returns
+        -------
+        bool
+            Flag indicating if reordering of subsystems was done.
+        """
+        return False
+
+    def _contained_syspath_iter(self, paths, direct=False):
+        """
+        Yield pathnames of all systems and subsystems that are under the given path.
+
+        Note: this assumes that the paths list does not contain the pathname of self.
+        This behavior allows us to handle children that are UnnamedGroups, which have the same
+        pathname as their parent, so if a path equals self.pathname in the list, we assume it is
+        an UnnamedGroup direct child of self.
+
+        Parameters
+        ----------
+        paths : set
+            Set of pathnames of systems that are under consideration.
+        direct : bool
+            If True, only yield direct children of the given path.
+
+        Yields
+        ------
+        str
+            Pathname of a system contained, directly or indirectly based on the value of 'direct',
+            under this system.
+        """
+        if direct:
+            if self.pathname == '':
+                for p in paths:
+                    if '.' not in p:
+                        yield p
+            else:
+                prefix = self.pathname + '.'
+                for p in paths:
+                    if p.startswith(prefix):
+                        if '.' not in p[len(prefix):]:
+                            yield p
+        else:
+            if self.pathname == '':
+                yield from paths
+            else:
+                prefix = self.pathname + '.'
+                for p in paths:
+                    if p.startswith(prefix):
+                        yield p
+
+    def _contained_varpath_iter(self, paths):
+        """
+        Yield pathnames of all variables that are under the given path.
+
+        Parameters
+        ----------
+        paths : set
+            Set of pathnames of systems that are under consideration.
+
+        Yields
+        ------
+        str
+            Pathname of a variable contained, directly or indirectly, under this system.
+        """
+        if self.pathname == '':
+            yield from paths
+        else:
+            prefix = self.pathname + '.'
+            for p in paths:
+                if p.startswith(prefix):
+                    yield p

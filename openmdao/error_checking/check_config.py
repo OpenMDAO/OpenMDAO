@@ -49,7 +49,7 @@ def _check_cycles(group, infos=None):
     list
         List of cycles, with subsystem names sorted in execution order.
     """
-    graph = group.compute_sys_graph(comps_only=False)
+    graph = group.compute_sys_graph()
     sccs = get_sccs_topo(graph)
     cycles = [sorted(s, key=lambda n: group._subsystems_allprocs[n].index)
               for s in sccs if len(s) > 1]
@@ -71,7 +71,7 @@ def _check_ubcs(group, warnings):
     warnings : list
         List to collect warning messages.
     """
-    out_of_order = group._check_order(reorder=False, recurse=False)
+    out_of_order = group._check_order(recurse=False)
     for syspath, conns in out_of_order.items():
         prefix = f"   In System '{syspath}', subsystem " if syspath else "   System "
         for tgt, srcs in conns.items():
@@ -389,7 +389,7 @@ def _check_solvers(problem, logger):
 
         # determine if this system is a group and has cycles
         if isinstance(system, Group):
-            graph = system.compute_sys_graph(comps_only=False)
+            graph = system.compute_sys_graph()
             sccs = get_sccs_topo(graph)
             allsubs = system._subsystems_allprocs
             has_cycles = [sorted(s, key=lambda n: allsubs[n].index) for s in sccs if len(s) > 1]

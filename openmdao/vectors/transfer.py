@@ -61,3 +61,11 @@ class Transfer(object):
             'fwd' or 'rev'.
         """
         pass
+
+
+def _get_xfer_tgt(group, sysname):
+    for i, cycle in enumerate(group._cycles):
+        if sysname in cycle:
+            return f"{group.name}_cycle#{i}"
+    else:
+        return sysname

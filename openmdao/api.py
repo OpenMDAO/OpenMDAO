@@ -115,7 +115,7 @@ from openmdao.utils.om_warnings import issue_warning, reset_warnings, OpenMDAOWa
     OMInvalidCheckDerivativesOptionsWarning
 
 # Utils
-from openmdao.utils.general_utils import wing_dbg, env_truthy
+from openmdao.utils.general_utils import env_truthy
 from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.jax_utils import register_jax_component
 
@@ -123,27 +123,5 @@ from openmdao.utils.jax_utils import register_jax_component
 from openmdao.utils.reports_system import register_report, unregister_report, get_reports_dir, \
     list_reports, clear_reports, set_reports_dir
 
-import os
 
-wing_dbg()
-
-# set up tracing or memory profiling if env vars are set.
-if env_truthy('OPENMDAO_TRACE'):  # pragma: no cover
-    from openmdao.devtools.itrace import setup, start
-    setup(os.environ['OPENMDAO_TRACE'])
-    start()
-elif env_truthy('OPENMDAO_PROF_MEM'):  # pragma: no cover
-    from openmdao.devtools.iprof_mem import setup, start
-    setup(os.environ['OPENMDAO_PROF_MEM'])
-    start()
-
-
-if env_truthy('FLUSH_PRINT'):  # pragma: no cover
-    import builtins
-    _oldprint = builtins.print
-
-    def _flushprint(*args, **kwargs):
-        kwargs['flush'] = True
-        _oldprint(*args, **kwargs)
-
-    builtins.print = _flushprint
+from openmdao.devtools.debug import print_on, print_off

@@ -235,8 +235,8 @@ class NonlinearBlockGS(NonlinearSolver):
                 outputs_n = outputs.asarray(copy=True)
 
             self._solver_info.append_subsolver()
-            for subsys in system._relevance.filter(system._all_subsystem_iter()):
-                system._transfer('nonlinear', 'fwd', subsys.name)
+            for subname, subsys in system._relevance.filter_items(system._all_subsystem_iter()):
+                system._transfer('nonlinear', 'fwd', subname)
                 if subsys._is_local:
                     subsys._solve_nonlinear()
 

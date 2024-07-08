@@ -842,6 +842,29 @@ class Relevance(object):
         elif relevant:
             yield from systems
 
+    def filter_items(self, sysitems, relevant=True):
+        """
+        Filter the given iterator of systems to only include those that are relevant.
+
+        Parameters
+        ----------
+        sysitems : iter of (name, System)
+            Iterator over names and systems.
+        relevant : bool
+            If True, return only relevant systems.  If False, return only irrelevant systems.
+
+        Yields
+        ------
+        name, System
+            Relevant name and system.
+        """
+        if self._active:
+            for tup in sysitems:
+                if relevant == self.is_relevant_system(tup[1].pathname):
+                    yield tup
+        elif relevant:
+            yield from sysitems
+
     def iter_seed_pair_relevance(self, fwd_seeds=None, rev_seeds=None, inputs=False, outputs=False):
         """
         Yield all relevant variables for each pair of seeds.

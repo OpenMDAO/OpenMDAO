@@ -663,3 +663,15 @@ class SellarProblemWithArrays(om.Problem):
 
         # default to non-verbose
         self.set_solver_print(0)
+
+
+def add_sellar_to_group(group, dis1, dis2):
+    group.add_subsystem('d1', dis1(), promotes=['x', 'z', 'y1', 'y2'])
+    group.add_subsystem('d2', dis2(), promotes=['z', 'y1', 'y2'])
+
+    group.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                        promotes=['x', 'z', 'y1', 'y2', 'obj'])
+
+    group.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+    group.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])

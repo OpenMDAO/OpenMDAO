@@ -42,7 +42,7 @@ def get_out_of_order_nodes(graph, orders):
     Returns
     -------
     list of sets of str
-        A list of strongly connected components in topological order.
+        A list of strongly connected component sets (some of size 1) in topological order.
     list of str
         A list of nodes that are out of order.
     """

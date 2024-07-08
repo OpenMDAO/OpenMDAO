@@ -232,7 +232,11 @@ class TestCheckConfig(unittest.TestCase):
         testlogger.find_in('warning', expected_warning)
 
         # test comps_only cycle check
-        graph = root.compute_sys_graph(comps_only=True)
+        graph = root.compute_sys_graph(comps_only=True, add_edge_info=True)
+        sccs = [sorted(s) for s in get_sccs_topo(graph) if len(s) > 1]
+        self.assertEqual([['C4', 'G1.C1', 'G1.C2']], sccs)
+
+        graph = root.compute_sys_graph(comps_only=True, add_edge_info=False)
         sccs = [sorted(s) for s in get_sccs_topo(graph) if len(s) > 1]
         self.assertEqual([['C4', 'G1.C1', 'G1.C2']], sccs)
 

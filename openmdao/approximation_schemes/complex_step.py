@@ -115,7 +115,7 @@ class ComplexStep(ApproximationScheme):
                 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
                 issue_warning("Nested complex step detected. Finite difference will be used.",
-                              prefix=system.pathname, category=DerivativesWarning)
+                              prefix=system.msginfo, category=DerivativesWarning)
 
                 fd = self._fd = FiniteDifference()
                 empty = {}

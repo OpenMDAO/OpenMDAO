@@ -5,7 +5,7 @@ from collections import defaultdict
 import numpy as np
 
 from openmdao.core.constants import INT_DTYPE
-from openmdao.vectors.transfer import Transfer
+from openmdao.vectors.transfer import Transfer, _get_xfer_tgt
 from openmdao.utils.array_utils import _global2local_offsets
 from openmdao.utils.mpi import MPI
 
@@ -190,11 +190,11 @@ class DefaultTransfer(Transfer):
                 tot_size += sizes_in[idx_in]
 
                 # Now the indices are ready - input_inds, output_inds
-                sub_in = abs_in[mypathlen:].split('.', 1)[0]
+                sub_in = _get_xfer_tgt(group, abs_in[mypathlen:].split('.', 1)[0])
                 fwd_xfer_in[sub_in].append(input_inds)
                 fwd_xfer_out[sub_in].append(output_inds)
                 if rev and abs_out in abs2meta['output']:
-                    sub_out = abs_out[mypathlen:].split('.', 1)[0]
+                    sub_out = _get_xfer_tgt(group, abs_out[mypathlen:].split('.', 1)[0])
                     rev_xfer_in[sub_out].append(input_inds)
                     rev_xfer_out[sub_out].append(output_inds)
 

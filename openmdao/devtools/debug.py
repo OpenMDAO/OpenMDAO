@@ -3,6 +3,7 @@
 
 import sys
 import pathlib
+import builtins
 from io import StringIO
 
 import numpy as np
@@ -11,11 +12,11 @@ from collections import Counter
 
 from openmdao.core.constants import _SetupStatus, _DEFAULT_OUT_STREAM
 from openmdao.utils.mpi import MPI
-from openmdao.utils.om_warnings import issue_warning, MPIWarning
 from openmdao.utils.reports_system import register_report
 from openmdao.utils.file_utils import text2html, _load_and_exec
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.visualization.tables.table_builder import generate_table
+from openmdao.utils.general_utils import env_truthy
 
 
 class _NoColor(object):
@@ -897,3 +898,75 @@ def _dist_conns_cmd(options, user_args):
     hooks._register_hook('final_setup', 'Problem', post=_dist_conns)
 
     _load_and_exec(options.file[0], user_args)
+
+
+if env_truthy('FLUSH_PRINT'):  # pragma: no cover
+    _oldprint = builtins.print
+
+    def _flushprint(*args, **kwargs):
+        kwargs['flush'] = True
+        _oldprint(*args, **kwargs)
+
+    builtins.print = _flushprint
+
+
+_oldprint = builtins.print
+
+def _no_print(*args, **kwargs):
+    pass
+
+
+if env_truthy('OPENMDAO_PRINT_OFF'):  # pragma: no cover
+    # in OPENMDAO_PRINT_OFF mode, printing will only be active within the print_on()
+    # context manager.
+    builtins.print = _no_print
+
+    @contextmanager
+    def print_on():
+        builtins.print = _oldprint
+        yield
+        builtins.print = _no_print
+
+else:
+    @contextmanager
+    def print_on():
+        yield
+
+
+@contextmanager
+def print_off():
+    builtins.print = _no_print
+    yield
+    builtins.print = _oldprint
+
+
+import os
+
+def wing_dbg():
+    """
+    Make import of wingdbstub contingent on value of WING_DBG environment variable.
+
+    Also will import wingdbstub from the WINGHOME directory.
+    """
+    if env_truthy('WING_DBG'):
+        import sys
+        import os
+        save = sys.path
+        new = sys.path[:] + [os.environ['WINGHOME']]
+        sys.path = new
+        try:
+            import wingdbstub
+        finally:
+            sys.path = save
+
+wing_dbg()
+
+# set up tracing or memory profiling if env vars are set.
+if env_truthy('OPENMDAO_TRACE'):  # pragma: no cover
+    from openmdao.devtools.itrace import setup, start
+    setup(os.environ['OPENMDAO_TRACE'])
+    start()
+elif env_truthy('OPENMDAO_PROF_MEM'):  # pragma: no cover
+    from openmdao.devtools.iprof_mem import setup, start
+    setup(os.environ['OPENMDAO_PROF_MEM'])
+    start()
