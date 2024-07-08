@@ -16,7 +16,7 @@ try:
     # through the main NumPy namespace for compatibility. (Until NumPy 2.0 release)
     from numpy.exceptions import ComplexWarning
 except ModuleNotFoundError:
-    from numpy import ComplexWarning
+    from numpy import ComplexWarning  # noqa: NPY201
 
 @use_tempdirs
 class TestBalanceComp(unittest.TestCase):
