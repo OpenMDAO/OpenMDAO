@@ -6,6 +6,8 @@ from aiounittest import async_test
 import os
 import sys
 
+from openmdao.utils.om_warnings import issue_warning
+
 from openmdao.utils.gui_testing_utils import _GuiTestCase
 
 # set DEBUG to True if you want to view the generated HTML file
@@ -226,7 +228,7 @@ class gen_gui_test_case(_GuiTestCase):
                     await btnHandle.click(button='left', timeout=3333, force=True)
                 except Exception as err:
                     if "Element is outside of the viewport" in str(err):
-                        pass
+                        issue_warning(str(err))
                     else:
                         raise(err)
 
