@@ -223,7 +223,7 @@ class TestLoadCase(unittest.TestCase):
 
             def setup(self):
                 super().setup()
-                self.add_discrete_output('disc_in', val='in')
+                self.add_discrete_input('disc_in', val='in')
                 self.add_discrete_output('disc_out', val='out')
                 self.add_design_var('x', lower=-50, upper=50)
                 self.add_design_var('y', lower=-50, upper=50)
@@ -231,6 +231,9 @@ class TestLoadCase(unittest.TestCase):
 
             def compute(self, inputs, outputs, d_ins, d_outs):
                 super().compute(inputs, outputs)
+
+            def compute_partials(self, inputs, outputs, d_ins):
+                super().compute_partials(inputs, outputs)
 
 
         # Setup the optimization 
@@ -241,6 +244,8 @@ class TestLoadCase(unittest.TestCase):
         prob.driver.options['optimizer'] = 'SLSQP'
 
         # Setup Recorder
+        prob.model.recording_options['record_inputs'] = True
+        prob.model.recording_options['record_outputs'] = True
         recorder = om.SqliteRecorder('cases.sql')
         prob.add_recorder(recorder)
 
