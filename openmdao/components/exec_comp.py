@@ -32,6 +32,9 @@ _disallowed_names = {'has_diag_partials', 'units', 'shape', 'shape_by_conn', 'ru
                      'constant', 'do_coloring'}
 
 
+check_option = check_units  # backwards compatibility (fixes CaseReader legacy tests)
+
+
 def array_idx_iter(shape):
     """
     Return an iterator over the indices into a n-dimensional array.

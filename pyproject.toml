@@ -130,6 +130,7 @@ simplegadriver = "openmdao.drivers.genetic_algorithm_driver:SimpleGADriver"
 [project.entry-points.openmdao_group]
 group = "openmdao.core.group:Group"
 parallelgroup = "openmdao.core.parallel_group:ParallelGroup"
+cyclegroup = "openmdao.core.cyclegroup:CycleGroup"
 
 [project.entry-points.openmdao_lin_solver]
 directsolver = "openmdao.solvers.linear.direct:DirectSolver"
