@@ -7,6 +7,43 @@ class UnnamedGroup(Group):
     """
     A Group without a name that can represent a collection of subsystems from a parent Group.
 
+    Parameters
+    ----------
+    parent : <Group>
+        The parent group that contains this unnamed group.
+    scc : <list>
+        The list of subsystem names that form a strongly connected component.
+    index : int
+        The index of this unnamed group within the cycle.
+    nonlinear_solver : <Solver>
+        The nonlinear solver to use for this unnamed group.
+    linear_solver : <Solver>
+        The linear solver to use for this unnamed group.
+    **kwargs : dict
+        Additional keyword arguments.
+
+    Attributes
+    ----------
+    cycle : <list>
+        The list of subsystem names that form a strongly connected component.
+    cycle_index : int
+        The index of this unnamed group within the cycle.
+    nonlinear_solver : <Solver>
+        The nonlinear solver to use for this unnamed group.
+    linear_solver : <Solver>
+        The linear solver to use for this unnamed group.
+    name : str
+        The name of the parent group.
+    pathname : str
+        The pathname of the parent group.
+    comm : MPI.Comm or <FakeComm>
+        The global communicator.
+    _subsystems_myproc : list
+        List of subsystems that are local to this processor.
+    _subgroups_myproc : list
+        List of subgroups that are local to this processor.
+    _subsystems_allprocs : dict
+        Dictionary of all subsystems keyed by name.
     """
 
     def __init__(self, parent, scc, index, nonlinear_solver=None, linear_solver=None, **kwargs):

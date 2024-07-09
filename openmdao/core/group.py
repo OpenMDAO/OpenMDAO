@@ -249,6 +249,7 @@ class Group(System):
         if not self._linear_solver:
             self._linear_solver = LinearRunOnce()
 
+    def _declare_options(self):
         self.options.declare('auto_order', types=bool, default=False,
                              desc='If True the order of subsystems is determined automatically '
                              'based on the dependency graph.  It will not break or reorder '
@@ -2298,43 +2299,6 @@ class Group(System):
 
         self._reordered = False
 
-    def _get_ordered_component_names(self):
-        """
-        Reorder subsystems based on 'auto_order' and 'auto_solver' options.
-
-        Yield components (leaf nodes) in this part of the system tree in final order of execution.
-
-        Yields
-        ------
-        str
-            Pathname of the component.
-        """
-        from openmdao.core.unnamedgroup import UnnamedGroup
-        if self.options['auto_solvers']:
-            G = self.compute_sys_graph()
-            toposorted = get_sccs_topo(G)
-            sccs = [scc for scc in toposorted if len(scc) > 1]
-            if sccs:
-                matches = self._match_solvers_to_sccs(sccs)
-                for i, (nlslv, linslv) in matches.items():
-                    g = UnnamedGroup(self, sccs[i], i)
-                    g.nonlinear_solver = nlslv
-                    g.linear_solver = linslv
-
-        if self.options['auto_order']:
-            G = self.compute_sys_graph()  # compute a sys graph even if we already did it above
-            old_order = {name: i for i, name in enumerate(self._subsystems_allprocs)}
-            toposorted, new_out_of_order = get_out_of_order_nodes(G, old_order)
-
-            if new_out_of_order:
-                self._set_auto_order(toposorted, old_order)
-
-        for system in self._subsystems_myproc:
-            if isinstance(system, Group):
-                yield from system._get_ordered_component_names()
-            else:
-                yield system.pathname
-
     def _match_solvers_to_sccs(self, sccs):
         """
         Match solvers to strongly connected components.
@@ -2892,7 +2856,8 @@ class Group(System):
             if out_subsys != in_subsys:
                 cycle_owns = False
                 for cycle in self._cycles:
-                    if out_subsys.rpartition('.')[2] in cycle and in_subsys.rpartition('.')[2] in cycle:
+                    if (out_subsys.rpartition('.')[2] in cycle and
+                            in_subsys.rpartition('.')[2] in cycle):
                         # cycle owns the connection
                         cycle_owns = True
                         break
@@ -3483,6 +3448,9 @@ class Group(System):
         ----------
         new_order : list of str
             List of system names in desired new execution order.
+        check : bool
+            If True, perform a check to ensure all systems have been specified in new_order and
+            all are valid.  If False, no check is performed.
         """
         if check:
             # Make sure the new_order is valid. It must contain all subsystems
@@ -3500,12 +3468,12 @@ class Group(System):
                 missing = oldset - newset
                 if missing:
                     msg.append("%s: %s expected in subsystem order and not found." %
-                            (self.msginfo, sorted(missing)))
+                               (self.msginfo, sorted(missing)))
 
                 extra = newset - oldset
                 if extra:
                     msg.append("%s: subsystem(s) %s found in subsystem order but don't exist." %
-                            (self.msginfo, sorted(extra)))
+                               (self.msginfo, sorted(extra)))
 
                 raise ValueError('\n'.join(msg))
 
@@ -3513,7 +3481,7 @@ class Group(System):
             if len(newset) < len(new_order):
                 dupes = [key for key, val in Counter(new_order).items() if val > 1]
                 raise ValueError("%s: Duplicate name(s) found in subsystem order list: %s" %
-                                (self.msginfo, sorted(dupes)))
+                                 (self.msginfo, sorted(dupes)))
 
         self._reorder_subsystems_star(new_order)
         self._reordered = True
@@ -5354,7 +5322,7 @@ class Group(System):
         meta['base'] = 'Group'
         return meta
 
-    def iter_group_sccs(self, recurse=True, use_abs_names=True):
+    def iter_group_sccs(self, recurse=True, use_abs_names=True, subcycles_only=False):
         """
         Yield strongly connected components of the group's subsystem graph.
 
@@ -5366,6 +5334,8 @@ class Group(System):
             If True, recurse into subgroups.
         use_abs_names : bool
             If True, return absolute names, otherwise return relative names.
+        subcycles_only : bool
+            If True, only yield SCCs that are only a subset of the group's subsystems.
 
         Yields
         ------
@@ -5374,24 +5344,31 @@ class Group(System):
             in this Group.
         """
         sccs = [s for s in get_sccs_topo(self.compute_sys_graph()) if len(s) > 1]
-        # names are relative to this group, but need absolute names
-        if use_abs_names and self.pathname:
-            prefix = self.pathname + '.'
-            abs_sccs = []
-            for scc in sccs:
-                abs_sccs.append({prefix + n for n in scc})
-        else:
-            abs_sccs = sccs
+        missing = None
+        if subcycles_only and sccs:
+            if len(sccs) == 1:
+                missing = set(s.name for s in self._subsystems_myproc) - sccs[0]
+                if len(sccs[0]) == len(self._subsystems_allprocs):
+                    sccs = []  # whole group is a cycle, so no need to assign solver(s) to cycle(s)
 
-        if abs_sccs:
+        if sccs:
+            # names are relative to this group, but need absolute names
+            if use_abs_names and self.pathname:
+                prefix = self.pathname + '.'
+                abs_sccs = []
+                for scc in sccs:
+                    abs_sccs.append({prefix + n for n in scc})
+                sccs = abs_sccs
+
             lnslvname = self.linear_solver.__class__.__name__ if self.linear_solver else None
             nlnslvname = self.nonlinear_solver.__class__.__name__ if self.nonlinear_solver else None
-            yield self.pathname, abs_sccs, lnslvname, nlnslvname
+            yield self.pathname, sccs, lnslvname, nlnslvname, missing
 
         if recurse:
             for s in self._subsystems_myproc:
                 if isinstance(s, Group):
-                    yield from s.iter_group_sccs(recurse=recurse, use_abs_names=use_abs_names)
+                    yield from s.iter_group_sccs(recurse=recurse, use_abs_names=use_abs_names,
+                                                 subcycles_only=subcycles_only)
 
     def add_solvers(self, nonlinear_solver, linear_solver, cycle_system):
         """

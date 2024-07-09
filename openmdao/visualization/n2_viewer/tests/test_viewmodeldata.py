@@ -287,7 +287,7 @@ class TestViewerData(unittest.TestCase):
         """
         filename = "sellarstate_test_viewer_data.sql"
 
-        p = om.Problem(model=SellarStateConnection(), allow_post_setup_reorder=False)
+        p = om.Problem(model=SellarStateConnection(), )
         p.driver.add_recorder(SqliteRecorder(filename))
         p.setup()
 

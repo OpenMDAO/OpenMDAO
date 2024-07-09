@@ -363,7 +363,6 @@ class GraphViewer(object):
 
         return pydot_graph, groups
 
-
     def _get_tree_graph(self, exclude, display_map=None):
         """
         Create a pydot graph of the system tree (without clusters).
@@ -528,7 +527,7 @@ class GraphViewer(object):
 
     def _add_sub_clusters(self, parent, group_tree_dict, path, idx, node_info, pydot_nodes):
 
-        children, scc, unique, pidx, _,  _ = group_tree_dict[path][idx]
+        children, scc, unique, pidx, _, _ = group_tree_dict[path][idx]
         lstr = path if path else '<model>'
         cluster = pydot.Cluster(f"{path}_{pidx}",
                                 label=f"{lstr} ({pidx + 1} of {len(group_tree_dict[path])})",
@@ -541,7 +540,7 @@ class GraphViewer(object):
             pydot_nodes[node] = pydot.Node(node, **kwargs)
             cluster.add_node(pydot_nodes[node])
 
-        for _, _, _, pidx, chpath,  _ in children:
+        for _, _, _, pidx, chpath, _ in children:
             self._add_sub_clusters(cluster, group_tree_dict, chpath, pidx, node_info,
                                    pydot_nodes)
 

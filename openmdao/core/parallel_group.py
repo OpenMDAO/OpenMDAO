@@ -201,34 +201,40 @@ class ParallelGroup(Group):
             return super()._setup_ordering(parent)
 
     def _update_data_order(self, parent=None):
-        # need to gather to update var_allprocs* arrays
-        pass
+        if self.comms.size > 1:
+            allprocs_abs2meta_keys = {'input': [], 'output': []}
+            if self._gather_full_data():
+                for io in ('input', 'output'):
+                    for subsys in self._subsystems_myproc:
+                        allprocs_abs2meta_keys[io].extend(subsys._var_allprocs_abs2meta[io])
 
-    # def _get_ordered_component_names(self):
-    #     """
-    #     Yield components (leaf nodes) in this part of the system tree in order of execution.
+            old_allprocs_abs2meta = self._var_allprocs_abs2meta
+            self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
 
-    #     Yields
-    #     ------
-    #     str
-    #         Pathname of the component.
-    #     """
-    #     if self.comm.size > 1:
-    #         if self._gather_full_data():
-    #             gathered = self.comm.allgather(list(super()._get_ordered_component_names()))
-    #         else:
-    #             gathered = self.comm.allgather([])
+            # get ordering for var_allprocs_abs2meta keys from all procs.  The metadata has
+            # already been gathered in _setup_var_data and it just needs to be reordered.
+            for proc_keys in self.comm.allgather(allprocs_abs2meta_keys):
+                for io, keylist in proc_keys.items():
+                    abs2meta = self._var_allprocs_abs2meta[io]
+                    old = old_allprocs_abs2meta[io]
+                    for k in keylist:
+                        abs2meta[k] = old[k]
 
-    #         seen = set()
-    #         for ranklist in gathered:
-    #             for name in ranklist:
-    #                 if name not in seen:
-    #                     yield name
-    #                     seen.add(name)
-    #     else:
-    #         yield from super()._get_ordered_component_names()
+            self._var_abs2meta = {'input': {}, 'output': {}}
+            self._var_allprocs_abs2idx = {'input': {}, 'output': {}}
+            for io in ('input', 'output'):
+                abs2meta = self._var_abs2meta[io]
+                for subsys in self._subsystems_myproc:
+                    abs2meta.update(subsys._var_abs2meta[io])
 
-    def iter_group_sccs(self, recurse=True, use_abs_names=True):
+                self._var_allprocs_abs2idx[io].update(
+                    {n: i for i, n in enumerate(self._var_allprocs_abs2meta[io])})
+
+            self._reordered = False
+        else:
+            super()._update_data_order(parent)
+
+    def iter_group_sccs(self, recurse=True, use_abs_names=True, subcycles_only=False):
         """
         Yield strongly connected components of the group's subsystem graph.
 
@@ -240,6 +246,8 @@ class ParallelGroup(Group):
             If True, recurse into subgroups.
         use_abs_names : bool
             If True, return absolute names, otherwise return relative names.
+        subcycles_only : bool
+            If True, only yield SCCs that are only a subset of the group's subsystems.
 
         Yields
         ------
@@ -250,7 +258,8 @@ class ParallelGroup(Group):
         if self.comm.size > 1:
             if self._gather_full_data():
                 gathered = self.comm.allgather(
-                    list(super()._iter_group_sccs(recurse=recurse, use_abs_names=use_abs_names)))
+                    list(super().iter_group_sccs(recurse=recurse, use_abs_names=use_abs_names,
+                                                 subcycles_only=subcycles_only)))
             else:
                 gathered = self.comm.allgather([])
 
@@ -258,4 +267,45 @@ class ParallelGroup(Group):
                 for tup in ranklist:
                     yield tup
         else:
-            yield from super().iter_group_sccs(recurse=recurse, use_abs_names=use_abs_names)
+            yield from super().iter_group_sccs(recurse=recurse, use_abs_names=use_abs_names,
+                                               subcycles_only=subcycles_only)
+
+    def all_system_visitor(self, func, predicate=None, recurse=True, include_self=True):
+        """
+        Apply a function to all subsystems.
+
+        Parameters
+        ----------
+        func : callable
+            A callable that takes a System as its only argument.
+        predicate : callable or None
+            A callable that takes a System as its only argument and returns -1, 0, or 1.
+            If it returns 1, apply the function to the system.
+            If it returns 0, don't apply the function, but continue on to the system's subsystems.
+            If it returns -1, don't apply the function and don't continue on to the system's
+            subsystems.
+            If predicate is None, the function is always applied.
+        recurse : bool
+            If True, function is applied to all subsystems of subsystems.
+        include_self : bool
+            If True, apply the function to the System itself.
+
+        Yields
+        ------
+        object
+            The result of the function called on each system.
+        """
+        if self.comm.size > 1:
+            if self._gather_full_data():
+                gathered = self.comm.allgather(
+                    list(super().all_system_visitor(func, predicate, recurse=recurse,
+                                                    include_self=include_self)))
+            else:
+                gathered = self.comm.allgather([])
+
+            for ranklist in gathered:
+                for tup in ranklist:
+                    yield tup
+        else:
+            yield from super().all_system_visitor(func, predicate, recurse=recurse,
+                                                  include_self=include_self)

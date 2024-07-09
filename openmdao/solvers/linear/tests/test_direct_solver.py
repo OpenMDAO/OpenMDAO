@@ -404,7 +404,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
     def test_raise_error_on_nan(self):
 
-        prob = om.Problem(allow_post_setup_reorder=False)
+        prob = om.Problem()
         model = prob.model
 
         model.add_subsystem('p', om.IndepVarComp('x', 2.0))
@@ -437,7 +437,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
     def test_raise_error_on_nan_sparse(self):
 
-        prob = om.Problem(allow_post_setup_reorder=False)
+        prob = om.Problem()
         model = prob.model
 
         model.add_subsystem('p', om.IndepVarComp('x', 2.0))
@@ -470,7 +470,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
     def test_raise_error_on_nan_dense(self):
 
-        prob = om.Problem(model=om.Group(assembled_jac_type='dense'), allow_post_setup_reorder=False)
+        prob = om.Problem(model=om.Group(assembled_jac_type='dense'), )
         model = prob.model
 
         model.add_subsystem('p', om.IndepVarComp('x', 2.0))
@@ -643,7 +643,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
                 self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
                 self.linear_solver = om.DirectSolver()
 
-        prob = om.Problem(allow_post_setup_reorder=False)
+        prob = om.Problem()
         prob.model.add_subsystem('sub', Rectifier())
 
         prob.setup()

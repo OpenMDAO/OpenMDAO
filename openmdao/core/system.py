@@ -6606,24 +6606,38 @@ class System(object):
                     if p.startswith(prefix):
                         yield p
 
-    def _contained_varpath_iter(self, paths):
+    def all_system_visitor(self, func, predicate=None, recurse=True, include_self=True):
         """
-        Yield pathnames of all variables that are under the given path.
+        Apply a function to all subsystems.
 
         Parameters
         ----------
-        paths : set
-            Set of pathnames of systems that are under consideration.
+        func : callable
+            A function that takes a System as its only argument.
+        predicate : callable or None
+            A callable that takes a System as its only argument and returns -1, 0, or 1.
+            If it returns 1, apply the function to the system.
+            If it returns 0, don't apply the function, but continue on to the system's subsystems.
+            If it returns -1, don't apply the function and don't continue on to the system's
+            subsystems.
+            If predicate is None, the function is always applied.
+        recurse : bool
+            If True, function is applied to all subsystems of subsystems.
+        include_self : bool
+            If True, apply the function to the Group itself.
 
         Yields
         ------
-        str
-            Pathname of a variable contained, directly or indirectly, under this system.
+        object
+            The result of the function.
         """
-        if self.pathname == '':
-            yield from paths
-        else:
-            prefix = self.pathname + '.'
-            for p in paths:
-                if p.startswith(prefix):
-                    yield p
+        if include_self:
+            pred = 1 if predicate is None else predicate(self)
+            if pred == 1:
+                yield func(self)
+            elif pred == -1:
+                return
+
+        if recurse:
+            for s in self._subsystems_myproc:
+                yield from s.all_system_visitor(func, predicate, recurse=True, include_self=True)

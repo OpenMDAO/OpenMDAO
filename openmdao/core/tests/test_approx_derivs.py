@@ -1725,11 +1725,9 @@ class TestGroupComplexStep(unittest.TestCase):
         of = ['obj']
 
         expected_warnings = [(om.DerivativesWarning,
-                              'd1: Nested complex step detected. '
-                              'Finite difference will be used.'),
+                              "'d1' <class SellarDis1CS>: Nested complex step detected. Finite difference will be used."),
                              (om.DerivativesWarning,
-                              'd2: Nested complex step detected. '
-                              'Finite difference will be used.')]
+                              "'d2' <class SellarDis2CS>: Nested complex step detected. Finite difference will be used.")]
 
         with assert_warnings(expected_warnings):
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')

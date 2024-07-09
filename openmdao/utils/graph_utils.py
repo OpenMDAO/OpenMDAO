@@ -93,8 +93,8 @@ def get_cycle_tree(group):
         group_tree_dict[cpath] = [([], scc, set(scc), i, cpath, None)
                                   for i, scc in enumerate(cpsccs)]
 
-    for path, _, _, _ in sorted(group.iter_group_sccs(), key=lambda x: (x[0].count('.'),
-                                                                        len(x[0]))):
+    for path, _, _, _, _ in sorted(group.iter_group_sccs(subcycles_only=False),
+                                   key=lambda x: (x[0].count('.'), len(x[0]))):
         for ans in all_ancestors(path):
             if ans in group_tree_dict:
                 parent_tree = group_tree_dict[ans]
@@ -139,7 +139,7 @@ def print_cycle_tree(group):
 
     def _print_tree(node, nscc, indent=''):
         children, scc, unique, i, path, _ = node
-        print(indent, f"cycle {i+1} of {nscc} for {path}")
+        print(indent, f"cycle {i+1} of {nscc} for '{path}'")
         for u in unique:
             print(indent, f"  {u}")
         if children:
@@ -152,16 +152,16 @@ def print_cycle_tree(group):
                 _print_tree(lst[idx], len(lst))
 
 
-def list_groups_with_cycles(group, min_cycles=2, out_stream=_DEFAULT_OUT_STREAM):
+def list_groups_with_subcycles(group, out_stream=_DEFAULT_OUT_STREAM):
     """
-    List the groups in the tree that contain cycles.
+    List the groups in the tree that contain cycles containing only a subset of their subsystems.
+
+    This will highlight groups that might benefit from solving subcycles with their own solver.
 
     Parameters
     ----------
     group : <Group>
         The top Group in the tree.
-    min_cycles : int
-        Minimum number of cycles required for a group to be listed.
     out_stream : file-like
         Where to send the output. Default is sys.stdout.
 
@@ -174,13 +174,16 @@ def list_groups_with_cycles(group, min_cycles=2, out_stream=_DEFAULT_OUT_STREAM)
         out_stream = sys.stdout
 
     ret = []
-    for path, sccs, lnslv, nlslv in sorted(group.iter_group_sccs(), key=lambda x: x[0]):
-        if len(sccs) >= min_cycles:
-            ret.append((path, sccs))
-            print(f"{path} contains {len(sccs)} cycles (NL: {nlslv}, LN: {lnslv}):",
-                  file=out_stream)
-            for scc in sccs:
-                print(f"  {scc}", file=out_stream)
-            print("", file=out_stream)
+    for path, sccs, lnslv, nlslv, missing in sorted(group.iter_group_sccs(use_abs_names=False,
+                                                                          subcycles_only=True),
+                                                    key=lambda x: x[0]):
+        ret.append((path, sccs))
+        print(f"{path} (NL: {nlslv}, LN: {lnslv}):", file=out_stream)
+
+        for i, scc in enumerate(sccs):
+            print(f"   Cycle {i}: {sorted(scc)}", file=out_stream)
+        if missing:
+            print(f"   No cycle: {sorted(missing)}", file=out_stream)
+        print("", file=out_stream)
 
     return ret
