@@ -4858,6 +4858,11 @@ class Group(System):
         This prevents sending a lot of unnecessary data across the network when
         the data is duplicated across multiple processes.
 
+        NOTE: If the data being gathered is the result of a function call that can in any way
+        result in a collective MPI call, then call the function on all procs, and only use
+        the return of this function to determine if that data should be gathered, rather than
+        some corresponding 'empty' data structure.
+
         Returns
         -------
         bool

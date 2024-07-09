@@ -175,10 +175,7 @@ class ParallelGroup(Group):
 
     def _setup_ordering(self, parent):
         if self.comm.size > 1:
-            if self._gather_full_data():
-                return self.comm.allreduce(super()._setup_ordering(parent))
-            else:
-                return self.comm.allreduce(False)
+            return self.comm.allreduce(super()._setup_ordering(parent))
         else:
             return super()._setup_ordering(parent)
 
@@ -236,10 +233,10 @@ class ParallelGroup(Group):
             in this Group.
         """
         if self.comm.size > 1:
+            lst = list(super().iter_group_sccs(recurse=recurse, use_abs_names=use_abs_names,
+                                               all_groups=all_groups))
             if self._gather_full_data():
-                gathered = self.comm.allgather(
-                    list(super().iter_group_sccs(recurse=recurse, use_abs_names=use_abs_names,
-                                                 all_groups=all_groups)))
+                gathered = self.comm.allgather(lst)
             else:
                 gathered = self.comm.allgather([])
 
@@ -276,10 +273,10 @@ class ParallelGroup(Group):
             The result of the function called on each system.
         """
         if self.comm.size > 1:
+            lst = list(super().all_system_visitor(func, predicate, recurse=recurse,
+                                                  include_self=include_self))
             if self._gather_full_data():
-                gathered = self.comm.allgather(
-                    list(super().all_system_visitor(func, predicate, recurse=recurse,
-                                                    include_self=include_self)))
+                gathered = self.comm.allgather(lst)
             else:
                 gathered = self.comm.allgather([])
 
