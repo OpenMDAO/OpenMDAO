@@ -1,24 +1,26 @@
 from openmdao.core.group import Group, _SysInfo
 from openmdao.utils.general_utils import truncate
 from openmdao.vectors.transfer import _get_xfer_tgt
+from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
+from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 
 
-class UnnamedGroup(Group):
+class CycleGroup(Group):
     """
     A Group without a name that can represent a collection of subsystems from a parent Group.
 
     Parameters
     ----------
     parent : <Group>
-        The parent group that contains this unnamed group.
+        The parent group that contains this cycle group.
     scc : <list>
         The list of subsystem names that form a strongly connected component.
     index : int
-        The index of this unnamed group within the cycle.
+        The index of this cycle group within the cycle.
     nonlinear_solver : <Solver>
-        The nonlinear solver to use for this unnamed group.
+        The nonlinear solver to use for this cycle group.
     linear_solver : <Solver>
-        The linear solver to use for this unnamed group.
+        The linear solver to use for this cycle group.
     **kwargs : dict
         Additional keyword arguments.
 
@@ -26,12 +28,14 @@ class UnnamedGroup(Group):
     ----------
     cycle : <list>
         The list of subsystem names that form a strongly connected component.
+    cycle_key : tuple
+        The sorted tuple of subsystem names that can be used as a key in a dictionary.
     cycle_index : int
-        The index of this unnamed group within the cycle.
+        The index of this cycle group within the cycle.
     nonlinear_solver : <Solver>
-        The nonlinear solver to use for this unnamed group.
+        The nonlinear solver to use for this cycle group.
     linear_solver : <Solver>
-        The linear solver to use for this unnamed group.
+        The linear solver to use for this cycle group.
     name : str
         The name of the parent group.
     pathname : str
@@ -50,6 +54,7 @@ class UnnamedGroup(Group):
         super().__init__(**kwargs)
         self._reset_setup_vars()
         self.cycle = scc
+        self.cycle_key = tuple(sorted(scc))  # for use in hashes
         self.cycle_index = index
         self.nonlinear_solver = nonlinear_solver
         self.linear_solver = linear_solver
@@ -91,28 +96,41 @@ class UnnamedGroup(Group):
             return f"'{self.name} {self._cycle_info()}' <class {type(self).__name__}>"
         return f"<class {type(self).__name__}>"
 
-    def _cycle_info(self):
+    def _cycle_info(self, verbose=True):
         """
         Return cycle information in string form.
+
+        Parameters
+        ----------
+        verbose : bool
+            If True, include cycle system names in the output.
 
         Returns
         -------
         str
             The string containing cycle info.
         """
-        cycle = truncate(f"{self.cycle}", 25)
-        return f"cycle {self.cycle_index} {cycle}"
+        if verbose:
+            cycle = truncate(f"{self.cycle_key}", 25)
+            return f"cycle {self.cycle_index}{cycle}"
+        else:
+            return f"cycle {self.cycle_index}"
 
-    def _user_pathname(self):
+    def _user_pathname(self, verbose=True):
         """
         Return the pathname of this system intended for user facing output.
+
+        Parameters
+        ----------
+        verbose : bool
+            If True, include cycle system names in the output.
 
         Returns
         -------
         str
             The pathname of this system intended for user facing output.
         """
-        return f"{self.pathname} {self._cycle_info()}"
+        return f"{self.pathname} {self._cycle_info(verbose)}"
 
     def _update_parent(self, parent):
         # update parent group's _subsystems_myproc
@@ -140,6 +158,11 @@ class UnnamedGroup(Group):
             else:
                 new_allprocs[name] = _SysInfo(sysinfo.system, len(new_allprocs))
         parent._subsystems_allprocs = new_allprocs
+
+        if not isinstance(parent.nonlinear_solver, NonlinearRunOnce):
+            parent.nonlinear_solver = NonlinearRunOnce()
+        if not isinstance(parent.linear_solver, LinearRunOnce):
+            parent.linear_solver = LinearRunOnce()
 
     def _setup_ordering(self, parent):
         for system in self._subsystems_myproc:
@@ -170,3 +193,14 @@ class UnnamedGroup(Group):
         for io in ('input', 'output'):
             for abs_name, prom_name in self._var_allprocs_abs2prom[io].items():
                 self._var_allprocs_prom2abs_list[io].setdefault(prom_name, []).append(abs_name)
+
+    def is_top(self):
+        """
+        Return True if this system is a top level system.
+
+        Returns
+        -------
+        bool
+            True if this system is a top level system.
+        """
+        return False  # a CycleGroup can never be a top level system

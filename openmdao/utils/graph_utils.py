@@ -93,8 +93,8 @@ def get_cycle_tree(group):
         group_tree_dict[cpath] = [([], scc, set(scc), i, cpath, None)
                                   for i, scc in enumerate(cpsccs)]
 
-    for path, _, _, _, _ in sorted(group.iter_group_sccs(subcycles_only=False),
-                                   key=lambda x: (x[0].count('.'), len(x[0]))):
+    for path, _, _, _, _, _, _ in sorted(group.iter_group_sccs(),
+                                         key=lambda x: (x[0].count('.'), len(x[0]))):
         for ans in all_ancestors(path):
             if ans in group_tree_dict:
                 parent_tree = group_tree_dict[ans]
@@ -174,9 +174,11 @@ def list_groups_with_subcycles(group, out_stream=_DEFAULT_OUT_STREAM):
         out_stream = sys.stdout
 
     ret = []
-    for path, sccs, lnslv, nlslv, missing in sorted(group.iter_group_sccs(use_abs_names=False,
-                                                                          subcycles_only=True),
-                                                    key=lambda x: x[0]):
+    for path, sccs, lnslv, nlslv, lnmaxiter, nlmaxiter, missing \
+            in group.iter_group_sccs(use_abs_names=False):
+        # exclude cases where the entire group is a cycle
+        if len(sccs) == 1 and len(sccs[0]) == len(group._subsystems_allprocs):
+            continue
         ret.append((path, sccs))
         print(f"{path} (NL: {nlslv}, LN: {lnslv}):", file=out_stream)
 

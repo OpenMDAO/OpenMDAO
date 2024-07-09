@@ -68,37 +68,20 @@ class ParallelGroup(Group):
         else:
             yield from super()._ordered_comp_name_iter()
 
-    def _check_order(self, recurse=True, out_of_order=None, reorder=True):
+    def _check_order(self):
         """
-        Check if auto ordering is needed and if so, set the order appropriately.
-
-        Parameters
-        ----------
-        recurse : bool
-            If True, call this method on all subgroups.
-        out_of_order : dict
-            Lists of out-of-order connections keyed by group pathname.
-        reorder : bool
-            If True and options['auto_order'] is True, reorder the subsystems based on the new
-            order.  Otherwise just return the out-of-order connections.
+        Check if auto ordering is needed.
 
         Returns
         -------
         dict
-            Lists of out-of-order connections keyed by group pathname.
+            Lists of out-of-order connections.
         """
         if self.options['auto_order']:
             issue_warning("auto_order is not supported in ParallelGroup. "
                           "Ignoring auto_order option.", prefix=self.msginfo)
 
-        if out_of_order is None:
-            out_of_order = {}
-
-        if recurse:
-            for s in self._subgroups_myproc:
-                s._check_order(recurse, out_of_order, reorder)
-
-        return out_of_order
+        return {}
 
     def comm_info_iter(self):
         """
@@ -191,7 +174,6 @@ class ParallelGroup(Group):
             super()._get_relevance_modifiers(grad_groups, always_opt_comps)
 
     def _setup_ordering(self, parent):
-        # for now, we don't allow ParallelGroup to have auto_order or auto_solvers
         if self.comm.size > 1:
             if self._gather_full_data():
                 return self.comm.allreduce(super()._setup_ordering(parent))
@@ -234,11 +216,9 @@ class ParallelGroup(Group):
         else:
             super()._update_data_order(parent)
 
-    def iter_group_sccs(self, recurse=True, use_abs_names=True, subcycles_only=False):
+    def iter_group_sccs(self, recurse=True, use_abs_names=True, all_groups=False):
         """
         Yield strongly connected components of the group's subsystem graph.
-
-        Only groups containing 1 or more SCCs with more than one node are included.
 
         Parameters
         ----------
@@ -246,8 +226,8 @@ class ParallelGroup(Group):
             If True, recurse into subgroups.
         use_abs_names : bool
             If True, return absolute names, otherwise return relative names.
-        subcycles_only : bool
-            If True, only yield SCCs that are only a subset of the group's subsystems.
+        all_groups : bool
+            If True, yield all groups, not just those with one or more cycles.
 
         Yields
         ------
@@ -259,7 +239,7 @@ class ParallelGroup(Group):
             if self._gather_full_data():
                 gathered = self.comm.allgather(
                     list(super().iter_group_sccs(recurse=recurse, use_abs_names=use_abs_names,
-                                                 subcycles_only=subcycles_only)))
+                                                 all_groups=all_groups)))
             else:
                 gathered = self.comm.allgather([])
 
@@ -268,7 +248,7 @@ class ParallelGroup(Group):
                     yield tup
         else:
             yield from super().iter_group_sccs(recurse=recurse, use_abs_names=use_abs_names,
-                                               subcycles_only=subcycles_only)
+                                               all_groups=all_groups)
 
     def all_system_visitor(self, func, predicate=None, recurse=True, include_self=True):
         """

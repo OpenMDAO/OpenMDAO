@@ -129,7 +129,7 @@ class Relevance(object):
         """
         Initialize all attributes.
         """
-        assert model.pathname == '', "Relevance can only be initialized on the top level Group."
+        assert model.is_top(), "Relevance can only be initialized on the top level Group."
 
         self._active = None  # allow relevance to be turned on later
         self._rel_array_cache = rel_array_cache

@@ -560,16 +560,21 @@ class System(object):
             Either our instance pathname or class name.
         """
         if self.pathname is not None:
-            if self.pathname == '':
+            if self.is_top():
                 return f"<model> <class {type(self).__name__}>"
             return f"'{self.pathname}' <class {type(self).__name__}>"
         if self.name:
             return f"'{self.name}' <class {type(self).__name__}>"
         return f"<class {type(self).__name__}>"
 
-    def _user_pathname(self):
+    def _user_pathname(self, verbose=True):
         """
         Return the pathname of this system intended for user facing output.
+
+        Parameters
+        ----------
+        verbose : bool
+            Ignored.
 
         Returns
         -------
@@ -639,7 +644,7 @@ class System(object):
         """
         toidx = self._var_allprocs_abs2idx
         sizes = self._var_sizes['output']
-        total = self.pathname == ''
+        total = self.is_top()
         szname = 'global_size' if total else 'size'
         start = end = 0
         for of, meta in self._var_abs2meta['output'].items():
@@ -681,7 +686,7 @@ class System(object):
         local_ins = self._var_abs2meta['input']
         local_outs = self._var_abs2meta['output']
 
-        total = self.pathname == ''
+        total = self.is_top()
         szname = 'global_size' if total else 'size'
 
         start = end = 0
@@ -2277,7 +2282,7 @@ class System(object):
         Perform setup in all solvers.
         """
         # remove old solver error files if they exist
-        if self.pathname == '':
+        if self.is_top():
             rank = MPI.COMM_WORLD.rank if MPI is not None else 0
             if rank == 0:
                 for f in os.listdir('.'):
@@ -6569,9 +6574,9 @@ class System(object):
         Yield pathnames of all systems and subsystems that are under the given path.
 
         Note: this assumes that the paths list does not contain the pathname of self.
-        This behavior allows us to handle children that are UnnamedGroups, which have the same
+        This behavior allows us to handle children that are CycleGroups, which have the same
         pathname as their parent, so if a path equals self.pathname in the list, we assume it is
-        an UnnamedGroup direct child of self.
+        an CycleGroup direct child of self.
 
         Parameters
         ----------
@@ -6587,7 +6592,7 @@ class System(object):
             under this system.
         """
         if direct:
-            if self.pathname == '':
+            if self.is_top():
                 for p in paths:
                     if '.' not in p:
                         yield p
@@ -6598,7 +6603,7 @@ class System(object):
                         if '.' not in p[len(prefix):]:
                             yield p
         else:
-            if self.pathname == '':
+            if self.is_top():
                 yield from paths
             else:
                 prefix = self.pathname + '.'
@@ -6641,3 +6646,14 @@ class System(object):
         if recurse:
             for s in self._subsystems_myproc:
                 yield from s.all_system_visitor(func, predicate, recurse=True, include_self=True)
+
+    def is_top(self):
+        """
+        Return True if this system is a top level system.
+
+        Returns
+        -------
+        bool
+            True if this system is a top level system.
+        """
+        return self.pathname == ''

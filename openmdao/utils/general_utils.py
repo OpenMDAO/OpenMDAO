@@ -378,7 +378,7 @@ def all_ancestors(pathname, delim='.'):
     """
     while pathname:
         yield pathname
-        pathname, _, _ = pathname.rpartition(delim)
+        pathname = pathname.rpartition(delim)[0]
 
 
 def find_matches(pattern, var_list):

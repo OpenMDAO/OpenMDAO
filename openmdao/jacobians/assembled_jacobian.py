@@ -98,7 +98,7 @@ class AssembledJacobian(Jacobian):
             Parent system to this jacobian.
         """
         # var_indices are the *global* indices for variables on this proc
-        is_top = system.pathname == ''
+        is_top = system.is_top()
 
         abs2meta_in = system._var_abs2meta['input']
         all_meta = system._var_allprocs_abs2meta

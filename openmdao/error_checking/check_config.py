@@ -17,7 +17,7 @@ from openmdao.utils.logger_utils import get_logger
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook
-from openmdao.utils.general_utils import printoptions
+from openmdao.utils.general_utils import printoptions, all_ancestors
 from openmdao.utils.units import _has_val_mismatch
 from openmdao.utils.file_utils import _load_and_exec, text2html
 from openmdao.utils.om_warnings import issue_warning, SetupWarning
@@ -71,7 +71,7 @@ def _check_ubcs(group, warnings):
     warnings : list
         List to collect warning messages.
     """
-    out_of_order = group._check_order(recurse=False)
+    out_of_order = group._check_order()
     for syspath, conns in out_of_order.items():
         prefix = f"   In System '{syspath}', subsystem " if syspath else "   System "
         for tgt, srcs in conns.items():
@@ -377,74 +377,119 @@ def _check_solvers(problem, logger):
     logger : object
         The object that manages logging output.
     """
-    iter_nl_depth = iter_ln_depth = np.inf
+    iter_nl_systems = set()
+    iter_lin_systems = set()
 
-    for system in problem.model.system_iter(include_self=True, recurse=True):
-        path = system.pathname
-        depth = 0 if path == '' else len(path.split('.'))
+    for path, sccs, lnslv, nlslv, lnmaxiter, nlmaxiter, missing \
+            in problem.model.iter_group_sccs(use_abs_names=False, all_groups=True):
 
-        # if this system is below both a nonlinear and linear solver, then skip checks
-        if (depth > iter_nl_depth) and (depth > iter_ln_depth):
-            continue
+        under_ln_iter = under_nl_iter = False
+        if lnmaxiter > 1:
+            iter_lin_systems.add(path)
+            under_ln_iter = True
+        if nlmaxiter > 1:
+            iter_nl_systems.add(path)
+            under_nl_iter = True
 
-        # determine if this system is a group and has cycles
-        if isinstance(system, Group):
-            graph = system.compute_sys_graph()
-            sccs = get_sccs_topo(graph)
-            allsubs = system._subsystems_allprocs
-            has_cycles = [sorted(s, key=lambda n: allsubs[n].index) for s in sccs if len(s) > 1]
-        else:
-            has_cycles = []
+        if not (under_ln_iter and under_nl_iter):
+            for anc in all_ancestors(path):
+                if anc in iter_lin_systems:
+                    under_ln_iter = True
+                if anc in iter_nl_systems:
+                    under_nl_iter = True
+                if under_ln_iter and under_nl_iter:
+                    break
 
-        # determine if this system has states (is an implicit component)
-        has_states = isinstance(system, ImplicitComponent)
-
-        # determine if this system has iterative solvers or implements the solve methods
-        # for handling cycles and implicit components
-        if depth > iter_nl_depth:
-            is_iter_nl = True
-        else:
-            is_iter_nl = (
-                (system.nonlinear_solver and 'maxiter' in system.nonlinear_solver.options) or
-                (has_states and overrides_method('solve_nonlinear', system, ImplicitComponent))
-            )
-            iter_nl_depth = depth if is_iter_nl else np.inf
-
-        if depth > iter_ln_depth:
-            is_iter_ln = True
-        else:
-            is_iter_ln = (
-                (system.linear_solver and
-                 ('maxiter' in system.linear_solver.options or
-                  isinstance(system.linear_solver, DirectSolver))) or
-                (has_states and overrides_method('solve_linear', system, ImplicitComponent))
-            )
-            iter_ln_depth = depth if is_iter_ln else np.inf
+        has_cycles = len(sccs) > 0
+        has_subcycles = len(sccs) > 1 or (len(sccs) == 1 and bool(missing))
 
         # if there are cycles, then check for iterative nonlinear and linear solvers
         if has_cycles:
-            if not is_iter_nl:
-                msg = ("Group '%s' contains cycles %s, but does not have an iterative "
-                       "nonlinear solver." % (path, has_cycles))
-                logger.warning(msg)
-            if not is_iter_ln:
-                msg = ("Group '%s' contains cycles %s, but does not have an iterative "
-                       "linear solver." % (path, has_cycles))
-                logger.warning(msg)
+            cycles = [list(scc) for scc in sccs]
+            slv = []
+            if nlmaxiter < 2 and not under_nl_iter:
+                slv.append("nonlinear")
+            if lnmaxiter < 2 and not under_ln_iter:
+                slv.append("linear")
 
-        # if there are implicit components, check for iterative solvers or the appropriate
-        # solve methods
-        if has_states:
-            if not is_iter_nl:
-                msg = ("%s '%s' contains implicit variables, but does not have an "
-                       "iterative nonlinear solver and does not implement 'solve_nonlinear'." %
-                       (system.__class__.__name__, path))
-                logger.warning(msg)
-            if not is_iter_ln:
-                msg = ("%s '%s' contains implicit variables, but does not have an "
-                       "iterative linear solver and does not implement 'solve_linear'." %
-                       (system.__class__.__name__, path))
-                logger.warning(msg)
+            if slv:
+                slvstr = ' or '.join(slv)
+                logger.error(f"Group '{path}' contains cycles {cycles}, but no iterative {slvstr} "
+                             "solver was found in it or any containing Group.")
+
+        if has_subcycles:
+            logger.warning(f"Group '{path}' contains subcycles {cycles}.\nA subcycle is a cycle "
+                           "within the Group that does not include all of the subsystems in the "
+                           "Group.\nWhile not guaranteed, assigning solvers to these subcycles "
+                           "can sometimes improve convergence.\nTo assign a solver to a subcycle, "
+                           "use the 'add_subsolvers' method on the Group, for example:\n\n"
+                            "add_subsolvers(om.NonlinearBlockGS(), om.LinearBlockGS(), 'mysys')\n"
+                            "\nwhere 'mysys' is the name of any subsystem contained in the "
+                            "subcycle.")
+
+    # for system in problem.model.system_iter(include_self=True, recurse=True):
+    #     path = system.pathname
+
+
+    #     # determine if this system is a group and has cycles
+    #     if isinstance(system, Group):
+    #         graph = system.compute_sys_graph()
+    #         sccs = get_sccs_topo(graph)
+    #         allsubs = system._subsystems_allprocs
+    #         has_cycles = [sorted(s, key=lambda n: allsubs[n].index) for s in sccs if len(s) > 1]
+    #     else:
+    #         has_cycles = []
+
+    #     # determine if this system has states (is an implicit component)
+    #     has_states = isinstance(system, ImplicitComponent)
+
+    #     # determine if this system has iterative solvers or implements the solve methods
+    #     # for handling cycles and implicit components
+    #     if depth > iter_nl_depth:
+    #         is_iter_nl = True
+    #     else:
+    #         is_iter_nl = (
+    #             (system.nonlinear_solver and 'maxiter' in system.nonlinear_solver.options and
+    #              system.nonlinear_solver.options['maxiter'] > 1) or
+    #             (has_states and overrides_method('solve_nonlinear', system, ImplicitComponent))
+    #         )
+    #         iter_nl_depth = depth if is_iter_nl else np.inf
+
+    #     if depth > iter_ln_depth:
+    #         is_iter_ln = True
+    #     else:
+    #         is_iter_ln = (
+    #             (system.linear_solver and
+    #              ('maxiter' in system.linear_solver.options or
+    #               isinstance(system.linear_solver, DirectSolver))) or
+    #             (has_states and overrides_method('solve_linear', system, ImplicitComponent))
+    #         )
+    #         iter_ln_depth = depth if is_iter_ln else np.inf
+
+    #     # if there are cycles, then check for iterative nonlinear and linear solvers
+    #     if has_cycles:
+    #         if not is_iter_nl:
+    #             msg = ("Group '%s' contains cycles %s, but does not have an iterative "
+    #                    "nonlinear solver." % (path, has_cycles))
+    #             logger.warning(msg)
+    #         if not is_iter_ln:
+    #             msg = ("Group '%s' contains cycles %s, but does not have an iterative "
+    #                    "linear solver." % (path, has_cycles))
+    #             logger.warning(msg)
+
+    #     # if there are implicit components, check for iterative solvers or the appropriate
+    #     # solve methods
+    #     if has_states:
+    #         if not is_iter_nl:
+    #             msg = ("%s '%s' contains implicit variables, but does not have an "
+    #                    "iterative nonlinear solver and does not implement 'solve_nonlinear'." %
+    #                    (system.__class__.__name__, path))
+    #             logger.warning(msg)
+    #         if not is_iter_ln:
+    #             msg = ("%s '%s' contains implicit variables, but does not have an "
+    #                    "iterative linear solver and does not implement 'solve_linear'." %
+    #                    (system.__class__.__name__, path))
+    #             logger.warning(msg)
 
 
 def _check_missing_recorders(problem, logger):
@@ -648,7 +693,11 @@ def _check_config_setup_parser(parser):
                         (sorted(_default_checks), sorted(set(_all_checks) - set(_default_checks))))
 
 
-def _get_checks(checks):
+def _get_checks(prob):
+    checks = prob._check
+    if not checks and 'checks' in prob._reports:
+        checks = _default_checks
+
     if checks is True:
         checks = sorted(_default_checks)
     elif not checks:
@@ -673,13 +722,14 @@ class _Log2File(object):
 
 def _run_check_report(prob):
     s = StringIO()
-    for c in _get_checks(prob._check):
+    for c in _get_checks(prob):
         if c not in _all_checks:
             print(f"WARNING: '{c}' is not a recognized check.  Available checks are: "
                   f"{sorted(_all_checks)}")
             continue
 
-        print('-' * 30, f'Checking {c}', '-' * 30, file=s)
+        chk = f"  Checking {c}  "
+        print(f"\n{chk:.^80}\n", file=s)
         _all_checks[c](prob, _Log2File(s))
 
     output = s.getvalue()

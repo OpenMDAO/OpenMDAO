@@ -236,7 +236,7 @@ class Group(System):
         self._post_components = None
         self._iterated_components = None
         self._fd_rev_xfer_correction_dist = {}
-        self._solvers = {}
+        self._subsolvers = {}
         self._component_graph = None
         self._reordered = False
         self._cycles = []
@@ -254,12 +254,6 @@ class Group(System):
                              desc='If True the order of subsystems is determined automatically '
                              'based on the dependency graph.  It will not break or reorder '
                              'cycles.')
-        self.options.declare('auto_solvers', types=bool, default=False,
-                             desc='If True and this group has one or more cycles, solvers will '
-                             'be paired with cycles within the group rather than being associated '
-                             'with the entire group. Note that if True this requires that the '
-                             'add_solvers method be called on this group to associate each '
-                             'linear/nonlinear solver pair with their corresponding cycle.')
 
     def setup(self):
         """
@@ -372,7 +366,7 @@ class Group(System):
         if excl_sub is None:
             cache_key = None
         else:
-            cache_key = excl_sub.pathname
+            cache_key = excl_sub._user_pathname()
 
         try:
             iovars, excl = self._scope_cache[cache_key]
@@ -807,7 +801,7 @@ class Group(System):
         networkx.DiGraph
             Graph of all variables and components in the model.
         """
-        assert self.pathname == '', "call _get_dataflow_graph on the top level Group only."
+        assert self.is_top(), "call _get_dataflow_graph on the top level Group only."
 
         graph = nx.DiGraph()
 
@@ -870,7 +864,7 @@ class Group(System):
         dict
             Dictionary of response metadata with alias keys removed.
         """
-        assert self.pathname == '', "call _check_alias_overlaps on the top level System only."
+        assert self.is_top(), "call _check_alias_overlaps on the top System only."
 
         aliases = set()
         srcdict = {}
@@ -1281,56 +1275,32 @@ class Group(System):
                                        " by promoting '*' at group level or promoting using"
                                        " dotted names.")
 
-    def _check_order(self, recurse=True, out_of_order=None, reorder=False):
+    def _check_order(self):
         """
         Check if auto ordering is needed, optionally reordering subsystems if appropriate.
 
-        Parameters
-        ----------
-        recurse : bool
-            If True, call this method on all subgroups.
-        out_of_order : dict or None
-            Any out-of-order connections found will be stored in lists keyed by group pathname.
-            Out of order connections are keyed by target system name and have values that are lists
-            of source system names. If incoming value of out_of_order is None, then a new dict is
-            created and returned.
-        reorder : bool
-            If True and options['auto_order'] is True, reorder the subsystems based on the computed
-            order.  Otherwise just return the out-of-order connections.
-
         Returns
         -------
-        dict
-            Lists of out-of-order connections keyed by group pathname.
+        dict of the form {target: [src1, src2, ...]}
+            Lists of out-of-order connections.
         """
-        if out_of_order is None:
-            out_of_order = {}
+        tgts = {}
 
-        if self.options['auto_order'] or not reorder:
-            G = self.compute_sys_graph()
-            orders = {name: i for i, name in enumerate(self._subsystems_allprocs)}
-            toposorted, new_out_of_order = get_out_of_order_nodes(G, orders)
+        G = self.compute_sys_graph()
+        orders = {name: i for i, name in enumerate(self._subsystems_allprocs)}
+        _, new_out_of_order = get_out_of_order_nodes(G, orders)
 
-            if new_out_of_order:
-                # group targets with all of their sources
-                tgts = {}
-                for u, v in new_out_of_order:
-                    if v not in tgts:
-                        tgts[v] = []
-                    tgts[v].append(u)
+        if new_out_of_order:
+            # group targets with all of their sources
+            for u, v in new_out_of_order:
+                if v not in tgts:
+                    tgts[v] = []
+                tgts[v].append(u)
 
-                for lst in tgts.values():
-                    lst.sort()
+            for lst in tgts.values():
+                lst.sort()
 
-                out_of_order[self.pathname] = tgts
-                if reorder:
-                    self._set_auto_order(toposorted, orders)
-
-        if recurse:
-            for s in self._subgroups_myproc:
-                s._check_order(recurse, out_of_order, reorder)
-
-        return out_of_order
+        return tgts
 
     def _set_auto_order(self, strongcomps, orders):
         """
@@ -1615,13 +1585,13 @@ class Group(System):
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
 
         for n, lst in self._group_inputs.items():
-            lst[0]['path'] = self.pathname  # used for error reporting
+            lst[0]['path'] = self._user_pathname()  # used for error reporting
             self._group_inputs[n] = lst.copy()  # must copy the list manually
 
         self._has_distrib_vars = False
         self._has_fd_group = self._owns_approx_jac
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
-        self._reordered |= self.options['auto_order'] or self.options['auto_solvers']
+        self._reordered |= self.options['auto_order'] or bool(self._subsolvers)
 
         for subsys in self._subsystems_myproc:
             self._has_output_scaling |= subsys._has_output_scaling
@@ -1630,7 +1600,7 @@ class Group(System):
             self._has_distrib_vars |= subsys._has_distrib_vars
             if len(subsys._subsystems_allprocs) > 0:
                 self._has_fd_group |= subsys._has_fd_group
-                self._reordered |= subsys.options['auto_order'] or subsys.options['auto_solvers']
+                self._reordered |= subsys.options['auto_order'] or bool(subsys._subsolvers)
 
             var_maps = subsys._get_promotion_maps()
 
@@ -2254,10 +2224,10 @@ class Group(System):
             allprocs_abs2meta_in[inp]['has_src_indices'] = True
 
     def _setup_ordering(self, parent):
-        from openmdao.core.unnamedgroup import UnnamedGroup
+        from openmdao.core.cyclegroup import CycleGroup
         reordered = False
 
-        if self.options['auto_solvers']:
+        if self._subsolvers:
             G = self.compute_sys_graph()
             toposorted = get_sccs_topo(G)
             self._cycles = sccs = [scc for scc in toposorted if len(scc) > 1]
@@ -2265,7 +2235,7 @@ class Group(System):
                 reordered = True
                 matches = self._match_solvers_to_sccs(sccs)
                 for i, (nlslv, linslv) in matches.items():
-                    UnnamedGroup(self, sccs[i], i, nlslv, linslv)
+                    CycleGroup(self, sccs[i], i, nlslv, linslv)
 
         if self.options['auto_order']:
             G = self.compute_sys_graph()  # compute a sys graph even if we already did it above
@@ -2314,14 +2284,14 @@ class Group(System):
             Dictionary mapping each SCC to a solver.
         """
         matches = {}
-        for sysname, (nlslv, linslv) in self._solvers.items():
+        for sysname, (nlslv, linslv) in self._subsolvers.items():
             for i, scc in enumerate(sccs):
                 if sysname in scc:
                     matches[i] = (nlslv, linslv)
                     break
             else:
-                raise RuntimeError(f"{self.msginfo}: The system '{sysname}' passed to add_solvers "
-                                   "does not match any cycles.")
+                raise RuntimeError(f"{self.msginfo}: The system '{sysname}' passed to "
+                                   "add_subsolvers does not match any cycles.")
 
         if len(matches) < len(sccs):
             missing = [scc for i, scc in enumerate(sccs) if i not in matches]
@@ -3202,7 +3172,7 @@ class Group(System):
                 type_exc, exc, tb = sys.exc_info()
                 self._collect_error(f"{self.msginfo}: When promoting {promoted} from "
                                     f"'{subsys_name}': {exc}", exc_type=type_exc, tback=tb,
-                                    ident=(self.pathname, tuple(promoted)))
+                                    ident=(self._user_pathname(), tuple(promoted)))
 
             if outputs:
                 self._collect_error(f"{self.msginfo}: Trying to promote outputs {outputs} while "
@@ -3218,7 +3188,7 @@ class Group(System):
                 if inputs is not None:
                     lst.extend(inputs)
                 self._collect_error(f"{self.msginfo}: When promoting {sorted(lst)}: {err}",
-                                    ident=(self.pathname, tuple(lst)))
+                                    ident=(self._user_pathname(), tuple(lst)))
                 return
 
         try:
@@ -3546,7 +3516,7 @@ class Group(System):
             initialized, the driver for this model must be supplied in order to properly
             initialize the approximations.
         """
-        if driver is not None and self.pathname == '' and self._owns_approx_jac:
+        if driver is not None and self.is_top() and self._owns_approx_jac:
             self._tot_jac = _TotalJacInfo(driver._problem(), None, None, 'flat_dict', approx=True)
 
         try:
@@ -3569,7 +3539,9 @@ class Group(System):
         """
         Compute outputs. The model is assumed to be in a scaled state.
         """
-        name = self.pathname if self.pathname else 'root'
+        name = self._user_pathname(verbose=False)
+        if not name:
+            name = 'root'
 
         with Recording(name + '._solve_nonlinear', self.iter_count, self):
             with self._relevance.active(self._nonlinear_solver.use_relevance()):
@@ -3799,7 +3771,7 @@ class Group(System):
         if self._owns_approx_jac:
 
             jac = self._jacobian
-            if self.pathname == "":
+            if self._user_pathname() == "":
                 for approximation in self._approx_schemes.values():
                     approximation.compute_approximations(self, jac=jac)
             else:
@@ -3936,7 +3908,7 @@ class Group(System):
 
     def _approx_subjac_keys_iter(self):
         # yields absolute keys (no aliases)
-        totals = self.pathname == ''
+        totals = self.is_top()
 
         wrt = set()
         ivc = set()
@@ -4018,7 +3990,7 @@ class Group(System):
             Distributed sizes if var is distributed else None
         """
         if self._owns_approx_of:
-            total = self.pathname == ''
+            total = self.is_top()
 
             abs2meta = self._var_allprocs_abs2meta['output']
             abs2idx = self._var_allprocs_abs2idx
@@ -4080,7 +4052,7 @@ class Group(System):
         ndarray or None
             Distributed sizes if var is distributed else None
         """
-        total = self.pathname == ''
+        total = self.is_top()
 
         if self._owns_approx_wrt:
             sizes = self._var_sizes
@@ -4093,7 +4065,7 @@ class Group(System):
 
             seen = set()
             start = end = 0
-            if self.pathname:  # doing semitotals, so include output columns
+            if not total:  # doing semitotals, so include output columns
                 for of, _start, _end, _, dist_sizes in self._jac_of_iter():
                     if wrt_matches is None or of in wrt_matches:
                         seen.add(of)
@@ -4137,7 +4109,7 @@ class Group(System):
             yield from super()._jac_wrt_iter(wrt_matches)
 
     def _promoted_wrt_iter(self):
-        if not (self._owns_approx_of or self.pathname):
+        if not self._owns_approx_of and self.is_top():
             return
 
         abs2prom = self._var_allprocs_abs2prom
@@ -4159,7 +4131,7 @@ class Group(System):
             self._jacobian = DictionaryJacobian(system=self)
 
         abs2meta = self._var_allprocs_abs2meta
-        total = self.pathname == ''
+        total = self.is_top()
         nprocs = self.comm.size
 
         if self._coloring_info.coloring is not None and (self._owns_approx_of is None or
@@ -4271,7 +4243,7 @@ class Group(System):
         """
         Do any error checking on user's setup, before any other recursion happens.
         """
-        if (self._coloring_info.static or self._coloring_info.dynamic) and self.pathname != '':
+        if (self._coloring_info.static or self._coloring_info.dynamic) and not self.is_top():
             msg = f"{self.msginfo}: semi-total coloring is currently not supported."
             raise RuntimeError(msg)
 
@@ -4345,16 +4317,21 @@ class Group(System):
                 self._component_graph = graph
         else:
             glen = self.pathname.count('.') + 1 if self.pathname else 0
-            var2sys = {v: v.split('.', glen + 1)[glen]
-                       for v in chain(self._var_allprocs_abs2prom['output'],
-                                      self._var_allprocs_abs2prom['input'])}
 
             # add all systems as nodes in the graph so they'll be there even if unconnected.
-            graph.add_nodes_from(var2sys.values())
+            graph.add_nodes_from(self._subsystems_allprocs.keys())
 
             for in_abs, src_abs in self._conn_global_abs_in2out.items():
-                src_sys = var2sys[src_abs]
-                tgt_sys = var2sys[in_abs]
+                src_sys = src_abs.split('.', glen + 1)[glen]
+                if src_sys not in self._subsystems_allprocs:
+                    for i, cycle in enumerate(self._cycles):
+                        if src_sys in cycle:
+                            src_sys = f"{self.pathname}_cycle#{i}"
+                tgt_sys = in_abs.split('.', glen + 1)[glen]
+                if tgt_sys not in self._subsystems_allprocs:
+                    for i, cycle in enumerate(self._cycles):
+                        if tgt_sys in cycle:
+                            tgt_sys = f"{self.pathname}_cycle#{i}"
                 if src_sys != tgt_sys:
                     graph.add_edge(src_sys, tgt_sys)
 
@@ -4517,7 +4494,7 @@ class Group(System):
                                 f"{src_idx_found} is unknown. You can specify the src shape for "
                                 "these inputs by setting 'val' or 'src_shape' in a call to "
                                 "set_input_defaults, or by adding an IndepVarComp as the source.",
-                                ident=(self.pathname, tuple(src_idx_found)))
+                                ident=(self._user_pathname(), tuple(src_idx_found)))
             return None
 
         return info
@@ -4782,7 +4759,7 @@ class Group(System):
             meta = sorted(metadata)
         inputs = sorted(tgts)
         gpath = common_subpath(tgts)
-        if gpath == self.pathname:
+        if gpath == self._user_pathname():
             g = self
         else:
             g = self._get_subsystem(gpath)
@@ -4849,9 +4826,9 @@ class Group(System):
             even if they aren't relevant in terms of data flow.
         """
         if self.nonlinear_solver is not None and self.nonlinear_solver.supports['gradients']:
-            grad_groups.add(self.pathname)
+            grad_groups.add(self._user_pathname(verbose=False))
         elif self.linear_solver is not None and isinstance(self.linear_solver, DirectSolver):
-            grad_groups.add(self.pathname)
+            grad_groups.add(self._user_pathname(verbose=False))
 
         for s in self._subsystems_myproc:
             if isinstance(s, Group):
@@ -5322,7 +5299,7 @@ class Group(System):
         meta['base'] = 'Group'
         return meta
 
-    def iter_group_sccs(self, recurse=True, use_abs_names=True, subcycles_only=False):
+    def iter_group_sccs(self, recurse=True, use_abs_names=True, all_groups=False):
         """
         Yield strongly connected components of the group's subsystem graph.
 
@@ -5334,8 +5311,8 @@ class Group(System):
             If True, recurse into subgroups.
         use_abs_names : bool
             If True, return absolute names, otherwise return relative names.
-        subcycles_only : bool
-            If True, only yield SCCs that are only a subset of the group's subsystems.
+        all_groups : bool
+            If True, yield all groups, not just those with SCCs.
 
         Yields
         ------
@@ -5344,12 +5321,15 @@ class Group(System):
             in this Group.
         """
         sccs = [s for s in get_sccs_topo(self.compute_sys_graph()) if len(s) > 1]
-        missing = None
-        if subcycles_only and sccs:
+        missing = set()
+        if sccs:
             if len(sccs) == 1:
-                missing = set(s.name for s in self._subsystems_myproc) - sccs[0]
                 if len(sccs[0]) == len(self._subsystems_allprocs):
                     sccs = []  # whole group is a cycle, so no need to assign solver(s) to cycle(s)
+            for scc in sccs:
+                missing.update(scc)
+
+            missing = set(s.system.name for s in self._subsystems_allprocs.values()) - missing
 
         if sccs:
             # names are relative to this group, but need absolute names
@@ -5360,17 +5340,23 @@ class Group(System):
                     abs_sccs.append({prefix + n for n in scc})
                 sccs = abs_sccs
 
+        if all_groups or sccs:
             lnslvname = self.linear_solver.__class__.__name__ if self.linear_solver else None
             nlnslvname = self.nonlinear_solver.__class__.__name__ if self.nonlinear_solver else None
-            yield self.pathname, sccs, lnslvname, nlnslvname, missing
+            lnmaxiter = nlmaxiter = 1
+            if lnslvname and 'maxiter' in self.linear_solver.options:
+                lnmaxiter = self.linear_solver.options['maxiter']
+            if nlnslvname and 'maxiter' in self.nonlinear_solver.options:
+                nlmaxiter = self.nonlinear_solver.options['maxiter']
+            yield self.pathname, sccs, lnslvname, nlnslvname, lnmaxiter, nlmaxiter, missing
 
         if recurse:
             for s in self._subsystems_myproc:
                 if isinstance(s, Group):
                     yield from s.iter_group_sccs(recurse=recurse, use_abs_names=use_abs_names,
-                                                 subcycles_only=subcycles_only)
+                                                 all_groups=all_groups)
 
-    def add_solvers(self, nonlinear_solver, linear_solver, cycle_system):
+    def add_subsolvers(self, nonlinear_solver, linear_solver, cycle_system):
         """
         Add nonlinear and linear solvers to be associated with the cycle containing cycle_system.
 
@@ -5390,4 +5376,4 @@ class Group(System):
             raise TypeError(f"{self.msginfo}: The 'linear_solver' argument should be an instance"
                             " of a LinearSolver.")
 
-        self._solvers[cycle_system] = (nonlinear_solver, linear_solver)
+        self._subsolvers[cycle_system] = (nonlinear_solver, linear_solver)

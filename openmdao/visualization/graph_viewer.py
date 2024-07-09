@@ -126,7 +126,7 @@ class GraphViewer(object):
 
                 if not recurse:
                     # layout graph from left to right
-                    gname = 'model' if group.pathname == '' else group.pathname
+                    gname = 'model' if group.is_top() else group.pathname
                     G.graph['graph'] = {'rankdir': 'LR', 'label': f"Dataflow for '{gname}'",
                                         'center': 'True'}
 
@@ -175,7 +175,7 @@ class GraphViewer(object):
                             G.nodes[prom_in]['fontcolor'] = 'red'
                             G.nodes[prom_in]['tooltip'] = '\n'.join(abs_ins)
 
-                if group.pathname == '':
+                if group.is_top():
                     if not recurse:
                         G = nx.subgraph(G, keep)
                 else:
