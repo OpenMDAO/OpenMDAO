@@ -460,7 +460,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
                 # turn on dynamic partial coloring
                 self.declare_coloring(wrt='*', method='cs', perturb_size=1e-5, num_full_jacs=2, tol=1e-20,
-                                    orders=20, show_summary=True, show_sparsity=True)
+                                      orders=20, show_summary=True, show_sparsity=True)
 
             def compute(self, inputs, outputs):
                 outputs['g'] = np.arctan(inputs['y'] / inputs['x'])

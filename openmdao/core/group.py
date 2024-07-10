@@ -5353,7 +5353,8 @@ class Group(System):
                 lnmaxiter = self.linear_solver.options['maxiter']
             if nlnslvname and 'maxiter' in self.nonlinear_solver.options:
                 nlmaxiter = self.nonlinear_solver.options['maxiter']
-            yield self.pathname, sccs, lnslvname, nlnslvname, lnmaxiter, nlmaxiter, missing
+            yield self.pathname, self.__class__.__name__, sccs, lnslvname, nlnslvname, lnmaxiter,\
+                  nlmaxiter, missing
 
         if recurse:
             for s in self._subsystems_myproc:

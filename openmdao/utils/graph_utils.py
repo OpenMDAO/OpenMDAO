@@ -5,6 +5,8 @@ import sys
 import networkx as nx
 from openmdao.core.constants import _DEFAULT_OUT_STREAM
 from openmdao.utils.general_utils import all_ancestors, common_subpath
+from openmdao.utils.file_utils import _load_and_exec
+import openmdao.utils.hooks as hooks
 
 
 def get_sccs_topo(graph):
@@ -93,8 +95,8 @@ def get_cycle_tree(group):
         group_tree_dict[cpath] = [([], scc, set(scc), i, cpath, None)
                                   for i, scc in enumerate(cpsccs)]
 
-    for path, _, _, _, _, _, _ in sorted(group.iter_group_sccs(),
-                                         key=lambda x: (x[0].count('.'), len(x[0]))):
+    for tup in sorted(group.iter_group_sccs(), key=lambda x: (x[0].count('.'), len(x[0]))):
+        path = tup[0]
         for ans in all_ancestors(path):
             if ans in group_tree_dict:
                 parent_tree = group_tree_dict[ans]
@@ -152,7 +154,7 @@ def print_cycle_tree(group):
                 _print_tree(lst[idx], len(lst))
 
 
-def list_groups_with_subcycles(group, out_stream=_DEFAULT_OUT_STREAM):
+def list_groups_with_subcycles(group, show_dups=False, outfile='stdout'):
     """
     List the groups in the tree that contain cycles containing only a subset of their subsystems.
 
@@ -162,30 +164,96 @@ def list_groups_with_subcycles(group, out_stream=_DEFAULT_OUT_STREAM):
     ----------
     group : <Group>
         The top Group in the tree.
-    out_stream : file-like
-        Where to send the output. Default is sys.stdout.
+    show_dups : bool
+        If True, report all instances of a given class. Otherwise only show the first.
+    outfile : str
+        Where to send the output. Default is 'stdout'.  Setting to None will disable output.
 
     Returns
     -------
-    list of (str, list of (list of str))
-        A list of group pathnames that contain cycles, along with a list of cycles for each group.
+    list
+        A list of group pathnames that contain cycles, along with a list of cycles for each group,
+        linear and nonlinear solver class names, max iterations for each solver, and a list of
+        subsystems that are not part of any cycle.
     """
-    if out_stream is _DEFAULT_OUT_STREAM:
+    if outfile == 'stdout':
         out_stream = sys.stdout
+    elif outfile == 'stderr':
+        out_stream = sys.stderr
+    elif outfile is None:
+        out_stream = None
+    else:
+        out_stream = open(outfile, 'w')
+
+    classes = set()
 
     ret = []
-    for path, sccs, lnslv, nlslv, lnmaxiter, nlmaxiter, missing \
-            in group.iter_group_sccs(use_abs_names=False):
+    for tup in group.iter_group_sccs(use_abs_names=False):
+        path, pathclass, sccs, lnslv, nlslv, lnmaxiter, nlmaxiter, missing = tup
+        if not show_dups:
+            if pathclass in classes:
+                continue
+            classes.add(pathclass)
+
         # exclude cases where the entire group is a cycle
         if len(sccs) == 1 and len(sccs[0]) == len(group._subsystems_allprocs):
             continue
-        ret.append((path, sccs))
-        print(f"{path} (NL: {nlslv}, LN: {lnslv}):", file=out_stream)
+        ret.append(tup)
 
-        for i, scc in enumerate(sccs):
-            print(f"   Cycle {i}: {sorted(scc)}", file=out_stream)
-        if missing:
-            print(f"   No cycle: {sorted(missing)}", file=out_stream)
-        print("", file=out_stream)
+        if out_stream is not None:
+            print(f"{pathclass} '{path}' NL: {nlslv} (maxiter={nlmaxiter}), LN: {lnslv} "
+                  f"(maxiter={lnmaxiter}):", file=out_stream)
+
+            for i, scc in enumerate(sccs):
+                print(f"   Cycle {i}: {sorted(scc)}", file=out_stream)
+            if missing:
+                print(f"   No cycle: {sorted(missing)}", file=out_stream)
+            print("", file=out_stream)
 
     return ret
+
+
+def _subcycles_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao subcycles' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('-o', default='stdout', action='store', dest='outfile',
+                        help='Name of output file.  By default, output goes to stdout.')
+    parser.add_argument('-p', '--problem', action='store', dest='problem', help='Problem name')
+    parser.add_argument('-g', '--group', action='store', dest='group', help='Top group pathname')
+    parser.add_argument('--showdups', action='store_true', dest='showdups',
+                        help="Display for all instances of a given class. Otherwise, only show "
+                        "the first.")
+
+
+def _subcycles_cmd(options, user_args):
+    """
+    Return the post_setup hook function for 'openmdao subcycles'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+    user_args : list of str
+        Args to be passed to the user script.
+    """
+    def _subcycles(prob):
+        if options.group:
+            group = prob.model._get_subsystem(options.group)
+            if group is None:
+                raise ValueError(f"Group '{options.group}' not found.")
+        else:
+            group = prob.model
+        list_groups_with_subcycles(group, show_dups=options.showdups, outfile=options.outfile)
+
+    # register the hook
+    hooks._register_hook('setup', class_name='Problem', inst_id=options.problem,
+                         post=_subcycles, exit=True)
+
+    _load_and_exec(options.file[0], user_args)

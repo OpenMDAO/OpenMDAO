@@ -180,24 +180,29 @@ class ParallelGroup(Group):
             return super()._setup_ordering(parent)
 
     def _update_data_order(self, parent=None):
-        if self.comms.size > 1:
+        if self.comm.size > 1:
             allprocs_abs2meta_keys = {'input': [], 'output': []}
             if self._gather_full_data():
+                # gather keys from subsystems so order will be correct
                 for io in ('input', 'output'):
+                    keys = allprocs_abs2meta_keys[io]
                     for subsys in self._subsystems_myproc:
-                        allprocs_abs2meta_keys[io].extend(subsys._var_allprocs_abs2meta[io])
+                        keys.extend(subsys._var_allprocs_abs2meta[io])
 
             old_allprocs_abs2meta = self._var_allprocs_abs2meta
             self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
 
+            # FIXME: discretes are missing!
+
             # get ordering for var_allprocs_abs2meta keys from all procs.  The metadata has
-            # already been gathered in _setup_var_data and it just needs to be reordered.
+            # already been gathered in the parent's _setup_var_data and it just needs to be
+            # reordered.
             for proc_keys in self.comm.allgather(allprocs_abs2meta_keys):
                 for io, keylist in proc_keys.items():
                     abs2meta = self._var_allprocs_abs2meta[io]
                     old = old_allprocs_abs2meta[io]
                     for k in keylist:
-                        abs2meta[k] = old[k]
+                        abs2meta[k] = old[k]  # keys in right order. just pull meta from parent
 
             self._var_abs2meta = {'input': {}, 'output': {}}
             self._var_allprocs_abs2idx = {'input': {}, 'output': {}}

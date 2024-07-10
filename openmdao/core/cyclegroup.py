@@ -78,6 +78,28 @@ class CycleGroup(Group):
                 self._subsystems_allprocs[name] = _SysInfo(system,
                                                            len(self._subsystems_allprocs))
 
+        self._conn_global_abs_in2out = {}
+        self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
+        self._var_abs2prom = {'input': {}, 'output': {}}
+        self.matrix_free = False
+
+        for system in self._subsystems_myproc:
+            self.matrix_free |= system.matrix_free
+            for io in ('input', 'output'):
+                self._var_allprocs_abs2prom[io].update(system._var_allprocs_abs2prom[io])
+                self._var_abs2prom[io].update(system._var_abs2prom[io])
+
+        parent_conns = parent._conn_global_abs_in2out
+        my_ins = self._var_allprocs_abs2prom['input']
+        my_outs = self._var_allprocs_abs2prom['output']
+        self._conn_global_abs_in2out = {tgt: src for tgt, src in parent_conns.items()
+                                        if tgt in my_ins and src in my_outs}
+
+        self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
+        for io in ('input', 'output'):
+            for abs_name, prom_name in self._var_allprocs_abs2prom[io].items():
+                self._var_allprocs_prom2abs_list[io].setdefault(prom_name, []).append(abs_name)
+
         self._update_parent(parent)
 
     @property
@@ -111,8 +133,8 @@ class CycleGroup(Group):
             The string containing cycle info.
         """
         if verbose:
-            cycle = truncate(f"{self.cycle_key}", 25)
-            return f"cycle {self.cycle_index}{cycle}"
+            cycle = truncate(f"{self.cycle_key}", 50)
+            return f"cycle {self.cycle_index} {cycle}"
         else:
             return f"cycle {self.cycle_index}"
 
@@ -171,28 +193,6 @@ class CycleGroup(Group):
         self._update_data_order(parent)
 
         return True
-
-    def _update_data_order(self, parent):
-        super()._update_data_order()
-
-        # also set up our _conn_global_abs_in2out dict
-        self._conn_global_abs_in2out = {}
-        self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
-
-        for system in self._subsystems_myproc:
-            for io in ('input', 'output'):
-                self._var_allprocs_abs2prom[io].update(system._var_allprocs_abs2prom[io])
-
-        parent_conns = parent._conn_global_abs_in2out
-        my_ins = self._var_allprocs_abs2prom['input']
-        my_outs = self._var_allprocs_abs2prom['output']
-        self._conn_global_abs_in2out = {tgt: src for tgt, src in parent_conns.items()
-                                        if tgt in my_ins and src in my_outs}
-
-        self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
-        for io in ('input', 'output'):
-            for abs_name, prom_name in self._var_allprocs_abs2prom[io].items():
-                self._var_allprocs_prom2abs_list[io].setdefault(prom_name, []).append(abs_name)
 
     def is_top(self):
         """
