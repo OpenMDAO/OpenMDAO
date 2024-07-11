@@ -2391,7 +2391,7 @@ class Problem(object):
                         except KeyError:
                             # Var may be discrete
                             varmeta = abs2meta_disc_in[abs_name]
-                        if varmeta['distributed'] and model.comm.size > 1:
+                        if varmeta.get('distributed') and model.comm.size > 1:
                             sizes = model._var_sizes['input'][:, abs2idx[abs_name]]
                             model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
                         else:

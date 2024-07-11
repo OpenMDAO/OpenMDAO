@@ -223,15 +223,6 @@ jobs:
           fi
           python -m pip install .
 
-      - name: Check NumPy 2.0 Compatibility
-        run: |
-          echo "============================================================="
-          echo "Check OpenMDAO code for NumPy 2.0 compatibility"
-          echo "See: https://numpy.org/devdocs/numpy_2_0_migration_guide.html"
-          echo "============================================================="
-          python -m pip install ruff
-          ruff check . --select NPY201
-
       - name: Display environment info
         id: env_info
         if: always()
@@ -374,6 +365,15 @@ jobs:
           message:
             Security issue found on `${{ matrix.NAME }}` build.
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Check NumPy 2.0 Compatibility
+        run: |
+          echo "============================================================="
+          echo "Check OpenMDAO code for NumPy 2.0 compatibility"
+          echo "See: https://numpy.org/devdocs/numpy_2_0_migration_guide.html"
+          echo "============================================================="
+          python -m pip install ruff
+          ruff check . --select NPY201
 
       - name: Slack env change
         if: steps.env_info.outputs.errors != ''
