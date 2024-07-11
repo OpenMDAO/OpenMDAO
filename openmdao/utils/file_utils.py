@@ -234,6 +234,7 @@ def _load_and_run_test(testspec):
         <fpath_or_modpath>:<testcase>.<method> OR <fpath_or_modpath>:<function>
     """
     syspath_save = sys.path[:]
+    sys.path.append(os.getcwd())
 
     modpath, funcpath = testspec.rsplit(':', 1)
     orig_modpath = modpath

@@ -1,7 +1,5 @@
 """Functions for plotting the dynamic shapes dependency graph."""
 
-import os
-import sys
 import networkx as nx
 
 from openmdao.core.problem import Problem
@@ -9,6 +7,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.file_utils import _load_and_exec
 import openmdao.utils.hooks as hooks
 from openmdao.utils.general_utils import common_subpath
+from openmdao.visualization.graph_viewer import write_graph
 
 
 def _view_dyn_shapes_setup_parser(parser):
@@ -27,6 +26,8 @@ def _view_dyn_shapes_setup_parser(parser):
     parser.add_argument('-t', '--title', action='store', dest='title', help='title of plot.')
     parser.add_argument('--no_display', action='store_true', dest='no_display',
                         help="don't display the plot.")
+    parser.add_argument('--lib', action='store', dest='lib',
+                        help="Library to use for plotting, either 'pydot' or 'matplotlib'.")
 
 
 def _view_dyn_shapes_cmd(options, user_args):
@@ -41,8 +42,12 @@ def _view_dyn_shapes_cmd(options, user_args):
         Args to be passed to the user script.
     """
     def _view_shape_graph(model):
+        if options.lib not in (None, 'pydot', 'matplotlib'):
+            raise RuntimeError(f"Invalid --lib specified for plotting: '{options.lib}'. Valid "
+                               "options are 'pydot' or 'matplotlib'.")
+
         view_dyn_shapes(model, outfile=options.outfile, show=not options.no_display,
-                        title=options.title)
+                        title=options.title, lib=options.lib)
 
     def _set_dyn_hook(prob):
         # we can't wait until the end of Problem.setup because we'll die in _setup_sizes
@@ -58,7 +63,7 @@ def _view_dyn_shapes_cmd(options, user_args):
     _load_and_exec(options.file[0], user_args)
 
 
-def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
+def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None, lib=None):
     """
     Generate a plot file containing the dynamic shape dependency graph.
 
@@ -68,15 +73,15 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
     ----------
     root : System or Problem
         The top level system or Problem.
-
     outfile : str, optional
         The name of the plot file.  Defaults to 'shape_dep_graph.png'.
-
     show : bool, optional
         If True, display the plot. Defaults to True.
-
     title : str, optional
         Sets the title of the plot.
+    lib : str, optional
+        Library to use for plotting, either 'pydot' or 'matplotlib'.  If not specified, the
+        default is 'pydot' if pydot is installed, otherwise 'matplotlib'.
     """
     if MPI and MPI.COMM_WORLD.rank != 0:
         return
@@ -93,7 +98,18 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
     try:
         import matplotlib.pyplot as plt
     except ImportError:
-        raise RuntimeError("The view_dyn_shapes command requires matplotlib.")
+        if lib == 'matplotlib':
+            raise RuntimeError("matplotlib was specified as the plotting library for "
+                               "view_dyn_shapes, but it is not installed.")
+        plt = None
+
+    try:
+        import pydot
+    except ImportError:
+        if lib == 'pydot':
+            raise RuntimeError("pydot was specified as the plotting library for "
+                               "view_dyn_shapes, but it is not installed.")
+        pydot = None
 
     graph = system._shapes_graph
 
@@ -139,13 +155,49 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
                 node_colors.append('green')
         node_labels[n] = f"{shape}: {n[common_idx:]}"
 
-    nx.draw_networkx(graph, with_labels=True, node_color=node_colors, labels=node_labels)
-    plt.axis('off')  # turn of axis
-    plt.title(title)
-    plt.savefig(outfile)
+    if pydot is not None and (lib is None or lib == 'pydot'):
+        Gdot = _to_pydot_graph(graph, node_colors, node_labels)
+        write_graph(Gdot, prog='dot', display=show, outfile='dyn_shape_graph.html')
+    elif plt is not None:
+        nx.draw_networkx(graph, with_labels=True, node_color=node_colors, labels=node_labels)
+        plt.axis('off')  # turn of axis
+        plt.title(title)
+        plt.savefig(outfile)
 
-    if show:
-        plt.show()
+        if show:
+            plt.show()
+    else:
+        raise RuntimeError("view_dyn_shapes requires either matplotlib or pydot.")
 
     # TODO: add a legend
-    # TODO: use a better graph plotting lib, maybe D3 or something else, to get better layout
+
+
+def _to_pydot_graph(G, node_colors, node_labels):
+    import pydot
+    gmeta = G.graph.get('graph', {}).copy()
+    gmeta['graph_type'] = 'digraph'
+    pydot_graph = pydot.Dot(**gmeta)
+    pydot_nodes = {}
+
+    for i, node in enumerate(G.nodes()):
+        try:
+            label = node_labels[node]
+        except TypeError:
+            label = node
+        color = node_colors[i]
+        if color == 'green':
+            color = 'lightgreen'
+        elif color == 'red':
+            color = 'lightcoral'
+        elif color == 'blue':
+            color = 'lightblue'
+        pdnode = pydot_nodes[node] = pydot.Node(node, style='filled', label=label, fillcolor=color)
+        pydot_graph.add_node(pdnode)
+
+    for u, v in G.edges():
+        pydot_graph.add_edge(pydot.Edge(pydot_nodes[u], pydot_nodes[v]))
+
+    # layout graph from left to right
+    # pydot_graph.set_rankdir('LR')
+
+    return pydot_graph

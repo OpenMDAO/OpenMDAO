@@ -1,4 +1,5 @@
 from openmdao.core.group import Group, _SysInfo
+from openmdao.core.component import _DictValues
 from openmdao.utils.general_utils import truncate
 from openmdao.vectors.transfer import _get_xfer_tgt
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
@@ -85,9 +86,20 @@ class CycleGroup(Group):
 
         for system in self._subsystems_myproc:
             self.matrix_free |= system.matrix_free
+            sub_prefix = system.name + '.'
+
             for io in ('input', 'output'):
                 self._var_allprocs_abs2prom[io].update(system._var_allprocs_abs2prom[io])
                 self._var_abs2prom[io].update(system._var_abs2prom[io])
+                self._var_allprocs_discrete[io].update(system._var_allprocs_discrete[io])
+                self._var_discrete[io].update({sub_prefix + k: v for k, v in
+                                              system._var_discrete[io].items()})
+
+        if self._var_discrete['input'] or self._var_discrete['output']:
+            self._discrete_inputs = _DictValues(self._var_discrete['input'])
+            self._discrete_outputs = _DictValues(self._var_discrete['output'])
+        else:
+            self._discrete_inputs = self._discrete_outputs = ()
 
         parent_conns = parent._conn_global_abs_in2out
         my_ins = self._var_allprocs_abs2prom['input']
