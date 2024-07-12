@@ -63,7 +63,7 @@ def _view_dyn_shapes_cmd(options, user_args):
     _load_and_exec(options.file[0], user_args)
 
 
-def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None, lib=None):
+def view_dyn_shapes(root, outfile=None, show=True, title=None, lib=None):
     """
     Generate a plot file containing the dynamic shape dependency graph.
 
@@ -81,7 +81,7 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None, 
         Sets the title of the plot.
     lib : str, optional
         Library to use for plotting, either 'pydot' or 'matplotlib'.  If not specified, the
-        default is 'pydot' if pydot is installed, otherwise 'matplotlib'.
+        default is 'matplotlib' if pydot is installed, otherwise 'pydot'.
     """
     if MPI and MPI.COMM_WORLD.rank != 0:
         return
@@ -155,10 +155,9 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None, 
                 node_colors.append('green')
         node_labels[n] = f"{shape}: {n[common_idx:]}"
 
-    if pydot is not None and (lib is None or lib == 'pydot'):
-        Gdot = _to_pydot_graph(graph, node_colors, node_labels)
-        write_graph(Gdot, prog='dot', display=show, outfile='dyn_shape_graph.html')
-    elif plt is not None:
+    if plt is not None:
+        if outfile is None:
+            outfile = 'shape_dep_graph.png'
         nx.draw_networkx(graph, with_labels=True, node_color=node_colors, labels=node_labels)
         plt.axis('off')  # turn of axis
         plt.title(title)
@@ -166,6 +165,12 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None, 
 
         if show:
             plt.show()
+    elif pydot is not None and (lib is None or lib == 'pydot'):
+        if outfile is None:
+            outfile = 'shape_dep_graph.html'
+        Gdot = _to_pydot_graph(graph, node_colors, node_labels)
+        write_graph(Gdot, prog='dot', display=show, outfile=outfile)
+
     else:
         raise RuntimeError("view_dyn_shapes requires either matplotlib or pydot.")
 
