@@ -208,6 +208,8 @@ class Group(System):
         If True, this group has been reordered without calling setup.
     _cycles : list
         List of cycles in the group.
+    _cycle_groups : list
+        List of CycleGroups in the group.
     """
 
     def __init__(self, **kwargs):
@@ -240,6 +242,7 @@ class Group(System):
         self._component_graph = None
         self._reordered = False
         self._cycles = []
+        self._cycle_groups = []
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -2227,6 +2230,7 @@ class Group(System):
         from openmdao.core.cyclegroup import CycleGroup
         reordered = False
 
+        self._cycle_groups = []
         if self._subsolvers:
             G = self.compute_sys_graph()
             toposorted = get_sccs_topo(G)
@@ -2235,7 +2239,7 @@ class Group(System):
                 reordered = True
                 matches = self._match_solvers_to_sccs(sccs)
                 for i, (nlslv, linslv) in matches.items():
-                    CycleGroup(self, sccs[i], i, nlslv, linslv)
+                    self._cycle_groups.append(CycleGroup(self, sccs[i], i, nlslv, linslv))
 
         if self.options['auto_order']:
             G = self.compute_sys_graph()  # compute a sys graph even if we already did it above
@@ -2295,8 +2299,8 @@ class Group(System):
 
         if len(matches) < len(sccs):
             missing = [scc for i, scc in enumerate(sccs) if i not in matches]
-            raise RuntimeError(f"{self.msginfo}: The following cycles, {missing}, have not been "
-                               "matched to solvers.")
+            issue_warning(f"{self.msginfo}: The following cycles, {missing}, have not been "
+                          "matched to solvers.")
 
         return matches
 
@@ -3498,6 +3502,12 @@ class Group(System):
                 except KeyError:
                     if name == '':
                         return self
+                    else:  # try looking in cycle groups
+                        for grp in self._cycle_groups:
+                            s = grp._get_subsystem(subname)
+                            if s is not None:
+                                system = s
+                                continue
                     return None
         return system
 
