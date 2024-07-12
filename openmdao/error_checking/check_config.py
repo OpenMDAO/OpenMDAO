@@ -72,9 +72,11 @@ def _check_ubcs(group, warnings):
         List to collect warning messages.
     """
     out_of_order = group._check_order()
-    for syspath, conns in out_of_order.items():
+    if out_of_order:
+        syspath = group._user_pathname(verbose=False)
         prefix = f"   In System '{syspath}', subsystem " if syspath else "   System "
-        for tgt, srcs in conns.items():
+
+        for tgt, srcs in out_of_order.items():
             warnings.append(f"{prefix}'{tgt}' executes out-of-order "
                             f"with respect to its source systems {srcs}\n")
 
@@ -345,22 +347,27 @@ def _check_solvers(problem, logger):
         The object that manages logging output.
     """
     iter_nl_systems = set()
-    iter_lin_systems = set()
+    iter_ln_systems = set()
 
     for path, pathclass, sccs, lnslv, nlslv, lnmaxiter, nlmaxiter, missing \
             in problem.model.iter_group_sccs(use_abs_names=False, all_groups=True):
 
         under_ln_iter = under_nl_iter = False
-        if lnmaxiter > 1:
-            iter_lin_systems.add(path)
+        if lnmaxiter > 1 or lnslv == 'DirectSolver':
+            iter_ln_systems.add(path)
             under_ln_iter = True
         if nlmaxiter > 1:
             iter_nl_systems.add(path)
             under_nl_iter = True
 
+        if '' in iter_nl_systems:
+            under_nl_iter = True
+        if '' in iter_ln_systems:
+            under_ln_iter = True
+
         if not (under_ln_iter and under_nl_iter):
             for anc in all_ancestors(path):
-                if anc in iter_lin_systems:
+                if anc in iter_ln_systems:
                     under_ln_iter = True
                 if anc in iter_nl_systems:
                     under_nl_iter = True
@@ -381,8 +388,9 @@ def _check_solvers(problem, logger):
 
             if slv:
                 slvstr = ' or '.join(slv)
-                logger.error(f"{pathclass} '{path}' contains cycles {cycles}, but no "
-                             f"iterative {slvstr} solver was found in it or any containing Group.")
+                logger.warning(f"{pathclass} '{path}' contains cycles {cycles}, but no "
+                               f"iterative {slvstr} solver was found in it or any containing "
+                               "Group.")
 
         if has_subcycles:
             logger.warning(f"{pathclass} '{path}' contains subcycles {cycles}.\nA subcycle "
@@ -391,9 +399,9 @@ def _check_solvers(problem, logger):
                            "solvers to these subcycles can sometimes improve convergence."
                            "\nTo assign a solver to a subcycle, "
                            "use the 'add_subsolvers' method on the Group, for example:\n\n"
-                            "add_subsolvers(om.NonlinearBlockGS(), om.LinearBlockGS(), 'mysys')\n"
-                            "\nwhere 'mysys' is the name of any subsystem contained in the "
-                            "subcycle.")
+                           "add_subsolvers(om.NonlinearBlockGS(), om.LinearBlockGS(), 'mysys')\n"
+                           "\nwhere 'mysys' is the name of any subsystem contained in the "
+                           "subcycle.")
 
     for system in problem.model.system_iter(include_self=True, recurse=True, typ=ImplicitComponent):
         # determine if this system has states (is an implicit component)
@@ -408,9 +416,14 @@ def _check_solvers(problem, logger):
             (overrides_method('solve_linear', system, ImplicitComponent))
         )
 
+        if '' in iter_nl_systems:
+            under_nl_iter = True
+        if '' in iter_ln_systems:
+            under_ln_iter = True
+
         if not (under_ln_iter and under_nl_iter):
             for anc in all_ancestors(path):
-                if anc in iter_lin_systems:
+                if anc in iter_ln_systems:
                     under_ln_iter = True
                 if anc in iter_nl_systems:
                     under_nl_iter = True
@@ -418,16 +431,20 @@ def _check_solvers(problem, logger):
                     break
 
         slv = []
+        methods = []
         if not under_nl_iter:
             slv.append("nonlinear")
+            methods.append("solve_nonlinear")
         if not under_ln_iter:
             slv.append("linear")
+            methods.append("solve_linear")
 
         if slv:
             slvstr = ' or '.join(slv)
+            methstr = ' or '.join(methods)
             logger.warning(f"{system.__class__.__name__} '{path}' contains implicit variables, but "
                            f"no iterative {slvstr} solvers were found in it or any containing "
-                           "group.")
+                           f"group, and it does not implement {methstr}.")
 
 
 def _check_missing_recorders(problem, logger):

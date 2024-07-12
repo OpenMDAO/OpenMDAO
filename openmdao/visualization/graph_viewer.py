@@ -550,6 +550,8 @@ class GraphViewer(object):
 
         Parameters
         ----------
+        G : nx.DiGraph
+            A pydot graph will be created based on this graph.
         group_tree_dict : dict
             A dict of group paths mapped to list of (scc, children) tuples.
         node_info : dict

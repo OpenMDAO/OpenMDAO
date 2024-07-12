@@ -141,7 +141,7 @@ def print_cycle_tree(group):
 
     def _print_tree(node, nscc, indent=''):
         children, scc, unique, i, path, _ = node
-        print(indent, f"cycle {i+1} of {nscc} for '{path}'")
+        print(indent, f"cycle {i + 1} of {nscc} for '{path}'")
         for u in unique:
             print(indent, f"  {u}")
         if children:

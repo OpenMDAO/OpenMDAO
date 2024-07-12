@@ -1,3 +1,7 @@
+"""
+Define the CycleGroup class.
+"""
+
 from openmdao.core.group import Group, _SysInfo
 from openmdao.core.component import _DictValues
 from openmdao.utils.general_utils import truncate
@@ -52,6 +56,9 @@ class CycleGroup(Group):
     """
 
     def __init__(self, parent, scc, index, nonlinear_solver=None, linear_solver=None, **kwargs):
+        """
+        Initialize all attributes.
+        """
         super().__init__(**kwargs)
         self._reset_setup_vars()
         self.cycle = scc

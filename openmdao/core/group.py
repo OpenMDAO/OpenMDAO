@@ -26,7 +26,7 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len, ValueRepeater
-from openmdao.utils.general_utils import common_subpath, all_ancestors, \
+from openmdao.utils.general_utils import common_subpath, \
     convert_src_inds, shape2tuple, get_connection_owner, ensure_compatible, \
     meta2src_iter, get_rev_conns, _contains_all
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
@@ -198,7 +198,7 @@ class Group(System):
         within this group, keyed by active response.  These determine if contributions
         from all ranks will be added together to get the correct input values when derivatives
         in the larger model are being solved using reverse mode.
-    _solvers : dict
+    _subsolvers : dict
         System name mapped to a tuple containing the nonlinear and linear solvers to be used
         on the cycle containing that system.
     _component_graph : nx.DiGraph
@@ -1280,7 +1280,7 @@ class Group(System):
 
     def _check_order(self):
         """
-        Check if auto ordering is needed, optionally reordering subsystems if appropriate.
+        Check if auto ordering is needed.
 
         Returns
         -------
@@ -5339,21 +5339,19 @@ class Group(System):
         missing = set()
         if sccs:
             if len(sccs) == 1:
-                if len(sccs[0]) == len(self._subsystems_allprocs):
+                if len(sccs[0]) == len(self._subsystems_allprocs) and not all_groups:
                     sccs = []  # whole group is a cycle, so no need to assign solver(s) to cycle(s)
             for scc in sccs:
                 missing.update(scc)
 
             missing = set(s.system.name for s in self._subsystems_allprocs.values()) - missing
 
-        if sccs:
-            # names are relative to this group, but need absolute names
-            if use_abs_names and self.pathname:
-                prefix = self.pathname + '.'
-                abs_sccs = []
-                for scc in sccs:
-                    abs_sccs.append({prefix + n for n in scc})
-                sccs = abs_sccs
+        if sccs and use_abs_names and self.pathname:
+            prefix = self.pathname + '.'
+            abs_sccs = []
+            for scc in sccs:
+                abs_sccs.append({prefix + n for n in scc})
+            sccs = abs_sccs
 
         if all_groups or sccs:
             lnslvname = self.linear_solver.__class__.__name__ if self.linear_solver else None
@@ -5363,8 +5361,8 @@ class Group(System):
                 lnmaxiter = self.linear_solver.options['maxiter']
             if nlnslvname and 'maxiter' in self.nonlinear_solver.options:
                 nlmaxiter = self.nonlinear_solver.options['maxiter']
-            yield self.pathname, self.__class__.__name__, sccs, lnslvname, nlnslvname, lnmaxiter,\
-                  nlmaxiter, missing
+            yield (self.pathname, self.__class__.__name__, sccs, lnslvname, nlnslvname, lnmaxiter,
+                   nlmaxiter, missing)
 
         if recurse:
             for s in self._subsystems_myproc:
