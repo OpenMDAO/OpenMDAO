@@ -675,3 +675,4 @@ def add_sellar_to_group(group, dis1, dis2):
 
     group.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
     group.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+    return group

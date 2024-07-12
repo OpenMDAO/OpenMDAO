@@ -1,6 +1,7 @@
 """
 Unit tests for Group.
 """
+import sys
 import itertools
 import unittest
 
@@ -12,13 +13,16 @@ except ImportError:
     from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 import openmdao.api as om
-from openmdao.test_suite.components.sellar import SellarDis2
+from openmdao.test_suite.components.sellar import SellarDis2, add_sellar_to_group, \
+    SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_no_warning, assert_check_totals, assert_check_partials
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.utils.om_warnings import PromotionWarning
 from openmdao.utils.name_maps import name2abs_names
 from openmdao.utils.testing_utils import set_env_vars_context, force_check_partials
+
+from openmdao.utils.graph_utils import list_groups_with_subcycles, print_cycle_tree
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -4378,6 +4382,44 @@ class TestConfigureUpdateMPI(TestConfigureUpdate):
     Runs test in TestConfigureUpdate with 2 procs to make sure the metadata is gathered correctly.
     """
     N_PROCS = 2
+
+
+class TestAutoSolvers(unittest.TestCase):
+    ofs = ['obj', 'con1', 'con2']
+    wrts = ['x', 'z']
+
+    def build_model(self, group, auto):
+        p = om.Problem()
+        model = p.model
+        if group:
+            g = add_sellar_to_group(model.add_subsystem('G1', om.Group(), promotes=['*']),
+                                    SellarDis1withDerivatives, SellarDis2withDerivatives)
+        else:
+            g = add_sellar_to_group(model, SellarDis1withDerivatives, SellarDis2withDerivatives)
+
+        if auto:
+            g.add_subsolvers(om.NonlinearBlockGS(maxiter=100), om.LinearBlockGS(maxiter=100), 'd1')
+
+        p.setup()
+        p.run_model()
+
+        J = p.compute_totals(of=self.ofs, wrt=self.wrts, return_format='flat_dict')
+
+        return p, J
+
+    def test_auto_solvers(self):
+        p, J = self.build_model(group=False, auto=True)
+        p_auto, J_auto = self.build_model(group=False, auto=True)
+        for of in self.ofs:
+            for wrt in self.wrts:
+                assert_near_equal(J[of, wrt], J_auto[of, wrt])
+
+    def test_auto_solvers_grouped(self):
+        p, J = self.build_model(group=True, auto=True)
+        p_auto, J_auto = self.build_model(group=True, auto=True)
+        for of in self.ofs:
+            for wrt in self.wrts:
+                assert_near_equal(J[of, wrt], J_auto[of, wrt])
 
 
 if __name__ == "__main__":
