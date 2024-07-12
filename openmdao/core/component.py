@@ -409,6 +409,22 @@ class Component(System):
         """
         pass
 
+    def _setup_residuals(self):
+        """
+        Process hook to call user-defined setup_residuals method if provided.
+        """
+        self.setup_residuals()
+
+    def setup_residuals(self):
+        """
+        Declare residuals.
+
+        This is meant to be overridden by component classes.  All residuals should be
+        declared here since this is called after all size/shape information is known for
+        all variables.
+        """
+        pass
+
     def _declared_partials_iter(self):
         """
         Iterate over all declared partials.
