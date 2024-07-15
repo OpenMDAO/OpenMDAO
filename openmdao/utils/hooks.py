@@ -80,6 +80,10 @@ class _HookMeta(object):
         If True, pass the hooked function's positional and keyword arguments to the hook function.
     pass_return : bool
         If True, pass the return value to the hook function.  Only valid for post hooks.
+    predicate : function or None
+        If not None, a function that will be called to determine if the hook should run. The
+        function should take the instance as its only argument, returning True if the hook should
+        run.
     **kwargs : dict of keyword arguments
         Keyword arguments that will be passed to the hook function.
 
@@ -101,12 +105,16 @@ class _HookMeta(object):
         If True, pass the return value to the hook function.  Only valid for post hooks.
     kwargs : dict of keyword arguments
         Keyword arguments that will be passed to the hook function.
+    predicate : function or None
+        If not None, a function that will be called to determine if the hook should run. The
+        function should take the instance as its only argument, returning True if the hook should
+        run.
     children : list
         If we're a 'None' inst_id hook, keep track of our child hooks.
     """
 
     def __init__(self, class_name, inst_id, hook, ncalls=None, exit=False, pass_args=False,
-                 pass_return=False, **kwargs):
+                 pass_return=False, predicate=None, **kwargs):
         global _hook_counter
         self._stamp = _hook_counter
         _hook_counter += 1
@@ -118,6 +126,7 @@ class _HookMeta(object):
         self.exit = exit
         self.pass_args = pass_args
         self.pass_return = pass_return
+        self.predicate = predicate
         self.kwargs = kwargs
         self.children = []  # if we're a 'None' inst_id hook, keep track of our child hooks
 
@@ -147,6 +156,9 @@ class _HookMeta(object):
         object
             The return value of the hook function.
         """
+        if self.predicate is not None and not self.predicate(inst):
+            return
+
         if self.ncalls is None:
             ret = self._call_hook(inst, args, kwargs, ret)
         elif self.ncalls > 0:
@@ -169,11 +181,11 @@ class _HookMeta(object):
         inst : object
             The instance that owns the method where the hook will be applied.
         args : list
-            Positional arguments.
+            Positional arguments passed to hooked method.
         kwargs : dict
             Keyword arguments.
         ret : object
-            The return value of the function or None.
+            The return value of the hooked method or None.
 
         Returns
         -------
