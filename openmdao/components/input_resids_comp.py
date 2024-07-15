@@ -1,10 +1,13 @@
+"""InputResidsComp provides a simple implicit component with minimal boilerplate."""
+
 import numpy as np
 
 import openmdao.api as om
 
 
 class InputResidsComp(om.ImplicitComponent):
-    """Class definition for the InputResidsComp.
+    """
+    Class definition for the InputResidsComp.
 
     Uses all inputs as residuals while allowing individual outputs that are not necessarily
     associated with a specific residual.
@@ -14,19 +17,33 @@ class InputResidsComp(om.ImplicitComponent):
     **kwargs : dict
         Dictionary of optional arguments.
 
+    Attributes
+    ----------
+    _refs : dict
+        Residual ref values that are cached during calls to the overloaded add_input method.
+
     """
+
     def __init__(self, **kwargs):
+        """
+        Initialize the InputResidsComp.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Keyword arguments passed to the __init__ method of ImplicitComponent
+        """
         self._refs = {}
         super().__init__(**kwargs)
 
     def add_input(self, name, val=1.0, shape=None, units=None, desc='', tags=None,
                   shape_by_conn=False, copy_shape=None, compute_shape=None, distributed=None,
                   ref=None):
-        """Add an input to be used as a residual.
+        """
+        Add an input to be used as a residual.
 
         Parameters
         ----------
-
         name : str
             Name of the variable in this component's namespace.
         val : float or list or tuple or ndarray or Iterable
@@ -64,6 +81,12 @@ class InputResidsComp(om.ImplicitComponent):
                           compute_shape=compute_shape, distributed=distributed)
 
     def setup_residuals(self):
+        """
+        Delay calls for add_residual for this component.
+
+        This method is used since input/residual sizes may not 
+        be known until final setup.
+        """
         for name in self._var_rel_names['input']:
             meta = self._var_rel2meta[name]
             resid_name = f'resid_{name}'
@@ -71,6 +94,12 @@ class InputResidsComp(om.ImplicitComponent):
                               desc=meta['desc'], ref=self._refs[name])
 
     def setup_partials(self):
+        """
+        Delay calls to declare_partials for the component.
+         
+        This method is used because input/residual sizes
+        may not be known until final setup.
+        """
         size = self._get_var_meta('x', 'size')
         self.mat = np.eye(size) * 3.
         rng = np.arange(size)
@@ -82,7 +111,8 @@ class InputResidsComp(om.ImplicitComponent):
             self.declare_partials(of=resid_name, wrt=name, rows=ar, cols=ar, val=1.0)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
-        """Compute residuals given inputs and outputs.
+        """
+        Compute residuals given inputs and outputs.
 
         The model is assumed to be in an unscaled state.
 

@@ -413,7 +413,8 @@ class ImplicitComponent(Component):
 
         if self._problem_meta is not None:
             if self._problem_meta['setup_status'] > _SetupStatus.POST_FINAL_SETUP:
-                raise RuntimeError(f"{self.msginfo}: Can't add residual '{name}' after final_setup.")
+                raise RuntimeError(f"{self.msginfo}: Can't add residual '{name}' "
+                                   "after final_setup.")
 
         # check ref shape
         if ref is not None:

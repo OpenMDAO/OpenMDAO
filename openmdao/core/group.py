@@ -3816,7 +3816,6 @@ class Group(System):
                     msg += "component whose input '{}' is distributed using src_indices. "
                     raise RuntimeError(msg.format(self.msginfo, iname))
 
-      
     def _setup_residuals(self):
         """
         Call setup_residuals in components.
