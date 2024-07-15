@@ -14,7 +14,7 @@ try:
     # through the main NumPy namespace for compatibility. (Until NumPy 2.0 release)
     from numpy.exceptions import ComplexWarning
 except ModuleNotFoundError:
-    from numpy import ComplexWarning
+    from numpy import ComplexWarning  # noqa: NPY201
 
 
 class TestEQConstraintComp(unittest.TestCase):
@@ -359,7 +359,7 @@ class TestEQConstraintComp(unittest.TestCase):
         prob.run_driver()
 
         with warnings.catch_warnings():
-            warnings.filterwarnings(action="error", category=ComplexWarning)
+            warnings.filterwarnings(action="error", category=ComplexWarning)  # noqa: NPY201
             cpd = force_check_partials(prob, out_stream=None, method='cs')
 
         assert_check_partials(cpd, atol=1e-10, rtol=1e-10)
