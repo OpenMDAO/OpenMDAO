@@ -457,6 +457,18 @@ class ImplicitComponent(Component):
         for name, meta in self._declared_residuals.items():
             yield name, meta['shape']
 
+    def setup_residuals(self):
+        """
+        User hook for adding named residuals to this component.
+        """
+        pass
+
+    def _setup_residuals(self):
+        """
+        Call setup_residuals if the user has defined it.
+        """
+        self.setup_residuals()
+
     def _setup_vectors(self, root_vectors):
         """
         Compute all vectors for all vec names and assign excluded variables lists.

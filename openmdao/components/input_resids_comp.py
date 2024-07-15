@@ -62,13 +62,6 @@ class InputResidsComp(om.ImplicitComponent):
         super().add_input(name, val=val, shape=shape, units=units, desc=desc, tags=tags,
                           shape_by_conn=shape_by_conn, copy_shape=copy_shape,
                           compute_shape=compute_shape, distributed=distributed)
-    
-    # def setup(self):
-    #     for name in self._var_rel_names['input']:
-    #         meta = self._var_rel2meta[name]
-    #         resid_name = f'resid_{name}'
-    #         self.add_residual(resid_name, shape=meta['shape'], units=meta['units'],
-    #                           desc=meta['desc'], ref=self._refs[name])
 
     def setup_residuals(self):
         for name in self._var_rel_names['input']:
