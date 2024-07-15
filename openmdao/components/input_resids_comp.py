@@ -21,7 +21,6 @@ class InputResidsComp(om.ImplicitComponent):
     ----------
     _refs : dict
         Residual ref values that are cached during calls to the overloaded add_input method.
-
     """
 
     def __init__(self, **kwargs):
@@ -73,7 +72,6 @@ class InputResidsComp(om.ImplicitComponent):
         ref : float or ndarray or None
             Scaling parameter. The value in the user-defined units of this residual
             when the scaled value is 1. Default is 1.
-
         """
         self._refs[name] = ref
         super().add_input(name, val=val, shape=shape, units=units, desc=desc, tags=tags,
@@ -84,7 +82,7 @@ class InputResidsComp(om.ImplicitComponent):
         """
         Delay calls for add_residual for this component.
 
-        This method is used since input/residual sizes may not 
+        This method is used since input/residual sizes may not
         be known until final setup.
         """
         for name in self._var_rel_names['input']:
@@ -96,7 +94,7 @@ class InputResidsComp(om.ImplicitComponent):
     def setup_partials(self):
         """
         Delay calls to declare_partials for the component.
-         
+
         This method is used because input/residual sizes
         may not be known until final setup.
         """
@@ -124,6 +122,5 @@ class InputResidsComp(om.ImplicitComponent):
             Unscaled, dimensional output variables read via outputs[key].
         residuals : Vector
             Unscaled, dimensional residuals written to via residuals[key].
-
         """
         residuals.set_val(inputs.asarray())
