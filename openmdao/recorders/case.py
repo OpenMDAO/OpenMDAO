@@ -1087,7 +1087,7 @@ class Case(object):
         ----------
         var_type : 'input', 'explicit' or 'implicit'
             Indicates type of variables, input or explicit/implicit output.
-        var_data : list
+        var_data : dict or list
             Dict of {name: metadata} or list of (name, metadata).
         hierarchical : bool
             When True, human readable output shows variables in hierarchical format.
