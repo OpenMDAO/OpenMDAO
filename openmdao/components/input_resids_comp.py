@@ -2,10 +2,10 @@
 
 import numpy as np
 
-import openmdao.api as om
+from openmdao.core.implicitcomponent import ImplicitComponent
 
 
-class InputResidsComp(om.ImplicitComponent):
+class InputResidsComp(ImplicitComponent):
     """
     Class definition for the InputResidsComp.
 
