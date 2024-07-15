@@ -3815,6 +3815,7 @@ class Group(System):
                     msg = "{}: Approx_totals is not supported on a group with a distributed "
                     msg += "component whose input '{}' is distributed using src_indices. "
                     raise RuntimeError(msg.format(self.msginfo, iname))
+
       
     def _setup_residuals(self):
         """
