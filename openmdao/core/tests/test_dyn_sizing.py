@@ -477,6 +477,24 @@ class TestDynShapes(unittest.TestCase):
         msg = "\nCollected errors for problem 'copy_shape_in_in_unresolvable':\n   <model> <class Group>: Failed to resolve shapes for ['comp.x1', 'comp.x2']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x1' to 'comp.x1'. The source shape is (2, 3) but the target shape is None.\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x2' to 'comp.x2'. The source shape is (2, 3) but the target shape is None."
         self.assertEqual(cm.exception.args[0], msg)
 
+    def test_copy_shape_none_set(self):
+        # test copy_shape from input to input
+        p = om.Problem(name='copy_shape_in_in_unresolvable')
+
+        p.model.add_subsystem('comp', om.ExecComp('y1, y2 = x1*2, x2*2',
+                                                  x1={'shape_by_conn': True},
+                                                  x2={'shape_by_conn': True},
+                                                  y1={'copy_shape': 'x1'},
+                                                  y2={'copy_shape': 'x2'}))
+
+        p.setup()
+
+        # The intent is that the shapes of x1 and x2 are set by these set_val calls.
+        p.set_val('indep.x1', np.ones(5))
+        p.set_val('indep.x2', np.arange(5))
+
+        p.final_setup()
+
     def test_mismatched_dyn_shapes(self):
         # this is a sized source and sink, but their sizes are incompatible
         p = om.Problem(name='mismatched_dyn_shapes')
