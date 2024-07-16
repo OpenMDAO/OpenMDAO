@@ -1,4 +1,30 @@
 ***********************************
+# Release Notes for OpenMDAO 3.34.0
+
+July 19, 2024
+
+OpenMDAO 3.34.0 is largely bug fixes with a few new features. It is likely the last release before a significant update to the way in which output files are organized for a problem.
+
+## New Features
+
+- Added InputResidsComp to the list of components. Added setup_residuals method for compatibility with dynamic shaping. [#3295](https://github.com/OpenMDAO/OpenMDAO/pull/3295)
+- Optimizers now keep track of design vars that impact linear constraints and nonlinear responses separately. [#3275](https://github.com/OpenMDAO/OpenMDAO/pull/3275)
+- update to hook system to allow args and/or return value to be passed to hook functions [#3276](https://github.com/OpenMDAO/OpenMDAO/pull/3276)
+
+## Bug Fixes
+
+- Speed up discrete variable dependency check. [#3277](https://github.com/OpenMDAO/OpenMDAO/pull/3277)
+- Fix for test_scaffold test that doesn't clean up site-packages installs on some machines [#3279](https://github.com/OpenMDAO/OpenMDAO/pull/3279)
+- Try Except for Report Dir removal [#3281](https://github.com/OpenMDAO/OpenMDAO/pull/3281)
+- Problem.load_case fix for discrete variables [#3284](https://github.com/OpenMDAO/OpenMDAO/pull/3284)
+- Prob.load_case discrete input fix [#3289](https://github.com/OpenMDAO/OpenMDAO/pull/3289)
+
+## Miscellaneous
+
+- Removed 2.0.0 pin from pydocstyle dependency requirement [#3286](https://github.com/OpenMDAO/OpenMDAO/pull/3286)
+- Updated a couple of tests to pass the NumPy 2.x compatibility check [#3291](https://github.com/OpenMDAO/OpenMDAO/pull/3291)
+
+***********************************
 # Release Notes for OpenMDAO 3.33.0
 
 June 07, 2024
