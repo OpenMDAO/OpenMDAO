@@ -4190,7 +4190,7 @@ class System(object):
 
         if all_procs or self.comm.rank == 0:
             write_var_table(self.pathname, var_list, 'all', var_dict,
-                            True, '', print_arrays, out_stream)
+                            True, print_arrays, out_stream)
 
         return var_dict if return_format == 'dict' else list(var_dict.items())
 
@@ -4604,11 +4604,10 @@ class System(object):
             inputs = var_type == 'input'
             outputs = not inputs
             var_list = self._get_vars_exec_order(inputs=inputs, outputs=outputs, variables=var_data)
-            top_name = self.name if self.name else 'model'
 
         if all_procs or self.comm.rank == 0:
             write_var_table(self.pathname, var_list, var_type, var_data,
-                            hierarchical, top_name, print_arrays, out_stream)
+                            hierarchical, print_arrays, out_stream)
 
     def _get_vars_exec_order(self, inputs=False, outputs=False, variables=None, local=False):
         """

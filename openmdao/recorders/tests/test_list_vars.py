@@ -229,6 +229,11 @@ class ListVarsTest(unittest.TestCase):
             assert_near_equal(bar_outputs['add_subtract_comp.adder_output2']['val'], a + a)
 
     def test_list_vars_bool_args(self):
+        """
+        Iterate through the boolean arguments to the list_vars function and toggle each one to
+        its non-default value.  Make sure the output from the Case method is the same as the
+        output from the System method.
+        """
         from openmdao.test_suite.components.sellar_feature import SellarMDAWithUnits
 
         model = SellarMDAWithUnits()
@@ -251,49 +256,33 @@ class ListVarsTest(unittest.TestCase):
 
         case = om.CaseReader('list_vars.db').get_case(0)
 
-        # arguments not exercised in this test (ie. those that are not boolean)
-        # are shown, but commented out
-        for arg in (
-            'val',
-            'prom_name',
-            'residuals',
-            # 'residuals_tol=None,
-            'units',
-            'shape',
-            'bounds',
-            'scaling',
-            'desc',
-            'print_arrays',
-            # 'includes=None,
-            # 'excludes=None,
-            'is_indep_var',
-            'is_design_var',
-            'list_autoivcs',
-            'print_min',
-            'print_max',
-            # 'return_format='list')'
-        ):
-            with self.subTest(f"{arg}=True"):
+        import inspect
+        func_sig = inspect.signature(case.list_vars)
+        bool_args = [(name, param.default) for name, param in func_sig.parameters.items()
+                     if param.default in {True, False}]
+
+        for (arg, dflt) in bool_args:
+            with self.subTest(f"{arg}={not dflt}"):
                 self.maxDiff = None
 
-                prob_out = io.StringIO()
+                model_out = io.StringIO()
                 case_out = io.StringIO()
 
-                kwargs = {arg: True}
+                kwargs = {arg: not dflt}
 
-                prob_vars = model.list_vars(out_stream=prob_out, **kwargs)
+                model_vars = model.list_vars(out_stream=model_out, **kwargs)
                 case_vars = case.list_vars(out_stream=case_out, **kwargs)
 
-                self.assertEqual(case_out.getvalue(), prob_out.getvalue(),
+                self.assertEqual(case_out.getvalue(), model_out.getvalue(),
                     f"Output comparison failed for {kwargs=}\n"
                     f"===================== PROB ===================\n"
-                    f"{prob_out.getvalue()}"
+                    f"{model_out.getvalue()}"
                     f"===================== CASE ===================\n"
                     f"{case_out.getvalue()}"
                     f"==============================================\n"
                 )
 
-                assert_near_equal(sorted(case_vars), sorted(prob_vars),
+                assert_near_equal(sorted(case_vars), sorted(model_vars),
                                   f"Return value comparison failed for {kwargs=}")
 
 

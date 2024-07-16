@@ -737,7 +737,7 @@ class Case(object):
                 var_list = sorted(var_dict.keys())
 
             write_var_table('', var_list, 'all', var_dict,
-                            True, '', print_arrays, out_stream)
+                            True, print_arrays, out_stream)
 
         return var_dict if return_format == 'dict' else list(var_dict.items())
 
@@ -1122,10 +1122,9 @@ class Case(object):
             # don't have execution order, just sort for determinism
             var_list = sorted(var_dict.keys())
 
-        top_name = pathname if pathname else 'model'
         write_var_table(pathname, var_list, var_type, var_dict,
-                        hierarchical=hierarchical, top_name=top_name,
-                        print_arrays=print_arrays, out_stream=out_stream)
+                        hierarchical=hierarchical, print_arrays=print_arrays,
+                        out_stream=out_stream)
 
     def _get_variables_of_type(self, var_type, scaled=False, use_indices=False):
         """

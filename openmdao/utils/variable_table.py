@@ -32,7 +32,7 @@ indent_inc = 2
 
 
 def write_var_table(pathname, var_list, var_type, var_dict,
-                    hierarchical=True, top_name='model', print_arrays=False,
+                    hierarchical=True, print_arrays=False,
                     out_stream=_DEFAULT_OUT_STREAM):
     """
     Write table of variable names, values, residuals, and metadata to out_stream.
@@ -49,8 +49,6 @@ def write_var_table(pathname, var_list, var_type, var_dict,
         Dict storing vals and metadata for each var name.
     hierarchical : bool
         When True, human readable output shows variables in hierarchical format.
-    top_name : str
-        The name of the top level group when using hierarchical format.
     print_arrays : bool
         When False, in the columnar display, just display norm of any ndarrays with size > 1.
         The norm is surrounded by vertical bars to indicate that it is a norm.
@@ -112,6 +110,11 @@ def write_var_table(pathname, var_list, var_type, var_dict,
         break
 
     column_names = [out_type for out_type in out_types if out_type in var_meta]
+
+    if 'tags' in column_names:
+        # if printing tags, print as a list (value may be a list or a set)
+        for meta in var_dict.values():
+            meta['tags'] = list(meta['tags'])
 
     if use_html and var_list:
         rows = []
