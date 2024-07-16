@@ -112,6 +112,13 @@ _COLORING_VERSION = '1.0'
 _CLASS_COLORINGS = {}
 
 
+class InvalidColoringError(Exception):
+    """
+    A custom error class that is raised in the event of an invalid coloring.
+    """
+    pass
+
+
 class ColoringMeta(object):
     """
     Container for all metadata relevant to a coloring.
@@ -985,6 +992,11 @@ class Coloring(object):
             Current driver object.
         model : Group
             Current model object.
+
+        Raises
+        ------
+        InvalidColoringError
+            Raised if the jacobian structure has changed and the coloring is invalid.
         """
         ofs = model._active_responses(driver._get_ordered_nl_responses(), driver._responses)
         of_sizes = [m['size'] for m in ofs.values()]
@@ -1002,6 +1014,11 @@ class Coloring(object):
         ----------
         system : System
             System being colored.
+
+        Raises
+        ------
+        InvalidColoringError
+            Raised if the jacobian structure has changed and the coloring is invalid.
         """
         # check the contents (vars and sizes) of the input and output vectors of system
         info = Partial_ColoringMeta(wrt_patterns=self._meta.get('wrt_patterns', ('*',)))
@@ -1072,7 +1089,7 @@ class Coloring(object):
 
         if len(msg) > 1:
             msg.append(msg_suffix)
-            raise RuntimeError('\n'.join(msg))
+            raise InvalidColoringError('\n'.join(msg))
 
     def __repr__(self):
         """
