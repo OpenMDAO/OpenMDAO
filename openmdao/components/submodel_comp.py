@@ -64,7 +64,7 @@ class SubmodelComp(ExplicitComponent):
         second element should be the outer name, the name used by everything outside
         the subproblem [e.g. (path.to.inner.var, outer_name)].
     reports : bool
-        Determines if reports should be include in subproblem. Default is False because
+        Determines if reports should be included in subproblem. Default is False because
         submodelcomp runs faster without reports.
     **kwargs : named args
         All remaining named args that become options for `SubmodelComp`.
