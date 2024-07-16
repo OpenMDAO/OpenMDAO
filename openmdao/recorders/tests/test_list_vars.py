@@ -251,6 +251,8 @@ class ListVarsTest(unittest.TestCase):
 
         case = om.CaseReader('list_vars.db').get_case(0)
 
+        # arguments not exercised in this test (ie. those that are not boolean)
+        # are shown, but commented out
         for arg in (
             'val',
             'prom_name',

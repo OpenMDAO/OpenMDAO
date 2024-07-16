@@ -727,17 +727,9 @@ class Case(object):
                     pass
 
         if var_dict:
-            # variables should be grouped by component in the order those components are executed
             if 'execution_order' in self._var_info:
                 var_list = []
-                var_order = self._var_info['execution_order']
-                # execution order will
-                cmp_names = [var_name.rsplit('.') for var_name in var_order if var_name in var_dict]
-                cmp_order = []
-                for cmp_name in cmp_names:
-                    if cmp_name not in cmp_order:
-                        cmp_order.append(cmp_name)
-                for var_name in var_order:
+                for var_name in self._var_info['execution_order']:
                     if var_name in var_dict:
                         var_list.append(var_name)
             else:

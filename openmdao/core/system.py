@@ -4663,7 +4663,7 @@ class System(object):
                             var_list.append(var_name)
         else:
             for var_name in chain(*var_dicts):
-                if not variables or var_name in variables:
+                if variables is None or var_name in variables:
                     var_list.append(var_name)
 
         return var_list
