@@ -358,6 +358,7 @@ class pyOptSparseDriver(Driver):
 
         self.pyopt_solution = None
         self._total_jac = None
+        self._total_jac_linear = None
         self.iter_count = 0
         self._nl_responses = []
 
@@ -608,8 +609,6 @@ class pyOptSparseDriver(Driver):
         except Exception as c:
             if self._exc_info is None:
                 raise
-        finally:
-            self._total_jac = None
 
         if self._exc_info is not None:
             exc_info = self._exc_info

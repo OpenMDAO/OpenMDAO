@@ -2822,6 +2822,8 @@ def dynamic_total_coloring(driver, run_model=True, fname=None, of=None, wrt=None
         driver._coloring_info.display()
         driver._setup_tot_jac_sparsity(coloring)
 
+    driver._total_jac = None
+
     return coloring
 
 
