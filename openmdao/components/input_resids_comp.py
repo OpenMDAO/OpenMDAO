@@ -99,12 +99,11 @@ class InputResidsComp(ImplicitComponent):
         may not be known until final setup.
         """
         size = self._get_var_meta('x', 'size')
-        self.mat = np.eye(size) * 3.
         rng = np.arange(size)
         self.declare_partials('y', 'x', rows=rng, cols=rng, val=3.0)
         for name in self._var_rel_names['input']:
             resid_name = 'resid_' + name
-            size = self._get_var_meta(name, 'size')
+            size = self._var_rel2meta[name]['size']
             ar = np.arange(size, dtype=int)
             self.declare_partials(of=resid_name, wrt=name, rows=ar, cols=ar, val=1.0)
 
