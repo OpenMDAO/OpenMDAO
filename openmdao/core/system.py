@@ -4599,7 +4599,6 @@ class System(object):
 
         if self._outputs is None:
             var_list = var_data.keys()
-            top_name = self.name
         else:
             inputs = var_type == 'input'
             outputs = not inputs
