@@ -1023,6 +1023,8 @@ class Group(System):
 
         This part of setup is called automatically at the start of run_model or run_driver.
         """
+        self._setup_residuals()
+
         if self._use_derivatives:
             # must call this before vector setup because it determines if we need to alloc commplex
             self._setup_partials()
@@ -3813,6 +3815,13 @@ class Group(System):
                     msg = "{}: Approx_totals is not supported on a group with a distributed "
                     msg += "component whose input '{}' is distributed using src_indices. "
                     raise RuntimeError(msg.format(self.msginfo, iname))
+
+    def _setup_residuals(self):
+        """
+        Call setup_residuals in components.
+        """
+        for subsys in self._sorted_sys_iter():
+            subsys._setup_residuals()
 
     def _declared_partials_iter(self):
         """
