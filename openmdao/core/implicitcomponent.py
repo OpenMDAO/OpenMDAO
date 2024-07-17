@@ -405,10 +405,6 @@ class ImplicitComponent(Component):
         dict
             Metadata for the added residual.
         """
-        if self._problem_meta is None:
-            raise RuntimeError(f"{self.msginfo}: "
-                               "A residual may only be added during component setup.")
-
         metadict = self._declared_residuals
 
         # Catch duplicated residuals
@@ -416,8 +412,9 @@ class ImplicitComponent(Component):
             raise ValueError(f"{self.msginfo}: Residual name '{name}' already exists.")
 
         if self._problem_meta is not None:
-            if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
-                raise RuntimeError(f"{self.msginfo}: Can't add residual '{name}' after configure.")
+            if self._problem_meta['setup_status'] > _SetupStatus.POST_FINAL_SETUP:
+                raise RuntimeError(f"{self.msginfo}: Can't add residual '{name}' "
+                                   "after final_setup.")
 
         # check ref shape
         if ref is not None:
@@ -460,6 +457,18 @@ class ImplicitComponent(Component):
     def _resid_name_shape_iter(self):
         for name, meta in self._declared_residuals.items():
             yield name, meta['shape']
+
+    def setup_residuals(self):
+        """
+        User hook for adding named residuals to this component.
+        """
+        pass
+
+    def _setup_residuals(self):
+        """
+        Call setup_residuals if the user has defined it.
+        """
+        self.setup_residuals()
 
     def _setup_vectors(self, root_vectors):
         """
