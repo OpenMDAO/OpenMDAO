@@ -764,16 +764,6 @@ class Group(System):
         # after auto_ivcs have been added, but auto_ivcs can't be added until after we know all of
         # the connections.
         self._setup_global_connections()
-        self._setup_dynamic_shapes()
-
-        self._top_level_post_connections()
-
-        self._setup_var_sizes()
-
-        self._top_level_post_sizes()
-
-        # determine which connections are managed by which group, and check validity of connections
-        self._setup_connections()
 
     def _get_dataflow_graph(self):
         """
@@ -1023,6 +1013,17 @@ class Group(System):
 
         This part of setup is called automatically at the start of run_model or run_driver.
         """
+        self._setup_dynamic_shapes()
+
+        self._top_level_post_connections()
+
+        self._setup_var_sizes()
+
+        self._top_level_post_sizes()
+
+        # determine which connections are managed by which group, and check validity of connections
+        self._setup_connections()
+
         if self._use_derivatives:
             # must call this before vector setup because it determines if we need to alloc commplex
             self._setup_partials()

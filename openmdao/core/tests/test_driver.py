@@ -191,6 +191,7 @@ class TestDriver(unittest.TestCase):
         model.add_constraint('comp.y2', ref=np.array([.2, 2e-6]))
 
         prob.setup()
+        prob.final_setup()
 
         desvars = model.get_design_vars()
 

@@ -36,6 +36,7 @@ class TestDesVarsResponses(unittest.TestCase):
         prob.model.add_constraint('con2')
 
         prob.setup()
+        prob.final_setup()
 
         des_vars = prob.model.get_design_vars()
         obj = prob.model.get_objectives()
@@ -59,6 +60,7 @@ class TestDesVarsResponses(unittest.TestCase):
         prob.model.add_response('con2', type_="con")
 
         prob.setup()
+        prob.final_setup()
 
         des_vars = prob.model.get_design_vars()
         responses = prob.model.get_responses(use_prom_ivc=True)
@@ -84,6 +86,7 @@ class TestDesVarsResponses(unittest.TestCase):
         prob.model.add_constraint('con2')
 
         prob.setup()
+        prob.final_setup()
 
         des_vars = prob.model.get_design_vars()
         obj = prob.model.get_objectives()
@@ -109,6 +112,7 @@ class TestDesVarsResponses(unittest.TestCase):
         prob.model.add_constraint('con2')
 
         prob.setup()
+        prob.final_setup()
 
         des_vars = prob.model.get_design_vars()
         obj = prob.model.get_objectives()
@@ -135,6 +139,7 @@ class TestDesVarsResponses(unittest.TestCase):
         prob.model.add_constraint('con2')
 
         prob.setup()
+        prob.final_setup()
 
         des_vars = prob.model.get_design_vars()
         obj = prob.model.get_objectives()
@@ -185,6 +190,7 @@ class TestDesVarsResponses(unittest.TestCase):
         con_comp2.add_constraint('con2')
 
         prob.setup()
+        prob.final_setup()
 
         des_vars = prob.model.get_design_vars()
         obj = prob.model.get_objectives()
@@ -423,6 +429,7 @@ class TestDesvarOnModel(unittest.TestCase):
         prob.model.add_constraint('con2')
 
         prob.setup()
+        prob.final_setup()
 
         des_vars = prob.model.get_design_vars()
 
@@ -449,6 +456,7 @@ class TestDesvarOnModel(unittest.TestCase):
         prob.model.add_constraint('con2', scaler=1e6)
 
         prob.setup()
+        prob.final_setup()
 
         des_vars = prob.model.get_design_vars()
 
@@ -569,6 +577,7 @@ class TestConstraintOnModel(unittest.TestCase):
         prob.model.add_constraint('con2')
 
         prob.setup()
+        prob.final_setup()
 
         constraints = prob.model.get_constraints()
 
@@ -930,6 +939,7 @@ class TestObjectiveOnModel(unittest.TestCase):
         prob.model.add_objective('con2')
 
         prob.setup()
+        prob.final_setup()
 
         objectives = prob.model.get_objectives()
 

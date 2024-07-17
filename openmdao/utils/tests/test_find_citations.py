@@ -37,6 +37,7 @@ class TestFindCite(unittest.TestCase):
 
         p = self.prob
         p.setup()
+        p.final_setup()
 
         citations = find_citations(p)
 

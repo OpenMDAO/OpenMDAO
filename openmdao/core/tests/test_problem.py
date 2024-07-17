@@ -953,8 +953,9 @@ class TestProblem(unittest.TestCase):
                                                      y={'val': 0.0, 'units': 'inch'}),
                                  promotes=['x'])
 
+        prob.setup()
         try:
-            prob.setup()
+            prob.final_setup()
         except Exception as err:
             self.assertEqual(str(err),
                "\nCollected errors for problem 'get_set_with_units_diff_err':"

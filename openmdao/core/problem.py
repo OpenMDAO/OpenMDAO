@@ -1052,12 +1052,15 @@ class Problem(object):
         """
         driver = self.driver
 
+        if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
+            self._metadata['static_mode'] = False
+            try:
+                self.model._final_setup()
+            finally:
+                self._metadata['static_mode'] = True
+
         responses = self.model.get_responses(recurse=True, use_prom_ivc=True)
         designvars = self.model.get_design_vars(recurse=True, use_prom_ivc=True)
-
-        if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-            self.model._final_setup()
-
         response_size, desvar_size = driver._update_voi_meta(self.model, responses, designvars)
 
         # update mode if it's been set to 'auto'

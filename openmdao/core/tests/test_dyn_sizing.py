@@ -183,12 +183,12 @@ class TestPassSize(unittest.TestCase):
 
         with self.assertRaises(Exception) as raises_cm:
             prob.setup()
+            prob.final_setup()
 
         exception = raises_cm.exception
 
         self.assertEqual(exception.args[0],
-            "\nCollected errors for problem 'unresolved_err':"
-            "\n   <model> <class Group>: Failed to resolve shapes for "
+            "<model> <class Group>: Failed to resolve shapes for "
             "['B.in', 'B.out', 'C.in', 'C.out']. To see the dynamic shape dependency graph, do "
             "'openmdao view_dyn_shapes <your_py_file>'.")
 
@@ -473,8 +473,9 @@ class TestDynShapes(unittest.TestCase):
         p.model.connect('comp.y2', 'sink.x2')
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
+            p.final_setup()
 
-        msg = "\nCollected errors for problem 'copy_shape_in_in_unresolvable':\n   <model> <class Group>: Failed to resolve shapes for ['comp.x1', 'comp.x2']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x1' to 'comp.x1'. The source shape is (2, 3) but the target shape is None.\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x2' to 'comp.x2'. The source shape is (2, 3) but the target shape is None."
+        msg = "<model> <class Group>: Failed to resolve shapes for ['comp.x1', 'comp.x2']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
         self.assertEqual(cm.exception.args[0], msg)
 
     def test_mismatched_dyn_shapes(self):
@@ -494,10 +495,10 @@ class TestDynShapes(unittest.TestCase):
         p.model.connect('indep.x2', 'Gdyn.C1.x2')
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(str(cm.exception),
-           "\nCollected errors for problem 'mismatched_dyn_shapes':"
-           "\n   <model> <class Group>: Shape mismatch, (4, 2) vs. (3, 2) for variables 'Gdyn.C2.x2' and 'Gdyn.C2.y2' during dynamic shape determination.")
+           "<model> <class Group>: Shape mismatch, (4, 2) vs. (3, 2) for variables 'Gdyn.C2.x2' and 'Gdyn.C2.y2' during dynamic shape determination.")
 
     def test_baseline_conn_inputs(self):
         # this is a sized source and unsized sink, with a DynShapeGroupConnectedInputs between them
@@ -604,10 +605,10 @@ class TestDynShapes(unittest.TestCase):
         p.model.connect('indep.x1', 'Gdyn.C1.x1')
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(str(cm.exception),
-           "\nCollected errors for problem 'cycle_unresolved':"
-           "\n   <model> <class Group>: Failed to resolve shapes for "
+           "<model> <class Group>: Failed to resolve shapes for "
            "['Gdyn.C1.x2', 'Gdyn.C1.y2', 'Gdyn.C2.x2', 'Gdyn.C2.y2', 'Gdyn.C3.x2', 'Gdyn.C3.y2', "
            "'sink.x2', 'sink.y2']. To see the dynamic shape dependency graph, do "
            "'openmdao view_dyn_shapes <your_py_file>'.")
@@ -621,11 +622,10 @@ class TestDynShapes(unittest.TestCase):
         p.model.connect('indep.x1', 'sink.x1')
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(str(cm.exception),
-           "\nCollected errors for problem 'bad_copy_shape_name':"
-           "\n   <model> <class Group>: Can't copy shape of variable 'sink.x11'. Variable doesn't exist or is not continuous."
-           "\n   <model> <class Group>: Failed to resolve shapes for ['sink.y1']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.")
+           "<model> <class Group>: Can't copy shape of variable 'sink.x11'. Variable doesn't exist or is not continuous.")
 
     def test_unconnected_var_dyn_shape(self):
         p = om.Problem(name='unconnected_var_dyn_shape')
@@ -636,11 +636,10 @@ class TestDynShapes(unittest.TestCase):
         p.model.connect('indep.x1', 'sink.x1')
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(str(cm.exception),
-           "\nCollected errors for problem 'unconnected_var_dyn_shape':"
-           "\n   <model> <class Group>: 'shape_by_conn' was set for unconnected variable 'sink.y1'."
-           "\n   <model> <class Group>: Failed to resolve shapes for ['sink.y1']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.")
+           "<model> <class Group>: 'shape_by_conn' was set for unconnected variable 'sink.y1'.")
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -1005,12 +1004,12 @@ class TestDynShapesWithInputConns(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             prob.setup()
+            prob.final_setup()
 
         # just make sure we still get a clear error msg
 
         self.assertEqual(cm.exception.args[0],
-           "\nCollected errors for problem 'shape_from_conn_input_mismatch':"
-           "\n   <model> <class Group>: Shape of input 'sub.comp3.x', (3,), doesn't match shape (2,).")
+           "<model> <class Group>: Shape of input 'sub.comp3.x', (3,), doesn't match shape (2,).")
 
     def test_shape_from_conn_input_mismatch_group_inputs(self):
         prob = om.Problem(name='shape_from_conn_input_mismatch_group_inputs')
@@ -1024,12 +1023,12 @@ class TestDynShapesWithInputConns(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             prob.setup()
+            prob.final_setup()
 
         # just make sure we still get a clear error msg
 
         self.assertEqual(cm.exception.args[0],
-           "\nCollected errors for problem 'shape_from_conn_input_mismatch_group_inputs':"
-           "\n   <model> <class Group>: Shape of input 'sub.comp2.x', (2,), doesn't match shape (3,).")
+           "<model> <class Group>: Shape of input 'sub.comp2.x', (2,), doesn't match shape (3,).")
 
 
 
