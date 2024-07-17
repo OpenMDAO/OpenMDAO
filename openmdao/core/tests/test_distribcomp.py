@@ -10,6 +10,7 @@ from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.array_utils import evenly_distrib_idxs, take_nth
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.om_warnings import DistributedComponentWarning
+from openmdao.utils.variable_table import NA
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -549,7 +550,7 @@ class MPITests(unittest.TestCase):
         test = self
 
         def verify(inputs, outputs, in_vals=1., out_vals=1., pathnames=False, comm=None, final=True, rank=None):
-            global_shape = (size, ) if final else 'Unavailable'
+            global_shape = (size, ) if final else NA
 
             inputs = sorted(inputs)
             outputs = sorted(outputs)

@@ -3086,7 +3086,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         model = prob.model
         model.add_design_var('z', lower=np.array([-10.0, 0.0]),
-                                upper=np.array([10.0, 10.0]))
+                                  upper=np.array([10.0, 10.0]))
         model.add_design_var('x', lower=0.0, upper=10.0)
         model.add_objective('obj')
         model.add_constraint('con1', upper=0.0)
