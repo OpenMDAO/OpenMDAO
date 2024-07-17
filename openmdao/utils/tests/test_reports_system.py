@@ -564,10 +564,12 @@ class TestReportsSystem(unittest.TestCase):
     @hooks_active
     def test_report_generation_extra_compute_totals_from_scaling_report(self):
         clear_reports()
-
+        from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver, pyoptsparse
+        if pyoptsparse is None:
+            raise unittest.SkipTest("pyoptsparse is required.")
         prob = self.setup_and_run_simple_problem(driver=om.pyOptSparseDriver(optimizer='SLSQP'),
                                                  reports=['scaling'], linear=True)
-        
+
         self.assertEqual(prob.driver.result.deriv_evals, 3)
 
         # See if the report files exist and if they have the right names
