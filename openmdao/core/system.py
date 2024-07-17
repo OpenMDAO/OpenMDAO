@@ -2,6 +2,7 @@
 import sys
 import os
 import hashlib
+import pathlib
 import time
 import functools
 
@@ -16,8 +17,8 @@ from numbers import Integral
 
 import numpy as np
 
-from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE, INF_BOUND, \
-    _SetupStatus
+from openmdao.core.constants import _DEFAULT_COLORING_DIR, _DEFAULT_OUT_STREAM, \
+    _UNDEFINED, INT_DTYPE, INF_BOUND, _SetupStatus
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
@@ -1666,7 +1667,7 @@ class System(object):
         if info.coloring is None and info.static is None:
             info.dynamic = True
 
-        coloring_fname = self.get_coloring_fname()
+        coloring_fname = self.get_coloring_fname(mode='output')
 
         # if we find a previously computed class coloring for our class, just use that
         # instead of regenerating a coloring.
@@ -1786,19 +1787,32 @@ class System(object):
     def _setup_approx_coloring(self):
         pass
 
-    def get_coloring_fname(self):
+    def get_coloring_fname(self, mode):
         """
         Return the full pathname to a coloring file.
 
+        Parameters
+        ----------
+        mode : str
+            The type of coloring file desired. Must be either 'input' or 'output'.
+
         Returns
         -------
-        str
+        pathlib.Path
             Full pathname of the coloring file.
         """
-        directory = self._problem_meta['coloring_dir']
+        prob_coloring_dir = self._problem_meta['coloring_dir']
+        if mode == 'output' or prob_coloring_dir is _DEFAULT_COLORING_DIR:
+            directory = self.get_outputs_dir('coloring_files', mkdir=True)
+        elif mode == 'input':
+            directory = pathlib.Path(prob_coloring_dir).absolute()
+        else:
+            raise ValueError(f"{self.msginfo}: get_coloring_fname requires mode" 
+                             "to be one of 'input' or 'output'.")
+
         if not self.pathname:
             # total coloring
-            return os.path.join(directory, 'total_coloring.pkl')
+            return directory / 'total_coloring.pkl'
 
         if self._coloring_info.per_instance:
             # base the name on the instance pathname
@@ -1808,7 +1822,7 @@ class System(object):
             fname = 'coloring_' + '_'.join(
                 [self.__class__.__module__.replace('.', '_'), self.__class__.__name__]) + '.pkl'
 
-        return os.path.join(directory, fname)
+        return directory / fname
 
     def _save_coloring(self, coloring):
         """
@@ -1822,7 +1836,7 @@ class System(object):
         # under MPI, only save on proc 0
         if ((self._full_comm is not None and self._full_comm.rank == 0) or
                 (self._full_comm is None and self.comm.rank == 0)):
-            coloring.save(self.get_coloring_fname())
+            coloring.save(self.get_coloring_fname(mode='output'))
 
     def _get_static_coloring(self):
         """
@@ -1843,11 +1857,14 @@ class System(object):
         static = info.static
         if static is _STD_COLORING_FNAME or isinstance(static, str):
             if static is _STD_COLORING_FNAME:
-                fname = self.get_coloring_fname()
+                fname = self.get_coloring_fname(mode='input')
             else:
                 fname = static
-            print("%s: loading coloring from file %s" % (self.msginfo, fname))
+            print(f"{self.msginfo}: loading coloring from file {fname}")
             info.coloring = coloring = Coloring.load(fname)
+
+            self._save_coloring(coloring)
+
             if info.wrt_patterns != coloring._meta['wrt_patterns']:
                 raise RuntimeError("%s: Loaded coloring has different wrt_patterns (%s) than "
                                    "declared ones (%s)." %

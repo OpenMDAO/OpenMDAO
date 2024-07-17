@@ -26,7 +26,8 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.system import System, _OptStatus
 from openmdao.core.group import Group
 from openmdao.core.total_jac import _TotalJacInfo
-from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
+from openmdao.core.constants import _DEFAULT_COLORING_DIR, _DEFAULT_OUT_STREAM, \
+    _UNDEFINED
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -228,10 +229,7 @@ class Problem(object):
         # Set the Problem name so that it can be referenced from command line tools (e.g. check)
         # that accept a Problem argument, and to name the corresponding outputs subdirectory.
         if name:  # if name hasn't been used yet, use it. Otherwise, error
-            if name not in _problem_names:
-                self._name = name
-            else:
-                raise ValueError(f"The problem name '{name}' already exists")
+            self._name = name
         else:  # No name given: look for a name, of the form, 'problemN', that hasn't been used
             problem_counter = len(_problem_names) + 1 if _problem_names else ''
             base = _default_prob_name()
@@ -955,7 +953,7 @@ class Problem(object):
             'name': self._name,  # the name of this Problem
             'pathname': None,  # the pathname of this Problem in the current tree of Problems
             'comm': comm,
-            'coloring_dir': self.options['coloring_dir'],  # directory for coloring files
+            'coloring_dir': _DEFAULT_COLORING_DIR,  # directory for coloring files
             'recording_iter': _RecIteration(comm.rank),  # manager of recorder iterations
             'local_vector_class': local_vector_class,
             'distributed_vector_class': distributed_vector_class,
@@ -2542,6 +2540,35 @@ class Problem(object):
            The path of the outputs directory for the problem.
         """
         return _get_outputs_dir(self, *subdirs, mkdir=mkdir)
+    
+    def get_coloring_dir(self, mode, mkdir=False):
+        """
+        Get the path to the directory where the report files should go.
+
+        If it doesn't exist, it will be created.
+
+        Parameters
+        ----------
+        mode : str
+            Must be one of 'input' or 'output'. A problem will always write its coloring files to
+            its standard output directory in `{prob_name}_out/coloring_files`, but input coloring
+            files to be loaded may be read from a different directory specifed by the problem's
+            `coloring_dir` option.
+        mkdir : bool
+            If True, attempt to create this directory if it does not exist.
+
+        Returns
+        -------
+        pathlib.Path
+            The path to the directory where reports should be written.
+        """
+        if mode == 'input':
+            return pathlib.Path(self.options['coloring_dir'])
+        elif mode == 'output':
+            return self.get_outputs_dir('coloring_files', mkdir=mkdir)
+        else:
+            raise ValueError(f"{self.msginfo}: get_coloring_dir requires mode" 
+                             "to be one of 'input' or 'output'.")
 
     def list_indep_vars(self, include_design_vars=True, options=None,
                         print_arrays=False, out_stream=_DEFAULT_OUT_STREAM):
@@ -2798,7 +2825,8 @@ class Problem(object):
                     coloring = \
                         coloring_mod.dynamic_total_coloring(
                             self.driver, run_model=do_run,
-                            fname=self.driver._get_total_coloring_fname(), of=of, wrt=wrt)
+                            fname=self.driver._get_total_coloring_fname(mode='output'),
+                            of=of, wrt=wrt)
             else:
                 return coloring_info.coloring
 

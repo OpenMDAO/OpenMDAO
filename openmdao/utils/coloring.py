@@ -5,6 +5,7 @@ import datetime
 import io
 import os
 import time
+import pathlib
 import pickle
 import sys
 import tempfile
@@ -966,11 +967,11 @@ class Coloring(object):
 
         Parameters
         ----------
-        fname : str
+        fname : str or pathlib.Path
             File to save to.
         """
-        if isinstance(fname, str):
-            color_dir = os.path.dirname(os.path.abspath(fname))
+        if isinstance(fname, str) or isinstance(fname, pathlib.Path):
+            color_dir = pathlib.Path(fname).absolute().parent
             if not os.path.exists(color_dir):
                 try:
                     os.makedirs(color_dir)
