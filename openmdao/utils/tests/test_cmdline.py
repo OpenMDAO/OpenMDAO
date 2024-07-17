@@ -42,6 +42,11 @@ try:
 except ImportError:
     pydot = None
 
+try:
+    import graphviz
+except ImportError:
+    graphviz = None
+
 
 dname = os.path.dirname
 
@@ -60,13 +65,13 @@ cmd_tests = [
     ('openmdao comm_info {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao cite {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao compute_entry_points openmdao', {}),
-    ('openmdao graph --no-display {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot}),
-    ('openmdao graph --no-display --type=tree {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot}),
-    ('openmdao graph --no-display --show-vars {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot}),
-    ('openmdao graph --no-display --show-vars --no-recurse {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot}),
-    ('openmdao graph --no-display --group=circuit {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot}),
-    ('openmdao graph --no-display --group=circuit --show-vars {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot}),
-    ('openmdao graph --no-display --group=circuit --show-vars --no-recurse {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot}),
+    ('openmdao graph --no-display {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot, 'graphviz': graphviz}),
+    ('openmdao graph --no-display --type=tree {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot, 'graphviz': graphviz}),
+    ('openmdao graph --no-display --show-vars {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot, 'graphviz': graphviz}),
+    ('openmdao graph --no-display --show-vars --no-recurse {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot, 'graphviz': graphviz}),
+    ('openmdao graph --no-display --group=circuit {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot, 'graphviz': graphviz}),
+    ('openmdao graph --no-display --group=circuit --show-vars {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot, 'graphviz': graphviz}),
+    ('openmdao graph --no-display --group=circuit --show-vars --no-recurse {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot, 'graphviz': graphviz}),
     ('openmdao iprof --no_browser {}'.format(os.path.join(scriptdir, 'circle_opt.py')),
         {'tornado': tornado}),
     ('openmdao iprof_totals {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
