@@ -112,6 +112,15 @@ class ExplicitComponent(Component):
                 yield wrt, start, end, vec, _full_slice, dist_sizes
                 start = end
 
+    def _setup_residuals(self):
+        """
+        Prevent the user from implementing setup_residuals for explicit components.
+        """
+        if overrides_method('setup_residuals', self, ExplicitComponent):
+            raise RuntimeError(f'{self.msginfo}: Class overrides setup_residuals but '
+                               'is an ExplicitComponent. setup_residuals may only be '
+                               'overridden by ImplicitComponents.')
+
     def _setup_partials(self):
         """
         Call setup_partials in components.
