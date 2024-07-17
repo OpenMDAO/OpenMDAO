@@ -373,7 +373,7 @@ class SqliteRecorder(CaseRecorder):
             inputs = list(system.abs_name_iter('input', local=False, discrete=True))
             outputs = list(system.abs_name_iter('output', local=False, discrete=True))
 
-            var_order = system._get_vars_exec_order(inputs=True, outputs=True)
+            var_order = system._get_vars_exec_order(inputs=True, outputs=True, local=True)
 
             # merge current abs2prom and prom2abs with this system's version
             self._abs2prom['input'].update(system._var_allprocs_abs2prom['input'])
