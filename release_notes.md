@@ -3,21 +3,21 @@
 
 July 19, 2024
 
-OpenMDAO 3.34.0 is largely bug fixes with a few new features. It is likely the last release before a significant update to the way in which output files are organized for a problem.
+OpenMDAO 3.34.0 provides a new implicit component, and adds the `list_vars` method to Case objects for a consistent API between cases and Problems/models.  The dependency check for discrete variables was made more performance, since it was being slow when many discrete variables were present, and some bugs with `load_case` were fixed for cases when discrete variables were present.
 
 ## New Features
 
-- Added InputResidsComp to the list of components. Added setup_residuals method for compatibility with dynamic shaping. [#3295](https://github.com/OpenMDAO/OpenMDAO/pull/3295)
 - Optimizers now keep track of design vars that impact linear constraints and nonlinear responses separately. [#3275](https://github.com/OpenMDAO/OpenMDAO/pull/3275)
 - update to hook system to allow args and/or return value to be passed to hook functions [#3276](https://github.com/OpenMDAO/OpenMDAO/pull/3276)
+- Added the `list_vars` method to the Case object. [#3293](https://github.com/OpenMDAO/OpenMDAO/pull/3293)
+- Added InputResidsComp to the list of components. Added `setup_residuals method` for compatibility with dynamic shaping. [#3295](https://github.com/OpenMDAO/OpenMDAO/pull/3295)
 
 ## Bug Fixes
 
-- Speed up discrete variable dependency check. [#3277](https://github.com/OpenMDAO/OpenMDAO/pull/3277)
+- Implemented a speed up for the discrete variable dependency check. [#3277](https://github.com/OpenMDAO/OpenMDAO/pull/3277)
 - Fix for test_scaffold test that doesn't clean up site-packages installs on some machines [#3279](https://github.com/OpenMDAO/OpenMDAO/pull/3279)
 - Try Except for Report Dir removal [#3281](https://github.com/OpenMDAO/OpenMDAO/pull/3281)
-- Problem.load_case fix for discrete variables [#3284](https://github.com/OpenMDAO/OpenMDAO/pull/3284)
-- Prob.load_case discrete input fix [#3289](https://github.com/OpenMDAO/OpenMDAO/pull/3289)
+- Fixed Problem.load_case for discrete variables [#3284](https://github.com/OpenMDAO/OpenMDAO/pull/3284) [#3289](https://github.com/OpenMDAO/OpenMDAO/pull/3289)
 
 ## Miscellaneous
 
