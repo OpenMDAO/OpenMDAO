@@ -922,7 +922,9 @@ class TestColoring(unittest.TestCase):
     def test_simple_totals_min_improvement(self):
         for optim in [pyOptSparseDriver, ScipyOptimizeDriver]:
             with self.subTest(msg=f'{optim=}'):
-                prob = Problem(name=f'test_simple_totals_min_improvement_{optim}')
+                str_optim = 'pyOptSparseDriver' if optim is \
+                    pyOptSparseDriver else 'ScipyOptimizeDrier'
+                prob = Problem(name=f'test_simple_totals_min_improvement_{str_optim}')
                 model = prob.model = CounterGroup()
                 prob.driver = optim(optimizer='SLSQP')
 
