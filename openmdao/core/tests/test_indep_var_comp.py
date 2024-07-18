@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_warnings
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestIndepVarComp(unittest.TestCase):

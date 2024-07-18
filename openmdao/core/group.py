@@ -1024,6 +1024,9 @@ class Group(System):
         # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
 
+        # setup of residuals must occur before setup of vectors and partials
+        self._setup_residuals()
+
         if self._use_derivatives:
             # must call this before vector setup because it determines if we need to alloc commplex
             self._setup_partials()
@@ -3814,6 +3817,13 @@ class Group(System):
                     msg = "{}: Approx_totals is not supported on a group with a distributed "
                     msg += "component whose input '{}' is distributed using src_indices. "
                     raise RuntimeError(msg.format(self.msginfo, iname))
+
+    def _setup_residuals(self):
+        """
+        Call setup_residuals in components.
+        """
+        for subsys in self._sorted_sys_iter():
+            subsys._setup_residuals()
 
     def _declared_partials_iter(self):
         """
