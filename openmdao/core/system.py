@@ -1552,7 +1552,8 @@ class System(object):
             if not info.per_instance:
                 # save the class coloring for so resources won't be wasted computing
                 # a bad coloring
-                coloring_mod._CLASS_COLORINGS[self.get_coloring_fname()] = None
+                fname = self.get_coloring_fname(mode='output')
+                coloring_mod._CLASS_COLORINGS[fname] = None
             return False
 
         sp_info['sparsity_time'] = sparsity_time
@@ -1584,7 +1585,8 @@ class System(object):
 
         if not info.per_instance:
             # save the class coloring for other instances of this class to use
-            coloring_mod._CLASS_COLORINGS[self.get_coloring_fname()] = coloring
+            ofname = self.get_coloring_fname(mode='output')
+            coloring_mod._CLASS_COLORINGS[ofname] = coloring
 
         return True
 
