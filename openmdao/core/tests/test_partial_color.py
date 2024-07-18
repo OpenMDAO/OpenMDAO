@@ -20,7 +20,7 @@ from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent, ExecCo
 import openmdao.func_api as omf
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.array_utils import evenly_distrib_idxs
-from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.utils.testing_utils import require_pyoptsparse, use_tempdirs
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import compute_total_coloring, Coloring
 
@@ -918,13 +918,12 @@ class TestColoring(unittest.TestCase):
                 nruns = model._nruns - start_nruns
                 self.assertEqual(nruns, 3)
 
+    @require_pyoptsparse(optimizer='SLSQP')
     def test_simple_totals_min_improvement(self):
         for optim in [pyOptSparseDriver, ScipyOptimizeDriver]:
             with self.subTest(msg=f'{optim=}'):
                 prob = Problem(name=f'test_simple_totals_min_improvement_{optim}')
                 model = prob.model = CounterGroup()
-                if optim is None:
-                    raise unittest.SkipTest('requires pyoptsparse SLSQP.')
                 prob.driver = optim(optimizer='SLSQP')
 
                 prob.driver.declare_coloring()

@@ -1463,8 +1463,6 @@ class Driver(object):
                         (model._full_comm is None and model.comm.rank == 0)):
                     coloring.save(ofname)
 
-
-
         if coloring is not None and info.static is not None:
             problem = self._problem()
             if coloring._rev and problem._orig_mode not in ('rev', 'auto'):
@@ -1623,10 +1621,11 @@ class Driver(object):
                               "already been computed.")
             if self._coloring_info.dynamic:
                 if self._coloring_info.do_compute_coloring():
+                    ofname = self._get_total_coloring_fname(mode='output')
                     self._coloring_info.coloring = \
                         coloring_mod.dynamic_total_coloring(self,
                                                             run_model=run_model,
-                                                            fname=self._get_total_coloring_fname(mode='output'))
+                                                            fname=ofname)
 
             return self._coloring_info.coloring
 

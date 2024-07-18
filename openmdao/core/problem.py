@@ -2540,7 +2540,7 @@ class Problem(object):
            The path of the outputs directory for the problem.
         """
         return _get_outputs_dir(self, *subdirs, mkdir=mkdir)
-    
+
     def get_coloring_dir(self, mode, mkdir=False):
         """
         Get the path to the directory where the report files should go.
@@ -2567,7 +2567,7 @@ class Problem(object):
         elif mode == 'output':
             return self.get_outputs_dir('coloring_files', mkdir=mkdir)
         else:
-            raise ValueError(f"{self.msginfo}: get_coloring_dir requires mode" 
+            raise ValueError(f"{self.msginfo}: get_coloring_dir requires mode"
                              "to be one of 'input' or 'output'.")
 
     def list_indep_vars(self, include_design_vars=True, options=None,

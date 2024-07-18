@@ -1809,7 +1809,7 @@ class System(object):
         elif mode == 'input':
             directory = pathlib.Path(prob_coloring_dir).absolute()
         else:
-            raise ValueError(f"{self.msginfo}: get_coloring_fname requires mode" 
+            raise ValueError(f"{self.msginfo}: get_coloring_fname requires mode"
                              "to be one of 'input' or 'output'.")
 
         if not self.pathname:
