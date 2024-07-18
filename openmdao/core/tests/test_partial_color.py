@@ -969,6 +969,7 @@ class TestColoring(unittest.TestCase):
                 _check_total_matrix(model, derivs, sparsity[[0,3,4],:], 'cs')
                 self.assertEqual(nruns, 5)
 
+    @require_pyoptsparse(optimizer='SLSQP')
     def test_totals_over_implicit_comp(self):
         for method in ['fd', 'cs']:
             with self.subTest(msg=f'{method=}'):
@@ -1243,12 +1244,12 @@ class TestStaticColoring(unittest.TestCase):
                 self.assertEqual(nruns, 10)
                 _check_total_matrix(model, derivs, sparsity, method)
 
-    def test_totals_over_implicit_comp(self):
+    def test_static_totals_over_implicit_comp(self):
         for method, isplit, osplit in itertools.product(['fd', 'cs'],
                                                         [1,2,19],
                                                         [1,2,11]):
             with self.subTest(msg=f'{method=}_{isplit=}_{osplit=}'):
-                prob = Problem(name=f'test_totals_over_implicit_comp_{method}_{isplit}_{osplit}')
+                prob = Problem(name=f'test_static_totals_over_implicit_comp_{method}_{isplit}_{osplit}')
                         
                 model = prob.model
 
@@ -1275,7 +1276,7 @@ class TestStaticColoring(unittest.TestCase):
                 prob.run_model()
                 model._save_coloring(compute_total_coloring(prob))
 
-                prob = Problem(name=f'test_totals_over_implicit_comp_{method}_{isplit}_{osplit}')      
+                prob = Problem(name=f'test_static_totals_over_implicit_comp_{method}_{isplit}_{osplit}')      
                 model = prob.model
 
                 indeps, conns = setup_indeps(isplit, _BIGMASK.shape[1], 'indeps', 'comp')

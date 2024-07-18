@@ -117,7 +117,7 @@ class InvalidColoringError(Exception):
     """
     A custom error class that is raised in the event of an invalid coloring.
     """
-    
+
     pass
 
 
