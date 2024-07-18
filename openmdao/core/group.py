@@ -1007,15 +1007,23 @@ class Group(System):
 
         return sarr, tarr, tsize, has_dist_data
 
-    def _final_setup(self):
+    def _setup_part2(self):
         """
-        Perform final setup for this system and its descendant systems.
+        Complete setup of connections, sizes, and residuals.
 
         This part of setup is called automatically at the start of run_model or run_driver.
+        This method is called only on the top level Group.
         """
         self._setup_dynamic_shapes()
 
-        self._top_level_post_connections()
+        self._problem_meta['prom2abs'] = self._get_all_promotes()
+        self._problem_meta['vars_to_gather'] = self._vars_to_gather
+
+        self._check_prom_masking()
+        self._check_order()
+
+        self._resolve_group_input_defaults()
+        self._setup_auto_ivcs()
 
         self._setup_var_sizes()
 
@@ -1027,6 +1035,13 @@ class Group(System):
         # setup of residuals must occur before setup of vectors and partials
         self._setup_residuals()
 
+    def _final_setup(self):
+        """
+        Perform final setup for this system and its descendant systems.
+
+        This part of setup is called automatically at the start of run_model or run_driver.
+        This method is called only on the top level Group.
+        """
         if self._use_derivatives:
             # must call this before vector setup because it determines if we need to alloc commplex
             self._setup_partials()
@@ -1235,16 +1250,6 @@ class Group(System):
                         t_prom2abs[prefix + prom] = abslist
 
         return prom2abs
-
-    def _top_level_post_connections(self):
-        # this is called on the top level group after all connections are known
-        self._problem_meta['vars_to_gather'] = self._vars_to_gather
-
-        self._resolve_group_input_defaults()
-        self._setup_auto_ivcs()
-        self._problem_meta['prom2abs'] = self._get_all_promotes()
-        self._check_prom_masking()
-        self._check_order()
 
     def _check_prom_masking(self):
         """
@@ -2550,7 +2555,7 @@ class Group(System):
                                 graph.add_edge(inp, name, multi=False)
                         elif not meta['compute_shape'] and not meta['copy_shape']:
                             # check to see if we can get shape from _group_inputs
-                            fail = True
+                            fail = not meta['shape']
                             if io == 'input':
                                 prom = all_abs2prom_in[name]
                                 grp_shape = get_group_input_shape(prom, grp_shapes)

@@ -208,7 +208,8 @@ class SerialTests(unittest.TestCase):
             p.final_setup()
         except Exception as err:
             self.assertTrue(
-              "<model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted "
+              "\nCollected errors for problem 'discrete_fan_out2':"
+              "\n   <model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted "
               "to 'x', are connected but their metadata entries ['val'] differ. Call "
               "<group>.set_input_defaults('x', val=?), where <group> is the Group named 'par' to "
               "remove the ambiguity." in str(err))

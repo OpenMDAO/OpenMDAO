@@ -1166,6 +1166,7 @@ class TestProblem(unittest.TestCase):
         prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.setup()
+        prob.final_setup()
 
         # default value from the class definition
         assert_near_equal(prob.get_val('x'), 1.0, 1e-6)

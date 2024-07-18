@@ -468,6 +468,7 @@ class DistributedListVarsTest(unittest.TestCase):
 
         prob = om.Problem(model)
         prob.setup()
+        prob.final_setup()
 
         # prior to model execution, the global shape of a distributed variable is not available
         # and only the local portion of the value is available

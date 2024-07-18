@@ -302,7 +302,7 @@ class TestConnectionsIndices(unittest.TestCase):
         # Should not be allowed because the source and target shapes do not match
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp')
 
-        expected = "<model> <class Group>: The source and target shapes do not match or are " + \
+        expected = "\nCollected errors for problem 'bad_shapes':\n   <model> <class Group>: The source and target shapes do not match or are " + \
                    "ambiguous for the connection 'idvp.blammo' to 'arraycomp.inp'. " + \
                    "The source shape is (1,) but the target shape is (2,)."
         self.prob.setup()
@@ -319,7 +319,7 @@ class TestConnectionsIndices(unittest.TestCase):
         self.build_model('bad_length')
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp', src_indices=[0, 0, 0])
 
-        expected = "<model> <class Group>: The source indices [0 0 0] do not specify a valid shape " + \
+        expected = "\nCollected errors for problem 'bad_length':\n   <model> <class Group>: The source indices [0 0 0] do not specify a valid shape " + \
                    "for the connection 'idvp.blammo' to 'arraycomp.inp'. The target shape is " + \
                    "(2,) but indices are shape (3,)."
 
@@ -342,7 +342,8 @@ class TestConnectionsIndices(unittest.TestCase):
             self.prob.final_setup()
         except Exception as err:
             self.assertEqual(str(err),
-               "<model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp1': "
+               "\nCollected errors for problem 'bad_value':"
+               "\n   <model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp1': "
                "index 100000 is out of bounds for source dimension of size 5.")
         else:
             self.fail('Exception expected.')
@@ -358,7 +359,8 @@ class TestConnectionsIndices(unittest.TestCase):
             self.prob.final_setup()
         except Exception as err:
             self.assertEqual(str(err),
-               "<model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp': "
+               "\nCollected errors for problem 'bad_value_bug':"
+               "\n   <model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp': "
                "index 100000 is out of bounds for source dimension of size 5.")
         else:
             self.fail('Exception expected.')
@@ -447,7 +449,7 @@ class TestShapes(unittest.TestCase):
                                                 y={'val': np.zeros((5, 2))}))
         p.model.connect('indep.x', 'C1.x')
 
-        expected = "<model> <class Group>: The source and target shapes do not match or are " + \
+        expected = "\nCollected errors for problem 'connect_incompatible_shapes':\n   <model> <class Group>: The source and target shapes do not match or are " + \
                    "ambiguous for the connection 'indep.x' to 'C1.x'. The source shape is " + \
                    "(1, 10, 1, 1) but the target shape is (5, 2)."
 
@@ -481,6 +483,7 @@ class TestMultiConns(unittest.TestCase):
 
         with self.assertRaises(Exception) as context:
             prob.setup()
+            prob.final_setup()
 
         self.assertEqual(str(context.exception),
            "\nCollected errors for problem 'mult_conns':"
@@ -594,6 +597,7 @@ class TestConnectionsDistrib(unittest.TestCase):
 
         try:
             prob.setup()
+            prob.final_setup()
         except Exception as err:
             self.assertTrue(
                              "\nCollected errors for problem 'serial_mpi_error':" \
@@ -625,6 +629,7 @@ class TestConnectionsDistrib(unittest.TestCase):
 
         try:
             prob.setup()
+            prob.final_setup()
         except Exception as err:
             self.assertTrue(
                              "\nCollected errors for problem 'serial_mpi_error_flat':" \
@@ -680,6 +685,7 @@ class TestConnectionsError(unittest.TestCase):
 
         with self.assertRaises(Exception) as context:
             prob.setup(check=False, mode='fwd')
+            prob.final_setup()
 
         self.assertTrue(
             "\nCollected errors for problem 'incompatible_src_indices':"

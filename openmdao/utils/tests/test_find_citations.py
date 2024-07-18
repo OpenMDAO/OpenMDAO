@@ -28,7 +28,7 @@ class TestFindCite(unittest.TestCase):
         indeps = p.model.add_subsystem('indeps', IndepVarComp('x', 10), promotes=['*'])
 
         ec = p.model.add_subsystem('ec', MyImplComp(), promotes=['*'])
-        ec.nonlinear_solver = NewtonSolver()
+        ec.nonlinear_solver = NewtonSolver(solve_subsystems=False)
         ec.cite = "foobar impl comp"
 
         self.prob = p
@@ -80,6 +80,7 @@ class TestFindCite(unittest.TestCase):
 
         p = self.prob
         p.setup()
+        p.final_setup()
 
         dest = StringIO()
         print_citations(p, out_stream=dest)
@@ -111,6 +112,7 @@ Class: <class 'openmdao.utils.tests.test_find_citations.MyImplComp'>
 
         p = self.prob
         p.setup()
+        p.final_setup()
 
         dest = StringIO()
         print_citations(p, classes=['Problem', 'LinearRunOnce'], out_stream=dest)
@@ -150,7 +152,7 @@ class TestFindCitePar(unittest.TestCase):
         par = p.model.add_subsystem('par', ParallelGroup(), promotes=['*'])
 
         ec = p.model.add_subsystem('ec', MyImplComp(), promotes=['*'])
-        ec.nonlinear_solver = NewtonSolver()
+        ec.nonlinear_solver = NewtonSolver(solve_subsystems=False)
         ec.cite = "foobar impl comp"
         c2 = par.add_subsystem('c2', ExecComp('y2=x'), promotes=['*'])
         c2.cite = 'foobar exec comp'
@@ -161,6 +163,7 @@ class TestFindCitePar(unittest.TestCase):
     def test_find_cite_petsc(self):
         p = self.prob
         p.setup()
+        p.final_setup()
 
         p.model._vector_class.cite = "foobar PETScVector"
 

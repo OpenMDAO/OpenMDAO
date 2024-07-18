@@ -5372,6 +5372,16 @@ class System(object):
                 abs_name = ginputs[name][0].get('use_tgt', abs_names[0])
             else:
                 abs_name = abs_names[0]
+                
+            if not has_vectors:
+                has_dyn_shape = []
+                for n in abs_names:
+                    if n in all_meta['input']:
+                        m = all_meta['input'][n]
+                        if 'shape_by_conn' in m and m['shape_by_conn']:
+                            has_dyn_shape.append(True)
+                    else:
+                        has_dyn_shape.append(False)
         else:
             raise KeyError(f'{model.msginfo}: Variable "{name}" not found.')
 
@@ -5418,10 +5428,10 @@ class System(object):
                         ivalue = model.convert_units(name, value, units, gunits)
                     value = model.convert_from_units(src, value, units)
                 set_units = sunits
-        else:
+        else:  # setting an output or an unconnected input
             src = abs_name
             if units is not None:
-                value = model.convert_from_units(abs_name, value, units)
+                value = model.convert_from_units(abs_name, np.asarray(value), units)
                 try:
                     set_units = all_meta['output'][abs_name]['units']
                 except KeyError:  # this can happen if a component is the top level System
@@ -5447,6 +5457,12 @@ class System(object):
                     raise RuntimeError(f"Failed to set value of '{name}': {str(err)}.")
             else:
                 ic_cache[abs_name] = (value, set_units, self.pathname, name)
+                
+            for n, dyn in zip(abs_names, has_dyn_shape):
+                if dyn:
+                    all_meta['input'][n]['shape'] = ic_cache[abs_name][0].shape
+                    if n in loc_meta['input']:
+                        loc_meta['input'][n]['shape'] = ic_cache[abs_name][0].shape
         else:
             myrank = model.comm.rank
 

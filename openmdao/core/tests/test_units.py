@@ -578,7 +578,8 @@ class TestUnitConversion(unittest.TestCase):
             prob.final_setup()
 
         self.assertEqual(str(cm.exception),
-           "<model> <class Group>: Output units of 'degC' for 'src.x2' are incompatible with "
+           "\nCollected errors for problem 'incompatible_connections':"
+           "\n   <model> <class Group>: Output units of 'degC' for 'src.x2' are incompatible with "
            "input units of 'm' for 'dest.x2'.")
 
         # Implicit Connection
@@ -590,7 +591,8 @@ class TestUnitConversion(unittest.TestCase):
             prob.final_setup()
 
         self.assertEqual(str(cm.exception),
-           "<model> <class Group>: Output units of 'degC' for 'src.x2' are incompatible with "
+           "\nCollected errors for problem 'incompatible_connections2':"
+           "\n   <model> <class Group>: Output units of 'degC' for 'src.x2' are incompatible with "
            "input units of 'm' for 'dest.x2'.")
 
     #def test_nested_relevancy_base(self):
@@ -921,12 +923,15 @@ class TestUnitConversion(unittest.TestCase):
         with self.assertRaises(Exception) as e:
             p.setup()
             p.final_setup()
-            
+
         self.assertEqual(str(e.exception),
-           "<model> <class Group>: The following inputs, ['G1.C1.x', 'G1.C2.x'], promoted "
+           "\nCollected errors for problem 'promotes_non_equivalent_units':"
+           "\n   <model> <class Group>: The following inputs, ['G1.C1.x', 'G1.C2.x'], promoted "
            "to 'x', are connected but their metadata entries ['units', 'val'] differ. "
            "Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the Group "
-           "named 'G1' to remove the ambiguity.")
+           "named 'G1' to remove the ambiguity."
+           "\n   <model> <class Group>: Output units of 'J/s**2' for '_auto_ivc.v0' are "
+           "incompatible with input units of 'm/s**2' for 'G1.C2.x'.")
 
     def test_input_defaults_unit_compat(self):
         p = om.Problem()

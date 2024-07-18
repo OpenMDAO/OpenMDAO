@@ -598,6 +598,7 @@ class MPITests(unittest.TestCase):
 
         p = om.Problem(Model())
         p.setup()
+        p.final_setup()
 
         # verify list_inputs/list_outputs work before final_setup for distributed comp on rank 0 only
         inputs = p.model.C2.list_inputs(shape=True, global_shape=True, val=True, out_stream=None)
@@ -608,8 +609,6 @@ class MPITests(unittest.TestCase):
         inputs = p.model.C2.list_inputs(shape=True, global_shape=True, val=True, all_procs=True, out_stream=None)
         outputs = p.model.C2.list_outputs(shape=True, global_shape=True, val=True, all_procs=True, out_stream=None)
         verify(inputs, outputs, pathnames=False, comm=p.comm, final=True)
-
-        p.final_setup()
 
         p['C1.invec'] = np.ones(size, float) * 5.0
 
@@ -821,6 +820,7 @@ class MPITests(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as context:
             prob.setup()
+            prob.final_setup()
 
         msg = 'Distributed component input "C.invec" requires an IndepVarComp.'
 

@@ -1036,8 +1036,6 @@ class Problem(object):
 
         self._metadata['setup_status'] = _SetupStatus.POST_SETUP
 
-        self._check_collected_errors()
-
         return self
 
     def final_setup(self):
@@ -1055,6 +1053,8 @@ class Problem(object):
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             self._metadata['static_mode'] = False
             try:
+                self.model._setup_part2()
+                self._check_collected_errors()
                 self.model._final_setup()
             finally:
                 self._metadata['static_mode'] = True

@@ -325,6 +325,7 @@ class TestModuleFunctions(unittest.TestCase):
         with warnings.catch_warnings():
             warnings.simplefilter("error")
             p.setup()
+            p.final_setup()
 
         p.run_model()
         assert_near_equal(p.get_val('exec_comp.z'), 15.0)
@@ -341,6 +342,7 @@ class TestModuleFunctions(unittest.TestCase):
         with warnings.catch_warnings():
             warnings.simplefilter("error")
             p.setup()
+            p.final_setup()
 
         p.run_model()
         assert_near_equal(p.get_val('exec_comp.z'), 15.0)
@@ -358,6 +360,7 @@ class TestModuleFunctions(unittest.TestCase):
         with warnings.catch_warnings():
             warnings.simplefilter("error")
             p.setup()
+            p.final_setup()
 
         p.run_model()
         assert_near_equal(p.get_val('exec_comp.z'), 15.0)
@@ -377,6 +380,7 @@ class TestModuleFunctions(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
+            p.final_setup()
         self.assertEqual(str(cm.exception), msg)
 
 class TestUnitless(unittest.TestCase):
@@ -385,6 +389,7 @@ class TestUnitless(unittest.TestCase):
         ivc = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
         ivc.add_output('margin_of_safety', val=0.05, units='unitless')
         p.setup()
+        p.final_setup()
         margin_percent = p.get_val('margin_of_safety', units='percent')[0]
         assert_near_equal(margin_percent, 5)
 
@@ -402,6 +407,7 @@ class TestUnitless(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
+            p.final_setup()
         self.assertEqual(str(cm.exception), msg)
 
 
