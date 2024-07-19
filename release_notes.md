@@ -18,6 +18,7 @@ OpenMDAO 3.34.0 provides a new implicit component, and adds the `list_vars` meth
 - Fixed test_scaffold test that didn't clean up site-packages installs on some machines [#3279](https://github.com/OpenMDAO/OpenMDAO/pull/3279)
 - Added Try Except for Report Dir removal [#3281](https://github.com/OpenMDAO/OpenMDAO/pull/3281)
 - Fixed Problem.load_case for discrete variables [#3284](https://github.com/OpenMDAO/OpenMDAO/pull/3284) [#3289](https://github.com/OpenMDAO/OpenMDAO/pull/3289)
+- Fixed an issue where the scaling report was causing an extra call to compute totals if there were linear constraints [#3296](https://github.com/OpenMDAO/OpenMDAO/pull/3296)
 
 ## Miscellaneous
 
