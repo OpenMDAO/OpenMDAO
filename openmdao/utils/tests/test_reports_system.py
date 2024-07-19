@@ -58,7 +58,7 @@ class TestReportsSystem(unittest.TestCase):
         if self.testflo_running is not None:
             os.environ['TESTFLO_RUNNING'] = self.testflo_running
 
-    def setup_and_run_simple_problem(self, driver=None, reports=_UNDEFINED, reports_dir=_UNDEFINED):
+    def setup_and_run_simple_problem(self, driver=None, reports=_UNDEFINED, reports_dir=_UNDEFINED, linear=False):
         if reports_dir is not _UNDEFINED:
             om.set_reports_dir(reports_dir)
 
@@ -72,6 +72,10 @@ class TestReportsSystem(unittest.TestCase):
         model.add_design_var('x', lower=0.0, upper=1.0)
         model.add_design_var('y', lower=0.0, upper=1.0)
         model.add_objective('f_xy')
+        if linear:
+            model.add_subsystem('con', om.ExecComp('y=x'))
+            model.connect('f_xy', 'con.x')
+            model.add_constraint('con.y', lower=0.0, linear=True)
 
         with assert_no_warning(om.OpenMDAOWarning):
             if driver:
@@ -556,6 +560,23 @@ class TestReportsSystem(unittest.TestCase):
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertFalse(path.is_file(),
                          f'The scaling report file, {str(path)}, was found but should not exist.')
+
+    @hooks_active
+    def test_report_generation_extra_compute_totals_from_scaling_report(self):
+        clear_reports()
+        from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver, pyoptsparse
+        if pyoptsparse is None:
+            raise unittest.SkipTest("pyoptsparse is required.")
+        prob = self.setup_and_run_simple_problem(driver=om.pyOptSparseDriver(optimizer='SLSQP'),
+                                                 reports=['scaling'], linear=True)
+
+        self.assertEqual(prob.driver.result.deriv_evals, 3)
+
+        # See if the report files exist and if they have the right names
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
+
+        path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
+        self.assertTrue(path.is_file(), f'The scaling report file, {str(path)} was not found')
 
 
 @use_tempdirs
