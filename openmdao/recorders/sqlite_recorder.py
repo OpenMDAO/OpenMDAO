@@ -460,6 +460,8 @@ class SqliteRecorder(CaseRecorder):
             var_settings.update(desvars)
             var_settings.update(objectives)
             var_settings.update(constraints)
+            import pprint
+            pprint.pprint(var_settings)
             var_settings = self._make_var_setting_serializable(var_settings)
             var_settings['execution_order'] = var_order
             var_settings_json = zlib.compress(

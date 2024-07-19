@@ -229,6 +229,7 @@ class Group(System):
         self._post_components = None
         self._iterated_components = None
         self._fd_rev_xfer_correction_dist = {}
+        self._auto_ivc_recorders = []
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -718,6 +719,7 @@ class Group(System):
         # save a ref to the problem level options.
         self._problem_meta = prob_meta
         self._initial_condition_cache = {}
+        self._auto_ivc_recorders = []
 
         # reset any coloring if a Coloring object was not set explicitly
         if self._coloring_info.dynamic or self._coloring_info.static is not None:
@@ -1033,6 +1035,9 @@ class Group(System):
 
         # setup of residuals must occur before setup of vectors and partials
         self._setup_residuals()
+
+        for recorder in self._auto_ivc_recorders:
+            self._auto_ivc.add_recorder(recorder)
 
     def _final_setup(self):
         """
@@ -1352,6 +1357,8 @@ class Group(System):
         if self._problem_meta['allow_post_setup_reorder']:
             self.set_order(new_order)
         else:
+            if '_auto_ivc' in new_order:
+                new_order.remove('_auto_ivc')
             issue_warning(f"{self.msginfo}: A new execution order {new_order} is recommended, but "
                           "auto ordering has been disabled because the Problem option "
                           "'allow_post_setup_reorder' is False. It is recommended to either set "
@@ -3291,6 +3298,33 @@ class Group(System):
         setattr(self, name, subsys)
 
         return subsys
+
+    def add_recorder(self, recorder, recurse=False):
+        """
+        Add a recorder to the system.
+
+        Parameters
+        ----------
+        recorder : <CaseRecorder>
+           A recorder instance.
+        recurse : bool
+            Flag indicating if the recorder should be added to all the subsystems.
+        """
+        if MPI:
+            raise RuntimeError(self.msginfo + ": Recording of Systems when running parallel "
+                                              "code is not supported yet")
+
+        self._rec_mgr.append(recorder)
+
+        if recurse:
+            for s in self.system_iter(include_self=False, recurse=recurse):
+                print(s.pathname)
+                s._rec_mgr.append(recorder)
+
+            if self.pathname == '':  # top level group
+                if '_auto_ivc' not in self._subsystems_allprocs:
+                    if recorder not in self._auto_ivc_recorders:
+                        self._auto_ivc_recorders.append(recorder)
 
     def connect(self, src_name, tgt_name, src_indices=None, flat_src_indices=None):
         """

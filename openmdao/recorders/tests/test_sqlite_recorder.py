@@ -1882,6 +1882,7 @@ class TestSqliteRecorder(unittest.TestCase):
                                                        mda_linear_solver=om.ScipyKrylov,
                                                        mda_nonlinear_solver=om.NonlinearBlockGS)
         prob.setup(mode='rev')
+        #prob.model._setup_part2()
 
         # Need to do recursive adding of recorders AFTER setup
         prob.model.add_recorder(self.recorder, recurse=True)

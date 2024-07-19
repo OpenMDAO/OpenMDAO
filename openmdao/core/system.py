@@ -4856,10 +4856,6 @@ class System(object):
 
         self._rec_mgr.append(recorder)
 
-        if recurse:
-            for s in self.system_iter(include_self=False, recurse=recurse):
-                s._rec_mgr.append(recorder)
-
     def record_iteration(self):
         """
         Record an iteration of the current System.
