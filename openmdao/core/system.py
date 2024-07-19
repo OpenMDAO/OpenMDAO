@@ -5372,7 +5372,7 @@ class System(object):
                 abs_name = ginputs[name][0].get('use_tgt', abs_names[0])
             else:
                 abs_name = abs_names[0]
-                
+
             if not has_vectors:
                 has_dyn_shape = []
                 for n in abs_names:
@@ -5457,7 +5457,7 @@ class System(object):
                     raise RuntimeError(f"Failed to set value of '{name}': {str(err)}.")
             else:
                 ic_cache[abs_name] = (value, set_units, self.pathname, name)
-                
+
             for n, dyn in zip(abs_names, has_dyn_shape):
                 if dyn:
                     all_meta['input'][n]['shape'] = ic_cache[abs_name][0].shape

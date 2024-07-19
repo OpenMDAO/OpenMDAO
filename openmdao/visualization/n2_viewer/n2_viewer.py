@@ -735,13 +735,13 @@ def _n2_cmd(options, user_args):
                     # errors will result in exit at the end of the _check_collected_errors method
                 else:
                     # no errors, generate n2 after final_setup
-                    def _view_model_no_errors(prob):
-                        n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
+                    def _view_model_no_errors(model):
+                        n2(model, outfile=options.outfile, show_browser=not options.no_browser,
                            values=not options.no_values, title=options.title, path=options.path,
                            embeddable=options.embeddable)
-                    hooks._register_hook('final_setup', 'Problem',
+                    hooks._register_hook('_final_setup', 'Group',
                                          post=_view_model_no_errors, exit=True)
-                    hooks._setup_hooks(prob)
+                    hooks._setup_hooks(prob.model)
 
         hooks._register_hook('_check_collected_errors', 'Problem', pre=_view_model_w_errors)
 

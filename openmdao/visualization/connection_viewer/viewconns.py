@@ -14,6 +14,7 @@ except ImportError:
     IFrame = display = None
 
 from openmdao.core.problem import Problem
+from openmdao.core.constants import _SetupStatus
 from openmdao.utils.units import convert_units
 from openmdao.utils.mpi import MPI
 from openmdao.utils.webview import webview
@@ -72,6 +73,12 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     else:
         system = root
 
+    if system._problem_meta is not None and system._problem_meta['saved_errors']:
+        pass  # special case of being called when errors occurred during setup
+    elif (system._problem_meta is None or
+          system._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP):
+        raise RuntimeError("view_connections may only be called after final_setup.")
+
     connections = system._problem_meta['model_ref']()._conn_global_abs_in2out
 
     src2tgts = defaultdict(list)
@@ -89,10 +96,6 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     for io in ('input', 'output'):
         all_vars[io] = chain(system._var_abs2meta[io].items(),
                              [(prefix + n, m) for n, m in system._var_discrete[io].items()])
-
-    if show_values and system._outputs is None:
-        issue_warning("Values will not be shown because final_setup has not been called yet.",
-                      prefix=system.msginfo)
 
     with printoptions(precision=precision, suppress=True, threshold=10000):
 

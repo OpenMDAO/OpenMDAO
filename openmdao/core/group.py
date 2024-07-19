@@ -1016,14 +1016,13 @@ class Group(System):
         """
         self._setup_dynamic_shapes()
 
-        self._problem_meta['prom2abs'] = self._get_all_promotes()
         self._problem_meta['vars_to_gather'] = self._vars_to_gather
-
-        self._check_prom_masking()
-        self._check_order()
 
         self._resolve_group_input_defaults()
         self._setup_auto_ivcs()
+        self._problem_meta['prom2abs'] = self._get_all_promotes()
+        self._check_prom_masking()
+        self._check_order()
 
         self._setup_var_sizes()
 
