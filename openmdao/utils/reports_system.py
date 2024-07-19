@@ -135,7 +135,8 @@ def reports_active():
     return not env_truthy('TESTFLO_RUNNING')
 
 
-def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=None, **kwargs):
+def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=None, predicate=None,
+                    **kwargs):
     """
     Register a report with the reporting system.
 
@@ -156,8 +157,18 @@ def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=N
     inst_id : str or None
         Either the instance ID of an OpenMDAO object (e.g. Problem, Driver) or None.
         If None, then this report will be run for all objects of type class_name.
+    predicate : function or None
+        If not None, this function will be called to determine if the report's hook function
+        should run. The predicate function should take the class instance as its only argument and
+        return True if the report should run.  Note that returning False does not disable the hook,
+        it just prevents the hook from running at that time.
     **kwargs : dict
         Keyword args passed to the report function.
+
+    Returns
+    -------
+    Report
+        The registered report object.
     """
     global _reports_registry
 
@@ -172,7 +183,8 @@ def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=N
     pre = func if pre_or_post == 'pre' else None
     post = func if pre_or_post == 'post' else None
     report.register_hook_args(fname=method, class_name=class_name, inst_id=inst_id, pre=pre,
-                              post=post, ncalls=1, **kwargs)
+                              post=post, ncalls=1, predicate=predicate, **kwargs)
+    return report
 
 
 def unregister_report(name):
