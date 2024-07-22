@@ -5,11 +5,9 @@ import unittest
 import itertools
 from fnmatch import fnmatchcase
 
-from click import clear
 import numpy as np
 from scipy.sparse import coo_matrix
 
-from openmdao.utils.reports_system import clear_report_registry
 
 try:
     import jax
