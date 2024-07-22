@@ -1077,6 +1077,10 @@ class Problem(object):
             first = False
             mode = self._metadata['mode']
 
+            responses = self.model.get_responses(recurse=True, use_prom_ivc=True)
+            designvars = self.model.get_design_vars(recurse=True, use_prom_ivc=True)
+            response_size, desvar_size = driver._update_voi_meta(self.model, responses, designvars)
+
             # If set_solver_print is called after an initial run, in a multi-run scenario,
             #  this part of _final_setup still needs to happen so that change takes effect
             #  in subsequent runs

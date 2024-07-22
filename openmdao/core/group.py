@@ -200,6 +200,9 @@ class Group(System):
         within this group, keyed by active response.  These determine if contributions
         from all ranks will be added together to get the correct input values when derivatives
         in the larger model are being solved using reverse mode.
+    _auto_ivc_recorders : list
+        List of recorders that were added to _auto_ivc before it existed so they can be added
+        after _auto_ivc is created.
     """
 
     def __init__(self, **kwargs):
@@ -1038,6 +1041,7 @@ class Group(System):
 
         for recorder in self._auto_ivc_recorders:
             self._auto_ivc.add_recorder(recorder)
+        self._auto_ivc_recorders = []
 
     def _final_setup(self):
         """
@@ -3322,6 +3326,7 @@ class Group(System):
                 s._rec_mgr.append(recorder)
 
             if self.pathname == '':  # top level group
+                # too early in setup for _auto_ivc to exist, so we'll add recorder to it later
                 if '_auto_ivc' not in self._subsystems_allprocs:
                     if recorder not in self._auto_ivc_recorders:
                         self._auto_ivc_recorders.append(recorder)
