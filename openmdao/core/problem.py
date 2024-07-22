@@ -960,7 +960,7 @@ class Problem(object):
         model_comm = self.driver._setup_comm(comm)
 
         # this metadata will be shared by all Systems/Solvers in the system tree
-        self._metadata = {
+        self._metadata.update({
             'name': self._name,  # the name of this Problem
             'pathname': None,  # the pathname of this Problem in the current tree of Problems
             'comm': comm,
@@ -1012,7 +1012,7 @@ class Problem(object):
             'relevance_cache': {},  # cache of relevance objects
             'rel_array_cache': {},  # cache of relevance arrays
             'ncompute_totals': 0,  # number of times compute_totals has been called
-        }
+        })
 
         if _prob_setup_stack:
             self._metadata['pathname'] = _prob_setup_stack[-1]._metadata['pathname'] + '/' + \
@@ -1051,52 +1051,58 @@ class Problem(object):
         driver = self.driver
 
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
+            first = True
             self._metadata['static_mode'] = False
             try:
                 self.model._setup_part2()
                 self._check_collected_errors()
+
+                responses = self.model.get_responses(recurse=True, use_prom_ivc=True)
+                designvars = self.model.get_design_vars(recurse=True, use_prom_ivc=True)
+                response_size, desvar_size = driver._update_voi_meta(self.model, responses,
+                                                                     designvars)
+
                 self.model._final_setup()
             finally:
                 self._metadata['static_mode'] = True
 
-        responses = self.model.get_responses(recurse=True, use_prom_ivc=True)
-        designvars = self.model.get_design_vars(recurse=True, use_prom_ivc=True)
-        response_size, desvar_size = driver._update_voi_meta(self.model, responses, designvars)
+            # update mode if it's been set to 'auto'
+            if self._orig_mode == 'auto':
+                mode = 'rev' if response_size < desvar_size else 'fwd'
+            else:
+                mode = self._orig_mode
 
-        # update mode if it's been set to 'auto'
-        if self._orig_mode == 'auto':
-            mode = 'rev' if response_size < desvar_size else 'fwd'
+            self._metadata['mode'] = mode
         else:
-            mode = self._orig_mode
+            first = False
+            mode = self._metadata['mode']
 
-        self._metadata['mode'] = mode
-
-        # If set_solver_print is called after an initial run, in a multi-run scenario,
-        #  this part of _final_setup still needs to happen so that change takes effect
-        #  in subsequent runs
-        if self._metadata['setup_status'] >= _SetupStatus.POST_FINAL_SETUP:
+            # If set_solver_print is called after an initial run, in a multi-run scenario,
+            #  this part of _final_setup still needs to happen so that change takes effect
+            #  in subsequent runs
             self.model._setup_solver_print()
 
         driver._setup_driver(self)
 
-        if coloring_mod._use_total_sparsity:
-            coloring = driver._coloring_info.coloring
-            if coloring is not None:
-                # if we're using simultaneous total derivatives then our effective size is less
-                # than the full size
-                if coloring._fwd and coloring._rev:
-                    pass  # we're doing both!
-                elif mode == 'fwd' and coloring._fwd:
-                    desvar_size = coloring.total_solves()
-                elif mode == 'rev' and coloring._rev:
-                    response_size = coloring.total_solves()
+        if first:
+            if coloring_mod._use_total_sparsity:
+                coloring = driver._coloring_info.coloring
+                if coloring is not None:
+                    # if we're using simultaneous total derivatives then our effective size is less
+                    # than the full size
+                    if coloring._fwd and coloring._rev:
+                        pass  # we're doing both!
+                    elif mode == 'fwd' and coloring._fwd:
+                        desvar_size = coloring.total_solves()
+                    elif mode == 'rev' and coloring._rev:
+                        response_size = coloring.total_solves()
 
-        if ((mode == 'fwd' and desvar_size > response_size) or
-                (mode == 'rev' and response_size > desvar_size)):
-            issue_warning(f"Inefficient choice of derivative mode.  You chose '{mode}' for a "
-                          f"problem with {desvar_size} design variables and {response_size} "
-                          "response variables (objectives and nonlinear constraints).",
-                          category=DerivativesWarning)
+            if ((mode == 'fwd' and desvar_size > response_size) or
+                    (mode == 'rev' and response_size > desvar_size)):
+                issue_warning(f"Inefficient choice of derivative mode.  You chose '{mode}' for a "
+                              f"problem with {desvar_size} design variables and {response_size} "
+                              "response variables (objectives and nonlinear constraints).",
+                              category=DerivativesWarning)
 
         if (not self._metadata['allow_post_setup_reorder'] and
                 self._metadata['setup_status'] == _SetupStatus.PRE_SETUP and self.model._order_set):

@@ -723,8 +723,8 @@ def _n2_cmd(options, user_args):
 
         def _view_model_w_errors(prob):
             # if problem name is not specified, use top-level problem (no delimiter in pathname)
-            pathname = prob._metadata['pathname']
-            if (probname is None and '/' not in pathname) or (probname == prob._name):
+            prob_id = prob._get_inst_id()
+            if (probname is None and '/' not in prob_id) or (probname == prob_id):
                 errs = prob._metadata['saved_errors']
                 if errs:
                     # only run the n2 here if we've had setup errors. Normally we'd wait until
@@ -733,17 +733,19 @@ def _n2_cmd(options, user_args):
                        values=not options.no_values, title=options.title, path=options.path,
                        embeddable=options.embeddable)
                     # errors will result in exit at the end of the _check_collected_errors method
-                else:
-                    # no errors, generate n2 after final_setup
-                    def _view_model_no_errors(model):
-                        n2(model, outfile=options.outfile, show_browser=not options.no_browser,
-                           values=not options.no_values, title=options.title, path=options.path,
-                           embeddable=options.embeddable)
-                    hooks._register_hook('_final_setup', 'Group',
-                                         post=_view_model_no_errors, exit=True)
-                    hooks._setup_hooks(prob.model)
 
-        hooks._register_hook('_check_collected_errors', 'Problem', pre=_view_model_w_errors)
+        # no errors, generate n2 after final_setup
+        def _view_model_no_errors(prob):
+            prob_id = prob._get_inst_id()
+            if (probname is None and '/' not in prob_id) or (probname == prob_id):
+                n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
+                   values=not options.no_values, title=options.title, path=options.path,
+                   embeddable=options.embeddable)
+
+        hooks._register_hook('_check_collected_errors', 'Problem', pre=_view_model_w_errors,
+                             inst_id=probname)
+        hooks._register_hook('final_setup', class_name='Problem', post=_view_model_no_errors,
+                             inst_id=probname, exit=True)
 
         _load_and_exec(options.file[0], user_args)
     else:

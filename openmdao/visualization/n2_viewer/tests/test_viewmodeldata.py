@@ -483,17 +483,14 @@ class TestViewerData(unittest.TestCase):
             p.model.add_subsystem('submodelcomp',
                                 om.SubmodelComp(problem=subprob, inputs=['*'], outputs=['*'], do_coloring=False),
                                 promotes=['*'])
-            p.model.add_subsystem('supercomp',
-                                om.ExecComp('z = 3 * y'),
-                                promotes=['*'])
+            p.model.add_subsystem('supercomp', om.ExecComp('z = 3 * y'), promotes=['*'])
 
             p.setup()
-            p.final_setup()
 
             # verify model runs correctly
-            p.set_val('x1', 1)
-            p.set_val('x2', 2)
-            p.set_val('x3', 3)
+            #p.set_val('x1', 1)
+            #p.set_val('x2', 2)
+            #p.set_val('x3', 3)
 
             p.run_model()
             """
