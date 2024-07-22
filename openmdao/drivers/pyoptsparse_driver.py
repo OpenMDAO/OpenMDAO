@@ -29,7 +29,6 @@ from openmdao.core.group import Group
 from openmdao.utils.class_util import WeakMethodWrapper
 from openmdao.utils.mpi import FakeComm, MPI
 from openmdao.utils.om_warnings import issue_warning, warn_deprecation
-from openmdao.utils.reports_system import get_reports_dir
 
 # what version of pyoptspare are we working with
 if pyoptsparse and hasattr(pyoptsparse, '__version__'):
@@ -276,7 +275,7 @@ class pyOptSparseDriver(Driver):
         self.options.declare('output_dir', types=(str, _ReprClass), default=_DEFAULT_REPORTS_DIR,
                              allow_none=True,
                              desc='Directory location of pyopt_sparse output files.'
-                             'Default is ./reports_directory/problem_name.')
+                             'Default is {prob_name}_out/reports.')
 
     @property
     def hist_file(self):
@@ -530,15 +529,10 @@ class pyOptSparseDriver(Driver):
             raise ImportError(msg)
 
         # Need to tell optimizer where to put its .out files
-        if self.options['output_dir'] is None:
-            output_dir = "."
-        elif self.options['output_dir'] == _DEFAULT_REPORTS_DIR:
-            problem = self._problem()
-            default_output_dir = pathlib.Path(get_reports_dir()).joinpath(problem._name)
-            pathlib.Path(default_output_dir).mkdir(parents=True, exist_ok=True)
-            output_dir = str(default_output_dir)
+        if self.options['output_dir'] in (None, _DEFAULT_REPORTS_DIR):
+            output_dir = str(self._problem().get_outputs_dir())
         else:
-            output_dir = self.options['output_dir']
+            output_dir = str(self.options['output_dir'])
 
         optimizers_and_output_files = {
             # ALPSO uses a single option `filename` to determine name of both output files
@@ -552,8 +546,7 @@ class pyOptSparseDriver(Driver):
 
         if optimizer in optimizers_and_output_files:
             for opt_setting_name, output_file_name in optimizers_and_output_files[optimizer]:
-                if self.opt_settings.get(opt_setting_name) is None:
-                    self.opt_settings[opt_setting_name] = f'{output_dir}/{output_file_name}'
+                self.opt_settings[opt_setting_name] = f'{output_dir}/{output_file_name}'
 
         # Process any default optimizer-specific settings.
         if optimizer in DEFAULT_OPT_SETTINGS:

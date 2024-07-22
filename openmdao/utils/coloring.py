@@ -2829,7 +2829,7 @@ def dynamic_total_coloring(driver, run_model=True, fname=None, of=None, wrt=None
 
 def _run_total_coloring_report(driver):
     reports_dir = driver._problem().get_reports_dir()
-    htmlpath = pathlib.Path(reports_dir).joinpath('total_coloring.html')
+    htmlpath = reports_dir / 'total_coloring.html'
 
     display_coloring(source=driver, output_file=htmlpath,
                      as_text=bokeh_resources is None, show=False)

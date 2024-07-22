@@ -38,6 +38,7 @@ from openmdao.utils.om_warnings import issue_warning, \
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, all_ancestors, match_prom_or_abs, \
     ensure_compatible, env_truthy, make_traceback, _is_slicer_op
+from openmdao.utils.file_utils import _get_outputs_dir
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -4947,6 +4948,25 @@ class System(object):
             The path to the directory where reports should be written.
         """
         return self._problem_meta['reports_dir']
+
+    def get_outputs_dir(self, *subdirs, mkdir=True):
+        """
+        Get the path under which all output files of this system are to be placed.
+
+        Parameters
+        ----------
+        *subdirs : str
+            Subdirectories nested under the relevant problem output directory.
+            To create {prob_output_dir}/a/b one would pass `system.get_outputs_dir('a', 'b')`.
+        mkdir : bool
+            If True, attempt to create this directory if it does not exist.
+
+        Returns
+        -------
+        pathlib.Path
+           The path of the outputs directory for the problem.
+        """
+        return _get_outputs_dir(self, *subdirs, mkdir=mkdir)
 
     def _set_finite_difference_mode(self, active):
         """

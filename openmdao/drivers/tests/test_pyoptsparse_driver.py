@@ -16,8 +16,7 @@ from openmdao.test_suite.components.paraboloid_problem import ParaboloidProblem
 from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
-from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
-from openmdao.utils.reports_system import get_reports_dir
+from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver 
 from openmdao.utils.testing_utils import use_tempdirs, require_pyoptsparse
 from openmdao.utils.om_warnings import OMDeprecationWarning
 from openmdao.utils.mpi import MPI
@@ -3370,7 +3369,7 @@ class TestPyoptSparseOutputFiles(unittest.TestCase):
         return prob
 
     def run_and_test_default_output_dir(self, optimizer, output_file_names):
-        # default is to put the files in the reports directory under the problem name folder
+        # default is to put the files in the ouputs directory for the problem
         # output_file_names is a list of tuples of setting name and output file name
         prob = self.createParaboloidProblem()
         prob.driver = pyOptSparseDriver(optimizer=optimizer, print_results=False)
@@ -3379,7 +3378,7 @@ class TestPyoptSparseOutputFiles(unittest.TestCase):
             prob.driver.opt_settings['fileout'] = 3 # need this to be 3 to get the output files
 
         prob.run_driver()
-        default_output_dir = pathlib.Path(get_reports_dir()).joinpath(prob._name)
+        default_output_dir = prob.get_outputs_dir()
         for opt_setting_name, output_file_name in output_file_names:
             output_file = default_output_dir.joinpath(output_file_name)
             self.assertTrue(output_file.is_file(),
@@ -3398,14 +3397,14 @@ class TestPyoptSparseOutputFiles(unittest.TestCase):
 
         prob.run_driver()
         for opt_setting_name, output_file_name in output_file_names:
-            output_file = pathlib.Path(output_file_name)
+            output_file = prob.get_outputs_dir() / output_file_name
             self.assertTrue(output_file.is_file(),
                         f"{output_file_name} output file not found at {str(output_file)}")
 
     def run_and_test_user_set_output_dir(self, optimizer, output_file_names):
         # output_file_names is a list of tuples of setting name and output file name
 
-        user_directory_name = 'user_reports_dir'
+        user_directory_name = 'user_outputs_dir'
         pathlib.Path(user_directory_name).mkdir(exist_ok=True)
 
         prob = self.createParaboloidProblem()
@@ -3413,7 +3412,6 @@ class TestPyoptSparseOutputFiles(unittest.TestCase):
 
         if optimizer == 'ALPSO':
             prob.driver.opt_settings['fileout'] = 3
-
 
         prob.driver.options['output_dir'] = user_directory_name
 

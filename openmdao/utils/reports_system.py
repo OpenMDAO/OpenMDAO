@@ -20,7 +20,6 @@ from openmdao.visualization.tables.table_builder import generate_table
 _reports_registry = {}
 _default_reports = ['scaling', 'total_coloring', 'n2', 'optimizer', 'inputs']
 _active_reports = set()  # these reports will actually run (assuming their hook funcs are triggered)
-_reports_dir = os.environ.get('OPENMDAO_REPORTS_DIR', './reports')  # top dir for the reports
 _plugins_loaded = False  # use this to ensure plugins only loaded once
 
 
@@ -177,6 +176,8 @@ def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=N
     if pre_or_post not in ('pre', 'post'):
         raise ValueError("The argument 'pre_or_post' can only have values of 'pre' or 'post', "
                          f"but {pre_or_post} was given")
+    if pre_or_post == 'pre' and method == 'setup':
+        raise ValueError('Reports cannot be registered to execute pre-setup.')
 
     _reports_registry[name] = report = Report(name, desc)
 
@@ -386,14 +387,14 @@ def view_reports(probnames=None, level=2):
     level : int
         Expand the reports directory tree to this level.  Default is 2.
     """
-    tdir = _reports_dir
+    tdir = pathlib.Path(os.getcwd()) / 'reports'
     to_match = set()
     if probnames:
         if isinstance(probnames, str):
             probnames = (probnames,)
 
         for probname in probnames:
-            subdir = os.path.join(_reports_dir, probname)
+            subdir = f'{probname}_out/'
             if not os.path.isdir(subdir):
                 # see if they provided script name instead of problem name
                 dname = os.path.splitext(subdir)[0]
@@ -456,8 +457,8 @@ def set_reports_dir(reports_dir_path):
     reports_dir_path : str
         Path to the top level reports directory.
     """
-    global _reports_dir
-    _reports_dir = reports_dir_path
+    raise RuntimeError('The set_reports_dir function has been removed. Reports are now stored in '
+                       'the reports subdirectory under the enclosing problem\'s output directory')
 
 
 # -----------------------------------------
@@ -485,8 +486,8 @@ def _reset_reports_dir():
     This is used during testing, where environment variables are sometimes modified during
     the test.
     """
-    global _reports_dir
-    _reports_dir = os.environ.get('OPENMDAO_REPORTS_DIR', './reports')
+    raise RuntimeError('The _reset_reports_dir function in openmdao.api has been removed. '
+                       'Reports are now placed in the reports sub-directory of the problem.')
 
 
 def get_reports_dir():
@@ -498,7 +499,8 @@ def get_reports_dir():
     str
         Path to the top level reports directory.
     """
-    return _reports_dir
+    raise RuntimeError('The get_reports_dir function in openmdao.api has '
+                       'been replaced by the get_reports_dir method on Problem and System.')
 
 
 def _reports2list(reports, defaults):
