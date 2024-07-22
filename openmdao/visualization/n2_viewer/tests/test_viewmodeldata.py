@@ -487,11 +487,6 @@ class TestViewerData(unittest.TestCase):
 
             p.setup()
 
-            # verify model runs correctly
-            #p.set_val('x1', 1)
-            #p.set_val('x2', 2)
-            #p.set_val('x3', 3)
-
             p.run_model()
             """
             with open("submodel_script.py", 'w') as f:

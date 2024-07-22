@@ -724,7 +724,7 @@ def _n2_cmd(options, user_args):
         def _view_model_w_errors(prob):
             # if problem name is not specified, use top-level problem (no delimiter in pathname)
             prob_id = prob._get_inst_id()
-            if (probname is None and '/' not in prob_id) or (probname == prob_id):
+            if probname is None or probname == prob_id:
                 errs = prob._metadata['saved_errors']
                 if errs:
                     # only run the n2 here if we've had setup errors. Normally we'd wait until

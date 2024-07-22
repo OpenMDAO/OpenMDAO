@@ -107,11 +107,10 @@ def _view_connections_cmd(options, user_args):
     def _view_model_w_errors(prob, show_values):
         if prob._metadata['saved_errors']:
             _viewconns(prob)
-            sys.exit()
+            # errors will result in exit at the end of the _check_collected_errors method
 
     # register the hooks
-    hooks._register_hook('_check_collected_errors', 'Problem', pre=_view_model_w_errors,
-                         show_values=options.show_values)
+    hooks._register_hook('_check_collected_errors', 'Problem', pre=_view_model_w_errors)
     hooks._register_hook('final_setup', class_name='Problem', inst_id=options.problem,
                          post=_viewconns, exit=True)
 
