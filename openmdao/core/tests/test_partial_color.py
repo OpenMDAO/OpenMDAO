@@ -5,8 +5,11 @@ import unittest
 import itertools
 from fnmatch import fnmatchcase
 
+from click import clear
 import numpy as np
 from scipy.sparse import coo_matrix
+
+from openmdao.utils.reports_system import clear_report_registry
 
 try:
     import jax
@@ -17,6 +20,7 @@ except ImportError:
 from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent, ExecComp, \
     ExplicitComponent, NonlinearBlockGS, ScipyOptimizeDriver, NewtonSolver, DirectSolver, \
         ImplicitFuncComp
+from openmdao.core.problem import _clear_problem_names
 import openmdao.func_api as omf
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.array_utils import evenly_distrib_idxs
@@ -409,6 +413,10 @@ class TestColoringExplicit(unittest.TestCase):
                 coloring = comp._compute_coloring(wrt_patterns='x*', method=method)[0]
                 comp._save_coloring(coloring)
 
+                # This is a hack to get around the restriction of duplicate
+                # problem names in the same execution of the same script.
+                _clear_problem_names()
+
                 # now make a second problem to use the coloring
                 prob = Problem(name=probname)
                 model = prob.model
@@ -536,6 +544,7 @@ class TestColoringImplicit(unittest.TestCase):
                 comp._save_coloring(coloring)
 
                 # now create a new problem and set the static coloring
+                _clear_problem_names()  # We don't care about a duplicate problem name in this test.
                 prob = Problem(name=f'test_simple_partials_implicit_static_{method}_{isplit}_{osplit}')
                 model = prob.model
 
@@ -1159,6 +1168,7 @@ class TestStaticColoring(unittest.TestCase):
                 comp._save_coloring(coloring)
 
                 # now make a second problem to use the coloring
+                _clear_problem_names()
                 prob = Problem(name=f'test_partials_explicit_shape_bug_{method}')
                 model = prob.model
                 indeps = IndepVarComp()
@@ -1213,6 +1223,7 @@ class TestStaticColoring(unittest.TestCase):
                 model._save_coloring(coloring)
 
                 # new Problem, loading the coloring we just computed
+                _clear_problem_names()
                 prob = Problem(name=f'test_simple_totals_static_{method}_{isplit}_{osplit}')
                 model = prob.model
 
@@ -1278,6 +1289,7 @@ class TestStaticColoring(unittest.TestCase):
                 prob.run_model()
                 model._save_coloring(compute_total_coloring(prob))
 
+                _clear_problem_names()
                 prob = Problem(name=f'test_static_totals_over_implicit_comp_{method}_{isplit}_{osplit}')      
                 model = prob.model
 
@@ -1349,7 +1361,7 @@ class TestStaticColoring(unittest.TestCase):
                 prob.run_model()
                 model._save_coloring(compute_total_coloring(prob))
 
-
+                _clear_problem_names()
                 prob = Problem(name=f'test_totals_of_indices_{method}')
                 model = prob.model
 
@@ -1416,7 +1428,7 @@ class TestStaticColoring(unittest.TestCase):
                 prob.run_model()
                 model._save_coloring(compute_total_coloring(prob))
 
-
+                _clear_problem_names()
                 prob = Problem(name=f'test_totals_wrt_indices_{method}')
                 model = prob.model
 
@@ -1487,6 +1499,7 @@ class TestStaticColoring(unittest.TestCase):
                 prob.run_model()
                 model._save_coloring(compute_total_coloring(prob))
 
+                _clear_problem_names()
                 prob = Problem(name=f'test_totals_of_wrt_indices_{method}')
                 model = prob.model
 
@@ -1664,6 +1677,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
                 coloring = comp._compute_coloring(wrt_patterns='x*', method=method)[0]
                 comp._save_coloring(coloring)
 
+                _clear_problem_names()
                 prob = Problem(name=f'test_simple_partials_implicit_{method}')
                 model = prob.model
 
@@ -1734,6 +1748,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
                 comp._save_coloring(coloring)
 
                 # now create a new problem and use the previously generated coloring
+                _clear_problem_names()
                 prob = Problem(name=f'test_simple_partials_explicit_{method}')
                 model = prob.model
 

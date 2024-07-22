@@ -2136,6 +2136,16 @@ class TestProblem(unittest.TestCase):
         d = prob.get_outputs_dir('subdir')
         self.assertEqual(str(pathlib.Path('prob_name_out', 'subdir')), str(d))
 
+    def test_duplicate_prob_name(self):
+
+        om.Problem(name='prob_name2')
+
+        with self.assertRaises(ValueError) as e:
+            om.Problem(name='prob_name2')
+
+        self.assertEqual(str(e.exception), "The problem name 'prob_name2' already exists")
+
+
 @use_tempdirs
 class RelevanceTestCase(unittest.TestCase):
     def _setup_relevance_problem(self):
@@ -2483,7 +2493,10 @@ class NestedProblemTestCase(unittest.TestCase):
         G.nonlinear_solver = _ProblemSolver(prob_name=defname)
         p.model.connect('indep.x', 'G.comp.x')
         p.setup()
-        p.run_model()
+
+        with self.assertRaises(Exception) as context:
+            p.run_model()
+        self.assertEqual(str(context.exception), f"The problem name '{defname}' already exists")
 
         # If the first Problem uses the default name of 'problem2'
         openmdao.core.problem._clear_problem_names()  # need to reset these to simulate separate runs
