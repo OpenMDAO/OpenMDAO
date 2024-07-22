@@ -495,22 +495,25 @@ def _scaling_setup_parser(parser):
                         help="Don't show jacobian info")
 
 
-_run_driver_called = set()
-_run_model_start = set()
-_run_model_done = set()
+_scaling_report_done = set()
 
 
 def _exitfunc(probname):
-    global _run_driver_called
+    global _scaling_report_done
     from openmdao.core.problem import _problem_names
     if probname is None:
         probnames = _problem_names
     else:
         probnames = [probname]
-    missing = [p for p in probnames if p not in _run_driver_called]
+    missing = [p for p in probnames if p not in _scaling_report_done]
     if missing:
-        print(f"\n\nMissing call(s) to run_driver() for Problem(s) {sorted(missing)} "
-              "so couldn't generate corresponding driver scaling report.\n")
+        print(f"\n\nDriver scaling report(s) not generated for Problem(s) {sorted(missing)}\n")
+
+
+def _check_nl_totals(driver, **kwargs):
+    # prevent hook from triggering until we have computed the total jacobian for the nonlinear
+    # constraints and objectives
+    return driver._total_jac is not None
 
 
 def _scaling_cmd(options, user_args):
@@ -527,45 +530,19 @@ def _scaling_cmd(options, user_args):
     # disable the reports system, we only want the scaling report and then we exit
     os.environ['OPENMDAO_REPORTS'] = '0'
 
-    def _set_run_driver_flag(problem):
-        global _run_driver_called
-        _run_driver_called.add(problem._name)
+    def _do_scaling_report(driver, infile='', outfile=_default_scaling_filename, show_browser=True,
+                           title=None, jac=True):
+        global _scaling_report_done
+        _scaling_report_done.add(driver._problem()._name)
+        if title is None:
+            title = f"Driver scaling for {infile}"
+        driver.scaling_report(outfile=outfile, show_browser=show_browser, title=title, jac=jac)
 
-    def _set_run_model_start(problem):
-        global _run_model_start
-        _run_model_start.add(problem._name)
-
-    def _set_run_model_done(problem):
-        global _run_model_done
-        _run_model_done.add(problem._name)
-
-    def _scaling_check(problem):
-        if problem._name in _run_driver_called:
-            # If run_driver has been called, we know no more user changes are coming.
-            if problem._name not in _run_model_start:
-                problem.run_model()
-            if problem._name in _run_model_done:
-                _scaling(problem)
-
-    def _scaling(problem):
-        driver = problem.driver
-        if options.title:
-            title = options.title
-        else:
-            title = "Driver scaling for %s" % os.path.basename(options.file[0])
-        view_driver_scaling(driver, outfile=options.outfile, show_browser=not options.no_browser,
-                            title=title, jac=not options.nojac)
-        exit()
-
-    # register the hooks
-    hooks._register_hook('final_setup', class_name='Problem', inst_id=options.problem,
-                         post=_scaling_check)
-
-    hooks._register_hook('run_model', class_name='Problem', inst_id=options.problem,
-                         pre=_set_run_model_start, post=_set_run_model_done, ncalls=1)
-
-    hooks._register_hook('run_driver', class_name='Problem', inst_id=options.problem,
-                         pre=_set_run_driver_flag, ncalls=1)
+    hooks._register_hook('_compute_totals', class_name='Driver', inst_id=options.problem,
+                         post=_do_scaling_report, ncalls=1, predicate=_check_nl_totals,
+                         infile=options.file[0], outfile=options.outfile,
+                         show_browser=not options.no_browser, title=options.title,
+                         jac=not options.nojac)
 
     # register an atexit function to check if scaling report was triggered during the script
     import atexit
@@ -593,4 +570,4 @@ def _run_scaling_report(driver, report_filename=_default_scaling_filename):
 
 def _scaling_report_register():
     register_report('scaling', _run_scaling_report, 'Driver scaling report', 'Driver',
-                    '_compute_totals', 'post')
+                    '_compute_totals', 'post', predicate=_check_nl_totals)

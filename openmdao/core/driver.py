@@ -1279,10 +1279,7 @@ class Driver(object):
                                       driver_scaling=driver_scaling)
 
             if total_jac.has_lin_cons and self.supports['linear_constraints']:
-                # if we're doing a scaling report, cache the linear total jacobian so we
-                # don't have to recreate it
-                if problem._has_active_report('scaling'):
-                    self._total_jac_linear = total_jac
+                self._total_jac_linear = total_jac
             else:
                 self._total_jac = total_jac
         else:

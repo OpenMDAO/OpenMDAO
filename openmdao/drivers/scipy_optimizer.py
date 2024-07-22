@@ -256,6 +256,7 @@ class ScipyOptimizeDriver(Driver):
         model = prob.model
         self.iter_count = 0
         self._total_jac = None
+        self._total_jac_linear = None
         self._desvar_array_cache = None
 
         self._check_for_missing_objective()
@@ -552,8 +553,6 @@ class ScipyOptimizeDriver(Driver):
         except Exception as msg:
             if self._exc_info is None:
                 raise
-        finally:
-            self._total_jac = None
 
         if self._exc_info is not None:
             self._reraise()
