@@ -357,6 +357,7 @@ class pyOptSparseDriver(Driver):
 
         self.pyopt_solution = None
         self._total_jac = None
+        self._total_jac_linear = None
         self.iter_count = 0
         self._nl_responses = []
 
@@ -601,8 +602,6 @@ class pyOptSparseDriver(Driver):
         except Exception as c:
             if self._exc_info is None:
                 raise
-        finally:
-            self._total_jac = None
 
         if self._exc_info is not None:
             exc_info = self._exc_info
@@ -749,7 +748,7 @@ class pyOptSparseDriver(Driver):
 
         if fail > 0 and self._fill_NANs:
             for name in func_dict:
-                func_dict[name].fill(np.NAN)
+                func_dict[name].fill(np.nan)
 
         # convert func_dict to use promoted names
         func_dict = model._prom_names_dict(func_dict)
@@ -862,7 +861,7 @@ class pyOptSparseDriver(Driver):
                     if ikey not in sens_dict[okey] or self._fill_NANs:
                         sens_dict[okey][ikey] = np.zeros((osize, isize))
                         if self._fill_NANs:
-                            sens_dict[okey][ikey].fill(np.NAN)
+                            sens_dict[okey][ikey].fill(np.nan)
 
         # convert sens_dict to use promoted names
         sens_dict = model._prom_names_jac(sens_dict)

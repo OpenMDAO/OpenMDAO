@@ -26,7 +26,7 @@ from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path, has_match
 from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
-from openmdao.utils.variable_table import write_var_table
+from openmdao.utils.variable_table import write_var_table, NA
 from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len
 from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
@@ -36,7 +36,7 @@ from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, \
     DerivativesWarning, PromotionWarning, UnusedOptionWarning, UnitsWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, \
-    format_as_float_or_array, all_ancestors, make_set, match_prom_or_abs, \
+    format_as_float_or_array, all_ancestors, match_prom_or_abs, \
     ensure_compatible, env_truthy, make_traceback, _is_slicer_op
 from openmdao.utils.file_utils import _get_outputs_dir
 from openmdao.approximation_schemes.complex_step import ComplexStep
@@ -3753,7 +3753,7 @@ class System(object):
 
     def get_io_metadata(self, iotypes=('input', 'output'), metadata_keys=None,
                         includes=None, excludes=None, is_indep_var=None, is_design_var=None,
-                        tags=(), get_remote=False, rank=None,
+                        tags=None, get_remote=False, rank=None,
                         return_rel_names=True):
         """
         Retrieve metadata for a filtered list of variables.
@@ -3800,7 +3800,7 @@ class System(object):
             A dict of metadata keyed on name, where name is either absolute or relative
             based on the value of the `return_rel_names` arg, and metadata is a dict containing
             entries based on the value of the metadata_keys arg.  Every metadata dict will
-            always contain two entries, 'promoted_name' and 'discrete', to indicate a given
+            always contain two entries, 'prom_name' and 'discrete', to indicate a given
             variable's promoted name and whether or not it is discrete.
         """
         prefix = self.pathname + '.' if self.pathname else ''
@@ -3821,6 +3821,8 @@ class System(object):
             includes = (includes,)
         if isinstance(excludes, str):
             excludes = (excludes,)
+        if isinstance(tags, str):
+            tags = {tags}
 
         gather_keys = {'val', 'src_indices'}
         need_gather = get_remote and self.comm is not None and self.comm.size > 1
@@ -3840,9 +3842,6 @@ class System(object):
             metadict = all2meta
             disc_metadict = self._var_allprocs_discrete
             need_gather = False  # we can get everything from 'allprocs' dict without gathering
-
-        if tags:
-            tagset = make_set(tags)
 
         result = {}
 
@@ -3881,7 +3880,7 @@ class System(object):
                             try:
                                 ret_meta[key] = meta[key]
                             except KeyError:
-                                ret_meta[key] = 'Unavailable'
+                                ret_meta[key] = NA
 
                 if need_gather:
                     if distrib or abs_name in self._vars_to_gather:
@@ -3951,8 +3950,16 @@ class System(object):
                             continue
 
                     # handle tags
-                    if tags and not tagset & ret_meta['tags']:
-                        continue
+                    if tags:
+                        meta_tags = ret_meta.get('tags', {})
+                        match_tag = False
+                        for tag in tags:
+                            for meta_tag in meta_tags:
+                                if fnmatchcase(meta_tag, tag):
+                                    match_tag = True
+                                    break
+                        if not match_tag:
+                            continue
 
                     ret_meta['prom_name'] = prom
                     ret_meta['discrete'] = abs_name not in all2meta[iotype]
@@ -3965,7 +3972,6 @@ class System(object):
         return result
 
     def list_vars(self,
-                  explicit=True, implicit=True,
                   val=True,
                   prom_name=True,
                   residuals=False,
@@ -3978,6 +3984,7 @@ class System(object):
                   desc=False,
                   print_arrays=False,
                   tags=None,
+                  print_tags=False,
                   includes=None,
                   excludes=None,
                   is_indep_var=None,
@@ -3993,10 +4000,6 @@ class System(object):
 
         Parameters
         ----------
-        explicit : bool, optional
-            Include outputs from explicit components. Default is True.
-        implicit : bool, optional
-            Include outputs from implicit components. Default is True.
         val : bool, optional
             When True, display output values. Default is True.
         prom_name : bool, optional
@@ -4030,6 +4033,8 @@ class System(object):
             User defined tags that can be used to filter what gets listed. Only outputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
+        print_tags : bool
+            When true, display tags in the columnar display.
         includes : None, str, or iter of str
             Collection of glob patterns for pathnames of variables to include. Default is None,
             which includes all output variables.
@@ -4076,7 +4081,7 @@ class System(object):
                              "must be a string value of 'list' or 'dict'")
 
         keynames = ['val', 'units', 'shape', 'global_shape', 'desc', 'tags']
-        keyflags = [val, units, shape, global_shape, desc, tags]
+        keyflags = [val, units, shape, global_shape, desc, tags or print_tags]
 
         keys = [name for i, name in enumerate(keynames) if keyflags[i]]
 
@@ -4093,7 +4098,7 @@ class System(object):
 
         metavalues = val and self._inputs is None
 
-        keyvals = [metavalues, units, shape, global_shape, desc, tags is not None]
+        keyvals = [metavalues, units, shape, global_shape, desc, tags or print_tags]
         keys = [n for i, n in enumerate(keynames) if keyvals[i]]
 
         inputs = self.get_io_metadata(('input',), keys, includes, excludes,
@@ -4154,62 +4159,41 @@ class System(object):
                         meta['max'] = np.round(np.max(meta['val']), np_precision)
 
         # NOTE: calls to _abs_get_val() above are collective calls and must be done on all procs
-        if not (outputs and inputs) or (not all_procs and self.comm.rank != 0):
-            return []
+        if not (outputs or inputs) or (not all_procs and self.comm.rank != 0):
+            return {} if return_format == 'dict' else []
 
         # remove metadata we don't want to show/return
         to_remove = ['discrete']
-        if tags:
+        if not print_tags:
             to_remove.append('tags')
         if not prom_name:
             to_remove.append('prom_name')
-        for _, meta in outputs.items():
+        for _, meta in chain(outputs.items(), inputs.items()):
             for key in to_remove:
-                del meta[key]
-        for _, meta in inputs.items():
-            for key in to_remove:
-                del meta[key]
+                try:
+                    del meta[key]
+                except KeyError:
+                    pass
 
         variables = set(outputs.keys()).union(set(inputs.keys()))
         var_list = []
         var_dict = {}
 
-        real_vars = self._var_allprocs_abs2meta
-        disc_vars = self._var_allprocs_discrete
-
-        if self._subsystems_allprocs:
-            from openmdao.core.component import Component
-            for subsys in self.system_iter(recurse=True, typ=Component):
-                prefix = subsys.pathname + '.'
-                for var_name in chain(real_vars['input'], real_vars['output'],
-                                      disc_vars['input'], disc_vars['output']):
-                    if var_name in variables:
-                        if var_name.startswith(prefix):
-                            var_list.append(var_name)
-                            if var_name in outputs:
-                                var_dict[var_name] = outputs[var_name]
-                                var_dict[var_name]['io'] = 'output'
-                            else:
-                                var_dict[var_name] = inputs[var_name]
-                                var_dict[var_name]['io'] = 'input'
-        else:
-            # For components with no children, self._subsystems_allprocs is empty.
-            for var_name in chain(real_vars['input'], real_vars['output'],
-                                  disc_vars['input'], disc_vars['output']):
-                if var_name in variables:
-                    var_list.append(var_name)
-                    if var_name in outputs:
-                        var_dict[var_name] = outputs[var_name]
-                        var_dict[var_name]['io'] = 'output'
-                    else:
-                        var_dict[var_name] = inputs[var_name]
-                        var_dict[var_name]['io'] = 'input'
+        var_list = self._get_vars_exec_order(inputs=True, outputs=True,
+                                             variables=variables, local=True)
+        for var_name in var_list:
+            if var_name in outputs:
+                var_dict[var_name] = outputs[var_name]
+                var_dict[var_name]['io'] = 'output'
+            else:
+                var_dict[var_name] = inputs[var_name]
+                var_dict[var_name]['io'] = 'input'
 
         if all_procs or self.comm.rank == 0:
             write_var_table(self.pathname, var_list, 'all', var_dict,
-                            True, '', print_arrays, out_stream)
+                            True, print_arrays, out_stream)
 
-        return var_dict
+        return var_dict if return_format == 'dict' else list(var_dict.items())
 
     def list_inputs(self,
                     val=True,
@@ -4221,6 +4205,7 @@ class System(object):
                     hierarchical=True,
                     print_arrays=False,
                     tags=None,
+                    print_tags=False,
                     includes=None,
                     excludes=None,
                     is_indep_var=None,
@@ -4260,6 +4245,8 @@ class System(object):
             User defined tags that can be used to filter what gets listed. Only inputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
+        print_tags : bool
+            When true, display tags in the columnar display.
         includes : None, str, or iter of str
             Collection of glob patterns for pathnames of variables to include. Default is None,
             which includes all input variables.
@@ -4300,14 +4287,13 @@ class System(object):
                           "any `set_val` calls.")
 
         if return_format not in ('list', 'dict'):
-            badarg = f"'{return_format}'" if isinstance(return_format, str) else f"{return_format}"
-            raise ValueError(f"Invalid value ({badarg}) for return_format, "
+            raise ValueError(f"Invalid value ({return_format}) for return_format, "
                              "must be a string value of 'list' or 'dict'")
 
         metavalues = val and self._inputs is None
 
         keynames = ['val', 'units', 'shape', 'global_shape', 'desc', 'tags']
-        keyvals = [metavalues, units, shape, global_shape, desc, tags is not None]
+        keyvals = [metavalues, units, shape, global_shape, desc, tags or print_tags]
         keys = [n for i, n in enumerate(keynames) if keyvals[i]]
 
         inputs = self.get_io_metadata(('input',), keys, includes, excludes,
@@ -4315,16 +4301,6 @@ class System(object):
                                       get_remote=True,
                                       rank=None if all_procs or val else 0,
                                       return_rel_names=False)
-
-        if inputs:
-            to_remove = ['discrete']
-            if tags:
-                to_remove.append('tags')
-            if not prom_name:
-                to_remove.append('prom_name')
-            for _, meta in inputs.items():
-                for key in to_remove:
-                    del meta[key]
 
         if val and self._inputs is not None:
             # we want value from the input vector, not from the metadata
@@ -4341,11 +4317,21 @@ class System(object):
                     if print_max:
                         meta['max'] = np.round(np.max(meta['val']), np_precision)
 
+        # NOTE: calls to _abs_get_val() above are collective calls and must be done on all procs
         if not inputs or (not all_procs and self.comm.rank != 0):
-            if return_format == 'dict':
-                return {}
-            else:
-                return []
+            return {} if return_format == 'dict' else []
+
+        to_remove = ['discrete']
+        if not print_tags:
+            to_remove.append('tags')
+        if not prom_name:
+            to_remove.append('prom_name')
+        for _, meta in inputs.items():
+            for key in to_remove:
+                try:
+                    del meta[key]
+                except KeyError:
+                    pass
 
         if out_stream:
             self._write_table('input', inputs, hierarchical, print_arrays, all_procs,
@@ -4358,10 +4344,7 @@ class System(object):
         else:
             inputs = list(inputs.items())
 
-        if return_format == 'dict':
-            return dict(inputs)
-        else:
-            return inputs
+        return dict(inputs) if return_format == 'dict' else inputs
 
     def list_outputs(self,
                      explicit=True, implicit=True,
@@ -4378,6 +4361,7 @@ class System(object):
                      hierarchical=True,
                      print_arrays=False,
                      tags=None,
+                     print_tags=False,
                      includes=None,
                      excludes=None,
                      is_indep_var=None,
@@ -4432,6 +4416,8 @@ class System(object):
             User defined tags that can be used to filter what gets listed. Only outputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
+        print_tags : bool
+            When true, display tags in the columnar display.
         includes : None, str, or iter of str
             Collection of glob patterns for pathnames of variables to include. Default is None,
             which includes all output variables.
@@ -4472,7 +4458,7 @@ class System(object):
                              "must be a string value of 'list' or 'dict'")
 
         keynames = ['val', 'units', 'shape', 'global_shape', 'desc', 'tags']
-        keyflags = [val, units, shape, global_shape, desc, tags]
+        keyflags = [val, units, shape, global_shape, desc, tags or print_tags]
 
         keys = [name for i, name in enumerate(keynames) if keyflags[i]]
 
@@ -4525,17 +4511,20 @@ class System(object):
 
         # NOTE: calls to _abs_get_val() above are collective calls and must be done on all procs
         if not outputs or (not all_procs and self.comm.rank != 0):
-            return []
+            return {} if return_format == 'dict' else []
 
         # remove metadata we don't want to show/return
         to_remove = ['discrete']
-        if tags:
+        if not print_tags:
             to_remove.append('tags')
         if not prom_name:
             to_remove.append('prom_name')
         for _, meta in outputs.items():
             for key in to_remove:
-                del meta[key]
+                try:
+                    del meta[key]
+                except KeyError:
+                    pass
 
         rel_idx = len(self.pathname) + 1 if self.pathname else 0
 
@@ -4580,10 +4569,7 @@ class System(object):
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-        if return_format == 'dict':
-            return dict(outputs)
-        else:
-            return outputs
+        return dict(outputs) if return_format == 'dict' else outputs
 
     def _write_table(self, var_type, var_data, hierarchical, print_arrays, all_procs, out_stream):
         """
@@ -4614,18 +4600,16 @@ class System(object):
 
         if self._outputs is None:
             var_list = var_data.keys()
-            top_name = self.name
         else:
             inputs = var_type == 'input'
             outputs = not inputs
             var_list = self._get_vars_exec_order(inputs=inputs, outputs=outputs, variables=var_data)
-            top_name = self.name if self.name else 'model'
 
         if all_procs or self.comm.rank == 0:
             write_var_table(self.pathname, var_list, var_type, var_data,
-                            hierarchical, top_name, print_arrays, out_stream)
+                            hierarchical, print_arrays, out_stream)
 
-    def _get_vars_exec_order(self, inputs=False, outputs=False, variables=None):
+    def _get_vars_exec_order(self, inputs=False, outputs=False, variables=None, local=False):
         """
         Get list of variable names in execution order, based on the order subsystems were setup.
 
@@ -4638,6 +4622,8 @@ class System(object):
         variables : Collection (list or dict)
             Absolute path names of the subset of variables to include.
             If None then all variables will be included. Default is None.
+        local : bool, optional
+            Get variables from local subsystems only. Default is False.
 
         Returns
         -------
@@ -4649,26 +4635,35 @@ class System(object):
         real_vars = self._var_allprocs_abs2meta
         disc_vars = self._var_allprocs_discrete
 
-        in_or_out = []
+        # variable order: real inputs, real outputs, discrete inputs, discrete outputs
+        var_dicts = []
         if inputs:
-            in_or_out.append('input')
+            var_dicts.append(real_vars['input'])
         if outputs:
-            in_or_out.append('output')
+            var_dicts.append(real_vars['output'])
+        if inputs:
+            var_dicts.append(disc_vars['input'])
+        if outputs:
+            var_dicts.append(disc_vars['output'])
 
+        # For components with no children, self._subsystems_allprocs is empty.
         if self._subsystems_allprocs:
-            for subsys, _ in self._subsystems_allprocs.values():
+            if local:
+                from openmdao.core.component import Component
+                it = self.system_iter(recurse=True, typ=Component)
+            else:
+                it = iter(subsys for subsys, _ in self._subsystems_allprocs.values())
+
+            for subsys in it:
                 prefix = subsys.pathname + '.'
-                for io in in_or_out:
-                    for var_name in chain(real_vars[io], disc_vars[io]):
-                        if variables is None or var_name in variables:
-                            if var_name.startswith(prefix):
-                                var_list.append(var_name)
-        else:
-            # For components with no children, self._subsystems_allprocs is empty.
-            for io in in_or_out:
-                for var_name in chain(real_vars[io], disc_vars[io]):
+                for var_name in chain(*var_dicts):
                     if not variables or var_name in variables:
-                        var_list.append(var_name)
+                        if var_name.startswith(prefix):
+                            var_list.append(var_name)
+        else:
+            for var_name in chain(*var_dicts):
+                if variables is None or var_name in variables:
+                    var_list.append(var_name)
 
         return var_list
 
