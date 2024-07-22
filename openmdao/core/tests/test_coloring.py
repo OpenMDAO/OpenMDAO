@@ -16,6 +16,7 @@ except ImportError:
     load_npz = None
 
 import openmdao.api as om
+from openmdao.core.problem import _clear_problem_names
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.array_utils import array_viz
 from openmdao.utils.coloring import _compute_coloring, compute_total_coloring, Coloring
@@ -1420,6 +1421,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
                               probname='test_good_total')
         p.run_driver()
 
+        _clear_problem_names()
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
                               sizes=[3, 4, 5], color='total', fixed=True,
                               probname='test_good_total')
@@ -1431,6 +1433,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
                               probname='test_good_partial')
         p.run_driver()
 
+        _clear_problem_names()
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
                               sizes=[3, 4, 5], color='partial', fixed=True,
                               probname='test_good_partial')
@@ -1442,6 +1445,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
                               probname='test_added_name_total')
         p.run_driver()
 
+        _clear_problem_names()
         with self.assertRaises(om.InvalidColoringError) as ctx:
             p = self._build_model(ofnames=['w', 'x', 'y', 'z'], wrtnames=['a', 'b', 'c', 'd'],
                                   sizes=[3, 4, 5, 6], color='total', fixed=True,
@@ -1456,6 +1460,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
                               probname='test_added_name_partial')
         p.run_driver()
 
+        _clear_problem_names()
         p = self._build_model(ofnames=['w', 'x', 'y', 'z'], wrtnames=['a', 'b', 'c', 'd'],
                               sizes=[3, 4, 5, 6], color='partial', fixed=True,
                               probname='test_added_name_partial')
@@ -1471,6 +1476,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
                               probname='test_removed_name_total')
         p.run_driver()
 
+        _clear_problem_names()
         with self.assertRaises(om.InvalidColoringError) as ctx:
             p = self._build_model(ofnames=['w', 'y'], wrtnames=['a', 'c'],
                                   sizes=[3, 5], color='total', fixed=True,
@@ -1483,6 +1489,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
                               probname='test_removed_name_partial')
         p.run_driver()
 
+        _clear_problem_names()
         p = self._build_model(ofnames=['w', 'y'], wrtnames=['a', 'c'],
                               sizes=[3, 5], color='partial', fixed=True,
                               probname='test_removed_name_partial')
@@ -1499,6 +1506,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
                               probname='test_reordered_name_total')
         p.run_driver()
 
+        _clear_problem_names()
         with self.assertRaises(om.InvalidColoringError) as ctx:
             p = self._build_model(ofnames=['w', 'y', 'x'], wrtnames=['a', 'c', 'b'],
                                   sizes=[3, 5, 4], color='total', fixed=True,
@@ -1511,6 +1519,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
                               probname='test_reordered_name_partial')
         p.run_driver()
 
+        _clear_problem_names()
         p = self._build_model(ofnames=['x', 'z', 'y'], wrtnames=['a', 'c', 'b'],
                               sizes=[3, 4, 5], color='partial', fixed=True,
                               probname='test_reordered_name_partial')
@@ -1526,6 +1535,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
                               probname='test_size_change_total')
         p.run_driver()
 
+        _clear_problem_names()
         with self.assertRaises(om.InvalidColoringError) as ctx:
             p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
                                   sizes=[3, 7, 5], color='total', fixed=True,
@@ -1538,6 +1548,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
                               probname='test_size_change_partial')
         p.run_driver()
 
+        _clear_problem_names()
         p = self._build_model(ofnames=['x', 'y', 'z'], wrtnames=['a', 'b', 'c'],
                               sizes=[3, 9, 5], color='partial', fixed=True,
                               probname='test_size_change_partial')
@@ -1573,6 +1584,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
 
         self.assertIsNotNone(p.driver._get_coloring())
 
+        _clear_problem_names()
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
                             sizes=[3, 4, 5], color='total', fixed=True,
                             probname='test_get_coloring')
