@@ -87,6 +87,9 @@ class TestReportsSystem(unittest.TestCase):
         return prob
 
     def setup_and_run_w_linear_only_dvs(self, driver=None, reports=_UNDEFINED, reports_dir=_UNDEFINED, shape=3):
+        if not OPTIMIZER:
+            raise unittest.SkipTest("This test requires pyOptSparseDriver.")
+
         prob = om.Problem(reports=reports)
         prob.driver = om.pyOptSparseDriver(optimizer='IPOPT')
         prob.driver.declare_coloring()
