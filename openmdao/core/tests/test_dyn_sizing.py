@@ -957,7 +957,7 @@ class DynShpComp(om.ExplicitComponent):
 
     def setup(self):
         self.add_input('x', units='ft', shape_by_conn=True)
-        self.add_output('y', copy_shape='x', units='ft')
+        self.add_output('y', compute_shape=lambda shapes: shapes['x'], units='ft')
 
     def compute(self, inputs, outputs):
         outputs['y'] = 3. * inputs['x']
@@ -980,6 +980,21 @@ class DanglingInputGroup(om.Group):
         self.add_subsystem('comp2', DynShpComp(), promotes_inputs=['x'])
 
 
+class TestDynShapesViaSetVal(unittest.TestCase):
+    def test_group_dangling_input(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('sub', DanglingInputGroup())
+
+        prob.setup()
+
+        # setting this sets the shape of sub.x
+        prob['sub.x'] = np.ones(2) * 7.
+        prob.run_model()
+
+        assert_near_equal(prob['sub.comp1.y'], np.ones(2) * 21.)
+        assert_near_equal(prob['sub.comp2.y'], np.ones(2) * 21.)
+
+
 class TestDynShapesWithInputConns(unittest.TestCase):
     # this tests the retrieval of shape info from a set_input_defaults call during
     # dynamic shape determination, which happens *before* group input defaults have
@@ -990,19 +1005,6 @@ class TestDynShapesWithInputConns(unittest.TestCase):
 
         prob.setup()
 
-        prob['sub.x'] = np.ones(2) * 7.
-        prob.run_model()
-
-        assert_near_equal(prob['sub.comp1.y'], np.ones(2) * 21.)
-        assert_near_equal(prob['sub.comp2.y'], np.ones(2) * 21.)
-
-    def test_group_dangling_input(self):
-        prob = om.Problem()
-        prob.model.add_subsystem('sub', DanglingInputGroup())
-
-        prob.setup()
-
-        # setting this sets the shape of sub.x
         prob['sub.x'] = np.ones(2) * 7.
         prob.run_model()
 

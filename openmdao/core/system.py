@@ -5443,7 +5443,7 @@ class System(object):
                     if _is_slicer_op(indices):
                         try:
                             ic_cache[abs_name] = (value[indices], set_units, self.pathname, name)
-                        except IndexError:
+                        except (IndexError, TypeError):
                             cval[indices] = value
                             ic_cache[abs_name] = (cval, set_units, self.pathname, name)
                     else:
