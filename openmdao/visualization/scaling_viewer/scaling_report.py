@@ -392,7 +392,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
 
         # assemble data for jacobian visualization
         data['oflabels'] = driver._get_ordered_nl_responses()
-        data['wrtlabels'] = list(dv_vals)
+        data['wrtlabels'] = list(n for n in dv_vals if n in driver._nl_dvs)
 
         if driver._total_jac is None:
             # this call updates driver._total_jac
