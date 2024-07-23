@@ -5,6 +5,8 @@ import sys
 import os
 from io import StringIO
 
+import numpy as np
+
 import openmdao.api as om
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.groups.parallel_groups import Diamond
@@ -89,6 +91,53 @@ class TestReportsSystem(unittest.TestCase):
 
         return prob
 
+    def setup_and_run_w_linear_only_dvs(self, driver=None, reports=_UNDEFINED, reports_dir=_UNDEFINED, shape=3):
+        prob = om.Problem(reports=reports)
+        prob.driver = om.pyOptSparseDriver(optimizer='IPOPT')
+        prob.driver.declare_coloring()
+
+        prob.driver.opt_settings['max_iter'] = 1000
+        prob.driver.opt_settings['print_level'] = 5
+        prob.driver.opt_settings['mu_strategy'] = 'monotone'
+        # prob.driver.opt_settings['mu_init'] = 1.0E-3
+        prob.driver.opt_settings['alpha_for_y'] = 'safer-min-dual-infeas'
+        # prob.driver.opt_settings['nlp_scaling_method'] = 'gradient-based'
+        prob.driver.opt_settings['tol'] = 1.0E-4
+        prob.driver.opt_settings['constr_viol_tol'] = 1.0E-4
+
+        model = prob.model
+
+        ivc = model.add_subsystem('ivc', om.IndepVarComp())
+        ivc.add_output('x', np.ones(shape))
+        ivc.add_output('y', np.ones(shape))
+        ivc.add_output('z', np.ones(shape))
+
+        model.add_subsystem('comp', om.ExecComp('f_xy=x*2.-y*3.', shape=shape))
+        model.add_subsystem('obj', om.ExecComp('obj = sum(x**2)', obj=1., x=np.ones(shape)))
+        model.add_subsystem('con', om.ExecComp('y=x', shape=shape))
+        model.add_subsystem('con2', om.ExecComp('y=sin(x)', shape=shape))
+
+        model.connect('ivc.x', 'comp.x')
+        model.connect('ivc.y', 'comp.y')
+        model.connect('comp.f_xy', 'obj.x')
+        model.connect('ivc.z', 'con.x')
+        model.connect('ivc.x', 'con2.x')
+
+        model.add_design_var('ivc.x', lower=0.0, upper=1.0)
+        model.add_design_var('ivc.y', lower=0.0, upper=1.0)
+        model.add_design_var('ivc.z', lower=0.0, upper=1.0)
+
+        model.add_objective('obj.obj')
+
+        model.add_constraint('con.y', lower=0.0, linear=True)
+        model.add_constraint('con2.y', lower=0.0)
+
+        prob.setup(check=False)
+        prob.run_driver()
+        prob.cleanup()
+
+        return prob
+
     def setup_problem_w_errors(self, prob_name, driver=None, reports=_UNDEFINED, reports_dir=_UNDEFINED):
         if reports_dir is not _UNDEFINED:
             om.set_reports_dir(reports_dir)
@@ -163,6 +212,16 @@ class TestReportsSystem(unittest.TestCase):
         self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
         path = pathlib.Path(problem_reports_dir).joinpath(self.optimizer_filename)
         self.assertTrue(path.is_file(), f'The optimizer report file, {str(path)}, was not found')
+
+    @hooks_active
+    def test_report_generation_linear_only_dv_scaling_report(self):
+        prob = self.setup_and_run_w_linear_only_dvs(reports=['scaling'])
+
+        # get the path to the problem subdirectory
+        problem_reports_dir = prob.get_reports_dir()
+
+        path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
+        self.assertTrue(path.is_file(), f'The scaling report file, {str(path)} was not found')
 
     @hooks_active
     def test_report_generation_on_error(self):
