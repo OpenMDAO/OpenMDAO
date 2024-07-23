@@ -1744,6 +1744,9 @@ class TestStaticColoringParallelCS(unittest.TestCase):
                 prob.run_model()
                 coloring = comp._compute_coloring(wrt_patterns='x*', method=method)[0]
                 comp._save_coloring(coloring)
+                
+                # make sure coloring file exists by the time we try to load the spec
+                MPI.COMM_WORLD.barrier()
 
                 # now create a new problem and use the previously generated coloring
                 _clear_problem_names()
@@ -1758,9 +1761,6 @@ class TestStaticColoringParallelCS(unittest.TestCase):
                                                                         num_par_fd=self.N_PROCS))
                 model.connect('indeps.x0', 'comp.x0')
                 model.connect('indeps.x1', 'comp.x1')
-
-                # make sure coloring file exists by the time we try to load the spec
-                MPI.COMM_WORLD.barrier()
 
                 comp.declare_coloring(wrt='x*', method=method)
                 comp.use_fixed_coloring()
