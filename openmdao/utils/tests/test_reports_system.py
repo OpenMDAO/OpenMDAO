@@ -209,8 +209,27 @@ class TestReportsSystem(unittest.TestCase):
         self.assertTrue(path.is_file(), f'The optimizer report file, {str(path)}, was not found')
 
     @hooks_active
-    def test_report_generation_linear_only_dv_scaling_report(self):
-        prob = self.setup_and_run_w_linear_only_dvs(reports=['scaling'])
+    def test_report_generation_linear_only_dv_scaling_report_pyoptsparse(self):
+        if not OPTIMIZER:
+            raise unittest.SkipTest("This test requires pyOptSparseDriver.")
+
+        driver = om.pyOptSparseDriver(optimizer='IPOPT')
+        driver.declare_coloring()
+
+        prob = self.setup_and_run_w_linear_only_dvs(driver=driver, reports=['scaling'])
+
+        # get the path to the problem subdirectory
+        problem_reports_dir = prob.get_reports_dir()
+
+        path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
+        self.assertTrue(path.is_file(), f'The scaling report file, {str(path)} was not found')
+
+    @hooks_active
+    def test_report_generation_linear_only_dv_scaling_report_scipyopt(self):
+        driver = om.ScipyOptimizeDriver(optimizer='SLSQP')
+        driver.declare_coloring()
+
+        prob = self.setup_and_run_w_linear_only_dvs(driver=driver, reports=['scaling'])
 
         # get the path to the problem subdirectory
         problem_reports_dir = prob.get_reports_dir()

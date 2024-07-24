@@ -330,6 +330,7 @@ class Driver(object):
         self.supports.declare('inequality_constraints', types=bool, default=False)
         self.supports.declare('equality_constraints', types=bool, default=False)
         self.supports.declare('linear_constraints', types=bool, default=False)
+        self.supports.declare('linear_only_designvars', types=bool, default=False)
         self.supports.declare('two_sided_constraints', types=bool, default=False)
         self.supports.declare('multiple_objectives', types=bool, default=False)
         self.supports.declare('integer_design_vars', types=bool, default=True)
@@ -590,7 +591,7 @@ class Driver(object):
             The model being used in the optimization problem.
         """
         lin_cons = tuple([meta['source'] for meta in self._cons.values() if meta['linear']])
-        if lin_cons:
+        if lin_cons and self.supports['linear_only_designvars']:
             relevance = model._relevance
             dvs = tuple([meta['source'] for meta in self._designvars.values()])
 
