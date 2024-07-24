@@ -91,23 +91,9 @@ class TestReportsSystem(unittest.TestCase):
 
         return prob
 
-    def setup_and_run_w_linear_only_dvs(self, driver=None, reports=_UNDEFINED, reports_dir=_UNDEFINED, shape=3):
-        if not OPTIMIZER:
-            raise unittest.SkipTest("This test requires pyOptSparseDriver.")
-
+    def setup_and_run_w_linear_only_dvs(self, driver, reports=_UNDEFINED, reports_dir=_UNDEFINED, shape=3):
         prob = om.Problem(reports=reports)
-        prob.driver = om.pyOptSparseDriver(optimizer='IPOPT')
-        prob.driver.declare_coloring()
-
-        prob.driver.opt_settings['max_iter'] = 1000
-        prob.driver.opt_settings['print_level'] = 5
-        prob.driver.opt_settings['mu_strategy'] = 'monotone'
-        # prob.driver.opt_settings['mu_init'] = 1.0E-3
-        prob.driver.opt_settings['alpha_for_y'] = 'safer-min-dual-infeas'
-        # prob.driver.opt_settings['nlp_scaling_method'] = 'gradient-based'
-        prob.driver.opt_settings['tol'] = 1.0E-4
-        prob.driver.opt_settings['constr_viol_tol'] = 1.0E-4
-
+        prob.driver = driver
         model = prob.model
 
         ivc = model.add_subsystem('ivc', om.IndepVarComp())
@@ -224,7 +210,14 @@ class TestReportsSystem(unittest.TestCase):
         driver = om.pyOptSparseDriver(optimizer='IPOPT')
         driver.declare_coloring()
 
-        prob = self.setup_and_run_w_linear_only_dvs(driver=driver, reports=['scaling'])
+        driver.opt_settings['max_iter'] = 1000
+        driver.opt_settings['print_level'] = 5
+        driver.opt_settings['mu_strategy'] = 'monotone'
+        driver.opt_settings['alpha_for_y'] = 'safer-min-dual-infeas'
+        driver.opt_settings['tol'] = 1.0E-4
+        driver.opt_settings['constr_viol_tol'] = 1.0E-4
+
+        prob = self.setup_and_run_w_linear_only_dvs(driver=driver, reports=['scaling'], shape=(9,7))
 
         # get the path to the problem subdirectory
         problem_reports_dir = prob.get_reports_dir()
@@ -237,7 +230,7 @@ class TestReportsSystem(unittest.TestCase):
         driver = om.ScipyOptimizeDriver(optimizer='SLSQP')
         driver.declare_coloring()
 
-        prob = self.setup_and_run_w_linear_only_dvs(driver=driver, reports=['scaling'])
+        prob = self.setup_and_run_w_linear_only_dvs(driver=driver, reports=['scaling'], shape=(9,7))
 
         # get the path to the problem subdirectory
         problem_reports_dir = prob.get_reports_dir()
