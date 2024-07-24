@@ -105,8 +105,8 @@ class TestReportsSystem(unittest.TestCase):
         model.add_subsystem('obj', om.ExecComp('obj = sum(x**2)', obj=1., x=np.ones(shape)))
         model.add_subsystem('con', om.ExecComp('y=x', shape=shape))
         model.add_subsystem('con2', om.ExecComp('y=sin(x)', shape=shape))
-        model.add_subsystem('con3', om.ExecComp('y=cos(x)', shape=shape), promotes_inputs=['x'])
-        model.add_subsystem('con4', om.ExecComp('y=x-x**1.5', shape=shape), promotes_inputs=['x'])
+        model.add_subsystem('con3', om.ExecComp('y=.2*x', shape=shape), promotes_inputs=['x'])
+        model.add_subsystem('con4', om.ExecComp('y=cos(x)', shape=shape), promotes_inputs=['x'])
 
         model.connect('ivc.x', 'comp.x')
         model.connect('ivc.y', 'comp.y')
@@ -123,7 +123,7 @@ class TestReportsSystem(unittest.TestCase):
 
         model.add_constraint('con.y', lower=0.0, linear=True)
         model.add_constraint('con3.y', lower=0.0, linear=True)
-        model.add_constraint('con4.y', lower=0.0, linear=True)
+        model.add_constraint('con4.y', lower=0.0)
         model.add_constraint('con2.y', lower=0.0)
 
         prob.setup(check=False)
