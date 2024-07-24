@@ -116,6 +116,8 @@ class TestReportsSystem(unittest.TestCase):
         model.add_design_var('ivc.x', lower=0.0, upper=1.0)
         model.add_design_var('ivc.y', lower=0.0, upper=1.0)
         model.add_design_var('ivc.z', lower=0.0, upper=1.0)
+        model.add_design_var('ivc.z2', lower=0.0, upper=1.0)
+        model.add_design_var('ivc.z3', lower=0.0, upper=1.0)
 
         model.add_objective('obj.obj')
 
