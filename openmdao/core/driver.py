@@ -591,7 +591,7 @@ class Driver(object):
             The model being used in the optimization problem.
         """
         lin_cons = tuple([meta['source'] for meta in self._cons.values() if meta['linear']])
-        if lin_cons and self.supports['linear_only_designvars']:
+        if lin_cons:
             relevance = model._relevance
             dvs = tuple([meta['source'] for meta in self._designvars.values()])
 
