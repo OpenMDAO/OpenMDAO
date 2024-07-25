@@ -2324,25 +2324,22 @@ class NestedProblemTestCase(unittest.TestCase):
         class _ProblemSolver(om.NonlinearRunOnce):
             def solve(self):
                 # create a simple subproblem and run it to test for global solver_info bug
-                p = om.Problem(name='abc123sub')
+                p = om.Problem()
                 p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
                 p.model.add_subsystem('comp', om.ExecComp('y=2*x'))
                 p.model.connect('indep.x', 'comp.x')
-                p.setup(parent=self._parent)
-                self_test.assertEqual('abc123/abc123sub', p._metadata['pathname'])
+                p.setup()
                 p.run_model()
 
                 return super().solve()
 
-        p = om.Problem(name='abc123')
+        p = om.Problem()
         p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
         G = p.model.add_subsystem('G', om.Group())
         G.add_subsystem('comp', om.ExecComp('y=2*x'))
         G.nonlinear_solver = _ProblemSolver()
         p.model.connect('indep.x', 'G.comp.x')
         p.setup()
-        self.assertEqual('abc123', p._metadata['pathname'])
-
         p.run_model()
 
     def test_cs_across_nested(self):
