@@ -2,12 +2,14 @@
 Utilities for working with files.
 """
 
+from multiprocessing import Value
 import sys
 import os
 import importlib
 import types
 from fnmatch import fnmatch
 from os.path import join, basename, dirname, isfile, split, splitext, abspath
+import pathlib
 
 
 def get_module_path(fpath):
@@ -427,3 +429,55 @@ def image2html(imagefile, title='', alt=''):
 </body>
 </html>
 """
+
+
+def _get_outputs_dir(obj=None, *subdirs, mkdir=True):
+    """
+    Return a pathlib.Path for the outputs directory related to the given problem or system.
+
+    This path is based on the "problem path" in a hierarchy of problems.
+    The resulting outputs directory will be nested where each problem's output directory
+    contains its own output files and subdirectories as well as any subproblems.
+
+    Parameters
+    ----------
+    obj : Problem or System or Solver or None
+        The problem or system or Solver from which we are opening a file.
+    mkdir : bool
+        If True, force the creation of this directory.
+    subdirs : str
+        Additional subdirectories under the top level directory for the relevant problem.
+    """
+    from openmdao.core.problem import Problem
+    from openmdao.core.system import System
+    from openmdao.solvers.solver import Solver
+    from openmdao.core.constants import _SetupStatus
+
+    if isinstance(obj, Problem):
+        prob_meta = obj._metadata
+        comm = obj.comm
+    elif isinstance(obj, System):
+        prob_meta = obj._problem_meta
+        comm = obj.comm
+    elif isinstance(obj, Solver):
+        system = obj._system
+        if system is None:
+            raise RuntimeError('The output directory for Solvers cannot be accessed '
+                               'before final_setup.')
+        prob_meta = system()._problem_meta
+        comm = system().comm
+    else:
+        raise RuntimeError(f'Cannot get problem metadata for object: {obj}')
+
+    if prob_meta is None or prob_meta.get('pathname', None) is None:
+        raise RuntimeError('The output directory cannot be accessed before setup.')
+
+    prob_pathname = prob_meta['pathname']
+
+    dirpath = pathlib.Path(*[f'{p}_out'
+                             for p in prob_pathname.split('/')]) / pathlib.Path(*subdirs)
+
+    if comm.rank == 0 and mkdir:
+        dirpath.mkdir(parents=True, exist_ok=True)
+
+    return dirpath

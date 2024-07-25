@@ -178,8 +178,7 @@ class DOEDriver(Driver):
             self._quantities.append(name)
 
         # Add all constraints
-        con_meta = self._cons
-        for name, _ in con_meta.items():
+        for name, _ in self._cons.items():
             self._quantities.append(name)
 
         if MPI and self.options['run_parallel']:

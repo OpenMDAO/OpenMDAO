@@ -217,6 +217,56 @@ class TestLoadCase(unittest.TestCase):
 
         self.assertEqual(convert_units(10., from_units, to_units), 10000./3600.)
 
+    def test_load_system_with_discrete_values(self):
+        # Defines a test class with discrete inputs and outputs
+        class ParaboloidWithDiscreteOutput(Paraboloid):
+
+            def setup(self):
+                super().setup()
+                self.add_discrete_input('disc_in', val='in')
+                self.add_discrete_output('disc_out', val='out')
+                self.add_design_var('x', lower=-50, upper=50)
+                self.add_design_var('y', lower=-50, upper=50)
+                self.add_objective('f_xy')
+
+            def compute(self, inputs, outputs, d_ins, d_outs):
+                super().compute(inputs, outputs)
+
+            def compute_partials(self, inputs, outputs, d_ins):
+                super().compute_partials(inputs, outputs)
+
+
+        # Setup the optimization 
+        prob = om.Problem() 
+        prob.model.add_subsystem(
+            'paraboloid', ParaboloidWithDiscreteOutput())
+        prob.driver = om.ScipyOptimizeDriver() 
+        prob.driver.options['optimizer'] = 'SLSQP'
+
+        # Setup Recorder
+        prob.model.recording_options['record_inputs'] = True
+        prob.model.recording_options['record_outputs'] = True
+        recorder = om.SqliteRecorder('cases.sql')
+        prob.add_recorder(recorder)
+
+        # Run the Opt
+        prob.setup()
+        prob.run_driver()
+        prob.record("after_run_driver")
+
+        # Set the discrete value to something arbritrary
+        prob.set_val('paraboloid.disc_in', 'INCORRECT_VAL')
+        prob.set_val('paraboloid.disc_out', 'INCORRECT_VAL')
+
+        # Load the Case from the recorder
+        cr = om.CaseReader("cases.sql")
+        case = cr.get_case('after_run_driver')
+        prob.load_case(case)
+
+        # Assert that the values have returned to those following the opt
+        self.assertEqual(prob.get_val('paraboloid.disc_in'), 'in')
+        self.assertEqual(prob.get_val('paraboloid.disc_out'), 'out')
+
     def test_optimization_load_system_cases(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce,
                                                        linear_solver=om.ScipyKrylov,

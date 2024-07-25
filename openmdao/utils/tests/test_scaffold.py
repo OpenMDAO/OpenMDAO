@@ -86,6 +86,7 @@ class TestScaffold(unittest.TestCase):
 
             # install it
             check_call(['pip', 'install', '-q', '--no-cache-dir', '--no-deps', '.'])  # nosec: trusted input
+            os.chdir(startdir) 
 
             try:
                 modname = _camel_case_split(cname)

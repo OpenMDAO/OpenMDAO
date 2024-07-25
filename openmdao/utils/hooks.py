@@ -32,8 +32,91 @@ def _reset_all_hooks():
     _hooks = {}
 
 
+def _hook_meta_factory(pass_args, pass_return):
+    """
+    Return classes for hook functions that accept different arguments.
+
+    Parameters
+    ----------
+    pass_args : bool
+        If True, create a class that passes args to the hook function.
+    pass_return : bool
+        If True, create a class that passes the return value of the hooked function to the hook
+        function. Only valid for post hooks.
+
+    Returns
+    -------
+    class
+        A class that handles calling a hook function.
+    """
+    if pass_return:
+        if pass_args:
+            return _HookMetaPassArgsPassReturn
+        else:
+            return _HookMetaPassRet
+    elif pass_args:
+        return _HookMetaPassArgs
+
+    return _HookMeta
+
+
 class _HookMeta(object):
-    def __init__(self, class_name, inst_id, hook, ncalls=None, exit=False, **kwargs):
+    """
+    Contains metadata that governs the behavior of a hook function.
+
+    Parameters
+    ----------
+    class_name : str
+        The name of the class owning the method where the hook will be applied.
+    inst_id : str or None
+        The name of the instance owning the method where the hook will be applied.
+    hook : function
+        The hook function.
+    ncalls : int or None
+        Auto-remove the hook function after this many calls.  If None, never auto-remove.
+    exit : bool
+        If True, run sys.exit() after calling the hook function.
+    pass_args : bool
+        If True, pass the hooked function's positional and keyword arguments to the hook function.
+    pass_return : bool
+        If True, pass the return value to the hook function.  Only valid for post hooks.
+    predicate : function or None
+        If not None, a function that will be called to determine if the hook should run. The
+        function should take the instance as its only argument, returning True if the hook should
+        run.
+    **reg_kwargs : dict of keyword arguments
+        Keyword arguments specified at registration time that will be passed to the hook function.
+
+    Attributes
+    ----------
+    class_name : str
+        The name of the class owning the method where the hook will be applied.
+    inst_id : str or None
+        The name of the instance owning the method where the hook will be applied.
+    hook : function
+        The hook function.
+    ncalls : int or None
+        deactivate the hook function after this many calls.  If None, never deactivate.
+    exit : bool
+        If True, run sys.exit() after calling the hook function.
+    pass_args : bool
+        If True, pass the hooked function's positional and keyword arguments to the hook function
+        and to the predicate function if it exists.
+    pass_return : bool
+        If True, pass the return value to the hook function and to the predicate function if it
+        exists.  Only valid for post hooks.
+    reg_kwargs : dict of keyword arguments
+        Keyword arguments that will be passed to the hook function.
+    predicate : function or None
+        If not None, a function that will be called to determine if the hook should run. The
+        function will be called with the same arguments as the hook function, returning True if
+        the hook should run.
+    children : list
+        If we're a 'None' inst_id hook, keep track of our child hooks.
+    """
+
+    def __init__(self, class_name, inst_id, hook, ncalls=None, exit=False, pass_args=False,
+                 pass_return=False, predicate=None, **kwargs):
         global _hook_counter
         self._stamp = _hook_counter
         _hook_counter += 1
@@ -43,28 +126,110 @@ class _HookMeta(object):
         self.hook = hook
         self.ncalls = ncalls
         self.exit = exit
-        self.kwargs = kwargs
+        self.pass_args = pass_args
+        self.pass_return = pass_return
+        self.predicate = predicate
+        self.reg_kwargs = kwargs
         self.children = []  # if we're a 'None' inst_id hook, keep track of our child hooks
 
     def __repr__(self):
         return f"<_HookMeta {self.class_name} {self.inst_id} {self.hook} {self.ncalls} "\
-               f"{self.exit} {self.kwargs}>"
+               f"{self.exit} {self.reg_kwargs}>"
 
-    def __call__(self, inst):
+    def __call__(self, inst, args, kwargs, ret=None):
+        """
+        Call the hook function assuming ncalls is not exceeded.
+
+        Exits after the call if self.exit is True.
+
+        Parameters
+        ----------
+        inst : object
+            The instance that owns the method where the hook will be applied.
+        args : list
+            Positional arguments.
+        kwargs : dict
+            Keyword arguments.
+        ret : object
+            The return value of the function or None.
+
+        Returns
+        -------
+        object
+            The return value of the hook function.
+        """
+        if self.predicate is not None and not self._call_predicate(inst, args, kwargs, ret):
+            return
+
         if self.ncalls is None:
-            self.hook(inst, **self.kwargs)
-            if self.exit:
-                sys.exit()
+            ret = self._call_hook(inst, args, kwargs, ret)
+        elif self.ncalls > 0:
+            self.ncalls -= 1
+            ret = self._call_hook(inst, args, kwargs, ret)
         else:
-            if self.ncalls > 0:
-                self.ncalls -= 1
-                self.hook(inst, **self.kwargs)
-                if self.exit:
-                    sys.exit()
+            return
+
+        if self.exit:
+            sys.exit()
+
+        return ret
+
+    def _call_hook(self, inst, args, kwargs, ret):
+        """
+        Call the hook function.
+
+        Parameters
+        ----------
+        inst : object
+            The instance that owns the method where the hook will be applied.
+        args : list
+            Positional arguments passed to hooked method.
+        kwargs : dict
+            Keyword arguments.
+        ret : object
+            The return value of the hooked method or None.
+
+        Returns
+        -------
+        object
+            The return value of the hook function.
+        """
+        return self.hook(inst, **self.reg_kwargs)
+
+    def _call_predicate(self, inst, args, kwargs, ret):
+        """
+        Call the predicate function to determine if the hook should run.
+
+        Parameters
+        ----------
+        inst : object
+            The instance that owns the method where the hook will be applied.
+        args : list
+            Positional arguments passed to hooked method.
+        kwargs : dict
+            Keyword arguments.
+        ret : object
+            The return value of the hooked method or None.
+
+        Returns
+        -------
+        bool
+            True if the hook should run.
+        """
+        return self.predicate(inst, **self.reg_kwargs)
 
     def copy(self):
-        hm = _HookMeta(self.class_name, self.inst_id, self.hook, self.ncalls,
-                       self.exit, **self.kwargs)
+        """
+        Return a copy of this _HookMeta.
+
+        Returns
+        -------
+        _HookMeta
+            A copy of this _HookMeta.
+        """
+        hm = self.__class__(self.class_name, self.inst_id, self.hook, self.ncalls,
+                            self.exit, self.pass_args, self.pass_return, self.predicate,
+                            **self.reg_kwargs)
         # keep the same stamp so that the order of hooks doesn't change
         hm._stamp = self._stamp
         if self.inst_id is None:
@@ -73,12 +238,64 @@ class _HookMeta(object):
         return hm
 
     def deactivate(self):
+        """
+        Deactivate all hooks associated with this _HookMeta.
+        """
         self.ncalls = 0
         for child in self.children:
             child.deactivate()
 
 
+class _HookMetaPassRet(_HookMeta):
+    """
+    A _HookMeta whose hook functions accept the return value of the hooked function.
+    """
+
+    def _call_hook(self, inst, args, kwargs, ret):
+        return self.hook(inst, ret, **self.reg_kwargs)
+
+    def _call_predicate(self, inst, args, kwargs, ret):
+        return self.predicate(inst, ret, **self.reg_kwargs)
+
+
+class _HookMetaPassArgs(_HookMeta):
+    """
+    A _HookMeta whose hook functions accept positional and keyword arguments of the hooked function.
+    """
+
+    def _call_hook(self, inst, args, kwargs, ret):
+        return self.hook(inst, args, kwargs, **self.reg_kwargs)
+
+    def _call_predicate(self, inst, args, kwargs, ret):
+        return self.predicate(inst, args, kwargs, **self.reg_kwargs)
+
+
+class _HookMetaPassArgsPassReturn(_HookMeta):
+    """
+    A _HookMeta whose hook functions accept arguments and the return value of the hooked function.
+    """
+
+    def _call_hook(self, inst, args, kwargs, ret):
+        return self.hook(inst, args, kwargs, ret, **self.reg_kwargs)
+
+    def _call_predicate(self, inst, args, kwargs, ret):
+        return self.predicate(inst, args, kwargs, ret, **self.reg_kwargs)
+
+
 class _HookDecorator(object):
+    """
+    Wraps a method with pre and/or post hooks.
+
+    Parameters
+    ----------
+    inst : object
+        The instance that owns the method.
+    func : function
+        The method to be wrapped.
+    hooks : list
+        List of hook data.
+    """
+
     def __init__(self, inst, func, hooks):
         self.__name__ = func.__name__
         self.__doc__ = func.__doc__
@@ -113,7 +330,7 @@ class _HookDecorator(object):
         self.pre_hooks = sorted(self.pre_hooks, key=lambda x: x._stamp)
         self.post_hooks = sorted(self.post_hooks, key=lambda x: x._stamp)
 
-    def _run_hooks(self, hooks):
+    def _run_hooks(self, hooks, args, kwargs, ret=None):
         """
         Run the given list of hooks.
 
@@ -121,15 +338,19 @@ class _HookDecorator(object):
         ----------
         hooks : list
             List of hook data.
-        inst : object
-            Object instance to pass to hook functions.
+        args : list
+            Positional arguments.
+        kwargs : dict
+            Keyword arguments.
+        ret : object
+            The return value of the function or None.
         """
         inst = self.inst()
         if inst is None:
             return
 
         for hook in hooks:
-            hook(inst)
+            hook(inst, args, kwargs, ret)
 
     def __call__(self, *args, **kwargs):
         """
@@ -147,9 +368,9 @@ class _HookDecorator(object):
         object
             The return value of the function.
         """
-        self._run_hooks(self.pre_hooks)
+        self._run_hooks(self.pre_hooks, args, kwargs)
         ret = self.func(*args, **kwargs)
-        self._run_hooks(self.post_hooks)
+        self._run_hooks(self.post_hooks, args, kwargs, ret)
         return ret
 
 
@@ -210,7 +431,7 @@ def _setup_hooks(obj):
 
 
 def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=None, exit=False,
-                   **kwargs):
+                   pass_args=False, pass_return=False, predicate=None, **kwargs):
     """
     Register a hook function.
 
@@ -236,6 +457,13 @@ def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=
     exit : bool
         If True, run sys.exit() after calling the hook function.  If post is registered, this
         affects only post, else it will affect pre.
+    pass_args : bool
+        If True, pass the arguments to the hook function.
+    pass_return : bool
+        If True, pass the return value to the hook function.  Only valid for post hooks.
+    predicate : func or None
+        If not None, pass same args to be passed to hook function, and if return value is True,
+        execute the hook. Otherwise do nothing.
     **kwargs : dict of keyword arguments
         Keyword arguments that will be passed to the hook function.
     """
@@ -260,12 +488,18 @@ def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=
         pre_hook = None
     else:
         pre_exit = exit if post is None else False
-        pre_hook = _HookMeta(class_name, inst_id, pre, ncalls, pre_exit, **kwargs)
+        klass = _hook_meta_factory(pass_args, False)
+        pre_hook = klass(class_name, inst_id, pre, ncalls=ncalls, exit=pre_exit,
+                         pass_args=pass_args, pass_return=pass_return,
+                         predicate=predicate, **kwargs)
 
     if post is None:
         post_hook = None
     else:
-        post_hook = _HookMeta(class_name, inst_id, post, ncalls, exit, **kwargs)
+        klass = _hook_meta_factory(pass_args, pass_return)
+        post_hook = klass(class_name, inst_id, post, ncalls=ncalls, exit=exit,
+                          pass_args=pass_args, pass_return=pass_return,
+                          predicate=predicate, **kwargs)
 
     imeta[fname].append((pre_hook, post_hook))
 

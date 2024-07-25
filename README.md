@@ -22,9 +22,9 @@ If you are using OpenMDAO, please [cite][20] us!
 
 ## Documentation
 
-Documentation for the latest version can be found [here][2].
+Documentation for the latest development version can be found [here][2].
 
-Documentation archives for prior versions can be found [here][3].
+Documentation for all released versions can be found [here][3].
 
 ## Important Notice
 

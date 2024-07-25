@@ -19,6 +19,7 @@ from openmdao.components.eq_constraint_comp import EQConstraintComp
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.explicit_func_comp import ExplicitFuncComp
 from openmdao.components.implicit_func_comp import ImplicitFuncComp
+from openmdao.components.input_resids_comp import InputResidsComp
 from openmdao.components.external_code_comp import ExternalCodeComp
 from openmdao.components.external_code_comp import ExternalCodeImplicitComp
 from openmdao.components.ks_comp import KSComp
