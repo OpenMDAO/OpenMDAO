@@ -560,7 +560,7 @@ def _scaling_cmd(options, user_args):
 def _run_scaling_report(driver, report_filename=_default_scaling_filename):
 
     prob = driver._problem()
-    scaling_filepath = str(pathlib.Path(prob.get_reports_dir()).joinpath(report_filename))
+    scaling_filepath = prob.get_reports_dir() / report_filename
 
     try:
         prob.driver.scaling_report(outfile=scaling_filepath, show_browser=False)

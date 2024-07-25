@@ -111,8 +111,6 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
         if optimizer in self.opt_settings:
             driver.opt_settings = self.opt_settings[optimizer]
         driver.options['print_results'] = False
-        driver.options['output_dir'] = None  # So output goes in current working directory
-                                             # that was the location when this test was written
 
         # setup problem & initialize values
         prob = om.Problem(model, driver)
@@ -123,7 +121,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
 
         return prob, comp
 
-    def check_history(self, optimizer, err_count=None, func='eval'):
+    def check_history(self, prob, optimizer, err_count=None, func='eval'):
         """
         Check the optimizer output file for evaluation errors and successful optimization.
         """
@@ -133,7 +131,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
 
         if optimizer == 'CONMIN':
             # check for NaN in CONMIN.out
-            with open("CONMIN.out", encoding="utf-8") as f:
+            with open(f"{prob.get_outputs_dir()}/CONMIN.out", encoding="utf-8") as f:
                 CONMIN_history = f.readlines()
 
             if func == 'eval':
@@ -150,7 +148,8 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
                                    f"Found {errs} {func} errors in CONMIN.out, expected {err_count}")
 
         elif optimizer == 'IPOPT':
-            with open("IPOPT.out", encoding="utf-8") as f:
+            output_dir = prob.get_outputs_dir()
+            with open(f"{prob.get_outputs_dir()}/IPOPT.out", encoding="utf-8") as f:
                 IPOPT_history = f.read()
 
             if func == 'eval':
@@ -179,7 +178,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
 
         elif optimizer == 'SNOPT':
             # check for evaluation error flags in the SNOPT history file
-            with open("SNOPT_print.out", encoding="utf-8", errors='ignore') as f:
+            with open(f"{prob.get_outputs_dir()}/SNOPT_print.out", encoding="utf-8", errors='ignore') as f:
                 SNOPT_history = f.readlines()
 
             itns = False
@@ -229,7 +228,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
         assert_near_equal(prob['y'], -7.833334, tolerance)
 
         # check that there are no AnalysisError related messages in the history
-        self.check_history(optimizer, err_count=None)
+        self.check_history(prob, optimizer, err_count=None)
 
         # save the optimizer's path to the solution
         nominal_history = comp.eval_history
@@ -258,7 +257,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
                             f"not greater than nominal iterations ({len(nominal_history)})")
 
             # check that the optimizer output shows the optimizer handling the errors
-            self.check_history(optimizer, err_count=len(comp.raised_eval_errors))
+            self.check_history(prob, optimizer, err_count=len(comp.raised_eval_errors))
 
         elif expected_result is not None:
             # we expect the optimizer to return an error code
@@ -270,7 +269,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
                             str(prob.driver.pyopt_solution.optInform))
 
             # check that the optimizer output shows the optimizer was unable to handle the errors
-            self.check_history(optimizer, err_count=len(comp.raised_eval_errors), func='eval')
+            self.check_history(prob, optimizer, err_count=len(comp.raised_eval_errors), func='eval')
 
     @parameterized.expand(grad_drivers - do_not_test, name_func=parameterized_name)
     def test_analysis_errors_grad(self, optimizer):
@@ -293,7 +292,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
         assert_near_equal(prob['y'], -7.833334, tolerance)
 
         # check that there are no AnalysisError related messages in the history
-        self.check_history(optimizer, err_count=None)
+        self.check_history(prob, optimizer, err_count=None)
 
         # save the optimizer's path to the solution
         nominal_history = comp.eval_history
@@ -326,7 +325,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
                             f"not greater than nominal iterations ({len(nominal_history)})")
 
             # check that the optimizer output shows the optimizer handling the errors
-            self.check_history(optimizer, err_count=len(comp.raised_grad_errors))
+            self.check_history(prob, optimizer, err_count=len(comp.raised_grad_errors))
 
         elif expected_result is not None:
             # we expect the optimizer to return an error code
@@ -338,7 +337,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
                             str(opt_inform))
 
             # check that the optimizer output shows the optimizer was unable to handle the errors
-            self.check_history(optimizer, err_count=len(comp.raised_grad_errors), func='grad')
+            self.check_history(prob, optimizer, err_count=len(comp.raised_grad_errors), func='grad')
 
 
 if __name__ == "__main__":
