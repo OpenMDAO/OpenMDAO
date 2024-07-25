@@ -1,4 +1,15 @@
 ***********************************
+# Release Notes for OpenMDAO 3.34.2
+
+July 25, 2024
+
+OpenMDAO 3.34.2 is a patch release to fix an issue with ScipyOptimizeDriver introduced in the scaling report PR.
+
+## Bug Fixes
+
+- Fixed issue with ScipyOptimizeDriver introduced in the scaling report PR.  [#3307](https://github.com/OpenMDAO/OpenMDAO/pull/3307)
+
+***********************************
 # Release Notes for OpenMDAO 3.34.1
 
 July 23, 2024
