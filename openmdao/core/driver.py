@@ -330,6 +330,7 @@ class Driver(object):
         self.supports.declare('inequality_constraints', types=bool, default=False)
         self.supports.declare('equality_constraints', types=bool, default=False)
         self.supports.declare('linear_constraints', types=bool, default=False)
+        self.supports.declare('linear_only_designvars', types=bool, default=False)
         self.supports.declare('two_sided_constraints', types=bool, default=False)
         self.supports.declare('multiple_objectives', types=bool, default=False)
         self.supports.declare('integer_design_vars', types=bool, default=True)

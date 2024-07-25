@@ -86,23 +86,9 @@ class TestReportsSystem(unittest.TestCase):
 
         return prob
 
-    def setup_and_run_w_linear_only_dvs(self, driver=None, reports=_UNDEFINED, reports_dir=_UNDEFINED, shape=3):
-        if not OPTIMIZER:
-            raise unittest.SkipTest("This test requires pyOptSparseDriver.")
-
+    def setup_and_run_w_linear_only_dvs(self, driver, reports=_UNDEFINED, reports_dir=_UNDEFINED, shape=3):
         prob = om.Problem(reports=reports)
-        prob.driver = om.pyOptSparseDriver(optimizer='IPOPT')
-        prob.driver.declare_coloring()
-
-        prob.driver.opt_settings['max_iter'] = 1000
-        prob.driver.opt_settings['print_level'] = 5
-        prob.driver.opt_settings['mu_strategy'] = 'monotone'
-        # prob.driver.opt_settings['mu_init'] = 1.0E-3
-        prob.driver.opt_settings['alpha_for_y'] = 'safer-min-dual-infeas'
-        # prob.driver.opt_settings['nlp_scaling_method'] = 'gradient-based'
-        prob.driver.opt_settings['tol'] = 1.0E-4
-        prob.driver.opt_settings['constr_viol_tol'] = 1.0E-4
-
+        prob.driver = driver
         model = prob.model
 
         ivc = model.add_subsystem('ivc', om.IndepVarComp())
@@ -114,6 +100,8 @@ class TestReportsSystem(unittest.TestCase):
         model.add_subsystem('obj', om.ExecComp('obj = sum(x**2)', obj=1., x=np.ones(shape)))
         model.add_subsystem('con', om.ExecComp('y=x', shape=shape))
         model.add_subsystem('con2', om.ExecComp('y=sin(x)', shape=shape))
+        model.add_subsystem('con3', om.ExecComp('y=.2*x', shape=shape), promotes_inputs=['x'])
+        model.add_subsystem('con4', om.ExecComp('y=cos(x)', shape=shape), promotes_inputs=['x'])
 
         model.connect('ivc.x', 'comp.x')
         model.connect('ivc.y', 'comp.y')
@@ -124,10 +112,13 @@ class TestReportsSystem(unittest.TestCase):
         model.add_design_var('ivc.x', lower=0.0, upper=1.0)
         model.add_design_var('ivc.y', lower=0.0, upper=1.0)
         model.add_design_var('ivc.z', lower=0.0, upper=1.0)
+        model.add_design_var('x', lower=0.0, upper=1.0)
 
         model.add_objective('obj.obj')
 
         model.add_constraint('con.y', lower=0.0, linear=True)
+        model.add_constraint('con3.y', lower=0.0, linear=True)
+        model.add_constraint('con4.y', lower=0.0)
         model.add_constraint('con2.y', lower=0.0)
 
         prob.setup(check=False)
@@ -209,8 +200,34 @@ class TestReportsSystem(unittest.TestCase):
         self.assertTrue(path.is_file(), f'The optimizer report file, {str(path)}, was not found')
 
     @hooks_active
-    def test_report_generation_linear_only_dv_scaling_report(self):
-        prob = self.setup_and_run_w_linear_only_dvs(reports=['scaling'])
+    def test_report_generation_linear_only_dv_scaling_report_pyoptsparse(self):
+        if not OPTIMIZER:
+            raise unittest.SkipTest("This test requires pyOptSparseDriver.")
+
+        driver = om.pyOptSparseDriver(optimizer='IPOPT')
+        driver.declare_coloring()
+
+        driver.opt_settings['max_iter'] = 1000
+        driver.opt_settings['print_level'] = 5
+        driver.opt_settings['mu_strategy'] = 'monotone'
+        driver.opt_settings['alpha_for_y'] = 'safer-min-dual-infeas'
+        driver.opt_settings['tol'] = 1.0E-4
+        driver.opt_settings['constr_viol_tol'] = 1.0E-4
+
+        prob = self.setup_and_run_w_linear_only_dvs(driver=driver, reports=['scaling'], shape=(9,7))
+
+        # get the path to the problem subdirectory
+        problem_reports_dir = prob.get_reports_dir()
+
+        path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
+        self.assertTrue(path.is_file(), f'The scaling report file, {str(path)} was not found')
+
+    @hooks_active
+    def test_report_generation_linear_only_dv_scaling_report_scipyopt(self):
+        driver = om.ScipyOptimizeDriver(optimizer='SLSQP')
+        driver.declare_coloring()
+
+        prob = self.setup_and_run_w_linear_only_dvs(driver=driver, reports=['scaling'], shape=(9,7))
 
         # get the path to the problem subdirectory
         problem_reports_dir = prob.get_reports_dir()

@@ -1209,12 +1209,12 @@ class TestProblem(unittest.TestCase):
     def test_setup_bad_mode(self):
         # Test error message when passing bad mode to setup.
 
-        prob = om.Problem(name='foo')
+        prob = om.Problem(name='xfoo')
 
         try:
             prob.setup(mode='junk')
         except ValueError as err:
-            msg = "Problem foo: Unsupported mode: 'junk'. Use either 'fwd' or 'rev'."
+            msg = "Problem xfoo: Unsupported mode: 'junk'. Use either 'fwd' or 'rev'."
             self.assertEqual(str(err), msg)
         else:
             self.fail('Expecting ValueError')
