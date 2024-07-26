@@ -1,5 +1,6 @@
 """Define the ImplicitComponent class."""
 
+from functools import partial
 from scipy.sparse import coo_matrix
 import numpy as np
 from types import MethodType
@@ -14,7 +15,7 @@ from openmdao.utils.general_utils import format_as_float_or_array, _subjac_meta2
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.jax_utils import jax, jit, JaxCompPyTreeWrapper
+from openmdao.utils.jax_utils import jax, jit, custom_jvp, JaxCompPyTreeWrapper
 
 
 _tuplist = (tuple, list)
@@ -903,7 +904,84 @@ class ImplicitComponent(Component):
         yield from inputs.values()
         yield from outputs.values()
 
+    @partial(jax.custom_vjp, nondiff_argnums=(0,))
+    def _jax_solve_nl_jvp(self):
+        pass
+
+    @_jax_solve_nl_jvp.defjvp
+    def _solve_nl_custom_jvp(self, primals, tangents):
+        primal_out = self._jax_solve_nl_jvp()
+
     def _setup_jax(self):
+
+# @custom_jvp
+# def f(x, y):
+#   return jnp.sin(x) * y
+
+# @f.defjvp
+# def f_jvp(primals, tangents):
+#   x, y = primals
+#   x_dot, y_dot = tangents
+#   primal_out = f(x, y)
+#   tangent_out = jnp.cos(x) * x_dot * y + jnp.sin(x) * y_dot
+#   return primal_out, tangent_out
+
+
+# Equivalent alternative using the defjvps convenience wrapper
+# @custom_jvp
+# def f(x, y):
+#   return jnp.sin(x) * y
+
+# f.defjvps(lambda x_dot, primal_out, x, y: jnp.cos(x) * x_dot * y,
+#           lambda y_dot, primal_out, x, y: jnp.sin(x) * y_dot)
+
+
+
+
+# custom ode deriv using custom_jvp
+# odeint_rk4 = jax.custom_jvp(odeint_rk4, nondiff_argnums=(0,))
+
+# @odeint_rk4.defjvp
+# def odeint_rk4_jvp(f, primals, tangents):
+#   y0, t, *args = primals
+#   delta_y0, _, *delta_args = tangents
+#   nargs = len(args)
+
+#   def f_aug(aug_state, t, *args_and_delta_args):
+#     primal_state, tangent_state = aug_state
+#     args, delta_args = args_and_delta_args[:nargs], args_and_delta_args[nargs:]
+#     primal_dot, tangent_dot = jax.jvp(f, (primal_state, t, *args), (tangent_state, 0., *delta_args))
+#     return jnp.stack([primal_dot, tangent_dot])
+
+#   aug_init_state = jnp.stack([y0, delta_y0])
+#   aug_states = odeint_rk4(f_aug, aug_init_state, t, *args, *delta_args)
+#   ys, ys_dot = aug_states[:, 0, :], aug_states[:, 1, :]
+#   return ys, ys_dot
+
+
+
+# example of custom_vjp
+
+# @partial(jax.custom_vjp, nondiff_argnums=(0, 1))
+# def fixed_point_layer(solver, f, params, x):
+#   z_star = solver(lambda z: f(params, x, z), z_init=jnp.zeros_like(x))
+#   return z_star
+
+# def fixed_point_layer_fwd(solver, f, params, x):
+#   z_star = fixed_point_layer(solver, f, params, x)
+#   return z_star, (params, x, z_star)
+
+# def fixed_point_layer_bwd(solver, f, res, z_star_bar):
+#   params, x, z_star = res
+#   _, vjp_a = jax.vjp(lambda params, x: f(params, x, z_star), params, x)
+#   _, vjp_z = jax.vjp(lambda z: f(params, x, z), z_star)
+#   return vjp_a(solver(lambda u: vjp_z(u)[0] + z_star_bar,
+#                       z_init=jnp.zeros_like(z_star)))
+
+# fixed_point_layer.defvjp(fixed_point_layer_fwd, fixed_point_layer_bwd)
+
+
+
         # we define linearize here instead of making this the base class version as we
         # did with apply_nonlinear, because the existence of a linearize method that is not the
         # base class method is used to determine if a given component computes its own partials.

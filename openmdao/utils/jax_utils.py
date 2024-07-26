@@ -41,11 +41,11 @@ try:
     import jax
     jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
     import jax.numpy as jnp
-    from jax import jit, tree_util
+    from jax import jit, tree_util, custom_jvp
 except ImportError:
     jax = None
+    custom_jvp = lambda f: f
     jnp = np
-
     jit = jit_stub
 
 
