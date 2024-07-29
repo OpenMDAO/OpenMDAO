@@ -49,7 +49,7 @@ from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.array_utils import scatter_dist_to_local
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
-    clear_reports, _load_report_plugins
+    clear_reports, get_reports_dir, _load_report_plugins
 from openmdao.utils.general_utils import pad_name, LocalRangeIterable, \
     _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
@@ -956,7 +956,7 @@ class Problem(object):
             'name': self._name,  # the name of this Problem
             'pathname': None,  # the pathname of this Problem in the current tree of Problems
             'comm': comm,
-            'coloring_dir': _DEFAULT_COLORING_DIR,  # directory for coloring files
+            'coloring_dir': _DEFAULT_COLORING_DIR,  # directory for input coloring files
             'recording_iter': _RecIteration(comm.rank),  # manager of recorder iterations
             'local_vector_class': local_vector_class,
             'distributed_vector_class': distributed_vector_class,
@@ -2546,9 +2546,7 @@ class Problem(object):
 
     def get_coloring_dir(self, mode, mkdir=False):
         """
-        Get the path to the directory where the report files should go.
-
-        If it doesn't exist, it will be created.
+        Get the path to the directory for the coloring files.
 
         Parameters
         ----------
