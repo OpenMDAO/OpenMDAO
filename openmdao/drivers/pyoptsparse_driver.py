@@ -207,6 +207,7 @@ class pyOptSparseDriver(Driver):
         self.supports['multiple_objectives'] = True
         self.supports['two_sided_constraints'] = True
         self.supports['linear_constraints'] = True
+        self.supports['linear_only_designvars'] = True
         self.supports['simultaneous_derivatives'] = True
         self.supports['total_jac_sparsity'] = True
 
@@ -936,11 +937,11 @@ class pyOptSparseDriver(Driver):
 
         use_approx = self._problem().model._owns_approx_of is not None
 
-        # exclude linear cons
+        # exclude linear cons and dvs that only impact linear cons
         for con, conmeta in filter_by_meta(self._cons.items(), 'linear', exclude=True):
             self._con_subjacs[con] = {}
             consrc = conmeta['source']
-            for dv, dvmeta in self._designvars.items():
+            for dv, dvmeta in self._nl_dvs.items():
                 if use_approx:
                     dvsrc = dvmeta['source']
                     rows, cols, shape = total_sparsity[consrc][dvsrc]

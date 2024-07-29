@@ -5105,12 +5105,15 @@ class Group(System):
         if wrt is None:
             lincons = [d for d, meta in driver._cons.items() if meta['linear']]
             if lincons:
-                if len(lincons) == len(driver._cons):  # all constraints are linear
-                    driver_wrt = list(driver._lin_dvs)
+                if len(lincons) == len(driver._responses):  # all 'ofs' are linear
+                    driver_wrt = list(driver._lin_dvs if driver.supports['linear_only_designvars']
+                                      else driver._designvars)
                 else:  # mixed linear and nonlinear constraints
-                    driver_wrt = list(driver._designvars)
+                    driver_wrt = list(driver._nl_dvs if driver.supports['linear_only_designvars']
+                                      else driver._designvars)
             else:
-                driver_wrt = list(driver._nl_dvs)
+                driver_wrt = list(driver._nl_dvs if driver.supports['linear_only_designvars']
+                                  else driver._designvars)
 
             wrt = driver_wrt
             if not wrt:

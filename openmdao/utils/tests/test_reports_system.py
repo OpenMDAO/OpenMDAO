@@ -5,6 +5,8 @@ import sys
 import os
 from io import StringIO
 
+import numpy as np
+
 import openmdao.api as om
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.groups.parallel_groups import Diamond
@@ -84,6 +86,47 @@ class TestReportsSystem(unittest.TestCase):
 
         return prob
 
+    def setup_and_run_w_linear_only_dvs(self, driver, reports=_UNDEFINED, reports_dir=_UNDEFINED, shape=3):
+        prob = om.Problem(reports=reports)
+        prob.driver = driver
+        model = prob.model
+
+        ivc = model.add_subsystem('ivc', om.IndepVarComp())
+        ivc.add_output('x', np.ones(shape))
+        ivc.add_output('y', np.ones(shape))
+        ivc.add_output('z', np.ones(shape))
+
+        model.add_subsystem('comp', om.ExecComp('f_xy=x*2.-y*3.', shape=shape))
+        model.add_subsystem('obj', om.ExecComp('obj = sum(x**2)', obj=1., x=np.ones(shape)))
+        model.add_subsystem('con', om.ExecComp('y=x', shape=shape))
+        model.add_subsystem('con2', om.ExecComp('y=sin(x)', shape=shape))
+        model.add_subsystem('con3', om.ExecComp('y=.2*x', shape=shape), promotes_inputs=['x'])
+        model.add_subsystem('con4', om.ExecComp('y=cos(x)', shape=shape), promotes_inputs=['x'])
+
+        model.connect('ivc.x', 'comp.x')
+        model.connect('ivc.y', 'comp.y')
+        model.connect('comp.f_xy', 'obj.x')
+        model.connect('ivc.z', 'con.x')
+        model.connect('ivc.x', 'con2.x')
+
+        model.add_design_var('ivc.x', lower=0.0, upper=1.0)
+        model.add_design_var('ivc.y', lower=0.0, upper=1.0)
+        model.add_design_var('ivc.z', lower=0.0, upper=1.0)
+        model.add_design_var('x', lower=0.0, upper=1.0)
+
+        model.add_objective('obj.obj')
+
+        model.add_constraint('con.y', lower=0.0, linear=True)
+        model.add_constraint('con3.y', lower=0.0, linear=True)
+        model.add_constraint('con4.y', lower=0.0)
+        model.add_constraint('con2.y', lower=0.0)
+
+        prob.setup(check=False)
+        prob.run_driver()
+        prob.cleanup()
+
+        return prob
+
     def setup_problem_w_errors(self, prob_name, driver=None, reports=_UNDEFINED, reports_dir=_UNDEFINED):
         prob = om.Problem(reports=reports, name=prob_name)
         model = prob.model
@@ -155,6 +198,42 @@ class TestReportsSystem(unittest.TestCase):
         self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
         path = pathlib.Path(problem_reports_dir).joinpath(self.optimizer_filename)
         self.assertTrue(path.is_file(), f'The optimizer report file, {str(path)}, was not found')
+
+    @hooks_active
+    def test_report_generation_linear_only_dv_scaling_report_pyoptsparse(self):
+        if not OPTIMIZER:
+            raise unittest.SkipTest("This test requires pyOptSparseDriver.")
+
+        driver = om.pyOptSparseDriver(optimizer='IPOPT')
+        driver.declare_coloring()
+
+        driver.opt_settings['max_iter'] = 1000
+        driver.opt_settings['print_level'] = 5
+        driver.opt_settings['mu_strategy'] = 'monotone'
+        driver.opt_settings['alpha_for_y'] = 'safer-min-dual-infeas'
+        driver.opt_settings['tol'] = 1.0E-4
+        driver.opt_settings['constr_viol_tol'] = 1.0E-4
+
+        prob = self.setup_and_run_w_linear_only_dvs(driver=driver, reports=['scaling'], shape=(9,7))
+
+        # get the path to the problem subdirectory
+        problem_reports_dir = prob.get_reports_dir()
+
+        path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
+        self.assertTrue(path.is_file(), f'The scaling report file, {str(path)} was not found')
+
+    @hooks_active
+    def test_report_generation_linear_only_dv_scaling_report_scipyopt(self):
+        driver = om.ScipyOptimizeDriver(optimizer='SLSQP')
+        driver.declare_coloring()
+
+        prob = self.setup_and_run_w_linear_only_dvs(driver=driver, reports=['scaling'], shape=(9,7))
+
+        # get the path to the problem subdirectory
+        problem_reports_dir = prob.get_reports_dir()
+
+        path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
+        self.assertTrue(path.is_file(), f'The scaling report file, {str(path)} was not found')
 
     @hooks_active
     def test_report_generation_on_error(self):
