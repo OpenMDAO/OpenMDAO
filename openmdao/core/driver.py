@@ -1619,11 +1619,11 @@ class Driver(object):
                               "already been computed.")
 
             if self._coloring_info.dynamic and self._coloring_info.do_compute_coloring():
-                    ofname = self._get_total_coloring_fname(mode='output')
-                    self._coloring_info.coloring = \
-                        coloring_mod.dynamic_total_coloring(self,
-                                                            run_model=run_model,
-                                                            fname=ofname)
+                ofname = self._get_total_coloring_fname(mode='output')
+                self._coloring_info.coloring = \
+                    coloring_mod.dynamic_total_coloring(self,
+                                                        run_model=run_model,
+                                                        fname=ofname)
 
             return self._coloring_info.coloring
 
