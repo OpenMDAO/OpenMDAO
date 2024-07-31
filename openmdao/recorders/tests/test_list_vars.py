@@ -131,7 +131,7 @@ class ListVarsTest(unittest.TestCase):
         p.run_driver()
         p.cleanup()
 
-        cr = om.CaseReader(prob.get_outputs_dir() / "driver_cases.db")
+        cr = om.CaseReader(p.get_outputs_dir() / "driver_cases.db")
         case = cr.get_case(-1)
 
         prob_out = io.StringIO()
