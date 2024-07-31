@@ -106,7 +106,10 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs = {"x": [1.0, ], "z": [5.0, 2.0]}
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
-        assertDriverIterDataRecorded(self, expected_data, self.eps)
+        assertDriverIterDataRecorded(self,
+                                     prob.get_outputs_dir() / self.filename,
+                                     expected_data,
+                                     self.eps)
 
     def test_add_recorder_after_setup(self):
         prob = SellarProblem(nonlinear_solver=om.NonlinearBlockGS,
@@ -128,7 +131,10 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs = {"x": [1.0, ], "z": [5.0, 2.0]}
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
-        assertDriverIterDataRecorded(self, expected_data, self.eps)
+        assertDriverIterDataRecorded(self,
+                                     prob.get_outputs_dir() / self.filename,
+                                     expected_data,
+                                     self.eps)
 
     def test_only_objectives_recorded(self):
         prob = SellarProblem(nonlinear_solver=om.NonlinearBlockGS,
@@ -150,7 +156,10 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs = expected_objectives
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
-        assertDriverIterDataRecorded(self, expected_data, self.eps)
+        assertDriverIterDataRecorded(self, 
+                                     prob.get_outputs_dir() / self.filename,
+                                     expected_data,
+                                     self.eps)
 
     def test_only_constraints_recorded(self):
         prob = SellarProblem(nonlinear_solver=om.NonlinearBlockGS,
@@ -175,7 +184,10 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs = expected_constraints
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
-        assertDriverIterDataRecorded(self, expected_data, self.eps)
+        assertDriverIterDataRecorded(self, 
+                                     prob.get_outputs_dir() / self.filename,
+                                     expected_data,
+                                     self.eps)
 
     def test_simple_driver_recording(self):
         prob = ParaboloidProblem()
@@ -211,7 +223,10 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs, None),)
-        assertDriverIterDataRecorded(self, expected_data, self.eps)
+        assertDriverIterDataRecorded(self, 
+                                     prob.get_outputs_dir() / self.filename,
+                                     expected_data, 
+                                     self.eps)
 
         expected_derivs = {
             "f_xy!x": np.array([[0.50120438]]),
@@ -221,7 +236,10 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_data = ((coordinate, (t0, t1), expected_derivs),)
-        assertDriverDerivDataRecorded(self, expected_data, self.eps)
+        assertDriverDerivDataRecorded(self, 
+                                     prob.get_outputs_dir() / self.filename,
+                                     expected_data, 
+                                     self.eps)
 
     def test_recorder_setup_timing(self):
         prob = ParaboloidProblem(driver=om.ScipyOptimizeDriver(disp=False))
@@ -285,11 +303,11 @@ class TestSqliteRecorder(unittest.TestCase):
             'rank0:'                          # after second run_driver
         ]
 
-        cr = om.CaseReader('cases1.sql')
+        cr = om.CaseReader(prob.get_outputs_dir() / 'cases1.sql')
         for i, case_id in enumerate(cr.list_cases(out_stream=None)):
             self.assertEqual(case_id, expected[i])
 
-        cr = om.CaseReader('cases2.sql')
+        cr = om.CaseReader(prob.get_outputs_dir() / 'cases2.sql')
         for i, case_id in enumerate(cr.list_cases(out_stream=None)):
             self.assertEqual(case_id, expected[i+6])
 
@@ -355,7 +373,10 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs = expected_constraints
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
-        assertDriverIterDataRecorded(self, expected_data, self.eps)
+        assertDriverIterDataRecorded(self, 
+                                     prob.get_outputs_dir() / self.filename,
+                                     expected_data, 
+                                     self.eps)
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SLSQP")
@@ -397,7 +418,10 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs, None),)
-        assertDriverIterDataRecorded(self, expected_data, self.eps)
+        assertDriverIterDataRecorded(self, 
+                                     prob.get_outputs_dir() / self.filename,
+                                     expected_data, 
+                                     self.eps)
 
         expected_derivs = {
             "f_xy!x": np.array([[0.50120438]]),
@@ -407,12 +431,15 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_data = ((coordinate, (t0, t1), expected_derivs),)
-        assertDriverDerivDataRecorded(self, expected_data, self.eps)
+        assertDriverDerivDataRecorded(self, 
+                                     prob.get_outputs_dir() / self.filename,
+                                     expected_data, 
+                                     self.eps)
 
     def test_double_run_driver_option_overwrite(self):
         prob = ParaboloidProblem()
 
-        driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+        prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
 
         prob.model.add_recorder(self.recorder)
 
@@ -420,7 +447,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.set_solver_print(0)
         prob.run_driver()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         self.assertTrue(cr._system_options['root']['component_options']['assembled_jac_type'], 'csc')
 
@@ -429,7 +456,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename,)
         self.assertTrue(cr._system_options['root!1']['component_options']['assembled_jac_type'], 'dense')
 
         stream = StringIO()
@@ -521,7 +548,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.set_solver_print(0)
         prob.run_model()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         self.assertTrue(cr._system_options['root']['component_options']['assembled_jac_type'], 'csc')
 
@@ -530,7 +557,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         self.assertTrue(cr._system_options['root!1']['component_options']['assembled_jac_type'], 'dense')
 
         stream = StringIO()
@@ -650,12 +677,14 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = (
             (run1_coord, (run1_t0, run1_t1), expected_outputs, expected_inputs, None),
         )
-        assertDriverIterDataRecorded(self, expected_data, self.eps, prefix='Run1')
+        assertDriverIterDataRecorded(self, prob.get_outputs_dir() / self.filename,
+                                     expected_data, self.eps, prefix='Run1')
 
         expected_data = (
             (run2_coord, (run2_t0, run2_t1), expected_outputs, expected_inputs, None),
         )
-        assertDriverIterDataRecorded(self, expected_data, self.eps, prefix='Run2')
+        assertDriverIterDataRecorded(self, prob.get_outputs_dir() / self.filename, 
+                                     expected_data, self.eps, prefix='Run2')
 
         expected_derivs = {
             "f_xy!x": np.array([[0.50120438]]),
@@ -667,7 +696,11 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = (
             (run1_coord, (run1_t0, run1_t1), expected_derivs),
         )
-        assertDriverDerivDataRecorded(self, expected_data, self.eps, prefix='Run1')
+        assertDriverDerivDataRecorded(self, 
+                                     prob.get_outputs_dir() / self.filename,
+                                     expected_data, 
+                                     self.eps, 
+                                     prefix='Run1')
 
     def test_driver_everything_recorded_by_default(self):
         prob = ParaboloidProblem()
@@ -699,7 +732,10 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs.update(expected_constraints)
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs, None),)
-        assertDriverIterDataRecorded(self, expected_data, self.eps)
+        assertDriverIterDataRecorded(self, 
+                                     prob.get_outputs_dir() / self.filename,
+                                     expected_data, 
+                                     self.eps)
 
     def test_driver_records_metadata(self):
         prob = SellarProblem(nonlinear_solver=om.NonlinearBlockGS,
@@ -758,13 +794,15 @@ class TestSqliteRecorder(unittest.TestCase):
             }
         }
 
-        assertMetadataRecorded(self, prom2abs, abs2prom)
+        assertMetadataRecorded(self, prob.get_outputs_dir() / self.filename, prom2abs, abs2prom)
         expected_problem_metadata = {
             'connections_list_length': 11,
             'tree_children_length': 6,
             'abs2prom': abs2prom,
         }
-        assertViewerDataRecorded(self, expected_problem_metadata)
+        assertViewerDataRecorded(self, 
+                                 prob.get_outputs_dir() / self.filename,
+                                 expected_problem_metadata)
 
     def test_deprecated_option(self):
         # check that deprecated options are recorded but no warning is issued
@@ -788,7 +826,7 @@ class TestSqliteRecorder(unittest.TestCase):
             'tree_children_length': 0,
             'abs2prom': {}
         }
-        data = assertViewerDataRecorded(self, expected_problem_metadata)
+        data = assertViewerDataRecorded(self, prob.get_outputs_dir() / self.filename, expected_problem_metadata)
         self.assertTrue('user_teriminate_signal' in data['driver']['options'],
                         'Deprecated key not found in recorded options')
 
@@ -805,7 +843,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.run_model()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         # Quick check to see that keys and values were recorded
         for key in ['root', '_auto_ivc', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
             self.assertTrue(key in cr._system_options.keys())
@@ -829,7 +867,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
         prob.cleanup()
-        cr = om.CaseReader("cases_driver.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases_driver.sql")
         # Quick check to see that keys and values were recorded
         for key in expected_system_options_keys:
             self.assertTrue(key in cr._system_options.keys())
@@ -845,7 +883,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
         prob.cleanup()
-        cr = om.CaseReader("cases_problem.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases_problem.sql")
         # Quick check to see that keys and values were recorded
         for key in expected_system_options_keys:
             self.assertTrue(key in cr._system_options.keys())
@@ -861,7 +899,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
         prob.cleanup()
-        cr = om.CaseReader("cases_subsystem.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases_subsystem.sql")
         # Quick check to see that keys and values were recorded
         for key in expected_system_options_keys:
             self.assertTrue(key in cr._system_options.keys())
@@ -877,7 +915,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
         prob.cleanup()
-        cr = om.CaseReader("cases_solver.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases_solver.sql")
         # Quick check to see that keys and values were recorded
         for key in expected_system_options_keys:
             self.assertTrue(key in cr._system_options.keys())
@@ -917,7 +955,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.final_setup()  # Conclude setup but don't run model.
         prob.cleanup()
 
-        assertViewerDataRecorded(self, None)
+        assertViewerDataRecorded(self, prob.get_outputs_dir() / self.filename, None)
 
     def test_record_system(self):
         prob = SellarProblem(nonlinear_solver=om.NonlinearBlockGS,
@@ -980,7 +1018,7 @@ class TestSqliteRecorder(unittest.TestCase):
                 {"obj_cmp.obj": [0.0]}
             ],
         ]
-        assertSystemIterDataRecorded(self, expected_data, self.eps)
+        assertSystemIterDataRecorded(self, prob.get_outputs_dir() / self.filename, expected_data, self.eps)
 
         # run again with prefix, only changes should be iter count reset and timestamps
         t0, t1 = run_driver(prob, case_prefix='Run#2')
@@ -994,7 +1032,8 @@ class TestSqliteRecorder(unittest.TestCase):
                                'NonlinearBlockGS', (0, ), 'obj_cmp._solve_nonlinear', (0, )]
         expected_data[1][1] = (t0, t1)
 
-        assertSystemIterDataRecorded(self, expected_data, self.eps, prefix='Run#2')
+        assertSystemIterDataRecorded(self, prob.get_outputs_dir() / self.filename,
+                                     expected_data, self.eps, prefix='Run#2')
 
     def test_includes(self):
         prob = ParaboloidProblem()
@@ -1035,7 +1074,8 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs, None),)
-        assertDriverIterDataRecorded(self, expected_data, self.eps)
+        assertDriverIterDataRecorded(self, prob.get_outputs_dir() / self.filename,
+                                     expected_data, self.eps)
 
     def test_includes_post_setup(self):
         prob = ParaboloidProblem()
@@ -1074,7 +1114,8 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs, None),)
-        assertDriverIterDataRecorded(self, expected_data, self.eps)
+        assertDriverIterDataRecorded(self, prob.get_outputs_dir() / self.filename,
+                                     expected_data, self.eps)
 
     def test_record_system_with_hierarchy(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce,
@@ -1132,7 +1173,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = (
             (coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),
         )
-        assertSystemIterDataRecorded(self, expected_data, self.eps)
+        assertSystemIterDataRecorded(self, prob.get_outputs_dir() / self.filename, expected_data, self.eps)
 
         #
         # check data for 'd2'
@@ -1160,7 +1201,8 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = (
             (coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),
         )
-        assertSystemIterDataRecorded(self, expected_data, self.eps)
+        assertSystemIterDataRecorded(self, prob.get_outputs_dir() / self.filename,
+                                     expected_data, self.eps)
 
     def test_record_solver(self):
         prob = SellarProblem(nonlinear_solver=om.NonlinearBlockGS,
@@ -1203,7 +1245,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
                           expected_solver_output, expected_solver_residuals),)
-        assertSolverIterDataRecorded(self, expected_data, self.eps)
+        assertSolverIterDataRecorded(self, prob.get_outputs_dir() / self.filename, expected_data, self.eps)
 
         #
         # run again with a prefix, iter_counts should be reset
@@ -1228,7 +1270,8 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
                           expected_solver_output, expected_solver_residuals),)
-        assertSolverIterDataRecorded(self, expected_data, self.eps, prefix='run_again')
+        assertSolverIterDataRecorded(self, prob.get_outputs_dir() / self.filename, 
+                                     expected_data, self.eps, prefix='run_again')
 
     def test_record_solver_includes_excludes(self):
         prob = om.Problem()
@@ -1257,7 +1300,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.run_driver()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         solver_cases = cr.list_cases('root.cycle.nonlinear_solver')
 
         # Test values from cases
@@ -1307,7 +1350,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.run_driver()
 
-        cr = om.CaseReader(filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / filename)
         solver_cases = cr.list_cases('root.cycle.nonlinear_solver')
 
         # Test values from cases
@@ -1362,7 +1405,8 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
                           expected_solver_output, expected_solver_residuals),)
-        assertSolverIterDataRecorded(self, expected_data, self.eps)
+        assertSolverIterDataRecorded(self, prob.get_outputs_dir() / self.filename,
+                                     expected_data, self.eps)
 
     def test_record_line_search_bounds_enforce(self):
         prob = SellarProblem(nonlinear_solver=om.NonlinearBlockGS,
@@ -1408,7 +1452,8 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_solver_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
                                  expected_solver_output, expected_solver_residuals),)
-        assertSolverIterDataRecorded(self, expected_solver_data, self.eps)
+        assertSolverIterDataRecorded(self, prob.get_outputs_dir() / self.filename,
+                                     expected_solver_data, self.eps)
 
     def test_record_pop_bug(self):
         prob = SellarProblem(nonlinear_solver=om.NonlinearBlockGS,
@@ -1474,7 +1519,8 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
                           expected_solver_output, expected_solver_residuals),)
-        assertSolverIterDataRecorded(self, expected_data, self.eps)
+        assertSolverIterDataRecorded(self, prob.get_outputs_dir() / self.filename,
+                                     expected_data, self.eps)
 
     def test_record_solver_nonlinear_block_jac(self):
         prob = SellarProblem(linear_solver=om.LinearBlockGS, nonlinear_solver=om.NonlinearBlockJac)
@@ -1505,7 +1551,8 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
                           expected_solver_output, expected_solver_residuals),)
-        assertSolverIterDataRecorded(self, expected_data, self.eps)
+        assertSolverIterDataRecorded(self, prob.get_outputs_dir() / self.filename,
+                                     expected_data, self.eps)
 
     def test_record_solver_nonlinear_newton(self):
         prob = SellarProblem(
@@ -1538,7 +1585,8 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
                           expected_solver_output, expected_solver_residuals),)
-        assertSolverIterDataRecorded(self, expected_data, self.eps)
+        assertSolverIterDataRecorded(self, prob.get_outputs_dir() / self.filename,
+                                     expected_data, self.eps)
 
     def test_record_solver_nonlinear_broyden(self):
         prob = SellarProblem(
@@ -1572,12 +1620,13 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
                           expected_solver_output, expected_solver_residuals),)
-        assertSolverIterDataRecorded(self, expected_data, self.eps)
+        assertSolverIterDataRecorded(self, prob.get_outputs_dir() / self.filename,
+                                     expected_data, self.eps)
 
         # Also check to make sure the first iteration has correct abs and rel errors
         # as a regression test for
         #   https://github.com/OpenMDAO/OpenMDAO/issues/2435
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         solver_cases = cr.get_cases("root.nonlinear_solver")
         self.assertAlmostEqual(solver_cases[0].abs_err, 2.254514106, delta=1e-6)
@@ -1613,7 +1662,8 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
                           expected_solver_output, expected_solver_residuals),)
-        assertSolverIterDataRecorded(self, expected_data, self.eps)
+        assertSolverIterDataRecorded(self, prob.get_outputs_dir() / self.filename,
+                                     expected_data, self.eps)
 
     def test_record_solver_linear(self):
         # adding a recorder to a linear solver should raise an error
@@ -1703,7 +1753,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs.update(expected_constraints)
 
         expected_driver_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
-        assertDriverIterDataRecorded(self, expected_driver_data, self.eps)
+        assertDriverIterDataRecorded(self, prob.get_outputs_dir() / self.filename, expected_driver_data, self.eps)
 
         #
         # System recording test
@@ -1718,7 +1768,8 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_system_data = (
             (coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),
         )
-        assertSystemIterDataRecorded(self, expected_system_data, self.eps)
+        assertSystemIterDataRecorded(self, prob.get_outputs_dir() / self.filename,
+                                     expected_system_data, self.eps)
 
         #
         # Solver recording test
@@ -1741,7 +1792,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_solver_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
                                  expected_solver_output, expected_solver_residuals),)
-        assertSolverIterDataRecorded(self, expected_solver_data, self.eps)
+        assertSolverIterDataRecorded(self, prob.get_outputs_dir() / self.filename, expected_solver_data, self.eps)
 
     def test_global_counter(self):
         # The case recorder maintains a global counter across all recordings
@@ -1761,7 +1812,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         # get global counter values from driver, system, and solver recording
-        con = sqlite3.connect(self.filename)
+        con = sqlite3.connect(prob.get_outputs_dir() / self.filename)
         cur = con.cursor()
         cur.execute("SELECT counter FROM driver_iterations")
         counters_driver = set(i[0] for i in cur.fetchall())
@@ -1828,7 +1879,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = (
             (coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),
         )
-        assertSystemIterDataRecorded(self, expected_data, self.eps)
+        assertSystemIterDataRecorded(self, prob.get_outputs_dir() / self.filename, expected_data, self.eps)
 
     def test_multidimensional_arrays(self):
         # component TestExplCompArray, put in a model and run it; its outputs are multi-d-arrays.
@@ -1872,7 +1923,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = (
             (coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),
         )
-        assertSystemIterDataRecorded(self, expected_data, self.eps)
+        assertSystemIterDataRecorded(self, prob.get_outputs_dir() / self.filename, expected_data, self.eps)
 
     def test_record_system_recursively(self):
         # Test adding recorders to all Systems using the recurse option to add_recorder
@@ -1892,7 +1943,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         # Just make sure all Systems had some metadata recorded
-        assertSystemMetadataIdsRecorded(self, [
+        assertSystemMetadataIdsRecorded(self, prob.get_outputs_dir() / self.filename, [
             'root',
             '_auto_ivc',
             'mda',
@@ -1904,7 +1955,7 @@ class TestSqliteRecorder(unittest.TestCase):
         ])
 
         # Make sure all the Systems are recorded
-        assertSystemIterCoordsRecorded(self, [
+        assertSystemIterCoordsRecorded(self, prob.get_outputs_dir() / self.filename,[
             'rank0:root._solve_nonlinear|0',
             'rank0:root._solve_nonlinear|0|NLRunOnce|0|con_cmp1._solve_nonlinear|0',
             'rank0:root._solve_nonlinear|0|NLRunOnce|0|con_cmp2._solve_nonlinear|0',
@@ -1931,7 +1982,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         # Just make sure all Systems had some metadata recorded
-        assertSystemMetadataIdsRecorded(self, [
+        assertSystemMetadataIdsRecorded(self, prob.get_outputs_dir() / self.filename, [
             'root',
             '_auto_ivc',
             'mda',
@@ -1943,7 +1994,7 @@ class TestSqliteRecorder(unittest.TestCase):
         ])
 
         # Make sure all the Systems are recorded at least once
-        assertSystemIterCoordsRecorded(self, [
+        assertSystemIterCoordsRecorded(self, prob.get_outputs_dir() / self.filename, [
             'Run1_rank0:root._solve_nonlinear|0',
             'Run1_rank0:root._solve_nonlinear|0|NLRunOnce|0|con_cmp1._solve_nonlinear|0',
             'Run1_rank0:root._solve_nonlinear|0|NLRunOnce|0|con_cmp2._solve_nonlinear|0',
@@ -2009,7 +2060,8 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs.update(expected_sysincludes)
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
-        assertDriverIterDataRecorded(self, expected_data, self.eps)
+        assertDriverIterDataRecorded(self, prob.get_outputs_dir() / self.filename,
+                                     expected_data, self.eps)
 
     def test_recorder_file_already_exists_no_append(self):
         prob = SellarProblem(nonlinear_solver=om.NonlinearBlockGS,
@@ -2047,7 +2099,8 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs = {"x": [1.0, ], "z": [5.0, 2.0]}
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
-        assertDriverIterDataRecorded(self, expected_data, self.eps)
+        assertDriverIterDataRecorded(self, prob.get_outputs_dir() / self.filename,
+                                     expected_data, self.eps)
 
     def test_recorder_cleanup(self):
         def assert_closed(self, recorder):
@@ -2113,7 +2166,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.record('final')
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         problem_cases = cr.list_cases('problem')
         self.assertEqual(len(problem_cases), 1)
@@ -2145,7 +2198,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.record('final')
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         # Just do some simple tests to make sure things were recorded
         problem_cases = cr.list_cases('problem')
@@ -2173,7 +2226,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.record('final')
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         problem_cases = cr.list_cases('problem')
         self.assertEqual(len(problem_cases), 1)
@@ -2215,7 +2268,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.record('final')
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         problem_cases = cr.list_cases('problem')
         self.assertEqual(len(problem_cases), 1)
@@ -2249,7 +2302,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.set_solver_print(0)
         prob.run_driver()
         prob.record('case1')
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         final_case = cr.get_case('case1')
         self.assertEqual(final_case.residuals, None)
 
@@ -2258,7 +2311,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.run_driver()
         prob.record('case2')
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         final_case = cr.get_case('case2')
         self.assertEqual(set(final_case.inputs.keys()), {'y', 'x'})
         self.assertAlmostEqual(final_case.inputs['comp.y'][0], -7.833333333333334)
@@ -2270,7 +2323,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.run_driver()
         prob.record('case3')
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         final_case = cr.get_case('case3')
         self.assertEqual(set(final_case.inputs.keys()), {'x'})
 
@@ -2280,7 +2333,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.run_driver()
         prob.record('case4')
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         final_case = cr.get_case('case4')
         self.assertEqual(set(final_case.inputs.keys()), {'y'})
 
@@ -2292,7 +2345,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.run_driver()
         prob.record('case5')
         prob.cleanup()
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         final_case = cr.get_case('case5')
         self.assertEqual(final_case.residuals, None)
 
@@ -2310,7 +2363,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.run_driver()
 
         prob.record('final')
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         final_case = cr.get_case('final')
         self.assertEqual(set(final_case.residuals.keys()), {'f_xy', 'y', 'x', 'c'})
         self.assertAlmostEqual(final_case.residuals['f_xy'][0], 0.0)
@@ -2321,7 +2374,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.run_driver()
         prob.record('final2')
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         final_case = cr.get_case('final2')
         self.assertEqual(set(final_case.residuals.keys()), {'x'})
 
@@ -2333,7 +2386,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.run_driver()
         prob.record('final3')
         prob.cleanup()
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         final_case = cr.get_case('final3')
         self.assertEqual(final_case.residuals, None)
 
@@ -2351,7 +2404,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.run_driver()
 
         prob.record('final')
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         final_case = cr.get_case('final')
         self.assertEqual(set(final_case.residuals.keys()), {'f_xy', 'y', 'x', 'c'})
         self.assertAlmostEqual(final_case.residuals['f_xy'][0], 0.0)
@@ -2362,7 +2415,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.run_driver()
         prob.record('final2')
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         final_case = cr.get_case('final2')
         self.assertEqual(set(final_case.residuals.keys()), {'x'})
 
@@ -2374,7 +2427,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.run_driver()
         prob.record('final3')
         prob.cleanup()
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         final_case = cr.get_case('final3')
         self.assertEqual(final_case.residuals, None)
 
@@ -2405,7 +2458,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         # get the cases from the problem and solver recording
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         final_case = cr.get_case('final')
         root_solver_cases = cr.list_cases('root.nonlinear_solver', recurse=False)
         last_root_solver_case = cr.get_case(root_solver_cases[-1])
@@ -2450,7 +2503,7 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
-        assertDriverIterDataRecorded(self, expected_data, self.eps)
+        assertDriverIterDataRecorded(self, prob.get_outputs_dir() / self.filename, expected_data, self.eps)
 
         # run again with includes and excludes
         self.recorder.delete_recordings()
@@ -2464,7 +2517,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "p1.x": 7.16666667,
         }
         expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
-        assertDriverIterDataRecorded(self, expected_data, self.eps)
+        assertDriverIterDataRecorded(self, prob.get_outputs_dir() / self.filename, expected_data, self.eps)
 
 
         # run again with record_residuals = False
@@ -2477,7 +2530,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         expected_data = ((coordinate, (t0, t1), None, None, None),)
-        assertDriverIterDataRecorded(self, expected_data, self.eps)
+        assertDriverIterDataRecorded(self, prob.get_outputs_dir() / self.filename, expected_data, self.eps)
 
     def test_driver_record_residuals(self):
 
@@ -2506,7 +2559,7 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_data = ((coordinate, (t0, t1), None, None, expected_residuals),)
-        assertDriverIterDataRecorded(self, expected_data, self.eps)
+        assertDriverIterDataRecorded(self, prob.get_outputs_dir() / self.filename, expected_data, self.eps)
 
 
         # run again with includes and excludes
@@ -2521,7 +2574,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "p1.x": 0.0,
         }
         expected_data = ((coordinate, (t0, t1), None, None, expected_residuals),)
-        assertDriverIterDataRecorded(self, expected_data, self.eps)
+        assertDriverIterDataRecorded(self, prob.get_outputs_dir() / self.filename, expected_data, self.eps)
 
 
         # run again with record_residuals = False
@@ -2534,7 +2587,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         expected_data = ((coordinate, (t0, t1), None, None, None),)
-        assertDriverIterDataRecorded(self, expected_data, self.eps)
+        assertDriverIterDataRecorded(self, prob.get_outputs_dir() / self.filename , expected_data, self.eps)
 
     def test_problem_record_options_includes(self):
         model = SellarDerivatives(nonlinear_solver=om.NonlinearBlockGS,
@@ -2558,7 +2611,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.record('final')
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         problem_cases = cr.list_cases('problem')
         self.assertEqual(len(problem_cases), 1)
@@ -2599,7 +2652,7 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_data = ((case_name, (t0, t1), expected_derivs),)
-        assertProblemDerivDataRecorded(self, expected_data, self.eps)
+        assertProblemDerivDataRecorded(self, prob.get_outputs_dir() / self.filename, expected_data, self.eps)
 
     def test_problem_recording_derivatives_option_false(self):
         prob = ParaboloidProblem()
@@ -2617,7 +2670,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_derivs = None
         expected_data = ((case_name, (t0, t1), expected_derivs),)
-        assertProblemDerivDataRecorded(self, expected_data, self.eps)
+        assertProblemDerivDataRecorded(self, prob.get_outputs_dir() / self.filename, expected_data, self.eps)
 
     def test_problem_recording_derivatives_no_voi(self):
 
@@ -2635,7 +2688,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         problem_cases = cr.list_cases('problem')
         self.assertEqual(len(problem_cases), 1)
@@ -2644,7 +2697,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_derivs = None
 
         expected_data = ((case_name, (t0, t1), expected_derivs),)
-        assertProblemDerivDataRecorded(self, expected_data, self.eps)
+        assertProblemDerivDataRecorded(self, prob.get_outputs_dir() / self.filename, expected_data, self.eps)
 
     def test_simple_paraboloid_scaled_desvars(self):
         prob = om.Problem()
@@ -2677,7 +2730,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         # Test values from one case, the last case
         driver_cases = cr.list_cases('driver')
@@ -2737,7 +2790,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         case = cr.get_case(-1)
 
         dvs = case.get_design_vars()
@@ -2828,7 +2881,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         assert_near_equal(p['circle.area'], np.pi, tolerance=1e-7)
 
-        cr = om.CaseReader('driver_iterations.sql')
+        cr = om.CaseReader(p.get_outputs_dir() / 'driver_iterations.sql')
         driver_cases = cr.list_cases(source='driver', out_stream=None)
 
         self.assertTrue(all([case.startswith('foo_') for case in driver_cases]),
@@ -2869,7 +2922,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(case_recorder_filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / case_recorder_filename)
         case = cr.get_case('rank0:ScipyOptimize_SLSQP|4')
 
         assert_near_equal(case.outputs['x'], 7.16666667, 1e-6)
@@ -2887,7 +2940,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         # access list of connections stored in metadata
         connections = sorted(cr.problem_metadata['connections_list'], key=lambda x: (x['tgt'], x['src']))
@@ -2935,7 +2988,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         metadata = cr.problem_metadata['driver']
         self.assertEqual(set(metadata.keys()), {'name', 'type', 'options', 'opt_settings'})
         self.assertEqual(metadata['name'], 'DOEDriver')
@@ -2954,7 +3007,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         metadata = cr.problem_metadata['driver']
         self.assertEqual(set(metadata.keys()), {'name', 'type', 'options', 'opt_settings'})
         self.assertEqual(metadata['name'], 'ScipyOptimizeDriver')
@@ -2990,7 +3043,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         # clean up after runs and open a case reader
         prob.cleanup()
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         # get/display options for initial run
         options = cr.list_solver_options()
@@ -3032,7 +3085,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         # clean up after runs and open a case reader
         prob.cleanup()
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         # get/display options for initial run
         options = cr.list_model_options()
@@ -3069,7 +3122,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.run_model()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         system_cases = cr.list_cases('root.obj_cmp')
 
@@ -3106,7 +3159,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.record("after_run_driver")
 
         # Instantiate your CaseReader
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         # Isolate "problem" as your source
         driver_cases = cr.list_cases('problem')
         # Get the first case from the recorder
@@ -3163,7 +3216,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         driver_cases = cr.list_cases('driver')
 
@@ -3200,7 +3253,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.run_model()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         solver_cases = cr.list_cases('root.nonlinear_solver')
 
@@ -3260,7 +3313,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         # create the case reader
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         # grab the data recorded in the first driver iteration
         driver_cases = cr.list_cases('driver')
@@ -3320,17 +3373,17 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         driver.options['tol'] = 1e-9
         driver.options['disp'] = False
 
-        prob = om.Problem(model, driver)
-        prob.setup()
+        prob2 = om.Problem(model, driver)
+        prob2.setup()
 
-        cr = om.CaseReader('cases.sql')
+        cr = om.CaseReader(prob.get_outputs_dir() / 'cases.sql')
 
         # Load the last case written
         last_case = cr.get_case(-1)
-        prob.load_case(last_case)
+        prob2.load_case(last_case)
 
-        prob.run_driver()
-        prob.cleanup()
+        prob2.run_driver()
+        prob2.cleanup()
 
     def test_feature_record_with_prefix(self):
 
@@ -3352,7 +3405,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         # all cases recorded by the root system
         model_cases = cr.list_cases('root', recurse=False)
@@ -3397,7 +3450,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.record('final')
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         # get list of cases recorded on problem
         problem_cases = cr.list_cases('problem')
@@ -3448,7 +3501,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.record('final')
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         # get list of cases recorded on problem
         problem_cases = cr.list_cases('problem')
@@ -3529,7 +3582,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         y1 = prob.get_val('test_sys.y')
 
-        case = om.CaseReader('cases.sql').get_case(-1)
+        case = om.CaseReader(prob.get_outputs_dir() / 'cases.sql').get_case(-1)
 
         y_recorded = case.get_val('test_sys.y')
 
@@ -3542,7 +3595,7 @@ class TestFeatureAdvancedExample(unittest.TestCase):
     def setUp(self):
 
         # build the model
-        prob = om.Problem(model=SellarMDAWithUnits())
+        prob = self._prob = om.Problem(model=SellarMDAWithUnits())
 
         model = prob.model
         model.add_design_var('z', lower=np.array([-10.0, 0.0]),
@@ -3585,7 +3638,7 @@ class TestFeatureAdvancedExample(unittest.TestCase):
     def test_feature_system_recorder(self):
 
         # Instantiate your CaseReader
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(self._prob.get_outputs_dir() / "cases.sql")
 
         system_cases = cr.list_cases('root.obj_cmp')
 
@@ -3604,7 +3657,7 @@ class TestFeatureAdvancedExample(unittest.TestCase):
     def test_feature_solver_recorder(self):
 
         # Instantiate your CaseReader
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(self._prob.get_outputs_dir() / "cases.sql")
 
         # Get list of cases, without displaying them
         solver_cases = cr.list_cases('root.cycle.nonlinear_solver', out_stream=None)
@@ -3619,7 +3672,7 @@ class TestFeatureAdvancedExample(unittest.TestCase):
     def test_feature_driver_recorder(self):
 
         # Instantiate your CaseReader
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(self._prob.get_outputs_dir() / "cases.sql")
 
         # List driver cases (do not recurse to system/solver cases)
         driver_cases = cr.list_cases('driver', recurse=False)
@@ -3639,7 +3692,7 @@ class TestFeatureAdvancedExample(unittest.TestCase):
     def test_feature_problem_recorder(self):
 
         # Instantiate your CaseReader
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(self._prob.get_outputs_dir() / "cases.sql")
 
         # get list of cases recorded on problem
         problem_cases = cr.list_cases('problem')
@@ -3667,7 +3720,7 @@ class TestFeatureBasicRecording(unittest.TestCase):
     def record_cases(self):
 
         # create our Sellar problem
-        prob = om.Problem(model=SellarMDA())
+        prob = self._prob = om.Problem(model=SellarMDA())
 
         model = prob.model
         model.add_design_var('z', lower=np.array([-10.0, 0.0]),
@@ -3702,7 +3755,7 @@ class TestFeatureBasicRecording(unittest.TestCase):
     def test_read_cases(self):
 
         # open database of previously saved cases
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(self._prob.get_outputs_dir() / "cases.sql")
 
         # get a list of cases that were recorded by the driver
         driver_cases = cr.list_cases('driver')
