@@ -319,7 +319,7 @@ class DistributedRecorderTest(unittest.TestCase):
     def test_sql_meta_file_exists(self):
         # Check that an existing sql_meta file will be deleted/overwritten
         # if it already exists before a run. (see Issue #2062)
-        prob = om.Problem(name='test_sql_meta_file_exists')
+        prob = om.Problem()
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
         prob.model.add_design_var('x', lower=0.0, upper=1.0)
@@ -330,15 +330,14 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.driver.options['run_parallel'] = True
         prob.driver.options['procs_per_model'] = 1
 
-        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+        prob.driver.add_recorder(om.SqliteRecorder("./cases.sql"))
 
         prob.setup()
         prob.run_driver()
         prob.cleanup()
 
-        _clear_problem_names
         # Run this again. It should NOT throw an exception.
-        prob = om.Problem(name='test_sql_meta_file_exists')
+        prob = om.Problem()
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
         prob.model.add_design_var('x', lower=0.0, upper=1.0)
@@ -349,23 +348,23 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.driver.options['run_parallel'] = True
         prob.driver.options['procs_per_model'] = 1
 
-        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+        prob.driver.add_recorder(om.SqliteRecorder("./cases.sql"))
 
         prob.setup()
 
         if prob.comm.rank == 0:
             expected_warnings = [
                 (UserWarning,
-                f'The existing case recorder metadata file, {prob.get_outputs_dir() / "cases.sql_meta"}, '
+                'The existing case recorder metadata file, ./cases.sql_meta, '
                 'is being overwritten.'),
                 (UserWarning,
-                f'The existing case recorder file, {prob.get_outputs_dir() / "cases.sql_0"}, is being '
+                'The existing case recorder file, ./cases.sql_0, is being '
                 'overwritten.'),
             ]
         else:
             expected_warnings = [
                 (UserWarning,
-                    f'The existing case recorder file, {prob.get_outputs_dir() / "cases.sql_1"}, is being '
+                    'The existing case recorder file, ./cases.sql_1, is being '
                     'overwritten.'),
             ]
         with assert_warnings(expected_warnings):

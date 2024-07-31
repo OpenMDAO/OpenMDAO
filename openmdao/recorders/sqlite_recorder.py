@@ -122,7 +122,7 @@ class SqliteRecorder(CaseRecorder):
 
     Parameters
     ----------
-    filepath : str
+    filepath : str or Path
         Path to the recorder file.
     append : bool, optional
         Optional. If True, append to an existing case recorder file.
@@ -174,7 +174,7 @@ class SqliteRecorder(CaseRecorder):
         self._prom2abs = {'input': {}, 'output': {}}
         self._abs2meta = {}
         self._pickle_version = pickle_version
-        self._filepath = filepath
+        self._filepath = pathlib.Path(filepath)
         self._database_initialized = False
         self._started = set()
 
