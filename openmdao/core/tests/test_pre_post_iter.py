@@ -657,7 +657,7 @@ class TestPrePostIter(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader('sqlite_test_pre_post')
+        cr = om.CaseReader(prob.get_outputs_dir() / 'sqlite_test_pre_post')
 
         # check that we only have the three system sources
         self.assertEqual(sorted(cr.list_sources(out_stream=None)), ['driver', 'root', 'root.iter1', 'root.iter2', 'root.iter3', 'root.iter4', 'root.post1', 'root.post2', 'root.pre1', 'root.pre2'])

@@ -322,7 +322,7 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
 
     Parameters
     ----------
-    data_source : <Problem> or <Group> or str
+    data_source : <Problem> or <Group> or str or pathlib.Path
         A Problem or Group or case recorder filename containing the model or model data.
         If the case recorder file from a parallel run has separate metadata, the
         filenames can be specified with a comma, e.g.: case.sql_0,case.sql_meta
@@ -381,8 +381,8 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
             values = (data_source._problem_meta is not None and
                       data_source._problem_meta['setup_status'] >= _SetupStatus.POST_FINAL_SETUP)
 
-    elif isinstance(data_source, str):
-        if ',' in data_source:
+    elif isinstance(data_source, str) or isinstance(data_source, pathlib.Path):
+        if  isinstance(data_source, str) and ',' in data_source:
             filenames = data_source.split(',')
             cr = CaseReader(filenames[0], metadata_filename=filenames[1])
         else:
