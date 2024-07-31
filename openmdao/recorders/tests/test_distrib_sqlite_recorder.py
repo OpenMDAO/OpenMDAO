@@ -11,6 +11,7 @@ from openmdao.utils.mpi import MPI
 
 import openmdao.api as om
 
+from openmdao.core.problem import _clear_problem_names
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.recorders.tests.sqlite_recorder_test_utils import \
     assertDriverIterDataRecorded, assertProblemDataRecorded
@@ -318,7 +319,7 @@ class DistributedRecorderTest(unittest.TestCase):
     def test_sql_meta_file_exists(self):
         # Check that an existing sql_meta file will be deleted/overwritten
         # if it already exists before a run. (see Issue #2062)
-        prob = om.Problem()
+        prob = om.Problem(name='test_sql_meta_file_exists')
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
         prob.model.add_design_var('x', lower=0.0, upper=1.0)
@@ -335,8 +336,9 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
+        _clear_problem_names
         # Run this again. It should NOT throw an exception.
-        prob = om.Problem()
+        prob = om.Problem(name='test_sql_meta_file_exists')
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
         prob.model.add_design_var('x', lower=0.0, upper=1.0)
@@ -354,16 +356,16 @@ class DistributedRecorderTest(unittest.TestCase):
         if prob.comm.rank == 0:
             expected_warnings = [
                 (UserWarning,
-                'The existing case recorder metadata file, cases.sql_meta, '
+                f'The existing case recorder metadata file, {prob.get_outputs_dir() / "cases.sql_meta"}, '
                 'is being overwritten.'),
                 (UserWarning,
-                'The existing case recorder file, cases.sql_0, is being '
+                f'The existing case recorder file, {prob.get_outputs_dir() / "cases.sql_0"}, is being '
                 'overwritten.'),
             ]
         else:
             expected_warnings = [
                 (UserWarning,
-                    'The existing case recorder file, cases.sql_1, is being '
+                    f'The existing case recorder file, {prob.get_outputs_dir() / "cases.sql_1"}, is being '
                     'overwritten.'),
             ]
         with assert_warnings(expected_warnings):
@@ -382,7 +384,7 @@ class DistributedRecorderTest(unittest.TestCase):
 
         def run_sequential():
             # problem will run in the single proc comm for this rank
-            prob = om.Problem(comm=my_comm)
+            prob = om.Problem(name='test_record_on_one_proc', comm=my_comm)
 
             prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
             prob.model.add_design_var('x', lower=0.0, upper=1.0)
@@ -400,7 +402,7 @@ class DistributedRecorderTest(unittest.TestCase):
 
         def run_parallel():
             # process cases.sql in parallel
-            cr = om.CaseReader("cases.sql")
+            cr = om.CaseReader('test_record_on_one_proc_out/cases.sql')
 
             cases = cr.list_cases()
             self.assertEqual(len(cases), 9)

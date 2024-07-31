@@ -1764,7 +1764,7 @@ class TestParallelDOE4Proc(unittest.TestCase):
         expect_msg = f"Cases from rank {rank} are being written to {filename}."
         self.assertTrue(expect_msg in output)
 
-        cr = om.CaseReader(prob.get_outputs_dir() / filename)
+        cr = om.CaseReader(filename)
         cases = cr.list_cases('driver', out_stream=None)
 
         # cases recorded on this proc
