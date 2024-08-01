@@ -135,7 +135,7 @@ class NonlinearBlockGS(NonlinearSolver):
 
         if use_aitken:
             self._aitken_relax(outputs, residuals, outputs_n, delta_outputs_n)
-            
+
         if not self.options['use_apply_nonlinear']:
             # Residual is the change in the outputs vector.
             with system._unscaled_context(outputs=[outputs], residuals=[residuals]):
@@ -183,7 +183,7 @@ class NonlinearBlockGS(NonlinearSolver):
 
             if use_aitken:
                 self._aitken_relax(outputs, residuals, outputs_n, delta_outputs_n)
-  
+
             self._solver_info.pop()
             with system._unscaled_context(residuals=[residuals], outputs=[outputs]):
                 residuals.set_val(outputs.asarray() - outputs_n)
