@@ -11,7 +11,6 @@ from openmdao.utils.mpi import MPI
 
 import openmdao.api as om
 
-from openmdao.core.problem import _clear_problem_names
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.recorders.tests.sqlite_recorder_test_utils import \
     assertDriverIterDataRecorded, assertProblemDataRecorded
@@ -187,7 +186,8 @@ class DistributedRecorderTest(unittest.TestCase):
             expected_outputs.update(expected_objectives)
 
             expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
-            assertDriverIterDataRecorded(self, expected_data, self.eps)
+            recorder_filepath = os.path.join(self.filename)
+            assertDriverIterDataRecorded(self, recorder_filepath, expected_data, self.eps)
 
     def test_recording_remote_voi(self):
         # Create a parallel model
@@ -273,10 +273,11 @@ class DistributedRecorderTest(unittest.TestCase):
             coordinate = [0, 'ScipyOptimize_SLSQP', (driver.iter_count-1,)]
 
             expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
-            assertDriverIterDataRecorded(self, expected_data, self.eps)
+            recorder_filepath = os.path.join(self.filename)
+            assertDriverIterDataRecorded(self, recorder_filepath, expected_data, self.eps)
 
             expected_data = (('final', (t1, t2), expected_outputs),)
-            assertProblemDataRecorded(self, expected_data, self.eps)
+            assertProblemDataRecorded(self, recorder_filepath, expected_data, self.eps)
 
     def test_input_desvar(self):
         # this failed with a KeyError before the fix
