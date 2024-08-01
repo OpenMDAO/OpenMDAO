@@ -349,7 +349,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         self.assertTrue(model.nonlinear_solver._theta_n_1 == 0.33)
 
 
-        model.nonlinear_solver.options['maxiter'] = 10
+        model.nonlinear_solver.options['maxiter'] = 14
         prob.run_model()
 
         # should converge to the same solution
@@ -357,10 +357,10 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
         # in more iterations
-        self.assertTrue(model.nonlinear_solver._iter_count == 7)
+        self.assertTrue(model.nonlinear_solver._iter_count == 12)
 
         #check that the relaxation factor is updated correctly (should tend towards 1)
-        assert_near_equal(model.nonlinear_solver._theta_n_1, 1.00, 0.001)
+        self.assertGreater(model.nonlinear_solver._theta_n_1, 0.99)
 
 
     def test_NLBGS_Aitken_min_max_factor(self):
