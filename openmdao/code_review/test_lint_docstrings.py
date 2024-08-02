@@ -517,6 +517,7 @@ class LintTestCase(unittest.TestCase):
 
     def test_docstrings(self):
         failures = {}
+
         # Loop over directories
         for dirpath in sorted(directories):
 
@@ -596,12 +597,17 @@ class LintTestCase(unittest.TestCase):
             msg = '\n'
             count = 0
             for key in failures:
+                # numpydoc 1.8.0rc2 introduces a bug that causes this decorator to fail the YD01 check
+                # (https://github.com/numpy/numpydoc/pull/541)
+                if key == 'openmdao.utils.options_dictionary.OptionsDictionary.temporary':
+                    failures[key].remove('YD01: No Yields section found')
                 msg += f'{key}\n'
                 count += len(failures[key])
                 for failure in failures[key]:
                     msg += f'    {failure}\n'
-            msg += f'Found {count} issues in docstrings'
-            self.fail(msg)
+            if count:
+                msg += f'Found {count} issues in docstrings'
+                self.fail(msg)
 
 
 if __name__ == '__main__':
