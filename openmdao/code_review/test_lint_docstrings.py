@@ -600,7 +600,10 @@ class LintTestCase(unittest.TestCase):
                 # numpydoc 1.8.0rc2 introduces a bug that causes this decorator to fail the YD01 check
                 # (https://github.com/numpy/numpydoc/pull/541)
                 if key == 'openmdao.utils.options_dictionary.OptionsDictionary.temporary':
-                    failures[key].remove('YD01: No Yields section found')
+                    try:
+                        failures[key].remove('YD01: No Yields section found')
+                    except ValueError:
+                        pass
                 msg += f'{key}\n'
                 count += len(failures[key])
                 for failure in failures[key]:
