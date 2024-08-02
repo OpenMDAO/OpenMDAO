@@ -1035,7 +1035,7 @@ class Problem(object):
                     pass
         self._metadata['reports_dir'] = self.get_reports_dir(force=False)
 
-        # Touch the .openmdao_out file for this directory to make the outputs directory easily identifiable.
+        # Touch the .openmdao_out file for the output directory to make it easily identifiable.
         open(self.get_outputs_dir() / '.openmdao_out', 'w').close()
 
         try:
