@@ -1026,7 +1026,7 @@ class Problem(object):
         # Start setup by deleting any existing reports so that the files
         # that are in that directory are all from this run and not a previous run
         reports_dirpath = self.get_reports_dir(force=False)
-        if self.comm.rank == 0:
+        if not MPI or (self.comm is not None and self.comm.rank == 0):
             if os.path.isdir(reports_dirpath):
                 try:
                     shutil.rmtree(reports_dirpath)
@@ -1036,7 +1036,8 @@ class Problem(object):
         self._metadata['reports_dir'] = self.get_reports_dir(force=False)
 
         # Touch the .openmdao_out file for the output directory to make it easily identifiable.
-        open(self.get_outputs_dir() / '.openmdao_out', 'w').close()
+        if not MPI or (self.comm is not None and self.comm.rank == 0):
+            open(self.get_outputs_dir() / '.openmdao_out', 'w').close()
 
         try:
             model._setup(model_comm, self._metadata)
