@@ -3,6 +3,7 @@ import unittest
 from contextlib import redirect_stdout, contextmanager
 import io
 import os
+import shutil
 import sys
 
 import openmdao.api as om
@@ -22,12 +23,12 @@ class TestCleanOutputs(unittest.TestCase):
 
     def test_specify_prob(self):
 
-        p1 = om.Problem(name='foo')
+        p1 = om.Problem()
         p1.model.add_subsystem('exec', om.ExecComp('y = a + b'))
         p1.setup()
         p1.run_model()
 
-        p2 = om.Problem(name='bar')
+        p2 = om.Problem()
         p2.model.add_subsystem('exec', om.ExecComp('z = a * b'))
         p2.setup()
         p2.run_model()
@@ -37,26 +38,25 @@ class TestCleanOutputs(unittest.TestCase):
         with redirect_stdout(ss):
             om.clean_outputs(p1, dryrun=True)
 
-        expected = ('Found 1 OpenMDAO output directories:\n'
-                    '  foo_out\n'
-                    'Would remove 1 output directories (dryrun = True).\n')
+        expected1 = 'Found 1 OpenMDAO output directories:\n'
+        expected2 = 'Would remove 1 output directories (dryrun = True).\n'
         
-        self.assertIn(expected, ss.getvalue())
+        self.assertIn(expected1, ss.getvalue())
+        self.assertIn(expected2, ss.getvalue())
 
         # Now actually do it.
         ss = io.StringIO()
         with redirect_stdout(ss):
             om.clean_outputs(p1)
 
-        self.assertNotIn('foo_out', os.listdir(os.getcwd()))
-        self.assertIn('bar_out', os.listdir(os.getcwd()))
+        self.assertEqual(len(os.listdir(os.getcwd())), 1)
 
         # Now specify p2 with the output directory.
         ss = io.StringIO()
         with redirect_stdout(ss):
             om.clean_outputs(p2)
         
-        self.assertNotIn('bar_out', os.listdir(os.getcwd()))
+        self.assertEqual(len(os.listdir(os.getcwd())), 0)
 
     def test_specify_non_output_dir_no_prompt(self):
 
@@ -74,8 +74,6 @@ class TestCleanOutputs(unittest.TestCase):
         ss = io.StringIO()
         with redirect_stdout(ss):
             om.clean_outputs('.', dryrun=True)
-
-        print(ss.getvalue())
 
         expected = ('Found 2 OpenMDAO output directories:\n'
                     '  bar_out\n'
@@ -125,30 +123,38 @@ class TestCleanOutputs(unittest.TestCase):
                 p2.setup()
                 p2.run_model()
 
+                output_dirs = [p1.get_outputs_dir(), p2.get_outputs_dir()]
+
+                os.mkdir('temp')
+                for od in output_dirs:
+                    shutil.move(od, 'temp')
+
                 # First, respond in the negative
                 ss = io.StringIO()
                 with redirect_stdout(ss):
                     with _replace_stdin(io.StringIO('n')):
                         om.clean_outputs(recurse=recurse)
-                
+
                 if recurse:
                     expected = ('Found 2 OpenMDAO output directories:\n')
                     self.assertIn(expected, ss.getvalue())
 
-                    outdirs = [d for d in os.listdir(os.getcwd()) if d.endswith('_out')]           
+                    outdirs = [d for d in os.listdir('temp') if d.endswith('_out')]           
                     self.assertEqual(len(outdirs), 2)
 
                     # Respond in the positive to actually remove them.
                     ss = io.StringIO()
                     with redirect_stdout(ss):
                         with _replace_stdin(io.StringIO('y')):
-                            om.clean_outputs()
+                            om.clean_outputs(recurse=recurse)
 
                     expected = ('Removed 2 OpenMDAO output directories.\n')
                     
                     self.assertIn(expected, ss.getvalue())
 
-                    outdirs = [d for d in os.listdir(os.getcwd()) if d.endswith('_out')]           
+                    outdirs = [d for d in os.listdir('temp') if d.endswith('_out')]           
                     self.assertEqual(len(outdirs), 0)
                 else:
-                    print(ss.getvalue())
+                    self.assertIn('No OpenMDAO output directories found.', ss.getvalue())
+                
+                shutil.rmtree('temp')

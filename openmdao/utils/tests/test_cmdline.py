@@ -125,18 +125,21 @@ class CmdlineTestCase(unittest.TestCase):
     def test_clean(self):
         import openmdao.api as om
 
-        p1 = om.Problem(name='foo')
+        p1 = om.Problem()
         p1.model.add_subsystem('exec', om.ExecComp('y = a + b'))
         p1.setup()
         p1.run_model()
 
-        p2 = om.Problem(name='bar')
+        p2 = om.Problem()
         p2.model.add_subsystem('exec', om.ExecComp('z = a * b'))
         p2.setup()
         p2.run_model()
 
-        self.assertIn('foo_out', os.listdir(os.getcwd()))
-        self.assertIn('bar_out', os.listdir(os.getcwd()))
+        p1_outdir = p1.get_outputs_dir()
+        p2_outdir = p2.get_outputs_dir()
+
+        self.assertIn(str(p1_outdir), os.listdir(os.getcwd()))
+        self.assertIn(str(p2_outdir), os.listdir(os.getcwd()))
 
         proc = subprocess.Popen('openmdao clean -f'.split(),  # nosec: trusted input
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -146,8 +149,8 @@ class CmdlineTestCase(unittest.TestCase):
             proc.kill()
             outs, errs = proc.communicate()
 
-        self.assertNotIn('foo_out', os.listdir(os.getcwd()))
-        self.assertNotIn('bar_out', os.listdir(os.getcwd()))
+        self.assertNotIn(str(p1_outdir), os.listdir(os.getcwd()))
+        self.assertNotIn(str(p2_outdir), os.listdir(os.getcwd()))
 
     def test_n2_err(self):
         # command should raise exception but still produce an n2 html file
