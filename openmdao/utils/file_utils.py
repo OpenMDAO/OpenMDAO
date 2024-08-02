@@ -444,7 +444,7 @@ def _get_outputs_dir(obj=None, *subdirs, mkdir=True):
     The resulting outputs directory will be nested where each problem's output directory
     contains its own output files and subdirectories as well as any subproblems.
 
-    This directory also will include a .openmdao_outputs hidden file that 
+    This directory also will include a .openmdao_outputs hidden file that
     marks this directory as being created by OpenMDAO. This makes identifying the
     directory during cleanup more reliable.
 
@@ -487,9 +487,6 @@ def _get_outputs_dir(obj=None, *subdirs, mkdir=True):
 
     if comm.rank == 0 and mkdir:
         dirpath.mkdir(parents=True, exist_ok=True)
-        # Create a hidden .openmdao_outputs file to mark the problem output dir
-        # as an openmdao-created directory.
-        open(pathlib.Path(f'{prob_pathname}_out') / '.openmdao_out', 'w').close()
 
     return dirpath
 
@@ -497,32 +494,33 @@ def _get_outputs_dir(obj=None, *subdirs, mkdir=True):
 def _is_openmdao_output_dir(directory):
     """
     Check if a directory is an OpenMDAO output directory.
-    
+
     Parameters
     ----------
     directory : str or Path
         The directory to check.
-        
+
     Returns
     -------
     bool
         True if the directory is an OpenMDAO output directory, False otherwise.
     """
     directory = pathlib.Path(directory)
-    return directory.is_dir() and directory.name.endswith('_out') and (directory / '.openmdao_out').exists()
+    return directory.is_dir() and directory.name.endswith('_out') \
+        and (directory / '.openmdao_out').exists()
 
 
 def _find_openmdao_output_dirs(paths, recurse):
     """
     Find all OpenMDAO output directories in the given path.
-    
+
     Parameters
     ----------
-    path : str or Path or Iterable
+    paths : str or Path or Iterable
         The path to search for OpenMDAO output directories.
     recurse : bool
         If True, search recursively.
-        
+
     Returns
     -------
     list
@@ -538,7 +536,7 @@ def _find_openmdao_output_dirs(paths, recurse):
         path = pathlib.Path(path)
         if not path.is_dir():
             continue
-        
+
         for root, dirs, _ in os.walk(path):
             # Use a copy of the dirs list to avoid modifying it while iterating
             if _is_openmdao_output_dir(root):
@@ -583,7 +581,7 @@ def clean_outputs(obj='.', recurse=False, prompt=True, dryrun=False):
         prompt = False
         if output_dir and _is_openmdao_output_dir(output_dir):
             output_dirs.append(pathlib.Path(output_dir))
-    
+
     if not output_dirs:
         print('No OpenMDAO output directories found.')
         return
@@ -592,12 +590,13 @@ def clean_outputs(obj='.', recurse=False, prompt=True, dryrun=False):
 
     for dir_path in sorted(output_dirs):
         print(f"  {dir_path}")
-    
+
     if dryrun:
         print(f'Would remove {len(output_dirs)} output directories (dryrun = True).')
         return
     if prompt:
-        response = input(f"Do you want to remove {len(output_dirs)} output directories? [y/N] ").strip().lower()
+        response = input(f"Do you want to remove {len(output_dirs)} output "
+                         "directories? [y/N] ").strip().lower()
         if response != 'y':
             return
     for dir_path in sorted(output_dirs):

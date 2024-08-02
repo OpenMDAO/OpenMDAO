@@ -280,6 +280,7 @@ def _tree_setup_parser(parser):
     parser.add_argument('--approx', action='store_true', dest='show_approx',
                         help="Show which components compute approximations.")
 
+
 def _clean_setup_parser(parser):
     """
     Set up the openmdao subparser for the 'openmdao clean' command.
@@ -298,6 +299,7 @@ def _clean_setup_parser(parser):
     parser.add_argument('-d', '--dryrun', action='store_true', dest='dryrun',
                         help='Highlight directories to be removed but do not actually remove them.')
 
+
 def _clean_cmd(options, user_args):
     """
     Return the post_setup hook function for 'openmdao summary'.
@@ -311,6 +313,7 @@ def _clean_cmd(options, user_args):
     """
     clean_outputs(options.path, recurse=not options.no_recurse, prompt=not options.force,
                   dryrun=options.dryrun)
+
 
 def _get_tree_filter(attrs, vecvars):
     """
