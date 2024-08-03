@@ -109,6 +109,7 @@ class TestCleanOutputs(unittest.TestCase):
         self.assertNotIn('foo_out', os.listdir(os.getcwd()))
         self.assertNotIn('bar_out', os.listdir(os.getcwd()))
 
+    @unittest.skipIf(sys.version_info  < (3, 9, 0))
     def test_specify_non_output_dir_prompt(self):
 
         for recurse in (True, False):
