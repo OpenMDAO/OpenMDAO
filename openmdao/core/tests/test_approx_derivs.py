@@ -1591,8 +1591,6 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
         assert_near_equal(J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
 
-    @unittest.skipUnless(ScipyVersion < Version("1.13"),
-                         "scipy < 1.13 is required, see issue #3156.")
     def test_newton_with_cscjac_under_cs(self):
         # Basic sellar test.
 
@@ -1618,7 +1616,7 @@ class TestGroupComplexStep(unittest.TestCase):
         sub.nonlinear_solver.options['atol'] = 1e-20
         sub.nonlinear_solver.options['rtol'] = 1e-20
 
-        model.approx_totals(method='cs', step=1e-12)
+        model.approx_totals(method='cs', step=1e-11)
 
         prob.setup()
         prob.set_solver_print(level=0)

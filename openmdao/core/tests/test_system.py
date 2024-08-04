@@ -9,6 +9,7 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_warning, asser
 from openmdao.utils.testing_utils import use_tempdirs
 
 
+@use_tempdirs
 class TestSystem(unittest.TestCase):
 
     def test_vector_context_managers(self):
@@ -667,6 +668,30 @@ class TestSystem(unittest.TestCase):
 
         with assert_warnings(expected_warnings):
             prob.final_setup()
+
+    def test_get_outputs_dir(self):
+        import pathlib
+        import openmdao.api as om
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = om.Problem(name='test_prob_name')
+        model = prob.model
+
+        model.add_subsystem('comp', Paraboloid())
+
+        model.set_input_defaults('comp.x', 3.0)
+        model.set_input_defaults('comp.y', -4.0)
+
+        with self.assertRaises(RuntimeError) as e:
+            model.get_outputs_dir()
+
+        self.assertEqual('The output directory cannot be accessed before setup.',
+                         str(e.exception))
+
+        prob.setup()
+
+        d = prob.get_outputs_dir('subdir')
+        self.assertEqual(str(pathlib.Path('test_prob_name_out', 'subdir')), str(d))
 
 
 if __name__ == "__main__":

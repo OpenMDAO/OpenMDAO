@@ -12,6 +12,9 @@ from openmdao.core.constants import _DEFAULT_OUT_STREAM
 from openmdao.utils.notebook_utils import notebook, display, HTML
 from openmdao.visualization.tables.table_builder import generate_table
 
+# string to display when an attribute is not available
+NA = 'n/a'
+
 column_widths = {
     'val': 20,
     'resids': 20,
@@ -29,7 +32,7 @@ indent_inc = 2
 
 
 def write_var_table(pathname, var_list, var_type, var_dict,
-                    hierarchical=True, top_name='model', print_arrays=False,
+                    hierarchical=True, print_arrays=False,
                     out_stream=_DEFAULT_OUT_STREAM):
     """
     Write table of variable names, values, residuals, and metadata to out_stream.
@@ -46,8 +49,6 @@ def write_var_table(pathname, var_list, var_type, var_dict,
         Dict storing vals and metadata for each var name.
     hierarchical : bool
         When True, human readable output shows variables in hierarchical format.
-    top_name : str
-        The name of the top level group when using hierarchical format.
     print_arrays : bool
         When False, in the columnar display, just display norm of any ndarrays with size > 1.
         The norm is surrounded by vertical bars to indicate that it is a norm.
@@ -78,7 +79,7 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     if var_type == 'input':
         header = "%d Input(s) in '%s'" % (count, pathname)
     elif var_type == 'all':
-        header = "%d %s Variables(s) in '%s'" % (count, var_type.capitalize(), pathname)
+        header = "%d Variables(s) in '%s'" % (count, pathname)
     else:
         header = "%d %s Output(s) in '%s'" % (count, var_type.capitalize(), pathname)
 
@@ -91,19 +92,29 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     # Need an ordered list of possible output values for the two cases: inputs and outputs
     #  so that we do the column output in the correct order
     if var_type == 'input':
-        out_types = ('val', 'units', 'shape', 'global_shape', 'prom_name', 'desc', 'min', 'max')
+        out_types = ('val', 'units', 'shape', 'global_shape', 'prom_name', 'desc', 'min', 'max',
+                     'tags')
     elif var_type == 'all':
         out_types = ('val', 'io', 'resids', 'units', 'shape', 'global_shape', 'lower', 'upper',
-                     'ref', 'ref0', 'res_ref', 'prom_name', 'desc', 'min', 'max')
+                     'ref', 'ref0', 'res_ref', 'prom_name', 'desc', 'min', 'max', 'tags')
     else:
         out_types = ('val', 'resids', 'units', 'shape', 'global_shape', 'lower', 'upper',
-                     'ref', 'ref0', 'res_ref', 'prom_name', 'desc', 'min', 'max')
+                     'ref', 'ref0', 'res_ref', 'prom_name', 'desc', 'min', 'max', 'tags')
 
-    # Figure out which columns will be displayed
-    # Look at any one of the outputs, they should all be the same, so just look at first one
-    for outputs in var_dict.values():
-        column_names = [out_type for out_type in out_types if out_type in outputs]
+    # Figure out which columns will be displayed.
+    for var_meta in var_dict.values():
+        # if 'all', look for an output as some fields (bounds, scaling) are only found in outputs
+        # otherwise just take the first meta dict since they should all be the same
+        if var_type == 'all' and var_meta['io'] != 'output':
+            continue
         break
+
+    column_names = [out_type for out_type in out_types if out_type in var_meta]
+
+    if 'tags' in column_names:
+        # if printing tags, print as a list (value may be a list or a set)
+        for meta in var_dict.values():
+            meta['tags'] = list(meta['tags'])
 
     if use_html and var_list:
         rows = []
@@ -132,7 +143,10 @@ def write_var_table(pathname, var_list, var_type, var_dict,
 
     for name in var_list:
         for column_name in column_names:
-            column_value = var_dict[name][column_name]
+            try:
+                column_value = var_dict[name][column_name]
+            except KeyError:
+                column_value = NA
             if isinstance(column_value, np.ndarray) and column_value.size > 1:
                 out = '|{}|'.format(str(np.linalg.norm(column_value)))
             else:
@@ -273,13 +287,16 @@ def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
     for column_name in column_names:
         row += column_spacing * ' '
 
-        if isinstance(var_dict[column_name], np.ndarray) and \
-                var_dict[column_name].size > 1:
+        try:
+            column_val = var_dict[column_name]
+        except KeyError:
+            column_val = NA
+        if isinstance(column_val, np.ndarray) and column_val.size > 1:
             have_array_values.append(column_name)
             norm = np.linalg.norm(var_dict[column_name])
             out = '|{}|'.format(str(np.round(norm, np_precision)))
         else:
-            out = str(var_dict[column_name])
+            out = str(column_val)
         row += '{:{align}{width}}'.format(out, align=align,
                                           width=column_widths[column_name])
     out_stream.write(row + '\n')

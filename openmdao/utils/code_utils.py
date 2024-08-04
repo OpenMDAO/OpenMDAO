@@ -8,6 +8,7 @@ import inspect
 import ast
 import textwrap
 import importlib
+from types import LambdaType
 from collections import defaultdict, OrderedDict
 
 import networkx as nx
@@ -348,6 +349,132 @@ def get_class_attributes(fname, class_dict=None):
         visitor = _AttrCollector(class_dict)
         visitor.visit(node)
         return visitor.get_attributes()
+
+
+def is_lambda(f):
+    """
+    Return True if the given function is a lambda function.
+
+    Parameters
+    ----------
+    f : function
+        The function to check.
+
+    Returns
+    -------
+    bool
+        True if the given function is a lambda function.
+    """
+    return isinstance(f, LambdaType) and f.__name__ == "<lambda>"
+
+
+class LambdaPickleWrapper(object):
+    """
+    A wrapper for a lambda function that allows it to be pickled.
+
+    Parameters
+    ----------
+    lambda_func : function
+        The lambda function to be wrapped.
+
+    Attributes
+    ----------
+    _func : function
+        The lambda function.
+    _src : str
+        The isolated source of the lambda function.
+    """
+
+    def __init__(self, lambda_func):
+        """
+        Initialize the wrapper.
+
+        Parameters
+        ----------
+        lambda_func : function
+            The lambda function to be wrapped.
+        """
+        self._func = lambda_func
+        self._src = None
+
+    def __call__(self, *args, **kwargs):
+        """
+        Call the lambda function.
+
+        Parameters
+        ----------
+        *args : list
+            Positional arguments.
+        **kwargs : dict
+            Keyword arguments.
+
+        Returns
+        -------
+        object
+            The result of the lambda function.
+        """
+        return self._func(*args, **kwargs)
+
+    def __getstate__(self):
+        """
+        Return the state of this object for pickling.
+
+        The lambda function is converted to a string for pickling.
+
+        Returns
+        -------
+        dict
+            The state of this object.
+        """
+        state = self.__dict__.copy()
+        state['_func'] = self._getsrc()
+        return state
+
+    def __setstate__(self, state):
+        """
+        Restore the state of this object after pickling.
+
+        Parameters
+        ----------
+        state : dict
+            The state of this object.
+        """
+        self.__dict__.update(state)
+        self._func = eval(state['_func'])  # nosec
+
+    def _getsrc(self):
+        if self._src is None:
+            self._src = _LambdaSrcFinder(self._func).src
+            if self._src is None:
+                raise RuntimeError("The fix for pickling lambda functions only works for python "
+                                   "3.9 and above. Try updating to a newer python version or "
+                                   "replacing the lambda with a regular function.")
+        return self._src
+
+
+class _LambdaSrcFinder(ast.NodeVisitor):
+    """
+    Given a lambda function, isolate the lambda function source from any surrounding code.
+    """
+
+    def __init__(self, func):
+        super().__init__()
+        self.src = None
+        # note that inspect.getsource gives the source for the line that contains the lambda
+        # function, so we have to isolate the lambda function itself
+        self.visit(ast.parse(textwrap.dedent(inspect.getsource(func)), filename='<string>'))
+
+    def visit_Lambda(self, node):
+        if self.src is not None:
+            # it's possible to have multiple lambdas defined on the same line, so raise an error
+            # if we find more than one.
+            raise RuntimeError("Only one lambda function is allowed per line when using "
+                               "_LambdaWrapper.")
+        try:
+            self.src = ast.unparse(node)
+        except AttributeError:
+            # ast.unparse was added in python 3.9
+            self.src = None
 
 
 if __name__ == '__main__':

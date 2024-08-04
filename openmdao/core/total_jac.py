@@ -140,6 +140,10 @@ class _TotalJacInfo(object):
         self.initialize = True
         self.approx = approx
         self.coloring_info = coloring_info
+        try:
+            self._linear_only_dvs = set(driver._lin_dvs).difference(driver._nl_dvs)
+        except AttributeError:
+            self._linear_only_dvs = set()
 
         orig_of = of
         orig_wrt = wrt
@@ -153,12 +157,17 @@ class _TotalJacInfo(object):
         ofsize = sum(meta['global_size'] for meta in of_metadata.values())
         wrtsize = sum(meta['global_size'] for meta in wrt_metadata.values())
 
-        for meta in of_metadata.values():
-            if 'linear' in meta and meta['linear']:
-                has_lin_cons = True
-                break
+        all_lin_cons = True
+        has_lin_cons = False
+        if driver and driver.supports['linear_constraints']:
+            for meta in of_metadata.values():
+                if 'linear' in meta and meta['linear']:
+                    has_lin_cons = True
+                    continue
+
+                all_lin_cons = False
         else:
-            has_lin_cons = False
+            all_lin_cons = False
 
         if self._orig_mode == 'auto':
             if has_lin_cons:
@@ -178,9 +187,6 @@ class _TotalJacInfo(object):
 
         all_abs2meta_out = model._var_allprocs_abs2meta['output']
 
-        if not driver or not driver.supports['linear_constraints']:
-            has_lin_cons = False
-
         self.has_lin_cons = has_lin_cons
         self.dist_input_range_map = {}
 
@@ -188,7 +194,8 @@ class _TotalJacInfo(object):
 
         self.relevance = get_relevance(model, of_metadata, wrt_metadata)
 
-        self._check_discrete_dependence()
+        if not all_lin_cons:
+            self._check_discrete_dependence()
 
         if approx:
             coloring_mod._initialize_model_approx(model, driver, of_metadata, wrt_metadata)
@@ -360,17 +367,21 @@ class _TotalJacInfo(object):
         # raise an exception if we depend on any discrete outputs
         if model._var_allprocs_discrete['output']:
             # discrete_outs at the model level are absolute names
-            discrete_outs = set(model._var_allprocs_discrete['output'])
-            piter = self.relevance.iter_seed_pair_relevance
-            for seed, rseed, rels in piter([m['source'] for m in self.input_meta['fwd'].values()],
-                                           [m['source'] for m in self.input_meta['rev'].values()],
-                                           outputs=True):
-                inter = discrete_outs.intersection(rels)
-                if inter:
-                    inp = seed if self.mode == 'fwd' else rseed
-                    kind = 'of' if self.mode == 'rev' else 'with respect to'
-                    raise RuntimeError("Total derivative %s '%s' depends upon "
-                                       "discrete output variables %s." % (kind, inp, sorted(inter)))
+            relevance = model._relevance
+            discrete_outs = model._var_allprocs_discrete['output']
+            disc_arr = relevance._vars2rel_array(discrete_outs)
+
+            with relevance.all_seeds_active():
+                if relevance.any_relevant(discrete_outs):
+                    for resp, rmeta in self.output_meta['fwd'].items():
+                        for dv, dvmeta in self.input_meta['fwd'].items():
+                            relarr = relevance._seed_var_map[dvmeta['source']][rmeta['source']]
+                            depdisc = disc_arr & relarr
+                            if np.any(depdisc):
+                                discnames = relevance.rel_vars_iter(depdisc)
+                                raise RuntimeError(f"Total derivative of '{resp}' with respect to "
+                                                   f"'{dv}' depends upon discrete output variables "
+                                                   f"{sorted(discnames)}.")
 
     @property
     def msginfo(self):
@@ -1640,7 +1651,9 @@ class _TotalJacInfo(object):
         if np.any(row):  # there's at least 1 col that's zero across all rows
             zero_cols = []
             for n, meta in self.input_meta['fwd'].items():
-
+                # don't flag zero cols for linear only dvs
+                if n in self._linear_only_dvs:
+                    continue
                 zero_idxs = self._get_zero_inds(meta, row)
 
                 if zero_idxs[0].size > 0:

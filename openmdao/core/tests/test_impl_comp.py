@@ -440,13 +440,8 @@ class ImplicitCompTestCase(unittest.TestCase):
         prob.run_model()
 
         # list outputs with residuals, p1 and d1 should not appear
-        sysout = sys.stdout
-        try:
-            stdout = StringIO()
-            sys.stdout = stdout
-            model.list_outputs(residuals_tol=0.01, residuals=True, prom_name=False, out_stream=stdout)
-        finally:
-            sys.stdout = sysout
+        stream = StringIO()
+        model.list_outputs(residuals_tol=0.01, residuals=True, prom_name=False, out_stream=stream)
 
         expected_text = [
             "0 Explicit Output(s) in 'model'",
@@ -460,10 +455,9 @@ class ImplicitCompTestCase(unittest.TestCase):
             "  y2",  # values removed from comparison
             "",
             "",
-            ""
         ]
-        captured_output = stdout.getvalue()
 
+        captured_output = stream.getvalue()
         for i, line in enumerate(captured_output.split('\n')):
             if line and not line.startswith('-'):
                 self.assertEqual(remove_whitespace(line.split('[')[0]),
@@ -508,7 +502,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         prob['pc.c'] = 3.
 
         # Making sure that guess_nonlinear is called early enough to eradicate this.
-        prob['comp2.x'] = np.NaN
+        prob['comp2.x'] = np.nan
 
         prob.run_model()
         assert_near_equal(prob['comp2.x'], 3.)

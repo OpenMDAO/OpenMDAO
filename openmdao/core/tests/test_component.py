@@ -302,7 +302,48 @@ class TestExplicitComponent(unittest.TestCase):
 
         with assert_warning(OMDeprecationWarning, msg):
             prob.setup()
+    
+    def test_setup_residuals_error(self):
+        class Comp(ExplicitComponent):
+            def setup(self):
+                self.add_input('x', val=3.0)
+                self.add_output('y', val=3.0)
 
+            def setup_residuals(self):
+                # Overriding setup_residuals should raise an error.
+                pass
+
+        prob = Problem()
+        prob.model.add_subsystem('comp', Comp())
+
+        msg = ("'comp' <class Comp>: Class overrides setup_residuals "
+               "but is an ExplicitComponent. setup_residuals may only "
+               "be overridden by ImplicitComponents.")
+
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as e:
+            prob.final_setup()
+        
+        self.assertEqual(str(e.exception), msg)
+
+    def test_add_residual_error(self):
+        class Comp(ExplicitComponent):
+            def setup(self):
+                self.add_input('x', val=3.0)
+                self.add_output('y', val=3.0)
+                # Invalid to add a residual to an explicit component
+                self.add_residual('resid_x', shape=(1,))
+
+        prob = Problem()
+        prob.model.add_subsystem('comp', Comp())
+
+        msg = ("'Comp' object has no attribute 'add_residual'")
+
+        with self.assertRaises(AttributeError) as e:
+            prob.setup()
+        
+        self.assertEqual(str(e.exception), msg)
 
 class TestImplicitComponent(unittest.TestCase):
 

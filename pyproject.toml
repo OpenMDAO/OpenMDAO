@@ -72,7 +72,7 @@ test = [
     "parameterized",
     "playwright>=1.20",
     "pycodestyle>=2.4.0",
-    "pydocstyle==2.0.0",
+    "pydocstyle>=2.0.0",
     "testflo>=1.3.6",
     "websockets>8",
 ]
@@ -107,6 +107,7 @@ externalcodecomp = "openmdao.components.external_code_comp:ExternalCodeComp"
 externalcodeimplicitcomp = "openmdao.components.external_code_comp:ExternalCodeImplicitComp"
 implicitfunccomp = "openmdao.components.implicit_func_comp:ImplicitFuncComp"
 indepvarcomp = "openmdao.core.indepvarcomp:IndepVarComp"
+inputresidscomp = "openmdao.components.input_resids_comp:InputResidsComp"
 kscomp = "openmdao.components.ks_comp:KSComp"
 linearsystemcomp = "openmdao.components.linear_system_comp:LinearSystemComp"
 matrixvectorproductcomp = "openmdao.components.matrix_vector_product_comp:MatrixVectorProductComp"

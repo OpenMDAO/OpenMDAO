@@ -38,6 +38,7 @@ from openmdao.utils.relevance import get_relevance
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     PromotionWarning, MPIWarning, DerivativesWarning
 from openmdao.utils.class_util import overrides_method
+from openmdao.core.total_jac import _TotalJacInfo
 
 # regex to check for valid names.
 import re
@@ -1022,6 +1023,8 @@ class Group(System):
 
         This part of setup is called automatically at the start of run_model or run_driver.
         """
+        self._setup_residuals()
+
         if self._use_derivatives:
             # must call this before vector setup because it determines if we need to alloc commplex
             self._setup_partials()
@@ -3436,6 +3439,29 @@ class Group(System):
                     return None
         return system
 
+    def run_linearize(self, sub_do_ln=True, driver=None):
+        """
+        Compute jacobian / factorization.
+
+        This calls _linearize, but with the model assumed to be in an unscaled state.
+
+        Parameters
+        ----------
+        sub_do_ln : bool
+            Flag indicating if the children should call linearize on their linear solvers.
+        driver : Driver or None
+            If this system is the top level system and approx derivatives have not been
+            initialized, the driver for this model must be supplied in order to properly
+            initialize the approximations.
+        """
+        if driver is not None and self.pathname == '' and self._owns_approx_jac:
+            self._tot_jac = _TotalJacInfo(driver._problem(), None, None, 'flat_dict', approx=True)
+
+        try:
+            super().run_linearize(sub_do_ln=sub_do_ln)
+        finally:
+            self._tot_jac = None
+
     def _apply_nonlinear(self):
         """
         Compute residuals. The model is assumed to be in a scaled state.
@@ -3789,6 +3815,13 @@ class Group(System):
                     msg = "{}: Approx_totals is not supported on a group with a distributed "
                     msg += "component whose input '{}' is distributed using src_indices. "
                     raise RuntimeError(msg.format(self.msginfo, iname))
+
+    def _setup_residuals(self):
+        """
+        Call setup_residuals in components.
+        """
+        for subsys in self._sorted_sys_iter():
+            subsys._setup_residuals()
 
     def _declared_partials_iter(self):
         """
@@ -5069,13 +5102,25 @@ class Group(System):
         has_custom_derivs = False
         list_wrt = list(wrt) if wrt is not None else []
 
-        driver_wrt = list(driver._designvars)
         if wrt is None:
+            lincons = [d for d, meta in driver._cons.items() if meta['linear']]
+            if lincons:
+                if len(lincons) == len(driver._responses):  # all 'ofs' are linear
+                    driver_wrt = list(driver._lin_dvs if driver.supports['linear_only_designvars']
+                                      else driver._designvars)
+                else:  # mixed linear and nonlinear constraints
+                    driver_wrt = list(driver._nl_dvs if driver.supports['linear_only_designvars']
+                                      else driver._designvars)
+            else:
+                driver_wrt = list(driver._nl_dvs if driver.supports['linear_only_designvars']
+                                  else driver._designvars)
+
             wrt = driver_wrt
             if not wrt:
                 raise RuntimeError("No design variables were passed to compute_totals and "
                                    "the driver is not providing any.")
         else:
+            driver_wrt = list(driver._designvars)
             wrt_src_names = [m['source'] for m in driver._designvars.values()]
             if list_wrt != driver_wrt and list_wrt != wrt_src_names:
                 has_custom_derivs = True

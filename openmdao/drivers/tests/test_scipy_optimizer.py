@@ -19,11 +19,11 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, Sell
 from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.test_suite.components.simple_comps import NonSquareArrayComp
 from openmdao.test_suite.groups.sin_fitter import SineFitter
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
-from openmdao.utils.general_utils import run_driver
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals, assert_no_warning
+from openmdao.utils.general_utils import run_driver, printoptions
 from openmdao.utils.testing_utils import set_env_vars_context, use_tempdirs
 from openmdao.utils.mpi import MPI
-from openmdao.utils.om_warnings import OMDeprecationWarning
+from openmdao.utils.om_warnings import OMDeprecationWarning, DerivativesWarning
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -2127,8 +2127,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        with self.assertRaises(RuntimeError) as msg:
-            prob.run_driver()
+        with printoptions(legacy='1.21'):
+            with self.assertRaises(RuntimeError) as msg:
+                prob.run_driver()
 
         self.assertEqual(str(msg.exception),
                          "Design variables [('z', inds=[0])] have no impact on the constraints or objective.")
@@ -2185,8 +2186,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         msg = "Constraints or objectives [('parab.z', inds=[0])] cannot be impacted by the design variables of the problem."
 
-        with assert_warning(UserWarning, msg):
-            prob.run_driver()
+        with printoptions(legacy='1.21'):
+            with assert_warning(UserWarning, msg):
+                prob.run_driver()
 
     def test_singular_jac_desvars_multidim_indices_dv(self):
         expected_msg = "Design variables [('z', inds=[(0, 1, 0), (1, 0, 1), (1, 1, 0)])] " \
@@ -2219,16 +2221,17 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
                 prob.setup()
 
-                # run the optimization
-                if option == 'error':
-                    with self.assertRaises(RuntimeError) as ctx:
+                with printoptions(legacy='1.21'):
+                    # run the optimization
+                    if option == 'error':
+                        with self.assertRaises(RuntimeError) as ctx:
+                            prob.run_driver()
+                        self.assertEqual(str(ctx.exception), expected_msg)
+                    elif option == 'warn':
+                        with assert_warning(om.DerivativesWarning, expected_msg):
+                            prob.run_driver()
+                    else:
                         prob.run_driver()
-                    self.assertEqual(str(ctx.exception), expected_msg)
-                elif option == 'warn':
-                    with assert_warning(om.DerivativesWarning, expected_msg):
-                        prob.run_driver()
-                else:
-                    prob.run_driver()
 
     def test_singular_jac_error_desvars_multidim_indices_con(self):
         prob = om.Problem()
@@ -2257,8 +2260,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        with self.assertRaises(RuntimeError) as msg:
-            prob.run_driver()
+        with printoptions(legacy='1.21'):
+            with self.assertRaises(RuntimeError) as msg:
+                prob.run_driver()
 
         self.assertEqual(str(msg.exception),
                          "Constraints or objectives [('parab.f_z', inds=[(1, 1, 0)])] cannot be impacted by the design variables of the problem.")
@@ -2400,6 +2404,42 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         y_out = prob.get_val('y')
 
         assert_near_equal(y_out, 1.0, tolerance=1.0E-3)
+
+    def test_resp_size_w_linear_cons(self):
+        class MyGroup(om.Group):
+            def setup(self):
+                dvs = self.add_subsystem('dvs', om.IndepVarComp())
+                dvs.add_output('x', val=np.ones(10))
+                self.add_subsystem('comp', MyComponent())
+
+                self.connect('dvs.x', 'comp.x')
+
+                self.add_design_var('dvs.x', lower=0.0, upper=1.0)
+                self.add_constraint('comp.y', indices=np.arange(0,3), equals=0)
+                self.add_constraint('comp.y', indices=np.arange(3,10), equals=0, linear=True, alias='y_lin')
+                self.add_objective('comp.z')
+
+        class MyComponent(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', val=np.ones(10))
+                self.add_output('y', val=np.ones(10))
+                self.add_output('z', val=1.0)
+
+                self.declare_partials('*', '*')
+
+            def compute(self, inputs, outputs):
+                outputs.set_vals(*inputs.values())
+
+            def compute_partials(self, inputs, partials):
+                partials['y', 'x'] = np.eye(10)
+                partials['z', 'x'] = np.ones(10)
+
+
+        prob = om.Problem(model=MyGroup(), driver=om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-4, disp=True))
+
+        with assert_no_warning(DerivativesWarning, "Inefficient choice of derivative mode", contains=True):
+            prob.setup(mode='rev')
+            prob.run_driver()
 
 
 if __name__ == "__main__":

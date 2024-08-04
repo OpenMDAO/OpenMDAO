@@ -11,6 +11,7 @@ from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.constants import _UNDEFINED
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.recorders.recording_manager import RecordingManager
+from openmdao.utils.file_utils import _get_outputs_dir
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
@@ -558,6 +559,25 @@ class Solver(object):
             True if relevance should be active.
         """
         return True
+
+    def get_outputs_dir(self, *subdirs, mkdir=True):
+        """
+        Get the path under which all output files of this solver are to be placed.
+
+        Parameters
+        ----------
+        *subdirs : str
+            Subdirectories nested under the relevant problem output directory.
+            To create {prob_output_dir}/a/b one would pass `solver.get_outputs_dir('a', 'b')`.
+        mkdir : bool
+            If True, attempt to create this directory if it does not exist.
+
+        Returns
+        -------
+        pathlib.Path
+           The path of the outputs directory for the problem.
+        """
+        return _get_outputs_dir(self, *subdirs, mkdir=mkdir)
 
 
 class NonlinearSolver(Solver):
@@ -1159,8 +1179,7 @@ class BlockLinearSolver(LinearSolver):
             depth of the current system (already incremented).
         """
         super()._setup_solvers(system, depth)
-        if system._use_derivatives:
-            self._create_rhs_vec()
+        self._rhs_vec = None
 
     def _create_rhs_vec(self):
         system = self._system()
@@ -1170,6 +1189,9 @@ class BlockLinearSolver(LinearSolver):
             self._rhs_vec = system._doutputs.asarray(True)
 
     def _update_rhs_vec(self):
+        if self._rhs_vec is None:
+            self._create_rhs_vec()
+
         if self._mode == 'fwd':
             self._rhs_vec[:] = self._system()._dresiduals.asarray()
         else:
@@ -1187,6 +1209,8 @@ class BlockLinearSolver(LinearSolver):
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
+        if self._rhs_vec is None:
+            self._create_rhs_vec()
         if active:
             self._rhs_vec = self._rhs_vec.astype(complex)
         else:

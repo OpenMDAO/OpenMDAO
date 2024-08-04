@@ -10,6 +10,7 @@ from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.array_utils import evenly_distrib_idxs, take_nth
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.om_warnings import DistributedComponentWarning
+from openmdao.utils.variable_table import NA
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -549,7 +550,7 @@ class MPITests(unittest.TestCase):
         test = self
 
         def verify(inputs, outputs, in_vals=1., out_vals=1., pathnames=False, comm=None, final=True, rank=None):
-            global_shape = (size, ) if final else 'Unavailable'
+            global_shape = (size, ) if final else NA
 
             inputs = sorted(inputs)
             outputs = sorted(outputs)
@@ -1139,6 +1140,89 @@ class TestDistribCheckMPI(unittest.TestCase):
 
         assert_near_equal(prob.get_val("parallel.sum1.sum", get_remote=True), 3.0)
         assert_near_equal(prob.get_val("parallel.sum2.sum", get_remote=True), 12.0)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestCompDistVarErrors(unittest.TestCase):
+    """
+    When a component declares variables in different orders on different ranks
+    or declares variables on some ranks but not others.
+    """
+
+    N_PROCS = 4
+
+    def test_missing_vars(self):
+        class Comp1(om.ExplicitComponent):
+            def setup(self):
+                if self.comm.rank==0:
+                    self.add_output('a', np.zeros((2,3)), distributed=True)
+                elif self.comm.rank==1:
+                    self.add_output('a', np.zeros((1,3)), distributed=True)
+                else:
+                    self.add_output('a', np.zeros((0,3)), distributed=True)
+
+        class Comp2(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('a', distributed=True, shape_by_conn=True)
+                if self.comm.rank==0:
+                    self.add_output('b', np.zeros(2), distributed=True)
+                    self.add_output('c', np.zeros(2), distributed=True)
+                else:
+                    self.add_output('b', np.zeros(0), distributed=True)
+
+        class Group1(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', Comp1(), promotes=['*'])
+                self.add_subsystem('comp2', Comp2(), promotes=['*'])
+
+        prob = om.Problem()
+        prob.model = Group1()
+
+        with self.assertRaises(Exception) as cm:
+            prob.setup(mode='rev')
+
+        self.assertEqual(str(cm.exception),
+                         "'comp2' <class Comp2>: Variable 'c' exists on some ranks and not others. "
+                         "A component must declare all variables in the same order on all ranks, "
+                         "even if the size of the variable is 0 on some ranks.")
+
+    def test_out_of_order_vars(self):
+        class Comp1(om.ExplicitComponent):
+            def setup(self):
+                if self.comm.rank==0:
+                    self.add_output('a', np.zeros((2,3)), distributed=True)
+                elif self.comm.rank==1:
+                    self.add_output('a', np.zeros((1,3)), distributed=True)
+                else:
+                    self.add_output('a', np.zeros((0,3)), distributed=True)
+
+        class Comp2(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('a', distributed=True, shape_by_conn=True)
+                if self.comm.rank==0:
+                    self.add_output('b', np.zeros(2), distributed=True)
+                    self.add_output('c', np.zeros(2), distributed=True)
+                else:
+                    self.add_output('c', np.zeros(1), distributed=True)
+                    self.add_output('b', np.zeros(1), distributed=True)
+
+        class Group1(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', Comp1(), promotes=['*'])
+                self.add_subsystem('comp2', Comp2(), promotes=['*'])
+
+        prob = om.Problem()
+        prob.model = Group1()
+
+        with self.assertRaises(Exception) as cm:
+            prob.setup(mode='rev')
+
+        self.assertEqual(str(cm.exception),
+                         "'comp2' <class Comp2>: Variables have not been declared in the same "
+                         "order on all ranks. A component must declare all variables in the "
+                         "same order on all ranks, even if the size of the variable is 0 on some ranks.")
+
+
 
 if __name__ == '__main__':
     from openmdao.utils.mpi import mpirun_tests

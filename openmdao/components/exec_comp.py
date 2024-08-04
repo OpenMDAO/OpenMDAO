@@ -272,6 +272,8 @@ class ExecComp(ExplicitComponent):
                              desc='If True (the default), compute the partial jacobian '
                              'coloring for this component.')
 
+        self.options.undeclare("distributed")
+
     @classmethod
     def register(cls, name, callable_obj, complex_safe):
         """
