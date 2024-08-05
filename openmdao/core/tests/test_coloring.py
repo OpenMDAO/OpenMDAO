@@ -39,6 +39,8 @@ except ImportError:
 
 # check that pyoptsparse is installed
 OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
+if OPTIMIZER:
+    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 
 class CounterGroup(om.Group):
