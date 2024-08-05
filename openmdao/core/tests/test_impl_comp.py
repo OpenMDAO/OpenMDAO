@@ -51,7 +51,6 @@ class QuadraticLinearize(QuadraticComp):
     def linearize(self, inputs, outputs, partials):
         a = inputs['a']
         b = inputs['b']
-        c = inputs['c']
         x = outputs['x']
 
         partials['x', 'a'] = x ** 2
@@ -83,7 +82,6 @@ class QuadraticJacVec(QuadraticComp):
                      d_inputs, d_outputs, d_residuals, mode):
         a = inputs['a']
         b = inputs['b']
-        c = inputs['c']
         x = outputs['x']
         if mode == 'fwd':
             if 'x' in d_residuals:

@@ -98,7 +98,7 @@ class MyExplicitComp2(ExplicitComponent):
 
     def compute_partials(self, inputs, partials):
         w = inputs['w']
-        z = inputs['z']
+
         jac = self._jac_type(np.array([[
             2.0*w[0] - 10.0,
             2.0*w[1] + 2.0,

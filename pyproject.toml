@@ -187,6 +187,6 @@ line-ending = "lf"
 convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
-# Ignore `E402` (import violations) in api files.
-"api.py" = ["E402"]
-"parallel_api.py" = ["E402"]
+# Ignore `F401` (import violations) in api files.
+"api.py" = ["F401"]
+"parallel_api.py" = ["F401"]

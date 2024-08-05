@@ -773,7 +773,7 @@ class GeneticAlgorithm(object):
                 # Find best performing point in this generation.
                 min_fit = np.min(fitness)
                 min_index = np.argmin(fitness)
-                min_gen = old_gen[min_index]
+                # min_gen = old_gen[min_index]
                 min_x = x_pop[min_index]
 
                 if min_fit < fopt:

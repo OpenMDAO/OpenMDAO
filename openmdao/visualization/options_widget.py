@@ -152,7 +152,7 @@ class OptionsWidget(object):
 
             types = option['types']
 
-            if types == list:
+            if isinstance(types, list):
                 _widgets.append(widgets.Textarea(
                     description=name,
                     tooltip=desc,

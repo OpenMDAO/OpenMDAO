@@ -237,7 +237,7 @@ class HtmlPreprocessor():
         for found_directive in matches:
 
             full_match = found_directive.group(0)
-            comment_start = found_directive.group(1)
+            # comment_start = found_directive.group(1)
             keyword = found_directive.group(2)
             arg = found_directive.group(3)
 

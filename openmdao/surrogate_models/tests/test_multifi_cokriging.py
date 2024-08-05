@@ -15,10 +15,12 @@ class CoKrigingSurrogateTest(unittest.TestCase):
         # A matching test using the OpenMDAO surrogate class is below (test_1d_2fi_cokriging).
 
         # high fidelity model
-        fe = lambda x: ((x * 6 - 2) ** 2) * np.sin((x * 6 - 2) * 2)
+        def fe(x):
+            return (x * 6 - 2) ** 2 * np.sin((x * 6 - 2) * 2)
 
         # low fidelity model
-        fc = lambda x: 0.5 * fe(x) + (x - 0.5) * 10. - 5
+        def fc(x):
+            return 0.5 * fe(x) + (x - 0.5) * 10.0 - 5
 
         # Xe: DOE for expensive code (nested in Xc)
         # Xc: DOE for cheap code

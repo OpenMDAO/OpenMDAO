@@ -324,7 +324,7 @@ class LintTestCase(unittest.TestCase):
             return []
 
         doc_returns = numpy_doc_string['Returns']
-        doc_yields = numpy_doc_string['Yields']
+        # doc_yields = numpy_doc_string['Yields']
 
         # TODO:  Enforce Yields in docs for contextmanagers
         if _is_context_manager(func):

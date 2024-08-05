@@ -12,7 +12,7 @@ class TestMissingImports(unittest.TestCase):
     def test_missing_imports_cm(self):
         with self.assertRaises(ImportError) as e:
             with MissingImports('pyoptsparse'):
-                import pyoptsparse  # noqa: E401
+                import pyoptsparse  # noqa: F401
 
         msg = "No module named pyoptsparse due to missing import pyoptsparse."
 
@@ -21,37 +21,37 @@ class TestMissingImports(unittest.TestCase):
     def test_missing_imports(self):
 
         with MissingImports('pyoptsparse'):
-            import openmdao.api as om  # noqa: E401
+            import openmdao.api as om  # noqa: F401
 
     def test_missing_imports_docs(self):
 
         with MissingImports('IPython'):
-            import openmdao.api as om  # noqa: E401
+            import openmdao.api as om  # noqa: F401
 
         with MissingImports('matplotlib'):
-            import openmdao.api as om  # noqa: E401
+            import openmdao.api as om  # noqa: F401
 
         with MissingImports('numpydoc'):
-            import openmdao.api as om  # noqa: E401
+            import openmdao.api as om  # noqa: F401
 
     def test_missing_imports_notebooks(self):
 
         with MissingImports('notebook'):
-            import openmdao.api as om  # noqa: E401
+            import openmdao.api as om  # noqa: F401
 
     def test_missing_imports_visualization(self):
         with MissingImports('bokeh'):
-            import openmdao.api as om  # noqa: E401
+            import openmdao.api as om  # noqa: F401
 
     def test_missing_imports_testing(self):
         with MissingImports('parameterized'):
-            import openmdao.api as om  # noqa: E401
+            import openmdao.api as om  # noqa: F401
 
         with MissingImports('pycodestyle'):
-            import openmdao.api as om  # noqa: E401
+            import openmdao.api as om  # noqa: F401
 
         with MissingImports('testflo'):
-            import openmdao.api as om  # noqa: E401
+            import openmdao.api as om  # noqa: F401
 
 
 class TestPrimitives(unittest.TestCase):
@@ -210,4 +210,3 @@ class TestSNumEqual(unittest.TestCase):
         # Test with strings that contain multiple numbers outside the tolerance
         self.assertFalse(snum_equal("abc123.0001def456.0001", "abc123.0002def456.0002", atol=1e-6))
         self.assertFalse(snum_equal("abc123.0001def456.0001", "abc123.0002def456.0002", rtol=1e-6))
-

@@ -1128,11 +1128,6 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         model = om.Group()
         ivc = om.IndepVarComp()
 
-        mapdata = SampleMap()
-
-        params = mapdata.param_data
-        outs = mapdata.output_data
-
         ivc.add_output('x', np.array([.33]))
 
         ivc.add_output('f_train', np.array([.3, .7, .5, .6, .3, .4, .2]))
@@ -1207,10 +1202,6 @@ class TestMetaModelStructuredPython(unittest.TestCase):
     def test_training_gradient_unsupported(self):
         # If using a fixed table method
         model = om.Group()
-        mapdata = SampleMap()
-
-        params = mapdata.param_data
-        outs = mapdata.output_data
 
         comp = om.MetaModelStructuredComp(training_data_gradients=True, extrapolate=True,
                                           method='1D-akima', vec_size=1)
@@ -1232,10 +1223,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
     def test_vectorized_1D_akima(self):
         model = om.Group()
-        mapdata = SampleMap()
 
-        params = mapdata.param_data
-        outs = mapdata.output_data
         nn = 2
 
         comp = om.MetaModelStructuredComp(extrapolate=True,

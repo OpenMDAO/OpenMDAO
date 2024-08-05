@@ -121,7 +121,6 @@ class DistParabDeprecated(om.ExplicitComponent):
         rank = comm.rank
 
         sizes, offsets = evenly_distrib_idxs(comm.size, arr_size)
-        start = offsets[rank]
         io_size = sizes[rank]
         self.offset = offsets[rank]
 

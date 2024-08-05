@@ -75,7 +75,7 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
 
     def test_interp_spline_bsplines(self):
 
-        xcp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
+        # xcp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
         ycp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
         n = 50
         x = np.linspace(1.0, 12.0, n)

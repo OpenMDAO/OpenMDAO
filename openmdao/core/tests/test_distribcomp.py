@@ -279,7 +279,7 @@ class NOMPITests(unittest.TestCase):
 
         p = om.Problem()
         top = p.model
-        C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
+        top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribInputComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
 
@@ -426,7 +426,7 @@ class MPITests(unittest.TestCase):
 
         p = om.Problem()
         top = p.model
-        C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
+        top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribCompSimple(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
 
@@ -637,7 +637,7 @@ class MPITests(unittest.TestCase):
 
         p = om.Problem()
         top = p.model
-        C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
+        top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribInputComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
 
@@ -658,9 +658,9 @@ class MPITests(unittest.TestCase):
         p = om.Problem()
 
         top = p.model
-        C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
+        top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribInputComp(arr_size=size))
-        C3 = top.add_subsystem("C3", om.ExecComp("y=x", x=np.zeros(size*commsize),
+        top.add_subsystem("C3", om.ExecComp("y=x", x=np.zeros(size*commsize),
                                                  y=np.zeros(size*commsize)))
 
         comm = p.comm
@@ -689,8 +689,8 @@ class MPITests(unittest.TestCase):
 
         p = om.Problem()
         top = p.model
-        C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
-        C2 = top.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
+        top.add_subsystem("C1", InOutArrayComp(arr_size=size))
+        top.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
         C3 = top.add_subsystem("C3", DistribGatherComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec')
@@ -755,7 +755,7 @@ class MPITests(unittest.TestCase):
 
         p = om.Problem()
         top = p.model
-        C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
+        top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribOverlappingInputComp(arr_size=size, local_size=local_size))
         top.connect('C1.outvec', 'C2.invec', src_indices=np.arange(start, end, dtype=int))
         p.setup()
@@ -793,8 +793,8 @@ class MPITests(unittest.TestCase):
 
         p = om.Problem()
         top = p.model
-        C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
-        C2 = top.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
+        top.add_subsystem("C1", InOutArrayComp(arr_size=size))
+        top.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
         C3 = top.add_subsystem("C3", NonDistribGatherComp(size=size))
         top.connect('C1.outvec', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec', om.slicer[:])

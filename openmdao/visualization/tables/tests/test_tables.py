@@ -269,8 +269,8 @@ Col0  Col1  Col2
     def test_basic_tabulator(self):
         # for now, just check that it doesn't crash
         headers = ['Strings', 'Floats', 'Something else']
-        table = generate_table(self.table_row_iter('str', 'float', None),
-                               tablefmt='tabulator', headers=headers)
+        generate_table(self.table_row_iter('str', 'float', None),
+                       tablefmt='tabulator', headers=headers)
 
     def test_embedded_newline(self):
         cells = [

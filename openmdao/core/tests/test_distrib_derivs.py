@@ -2472,8 +2472,8 @@ class TestDistribBugs(unittest.TestCase):
             Jname = 'J_fwd' if 'J_fwd' in val else 'J_rev'
             idx = 0 if 'J_fwd' in val else 1
             try:
-                analytic = val[Jname]
-                fd = val['J_fd']
+                val[Jname]  # analytic
+                val['J_fd']  # FD
             except Exception as err:
                 self.fail(f"For key {key}: {err}")
             try:
