@@ -68,7 +68,7 @@ jobs:
           # test latest versions on macos
           # Include PETSc/pyOptSparse, which require NumPy<2
           - NAME: MacOS Latest, NumPy<2
-            OS: macos-latest
+            OS: macos-13
             PY: 3
             NUMPY: '<2'
             PETSc: true
@@ -77,7 +77,7 @@ jobs:
           # test latest versions on macos
           # Exclude PETSc/pyOptSparse, which require NumPy<2
           - NAME: MacOS Latest, NumPy 2 (No PETSc/pyOptSparse)
-            OS: macos-latest
+            OS: macos-13
             PY: 3
 
     runs-on: ${{ matrix.OS }}
@@ -127,17 +127,10 @@ jobs:
           conda-version: "*"
           channels: conda-forge
 
-      - name: Install compilers
+      - name: Install MacOS-specific dependencies
         if: matrix.OS == 'macos-13'
         run: |
-          if [[ "${{ matrix.BREW }}" ]]; then
-            brew install swig meson
-            if [[ "${{ matrix.OS }}" == "macos-latest" ]]; then
-              ln -s /opt/homebrew/bin/gfortran-13 /opt/homebrew/bin/gfortran
-            fi
-          else
-            conda install compilers cython swig -q -y
-          fi
+          conda install compilers swig
 
       - name: Install NumPy/SciPy
         run: |
@@ -221,7 +214,7 @@ jobs:
               echo "SNOPT source is not available"
             fi
           fi
-          build_pyoptsparse -v $BRANCH $SNOPT
+          build_pyoptsparse $BRANCH $SNOPT
 
       - name: Install OpenMDAO
         run: |
@@ -291,7 +284,7 @@ jobs:
           cd $HOME
           RPT_FILE=`pwd`/deprecations.txt
           echo "RPT_FILE=$RPT_FILE" >> $GITHUB_ENV
-          testflo -n 1 openmdao --pre_announce --timeout=240 --deprecations_report=$RPT_FILE --exclude=test_warnings_filters
+          testflo -n 1 openmdao --timeout=240 --deprecations_report=$RPT_FILE --exclude=test_warnings_filters
 
       - name: Build docs
         id: build_docs
