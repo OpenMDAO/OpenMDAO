@@ -69,11 +69,10 @@ class TestCmdlineMemory(unittest.TestCase):
 
     def _run_command(self, cmd):
         try:
-            output = subprocess.check_output(cmd).decode('utf-8', 'ignore')
+            subprocess.check_output(cmd).decode('utf-8', 'ignore')
         except subprocess.CalledProcessError as err:
-            msg = f"Running command '{cmd}' failed. " + \
-                  f"Output was: \n{err.output.decode('utf-8')}")
-            self.fail(msg)
+            self.fail(f"Running command '{cmd}' failed. " + \
+                      f"Output was: \n{err.output.decode('utf-8')}")
 
     def test_mem(self):
         self._run_command(['openmdao', 'mem', self.tstfile])
