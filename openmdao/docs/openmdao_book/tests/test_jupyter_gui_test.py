@@ -11,7 +11,7 @@ except ImportError:
             raise unittest.SkipTest("tests require the 'playwright' and 'aiounittest' packages.")
 else:
     os.system("playwright install")
-    from .jupyter_gui_test import TestOpenMDAOJupyterBookDocs
+    from .jupyter_gui_test import TestOpenMDAOJupyterBookDocs  # noqa: E401
 
 
 if __name__ == "__main__":

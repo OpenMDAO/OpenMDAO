@@ -10,8 +10,8 @@ except ImportError:
             raise unittest.SkipTest("tests require the 'playwright' package.")
 else:
     os.system("playwright install")
-    from .n2_gui_test import n2_gui_test_case
-    from .gen_gui_test import gen_gui_test_case
+    from .n2_gui_test import n2_gui_test_case  # noqa: E401
+    from .gen_gui_test import gen_gui_test_case  # noqa: E401
 
 if __name__ == "__main__":
     unittest.main()

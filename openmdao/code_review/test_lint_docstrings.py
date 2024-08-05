@@ -340,11 +340,9 @@ class LintTestCase(unittest.TestCase):
             # Check formatting
             for (name, typ, desc) in doc_returns:
                 if name_required and not name:
-                    new_failures.append('no detectable name for Return '
-                                        'value'.format(name))
+                    new_failures.append('no detectable name for Return value')
                 if desc == '':
-                    new_failures.append('no description given for Return '
-                                        '{0}'.format(name))
+                    new_failures.append(f'no description given for Return {name}')
 
         return new_failures
 

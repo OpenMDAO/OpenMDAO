@@ -2,8 +2,8 @@
 
 import numpy as np
 
-from openmdao.proc_allocators.proc_allocator import ProcAllocator, ProcAllocationError
-from openmdao.utils.mpi import MPI
+from openmdao.proc_allocators.proc_allocator import ProcAllocator, ProcAllocationError  # noqa: E401
+from openmdao.utils.mpi import MPI  # noqa: E401
 
 
 class DefaultAllocator(ProcAllocator):

@@ -71,8 +71,8 @@ class TestCmdlineMemory(unittest.TestCase):
         try:
             output = subprocess.check_output(cmd).decode('utf-8', 'ignore')
         except subprocess.CalledProcessError as err:
-            msg = "Running command '{}' failed. " + \
-                  "Output was: \n{}".format(cmd, err.output.decode('utf-8'))
+            msg = f"Running command '{cmd}' failed. " + \
+                  f"Output was: \n{err.output.decode('utf-8')}")
             self.fail(msg)
 
     def test_mem(self):
