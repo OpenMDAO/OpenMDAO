@@ -1,8 +1,6 @@
 import unittest
-import math
 
 import numpy as np
-from scipy.optimize import newton
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals

@@ -2,7 +2,6 @@
 
 import sys
 import os
-import sys
 import unittest
 
 from io import StringIO
@@ -2844,7 +2843,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         ]
 
         stream = StringIO()
-        cases = cr.list_cases(out_stream=stream)
+        cr.list_cases(out_stream=stream)
         text = stream.getvalue().split('\n')
         for i, line in enumerate(expected_cases):
             self.assertEqual(text[i], line)
@@ -2875,7 +2874,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertTrue(str(cm.exception), "Invalid output stream specified for 'out_stream'.")
 
         stream = StringIO()
-        cases = cr.list_sources(out_stream=stream)
+        cr.list_sources(out_stream=stream)
         text = stream.getvalue().split('\n')
         for i, line in enumerate(expected_sources):
             self.assertEqual(text[i], line)
@@ -2905,7 +2904,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         ]
 
         stream = StringIO()
-        cases = cr.list_source_vars('driver', out_stream=stream)
+        cr.list_source_vars('driver', out_stream=stream)
         text = sorted(stream.getvalue().split('\n'), reverse=True)
         for i, line in enumerate(expected_cases):
             self.assertEqual(text[i], line)
@@ -3912,10 +3911,10 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         cr = om.CaseReader(filename)
 
         with assert_warning(UserWarning, 'System options not recorded.'):
-            options = cr.list_model_options()
+            cr.list_model_options()
 
         with assert_warning(UserWarning, 'Solver options not recorded.'):
-            options = cr.list_solver_options()
+            cr.list_solver_options()
 
         # The case reader should handle a v11 database that had a
         # different separator for runs in the model option keys

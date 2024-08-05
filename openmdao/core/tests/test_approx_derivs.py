@@ -1977,7 +1977,7 @@ class TestComponentComplexStep(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        comp = model.add_subsystem('comp', BadSparsityComp())
+        model.add_subsystem('comp', BadSparsityComp())
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -2361,7 +2361,6 @@ class TestFDRelative(unittest.TestCase):
                 self.add_output('y', np.ones((nn, )))
 
             def setup_partials(self):
-                nn = self.options['vec_size']
                 self.set_check_partial_options('x_element', method='fd', step_calc='rel_element', directional=True)
 
             def compute(self, inputs, outputs):
@@ -2620,7 +2619,7 @@ class CheckTotalsIndices(unittest.TestCase):
         prob.setup()
 
         prob.run_model()
-        check = prob.check_totals(compact_print=True)
+        prob.check_totals(compact_print=True)
 
 
 def _setup_1ivc_fdgroupwithpar_1sink(size=7):

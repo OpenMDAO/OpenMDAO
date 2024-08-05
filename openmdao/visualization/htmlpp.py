@@ -270,7 +270,7 @@ class HtmlPreprocessor():
                 # Recursively insert a CSS file which may also have hpp directives
                 new_content = '<style type="text/css">\n' + \
                               self.parse_contents(self.load_file(arg, rlvl=rlvl,
-                                                  allow_dup=flags['dup']), rlvl) + f'\n</style>'
+                                                  allow_dup=flags['dup']), rlvl) + '\n</style>'
 
             elif keyword == 'bin2b64':
                 new_content = self.load_file(arg, binary=True, allow_dup=flags['dup'], rlvl=rlvl)

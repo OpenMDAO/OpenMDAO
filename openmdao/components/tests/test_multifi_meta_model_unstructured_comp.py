@@ -2,7 +2,7 @@ import numpy as np
 import unittest
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class MockSurrogate(om.MultiFiSurrogateModel):

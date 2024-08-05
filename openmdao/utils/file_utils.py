@@ -2,7 +2,6 @@
 Utilities for working with files.
 """
 
-from multiprocessing import Value
 import sys
 import os
 import importlib
@@ -451,7 +450,6 @@ def _get_outputs_dir(obj=None, *subdirs, mkdir=True):
     from openmdao.core.problem import Problem
     from openmdao.core.system import System
     from openmdao.solvers.solver import Solver
-    from openmdao.core.constants import _SetupStatus
 
     if isinstance(obj, Problem):
         prob_meta = obj._metadata

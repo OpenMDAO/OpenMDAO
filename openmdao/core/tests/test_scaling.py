@@ -6,7 +6,6 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.core.driver import Driver
-from openmdao.utils.testing_utils import use_tempdirs
 
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayDense
@@ -900,7 +899,7 @@ class TestScaling(unittest.TestCase):
 
         model.add_subsystem('p1', om.IndepVarComp('x1', 1.0))
         model.add_subsystem('p2', om.IndepVarComp('x2', 1.0))
-        comp = model.add_subsystem('comp', ScalingExample1())
+        model.add_subsystem('comp', ScalingExample1())
         model.connect('p1.x1', 'comp.x1')
         model.connect('p2.x2', 'comp.x2')
 
@@ -922,7 +921,7 @@ class TestScaling(unittest.TestCase):
 
         model.add_subsystem('p1', om.IndepVarComp('x1', 1.0))
         model.add_subsystem('p2', om.IndepVarComp('x2', 1.0))
-        comp = model.add_subsystem('comp', ScalingExample2())
+        model.add_subsystem('comp', ScalingExample2())
         model.connect('p1.x1', 'comp.x1')
         model.connect('p2.x2', 'comp.x2')
 
@@ -944,7 +943,7 @@ class TestScaling(unittest.TestCase):
 
         model.add_subsystem('p1', om.IndepVarComp('x1', 1.0))
         model.add_subsystem('p2', om.IndepVarComp('x2', 1.0))
-        comp = model.add_subsystem('comp', ScalingExample3())
+        model.add_subsystem('comp', ScalingExample3())
         model.connect('p1.x1', 'comp.x1')
         model.connect('p2.x2', 'comp.x2')
 
@@ -965,7 +964,7 @@ class TestScaling(unittest.TestCase):
         model = prob.model
 
         model.add_subsystem('p', om.IndepVarComp('x', np.ones((2))))
-        comp = model.add_subsystem('comp', ScalingExampleVector())
+        model.add_subsystem('comp', ScalingExampleVector())
         model.connect('p.x', 'comp.x')
 
         prob.setup()
@@ -1215,8 +1214,8 @@ class MyComp(om.ExplicitComponent):
                            [7.0, 5.0, 1.1, 2.2],
                            [-3.0, 2.0, 6.8, -1.5]
                            ])
-        rows = np.repeat(np.arange(4), 4)
-        cols = np.tile(np.arange(4), 4)
+        np.repeat(np.arange(4), 4)
+        np.tile(np.arange(4), 4)
 
         self.declare_partials(of='x3_u_u', wrt='x2_u_u', val=self.J[0, 0])
         self.declare_partials(of='x3_u_u', wrt='x2_u_s', val=self.J[0, 1])
@@ -1314,7 +1313,7 @@ class TestScalingOverhaul(unittest.TestCase):
         inputs_comp.add_output('ox1_s_s', val=1.0)
 
         model.add_subsystem('p', inputs_comp)
-        mycomp = model.add_subsystem('comp', MyComp())
+        model.add_subsystem('comp', MyComp())
 
         model.connect('p.x1_u_u', 'comp.x2_u_u')
         model.connect('p.x1_u_s', 'comp.x2_u_s')
@@ -1412,7 +1411,7 @@ class TestScalingOverhaul(unittest.TestCase):
         inputs_comp.add_output('x1_u', val=1.0)
 
         model.add_subsystem('p', inputs_comp)
-        mycomp = model.add_subsystem('comp', MyImplicitComp())
+        model.add_subsystem('comp', MyImplicitComp())
 
         model.connect('p.x1_u', 'comp.x2_u')
 

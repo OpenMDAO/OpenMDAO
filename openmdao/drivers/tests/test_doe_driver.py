@@ -1271,7 +1271,6 @@ class TestDOEDriver(unittest.TestCase):
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('problem', out_stream=None)
 
         case = cr.get_case('end')
         inputs = case.inputs
@@ -2190,7 +2189,7 @@ class TestParallelDOE2proc(unittest.TestCase):
 
         # Test for missing metadata db file error
         try:
-            cr_test = om.CaseReader(filename, metadata_filename='nonexistant_filename')
+            om.CaseReader(filename, metadata_filename='nonexistant_filename')
             found_metadata = True
         except IOError:
             found_metadata = False

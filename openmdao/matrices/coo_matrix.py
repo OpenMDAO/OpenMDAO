@@ -1,9 +1,8 @@
 """Define the COOmatrix class."""
 import numpy as np
 from numpy import ndarray
-from scipy.sparse import coo_matrix, csc_matrix
+from scipy.sparse import coo_matrix
 
-from collections import OrderedDict
 
 from openmdao.core.constants import INT_DTYPE
 from openmdao.matrices.matrix import Matrix, _compute_index_map

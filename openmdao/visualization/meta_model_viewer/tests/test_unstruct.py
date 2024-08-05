@@ -74,7 +74,7 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         prob.setup()
 
         with self.assertRaises(Exception) as context:
-            viz = MetaModelVisualization(interp)
+            MetaModelVisualization(interp)
 
         msg = "No training data present for one or more parameters"
         self.assertTrue(msg in str(context.exception))
@@ -102,7 +102,7 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         prob.setup()
 
         with self.assertRaises(Exception) as context:
-            viz = MetaModelVisualization(interp)
+            MetaModelVisualization(interp)
 
         msg = 'Must have more than one input value'
         self.assertTrue(msg in str(context.exception))

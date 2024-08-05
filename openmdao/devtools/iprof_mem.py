@@ -1,16 +1,13 @@
 
 import sys
 import os
-import argparse
 import time
 import gc
 from importlib import import_module
-from collections import defaultdict
 from os.path import abspath, isfile, dirname, join
 from contextlib import contextmanager
 
-from openmdao.devtools.iprof_utils import find_qualified_name, func_group, \
-     _collect_methods, _setup_func_group, _get_methods, _Options
+from openmdao.devtools.iprof_utils import find_qualified_name, _Options
 from openmdao.utils.mpi import MPI
 from openmdao.devtools.debug import _get_color_printer
 
@@ -289,9 +286,7 @@ def postprocess_memtrace_tree(fname, min_mem=1.0, show_colors=True, rank=0, stre
     cprint, Fore, Back, Style = _get_color_printer(stream, show_colors, rank=rank)
 
     info = {}
-    cache = {}
 
-    top = None
     stack = []
     path_stack = []
     qual_cache = {}
@@ -399,9 +394,7 @@ def postprocess_memtrace_flat(fname, min_mem=1.0, show_colors=True, rank=0, stre
     cprint, Fore, Back, Style = _get_color_printer(stream, show_colors, rank=rank)
 
     info = {}
-    cache = {}
 
-    top = None
     stack = []
     qual_cache = {}
     maxmem = 0.0

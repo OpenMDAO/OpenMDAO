@@ -61,9 +61,6 @@ class TestParallelGroups(unittest.TestCase):
     def test_fan_out_grouped(self, solv_tup, nlsolver):
         prob = om.Problem(FanOutGrouped())
 
-        of=['c2.y', "c3.y"]
-        wrt=['iv.x']
-
         solver, jactype = solv_tup
 
         prob.model.linear_solver = solver()
@@ -309,9 +306,6 @@ class TestParallelGroupsMPI2(TestParallelGroups):
 
         model.connect('sub.c2.y', 'c2.x')
         model.connect('sub.c3.y', 'c3.x')
-
-        of=['c2.y', "c3.y"]
-        wrt=['iv.x']
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -843,8 +837,8 @@ class TestSingleRankRunWithBcast(unittest.TestCase):
         par.add_subsystem('C1', BcastComp())
         par.add_subsystem('C2', BcastComp())
 
-        model.connect('indep.x', f'par.C1.x')
-        model.connect('indep.x', f'par.C2.x')
+        model.connect('indep.x', 'par.C1.x')
+        model.connect('indep.x', 'par.C2.x')
 
         # add component that uses outputs from parallel components
         model.add_subsystem('dummy_comp', DoubleComp())

@@ -632,7 +632,6 @@ class Interp2DSlinear(InterpAlgorithmFixed):
         """
         x = x_vec[:, 0]
         y = x_vec[:, 1]
-        grid = self.grid
         vec_size = len(x)
         i_x, i_y = idx
 
@@ -971,7 +970,6 @@ class Interp3DSlinear(InterpAlgorithmFixed):
         x = x_vec[:, 0]
         y = x_vec[:, 1]
         z = x_vec[:, 2]
-        grid = self.grid
         vec_size = len(x)
         i_x, i_y, i_z = idx
 

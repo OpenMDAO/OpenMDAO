@@ -1,6 +1,5 @@
 from openmdao.visualization.htmlpp import HtmlPreprocessor
 from num2words import num2words
-import json
 import os
 import inspect 
 import sys

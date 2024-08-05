@@ -2,7 +2,7 @@
 Interpolation usng simple B-splines.
 """
 import numpy as np
-from scipy.sparse import csc_matrix, csr_matrix
+from scipy.sparse import csr_matrix
 
 from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm
 

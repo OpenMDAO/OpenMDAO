@@ -2,7 +2,6 @@
 Unit tests for the structured metamodel component.
 """
 import unittest
-import inspect
 
 import numpy as np
 from numpy.testing import assert_almost_equal
@@ -24,7 +23,7 @@ except ImportError:
 # if it is, try to use SNOPT but fall back to SLSQP
 OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
 if OPTIMIZER:
-    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
+    pass
 
 x = np.array([-0.97727788, -0.15135721, -0.10321885,  0.40015721,  0.4105985,
                0.95008842,  0.97873798,  1.76405235,  1.86755799,  2.2408932 ])
@@ -628,7 +627,7 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         prob.run_model()
 
         chk = prob.check_totals(of='comp.f', wrt=['tab.k', 'comp.p1', 'comp.p2', 'comp.p3'],
-                                method='cs', out_stream=None);
+                                method='cs', out_stream=None)
         assert_check_totals(chk, atol=1e-10, rtol=1e-10)
 
     def test_training_gradient_setup_called_twice(self):
@@ -1462,8 +1461,7 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
         force_check_partials(prob, compact_print=True)
 
     def test_error_messages_scalar_only(self):
-        prob = om.Problem()
-        model = prob.model
+        om.Problem()
 
         comp = om.MetaModelStructuredComp(training_data_gradients=True,
                                           method='slinear', vec_size=3)

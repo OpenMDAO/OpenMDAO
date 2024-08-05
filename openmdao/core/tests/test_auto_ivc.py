@@ -1,13 +1,10 @@
 import unittest
-import time
 from collections.abc import Iterable
 
 import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.mpi import MPI
-from openmdao.utils.array_utils import evenly_distrib_idxs, take_nth
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 
 try:
     from parameterized import parameterized

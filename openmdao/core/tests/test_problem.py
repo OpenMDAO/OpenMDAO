@@ -181,7 +181,7 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
 
         with self.assertRaises(KeyError) as cm:
-            totals = prob.compute_totals(of='comp.f_xy', wrt="p1.x, p2.y")
+            prob.compute_totals(of='comp.f_xy', wrt="p1.x, p2.y")
         self.assertEqual(str(cm.exception), "'p1.x, p2.y'")
 
     def test_compute_totals_cleanup(self):
@@ -445,12 +445,12 @@ class TestProblem(unittest.TestCase):
             seed_names = wrt
             result_names = of
             rvec = prob.model._vectors['output']['linear']
-            lvec = prob.model._vectors['residual']['linear']
+            prob.model._vectors['residual']['linear']
         else:
             seed_names = of
             result_names = wrt
             rvec = prob.model._vectors['residual']['linear']
-            lvec = prob.model._vectors['output']['linear']
+            prob.model._vectors['output']['linear']
 
         J = prob.compute_totals(of, wrt, return_format='array')
 
@@ -1074,7 +1074,7 @@ class TestProblem(unittest.TestCase):
         # using the promoted name of the inputs will raise an exception because the two promoted
         # inputs have different units and set_input_defaults was not called to disambiguate.
         with self.assertRaises(RuntimeError) as cm:
-            x = prob['G1.x']
+            prob['G1.x']
 
         msg = "<model> <class Group>: The following inputs, ['G1.C1.x', 'G1.C2.x'], promoted to 'G1.x', are connected but their metadata entries ['units'] differ. Call <group>.set_input_defaults('x', units=?), where <group> is the Group named 'G1' to remove the ambiguity."
         self.assertEqual(cm.exception.args[0], msg)

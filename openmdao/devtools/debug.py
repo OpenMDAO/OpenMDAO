@@ -2,7 +2,6 @@
 
 
 import sys
-import pathlib
 from io import StringIO
 
 import numpy as np
@@ -11,7 +10,6 @@ from collections import Counter
 
 from openmdao.core.constants import _SetupStatus, _DEFAULT_OUT_STREAM
 from openmdao.utils.mpi import MPI
-from openmdao.utils.om_warnings import issue_warning, MPIWarning
 from openmdao.utils.reports_system import register_report
 from openmdao.utils.file_utils import text2html, _load_and_exec
 from openmdao.utils.rangemapper import RangeMapper
@@ -121,7 +119,6 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
         indent = '    ' * (depth + tab)
         cprint(indent, end='')
 
-        info = ''
         if isinstance(s, Group):
             cprint("%s " % type(s).__name__, color=Fore.GREEN + Style.BRIGHT)
             cprint("%s" % s.name)
@@ -680,7 +677,8 @@ def show_dist_var_conns(group, rev=False, out_stream=_DEFAULT_OUT_STREAM):
         out_stream = sys.stdout
 
     if out_stream is None:
-        printer = lambda *args, **kwargs: None
+        def printer(*args, **kwargs):
+            return None
     else:
         printer = print
 

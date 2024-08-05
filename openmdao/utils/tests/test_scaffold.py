@@ -4,7 +4,6 @@ import os
 import importlib
 from subprocess import check_call
 
-import openmdao.api as om
 from openmdao.utils.scaffold import _camel_case_split, _write_template
 from openmdao.utils.testing_utils import use_tempdirs
 
@@ -94,7 +93,7 @@ class TestScaffold(unittest.TestCase):
                 # try to instantiate it
                 mod = importlib.import_module('.'.join((pkgname, modname)))
                 klass = getattr(mod, tgtname)
-                instance = klass(*args)
+                klass(*args)
 
             finally:
 

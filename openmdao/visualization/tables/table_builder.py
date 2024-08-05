@@ -6,7 +6,6 @@ import sys
 import os
 import json
 import textwrap
-from collections import namedtuple
 from itertools import zip_longest, chain
 from html import escape
 from dataclasses import dataclass
@@ -103,7 +102,7 @@ class TableBuilder(object):
         if headers in ('keys', 'firstrow'):
             rows, headers = self._to_rows(rows, headers)
         elif isinstance(headers, str):
-            raise RuntimeError(f"If 'headers' is a string, it must be one of ['keys', 'firstrow'].")
+            raise RuntimeError("If 'headers' is a string, it must be one of ['keys', 'firstrow'].")
 
         self._raw_rows = []
         for row in rows:
@@ -873,7 +872,6 @@ class TextTableBuilder(TableBuilder):
         """
         header_lines = []
         data_lines = []
-        sep = self.data_row_line.sep
         row_cells = None
         row_list = list(self._stringified_row_iter())
         if row_list:

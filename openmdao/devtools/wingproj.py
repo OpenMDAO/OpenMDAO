@@ -6,7 +6,6 @@ import os.path
 from os.path import exists, abspath, dirname, join
 import sys
 import fnmatch
-import logging
 from subprocess import Popen
 from configparser import ConfigParser
 from optparse import OptionParser
@@ -163,7 +162,7 @@ def run_wing():
     try:
         print("wing command: ", ' '.join(cmd))
         Popen(cmd, env=env)
-    except Exception as err:
+    except Exception:
         print("Failed to run command '%s'." % ' '.join(cmd))
 
 if __name__ == '__main__':

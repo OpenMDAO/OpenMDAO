@@ -239,7 +239,7 @@ class TestReportsSystem(unittest.TestCase):
     def test_report_generation_on_error(self):
         prob_name = 'error_problem'
         try:
-            prob = self.setup_problem_w_errors(prob_name)
+            self.setup_problem_w_errors(prob_name)
         except Exception as err:
             # get the path to the problem subdirectory
             problem_reports_dir = pathlib.Path(f'{prob_name}_out/reports')
@@ -612,7 +612,7 @@ class TestReportsSystem(unittest.TestCase):
 
         problem_reports_dir = subprob.get_reports_dir()
         self.assertFalse(problem_reports_dir.is_dir(),
-                         f'The problem2 report dir was found but should not exist.')
+                         'The problem2 report dir was found but should not exist.')
         path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
         self.assertFalse(path.is_file(),
                          f'The problem2 n2 report file, {str(path)}, was found but should not exist.')
@@ -635,7 +635,7 @@ class TestReportsSystem(unittest.TestCase):
     @hooks_active
     def test_report_generation_extra_compute_totals_from_scaling_report(self):
         clear_reports()
-        from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver, pyoptsparse
+        from openmdao.drivers.pyoptsparse_driver import pyoptsparse
         if pyoptsparse is None:
             raise unittest.SkipTest("pyoptsparse is required.")
         prob = self.setup_and_run_simple_problem(driver=om.pyOptSparseDriver(optimizer='SLSQP'),

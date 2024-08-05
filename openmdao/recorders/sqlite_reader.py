@@ -1,11 +1,9 @@
 """
 Definition of the SqliteCaseReader.
 """
-import importlib
 import sqlite3
 from collections import OrderedDict
 
-import os
 import sys
 import numpy as np
 import io

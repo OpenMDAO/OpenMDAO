@@ -1,10 +1,9 @@
 import unittest
 import numpy as np
 from openmdao.utils.mpi import MPI
-import traceback
 
 from openmdao.api import Problem
-from openmdao.api import ExplicitComponent, IndepVarComp
+from openmdao.api import ExplicitComponent
 from openmdao.api import NonlinearRunOnce, LinearRunOnce
 
 try:

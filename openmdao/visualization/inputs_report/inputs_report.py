@@ -1,7 +1,6 @@
 """
 A Viewer for OpenMDAO inputs.
 """
-import pathlib
 import functools
 
 import numpy as np

@@ -1,12 +1,8 @@
 """Define the NewtonSolver class."""
 
-
-import numpy as np
-
 from openmdao.solvers.linesearch.backtracking import BoundsEnforceLS
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import Recording
-from openmdao.utils.mpi import MPI
 
 
 class NewtonSolver(NonlinearSolver):

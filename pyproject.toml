@@ -176,3 +176,12 @@ path = "openmdao/__init__.py"
 include = [
     "/openmdao",
 ]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.format]
+line-ending = "lf"
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"

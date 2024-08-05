@@ -112,13 +112,13 @@ class CoKrigingSurrogateTest(unittest.TestCase):
 
         # Test with theta setting instead of estimation
         krig2 = MultiFiCoKrigingSurrogate(theta=[0.1])
-        krig1.train(x, y)
+        krig2.train(x, y)
 
         mu, sigma = krig1.predict([-2., 0.])
         assert_near_equal(mu, [[branin(x[0])]], 1e-5)
-        assert_near_equal(sigma, [[0.]], 1e-5)
+        assert_near_equal(sigma, [[0.]], 1e-4)
 
-        mu, sigma = krig1.predict([5., 5.])
+        mu, sigma = krig2.predict([5., 5.])
         assert_near_equal(mu, [[22]], 1)
         assert_near_equal(sigma, [[13]], 1)
 

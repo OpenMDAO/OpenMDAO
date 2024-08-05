@@ -2191,7 +2191,7 @@ class TestBugs(unittest.TestCase):
                 outputs['func'] += np.sum(inputs['state'])
 
         prob = om.Problem()
-        dvs = prob.model.add_subsystem('dvs',DVS())
+        prob.model.add_subsystem('dvs', DVS())
         prob.model.add_subsystem('solver', SolverComp())
         prob.model.connect('dvs.state','solver.state')
         prob.model.add_design_var('dvs.state', indices=[0,2])
@@ -2595,14 +2595,14 @@ class TestDistribBugs(unittest.TestCase):
 
     def test_check_err(self):
         with self.assertRaises(RuntimeError) as cm:
-            prob = self.get_problem(Distrib_DerivsErr)
+            self.get_problem(Distrib_DerivsErr)
 
         msg = "'D1' <class Distrib_DerivsErr>: component has defined partial ('out_nd', 'in_dist') which is a non-distributed output wrt a distributed input. This is only supported using the matrix free API."
         self.assertEqual(str(cm.exception), msg)
 
     def test_fd_check_err(self):
         with self.assertRaises(RuntimeError) as cm:
-            prob = self.get_problem(Distrib_DerivsFD, mode='fwd')
+            self.get_problem(Distrib_DerivsFD, mode='fwd')
 
         msg = "'D1' <class Distrib_DerivsFD>: component has defined partial ('out_nd', 'in_dist') which is a non-distributed output wrt a distributed input. This is only supported using the matrix free API."
         self.assertEqual(str(cm.exception), msg)
@@ -2631,7 +2631,7 @@ class TestDistribBugs(unittest.TestCase):
 
         prob.run_driver()
 
-        desvar = prob.driver.get_design_var_values()
+        prob.driver.get_design_var_values()
         con = prob.driver.get_constraint_values()
 
         assert_near_equal(con['f_xy'], 24.0)

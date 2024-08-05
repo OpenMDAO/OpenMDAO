@@ -5427,9 +5427,9 @@ class System(object):
                         elif tunits is not None:
                             value = model.convert_from_units(src, value, tunits)
                         else:
-                            msg = f"A value with no units has been specified for input " + \
+                            msg = "A value with no units has been specified for input " + \
                                   f"'{name}', but the source ('{src}') has units '{sunits}'. " + \
-                                  f"No unit checking can be done."
+                                  "No unit checking can be done."
                             issue_warning(msg, prefix=self.msginfo, category=UnitsWarning)
                 else:
                     if gunits is None:

@@ -3,7 +3,6 @@ import numpy as np
 import math
 from html.parser import HTMLParser
 
-import openmdao.api as om
 from openmdao.visualization.tables.table_builder import generate_table
 from openmdao.utils.testing_utils import use_tempdirs
 
@@ -272,7 +271,6 @@ Col0  Col1  Col2
         headers = ['Strings', 'Floats', 'Something else']
         table = generate_table(self.table_row_iter('str', 'float', None),
                                tablefmt='tabulator', headers=headers)
-        tstr = str(table)
 
     def test_embedded_newline(self):
         cells = [

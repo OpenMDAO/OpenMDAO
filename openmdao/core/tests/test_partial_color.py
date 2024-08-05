@@ -19,16 +19,14 @@ try:
 except ImportError:
     jax = None
 
-from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent, ExecComp, \
-    ExplicitComponent, NonlinearBlockGS, ScipyOptimizeDriver, NewtonSolver, DirectSolver, \
-        ImplicitFuncComp, slicer
+from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent, ExplicitComponent, \
+    NonlinearBlockGS, ScipyOptimizeDriver, NewtonSolver, DirectSolver, ImplicitFuncComp
 import openmdao.func_api as omf
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
-from openmdao.utils.array_utils import evenly_distrib_idxs, rand_sparsity
+from openmdao.utils.assert_utils import assert_warning
+from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.mpi import MPI
-from openmdao.utils.coloring import compute_total_coloring, Coloring
+from openmdao.utils.coloring import compute_total_coloring
 
-from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -692,8 +690,8 @@ class TestColoringSemitotals(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         sub = model.add_subsystem('sub', CounterGroup())
         sub.declare_coloring('*', method=method)
-        comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=osplit,
-                                                            sparse_partials=sparse_partials))
+        sub.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=osplit,
+                                                     sparse_partials=sparse_partials))
 
         for conn in conns:
             model.connect(*conn)
@@ -708,10 +706,10 @@ class TestColoringSemitotals(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        derivs = prob.driver._compute_totals()  # this is when the dynamic coloring update happens
+        prob.driver._compute_totals()  # this is when the dynamic coloring update happens
 
         start_nruns = sub._nruns
-        derivs = prob.driver._compute_totals()
+        prob.driver._compute_totals()
         _check_partial_matrix(sub, sub._jacobian._subjacs_info, sparsity, method)
         self.assertEqual(sub._nruns - start_nruns, 10)
 
@@ -777,7 +775,7 @@ class TestColoringSemitotals(unittest.TestCase):
         prob.run_model()
 
         start_nruns = comp._nruns
-        derivs = prob.driver._compute_totals()
+        prob.driver._compute_totals()
 
         nruns = comp._nruns - start_nruns
         self.assertEqual(nruns, 10)
@@ -793,8 +791,8 @@ class TestColoringSemitotals(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         sub = model.add_subsystem('sub', CounterGroup())
         sub.declare_coloring('*', method='fd')
-        comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, 'fd', isplit=1, osplit=1,
-                                                            sparse_partials=False))
+        sub.add_subsystem('comp', SparseCompExplicit(sparsity, 'fd', isplit=1, osplit=1,
+                                                     sparse_partials=False))
         for conn in conns:
             model.connect(*conn)
 
@@ -974,7 +972,7 @@ class TestColoring(unittest.TestCase):
         indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
 
         model.add_subsystem('indeps', indeps)
-        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=2))
+        model.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=2))
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
         model.declare_coloring('*', method=method, step=1e-6 if method=='fd' else None)
@@ -1026,7 +1024,7 @@ class TestColoring(unittest.TestCase):
         indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
 
         model.add_subsystem('indeps', indeps)
-        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, 'cs', isplit=isplit, osplit=2))
+        model.add_subsystem('comp', SparseCompExplicit(sparsity, 'cs', isplit=isplit, osplit=2))
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -1079,7 +1077,7 @@ class TestColoring(unittest.TestCase):
 
         model.nonlinear_solver = NonlinearBlockGS()
         model.add_subsystem('indeps', indeps)
-        comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, method, isplit=isplit, osplit=2))
+        model.add_subsystem('comp', SparseCompImplicit(sparsity, method, isplit=isplit, osplit=2))
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -1131,9 +1129,9 @@ class TestColoring(unittest.TestCase):
         indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
 
         model.add_subsystem('indeps', indeps)
-        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, method,
-                                                              isplit=isplit, osplit=2,
-                                                              sparse_partials=sparse_partials))
+        model.add_subsystem('comp', SparseCompExplicit(sparsity, method,
+                                                       isplit=isplit, osplit=2,
+                                                       sparse_partials=sparse_partials))
 
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')

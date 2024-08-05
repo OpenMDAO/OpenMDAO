@@ -2,15 +2,11 @@
 import os
 import sys
 from timeit import default_timer as etime
-import argparse
-import json
 import atexit
 from collections import defaultdict
-from itertools import chain
 
 from openmdao.utils.mpi import MPI
 
-from openmdao.utils.webview import webview
 from openmdao.devtools.iprof_utils import func_group, find_qualified_name, _collect_methods, \
      _setup_func_group, _get_methods, _Options
 

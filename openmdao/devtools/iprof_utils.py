@@ -1,6 +1,4 @@
 
-import os
-import sys
 import ast
 
 from inspect import getmembers
@@ -108,7 +106,6 @@ def _setup_func_group():
 
     from openmdao.core.system import System
     from openmdao.core.group import Group
-    from openmdao.core.component import Component
     from openmdao.core.explicitcomponent import ExplicitComponent
     from openmdao.core.problem import Problem
     from openmdao.core.driver import Driver
@@ -119,7 +116,6 @@ def _setup_func_group():
     from openmdao.jacobians.jacobian import Jacobian
     from openmdao.matrices.matrix import Matrix
     from openmdao.vectors.default_vector import DefaultVector, DefaultTransfer
-    from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
 
     for class_ in [System, ExplicitComponent, Problem, Driver, _TotalJacInfo, Solver, LinearSolver,
                    NewtonSolver, Jacobian, Matrix, DefaultVector, DefaultTransfer, Group]:
