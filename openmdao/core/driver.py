@@ -1437,6 +1437,7 @@ class Driver(object):
         coloring = None
         info = self._coloring_info
         static = info.static
+        model = self._problem().model
 
         if isinstance(static, coloring_mod.Coloring):
             coloring = static
@@ -1447,13 +1448,18 @@ class Driver(object):
             if coloring is None and (static is coloring_mod._STD_COLORING_FNAME or
                                      isinstance(static, str)):
                 if static is coloring_mod._STD_COLORING_FNAME:
-                    fname = self._get_total_coloring_fname()
+                    fname = self._get_total_coloring_fname(mode='input')
                 else:
                     fname = static
 
-                print("loading total coloring from file %s" % fname)
+                print(f"loading total coloring from file {fname}")
                 coloring = info.coloring = coloring_mod.Coloring.load(fname)
                 info.update(coloring._meta)
+
+                ofname = self._get_total_coloring_fname(mode='output')
+                if ((model._full_comm is not None and model._full_comm.rank == 0) or
+                        (model._full_comm is None and model.comm.rank == 0)):
+                    coloring.save(ofname)
 
         if coloring is not None and info.static is not None:
             problem = self._problem()
@@ -1470,8 +1476,8 @@ class Driver(object):
 
         return coloring
 
-    def _get_total_coloring_fname(self):
-        return os.path.join(self._problem().options['coloring_dir'], 'total_coloring.pkl')
+    def _get_total_coloring_fname(self, mode='output'):
+        return self._problem().get_coloring_dir(mode='output') / 'total_coloring.pkl'
 
     def scaling_report(self, outfile='driver_scaling_report.html', title=None, show_browser=True,
                        jac=True):
@@ -1611,10 +1617,13 @@ class Driver(object):
             if run_model and self._coloring_info.coloring is not None:
                 issue_warning("The 'run_model' argument is ignored because the coloring has "
                               "already been computed.")
+
             if self._coloring_info.dynamic and self._coloring_info.do_compute_coloring():
+                ofname = self._get_total_coloring_fname(mode='output')
                 self._coloring_info.coloring = \
-                    coloring_mod.dynamic_total_coloring(self, run_model=run_model,
-                                                        fname=self._get_total_coloring_fname())
+                    coloring_mod.dynamic_total_coloring(self,
+                                                        run_model=run_model,
+                                                        fname=ofname)
 
             return self._coloring_info.coloring
 
