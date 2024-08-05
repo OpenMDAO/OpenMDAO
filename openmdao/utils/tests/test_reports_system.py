@@ -31,9 +31,6 @@ except ImportError:
 
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 
-if OPTIMIZER:
-    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
-
 
 @use_tempdirs
 class TestReportsSystem(unittest.TestCase):
@@ -258,7 +255,7 @@ class TestReportsSystem(unittest.TestCase):
     @unittest.skipUnless(OPTIMIZER, "This test requires pyOptSparseDriver.")
     def test_report_generation_basic_pyoptsparse(self):
         # Just to try a different driver
-        prob = self.setup_and_run_simple_problem(driver=pyOptSparseDriver(optimizer='SLSQP'))
+        prob = self.setup_and_run_simple_problem(driver=om.pyOptSparseDriver(optimizer='SLSQP'))
 
         # get the path to the problem subdirectory
         problem_reports_dir = prob.get_reports_dir()

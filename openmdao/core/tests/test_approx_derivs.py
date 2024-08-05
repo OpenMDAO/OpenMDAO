@@ -36,9 +36,6 @@ except ImportError:
 # if it is, try to use SNOPT but fall back to SLSQP
 OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
 
-if OPTIMIZER:
-    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
-
 
 @use_tempdirs
 class TestGroupFiniteDifference(unittest.TestCase):

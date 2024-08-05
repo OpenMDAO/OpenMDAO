@@ -22,8 +22,7 @@ except ImportError:
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
 OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
-if OPTIMIZER:
-    pass
+
 
 x = np.array([-0.97727788, -0.15135721, -0.10321885,  0.40015721,  0.4105985,
                0.95008842,  0.97873798,  1.76405235,  1.86755799,  2.2408932 ])

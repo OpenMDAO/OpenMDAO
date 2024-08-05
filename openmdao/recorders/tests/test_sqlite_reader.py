@@ -34,8 +34,6 @@ from openmdao.utils.testing_utils import use_tempdirs
 
 # check that pyoptsparse is installed
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
-if OPTIMIZER:
-    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 
 def count_keys(d):
@@ -523,7 +521,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                                                        linear_solver=om.ScipyKrylov,
                                                        mda_nonlinear_solver=om.NonlinearBlockGS)
 
-        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP', print_results=False)
+        driver = prob.driver = om.pyOptSparseDriver(optimizer='SLSQP', print_results=False)
         driver.recording_options['record_desvars'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True

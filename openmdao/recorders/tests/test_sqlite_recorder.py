@@ -37,9 +37,6 @@ from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 
-if OPTIMIZER:
-    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
-
 
 class Cycle(om.Group):
 
@@ -362,7 +359,7 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_simple_driver_recording_pyoptsparse(self):
         prob = ParaboloidProblem()
 
-        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        driver = prob.driver = om.pyOptSparseDriver(optimizer='SLSQP')
         driver.options['print_results'] = False
         driver.opt_settings['ACC'] = 1e-9
 
