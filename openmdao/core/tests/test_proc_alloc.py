@@ -9,7 +9,7 @@ from openmdao.utils.testing_utils import use_tempdirs
 
 try:
     from openmdao.api import PETScVector
-except:
+except Exception:
     PETScVector = None
 
 

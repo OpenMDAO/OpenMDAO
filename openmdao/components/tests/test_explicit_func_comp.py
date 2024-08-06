@@ -13,7 +13,6 @@ from openmdao.utils.coloring import compute_total_coloring
 
 try:
     import jax
-    import jax.numpy as jnp
 except ImportError:
     jax = None
 
@@ -1050,7 +1049,7 @@ class TestJax(unittest.TestCase):
         p.run_model()
         J = p.compute_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'])
 
-        I = np.eye(np.prod(shape, dtype=int))
+        I = np.eye(np.prod(shape, dtype=int))  # noqa: E741
         assert_near_equal(J['comp.x', 'comp.a'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.b'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.c'], I * 3.)
@@ -1227,7 +1226,7 @@ class TestJaxNumpy(unittest.TestCase):
 
         J = p.compute_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'])
 
-        I = np.eye(np.prod(shape)) if shape else np.eye(1)
+        I = np.eye(np.prod(shape)) if shape else np.eye(1)  # noqa: E741
         assert_near_equal(J['comp.x', 'comp.a'], I * p['comp.b'].ravel() * np.cos(p['comp.a']).ravel(), tolerance=1e-7)
         assert_near_equal(J['comp.x', 'comp.b'], I * np.sin(p['comp.a']).ravel(), tolerance=1e-7)
         assert_near_equal(J['comp.x', 'comp.c'], I * 3., tolerance=1e-7)
@@ -1272,7 +1271,7 @@ class TestJax2retvals(unittest.TestCase):
         p.run_model()
         J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
 
-        I = np.eye(np.prod(shape)) if shape else np.eye(1)
+        I = np.eye(np.prod(shape)) if shape else np.eye(1)  # noqa: E741
         assert_near_equal(J['comp.x', 'comp.a'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.b'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.c'], I * 3.)
@@ -1329,7 +1328,7 @@ class TestJaxNonDifferentiableArgs(unittest.TestCase):
         p.run_model()
         J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
 
-        I = np.eye(3)
+        I = np.eye(3)  # noqa: E741
         assert_near_equal(J['comp.x', 'comp.a'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.b'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.c'], I * 3.)
@@ -1375,7 +1374,7 @@ class TestJax2retvalsColoring(unittest.TestCase):
         p.run_model()
         J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
 
-        I = np.eye(np.prod(shape)) if shape else np.eye(1)
+        I = np.eye(np.prod(shape)) if shape else np.eye(1)  # noqa: E741
         assert_near_equal(J['comp.x', 'comp.a'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.b'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.c'], I * 3.)

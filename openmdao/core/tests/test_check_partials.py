@@ -1234,7 +1234,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count('n/a'), 25)
         self.assertEqual(stream.getvalue().count('rev'), 15)
         self.assertEqual(stream.getvalue().count('Component'), 2)
-        self.assertEqual(len([l for l in stream.getvalue().splitlines() if l.startswith('| ')]), 12) # counts rows (including headers)
+        self.assertEqual(len([ln for ln in stream.getvalue().splitlines() if ln.startswith('| ')]), 12) # counts rows (including headers)
 
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=False)
@@ -1320,7 +1320,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count('n/a'), 10)
         self.assertEqual(stream.getvalue().count('rev'), 15)
         self.assertEqual(stream.getvalue().count('Component'), 2)
-        self.assertEqual(len([l for l in stream.getvalue().splitlines() if l.startswith('| ')]), 8)
+        self.assertEqual(len([ln for ln in stream.getvalue().splitlines() if ln.startswith('| ')]), 8)
 
         stream = StringIO()
         partials_data = prob.check_partials(out_stream=stream, compact_print=False)

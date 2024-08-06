@@ -1750,7 +1750,7 @@ class TestProblem(unittest.TestCase):
         strout = StringIO()
         sys.stdout = strout
         try:
-            l = prob.list_driver_vars(print_arrays=True,
+            dv = prob.list_driver_vars(print_arrays=True,
                                        desvar_opts=['lower', 'upper', 'ref', 'ref0',
                                                     'indices', 'adder', 'scaler',
                                                     'parallel_deriv_color',
@@ -1775,37 +1775,37 @@ class TestProblem(unittest.TestCase):
         self.assertRegex(output[13], r'^\s+array+\(+\[[0-9., e+-]+\]+\)')
 
         # design vars
-        self.assertEqual(l['design_vars'][0][1]['name'], 'z')
-        self.assertEqual(l['design_vars'][0][1]['size'], 2)
-        assert(all(l['design_vars'][0][1]['val'] == prob.get_val('z')))
-        self.assertEqual(l['design_vars'][0][1]['scaler'], None)
-        self.assertEqual(l['design_vars'][0][1]['adder'], None)
+        self.assertEqual(dv['design_vars'][0][1]['name'], 'z')
+        self.assertEqual(dv['design_vars'][0][1]['size'], 2)
+        assert(all(dv['design_vars'][0][1]['val'] == prob.get_val('z')))
+        self.assertEqual(dv['design_vars'][0][1]['scaler'], None)
+        self.assertEqual(dv['design_vars'][0][1]['adder'], None)
 
-        self.assertEqual(l['design_vars'][1][1]['name'], 'x')
-        self.assertEqual(l['design_vars'][1][1]['size'], 1)
-        assert(all(l['design_vars'][1][1]['val'] == prob.get_val('x')))
-        self.assertEqual(l['design_vars'][1][1]['scaler'], None)
-        self.assertEqual(l['design_vars'][1][1]['adder'], None)
+        self.assertEqual(dv['design_vars'][1][1]['name'], 'x')
+        self.assertEqual(dv['design_vars'][1][1]['size'], 1)
+        assert(all(dv['design_vars'][1][1]['val'] == prob.get_val('x')))
+        self.assertEqual(dv['design_vars'][1][1]['scaler'], None)
+        self.assertEqual(dv['design_vars'][1][1]['adder'], None)
 
         # constraints
-        self.assertEqual(l['constraints'][0][1]['name'], 'con1')
-        self.assertEqual(l['constraints'][0][1]['size'], 1)
-        assert(all(l['constraints'][0][1]['val'] == prob.get_val('con1')))
-        self.assertEqual(l['constraints'][0][1]['scaler'], None)
-        self.assertEqual(l['constraints'][0][1]['adder'], None)
+        self.assertEqual(dv['constraints'][0][1]['name'], 'con1')
+        self.assertEqual(dv['constraints'][0][1]['size'], 1)
+        assert(all(dv['constraints'][0][1]['val'] == prob.get_val('con1')))
+        self.assertEqual(dv['constraints'][0][1]['scaler'], None)
+        self.assertEqual(dv['constraints'][0][1]['adder'], None)
 
-        self.assertEqual(l['constraints'][1][1]['name'], 'con2')
-        self.assertEqual(l['constraints'][1][1]['size'], 1)
-        assert(all(l['constraints'][1][1]['val'] == prob.get_val('con2')))
-        self.assertEqual(l['constraints'][1][1]['scaler'], None)
-        self.assertEqual(l['constraints'][1][1]['adder'], None)
+        self.assertEqual(dv['constraints'][1][1]['name'], 'con2')
+        self.assertEqual(dv['constraints'][1][1]['size'], 1)
+        assert(all(dv['constraints'][1][1]['val'] == prob.get_val('con2')))
+        self.assertEqual(dv['constraints'][1][1]['scaler'], None)
+        self.assertEqual(dv['constraints'][1][1]['adder'], None)
 
         # objectives
-        self.assertEqual(l['objectives'][0][1]['name'], 'obj')
-        self.assertEqual(l['objectives'][0][1]['size'], 1)
-        assert(all(l['objectives'][0][1]['val'] == prob.get_val('obj')))
-        self.assertEqual(l['objectives'][0][1]['scaler'], None)
-        self.assertEqual(l['objectives'][0][1]['adder'], None)
+        self.assertEqual(dv['objectives'][0][1]['name'], 'obj')
+        self.assertEqual(dv['objectives'][0][1]['size'], 1)
+        assert(all(dv['objectives'][0][1]['val'] == prob.get_val('obj')))
+        self.assertEqual(dv['objectives'][0][1]['scaler'], None)
+        self.assertEqual(dv['objectives'][0][1]['adder'], None)
 
     def test_list_problem_vars_deprecated(self):
         model = SellarDerivatives()

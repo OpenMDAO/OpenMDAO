@@ -14,7 +14,7 @@ from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI
 try:
     from openmdao.api import PETScVector
-except:
+except Exception:
     PETScVector = None
 
 

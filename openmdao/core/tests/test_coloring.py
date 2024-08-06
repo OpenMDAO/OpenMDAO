@@ -534,7 +534,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
         try:
             OPT('SLSQP')
-        except:
+        except Exception:
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
         p_color = run_opt(pyOptSparseDriver, 'auto', optimizer='SLSQP', print_results=False,
@@ -653,7 +653,7 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
 
         try:
             OPT('SLSQP')
-        except:
+        except Exception:
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
         p_color = run_opt(pyOptSparseDriver, 'rev', optimizer='SLSQP', print_results=False,
@@ -685,7 +685,7 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
 
         try:
             OPT('SLSQP')
-        except:
+        except Exception:
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
         # run w/o coloring
@@ -739,7 +739,7 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
 
         try:
             OPT('SLSQP')
-        except:
+        except Exception:
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
         p = run_opt(pyOptSparseDriver, 'auto', optimizer='SLSQP', print_results=False, con_alias=True)
@@ -1132,7 +1132,7 @@ def _test_func_name(func, num, param):
     for p in param.args:
         try:
             arg = p.__name__
-        except:
+        except Exception:
             arg = str(p)
         args.append(arg)
     return func.__name__ + '_'.join(args)

@@ -15,7 +15,7 @@ from openmdao.utils.testing_utils import use_tempdirs, force_check_partials
 
 scipy_gte_019 = True
 try:
-    from scipy.interpolate._bsplines import make_interp_spline
+    from scipy.interpolate._bsplines import make_interp_spline  # noqa: F401
 except ImportError:
     scipy_gte_019 = False
 

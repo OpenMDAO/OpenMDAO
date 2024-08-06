@@ -47,7 +47,7 @@ def _test_func_name(func, num, param):
         for item in p:
             try:
                 arg = item.__name__
-            except:
+            except Exception:
                 arg = str(item)
             args.append(arg)
     return func.__name__ + '_' + '_'.join(args)
@@ -267,7 +267,7 @@ class TestParallelGroupsMPI2(TestParallelGroups):
 
     def test_zero_shape(self):
         raise unittest.SkipTest("zero shapes not fully supported yet")
-        class MultComp(ExplicitComponent):
+        class MultComp(om.ExplicitComponent):
             def __init__(self, mult):
                 self.mult = mult
                 super().__init__()

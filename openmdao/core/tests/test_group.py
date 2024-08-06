@@ -2752,7 +2752,8 @@ class TestGroupAddInput(unittest.TestCase):
                                             promotes_inputs=['x'])
 
         g3 = g1.add_subsystem("G3", om.Group(), promotes_inputs=['x'])
-        if diff_vals: val = 2.0
+        if diff_vals:
+            val = 2.0
         g3.add_subsystem("C3", om.ExecComp("y = 4. * x",
                                             x={'val': val, 'units': units1},
                                             y={'val': 1.0, 'units': units1}),
@@ -2765,7 +2766,8 @@ class TestGroupAddInput(unittest.TestCase):
         par = model.add_subsystem("par", om.ParallelGroup(), promotes_inputs=['x'])
 
         g4 = par.add_subsystem("G4", om.Group(), promotes_inputs=['x'])
-        if diff_vals: val = 3.0
+        if diff_vals:
+            val = 3.0
         g4.add_subsystem("C5", om.ExecComp("y = 6. * x",
                                             x={'val': val, 'units': units2},
                                             y={'val': 1.0, 'units': units2}),
@@ -2776,7 +2778,8 @@ class TestGroupAddInput(unittest.TestCase):
                                             promotes_inputs=['x'])
 
         g5 = par.add_subsystem("G5", om.Group(), promotes_inputs=['x'])
-        if diff_vals: val = 4.0
+        if diff_vals:
+            val = 4.0
         g5.add_subsystem("C7", om.ExecComp("y = 8. * x",
                                             x={'val': val, 'units': units1},
                                             y={'val': 1.0, 'units': units1}),

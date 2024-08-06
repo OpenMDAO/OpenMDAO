@@ -220,7 +220,7 @@ def _test_func_name(func, num, param):
     for p in param.args:
         try:
             arg = p.__name__
-        except:
+        except Exception:
             arg = str(p)
         args.append(arg)
     return 'test_jacobian_src_indices_' + '_'.join(args)

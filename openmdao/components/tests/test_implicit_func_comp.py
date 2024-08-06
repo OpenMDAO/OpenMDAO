@@ -9,7 +9,6 @@ from openmdao.core.tests.test_partial_color import _check_partial_matrix
 
 try:
     import jax
-    import jax.numpy as jnp
 except ImportError:
     jax = None
 

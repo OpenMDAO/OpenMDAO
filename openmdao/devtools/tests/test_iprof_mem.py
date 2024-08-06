@@ -51,7 +51,7 @@ class TestProfileMemory(unittest.TestCase):
 class TestCmdlineMemory(unittest.TestCase):
     def setUp(self):
         try:
-            import psutil
+            import psutil  # noqa: F401
         except ImportError:
             raise unittest.SkipTest("psutil is not installed")
 

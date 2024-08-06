@@ -249,7 +249,7 @@ class TestFuncAPI(unittest.TestCase):
             return x, y
 
         with self.assertRaises(Exception) as cm:
-            f = (omf.wrap(func)
+            f = (omf.wrap(func)  # noqa: F841
                  .declare_partials(of='x', wrt=['a', 'b'], method='jax')
                  .declare_partials(of='y', wrt=['a', 'b'], method='fd'))
 
@@ -264,7 +264,7 @@ class TestFuncAPI(unittest.TestCase):
             return x, y
 
         with self.assertRaises(Exception) as cm:
-            f = (omf.wrap(func)
+            f = (omf.wrap(func)  # noqa: F841
                  .declare_partials(of='y', wrt=['a', 'b'], method='fd')
                  .declare_partials(of='x', wrt=['a', 'b'], method='jax'))
 
@@ -277,14 +277,14 @@ class TestFuncAPI(unittest.TestCase):
             y = a / b
             return x, y
 
-        f = (omf.wrap(func)
+        f = (omf.wrap(func)  # noqa: F841
              .declare_coloring(wrt='*', method='cs'))
 
         meta = f.get_declare_coloring()
         self.assertEqual(meta, {'wrt': '*', 'method': 'cs'})
 
         with self.assertRaises(Exception) as cm:
-            f2 = (omf.wrap(func)
+            f2 = (omf.wrap(func)  # noqa: F841
                     .declare_coloring(wrt='a', method='cs')
                     .declare_coloring(wrt='b', method='cs'))
 
@@ -481,7 +481,7 @@ class TestFuncAPI(unittest.TestCase):
 
     def test_return_names(self):
         def func(a):
-            b = a + 1
+            b = a + 1  # noqa: F841
             # no return statement
 
         f = omf.wrap(func)
@@ -489,5 +489,3 @@ class TestFuncAPI(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
-

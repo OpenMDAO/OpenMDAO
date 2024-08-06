@@ -7,8 +7,6 @@ from packaging.version import Version
 import numpy as np
 from scipy import __version__ as scipy_version
 
-ScipyVersion = Version(scipy_version)
-
 import openmdao.api as om
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, TestImplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -31,6 +29,8 @@ try:
 except ImportError:
     vector_class = om.DefaultVector
     PETScVector = None
+
+ScipyVersion = Version(scipy_version)
 
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP

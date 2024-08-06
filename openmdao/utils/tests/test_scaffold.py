@@ -2,7 +2,7 @@
 import unittest
 import os
 import importlib
-from subprocess import check_call
+from subprocess import CalledProcessError, check_call
 
 from openmdao.utils.scaffold import _camel_case_split, _write_template
 from openmdao.utils.testing_utils import use_tempdirs
@@ -85,7 +85,7 @@ class TestScaffold(unittest.TestCase):
 
             # install it
             check_call(['pip', 'install', '-q', '--no-cache-dir', '--no-deps', '.'])  # nosec: trusted input
-            os.chdir(startdir) 
+            os.chdir(startdir)
 
             try:
                 modname = _camel_case_split(cname)

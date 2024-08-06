@@ -191,8 +191,6 @@ convention = "numpy"
 "api.py" = ["F401"]
 "parallel_api.py" = ["F401"]
 "__init__.py" = ["F401"]
-# Ignore all directories named `tests`.
-"**/tests/**" = ["E","F"]
 # Ignore files in the test suite.
 "**/test_suite/**" = ["E","F"]
 # Allow variable name I for current

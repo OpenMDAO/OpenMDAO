@@ -285,7 +285,7 @@ def _test_func_name(func, num, param):
     for p in param.args:
         try:
             arg = p.__name__
-        except:
+        except Exception:
             arg = str(p)
         args.append(arg)
     return func.__name__ + '_' + '_'.join(args)
@@ -870,13 +870,13 @@ class MPITests2(unittest.TestCase):
 
         assert_check_totals(prob.check_totals(method='fd', out_stream=None), rtol=1e-5)
 
-    def test_distrib_voi_group_fd2(self):
+    def test_distrib_voi_group_fd2_fwd(self):
         prob = _setup_ivc_subivc_dist_parab_sum()
         prob.setup(mode='fwd', force_alloc_complex=True)
         prob.run_model()
         assert_check_totals(prob.check_totals(method='fd', out_stream=None))
 
-    def test_distrib_voi_group_fd2(self):
+    def test_distrib_voi_group_fd2_rev(self):
         prob = _setup_ivc_subivc_dist_parab_sum()
         prob.setup(mode='rev', force_alloc_complex=True)
         prob.run_model()

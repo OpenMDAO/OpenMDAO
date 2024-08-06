@@ -3,8 +3,8 @@ import unittest
 import os
 
 try:
-    import playwright
-    import aiounittest
+    import playwright   # noqa: F401
+    import aiounittest  # noqa: F401
 except ImportError:
     class TestOpenMDAOJupyterBookDocs(unittest.TestCase):
         def test_jupyter_book_docs(self):

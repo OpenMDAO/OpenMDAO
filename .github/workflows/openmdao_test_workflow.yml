@@ -518,6 +518,7 @@ jobs:
           ruff check . --select NPY201
 
       - name: Perform linting with Ruff
+        if: ${{ matrix.NAME == 'Ubuntu Baseline' }}
         run: |
           echo "============================================================="
           echo "Lint OpenMDAO code per settings in pyproject.toml"

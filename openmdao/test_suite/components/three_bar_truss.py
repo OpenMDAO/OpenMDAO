@@ -219,7 +219,7 @@ class ThreeBarTrussVector(om.ExplicitComponent):
         rho = np.zeros((3, ))
         try:
             rho[0] = self.rho[mat[0]]
-        except:
+        except Exception:
             pass
         rho[1] = self.rho[mat[1]]
         rho[2] = self.rho[mat[2]]

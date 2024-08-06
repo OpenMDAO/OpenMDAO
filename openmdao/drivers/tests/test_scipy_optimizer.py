@@ -9,8 +9,6 @@ from packaging.version import Version
 import numpy as np
 from scipy import __version__ as scipy_version
 
-ScipyVersion = Version(scipy_version)
-
 import openmdao.api as om
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense, TestExplCompArraySparse, TestExplCompArrayJacVec
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -31,6 +29,10 @@ try:
 except ImportError:
     vector_class = om.DefaultVector
     PETScVector = None
+
+
+ScipyVersion = Version(scipy_version)
+
 
 def rosenbrock(x):
     x_0 = x[:-1]
