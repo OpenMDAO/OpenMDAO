@@ -700,7 +700,6 @@ class GeneticAlgorithm(object):
 
         # Main Loop
         nfit = 0
-
         for generation in range(max_gen + 1):
             old_gen = copy.deepcopy(new_gen)
             x_pop = self.decode(old_gen, vlb, vub, bits)
@@ -774,7 +773,7 @@ class GeneticAlgorithm(object):
                 # Find best performing point in this generation.
                 min_fit = np.min(fitness)
                 min_index = np.argmin(fitness)
-                # min_gen = old_gen[min_index]
+                min_gen = old_gen[min_index]  # noqa: F841, used above
                 min_x = x_pop[min_index]
 
                 if min_fit < fopt:
