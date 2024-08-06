@@ -271,11 +271,13 @@ def _process_profile(flist):
     """
 
     nfiles = len(flist)
-    top_nodes = []
-    top_totals = []
 
     if nfiles == 1:
         return _process_1_profile(flist[0])
+
+    tot_names = []
+    top_nodes = []
+    top_totals = []
 
     for fname in sorted(flist):
         ext = os.path.splitext(fname)[1]
@@ -283,7 +285,7 @@ def _process_profile(flist):
             int(ext.lstrip('.'))
             dec = ext
             tot_names.append('$total' + dec)
-        except:
+        except Exception:
             dec = None
 
         nodes, tots = _process_1_profile(fname)
@@ -307,7 +309,6 @@ def _process_profile(flist):
     tree_nodes['$total'] = grand_total
 
     totals = {}
-    tot_names = []
     for i, tot in enumerate(top_totals):
         tot_names.append('$total.%d' % i)
         for name, tots in tot.items():

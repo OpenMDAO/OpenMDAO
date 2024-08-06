@@ -64,13 +64,13 @@ def _find_wing():
         try:
             locs = [os.path.join(tdir, p, 'bin') for p in
                     fnmatch.filter(os.listdir(tdir), r'Wing IDE ?.?')]
-        except:
+        except Exception:
             locs = []
         tdir = r'C:\Program Files'
         try:
             locs.extend([os.path.join(tdir, p, 'bin') for p in
                          fnmatch.filter(os.listdir(tdir), r'Wing IDE ?.?')])
-        except:
+        except Exception:
             pass
     elif sys.platform == 'darwin':
         wname = 'wing'
@@ -89,7 +89,7 @@ def _find_wing():
     for path in all_locs:
         try:
             matches = fnmatch.filter(os.listdir(path), wname)
-        except:
+        except Exception:
             continue
         if matches:
             return os.path.join(path, sorted(matches)[-1])

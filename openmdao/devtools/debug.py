@@ -476,11 +476,11 @@ def trace_dump(fname='trace_dump', skip=(), flush=True):
                 if 'self' in frame.f_locals:
                     try:
                         pname = frame.f_locals['self'].msginfo
-                    except:
+                    except Exception:
                         pass
                     try:
                         commsize = frame.f_locals['self'].comm.size
-                    except:
+                    except Exception:
                         pass
                 if pname is not None:
                     if not stack or pname != stack[-1][0]:
@@ -498,11 +498,11 @@ def trace_dump(fname='trace_dump', skip=(), flush=True):
                 if 'self' in frame.f_locals:
                     try:
                         pname = frame.f_locals['self'].msginfo
-                    except:
+                    except Exception:
                         pass
                     try:
                         commsize = frame.f_locals['self'].comm.size
-                    except:
+                    except Exception:
                         pass
                 print('   ' * len(stack), '<--', frame.f_code.co_name, "%s:%d" %
                       (frame.f_code.co_filename, frame.f_code.co_firstlineno),
@@ -804,7 +804,7 @@ def show_dist_var_conns(group, rev=False, out_stream=_DEFAULT_OUT_STREAM):
                             orstr = str(sorted_ranks)
                             if len(sorted_ranks) > 3:
                                 for j, r in enumerate(sorted_ranks):
-                                    if j == 0 or r - val == 1:
+                                    if j == 0 or r - val == 1:  # noqa: F821, val initialized below
                                         val = r
                                     else:
                                         break
@@ -818,7 +818,7 @@ def show_dist_var_conns(group, rev=False, out_stream=_DEFAULT_OUT_STREAM):
                             irstr = str(sorted(iranks))
                             if len(sorted_ranks) > 3:
                                 for j, r in enumerate(sorted_ranks):
-                                    if j == 0 or r - val == 1:
+                                    if j == 0 or r - val == 1:  # noqa: F821, val initialized below
                                         val = r
                                     else:
                                         break

@@ -549,7 +549,7 @@ class LintTestCase(unittest.TestCase):
                         full_class_path = f'{module_name}.{class_name}'
                         try:
                             result = validate.validate(full_class_path)
-                        except:
+                        except Exception:
                             continue
 
                         failures.update(self._failure_dict(full_class_path, result))
@@ -568,7 +568,7 @@ class LintTestCase(unittest.TestCase):
                                 full_method_path = f'{module_name}.{class_name}.{method_name}'
                                 try:
                                     result = validate.validate(full_method_path)
-                                except:
+                                except Exception:
                                     continue
 
                                 failures.update(self._failure_dict(full_method_path, result))
@@ -586,7 +586,7 @@ class LintTestCase(unittest.TestCase):
                             full_function_path = f'{module_name}.{func_name}'
                             try:
                                 result = validate.validate(full_function_path)
-                            except:
+                            except Exception:
                                 continue
 
                             failures.update(self._failure_dict(full_function_path, result))

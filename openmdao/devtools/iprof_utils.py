@@ -229,8 +229,8 @@ def _setup_func_group():
     })
 
     try:
-        from mpi4py import MPI
-        from petsc4py import PETSc
+        from mpi4py import MPI      # noqa: F401
+        from petsc4py import PETSc  # noqa: F401
         from openmdao.vectors.petsc_vector import PETScVector, PETScTransfer
 
         #TODO: this needs work.  Still lots of MPI calls not covered here...

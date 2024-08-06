@@ -12,7 +12,7 @@ class TestMissingImports(unittest.TestCase):
     def test_missing_imports_cm(self):
         with self.assertRaises(ImportError) as e:
             with MissingImports('pyoptsparse'):
-                import pyoptsparse  # noqa: F401
+                import pyoptsparse  # noqa
 
         msg = "No module named pyoptsparse due to missing import pyoptsparse."
 
@@ -21,37 +21,39 @@ class TestMissingImports(unittest.TestCase):
     def test_missing_imports(self):
 
         with MissingImports('pyoptsparse'):
-            import openmdao.api as om  # noqa: F401
+            import openmdao.api as om  # noqa
 
     def test_missing_imports_docs(self):
 
         with MissingImports('IPython'):
-            import openmdao.api as om  # noqa: F401
+            import openmdao.api as om  # noqa
 
         with MissingImports('matplotlib'):
-            import openmdao.api as om  # noqa: F401
+            import openmdao.api as om  # noqa
 
         with MissingImports('numpydoc'):
-            import openmdao.api as om  # noqa: F401
+            import openmdao.api as om  # noqa
 
     def test_missing_imports_notebooks(self):
 
         with MissingImports('notebook'):
-            import openmdao.api as om  # noqa: F401
+            import openmdao.api as om  # noqa
 
     def test_missing_imports_visualization(self):
+
         with MissingImports('bokeh'):
-            import openmdao.api as om  # noqa: F401
+            import openmdao.api as om  # noqa
 
     def test_missing_imports_testing(self):
+
         with MissingImports('parameterized'):
-            import openmdao.api as om  # noqa: F401
+            import openmdao.api as om  # noqa
 
         with MissingImports('pycodestyle'):
-            import openmdao.api as om  # noqa: F401
+            import openmdao.api as om  # noqa
 
         with MissingImports('testflo'):
-            import openmdao.api as om  # noqa: F401
+            import openmdao.api as om  # noqa
 
 
 class TestPrimitives(unittest.TestCase):

@@ -4,6 +4,7 @@ Utility functions related to the reporting system which generates reports by def
 
 import os
 import inspect
+import pathlib
 from itertools import chain
 
 from openmdao.core.constants import _UNDEFINED

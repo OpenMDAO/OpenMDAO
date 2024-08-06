@@ -187,6 +187,13 @@ line-ending = "lf"
 convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
-# Ignore `F401` (import violations) in api files.
+# Ignore `F401` (unused import) in api files.
 "api.py" = ["F401"]
 "parallel_api.py" = ["F401"]
+"__init__.py" = ["F401"]
+# Ignore all directories named `tests`.
+"**/tests/**" = ["E","F"]
+# Ignore files in the test suite.
+"**/test_suite/**" = ["E","F"]
+# Allow variable name I for current
+"**/extcode_resistor.py" = ["E741"]

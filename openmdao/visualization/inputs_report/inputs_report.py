@@ -5,11 +5,6 @@ import functools
 
 import numpy as np
 
-try:
-    from IPython.display import IFrame, display, HTML
-except ImportError:
-    IFrame = display = None
-
 from openmdao.core.problem import Problem
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import printoptions

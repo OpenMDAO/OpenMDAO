@@ -306,7 +306,7 @@ class CaseViewer(object):
         if get_ipython() is None:
             raise RuntimeError('CaseViewer must be run from within a Jupyter notebook.')
         try:
-            import ipympl
+            import ipympl  # noqa: F401
         except ImportError:
             raise RuntimeError('CaseViewer requires ipympl')
 

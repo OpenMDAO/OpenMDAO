@@ -5,8 +5,8 @@ If numba is not available, this module provides a dummy jit decorator that simpl
 original function.
 """
 try:
-    import numba
-    from numba import *
+    import numba         # noqa: F401
+    from numba import *  # noqa: F403
 except ImportError:
     numba = None
     prange = range
