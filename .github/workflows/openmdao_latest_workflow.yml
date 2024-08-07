@@ -158,7 +158,6 @@ jobs:
             conda install mpich mpi4py petsc4py -q -y
           fi
 
-
           echo "============================================================="
           echo "Check MPI and PETSc installation"
           echo "============================================================="

@@ -1,6 +1,5 @@
 """Test the Broyden nonlinear solver. """
 
-import os
 import unittest
 
 import numpy as np
@@ -13,13 +12,11 @@ from openmdao.test_suite.components.sellar import SellarStateConnection, SellarD
      SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.scripts.circuit_analysis import Circuit
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
-from openmdao.utils.array_utils import evenly_distrib_idxs
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
     PETScVector = None
-from openmdao.utils.mpi import MPI
 
 
 class VectorEquation(om.ImplicitComponent):
@@ -70,8 +67,6 @@ class MixedEquation(om.ImplicitComponent):
         residuals['x45'] = res[3:]
 
     def linearize(self, inputs, outputs, jacobian):
-        c = inputs['c']
-        x = np.empty((5, ))
         x12 = outputs['x12']
         x3 = outputs['x3']
         x45 = outputs['x45']
@@ -184,8 +179,8 @@ class TestBryoden(unittest.TestCase):
         # Test top level Sellar (i.e., not grouped).
 
         prob = om.Problem()
-        model = prob.model = SellarStateConnection(nonlinear_solver=om.BroydenSolver(),
-                                                   linear_solver=om.LinearRunOnce())
+        prob.model = SellarStateConnection(nonlinear_solver=om.BroydenSolver(),
+                                           linear_solver=om.LinearRunOnce())
 
         prob.setup()
 

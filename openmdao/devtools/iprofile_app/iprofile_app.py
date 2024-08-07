@@ -55,7 +55,8 @@ def _stratify(call_data, sortby='time'):
     """
     depth_groups = []
     node_list = []  # all nodes in a single list
-    depthfunc=lambda d: d['depth']
+    def depthfunc(d):
+        return d['depth']
     for key, group in groupby(sorted(call_data.values(), key=depthfunc), key=depthfunc):
         # now further group each group by parent, then sort those in descending order
         # by 'sortby'
@@ -66,7 +67,6 @@ def _stratify(call_data, sortby='time'):
 
     max_depth = len(depth_groups)
     delta_y = 1.0 / max_depth
-    y = 0
     max_x = call_data['$total'][sortby]
 
     for depth, pardict in enumerate(depth_groups):
@@ -223,7 +223,7 @@ else:
             print("starting server on port %d" % options.port)
 
             serve_thread = _startThread(tornado.ioloop.IOLoop.current().start)
-            launch_thread = _startThread(lambda: _launch_browser(options.port))
+            _startThread(lambda: _launch_browser(options.port))
 
             while serve_thread.is_alive():
                 serve_thread.join(timeout=1)

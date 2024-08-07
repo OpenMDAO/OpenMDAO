@@ -2,8 +2,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
-from openmdao.utils.om_warnings import  OMDeprecationWarning
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
 
 class Inner(om.Group):
     def setup(self):
@@ -23,7 +22,7 @@ class SrcIndicesTestCase(unittest.TestCase):
     def test_one_nesting(self):
         prob = om.Problem()
         model = prob.model
-        comp = model.add_subsystem('src', om.ExecComp('y=3*x', x=np.zeros((7)), y=np.zeros((7))))
+        model.add_subsystem('src', om.ExecComp('y=3*x', x=np.zeros((7)), y=np.zeros((7))))
         model.add_subsystem('outer', Outer())
         model.connect('src.y', 'outer.desvar_x', src_indices=[2, 4], flat_src_indices=True)
         prob.setup()
@@ -50,7 +49,7 @@ class SrcIndicesTestCase(unittest.TestCase):
 
         g1 = p.model.add_subsystem('g1', om.Group())
         # c2 is vectorized calculations
-        c2 = g1.add_subsystem('c2', om.ExecComp('z = a * y', shape=(4,)))
+        g1.add_subsystem('c2', om.ExecComp('z = a * y', shape=(4,)))
 
         # The ultimate source of a and y may be scalar, or have some other arbitrary shape
         g1.promotes('c2', inputs=['a'], src_indices=[0, 0, 0, 0], src_shape=(1,))
@@ -83,11 +82,11 @@ class SrcIndicesTestCase(unittest.TestCase):
 
         g1 = p.model.add_subsystem('g1', om.Group(), promotes_inputs=['b'])
         # c1 contains scalar calculations
-        c1 = g1.add_subsystem('c1', om.ExecComp('y = a0 + b', shape=(1,)),
-                              promotes_inputs=[('a0', 'a'), 'b'], promotes_outputs=['y'])
+        g1.add_subsystem('c1', om.ExecComp('y = a0 + b', shape=(1,)),
+                         promotes_inputs=[('a0', 'a'), 'b'], promotes_outputs=['y'])
         g2 = g1.add_subsystem('g2', om.Group())
         # c2 is vectorized calculations
-        c2 = g2.add_subsystem('c2', om.ExecComp('z = a * y', shape=(4,)), promotes_inputs=['a', 'y'])
+        g2.add_subsystem('c2', om.ExecComp('z = a * y', shape=(4,)), promotes_inputs=['a', 'y'])
 
         g1.promotes('g2', inputs=['y'], src_indices=[0, 0, 0, 0], src_shape=(1,))
         g1.promotes('g2', inputs=['a'], src_indices=[0, 0, 0, 0], src_shape=(1,))
@@ -127,12 +126,12 @@ class SrcIndicesTestCase(unittest.TestCase):
 
         g1 = p.model.add_subsystem('g1', om.Group(), promotes_inputs=['b'])
         # c1 contains scalar calculations
-        c1 = g1.add_subsystem('c1', om.ExecComp('y = a0 + b', shape=(1,)),
-                              promotes_inputs=[('a0', 'a'), 'b'], promotes_outputs=['y'])
+        g1.add_subsystem('c1', om.ExecComp('y = a0 + b', shape=(1,)),
+                         promotes_inputs=[('a0', 'a'), 'b'], promotes_outputs=['y'])
 
         g2 = g1.add_subsystem('g2', om.Group())
         # c2 is vectorized calculations
-        c2 = g2.add_subsystem('c2',  om.ExecComp('z = a * y', shape=(4,)), promotes_inputs=['a', 'y'])
+        g2.add_subsystem('c2',  om.ExecComp('z = a * y', shape=(4,)), promotes_inputs=['a', 'y'])
 
         g1.promotes('g2', inputs=['a'], src_indices=[0, 0, 0, 0], src_shape=(1,))
         g1.promotes('g2', inputs=['y'], src_indices=[0, 0, 0, 0], src_shape=(1,))

@@ -1,7 +1,6 @@
 """ Test for the Backtracking Line Search"""
 
 import sys
-import os
 import unittest
 from math import atan
 
@@ -10,7 +9,6 @@ from io import StringIO
 import numpy as np
 
 import openmdao.api as om
-from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.implicit_newton_linesearch \
     import ImplCompTwoStates, ImplCompTwoStatesArrays
 from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2withDerivatives
@@ -445,7 +443,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
             assert_near_equal(top['comp.z'][ind], [1.5], 1e-8)
 
         with printoptions(precision=3):
-            msg = (f"'comp.z' exceeds lower bounds\n  Val: [1.333 1.333 1.333]\n  Lower: [1.5 1.5 1.5]\n")
+            msg = ("'comp.z' exceeds lower bounds\n  Val: [1.333 1.333 1.333]\n  Lower: [1.5 1.5 1.5]\n")
             with assert_warning(om.SolverWarning, msg):
                 top.run_model()
 
@@ -456,7 +454,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         top['comp.z'] = 2.4
 
         with printoptions(precision=3):
-            msg = (f"'comp.z' exceeds upper bounds\n  Val: [2.667 2.667 2.667]\n  Upper: [2.6  2.5  2.65]\n")
+            msg = ("'comp.z' exceeds upper bounds\n  Val: [2.667 2.667 2.667]\n  Upper: [2.6  2.5  2.65]\n")
             with assert_warning(om.SolverWarning, msg):
                 top.run_model()
 
@@ -742,7 +740,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
 
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 4
-        ls = model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
+        model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
 
         prob.set_solver_print(level=0)
 
@@ -784,7 +782,6 @@ class CompAtan(om.ImplicitComponent):
         residuals['y'] = (33.0 * atan(y-20.0))**2 + x
 
     def linearize(self, inputs, outputs, jacobian):
-        x = inputs['x'].item()
         y = outputs['y'].item()
 
         jacobian['y', 'y'] = 2178.0*atan(y-20.0) / (y**2 - 40.0*y + 401.0)
@@ -1035,7 +1032,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='scalar')
+        top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='scalar')
 
         top.setup()
         top.set_val('x', np.array([2., 2, 2]).reshape(3, 1))

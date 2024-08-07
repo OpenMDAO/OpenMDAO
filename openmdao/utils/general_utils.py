@@ -1187,7 +1187,7 @@ def wing_dbg():
         new = sys.path[:] + [os.environ['WINGHOME']]
         sys.path = new
         try:
-            import wingdbstub
+            import wingdbstub  # noqa: F401
         finally:
             sys.path = save
 

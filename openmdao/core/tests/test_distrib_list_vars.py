@@ -261,13 +261,13 @@ class DistributedListVarsTest(unittest.TestCase):
 
         stream = StringIO()
         with multi_proc_exception_check(prob.comm):
-            vars = sorted(prob.model.list_vars(val=True,
-                                               units=True,
-                                               shape=True,
-                                               prom_name=False,
-                                               print_arrays=True,
-                                               all_procs=True,
-                                               out_stream=stream))
+            prob.model.list_vars(val=True,
+                                 units=True,
+                                 shape=True,
+                                 prom_name=False,
+                                 print_arrays=True,
+                                 all_procs=True,
+                                 out_stream=stream)
 
             expected = [
                 "8 Variables(s) in 'model'",

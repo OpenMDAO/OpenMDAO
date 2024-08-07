@@ -7,8 +7,6 @@ import warnings
 import weakref
 from inspect import getmro
 
-from openmdao.utils.om_warnings import issue_warning
-
 
 # global dict of hooks
 # {class_name: { inst_id: {fname: [pre_hooks, post_hooks]}}}

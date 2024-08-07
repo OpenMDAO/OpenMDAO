@@ -1,9 +1,5 @@
 """Complex Step derivative approximations."""
 
-from collections import defaultdict
-
-import numpy as np
-
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
 

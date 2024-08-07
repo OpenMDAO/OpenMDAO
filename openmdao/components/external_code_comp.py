@@ -8,7 +8,7 @@ from shutil import which
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.implicitcomponent import ImplicitComponent
-from openmdao.utils.shell_proc import STDOUT, DEV_NULL, ShellProc
+from openmdao.utils.shell_proc import STDOUT, DEV_NULL, ShellProc  # noqa: F401
 
 
 class ExternalCodeDelegate(object):

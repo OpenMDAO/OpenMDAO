@@ -157,9 +157,9 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        J = prob.driver._compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
+        prob.driver._compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
         icount1 = prob.model.linear_solver._iter_count
-        J = prob.driver._compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
+        prob.driver._compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
         icount2 = prob.model.linear_solver._iter_count
 
         # Should take less iterations when starting from previous solution.
@@ -190,9 +190,9 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        J = prob.driver._compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
+        prob.driver._compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
         icount1 = prob.model.linear_solver._iter_count
-        J = prob.driver._compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
+        prob.driver._compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
         icount2 = prob.model.linear_solver._iter_count
 
         # Should take less iterations when starting from previous solution.
@@ -293,7 +293,7 @@ class TestScipyKrylovFeature(unittest.TestCase):
         of = ['obj']
 
         with self.assertRaises(om.AnalysisError) as cm:
-            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
+            prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
         msg = "Solver 'LN: SCIPY' on system '' failed to converge in 3 iterations."
         self.assertEqual(str(cm.exception), msg)
@@ -394,7 +394,7 @@ class TestCaching(unittest.TestCase):
         prob.set_val('ivc.x', .3)
         prob.run_model()
 
-        J = prob.compute_totals()
+        prob.compute_totals()
 
         self.assertEqual(G.linear_solver._lin_rhs_checker._stats['parhits'], 1)
 

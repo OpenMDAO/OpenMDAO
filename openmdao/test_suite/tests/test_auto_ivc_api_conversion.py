@@ -63,7 +63,7 @@ class TestConversionGuideDoc(unittest.TestCase):
 
         prob.setup()
 
-        x = prob.get_val('x')
+        prob.get_val('x')
         prob.set_val('y', 15.0)
 
     def test_constrained(self):

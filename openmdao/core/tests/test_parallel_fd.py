@@ -2,7 +2,6 @@
 import itertools
 import numpy as np
 import unittest
-TestCase = unittest.TestCase
 
 import openmdao.api as om
 from openmdao.utils.mpi import MPI
@@ -101,7 +100,7 @@ def setup_diamond_model(par_fds, size, method, par_fd_at):
     return prob
 
 
-class SerialSimpleFDTestCase(TestCase):
+class SerialSimpleFDTestCase(unittest.TestCase):
 
     def test_serial_fd(self):
         size = 15
@@ -123,7 +122,7 @@ class SerialSimpleFDTestCase(TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class ParallelSimpleFDTestCase2(TestCase):
+class ParallelSimpleFDTestCase2(unittest.TestCase):
 
     N_PROCS = 2
 
@@ -149,7 +148,7 @@ class ParallelSimpleFDTestCase2(TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class ParallelFDTestCase5(TestCase):
+class ParallelFDTestCase5(unittest.TestCase):
 
     N_PROCS = 5
 
@@ -172,7 +171,7 @@ class ParallelFDTestCase5(TestCase):
         assert_near_equal(J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
 
 
-class SerialDiamondFDTestCase(TestCase):
+class SerialDiamondFDTestCase(unittest.TestCase):
 
     def test_diamond_fd_totals(self):
         size = 15
@@ -198,7 +197,7 @@ class SerialDiamondFDTestCase(TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class ParallelDiamondFDTestCase(TestCase):
+class ParallelDiamondFDTestCase(unittest.TestCase):
 
     N_PROCS = 4
 
@@ -256,7 +255,7 @@ def _test_func_name(func, num, param):
     for p in param.args:
         try:
             arg = p.__name__
-        except:
+        except Exception:
             arg = str(p)
         args.append(arg)
     return func.__name__ + '_' + '_'.join(args)

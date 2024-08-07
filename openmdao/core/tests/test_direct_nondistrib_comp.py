@@ -1,6 +1,5 @@
 import unittest
 
-import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_check_partials
@@ -41,7 +40,6 @@ class QuadraticComp(om.ImplicitComponent):
     def linearize(self, inputs, outputs, partials):
         a = inputs['a']
         b = inputs['b']
-        c = inputs['c']
         x = outputs['x']
 
         partials['x', 'a'] = x ** 2

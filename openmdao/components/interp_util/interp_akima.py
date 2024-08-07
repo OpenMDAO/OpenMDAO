@@ -501,7 +501,6 @@ class InterpAkima(InterpAlgorithm):
 
         # Propagate derivatives from sub table.
         if subtable is not None and (self._compute_d_dx or self._compute_d_dvalues):
-            shape = dval3.shape
             cd_term = 0
 
             if self._compute_d_dx:
@@ -1559,12 +1558,6 @@ class Interp1DAkima(InterpAlgorithmFixed):
         idx_coeffs = idx_grid + 1
         needed = set(idx_coeffs)
         x = x.ravel()
-
-        # Complex Step
-        if self.values.dtype == complex:
-            dtype = self.values.dtype
-        else:
-            dtype = x.dtype
 
         if self.vec_coeff is None:
             self.coeffs = set()

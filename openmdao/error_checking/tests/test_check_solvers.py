@@ -1,7 +1,7 @@
 
 import unittest
 
-from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent, ExecComp, \
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, \
     LinearBlockGS, NonlinearBlockGS, DirectSolver
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.test_suite.components.sellar import StateConnection
@@ -221,9 +221,9 @@ class TestCheckSolvers(unittest.TestCase):
         prob = Problem()
         model = prob.model
 
-        C1 = model.add_subsystem("C1", ExecComp('y=2.0*x'))
-        C2 = model.add_subsystem("C2", ExecComp('y=2.0*x'))
-        C3 = model.add_subsystem("C3", ExecComp('y=2.0*x'))
+        model.add_subsystem("C1", ExecComp('y=2.0*x'))
+        model.add_subsystem("C2", ExecComp('y=2.0*x'))
+        model.add_subsystem("C3", ExecComp('y=2.0*x'))
 
         model.connect('C1.y','C2.x')
         model.connect('C2.y','C3.x')
@@ -247,9 +247,9 @@ class TestCheckSolvers(unittest.TestCase):
         prob = Problem()
         model = prob.model
 
-        C1 = model.add_subsystem("C1", ExecComp('y=2.0*x'))
-        C2 = model.add_subsystem("C2", ExecComp('y=2.0*x'))
-        C3 = model.add_subsystem("C3", ExecComp('y=2.0*x'))
+        model.add_subsystem("C1", ExecComp('y=2.0*x'))
+        model.add_subsystem("C2", ExecComp('y=2.0*x'))
+        model.add_subsystem("C3", ExecComp('y=2.0*x'))
 
         model.connect('C1.y','C2.x')
         model.connect('C2.y','C3.x')
@@ -274,9 +274,9 @@ class TestCheckSolvers(unittest.TestCase):
         model = prob.model
 
         G1 = model.add_subsystem("G1", Group())
-        C1 = G1.add_subsystem("C1", ExecComp('y=2.0*x'))
-        C2 = G1.add_subsystem("C2", ExecComp('y=2.0*x'))
-        C3 = G1.add_subsystem("C3", ExecComp('y=2.0*x'))
+        G1.add_subsystem("C1", ExecComp('y=2.0*x'))
+        G1.add_subsystem("C2", ExecComp('y=2.0*x'))
+        G1.add_subsystem("C3", ExecComp('y=2.0*x'))
 
         G1.connect('C1.y','C2.x')
         G1.connect('C2.y','C3.x')

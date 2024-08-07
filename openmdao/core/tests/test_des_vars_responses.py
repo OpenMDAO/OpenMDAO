@@ -616,20 +616,6 @@ class TestConstraintOnModel(unittest.TestCase):
             prob.model.add_design_var('x', lower=0.0, upper=['a', 'b'],
                                       ref0=-100.0, ref=100)
 
-    def test_constraint_invalid_name(self):
-
-        prob = om.Problem()
-
-        prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = om.NonlinearBlockGS()
-
-        with self.assertRaises(TypeError) as context:
-            prob.model.add_constraint(42, lower=-100, upper=100, ref0=-100.0,
-                                      ref=100)
-
-        self.assertEqual(str(context.exception), '<class SellarDerivatives>: The name argument should '
-                                                 'be a string, got 42')
-
     def test_constraint_invalid_lower(self):
 
         prob = om.Problem()

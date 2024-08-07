@@ -4,7 +4,6 @@ Define the LinearRHSChecker class.
 LinearRHSChecker manages caching of solutions and right-hand sides for linear solves.
 """
 
-import os
 from collections import deque
 import atexit
 

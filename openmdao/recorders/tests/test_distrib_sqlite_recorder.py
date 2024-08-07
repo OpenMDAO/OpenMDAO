@@ -298,7 +298,7 @@ class DistributedRecorderTest(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        geom = model.add_subsystem('tcomp', TopComp())
+        model.add_subsystem('tcomp', TopComp())
 
         model.add_design_var('tcomp.theta_c2_C', lower=-20., upper=20., indices=range(2, 9))
         model.add_constraint('tcomp.c_ae', lower=0.e0,)

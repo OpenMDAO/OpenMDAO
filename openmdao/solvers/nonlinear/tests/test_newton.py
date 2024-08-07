@@ -1,7 +1,6 @@
 """Test the Newton nonlinear solver. """
 
 import unittest
-import warnings
 
 import numpy as np
 

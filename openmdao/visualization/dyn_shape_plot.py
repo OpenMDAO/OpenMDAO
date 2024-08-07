@@ -1,7 +1,5 @@
 """Functions for plotting the dynamic shapes dependency graph."""
 
-import os
-import sys
 import networkx as nx
 
 from openmdao.core.problem import Problem

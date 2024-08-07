@@ -1,6 +1,4 @@
 
-import numpy as np
-
 from openmdao.api import Group, ExplicitComponent, IndepVarComp
 
 

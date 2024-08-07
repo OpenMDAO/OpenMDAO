@@ -69,7 +69,7 @@ class SemistructuredMetaModelCompTests(unittest.TestCase):
         prob.setup(force_alloc_complex=True)
         prob.run_model()
 
-        viz = MetaModelVisualization(interp)
+        MetaModelVisualization(interp)
 
 
 if __name__ == '__main__':

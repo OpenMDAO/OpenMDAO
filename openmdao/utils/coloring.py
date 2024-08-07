@@ -21,8 +21,8 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM
-from openmdao.utils.general_utils import _src_name_iter, _src_or_alias_item_iter, \
-    _convert_auto_ivc_to_conn_name, pattern_filter
+from openmdao.utils.general_utils import _src_name_iter, _convert_auto_ivc_to_conn_name, \
+    pattern_filter
 import openmdao.utils.hooks as hooks
 from openmdao.utils.file_utils import _load_and_exec
 from openmdao.utils.om_warnings import issue_warning, OMDeprecationWarning, DerivativesWarning
@@ -1286,8 +1286,8 @@ class Coloring(object):
                 print('</pre>\n', file=out_stream)
 
         if html:
-            out_stream.write(f'</body>\n'
-                             f'</html>')
+            out_stream.write('</body>\n'
+                             '</html>')
 
         if has_overlap:
             raise RuntimeError("Internal coloring bug: jacobian has entries where fwd and rev "
@@ -2997,7 +2997,6 @@ def _partial_coloring_cmd(options, user_args):
         Args to be passed to the user script.
 
     """
-    from openmdao.core.problem import Problem
     from openmdao.core.component import Component
     from openmdao.devtools.debug import profiling
     from openmdao.utils.general_utils import do_nothing_context

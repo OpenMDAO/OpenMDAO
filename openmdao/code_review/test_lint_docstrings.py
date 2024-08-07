@@ -324,7 +324,7 @@ class LintTestCase(unittest.TestCase):
             return []
 
         doc_returns = numpy_doc_string['Returns']
-        doc_yields = numpy_doc_string['Yields']
+        # doc_yields = numpy_doc_string['Yields']
 
         # TODO:  Enforce Yields in docs for contextmanagers
         if _is_context_manager(func):
@@ -340,11 +340,9 @@ class LintTestCase(unittest.TestCase):
             # Check formatting
             for (name, typ, desc) in doc_returns:
                 if name_required and not name:
-                    new_failures.append('no detectable name for Return '
-                                        'value'.format(name))
+                    new_failures.append('no detectable name for Return value')
                 if desc == '':
-                    new_failures.append('no description given for Return '
-                                        '{0}'.format(name))
+                    new_failures.append(f'no description given for Return {name}')
 
         return new_failures
 
@@ -551,7 +549,7 @@ class LintTestCase(unittest.TestCase):
                         full_class_path = f'{module_name}.{class_name}'
                         try:
                             result = validate.validate(full_class_path)
-                        except:
+                        except Exception:
                             continue
 
                         failures.update(self._failure_dict(full_class_path, result))
@@ -570,7 +568,7 @@ class LintTestCase(unittest.TestCase):
                                 full_method_path = f'{module_name}.{class_name}.{method_name}'
                                 try:
                                     result = validate.validate(full_method_path)
-                                except:
+                                except Exception:
                                     continue
 
                                 failures.update(self._failure_dict(full_method_path, result))
@@ -588,7 +586,7 @@ class LintTestCase(unittest.TestCase):
                             full_function_path = f'{module_name}.{func_name}'
                             try:
                                 result = validate.validate(full_function_path)
-                            except:
+                            except Exception:
                                 continue
 
                             failures.update(self._failure_dict(full_function_path, result))

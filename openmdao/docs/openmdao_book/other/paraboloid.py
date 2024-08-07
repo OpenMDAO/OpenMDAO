@@ -20,4 +20,4 @@ prob.set_val('paraboloid.x', 3.0)
 prob.set_val('paraboloid.y', -4.0)
 
 # run the optimization
-prob.run_driver();
+prob.run_driver()

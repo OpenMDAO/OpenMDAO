@@ -2,7 +2,6 @@
 from math import exp
 
 import numpy as np
-import unittest
 
 import openmdao.api as om
 

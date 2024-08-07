@@ -343,12 +343,12 @@ class StructuredMetaModelCompTests(unittest.TestCase):
         adjusted_points.input_point_list = [6.632653061224477, 3.36734693877551]
         adjusted_points.dist_range = 0.5
 
-        right_points = adjusted_points._structured_training_points(compute_distance=True, source='right')
-        right_plot = adjusted_points._right_plot()
+        right_points = adjusted_points._structured_training_points(compute_distance=True, source='right')  # noqa: F841 unused
+        right_plot = adjusted_points._right_plot()  # noqa: F841 unused
         right_transparency = adjusted_points.right_alphas
 
-        bottom_points = adjusted_points._structured_training_points(compute_distance=True, source='bottom')
-        bottom_plot = adjusted_points._bottom_plot()
+        bottom_points = adjusted_points._structured_training_points(compute_distance=True, source='bottom')  # noqa: F841 unused
+        bottom_plot = adjusted_points._bottom_plot()  # noqa: F841 unused
         bottom_transparency = adjusted_points.bottom_alphas
 
 
@@ -360,11 +360,11 @@ class StructuredMetaModelCompTests(unittest.TestCase):
         adjusted_points = MetaModelVisualization(self.mm)
         adjusted_points.input_point_list = [6.632653061224477, 3.36734693877551]
 
-        right_points = adjusted_points._structured_training_points(compute_distance=True, source='right')
-        right_plot = adjusted_points._right_plot()
+        right_points = adjusted_points._structured_training_points(compute_distance=True, source='right')  # noqa: F841 unused
+        right_plot = adjusted_points._right_plot()  # noqa: F841 unused
 
-        bottom_points = adjusted_points._structured_training_points(compute_distance=True, source='bottom')
-        bottom_plot = adjusted_points._bottom_plot()
+        bottom_points = adjusted_points._structured_training_points(compute_distance=True, source='bottom')  # noqa: F841 unused
+        bottom_plot = adjusted_points._bottom_plot()  # noqa: F841 unused
 
 
         self.assertTrue(len(adjusted_points.right_alphas) == 10)

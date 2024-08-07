@@ -10,8 +10,6 @@ from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.testing_utils import use_tempdirs, parameterized_name, require_pyoptsparse
 from openmdao.test_suite.components.paraboloid_invalid_region import Paraboloid
 
-from openmdao.utils.mpi import MPI
-
 try:
     from parameterized import parameterized
 except ImportError:
@@ -148,7 +146,6 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
                                    f"Found {errs} {func} errors in CONMIN.out, expected {err_count}")
 
         elif optimizer == 'IPOPT':
-            output_dir = prob.get_outputs_dir()
             with open(f"{prob.get_outputs_dir()}/IPOPT.out", encoding="utf-8") as f:
                 IPOPT_history = f.read()
 

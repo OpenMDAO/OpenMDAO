@@ -122,7 +122,7 @@ class TestOptionsDictionary(unittest.TestCase):
                 outputs['y'] = 2 * inputs['x']
 
         try:
-            comp = VectorDoublingComp(size=5)
+            VectorDoublingComp(size=5)
         except Exception as err:
             self.assertEqual(str(err), "Option 'size' with value 5 must be an even number.")
 

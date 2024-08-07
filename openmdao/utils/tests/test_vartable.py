@@ -1,7 +1,6 @@
 import sys
 import unittest
 
-import numpy as np
 from io import StringIO
 
 import openmdao.api as om

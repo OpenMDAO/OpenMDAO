@@ -10,7 +10,6 @@ from openmdao.solvers.linesearch.backtracking import BoundsEnforceLS
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.om_warnings import issue_warning, SetupWarning
-from openmdao.utils.mpi import MPI
 
 
 CITATION = """@ARTICLE{

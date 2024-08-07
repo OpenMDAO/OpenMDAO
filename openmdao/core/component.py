@@ -2,7 +2,6 @@
 
 import sys
 import types
-from types import LambdaType
 from collections import defaultdict
 from collections.abc import Iterable
 from itertools import product
@@ -17,9 +16,8 @@ from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_M
 from openmdao.core.constants import INT_DTYPE
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.array_utils import shape_to_len
-from openmdao.utils.class_util import overrides_method
 from openmdao.utils.units import simplify_unit
-from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_name2abs_name
+from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     find_matches, make_set, inconsistent_across_procs
@@ -194,7 +192,6 @@ class Component(System):
                 self._num_par_fd = 1
 
         self.comm = comm
-        nprocs = comm.size
 
         # Clear out old variable information so that we can call setup on the component.
         self._var_rel_names = {'input': [], 'output': []}

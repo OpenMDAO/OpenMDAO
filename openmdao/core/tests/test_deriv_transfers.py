@@ -31,7 +31,7 @@ def _test_func_name(func, num, param):
         for item in p:
             try:
                 arg = item.__name__
-            except:
+            except Exception:
                 arg = str(item)
             args.append(arg)
     return func.__name__ + '_' + '_'.join(args)
@@ -210,9 +210,6 @@ class TestParallelGroups(unittest.TestCase):
         model = prob.model
         size = 3
 
-        sizes = [2, 1]
-        rank = prob.comm.rank
-
         if not auto:
             model.add_subsystem('indep', om.IndepVarComp('x', np.ones(size)), promotes=['x'])
 
@@ -363,8 +360,6 @@ class TestParallelGroups(unittest.TestCase):
         model = prob.model
         size = 3
 
-        sizes = [2, 1]
-        rank = prob.comm.rank
         model.add_subsystem('indep', om.IndepVarComp('x', np.ones(size)))
         par = model.add_subsystem('par', om.ParallelGroup())
         par.add_subsystem('C1', om.ExecComp('y = 3 * x', x=np.zeros(size), y=np.zeros(size)))

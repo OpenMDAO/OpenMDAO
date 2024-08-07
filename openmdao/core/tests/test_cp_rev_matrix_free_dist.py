@@ -4,7 +4,6 @@ left the test because it checks the format of the printed values from check part
 """
 import unittest
 from io import StringIO
-import re
 
 import numpy as np
 

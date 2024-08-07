@@ -5,7 +5,6 @@ pyoptsparse is based on pyOpt, which is an object-oriented framework for
 formulating and solving nonlinear constrained optimization problems, with
 additional MPI capability.
 """
-import pathlib
 import sys
 import json
 import signal
@@ -22,7 +21,7 @@ except ImportError:
 except Exception as err:
     pyoptsparse = err
 
-from openmdao.core.constants import INT_DTYPE, _DEFAULT_REPORTS_DIR, _ReprClass
+from openmdao.core.constants import _DEFAULT_REPORTS_DIR, _ReprClass
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging, filter_by_meta
 from openmdao.core.group import Group
@@ -523,7 +522,7 @@ class pyOptSparseDriver(Driver):
             _tmp = __import__('pyoptsparse', globals(), locals(), [optimizer], 0)
             opt = getattr(_tmp, optimizer)()
 
-        except Exception as err:
+        except Exception:
             # Change whatever pyopt gives us to an ImportError, give it a readable message,
             # but raise with the original traceback.
             msg = "Optimizer %s is not available in this installation." % optimizer
@@ -600,7 +599,7 @@ class pyOptSparseDriver(Driver):
                           storeHistory=self.options['hist_file'],
                           hotStart=self.options['hotstart_file'])
 
-        except Exception as c:
+        except Exception:
             if self._exc_info is None:
                 raise
 

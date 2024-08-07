@@ -167,7 +167,7 @@ class TestIndepVarComp(unittest.TestCase):
 
     def test_invalid_tags(self):
         with self.assertRaises(TypeError) as cm:
-            comp = om.IndepVarComp('indep_var', tags=99)
+            om.IndepVarComp('indep_var', tags=99)
 
         self.assertEqual(str(cm.exception),
             "IndepVarComp: Value (99) of option 'tags' has type 'int', "

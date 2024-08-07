@@ -1,5 +1,4 @@
 """Define the explicit test component (simple)."""
-import scipy.sparse
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 

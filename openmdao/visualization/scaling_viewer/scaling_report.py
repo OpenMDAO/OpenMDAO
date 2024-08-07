@@ -3,13 +3,11 @@
 import os
 import json
 import functools
-import pathlib
 
 import numpy as np
 
 from openmdao.core.constants import _SetupStatus, INF_BOUND
 import openmdao.utils.hooks as hooks
-from openmdao.utils.mpi import MPI
 from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import default_noraise
 from openmdao.utils.file_utils import _load_and_exec

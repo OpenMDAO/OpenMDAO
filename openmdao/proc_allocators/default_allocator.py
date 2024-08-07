@@ -1,10 +1,9 @@
 """Define the DefaultAllocator class."""
-import warnings
 
 import numpy as np
 
-from openmdao.proc_allocators.proc_allocator import ProcAllocator, ProcAllocationError
-from openmdao.utils.mpi import MPI
+from openmdao.proc_allocators.proc_allocator import ProcAllocator, ProcAllocationError  # noqa: F401
+from openmdao.utils.mpi import MPI  # noqa: F401
 
 
 class DefaultAllocator(ProcAllocator):

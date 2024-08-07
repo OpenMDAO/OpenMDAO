@@ -906,10 +906,10 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         prob.run_model()
 
         with self.assertRaises(RuntimeError) as cm:
-            jac = prob.compute_totals(of=['x', 'y', 'z'], wrt=['a'])
+            prob.compute_totals(of=['x', 'y', 'z'], wrt=['a'])
 
         expected = "Jacobian in '' is not full rank, but OpenMDAO was not " + \
-                    "able to determine which rows or columns."
+                   "able to determine which rows or columns."
 
         self.assertEqual(expected, str(cm.exception))
 

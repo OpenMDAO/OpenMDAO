@@ -1,7 +1,5 @@
 
-import sys
 import unittest
-from io import StringIO
 
 from openmdao.api import ParallelGroup, Problem, IndepVarComp, ExecComp, PETScVector
 from openmdao.devtools.debug import comm_info
@@ -11,7 +9,7 @@ from openmdao.utils.testing_utils import use_tempdirs
 
 try:
     from openmdao.api import PETScVector
-except:
+except Exception:
     PETScVector = None
 
 
@@ -112,7 +110,7 @@ class ProcTestCase3(unittest.TestCase):
 
     def test_4_subs_with_mins(self):
         try:
-            p = _build_model(nsubs=4, min_procs=[1,2,2,1])
+            _build_model(nsubs=4, min_procs=[1,2,2,1])
         except Exception as err:
             self.assertEqual(str(err), "'par' <class ParallelGroup>: MPI process allocation failed: can't meet min_procs required because the sum of the min procs required exceeds the procs allocated and the min procs required is > 1 for the following subsystems: ['C1', 'C2']")
         else:
@@ -183,7 +181,7 @@ class ProcTestCase6(unittest.TestCase):
 
     def test_3_subs_over_max(self):
         try:
-            p = _build_model(nsubs=3, max_procs=[1, 2, 2])
+            _build_model(nsubs=3, max_procs=[1, 2, 2])
         except Exception as err:
             self.assertEqual(str(err), "'par' <class ParallelGroup>: too many MPI procs allocated. Comm is size 6 but can only use 5.")
         else:

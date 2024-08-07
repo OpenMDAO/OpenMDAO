@@ -263,39 +263,39 @@ class ResidNamingTestCase(unittest.TestCase):
 
     def test_size_mismatch(self):
         with self.assertRaises(Exception) as cm:
-            prob = self._build_model(MyCompSizeMismatch)
+            self._build_model(MyCompSizeMismatch)
 
         self.assertEqual(cm.exception.args[0], "'MyComp' <class MyCompSizeMismatch>: The number of residuals (3) doesn't match number of outputs (2).  If any residuals are added using 'add_residuals', their total size must match the total size of the outputs.")
 
     def test_ref_shape_mismatch(self):
         with self.assertRaises(Exception) as cm:
-            prob = self._build_model(MyCompShapeMismatch)
+            self._build_model(MyCompShapeMismatch)
 
         self.assertEqual(cm.exception.args[0], "'MyComp' <class MyCompShapeMismatch>: When adding residual 'res1', expected shape (1,) but got shape (1, 2) for argument 'ref'.")
 
     def test_bad_unit(self):
         with self.assertRaises(Exception) as cm:
-            prob = self._build_model(MyCompBadUnits)
+            self._build_model(MyCompBadUnits)
 
         self.assertEqual(cm.exception.args[0], "'MyComp' <class MyCompBadUnits>: The units 'foobar/baz' are invalid.")
 
     def test_unit_mismatch(self):
         with self.assertRaises(Exception) as cm:
-            prob = self._build_model(MyCompUnitsMismatch)
+            self._build_model(MyCompUnitsMismatch)
 
         self.assertEqual(cm.exception.args[0], "'MyComp' <class MyCompUnitsMismatch>: residual units 'inch' for residual 'res1' != output res_units 'ft' for output 'Re'.")
 
     def test_ref_mismatch(self):
         with self.assertRaises(Exception) as cm:
-            prob = self._build_model(MyCompRefMismatch)
+            self._build_model(MyCompRefMismatch)
 
         self.assertEqual(cm.exception.args[0], "'MyComp' <class MyCompRefMismatch>: (4.0 != 3.0), 'ref' for residual 'res1' != 'res_ref' for output 'Re'.")
 
     def test_ref_mismatch_default_no_exception(self):
-        prob = self._build_model(MyCompRefMismatchDefault)
+        self._build_model(MyCompRefMismatchDefault)
 
     def test_ref_mismatch_default2_no_exception(self):
-        prob = self._build_model(MyCompRefMismatchDefault2)
+        self._build_model(MyCompRefMismatchDefault2)
 
     def test_analytic(self):
         prob = self._build_model(MyCompAnalytic)

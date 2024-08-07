@@ -2,8 +2,8 @@ import unittest
 import numpy as np
 from numpy.testing import assert_almost_equal
 
-from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, NewtonSolver, \
-    ScipyKrylov, LinearRunOnce, LinearBlockGS
+from openmdao.api import Problem, IndepVarComp, DirectSolver, NewtonSolver, \
+    ScipyKrylov, LinearBlockGS
 
 from openmdao.test_suite.components.double_sellar import DoubleSellar, DoubleSellarImplicit
 

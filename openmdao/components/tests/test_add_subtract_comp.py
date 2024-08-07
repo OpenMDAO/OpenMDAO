@@ -472,7 +472,6 @@ class TestFeature(unittest.TestCase):
         n = 3
 
         p = om.Problem()
-        model = p.model
 
         # Construct an adder/subtracter here. create a relationship through the add_equation method
         adder = om.AddSubtractComp()

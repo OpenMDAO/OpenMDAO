@@ -2,7 +2,6 @@
 
 
 import sys
-import pathlib
 from io import StringIO
 
 import numpy as np
@@ -11,7 +10,6 @@ from collections import Counter
 
 from openmdao.core.constants import _SetupStatus, _DEFAULT_OUT_STREAM
 from openmdao.utils.mpi import MPI
-from openmdao.utils.om_warnings import issue_warning, MPIWarning
 from openmdao.utils.reports_system import register_report
 from openmdao.utils.file_utils import text2html, _load_and_exec
 from openmdao.utils.rangemapper import RangeMapper
@@ -121,7 +119,6 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
         indent = '    ' * (depth + tab)
         cprint(indent, end='')
 
-        info = ''
         if isinstance(s, Group):
             cprint("%s " % type(s).__name__, color=Fore.GREEN + Style.BRIGHT)
             cprint("%s" % s.name)
@@ -479,11 +476,11 @@ def trace_dump(fname='trace_dump', skip=(), flush=True):
                 if 'self' in frame.f_locals:
                     try:
                         pname = frame.f_locals['self'].msginfo
-                    except:
+                    except Exception:
                         pass
                     try:
                         commsize = frame.f_locals['self'].comm.size
-                    except:
+                    except Exception:
                         pass
                 if pname is not None:
                     if not stack or pname != stack[-1][0]:
@@ -501,11 +498,11 @@ def trace_dump(fname='trace_dump', skip=(), flush=True):
                 if 'self' in frame.f_locals:
                     try:
                         pname = frame.f_locals['self'].msginfo
-                    except:
+                    except Exception:
                         pass
                     try:
                         commsize = frame.f_locals['self'].comm.size
-                    except:
+                    except Exception:
                         pass
                 print('   ' * len(stack), '<--', frame.f_code.co_name, "%s:%d" %
                       (frame.f_code.co_filename, frame.f_code.co_firstlineno),
@@ -680,7 +677,8 @@ def show_dist_var_conns(group, rev=False, out_stream=_DEFAULT_OUT_STREAM):
         out_stream = sys.stdout
 
     if out_stream is None:
-        printer = lambda *args, **kwargs: None
+        def printer(*args, **kwargs):
+            return None
     else:
         printer = print
 
@@ -806,7 +804,7 @@ def show_dist_var_conns(group, rev=False, out_stream=_DEFAULT_OUT_STREAM):
                             orstr = str(sorted_ranks)
                             if len(sorted_ranks) > 3:
                                 for j, r in enumerate(sorted_ranks):
-                                    if j == 0 or r - val == 1:
+                                    if j == 0 or r - val == 1:  # noqa: F821, val initialized below
                                         val = r
                                     else:
                                         break
@@ -820,7 +818,7 @@ def show_dist_var_conns(group, rev=False, out_stream=_DEFAULT_OUT_STREAM):
                             irstr = str(sorted(iranks))
                             if len(sorted_ranks) > 3:
                                 for j, r in enumerate(sorted_ranks):
-                                    if j == 0 or r - val == 1:
+                                    if j == 0 or r - val == 1:  # noqa: F821, val initialized below
                                         val = r
                                     else:
                                         break

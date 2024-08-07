@@ -1,6 +1,5 @@
 """ Unit tests for discrete variables."""
 
-import sys
 import unittest
 import copy
 
@@ -588,7 +587,7 @@ class DiscreteTestCase(unittest.TestCase):
         indep = model.add_subsystem('indep', om.IndepVarComp())
         indep.add_output('x', 1.0)
 
-        comp = model.add_subsystem('comp', CompDiscWDerivs())
+        model.add_subsystem('comp', CompDiscWDerivs())
         model.connect('indep.x', 'comp.x')
 
         model.add_design_var('indep.x')
@@ -608,8 +607,8 @@ class DiscreteTestCase(unittest.TestCase):
         indep = model.add_subsystem('indep', om.IndepVarComp())
         indep.add_output('x', 1.0)
 
-        comp = model.add_subsystem('comp', CompDiscWDerivsImplicit(), promotes=['N'])
-        sink = model.add_subsystem('sink', MixedCompDiscIn(1.0))
+        model.add_subsystem('comp', CompDiscWDerivsImplicit(), promotes=['N'])
+        model.add_subsystem('sink', MixedCompDiscIn(1.0))
         model.connect('indep.x', 'comp.y2_actual')
         model.connect('comp.Nout', 'sink.x')
 
@@ -635,7 +634,7 @@ class DiscreteTestCase(unittest.TestCase):
 
         G = model.add_subsystem('G', om.Group(), promotes_inputs=['x'])
 
-        G1 = G.add_subsystem('G1', InternalDiscreteGroup(), promotes_inputs=['x'], promotes_outputs=['y'])
+        G.add_subsystem('G1', InternalDiscreteGroup(), promotes_inputs=['x'], promotes_outputs=['y'])
 
         G2 = G.add_subsystem('G2', om.Group(), promotes_inputs=['x'])
         G2.add_subsystem('C2_1', om.ExecComp('y=3*x'), promotes_inputs=['x'])
@@ -659,7 +658,7 @@ class DiscreteTestCase(unittest.TestCase):
         self.assertEqual(prob['C4.y'], 16.0)
 
         with self.assertRaises(Exception) as ctx:
-            J = prob.compute_totals()
+            prob.compute_totals()
         self.assertEqual(str(ctx.exception),
                          "Total derivative of 'C3.y' with respect to 'x' depends upon discrete output variables ['G.G1.C1.y'].")
 

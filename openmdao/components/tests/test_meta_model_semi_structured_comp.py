@@ -368,7 +368,7 @@ class TestMetaModelSemiStructured(unittest.TestCase):
         model.add_subsystem('comp', comp)
 
         msg = "Size mismatch: training data for 'f' is length 3, but" + \
-            f" data for 'x' is length 4."
+              " data for 'x' is length 4."
         with self.assertRaisesRegex(ValueError, msg):
             prob.setup()
 
@@ -516,7 +516,7 @@ class TestMetaModelSemiStructured(unittest.TestCase):
 
         # we can verify all gradients by checking against finite-difference
         chk = prob.check_totals(of='comp.f', wrt=['tab.k', 'comp.p1', 'comp.p2', 'comp.p3'],
-                                   method='cs', out_stream=None);
+                                method='cs', out_stream=None)
         assert_check_totals(chk, atol=1e-10, rtol=1e-10)
 
     def test_detect_local_extrapolation(self):
@@ -564,8 +564,6 @@ class TestMetaModelSemiStructured(unittest.TestCase):
             assert_near_equal(prob.get_val('interp.f'), expected, 1e-3)
 
     def test_lagrange3_edge_extrapolation_detection_bug(self):
-        import itertools
-
         import numpy as np
         import openmdao.api as om
 

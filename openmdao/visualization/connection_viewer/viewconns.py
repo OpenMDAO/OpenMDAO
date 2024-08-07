@@ -1,7 +1,6 @@
 
 """Define a function to view connections."""
 import os
-import pathlib
 import json
 from itertools import chain
 from collections import defaultdict
@@ -14,9 +13,7 @@ except ImportError:
     IFrame = display = None
 
 from openmdao.core.problem import Problem
-from openmdao.utils.units import convert_units
 from openmdao.utils.mpi import MPI
-from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.notebook_utils import notebook, colab
 from openmdao.utils.om_warnings import issue_warning

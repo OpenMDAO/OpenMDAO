@@ -3,7 +3,6 @@ Figure built manually in SVG.
 
 Note, these require the svgwrite package (and optionally, the svglib package to convert to pdf).
 """
-import subprocess
 
 from svgwrite import Drawing
 

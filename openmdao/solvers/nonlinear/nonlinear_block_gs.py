@@ -3,7 +3,6 @@
 import numpy as np
 
 from openmdao.solvers.solver import NonlinearSolver
-from openmdao.utils.mpi import MPI
 
 
 class NonlinearBlockGS(NonlinearSolver):

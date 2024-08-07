@@ -1,6 +1,4 @@
-import numpy as np
 import unittest
-import scipy.sparse.linalg
 
 from openmdao.api import Problem, ImplicitComponent, Group
 from openmdao.api import LinearBlockGS

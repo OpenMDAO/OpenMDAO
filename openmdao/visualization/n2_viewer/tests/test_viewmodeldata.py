@@ -8,9 +8,6 @@ import types
 import base64
 import zlib
 
-from shutil import rmtree
-from tempfile import mkdtemp
-
 import numpy as np
 
 import openmdao.api as om
@@ -101,7 +98,7 @@ class TestViewerData(unittest.TestCase):
                     val = np.asarray(tree[key])
                     try:
                         assert_near_equal(expected_val, val, tolerance=val_tol)
-                    except Exception as e:
+                    except Exception:
                         raise AssertionError(f'{_path + [key]} did not match to expected value')
 
         for i, key in enumerate(expected_tree.keys()):

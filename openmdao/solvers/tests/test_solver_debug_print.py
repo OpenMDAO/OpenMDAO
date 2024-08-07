@@ -1,7 +1,6 @@
 """Tests the `debug_print` option for Nonlinear solvers."""
 
 import os
-import re
 import sys
 import shutil
 import tempfile
@@ -33,7 +32,6 @@ nonlinear_solvers = [
 
 class TestNonlinearSolvers(unittest.TestCase):
     def setUp(self):
-        import re
         import os
         from tempfile import mkdtemp
 

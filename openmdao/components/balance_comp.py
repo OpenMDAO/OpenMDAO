@@ -1,7 +1,6 @@
 """Define the BalanceComp class."""
 
 from types import FunctionType
-from numbers import Number
 
 import numpy as np
 

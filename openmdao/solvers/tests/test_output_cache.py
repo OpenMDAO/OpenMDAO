@@ -4,7 +4,7 @@ import numpy as np
 
 import openmdao.api as om
 
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_no_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 
 
 class SubComp1(om.ExplicitComponent):

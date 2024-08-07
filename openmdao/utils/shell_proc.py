@@ -259,9 +259,9 @@ class ShellProc(subprocess.Popen):
         if return_code:
             if return_code > 0:
                 try:
-                    err_msg = os.strerror(return_code)
+                    error_msg = os.strerror(return_code)
                 except OverflowError:
-                    err_msg = "Process exited with unknown return code {}".format(return_code)
+                    error_msg = "Process exited with unknown return code {}".format(return_code)
             elif sys.platform != 'win32':
                 sig = -return_code
                 if sig < signal.NSIG:

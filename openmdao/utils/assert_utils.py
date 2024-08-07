@@ -2,7 +2,6 @@
 Functions for making assertions about OpenMDAO Systems.
 """
 
-from math import isnan
 from fnmatch import fnmatch
 import warnings
 import unittest

@@ -250,10 +250,12 @@ class SellarMDALinearSolver(om.Group):
     def setup(self):
 
         cycle = self.add_subsystem('cycle', om.Group(), promotes=['*'])
-        d1 = cycle.add_subsystem('d1', SellarDis1(), promotes_inputs=['x', 'z', 'y2'],
-                                 promotes_outputs=['y1'])
-        d2 = cycle.add_subsystem('d2', SellarDis2(), promotes_inputs=['z', 'y1'],
-                                 promotes_outputs=['y2'])
+        cycle.add_subsystem('d1', SellarDis1(), 
+                            promotes_inputs=['x', 'z', 'y2'],
+                            promotes_outputs=['y1'])
+        cycle.add_subsystem('d2', SellarDis2(), 
+                            promotes_inputs=['z', 'y1'],
+                            promotes_outputs=['y2'])
 
         self.set_input_defaults('x', 1.0)
         self.set_input_defaults('z', np.array([5.0, 2.0]))
@@ -355,8 +357,8 @@ class SellarNoDerivativesCS(om.Group):
         self.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         cycle = self.add_subsystem('cycle', om.Group(), promotes=['x', 'z', 'y1', 'y2'])
-        d1 = cycle.add_subsystem('d1', SellarDis1CS(), promotes=['x', 'z', 'y1', 'y2'])
-        d2 = cycle.add_subsystem('d2', SellarDis2CS(), promotes=['z', 'y1', 'y2'])
+        cycle.add_subsystem('d1', SellarDis1CS(), promotes=['x', 'z', 'y1', 'y2'])
+        cycle.add_subsystem('d2', SellarDis2CS(), promotes=['z', 'y1', 'y2'])
 
         self.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
                                                   z=np.array([0.0, 0.0]), x=0.0),

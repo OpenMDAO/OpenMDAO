@@ -56,7 +56,7 @@ class TestConnections(unittest.TestCase):
     def test_pull_size_from_source(self):
         raise unittest.SkipTest("setting input size based on src size not supported yet")
 
-        class Src(ExplicitComponent):
+        class Src(om.ExplicitComponent):
 
             def setup(self):
 
@@ -70,7 +70,7 @@ class TestConnections(unittest.TestCase):
                 outputs['y1'] = x * np.array([1.0, 2.0, 3.0])
                 outputs['y2'] = x * np.array([1.0, 2.0, 3.0])
 
-        class Tgt(ExplicitComponent):
+        class Tgt(om.ExplicitComponent):
 
             def setup(self):
 
@@ -102,7 +102,7 @@ class TestConnections(unittest.TestCase):
     def test_pull_size_from_source_with_indices(self):
         raise unittest.SkipTest("setting input size based on src size not supported yet")
 
-        class Src(ExplicitComponent):
+        class Src(om.ExplicitComponent):
 
             def setup(self):
 
@@ -120,7 +120,7 @@ class TestConnections(unittest.TestCase):
                 outputs['y2'] = x * np.array([1.0, 2.0, 3.0])
                 outputs['y3'] = x * 4.0
 
-        class Tgt(ExplicitComponent):
+        class Tgt(om.ExplicitComponent):
 
             def setup(self):
 

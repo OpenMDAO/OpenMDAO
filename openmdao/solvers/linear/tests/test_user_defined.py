@@ -7,6 +7,7 @@ import numpy as np
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.array_utils import evenly_distrib_idxs
+from openmdao.utils.mpi import MPI
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -46,7 +47,7 @@ class DistribStateImplicit(om.ImplicitComponent):
 
         local_sum = np.zeros(1)
         local_sum[0] = np.sum(o['states'])
-        global_sum = np.zeros(1)
+        tmp = np.zeros(1)
 
         r['out_var'] = o['out_var'] - tmp[0]
 
@@ -164,7 +165,7 @@ class TestUserDefinedSolver(unittest.TestCase):
 
         p.setup(mode='rev', check=False)
         p.run_model()
-        jac = p.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
+        p.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
 
     def test_method_default(self):
         # Uses `solve_linear` by default
@@ -222,7 +223,7 @@ class TestUserDefinedSolver(unittest.TestCase):
 
                 local_sum = np.zeros(1)
                 local_sum[0] = np.sum(o['states'])
-                global_sum = np.zeros(1)
+                tmp = np.zeros(1)
 
                 r['out_var'] = o['out_var'] - tmp[0]
 

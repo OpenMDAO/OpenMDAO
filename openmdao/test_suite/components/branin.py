@@ -125,8 +125,8 @@ class BraninDiscrete(om.ExplicitComponent):
         b = 5.1/(4.0*np.pi**2)
         c = 5.0/np.pi
         d = 6.0
-        e = 10.0
-        f = 1.0/(8.0*np.pi)
+        # e = 10.0
+        # f = 1.0/(8.0*np.pi)
 
         partials['f', 'x1'] = 2.0*a*(x1 - b*x0**2 + c*x0 - d)
         #partials['f', 'x0'] = 2.0*a*(x1 - b*x0**2 + c*x0 - d)*(-2.*b*x0 + c) - e*(1.-f)*np.sin(x0)

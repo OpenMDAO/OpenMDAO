@@ -5,7 +5,6 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.sellar import SellarDerivatives, \
     SellarDis1withDerivatives, SellarDis2withDerivatives, \
@@ -15,7 +14,7 @@ from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI
 try:
     from openmdao.api import PETScVector
-except:
+except Exception:
     PETScVector = None
 
 
@@ -340,8 +339,6 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         prob.setup()
 
-        y1_0 = prob.get_val('y1')
-        y2_0 = prob.get_val('y2')
         model.nonlinear_solver.options['use_aitken'] = True
         model.nonlinear_solver.options['aitken_initial_factor'] = 0.33
         model.nonlinear_solver.options['maxiter'] = 1
@@ -370,8 +367,6 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         prob.setup()
 
-        y1_0 = prob.get_val('y1')
-        y2_0 = prob.get_val('y2')
         model.nonlinear_solver.options['use_aitken'] = True
         model.nonlinear_solver.options['aitken_min_factor'] = 1.2
         model.nonlinear_solver.options['maxiter'] = 1

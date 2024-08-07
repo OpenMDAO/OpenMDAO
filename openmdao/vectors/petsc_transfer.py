@@ -11,7 +11,7 @@ if use_mpi is False:
     PETScTransfer = None
 else:
     try:
-        import petsc4py
+        import petsc4py  # noqa: F401
         from petsc4py import PETSc
     except ImportError:
         PETSc = None

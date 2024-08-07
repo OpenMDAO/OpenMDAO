@@ -21,9 +21,9 @@ import scipy.sparse as sparse
 
 from openmdao.core.constants import _SetupStatus
 from openmdao.core.component import Component
-from openmdao.core.driver import Driver, record_iteration, SaveOptResult
+from openmdao.core.driver import Driver, record_iteration
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.core.system import System, _OptStatus
+from openmdao.core.system import System
 from openmdao.core.group import Group
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
@@ -1605,7 +1605,7 @@ class Problem(object):
                     # one.
                     if _wrt in local_opts and local_opts[_wrt]['directional']:
                         if i == 0:  # only do this on the first iteration
-                            deriv[f'J_fwd'] = np.atleast_2d(np.sum(deriv['J_fwd'], axis=1)).T
+                            deriv['J_fwd'] = np.atleast_2d(np.sum(deriv['J_fwd'], axis=1)).T
 
                         if comp.matrix_free:
                             if i == 0:  # only do this on the first iteration
@@ -2632,7 +2632,7 @@ class Problem(object):
                     out_stream = sys.stdout
                 hr = '-' * len(header)
                 print(f'{hr}\n{header}\n{hr}', file=out_stream)
-                print(f'None found', file=out_stream)
+                print('None found', file=out_stream)
 
         return problem_indep_vars
 
@@ -3147,7 +3147,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             num_col_meta = {'format': num_format}
 
             if totals:
-                title = f"Total Derivatives"
+                title = "Total Derivatives"
             else:
                 title = f"{sys_type}: {sys_class_name} '{sys_name}'"
 

@@ -6,6 +6,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, \
      assert_check_totals
 from openmdao.test_suite.groups.parallel_groups import FanInGrouped, FanOutGrouped
+from openmdao.test_suite.components.distributed_components import DistribCompDerivs
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -240,7 +241,8 @@ class TestSubmodelComp(unittest.TestCase):
                 comp = om.ExecComp('x = r*cos(theta)')
                 model.add_subsystem('comp', comp, promotes_inputs=['r', 'theta'],
                                     promotes_outputs=['x'])
-                subprob = om.Problem(); subprob.model.add_subsystem('model', model)
+                subprob = om.Problem()
+                subprob.model.add_subsystem('model', model)
                 subprob.model.promotes('model', any=['*'])
                 self.add_subsystem('submodel1', om.SubmodelComp(problem=subprob, do_coloring=True))
 
@@ -257,7 +259,8 @@ class TestSubmodelComp(unittest.TestCase):
                 comp = om.ExecComp('y = r*sin(theta)')
                 model.add_subsystem('comp', comp, promotes_inputs=['r', 'theta'],
                                     promotes_outputs=['y'])
-                subprob = om.Problem(); subprob.model.add_subsystem('model', model)
+                subprob = om.Problem()
+                subprob.model.add_subsystem('model', model)
                 subprob.model.promotes('model', any=['*'])
                 self.add_subsystem('submodel2', om.SubmodelComp(problem=subprob, do_coloring=True))
 

@@ -27,7 +27,6 @@ class DistParab(om.ExplicitComponent):
         rank = comm.rank
 
         sizes, offsets = evenly_distrib_idxs(comm.size, arr_size)
-        start = offsets[rank]
         io_size = sizes[rank]
         self.offset = offsets[rank]
 
@@ -122,10 +121,8 @@ class DistParabDeprecated(om.ExplicitComponent):
         rank = comm.rank
 
         sizes, offsets = evenly_distrib_idxs(comm.size, arr_size)
-        start = offsets[rank]
         io_size = sizes[rank]
         self.offset = offsets[rank]
-        end = start + io_size
 
         # src_indices will be computed automatically
         self.add_input('x', val=np.ones(io_size), distributed=True)

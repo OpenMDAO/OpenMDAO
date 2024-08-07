@@ -184,8 +184,9 @@ class LintAttributesTestCase(unittest.TestCase):
                                             doc_varnames_re.findall(pc_doc_matches[0]) \
                                                 if(len(pc_doc_matches) == 1) else []
                                         if v in pc_doc_name_matches:
-                                            if(print_info): print(f"    Documented member `{v}` in "
-                                                                  f"base class `{pc.__name__}`")
+                                            if(print_info):
+                                                print(f"    Documented member `{v}` in "
+                                                      f"base class `{pc.__name__}`")
                                             break
                                 else:
                                     new_failures.append(
@@ -193,9 +194,9 @@ class LintAttributesTestCase(unittest.TestCase):
                                         'class or parent class docstrings')
                         else:  # no init section
                             if len(doc_matches) == 0: # no Attributes section
-                                if print_info: print(
-                                    f'    Skipping Class `{class_name}`... missing Attributes '
-                                    'and init')
+                                if print_info:
+                                    print(f'    Skipping Class `{class_name}`... '
+                                          'missing Attributes and init')
                             else:  # one Attributes section
                                 new_failures.append(
                                     'Attributes section in docstring but no __init__ function')

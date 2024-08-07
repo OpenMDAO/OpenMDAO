@@ -1,15 +1,9 @@
 """
 A Viewer for OpenMDAO inputs.
 """
-import pathlib
 import functools
 
 import numpy as np
-
-try:
-    from IPython.display import IFrame, display, HTML
-except ImportError:
-    IFrame = display = None
 
 from openmdao.core.problem import Problem
 from openmdao.utils.mpi import MPI

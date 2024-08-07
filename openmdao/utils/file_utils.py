@@ -2,7 +2,6 @@
 Utilities for working with files.
 """
 
-from multiprocessing import Value
 import sys
 import os
 import importlib
@@ -10,6 +9,8 @@ import types
 from fnmatch import fnmatch
 from os.path import join, basename, dirname, isfile, split, splitext, abspath
 import pathlib
+
+from openmdao.utils.om_warnings import issue_warning
 
 
 def get_module_path(fpath):
@@ -217,7 +218,7 @@ def fname2mod_name(fname):
                   ';', ':', '"', "'", '<', '>', '?', '/', '\\', '|']
 
     if not fname.endswith('.py'):
-        raise ValueError(f"'{s}' does not end with '.py'")
+        raise ValueError(f"'{fname}' does not end with '.py'")
 
     s = os.path.basename(fname).rsplit('.', 1)[0]
 
@@ -451,7 +452,6 @@ def _get_outputs_dir(obj=None, *subdirs, mkdir=True):
     from openmdao.core.problem import Problem
     from openmdao.core.system import System
     from openmdao.solvers.solver import Solver
-    from openmdao.core.constants import _SetupStatus
 
     if isinstance(obj, Problem):
         prob_meta = obj._metadata

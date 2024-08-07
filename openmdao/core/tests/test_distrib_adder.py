@@ -1,9 +1,7 @@
-import os
-
 import unittest
 import numpy as np
 
-from openmdao.api import ExplicitComponent, Problem, Group, IndepVarComp, slicer
+from openmdao.api import ExplicitComponent, Problem, IndepVarComp, slicer
 
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.mpi import MPI

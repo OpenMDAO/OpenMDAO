@@ -152,7 +152,7 @@ def _scaffold_exec(options, user_args):
                 os.mkdir(pkg_name)
                 os.chdir(pkg_name)
 
-                with open('__init__.py', 'w') as f:
+                with open('__init__.py', 'w'):
                     pass
 
                 if base == 'command':
@@ -164,7 +164,7 @@ def _scaffold_exec(options, user_args):
                 os.chdir('test')
 
                 # make test dir a package as well
-                with open('__init__.py', 'w') as f:
+                with open('__init__.py', 'w'):
                     pass
 
                 _write_template(testfile, 'test', class_name=options.class_name)

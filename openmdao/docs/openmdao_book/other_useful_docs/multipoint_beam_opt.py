@@ -2,7 +2,6 @@
 import numpy as np
 
 import openmdao.api as om
-from openmdao.test_suite.test_examples.beam_optimization.beam_group import BeamGroup
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
 
 try:

@@ -33,7 +33,8 @@ def matlab2npy(mlfile):
 
 
 if __name__ == '__main__':
-    import sys, os
+    import sys
+    import os
 
     a = matlab2npy(sys.argv[1])
     base = os.path.splitext(sys.argv[1])[0]

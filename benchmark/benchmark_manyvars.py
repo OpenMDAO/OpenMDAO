@@ -2,7 +2,7 @@
 import unittest
 
 import openmdao.api as om
-from openmdao.test_suite.build4test import DynComp, create_dyncomps
+from openmdao.test_suite.build4test import DynComp
 
 
 def _build_comp(np, no, ns=0):

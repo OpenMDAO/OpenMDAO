@@ -10,7 +10,6 @@ from openmdao.components.spline_comp import SPLINE_METHODS
 from openmdao.utils.assert_utils import assert_check_partials, assert_near_equal
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.spline_distributions import cell_centered, sine_distribution
-from openmdao.components.interp_util.interp import InterpND
 from openmdao.utils.testing_utils import force_check_partials
 
 
@@ -353,7 +352,6 @@ class SplineCompTestCase(unittest.TestCase):
         x = np.linspace(1.0, 12.0, n)
 
         prob = om.Problem()
-        model = prob.model
 
         # Set options specific to akima
         akima_option = {'delta_x': 0.1, 'eps': 1e-30}
@@ -430,7 +428,6 @@ class SplineCompFeatureTestCase(unittest.TestCase):
 
         x_cp = np.linspace(0., 1., 6)
         y_cp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
-        n = 20
         x = om.sine_distribution(20, start=0, end=1, phase=np.pi)
 
         prob = om.Problem()
@@ -459,7 +456,6 @@ class SplineCompFeatureTestCase(unittest.TestCase):
         x = np.linspace(1.0, 12.0, n)
 
         prob = om.Problem()
-        model = prob.model
 
         # Set options specific to akima
         akima_option = {'delta_x': 0.1, 'eps': 1e-30}
@@ -477,7 +473,6 @@ class SplineCompFeatureTestCase(unittest.TestCase):
     def test_bspline_options(self):
 
         prob = om.Problem()
-        model = prob.model
 
         n_cp = 80
         n_point = 160
@@ -527,7 +522,6 @@ class SplineCompFeatureTestCase(unittest.TestCase):
     def test_bsplines_2to3doc(self):
 
         prob = om.Problem()
-        model = prob.model
 
         n_cp = 5
         n_point = 10

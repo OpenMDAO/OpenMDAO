@@ -1,5 +1,4 @@
 """Define the CSRmatrix class."""
-from scipy.sparse import coo_matrix
 
 from openmdao.matrices.coo_matrix import COOMatrix
 

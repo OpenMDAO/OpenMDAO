@@ -342,7 +342,7 @@ test       **Required**  ['a', 'b']         N/A                    Test integer 
             self.dict['test2'] = None
         # Should only generate warning first time
         with assert_no_warning(OMDeprecationWarning, msg):
-            option = self.dict['test2']
+            self.dict['test2']
 
     def test_deprecated_tuple_option(self):
         msg = 'Option "test1" is deprecated. Use "foo" instead.'

@@ -477,7 +477,7 @@ class ParTestCase(unittest.TestCase):
         G = p.model.add_subsystem('G', om.ParallelGroup())
 
         a = G.add_subsystem('a', CompA())
-        b = G.add_subsystem('b', CompB())
+        G.add_subsystem('b', CompB())
 
         G.connect('a.y', 'b.y', src_indices=[-1])
 

@@ -2,8 +2,6 @@
 A collection of classes for mapping indices to variable names and vice versa.
 """
 
-from openmdao.utils.array_utils import shape_to_len
-
 
 # default size of array for which we use a FlatRangeMapper instead of a RangeTree
 MAX_FLAT_RANGE_SIZE = 10000

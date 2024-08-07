@@ -830,7 +830,7 @@ class n2_gui_test_case(_GuiTestCase):
                     await self.page.wait_for_selector(nth_selector, state='attached',
                                                       timeout=max_time)
                     found = True
-                except:
+                except Exception:
                     num_tries += 1
 
             num_tries = 0
@@ -841,7 +841,7 @@ class n2_gui_test_case(_GuiTestCase):
                     await self.page.wait_for_selector(nth_selector, state='detached',
                                                       timeout=max_time)
                     found = True
-                except:
+                except Exception:
                     num_tries += 1
 
         else:
@@ -853,7 +853,7 @@ class n2_gui_test_case(_GuiTestCase):
                     await self.page.wait_for_selector(nth_selector, state='detached',
                                                       timeout=max_time)
                     found = True
-                except:
+                except Exception:
                     num_tries += 1
 
         hndl_list = await self.page.query_selector_all(selector)

@@ -10,7 +10,7 @@ from scipy.optimize import fsolve
 import openmdao.api as om
 from openmdao.components.external_code_comp import STDOUT
 
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal
 
 DIRECTORY = os.path.dirname((os.path.abspath(__file__)))
 

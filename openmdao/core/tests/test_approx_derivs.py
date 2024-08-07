@@ -7,8 +7,6 @@ from packaging.version import Version
 import numpy as np
 from scipy import __version__ as scipy_version
 
-ScipyVersion = Version(scipy_version)
-
 import openmdao.api as om
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, TestImplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -31,6 +29,8 @@ try:
 except ImportError:
     vector_class = om.DefaultVector
     PETScVector = None
+
+ScipyVersion = Version(scipy_version)
 
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
@@ -108,8 +108,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         prob.setup()
         prob.run_model()
-        J = prob.compute_totals(of=['parab.f_xy'], wrt=['px.x', 'py.y'])
-        # print(J)
+        prob.compute_totals(of=['parab.f_xy'], wrt=['px.x', 'py.y'])
 
         # 1. run_model; 2. step x; 3. step y
         self.assertEqual(model.parab.count, 3)
@@ -1977,7 +1976,7 @@ class TestComponentComplexStep(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        comp = model.add_subsystem('comp', BadSparsityComp())
+        model.add_subsystem('comp', BadSparsityComp())
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -2361,7 +2360,6 @@ class TestFDRelative(unittest.TestCase):
                 self.add_output('y', np.ones((nn, )))
 
             def setup_partials(self):
-                nn = self.options['vec_size']
                 self.set_check_partial_options('x_element', method='fd', step_calc='rel_element', directional=True)
 
             def compute(self, inputs, outputs):
@@ -2620,7 +2618,7 @@ class CheckTotalsIndices(unittest.TestCase):
         prob.setup()
 
         prob.run_model()
-        check = prob.check_totals(compact_print=True)
+        prob.check_totals(compact_print=True)
 
 
 def _setup_1ivc_fdgroupwithpar_1sink(size=7):

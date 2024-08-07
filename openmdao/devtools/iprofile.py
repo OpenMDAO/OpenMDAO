@@ -2,15 +2,11 @@
 import os
 import sys
 from timeit import default_timer as etime
-import argparse
-import json
 import atexit
 from collections import defaultdict
-from itertools import chain
 
 from openmdao.utils.mpi import MPI
 
-from openmdao.utils.webview import webview
 from openmdao.devtools.iprof_utils import func_group, find_qualified_name, _collect_methods, \
      _setup_func_group, _get_methods, _Options
 
@@ -275,11 +271,13 @@ def _process_profile(flist):
     """
 
     nfiles = len(flist)
-    top_nodes = []
-    top_totals = []
 
     if nfiles == 1:
         return _process_1_profile(flist[0])
+
+    tot_names = []
+    top_nodes = []
+    top_totals = []
 
     for fname in sorted(flist):
         ext = os.path.splitext(fname)[1]
@@ -287,7 +285,7 @@ def _process_profile(flist):
             int(ext.lstrip('.'))
             dec = ext
             tot_names.append('$total' + dec)
-        except:
+        except Exception:
             dec = None
 
         nodes, tots = _process_1_profile(fname)
@@ -311,7 +309,6 @@ def _process_profile(flist):
     tree_nodes['$total'] = grand_total
 
     totals = {}
-    tot_names = []
     for i, tot in enumerate(top_totals):
         tot_names.append('$total.%d' % i)
         for name, tots in tot.items():

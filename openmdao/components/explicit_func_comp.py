@@ -5,7 +5,6 @@ import traceback
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.core.constants import INT_DTYPE
 import openmdao.func_api as omf
 from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore, _add_options, \
     jac_forward, jac_reverse, _get_tangents
@@ -14,7 +13,6 @@ from openmdao.utils.array_utils import shape_to_len
 try:
     import jax
     from jax import jit
-    import jax.numpy as jnp
     jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
 except Exception:
     _, err, tb = sys.exc_info()
@@ -27,7 +25,7 @@ if jax is not None:
         from jax import Array as JaxArray
     except ImportError:
         # versions of jax before 0.3.18 do not have the jax.Array base class
-        raise RuntimeError(f"An unsupported version of jax is installed. "
+        raise RuntimeError("An unsupported version of jax is installed. "
                            "OpenMDAO requires 'jax>=4.0' and 'jaxlib>=4.0'. "
                            "Try 'pip install openmdao[jax]' with Python>=3.8.")
 
