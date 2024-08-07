@@ -445,12 +445,12 @@ class TestProblem(unittest.TestCase):
             seed_names = wrt
             result_names = of
             rvec = prob.model._vectors['output']['linear']
-            prob.model._vectors['residual']['linear']
+            # lvec = prob.model._vectors['residual']['linear']
         else:
             seed_names = of
             result_names = wrt
             rvec = prob.model._vectors['residual']['linear']
-            prob.model._vectors['output']['linear']
+            # lvec = prob.model._vectors['output']['linear']
 
         J = prob.compute_totals(of, wrt, return_format='array')
 
@@ -1763,7 +1763,7 @@ class TestProblem(unittest.TestCase):
                                                    'indices', 'adder', 'scaler',
                                                    'parallel_deriv_color',
                                                    'cache_linear_solution'],
-                                   )
+                                       )
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')

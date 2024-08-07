@@ -1213,9 +1213,7 @@ class MyComp(om.ExplicitComponent):
                            [1.0, 6.0, -2.3, 1.0],
                            [7.0, 5.0, 1.1, 2.2],
                            [-3.0, 2.0, 6.8, -1.5]
-                           ])
-        np.repeat(np.arange(4), 4)
-        np.tile(np.arange(4), 4)
+                          ])
 
         self.declare_partials(of='x3_u_u', wrt='x2_u_u', val=self.J[0, 0])
         self.declare_partials(of='x3_u_u', wrt='x2_u_s', val=self.J[0, 1])
@@ -1237,8 +1235,7 @@ class MyComp(om.ExplicitComponent):
         self.declare_partials(of='x3_s_s', wrt='x2_s_u', val=self.J[3, 2])
         self.declare_partials(of='x3_s_s', wrt='x2_s_s', val=self.J[3, 3])
 
-    def compute(self, inputs, outputs, discrete_inputs=None,
-                discrete_outputs=None):
+    def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
 
         outputs['x3_u_u'] = self.J[0, 0] * inputs['x2_u_u'] + self.J[0, 1] * inputs['x2_u_s'] + self.J[0, 2] * inputs['x2_s_u'] + self.J[0, 3] * inputs['x2_s_s']
         outputs['x3_u_s'] = self.J[1, 0] * inputs['x2_u_u'] + self.J[1, 1] * inputs['x2_u_s'] + self.J[1, 2] * inputs['x2_s_u'] + self.J[1, 3] * inputs['x2_s_s']
