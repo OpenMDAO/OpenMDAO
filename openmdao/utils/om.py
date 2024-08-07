@@ -104,14 +104,14 @@ def _view_connections_cmd(options, user_args):
         view_connections(prob, outfile=options.outfile, show_browser=not options.no_browser,
                          show_values=options.show_values, title=title)
 
-    def _view_model_w_errors(prob, show_values):
+    def _view_model_w_errors(prob):
         if prob._metadata['saved_errors']:
             _viewconns(prob)
             # errors will result in exit at the end of the _check_collected_errors method
 
     # register the hooks
     hooks._register_hook('_check_collected_errors', 'Problem', pre=_view_model_w_errors)
-    hooks._register_hook('final_setup', class_name='Problem', inst_id=options.problem,
+    hooks._register_hook('final_setup', 'Problem', inst_id=options.problem,
                          post=_viewconns, exit=True)
 
     _load_and_exec(options.file[0], user_args)

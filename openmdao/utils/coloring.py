@@ -2548,7 +2548,8 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
             else:
                 fullJ += np.abs(Jabs)
 
-        driver._total_jac = None
+        if driver:
+            driver._total_jac = None
         Jabs = None
         elapsed = time.perf_counter() - start_time
 
