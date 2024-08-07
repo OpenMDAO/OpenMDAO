@@ -33,7 +33,7 @@ classifiers = [
 ]
 dependencies = [
     "networkx>=2.0",
-    "numpy<2",
+    "numpy",
     "packaging",
     "requests",
     "scipy",

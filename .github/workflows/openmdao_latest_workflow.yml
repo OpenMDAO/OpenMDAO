@@ -53,7 +53,7 @@ jobs:
             OS: ubuntu-latest
             PY: 3
             NUMPY: '<2'
-            PETSc: True
+            PETSc: true
             PYOPTSPARSE: true
             SNOPT: true
             BANDIT: true
@@ -71,7 +71,7 @@ jobs:
             OS: macos-13
             PY: 3
             NUMPY: '<2'
-            PETSc: True
+            PETSc: true
             PYOPTSPARSE: true
 
           # test latest versions on macos
@@ -152,7 +152,12 @@ jobs:
           echo "============================================================="
           echo "Install latest PETSc"
           echo "============================================================="
-          conda install mpi4py petsc!=3.21.1 petsc4py -q -y
+          if [[ "${{ matrix.NUMPY }}" == "<2" ]]; then
+            conda install mpich mpi4py petsc4py=3.21.2 -q -y
+          else
+            conda install mpich mpi4py petsc4py -q -y
+          fi
+
 
           echo "============================================================="
           echo "Check MPI and PETSc installation"

@@ -23,7 +23,7 @@ body:
     attributes:
       label: OpenMDAO Version
       description: What version of OpenMDAO is being used.
-      placeholder: "3.34.2-dev"
+      placeholder: "3.34.3-dev"
     validations:
       required: true
   - type: textarea
