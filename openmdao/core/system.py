@@ -6298,9 +6298,7 @@ class System(object):
         str
             The best direction for derivative calculations, 'fwd' or 'rev'.
         """
-        if len(self._outputs) > len(self._inputs):
-            return 'fwd'
-        return 'rev'
+        return 'fwd' if len(self._outputs) > len(self._inputs) else 'rev'
 
     def _get_sys_promotion_tree(self, tree=None):
         """

@@ -1892,9 +1892,16 @@ class Component(System):
         """
         Override this in derived classes if compute_primal references static values.
 
-        Do NOT include self._discrete_inputs in the returned tuple.
-        Return value MUST be a tuple.
+        Do NOT include self._discrete_inputs in the returned tuple.  Include things like
+        self.options['opt_name'], etc., that are used in compute_primal but are assumed to be
+        constant during derivative computation.
+
+        Return value MUST be a tuple. Don't forget the trailing comma if tuple has only one item.
         Return value MUST be hashable.
+
+        The order of these values doesn't matter.  They are only checked (by computing their hash)
+        to see if they have changed since the last time compute_primal was jitted, and if so,
+        compute_primal will be re-jitted.
 
         Returns
         -------

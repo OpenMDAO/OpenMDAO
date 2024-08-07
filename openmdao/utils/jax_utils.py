@@ -337,7 +337,7 @@ class CompJaxifyBase(ast.NodeTransformer):
             for entry in entries:
                 tupargs.append(f"self.{name}['{entry}']")
             if len(entries) == 1:
-                tupargs.append('')
+                tupargs.append('')  # so we'll get a trailing comma for a 1 item tuple
         fsrc.append(f'    return ({", ".join(tupargs)})')
         fsrc = '\n'.join(fsrc)
         namespace = self._comp().compute.__globals__.copy()
@@ -473,9 +473,7 @@ class ExplicitCompJaxify(CompJaxifyBase):
     If the component has discrete inputs, they will be passed individually into compute_primal
     *before* the continuous inputs.  If the component has discrete outputs, they will be assigned
     to local variables of the same name within the function and set back into the discrete
-    outputs dict just prior to the return from the function.  If the component has any other
-    attributes that are accessed in the compute function, they will be combined into a single
-    tuple and passed as the first argument to the function after 'self'.
+    outputs dict just prior to the return from the function.
 
     Parameters
     ----------
@@ -503,69 +501,71 @@ class ExplicitCompJaxify(CompJaxifyBase):
     def _get_compute_primal_args(self):
         # ensure that ordering of args and returns exactly matches the order of the inputs and
         # outputs vectors.
-        return [n for n in chain(self._comp()._discrete_inputs, self._comp()._var_rel_names['input'])]
+        return [n for n in chain(self._comp()._discrete_inputs,
+                                 self._comp()._var_rel_names['input'])]
 
     def _get_compute_primal_returns(self):
         return [n for n in chain(self._comp()._discrete_outputs,
                                  self._comp()._var_rel_names['output'])]
 
 
-# class ImplicitCompJaxify(CompJaxifyBase):
-#     """
-#     A NodeTransformer that transforms an apply_nonlinear function definition to jax compatible form.
+class ImplicitCompJaxify(CompJaxifyBase):
+    """
+    A NodeTransformer that transforms an apply_nonlinear function definition to jax compatible form.
 
-#     So apply_nonlinear(self, inputs, outputs, residuals) becomes
-#     compute_primal(self, arg1, arg2, ...) where args are
-#     the input and output values in the order they are stored in their respective Vectors.
-#     The new function will return a tuple of the residual values in the order they are stored in
-#     the residuals Vector.
+    So apply_nonlinear(self, inputs, outputs, residuals) becomes
+    compute_primal(self, arg1, arg2, ...) where args are
+    the input and output values in the order they are stored in their respective Vectors.
+    The new function will return a tuple of the residual values in the order they are stored in
+    the residuals Vector.
 
-#     If the component has discrete inputs, they will be passed individually into compute_primal
-#     *before* the continuous inputs.  If the component has discrete outputs, they will be assigned
-#     to local variables of the same name within the function and set back into the discrete
-#     outputs dict just prior to the return from the function.
+    If the component has discrete inputs, they will be passed individually into compute_primal
+    *before* the continuous inputs.  If the component has discrete outputs, they will be assigned
+    to local variables of the same name within the function and set back into the discrete
+    outputs dict just prior to the return from the function.
 
-#     Parameters
-#     ----------
-#     comp : ImplicitComponent
-#         The Component whose apply_nonlinear function is to be transformed. This NodeTransformer
-#         may only be used after the Component has had its _setup_var_data method called, because that
-#         determines the ordering of the inputs, outputs, and residuals.
-#     verbose : bool
-#         If True, the transformed function will be printed to stdout.
-#     """
+    Parameters
+    ----------
+    comp : ImplicitComponent
+        The Component whose apply_nonlinear function is to be transformed. This NodeTransformer
+        may only be used after the Component has had its _setup_var_data method called, because that
+        determines the ordering of the inputs, outputs, and residuals.
+    verbose : bool
+        If True, the transformed function will be printed to stdout.
+    """
 
-#     def __init__(self, comp, verbose=False):  # noqa
-#         super().__init__(comp, 'apply_nonlinear', verbose)
+    def __init__(self, comp, verbose=False):  # noqa
+        super().__init__(comp, 'apply_nonlinear', verbose)
 
-#     def _get_arg_values(self):
-#         discrete_inputs = self._comp()._discrete_inputs
-#         yield from discrete_inputs.values()
+    def _get_arg_values(self):
+        discrete_inputs = self._comp()._discrete_inputs
+        yield from discrete_inputs.values()
 
-#         comp = self._comp()
-#         if comp._inputs is None:
-#             for name, meta in comp._var_rel2meta['input'].items():
-#                 if name not in discrete_inputs:
-#                     yield meta['value']
-#         else:
-#             yield from comp._inputs.values()
+        comp = self._comp()
+        if comp._inputs is None:
+            for name, meta in comp._var_rel2meta['input'].items():
+                if name not in discrete_inputs:
+                    yield meta['value']
+        else:
+            yield from comp._inputs.values()
 
-#         if comp._outputs is None:
-#             for name, meta in comp._var_rel2meta['output'].items():
-#                 if name not in comp._discrete_outputs:
-#                     yield meta['value']
-#         else:
-#             yield from comp._outputs.values()
+        if comp._outputs is None:
+            for name, meta in comp._var_rel2meta['output'].items():
+                if name not in comp._discrete_outputs:
+                    yield meta['value']
+        else:
+            yield from comp._outputs.values()
 
-#     def _get_compute_primal_args(self):
-#         # ensure that ordering of args and returns exactly matches the order of the inputs,
-#         # outputs, and residuals vectors.
-#         return [n for n in chain(self._comp()._discrete_inputs,
-#                                  self._comp()._var_rel_names['input'],
-#                                  self._comp()._var_rel_names['output'])]
+    def _get_compute_primal_args(self):
+        # ensure that ordering of args and returns exactly matches the order of the inputs,
+        # outputs, and residuals vectors.
+        return [n for n in chain(self._comp()._discrete_inputs,
+                                 self._comp()._var_rel_names['input'],
+                                 self._comp()._var_rel_names['output'])]
 
-#     def _get_compute_primal_returns(self):
-#         return [n for n in chain(self._comp()._discrete_outputs, self._comp()._var_rel_names['output'])]
+    def _get_compute_primal_returns(self):
+        return [n for n in chain(self._comp()._discrete_outputs,
+                                 self._comp()._var_rel_names['output'])]
 
 
 class SelfAttrFinder(ast.NodeVisitor):
@@ -718,6 +718,8 @@ else:
             tuple (tuple, dict)
                 The flattened representation of this object.
             """
+            # we include the self_statics data here because otherwise if a static value changes,
+            # e.g. an option value, then the jit-compiled function would not get recompiled.
             return ((), {'_comp_': self._comp, '_self_statics_': self._comp.get_self_statics()})
 
         @staticmethod

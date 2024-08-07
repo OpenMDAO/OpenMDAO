@@ -253,49 +253,23 @@ x_shape = (2, 3)
 y_shape = (3, 4)
 
 
-class ASTContinuousCompTester(om.ExplicitComponent):
-    def setup(self):
-        self.add_input('in_scalar', val=7.0)
-        self.add_input('in_array', val=np.ones((2, 3)))
-        self.add_input('in_array2', val=np.ones((3,4)))
-        self.add_output('out_scalar', val=5.0)
-        self.add_output('out_array', val=np.ones((2, 3)))
-        self.add_output('out_array2', val=np.ones((3, 4)))
-
-    def compute(self, inputs, outputs):
-        outputs['out_scalar'] = inputs['in_scalar'] * 2.0
-        outputs['out_array'] = inputs['in_array'] * 2.0
-        outputs['out_array2'] = np.dot(inputs['in_array'], inputs['in_array2'])
-
-
-class ASTDiscreteCompTester(om.ExplicitComponent):
-    def setup(self):
-        self.add_input('in_scalar', val=7.0)
-        self.add_input('in_array', val=np.ones((2, 3)))
-        self.add_input('in_array2', val=np.ones((3,4)))
-        self.add_output('out_scalar', val=5.0)
-        self.add_output('out_array', val=np.ones((2, 3)))
-        self.add_output('out_array2', val=np.ones((3, 4)))
-        self.add_discrete_input('disc_in', val=2)
-        self.add_discrete_output('disc_out', val=3)
-
-    def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
-        outputs['out_scalar'] = inputs['in_scalar'] * 2.0
-        outputs['out_array'] = inputs['in_array'] * 2.0
-        outputs['out_array2'] = np.dot(inputs['in_array'], inputs['in_array2'])
-        if discrete_inputs['disc_in'] > 0:
-            outputs['out_scalar'] *= 2.0
-            outputs['out_array'] *= 2.0
-            outputs['out_array2'] *= 2.0
-        else:
-            outputs['out_scalar'] *= 3.0
-            outputs['out_array'] *= 3.0
-            outputs['out_array2'] *= 3.0
-
-
 @unittest.skipIf(jax is None or sys.version_info < (3, 9), 'jax is not available or python < 3.9.')
 class TestJaxAST(unittest.TestCase):
     def test_ast_continuous(self):
+        class ASTContinuousCompTester(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('in_scalar', val=7.0)
+                self.add_input('in_array', val=np.ones((2, 3)))
+                self.add_input('in_array2', val=np.ones((3,4)))
+                self.add_output('out_scalar', val=5.0)
+                self.add_output('out_array', val=np.ones((2, 3)))
+                self.add_output('out_array2', val=np.ones((3, 4)))
+
+            def compute(self, inputs, outputs):
+                outputs['out_scalar'] = inputs['in_scalar'] * 2.0
+                outputs['out_array'] = inputs['in_array'] * 2.0
+                outputs['out_array2'] = np.dot(inputs['in_array'], inputs['in_array2'])
+
         p = om.Problem()
         comp = p.model.add_subsystem('comp', ASTContinuousCompTester())
         p.setup()
@@ -314,6 +288,30 @@ def compute_primal(self, in_scalar, in_array, in_array2):
         self.assertEqual(converter.get_compute_primal_src().strip(), expected)
 
     def test_ast_discrete(self):
+        class ASTDiscreteCompTester(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('in_scalar', val=7.0)
+                self.add_input('in_array', val=np.ones((2, 3)))
+                self.add_input('in_array2', val=np.ones((3,4)))
+                self.add_output('out_scalar', val=5.0)
+                self.add_output('out_array', val=np.ones((2, 3)))
+                self.add_output('out_array2', val=np.ones((3, 4)))
+                self.add_discrete_input('disc_in', val=2)
+                self.add_discrete_output('disc_out', val=3)
+
+            def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+                outputs['out_scalar'] = inputs['in_scalar'] * 2.0
+                outputs['out_array'] = inputs['in_array'] * 2.0
+                outputs['out_array2'] = np.dot(inputs['in_array'], inputs['in_array2'])
+                if discrete_inputs['disc_in'] > 0:
+                    outputs['out_scalar'] *= 2.0
+                    outputs['out_array'] *= 2.0
+                    outputs['out_array2'] *= 2.0
+                else:
+                    outputs['out_scalar'] *= 3.0
+                    outputs['out_array'] *= 3.0
+                    outputs['out_array2'] *= 3.0
+
         p = om.Problem()
         comp = p.model.add_subsystem('comp', ASTDiscreteCompTester())
         p.setup()

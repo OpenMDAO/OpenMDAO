@@ -648,6 +648,8 @@ class ExplicitComponent(Component):
             self.compute_primal = jaxifier.compute_primal
             if jaxifier.get_self_statics:
                 self.get_self_statics = MethodType(jaxifier.get_self_statics, self)
+            # replace existing compute method with base class method, so that compute_primal
+            # will be called.
             self.compute = MethodType(ExplicitComponent.compute, self)
         elif 'use_jit' in self.options and self.options['use_jit']:
             static_argnums = tuple(range(len(self._var_discrete['input'])))
@@ -662,8 +664,7 @@ class ExplicitComponent(Component):
         # on DV/response so that we don't compute any derivatives that are always zero.
         if self._jac_func_ is None:
             fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
-            nselfstatic = 1
-            nstatic = nselfstatic + len(self._discrete_inputs)
+            nstatic = len(self._discrete_inputs) + 1  # + 1 for self
             wrt_idxs = list(range(nstatic, len(self._var_abs2meta['input']) + nstatic))
             static_argnums = tuple(range(nstatic))
             self._jac_func_ = jit(fjax(self.compute_primal, argnums=wrt_idxs),
