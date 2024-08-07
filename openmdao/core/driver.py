@@ -330,6 +330,7 @@ class Driver(object):
         self.supports.declare('inequality_constraints', types=bool, default=False)
         self.supports.declare('equality_constraints', types=bool, default=False)
         self.supports.declare('linear_constraints', types=bool, default=False)
+        self.supports.declare('linear_only_designvars', types=bool, default=False)
         self.supports.declare('two_sided_constraints', types=bool, default=False)
         self.supports.declare('multiple_objectives', types=bool, default=False)
         self.supports.declare('integer_design_vars', types=bool, default=True)
@@ -1610,11 +1611,10 @@ class Driver(object):
             if run_model and self._coloring_info.coloring is not None:
                 issue_warning("The 'run_model' argument is ignored because the coloring has "
                               "already been computed.")
-            if self._coloring_info.dynamic and self._coloring_info.coloring is not None:
-                if self._coloring_info.do_compute_coloring():
-                    self._coloring_info.coloring = \
-                        coloring_mod.dynamic_total_coloring(self, run_model=run_model,
-                                                            fname=self._get_total_coloring_fname())
+            if self._coloring_info.dynamic and self._coloring_info.do_compute_coloring():
+                self._coloring_info.coloring = \
+                    coloring_mod.dynamic_total_coloring(self, run_model=run_model,
+                                                        fname=self._get_total_coloring_fname())
 
             return self._coloring_info.coloring
 

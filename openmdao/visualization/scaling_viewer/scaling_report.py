@@ -200,7 +200,6 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
     obj_table = []
 
     dv_vals = driver.get_design_var_values(get_remote=True)
-    lin_dv_vals = {n: v for n, v in dv_vals.items() if n in driver._lin_dvs}
     obj_vals = driver.get_objective_values(driver_scaling=True)
     con_vals = driver.get_constraint_values(driver_scaling=True)
 
@@ -390,11 +389,15 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
         # save old totals
         coloring = driver._get_coloring()
 
-        # assemble data for jacobian visualization
-        data['oflabels'] = driver._get_ordered_nl_responses()
-        data['wrtlabels'] = list(dv_vals)
+        nldvs = driver._nl_dvs if driver.supports['linear_only_designvars'] else driver._designvars
+        ldvs = driver._lin_dvs if driver.supports['linear_only_designvars'] else driver._designvars
+        lin_dv_vals = {n: dv_vals[n] for n in ldvs}
 
+        # assemble data for jacobian visualization
         if driver._total_jac is None:
+            data['oflabels'] = driver._get_ordered_nl_responses()
+            data['wrtlabels'] = list(n for n in dv_vals if n in nldvs)
+
             # this call updates driver._total_jac
             driver._compute_totals(of=data['oflabels'], wrt=data['wrtlabels'],
                                    return_format=driver._total_jac_format)
@@ -402,17 +405,19 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
             driver._total_jac = None
         else:
             totals = driver._total_jac.J  # .J is always an array even if return format != 'array'
+            data['oflabels'] = list(driver._total_jac.output_meta['fwd'])
+            data['wrtlabels'] = list(driver._total_jac.input_meta['fwd'])
 
         data['linear'] = lindata = {}
         lindata['oflabels'] = [n for n, meta in driver._cons.items() if meta['linear']]
-        lindata['wrtlabels'] = [n for n in dv_vals if n in driver._lin_dvs]
+        lindata['wrtlabels'] = [n for n in dv_vals if n in ldvs]
 
         # check for separation of linear constraints
         if lindata['oflabels']:
             if set(lindata['oflabels']).intersection(data['oflabels']):
                 # linear cons are found in data['oflabels'] so they're not separated
                 lindata['oflabels'] = []
-                lindata['wrtlables'] = []
+                lindata['wrtlabels'] = []
 
         full_response_vals = con_vals.copy()
         full_response_vals.update(obj_vals)
@@ -420,7 +425,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
 
         _compute_jac_view_info(totals, data, dv_vals, response_vals, coloring)
 
-        if lindata['oflabels'] and lindata['wrtlabels']:
+        if lindata['oflabels'] and lin_dv_vals:
             lin_response_vals = {n: full_response_vals[n] for n in lindata['oflabels']}
 
             if driver._total_jac_linear is None:
@@ -555,7 +560,7 @@ def _scaling_cmd(options, user_args):
 def _run_scaling_report(driver, report_filename=_default_scaling_filename):
 
     prob = driver._problem()
-    scaling_filepath = str(pathlib.Path(prob.get_reports_dir()).joinpath(report_filename))
+    scaling_filepath = prob.get_reports_dir() / report_filename
 
     try:
         prob.driver.scaling_report(outfile=scaling_filepath, show_browser=False)

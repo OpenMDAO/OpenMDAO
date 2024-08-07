@@ -1,4 +1,26 @@
 ***********************************
+# Release Notes for OpenMDAO 3.34.2
+
+July 25, 2024
+
+OpenMDAO 3.34.2 is a patch release to fix an issue with ScipyOptimizeDriver introduced in the scaling report PR.
+
+## Bug Fixes
+
+- Fixed issue with ScipyOptimizeDriver introduced in the scaling report PR.  [#3307](https://github.com/OpenMDAO/OpenMDAO/pull/3307)
+
+***********************************
+# Release Notes for OpenMDAO 3.34.1
+
+July 23, 2024
+
+OpenMDAO 3.34.1 is a patch release to fix a bug with the scaling report when there are linear-only design variables.
+
+## Bug Fixes
+
+- Fixed issue with scaling report when there are linear-only design variables.  [#3302](https://github.com/OpenMDAO/OpenMDAO/pull/3302)
+
+***********************************
 # Release Notes for OpenMDAO 3.34.0
 
 July 19, 2024

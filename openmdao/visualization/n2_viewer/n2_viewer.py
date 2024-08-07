@@ -642,7 +642,7 @@ def n2(data_source, outfile=_default_n2_filename, path=None, values=_UNDEFINED, 
 # N2 report definition
 def _run_n2_report(prob, report_filename=_default_n2_filename):
 
-    n2_filepath = str(pathlib.Path(prob.get_reports_dir()).joinpath(report_filename))
+    n2_filepath = prob.get_reports_dir() / report_filename
     try:
         n2(prob, show_browser=False, outfile=n2_filepath, display_in_notebook=False)
     except RuntimeError as err:
@@ -654,7 +654,7 @@ def _run_n2_report(prob, report_filename=_default_n2_filename):
 
 def _run_n2_report_w_errors(prob, report_filename=_default_n2_filename):
     if prob._any_rank_has_saved_errors():
-        n2_filepath = str(pathlib.Path(prob.get_reports_dir()).joinpath(report_filename))
+        n2_filepath = prob.get_reports_dir() / report_filename
         # only run the n2 here if we've had setup errors. Normally we'd wait until
         # after final_setup in order to have correct values for all of the I/O variables.
         try:
