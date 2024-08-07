@@ -904,7 +904,7 @@ class ImplicitComponent(Component):
         yield from inputs.values()
         yield from outputs.values()
 
-    @partial(jax.custom_vjp, nondiff_argnums=(0,))
+    @partial(jax.custom_jvp, nondiff_argnums=(0,))
     def _jax_solve_nl_jvp(self):
         pass
 
@@ -959,26 +959,81 @@ class ImplicitComponent(Component):
 #   return ys, ys_dot
 
 
+# from ChatGPT:
 
-# example of custom_vjp
+# # solver with custom JVP
+# @partial(custom_vjp, nondiff_argnums=(0,))
+# def solver(f, x_init, lr=0.1, num_iters=100):
+#     x = x_init
+#     for _ in range(num_iters):
+#         grad = jax.grad(f)(x)
+#         x = x - lr * grad
+#     return x
 
-# @partial(jax.custom_vjp, nondiff_argnums=(0, 1))
-# def fixed_point_layer(solver, f, params, x):
-#   z_star = solver(lambda z: f(params, x, z), z_init=jnp.zeros_like(x))
-#   return z_star
+# # Define the custom JVP rule
+# @solver.defjvp
+# def solver_jvp(primals, tangents):
+#     x_init, = primals
+#     t_init, = tangents
 
-# def fixed_point_layer_fwd(solver, f, params, x):
-#   z_star = fixed_point_layer(solver, f, params, x)
-#   return z_star, (params, x, z_star)
+#     def body_fun(x, _):
+#         grad = jax.grad(f)(x)
+#         return x - lr * grad, None
 
-# def fixed_point_layer_bwd(solver, f, res, z_star_bar):
-#   params, x, z_star = res
-#   _, vjp_a = jax.vjp(lambda params, x: f(params, x, z_star), params, x)
-#   _, vjp_z = jax.vjp(lambda z: f(params, x, z), z_star)
-#   return vjp_a(solver(lambda u: vjp_z(u)[0] + z_star_bar,
-#                       z_init=jnp.zeros_like(z_star)))
+#     # Forward pass
+#     x_final = solver(x_init, lr, num_iters)
 
-# fixed_point_layer.defvjp(fixed_point_layer_fwd, fixed_point_layer_bwd)
+#     # Reverse-mode pass
+#     _, vjp_fun = jax.vjp(lambda x: jax.lax.scan(body_fun, x, None, length=num_iters)[0], x_init)
+#     x_final_dot = vjp_fun(t_init)[0]
+
+#     return x_final, x_final_dot
+
+# # Initial point
+# x_init = jnp.array(3.0)
+# v = jnp.array(1.0)  # Direction vector
+
+# # Compute the function value and the JVP
+# x_min, jvp_val = solver_jvp((x_init,), (v,))
+# print("Minimum found at x =", x_min)
+# print("Jacobian-vector product at x =", x_init, "with v =", v, "is", jvp_val)
+
+
+# iterative solver example
+
+# from jax import vjp
+
+# @partial(custom_vjp, nondiff_argnums=(0,))
+# def fixed_point(f, a, x_guess):
+#   def cond_fun(carry):
+#     x_prev, x = carry
+#     return jnp.abs(x_prev - x) > 1e-6
+
+#   def body_fun(carry):
+#     _, x = carry
+#     return x, f(a, x)
+
+#   _, x_star = while_loop(cond_fun, body_fun, (x_guess, f(a, x_guess)))
+#   return x_star
+
+# def fixed_point_fwd(f, a, x_init):
+#   x_star = fixed_point(f, a, x_init)
+#   return x_star, (a, x_star)
+
+# def fixed_point_rev(f, res, x_star_bar):
+#   a, x_star = res
+#   _, vjp_a = vjp(lambda a: f(a, x_star), a)
+#   a_bar, = vjp_a(fixed_point(partial(rev_iter, f),
+#                              (a, x_star, x_star_bar),
+#                              x_star_bar))
+#   return a_bar, jnp.zeros_like(x_star)
+
+# def rev_iter(f, packed, u):
+#   a, x_star, x_star_bar = packed
+#   _, vjp_x = vjp(lambda x: f(a, x), x_star)
+#   return x_star_bar + vjp_x(u)[0]
+
+# fixed_point.defvjp(fixed_point_fwd, fixed_point_rev)
 
 
 
