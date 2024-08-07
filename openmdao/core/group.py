@@ -3322,7 +3322,6 @@ class Group(System):
 
         if recurse:
             for s in self.system_iter(include_self=False, recurse=recurse):
-                print(s.pathname)
                 s._rec_mgr.append(recorder)
 
             if self.pathname == '':  # top level group
