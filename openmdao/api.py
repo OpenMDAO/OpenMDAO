@@ -60,8 +60,9 @@ from openmdao.surrogate_models.response_surface import ResponseSurface
 from openmdao.surrogate_models.surrogate_model import SurrogateModel, \
     MultiFiSurrogateModel
 
-from openmdao.utils.coloring import display_coloring
+from openmdao.utils.coloring import display_coloring, InvalidColoringError
 from openmdao.utils.indexer import slicer, indexer
+from openmdao.utils.file_utils import clean_outputs
 from openmdao.utils.find_cite import print_citations
 from openmdao.utils.spline_distributions import cell_centered
 from openmdao.utils.spline_distributions import sine_distribution

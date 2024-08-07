@@ -186,7 +186,8 @@ class DistributedRecorderTest(unittest.TestCase):
             expected_outputs.update(expected_objectives)
 
             expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
-            assertDriverIterDataRecorded(self, expected_data, self.eps)
+            recorder_filepath = os.path.join(self.filename)
+            assertDriverIterDataRecorded(self, recorder_filepath, expected_data, self.eps)
 
     def test_recording_remote_voi(self):
         # Create a parallel model
@@ -272,10 +273,11 @@ class DistributedRecorderTest(unittest.TestCase):
             coordinate = [0, 'ScipyOptimize_SLSQP', (driver.iter_count-1,)]
 
             expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
-            assertDriverIterDataRecorded(self, expected_data, self.eps)
+            recorder_filepath = os.path.join(self.filename)
+            assertDriverIterDataRecorded(self, recorder_filepath, expected_data, self.eps)
 
             expected_data = (('final', (t1, t2), expected_outputs),)
-            assertProblemDataRecorded(self, expected_data, self.eps)
+            assertProblemDataRecorded(self, recorder_filepath, expected_data, self.eps)
 
     def test_input_desvar(self):
         # this failed with a KeyError before the fix
@@ -329,7 +331,7 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.driver.options['run_parallel'] = True
         prob.driver.options['procs_per_model'] = 1
 
-        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+        prob.driver.add_recorder(om.SqliteRecorder("./cases.sql"))
 
         prob.setup()
         prob.run_driver()
@@ -347,23 +349,23 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.driver.options['run_parallel'] = True
         prob.driver.options['procs_per_model'] = 1
 
-        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+        prob.driver.add_recorder(om.SqliteRecorder("./cases.sql"))
 
         prob.setup()
 
         if prob.comm.rank == 0:
             expected_warnings = [
                 (UserWarning,
-                'The existing case recorder metadata file, cases.sql_meta, '
+                'The existing case recorder metadata file, ./cases.sql_meta, '
                 'is being overwritten.'),
                 (UserWarning,
-                'The existing case recorder file, cases.sql_0, is being '
+                'The existing case recorder file, ./cases.sql_0, is being '
                 'overwritten.'),
             ]
         else:
             expected_warnings = [
                 (UserWarning,
-                    'The existing case recorder file, cases.sql_1, is being '
+                    'The existing case recorder file, ./cases.sql_1, is being '
                     'overwritten.'),
             ]
         with assert_warnings(expected_warnings):
@@ -382,7 +384,7 @@ class DistributedRecorderTest(unittest.TestCase):
 
         def run_sequential():
             # problem will run in the single proc comm for this rank
-            prob = om.Problem(comm=my_comm)
+            prob = om.Problem(name='test_record_on_one_proc', comm=my_comm)
 
             prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
             prob.model.add_design_var('x', lower=0.0, upper=1.0)
@@ -400,7 +402,7 @@ class DistributedRecorderTest(unittest.TestCase):
 
         def run_parallel():
             # process cases.sql in parallel
-            cr = om.CaseReader("cases.sql")
+            cr = om.CaseReader('test_record_on_one_proc_out/cases.sql')
 
             cases = cr.list_cases()
             self.assertEqual(len(cases), 9)

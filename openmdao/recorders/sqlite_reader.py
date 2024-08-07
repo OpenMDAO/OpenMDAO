@@ -1,11 +1,10 @@
 """
 Definition of the SqliteCaseReader.
 """
-import importlib
+import pathlib
 import sqlite3
 from collections import OrderedDict
 
-import os
 import sys
 import numpy as np
 import io
@@ -86,7 +85,7 @@ class SqliteCaseReader(BaseCaseReader):
 
     Parameters
     ----------
-    filename : str
+    filename : str or pathlib.Path
         The path to the filename containing the recorded data.
     pre_load : bool
         If True, load all the data into memory during initialization.
@@ -138,13 +137,15 @@ class SqliteCaseReader(BaseCaseReader):
             check_valid_sqlite3_db(metadata_filename)
 
         # initialize private attributes
-        self._filename = filename
+        self._filename = pathlib.Path(filename)
         self._abs2prom = None
         self._prom2abs = None
         self._abs2meta = None
         self._conns = None
         self._auto_ivc_map = {}
         self._global_iterations = None
+
+        filename = str(filename)
 
         with sqlite3.connect(filename) as con:
             con.row_factory = sqlite3.Row

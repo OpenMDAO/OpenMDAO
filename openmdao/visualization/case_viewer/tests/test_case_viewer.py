@@ -16,7 +16,7 @@ class TestCaseRetrieval(unittest.TestCase):
 
     def setUp(self):
         # build the model
-        prob = om.Problem()
+        prob = self._prob = om.Problem()
         prob.model.add_subsystem('parab', Paraboloid(), promotes_inputs=['x', 'y'])
 
         # define the component whose output will be constrained
@@ -50,7 +50,7 @@ class TestCaseRetrieval(unittest.TestCase):
         prob.run_driver()
 
     def test_get_vars(self):
-        cr = om.CaseReader('parab_record.sql')
+        cr = om.CaseReader(self._prob.get_outputs_dir() / 'parab_record.sql')
         case_names = cr.list_cases(out_stream=None)
         inputs = _get_vars(cr, case_names=case_names, var_types='inputs')
         outputs = _get_vars(cr, case_names=case_names, var_types='outputs')
@@ -58,7 +58,7 @@ class TestCaseRetrieval(unittest.TestCase):
         self.assertSetEqual(set(outputs), {'const.g', 'parab.f_xy'})
 
     def test_get_opt_vars(self):
-        cr = om.CaseReader('parab_record.sql')
+        cr = om.CaseReader(self._prob.get_outputs_dir() / 'parab_record.sql')
         case_names = cr.list_cases(out_stream=None)
         desvars = _get_opt_vars(cr, case_names, var_type='desvars')
         constraints = _get_opt_vars(cr, case_names, var_type='constraints')
@@ -72,7 +72,7 @@ class TestCaseRetrieval(unittest.TestCase):
         self.assertSetEqual(set(all), {'x', 'y', 'const.g', 'parab.f_xy'})
 
     def test_get_var_meta(self):
-        cr = om.CaseReader('parab_record.sql')
+        cr = om.CaseReader(self._prob.get_outputs_dir() / 'parab_record.sql')
         case_name = cr.list_cases(out_stream=None)[0]
         g_meta = _get_var_meta(cr, case_name, 'const.g')
         self.assertEqual(g_meta['prom_name'], 'const.g')
@@ -90,13 +90,13 @@ class TestCaseRetrieval(unittest.TestCase):
         self.assertEqual(x_meta['shape'], (1,))
 
     def test_get_resids_vars(self):
-        cr = om.CaseReader('parab_record.sql')
+        cr = om.CaseReader(self._prob.get_outputs_dir() / 'parab_record.sql')
         case_names = cr.list_cases(out_stream=None)
         vars_with_resids = _get_resids_vars(cr, case_names)
         self.assertSetEqual(set(vars_with_resids), {'const.g', 'parab.f_xy'})
 
     def test_get_resids_val(self):
-        cr = om.CaseReader('parab_record.sql')
+        cr = om.CaseReader(self._prob.get_outputs_dir() / 'parab_record.sql')
         case_name = cr.list_cases(out_stream=None)[0]
         case = cr.get_case(case_name)
 

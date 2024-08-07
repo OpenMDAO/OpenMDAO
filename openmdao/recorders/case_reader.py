@@ -10,7 +10,7 @@ def CaseReader(filename, pre_load=True, metadata_filename=None):
 
     Parameters
     ----------
-    filename : str
+    filename : str or Path
         A path to the recorded file.
         Currently only sqlite database files recorded via SqliteRecorder are supported.
     pre_load : bool

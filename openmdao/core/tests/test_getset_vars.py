@@ -494,7 +494,7 @@ class ParTestCase(unittest.TestCase):
         p.record(case_name='case_1')
         p.cleanup()
 
-        case_1 = om.CaseReader('load_case_issue.sql').get_case('case_1')
+        case_1 = om.CaseReader(p.get_outputs_dir() / 'load_case_issue.sql').get_case('case_1')
         assert_near_equal(case_1.get_val('G.a.y')[-1], case_1.get_val('G.b.y'))
 
         # Populate the x input with zeros just to make sure we're changing it.

@@ -649,7 +649,7 @@ class TestDriver(unittest.TestCase):
 
         assert_check_totals(prob.check_totals(out_stream=None, driver_scaling=True))
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
         case = cr.get_case(cases[0])
 

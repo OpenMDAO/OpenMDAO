@@ -11,7 +11,7 @@ class BaseCaseReader(object):
 
     Parameters
     ----------
-    filename : str
+    filename : str or pathlib.Path
         The path to the file containing the recorded data.
     pre_load : bool
         If True, load all the data into memory during initialization.

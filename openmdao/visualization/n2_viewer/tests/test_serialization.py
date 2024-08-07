@@ -121,7 +121,7 @@ class TestSerialization(unittest.TestCase):
 
         prob.run_model()
 
-        cr = om.CaseReader("cases1.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases1.sql")
 
         dval = cr.problem_metadata['tree']['children'][1]['options']['bad']
         key, val = [(k, v) for k, v in dval[0].items()][0]
