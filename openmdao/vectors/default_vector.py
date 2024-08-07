@@ -125,13 +125,11 @@ class DefaultVector(Vector):
         ndarray
             zeros array of correct size.
         """
-        system = self._system()
-        type_ = self._typ
         root_vec = self._root_vector
 
         slices = root_vec.get_slice_dict()
 
-        mynames = list(system._var_abs2meta[type_])
+        mynames = list(self._system().abs_name_iter(self._typ))
         if mynames:
             myslice = slice(slices[mynames[0]].start, slices[mynames[-1]].stop)
         else:

@@ -4,7 +4,7 @@ KS Function Component.
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.utils.units import valid_units
+from openmdao.utils.options_dictionary import check_units
 
 
 CITATIONS = """
@@ -18,25 +18,6 @@ CITATIONS = """
         author = {Joaquim R. R. A. Martins and Nicholas M. K. Poon}
 }
 """
-
-
-def check_option(option, value):
-    """
-    Check option for validity.
-
-    Parameters
-    ----------
-    option : str
-        The name of the option.
-    value : any
-        The value of the option.
-
-    Raises
-    ------
-    ValueError
-    """
-    if option == 'units' and value is not None and not valid_units(value):
-        raise ValueError("The units '%s' are invalid." % value)
 
 
 class KSfunction(object):
@@ -175,7 +156,7 @@ class KSComp(ExplicitComponent):
         self.options.declare('units', types=str, allow_none=True, default=None,
                              desc='Units to be assigned to all variables in this component. '
                                   'Default is None, which means variables are unitless.',
-                             check_valid=check_option)
+                             check_valid=check_units)
         self.options.declare('scaler', types=(int, float), allow_none=True, default=None,
                              desc="Scaler for constraint, if added, default is one.")
         self.options.declare('adder', types=(int, float), allow_none=True, default=None,

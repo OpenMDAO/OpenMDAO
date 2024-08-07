@@ -102,9 +102,9 @@ class LinearBlockGS(BlockLinearSolver):
         if mode == 'fwd':
             parent_offset = system._dresiduals._root_offset
 
-            for subsys in relevance.filter(system._all_subsystem_iter()):
+            for subname, subsys in relevance.filter_items(system._all_subsystem_iter()):
                 # must always do the transfer on all procs even if subsys not local
-                system._transfer('linear', mode, subsys.name)
+                system._transfer('linear', mode, subname)
 
                 if not subsys._is_local:
                     continue
@@ -133,16 +133,16 @@ class LinearBlockGS(BlockLinearSolver):
                 subsys._solve_linear(mode, scope_out, scope_in)
 
         else:  # rev
-            subsystems = list(relevance.filter(system._all_subsystem_iter()))
+            subsystems = list(relevance.filter_items(system._all_subsystem_iter()))
             subsystems.reverse()
             parent_offset = system._doutputs._root_offset
 
-            for subsys in subsystems:
+            for subname, subsys in subsystems:
                 if subsys._is_local:
                     b_vec = subsys._doutputs
                     b_vec.set_val(0.0)
 
-                    system._transfer('linear', mode, subsys.name)
+                    system._transfer('linear', mode, subname)
 
                     b_vec *= -1.0
                     off = b_vec._root_offset - parent_offset
@@ -159,7 +159,7 @@ class LinearBlockGS(BlockLinearSolver):
                     else:
                         b_vec.set_val(0.0)
                 else:   # subsys not local
-                    system._transfer('linear', mode, subsys.name)
+                    system._transfer('linear', mode, subname)
 
         if use_aitken:
             if self._mode == 'fwd':

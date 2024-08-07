@@ -298,15 +298,7 @@ class Problem(object):
                              "iterate over the optimization subsystems during optimization.  This "
                              "applies only when the top level nonlinear solver is of type"
                              "NonlinearRunOnce.")
-        self.options.declare('allow_post_setup_reorder', types=bool,
-                             default=True,
-                             desc="If True, the execution order of direct subsystems of any group "
-                             "that sets its 'auto_order' option to True will be automatically "
-                             "ordered according to data dependencies. If this option is False, the "
-                             "'auto_order' option will be ignored and a warning will be issued for "
-                             "each group that has set it to True. Note that subsystems of a Group "
-                             "that form a cycle will never be reordered, regardless of the value of"
-                             " the 'auto_order' option.")
+
         self.options.update(options)
 
         # Options passed to models
@@ -641,23 +633,22 @@ class Problem(object):
             If True and model has been run previously, reset all iteration counters.
         """
         if not self.model._have_output_solver_options_been_applied():
-            raise RuntimeError(self.msginfo +
-                               ": Before calling `run_model`, the `setup` method must be called "
-                               "if set_output_solver_options has been called.")
+            raise RuntimeError(f"{self.msginfo}: Before calling `run_model`, the `setup` method "
+                               "must be called if set_output_solver_options has been called.")
 
         if self._metadata['setup_status'] < _SetupStatus.POST_SETUP:
-            if self.model._order_set:
-                raise RuntimeError(f"{self.msginfo}: Cannot call set_order without calling setup "
-                                   "after")
-            else:
-                raise RuntimeError(self.msginfo +
-                                   ": The `setup` method must be called before `run_model`.")
+            raise RuntimeError(
+                f"{self.msginfo}: The `setup` method must be called before `run_model`.")
+
+        if self.model._reordered:
+            raise RuntimeError(f"{self.msginfo}: Execution order has been changed since last "
+                               "call to setup. Call setup() again to reinitialize.")
 
         old_prefix = self._recording_iter.prefix
 
         if case_prefix is not None:
             if not isinstance(case_prefix, str):
-                raise TypeError(self.msginfo + ": The 'case_prefix' argument should be a string.")
+                raise TypeError(f"{self.msginfo}: The 'case_prefix' argument should be a string.")
             self._recording_iter.prefix = case_prefix
 
         try:
@@ -990,7 +981,6 @@ class Problem(object):
             'saved_errors': [],  # store setup errors here until after final_setup
             'checking': False,  # True if check_totals or check_partials is running
             'model_options': self.model_options,  # A dict of options passed to all systems in tree
-            'allow_post_setup_reorder': self.options['allow_post_setup_reorder'],  # see option
             'singular_jac_behavior': 'warn',  # How to handle singular jac conditions
             'parallel_deriv_color': None,  # None unless derivatives involving a parallel deriv
                                            # colored dv/response are currently being computed.
@@ -1105,10 +1095,6 @@ class Problem(object):
                           f"problem with {desvar_size} design variables and {response_size} "
                           "response variables (objectives and nonlinear constraints).",
                           category=DerivativesWarning)
-
-        if (not self._metadata['allow_post_setup_reorder'] and
-                self._metadata['setup_status'] == _SetupStatus.PRE_SETUP and self.model._order_set):
-            raise RuntimeError(f"{self.msginfo}: Cannot call set_order without calling setup after")
 
         # set up recording, including any new recorders since last setup
         if self._metadata['setup_status'] >= _SetupStatus.POST_SETUP:
@@ -2333,7 +2319,7 @@ class Problem(object):
         system_overrides = {}
         for subsys in model.system_iter(include_self=False, recurse=True):
             if overrides_method('load_case', subsys, System):
-                system_overrides[subsys.pathname] = subsys
+                system_overrides[subsys._user_pathname(verbose=False)] = subsys
 
         def set_later(var_name):
             # determine if variable should be set later via an overridden load_case method
@@ -2635,47 +2621,6 @@ class Problem(object):
                 print(f'None found', file=out_stream)
 
         return problem_indep_vars
-
-    def iter_count_iter(self, include_driver=True, include_solvers=True, include_systems=False):
-        """
-        Yield iteration counts for driver, solvers and/or systems.
-
-        Parameters
-        ----------
-        include_driver : bool
-            If True, include the driver in the iteration counts.
-        include_solvers : bool
-            If True, include solvers in the iteration counts.
-        include_systems : bool
-            If True, include systems in the iteration counts.
-
-        Yields
-        ------
-        str
-            Name of the object.
-        str
-            Name of the counter.
-        int
-            Value of the counter.
-        """
-        if include_driver:
-            yield ('Driver', 'iter_count', self.driver.iter_count)
-        if include_solvers or include_systems:
-            for s in self.model.system_iter(include_self=True, recurse=True):
-                if include_systems:
-                    for it in ('iter_count', 'iter_count_apply'):
-                        val = getattr(s, it)
-                        if val > 0:
-                            yield (s.pathname, it, val)
-
-                if include_solvers:
-                    prefix = s.pathname + '.' if s.pathname else ''
-                    if s.nonlinear_solver is not None and s.nonlinear_solver._iter_count > 0:
-                        yield (prefix + 'nonlinear_solver', '_iter_count',
-                               s.nonlinear_solver._iter_count)
-                    if s.linear_solver is not None and s.linear_solver._iter_count > 0:
-                        yield (prefix + 'linear_solver', '_iter_count',
-                               s.linear_solver._iter_count)
 
     def list_pre_post(self, outfile=None):
         """
@@ -3119,7 +3064,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         else:
             raise RuntimeError(f"Object type {type(system).__name__} is not a Component or Group.")
 
-        sys_name = system.pathname
+        sys_name = system._user_pathname()
         sys_class_name = type(system).__name__
         matrix_free = system.matrix_free
 

@@ -150,7 +150,7 @@ class NewtonSolver(NonlinearSolver):
         bool
             Flag for indicating child linerization
         """
-        return (self.options['solve_subsystems'] and not system.under_complex_step
+        return (self.options['solve_subsystems'] and not self._system().under_complex_step
                 and self._iter_count <= self.options['max_sub_solves'])
 
     def _linearize(self):

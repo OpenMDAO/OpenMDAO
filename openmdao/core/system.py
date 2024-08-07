@@ -561,12 +561,28 @@ class System(object):
             Either our instance pathname or class name.
         """
         if self.pathname is not None:
-            if self.pathname == '':
+            if self.is_top():
                 return f"<model> <class {type(self).__name__}>"
             return f"'{self.pathname}' <class {type(self).__name__}>"
         if self.name:
             return f"'{self.name}' <class {type(self).__name__}>"
         return f"<class {type(self).__name__}>"
+
+    def _user_pathname(self, verbose=True):
+        """
+        Return the pathname of this system intended for user facing output.
+
+        Parameters
+        ----------
+        verbose : bool
+            Ignored.
+
+        Returns
+        -------
+        str
+            The pathname of this system intended for user facing output.
+        """
+        return self.pathname
 
     def _get_inst_id(self):
         return self.pathname if self.pathname is not None else ''
@@ -629,7 +645,7 @@ class System(object):
         """
         toidx = self._var_allprocs_abs2idx
         sizes = self._var_sizes['output']
-        total = self.pathname == ''
+        total = self.is_top()
         szname = 'global_size' if total else 'size'
         start = end = 0
         for of, meta in self._var_abs2meta['output'].items():
@@ -671,7 +687,7 @@ class System(object):
         local_ins = self._var_abs2meta['input']
         local_outs = self._var_abs2meta['output']
 
-        total = self.pathname == ''
+        total = self.is_top()
         szname = 'global_size' if total else 'size'
 
         start = end = 0
@@ -2252,7 +2268,7 @@ class System(object):
             self._doutputs = vectors['output']['linear']
             self._dresiduals = vectors['residual']['linear']
 
-        for subsys in self._sorted_sys_iter():
+        for subsys in self._subsystems_myproc:
             subsys._scale_factors = self._scale_factors
             subsys._setup_vectors(root_vectors)
 
@@ -2267,7 +2283,7 @@ class System(object):
         Perform setup in all solvers.
         """
         # remove old solver error files if they exist
-        if self.pathname == '':
+        if self.is_top():
             rank = MPI.COMM_WORLD.rank if MPI is not None else 0
             if rank == 0:
                 for f in os.listdir('.'):
@@ -2580,7 +2596,7 @@ class System(object):
                     vec.scale_to_phys()
 
     @contextmanager
-    def _matvec_context(self, scope_out, scope_in, mode, clear=True):
+    def _matvec_context(self, scope_out, scope_in, mode):
         """
         Context manager for vectors.
 
@@ -2598,9 +2614,6 @@ class System(object):
         mode : str
             Key for specifying derivative direction. Values are 'fwd'
             or 'rev'.
-        clear : bool(True)
-            If True, zero out residuals (in fwd mode) or inputs and outputs
-            (in rev mode).
 
         Yields
         ------
@@ -2613,14 +2626,13 @@ class System(object):
         d_outputs = self._doutputs
         d_residuals = self._dresiduals
 
-        if clear:
-            if mode == 'fwd':
-                d_residuals.set_val(0.0)
-            else:  # rev
-                d_inputs.set_val(0.0)
-                d_outputs.set_val(0.0)
+        if mode == 'fwd':
+            d_residuals.set_val(0.0)
+        else:  # rev
+            d_inputs.set_val(0.0)
+            d_outputs.set_val(0.0)
 
-        if scope_out is None and scope_in is None:
+        if scope_in is None:
             yield d_inputs, d_outputs, d_residuals
         else:
             old_ins = d_inputs._names
@@ -2705,6 +2717,28 @@ class System(object):
                                "called.".format(self.msginfo))
 
         return (self._dinputs, self._doutputs, self._dresiduals)
+
+    def _iter_distrib_vars(self, io, local=False):
+        """
+        Iterate over distributed variables.
+
+        Parameters
+        ----------
+        io : str
+            Either 'input' or 'output'.
+        local : bool
+            If True, iterate only over variables that are local to this processor.
+
+        Yields
+        ------
+        str
+            The name of the distributed variable.
+        """
+        abs2meta = self._var_abs2meta[io] if local else self._var_allprocs_abs2meta[io]
+
+        for abs_name, meta in abs2meta.items():
+            if meta['distributed']:
+                yield abs_name
 
     @property
     def nonlinear_solver(self):
@@ -2917,8 +2951,7 @@ class System(object):
             if typ is None or isinstance(s, typ):
                 yield s
             if recurse:
-                for sub in s.system_iter(recurse=True, typ=typ):
-                    yield sub
+                yield from s.system_iter(recurse=True, typ=typ)
 
     def _all_subsystem_iter(self):
         """
@@ -6409,9 +6442,6 @@ class System(object):
         # return regular dict sorted by system pathname
         return {spath: data for spath, data in sorted(sys_prom_map.items(), key=lambda x: x[0])}
 
-    def _sorted_sys_iter(self):
-        yield from ()
-
     def load_case(self, case):
         """
         Pull all input and output variables from a Case into this System.
@@ -6537,3 +6567,108 @@ class System(object):
             Array of sizes of the variable on all procs.
         """
         return self._var_sizes[io][:, self._var_allprocs_abs2idx[name]]
+
+    def _setup_ordering(self, parent):
+        """
+        Perform ordering setup.  This does nothing in Components.
+
+        Parameters
+        ----------
+        parent : <System>
+            Parent Group or None.
+
+        Returns
+        -------
+        bool
+            Flag indicating if reordering of subsystems was done.
+        """
+        return False
+
+    def _contained_syspath_iter(self, paths, direct=False):
+        """
+        Yield pathnames of all systems and subsystems that are under the given path.
+
+        Note: this assumes that the paths list does not contain the pathname of self.
+        This behavior allows us to handle children that are CycleGroups, which have the same
+        pathname as their parent, so if a path equals self.pathname in the list, we assume it is
+        an CycleGroup direct child of self.
+
+        Parameters
+        ----------
+        paths : set
+            Set of pathnames of systems that are under consideration.
+        direct : bool
+            If True, only yield direct children of the given path.
+
+        Yields
+        ------
+        str
+            Pathname of a system contained, directly or indirectly based on the value of 'direct',
+            under this system.
+        """
+        if direct:
+            if self.is_top():
+                for p in paths:
+                    if '.' not in p:
+                        yield p
+            else:
+                prefix = self.pathname + '.'
+                for p in paths:
+                    if p.startswith(prefix):
+                        if '.' not in p[len(prefix):]:
+                            yield p
+        else:
+            if self.is_top():
+                yield from paths
+            else:
+                prefix = self.pathname + '.'
+                for p in paths:
+                    if p.startswith(prefix):
+                        yield p
+
+    def all_system_visitor(self, func, predicate=None, recurse=True, include_self=True):
+        """
+        Apply a function to all subsystems.
+
+        Parameters
+        ----------
+        func : callable
+            A function that takes a System as its only argument.
+        predicate : callable or None
+            A callable that takes a System as its only argument and returns -1, 0, or 1.
+            If it returns 1, apply the function to the system.
+            If it returns 0, don't apply the function, but continue on to the system's subsystems.
+            If it returns -1, don't apply the function and don't continue on to the system's
+            subsystems.
+            If predicate is None, the function is always applied.
+        recurse : bool
+            If True, function is applied to all subsystems of subsystems.
+        include_self : bool
+            If True, apply the function to the Group itself.
+
+        Yields
+        ------
+        object
+            The result of the function.
+        """
+        if include_self:
+            pred = 1 if predicate is None else predicate(self)
+            if pred == 1:
+                yield func(self)
+            elif pred == -1:
+                return
+
+        if recurse:
+            for s in self._subsystems_myproc:
+                yield from s.all_system_visitor(func, predicate, recurse=True, include_self=True)
+
+    def is_top(self):
+        """
+        Return True if this system is a top level system.
+
+        Returns
+        -------
+        bool
+            True if this system is a top level system.
+        """
+        return self.pathname == ''

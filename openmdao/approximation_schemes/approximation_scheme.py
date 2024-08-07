@@ -133,7 +133,7 @@ class ApproximationScheme(object):
         raise NotImplementedError("add_approximation has not been implemented")
 
     def _init_colored_approximations(self, system):
-        is_total = system.pathname == ''
+        is_total = system.is_top()
         is_semi = _is_group(system) and not is_total
         self._colored_approx_groups = []
         wrt_ranges = []
@@ -225,7 +225,7 @@ class ApproximationScheme(object):
         system : System
             The system having its derivs approximated.
         """
-        total = system.pathname == ''
+        total = system.is_top()
 
         in_slices = system._inputs.get_slice_dict()
         out_slices = system._outputs.get_slice_dict()
@@ -350,7 +350,7 @@ class ApproximationScheme(object):
         ndarray
             solution array corresponding to the jacobian column at the given column index
         """
-        total = system.pathname == ''
+        total = system.is_top()
         total_or_semi = total or _is_group(system)
 
         if total:
@@ -478,7 +478,7 @@ class ApproximationScheme(object):
         ndarray
             solution array corresponding to the jacobian column at the given column index
         """
-        total = system.pathname == ''
+        total = system.is_top()
         if total:
             for _, _, end, _, _ in system._jac_of_iter():
                 pass

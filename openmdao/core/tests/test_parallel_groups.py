@@ -25,7 +25,7 @@ except ImportError:
 from openmdao.test_suite.groups.parallel_groups import \
     FanOutGrouped, FanInGrouped2, Diamond, ConvergeDiverge
 
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals, assert_check_partials
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.error_checking.check_config import _default_checks
@@ -691,16 +691,12 @@ class TestDesvarResponseOrdering(unittest.TestCase):
         model = prob.model
         model.add_subsystem('phases', MyPhases())
 
-        prob.setup()
+        prob.setup(force_alloc_complex=True)
 
-        dvs = prob.model.get_design_vars(recurse=True, get_sizes=True, use_prom_ivc=True)
-        cons = prob.model.get_constraints(recurse=True, get_sizes=True, use_prom_ivc=False)
-
-        dv_names = [z for z in dvs.keys()]
-        con_names = [z for z in cons.keys()]
-
-        self.assertEqual(dv_names, ['phases.climb.comp.x', 'phases.cruise.comp.x', 'phases.descent.comp.x'])
-        self.assertEqual(con_names, ['phases.climb.comp.y', 'phases.cruise.comp.y', 'phases.descent.comp.y'])
+        prob.run_model()
+        
+        assert_check_totals(prob.check_totals(method='cs', show_only_incorrect=True))
+        assert_check_partials(prob.check_partials(method='cs', show_only_incorrect=True))
 
 
 

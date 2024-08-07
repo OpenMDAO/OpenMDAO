@@ -61,6 +61,7 @@ from openmdao.utils.entry_points import _list_installed_setup_parser, _list_inst
         _find_repos_setup_parser, _find_repos_exec
 from openmdao.utils.reports_system import _list_reports_setup_parser, _list_reports_cmd, \
     _view_reports_setup_parser, _view_reports_cmd
+from openmdao.utils.graph_utils import _subcycles_setup_parser, _subcycles_cmd
 from openmdao.visualization.graph_viewer import _graph_setup_parser, _graph_cmd
 
 
@@ -546,6 +547,8 @@ _command_map = {
                      'Generate total timings of calls to particular object instances.'),
     'list_installed': (_list_installed_setup_parser, _list_installed_cmd,
                        'List installed types recognized by OpenMDAO.'),
+    'list_pre_post': (_list_pre_post_setup_parser, _list_pre_post_cmd,
+                      'Show pre and post setup systems.'),
     'list_reports': (_list_reports_setup_parser, _list_reports_cmd, 'List available reports.'),
     'mem': (_mem_prof_setup_parser, _mem_prof_exec,
             'Profile memory used by OpenMDAO related functions.'),
@@ -556,8 +559,8 @@ _command_map = {
     'scaffold': (_scaffold_setup_parser, _scaffold_exec,
                  'Generate a simple scaffold for a component.'),
     'scaling': (_scaling_setup_parser, _scaling_cmd, 'View driver scaling report.'),
-    'list_pre_post': (_list_pre_post_setup_parser, _list_pre_post_cmd,
-                      'Show pre and post setup systems.'),
+    'subcycles': (_subcycles_setup_parser, _subcycles_cmd,
+                  'Show groups containing subcycles.'),
     'summary': (_config_summary_setup_parser, _config_summary_cmd,
                 'Print a short top-level summary of the problem.'),
     'timing': (_timing_setup_parser, _timing_cmd, 'Collect timing information for all systems.'),

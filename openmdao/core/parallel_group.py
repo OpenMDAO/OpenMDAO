@@ -2,6 +2,7 @@
 
 from openmdao.core.group import Group
 from openmdao.utils.om_warnings import issue_warning
+from openmdao.utils.graph_utils import get_sccs_topo
 
 
 class ParallelGroup(Group):
@@ -67,37 +68,20 @@ class ParallelGroup(Group):
         else:
             yield from super()._ordered_comp_name_iter()
 
-    def _check_order(self, reorder=True, recurse=True, out_of_order=None):
+    def _check_order(self):
         """
-        Check if auto ordering is needed and if so, set the order appropriately.
-
-        Parameters
-        ----------
-        reorder : bool
-            If True, reorder the subsystems based on the new order.  Otherwise
-            just return the out-of-order connections.
-        recurse : bool
-            If True, call this method on all subgroups.
-        out_of_order : dict
-            Lists of out-of-order connections keyed by group pathname.
+        Check if auto ordering is needed.
 
         Returns
         -------
         dict
-            Lists of out-of-order connections keyed by group pathname.
+            Lists of out-of-order connections.
         """
         if self.options['auto_order']:
             issue_warning("auto_order is not supported in ParallelGroup. "
                           "Ignoring auto_order option.", prefix=self.msginfo)
 
-        if out_of_order is None:
-            out_of_order = {}
-
-        if recurse:
-            for s in self._subgroups_myproc:
-                s._check_order(reorder, recurse, out_of_order)
-
-        return out_of_order
+        return {}
 
     def comm_info_iter(self):
         """
@@ -188,3 +172,122 @@ class ParallelGroup(Group):
                 always_opt_comps.update(a)
         else:
             super()._get_relevance_modifiers(grad_groups, always_opt_comps)
+
+    def _setup_ordering(self, parent):
+        if self.comm.size > 1:
+            return self.comm.allreduce(super()._setup_ordering(parent))
+        else:
+            return super()._setup_ordering(parent)
+
+    def _update_data_order(self, parent=None):
+        if self.comm.size > 1:
+            allprocs_abs2meta_keys = {'input': [], 'output': []}
+            if self._gather_full_data():
+                # gather keys from subsystems so order will be correct
+                for io in ('input', 'output'):
+                    keys = allprocs_abs2meta_keys[io]
+                    for subsys in self._subsystems_myproc:
+                        keys.extend(subsys._var_allprocs_abs2meta[io])
+
+            old_allprocs_abs2meta = self._var_allprocs_abs2meta
+            self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
+
+            # FIXME: discretes are missing!
+
+            # get ordering for var_allprocs_abs2meta keys from all procs.  The metadata has
+            # already been gathered in the parent's _setup_var_data and it just needs to be
+            # reordered.
+            for proc_keys in self.comm.allgather(allprocs_abs2meta_keys):
+                for io, keylist in proc_keys.items():
+                    abs2meta = self._var_allprocs_abs2meta[io]
+                    old = old_allprocs_abs2meta[io]
+                    for k in keylist:
+                        abs2meta[k] = old[k]  # keys in right order. just pull meta from parent
+
+            self._var_abs2meta = {'input': {}, 'output': {}}
+            self._var_allprocs_abs2idx = {'input': {}, 'output': {}}
+            for io in ('input', 'output'):
+                abs2meta = self._var_abs2meta[io]
+                for subsys in self._subsystems_myproc:
+                    abs2meta.update(subsys._var_abs2meta[io])
+
+                self._var_allprocs_abs2idx[io].update(
+                    {n: i for i, n in enumerate(self._var_allprocs_abs2meta[io])})
+
+            self._reordered = False
+        else:
+            super()._update_data_order(parent)
+
+    def iter_group_sccs(self, recurse=True, use_abs_names=True, all_groups=False):
+        """
+        Yield strongly connected components of the group's subsystem graph.
+
+        Parameters
+        ----------
+        recurse : bool
+            If True, recurse into subgroups.
+        use_abs_names : bool
+            If True, return absolute names, otherwise return relative names.
+        all_groups : bool
+            If True, yield all groups, not just those with one or more cycles.
+
+        Yields
+        ------
+        str, list of sets of str
+            Group pathname and list of sets of subsystems in any strongly connected components
+            in this Group.
+        """
+        if self.comm.size > 1:
+            lst = list(super().iter_group_sccs(recurse=recurse, use_abs_names=use_abs_names,
+                                               all_groups=all_groups))
+            if self._gather_full_data():
+                gathered = self.comm.allgather(lst)
+            else:
+                gathered = self.comm.allgather([])
+
+            for ranklist in gathered:
+                for tup in ranklist:
+                    yield tup
+        else:
+            yield from super().iter_group_sccs(recurse=recurse, use_abs_names=use_abs_names,
+                                               all_groups=all_groups)
+
+    def all_system_visitor(self, func, predicate=None, recurse=True, include_self=True):
+        """
+        Apply a function to all subsystems.
+
+        Parameters
+        ----------
+        func : callable
+            A callable that takes a System as its only argument.
+        predicate : callable or None
+            A callable that takes a System as its only argument and returns -1, 0, or 1.
+            If it returns 1, apply the function to the system.
+            If it returns 0, don't apply the function, but continue on to the system's subsystems.
+            If it returns -1, don't apply the function and don't continue on to the system's
+            subsystems.
+            If predicate is None, the function is always applied.
+        recurse : bool
+            If True, function is applied to all subsystems of subsystems.
+        include_self : bool
+            If True, apply the function to the System itself.
+
+        Yields
+        ------
+        object
+            The result of the function called on each system.
+        """
+        if self.comm.size > 1:
+            lst = list(super().all_system_visitor(func, predicate, recurse=recurse,
+                                                  include_self=include_self))
+            if self._gather_full_data():
+                gathered = self.comm.allgather(lst)
+            else:
+                gathered = self.comm.allgather([])
+
+            for ranklist in gathered:
+                for tup in ranklist:
+                    yield tup
+        else:
+            yield from super().all_system_visitor(func, predicate, recurse=recurse,
+                                                  include_self=include_self)

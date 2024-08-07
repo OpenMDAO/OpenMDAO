@@ -5,6 +5,7 @@ import re
 from openmdao.utils.om_warnings import warn_deprecation
 from openmdao.utils.notebook_utils import notebook
 from openmdao.visualization.tables.table_builder import generate_table
+from openmdao.utils.units import valid_units
 
 from openmdao.core.constants import _UNDEFINED
 
@@ -33,6 +34,25 @@ def check_valid(name, value):
         If value is not valid for option.
     """
     raise ValueError(f"Option '{name}' with value {value} is not valid.")
+
+
+def check_units(name, units):
+    """
+    Check units for validity.
+
+    Parameters
+    ----------
+    name : str
+        The name of the option.
+    units : any
+        The units of the option.
+
+    Raises
+    ------
+    ValueError
+    """
+    if units is not None and not valid_units(units):
+        raise ValueError(f"The {name} '{units}' are invalid.")
 
 
 class OptionsDictionary(object):
