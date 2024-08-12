@@ -1,6 +1,5 @@
 import unittest
 import sys
-from functools import partial
 import itertools
 from collections.abc import Iterable
 
@@ -20,7 +19,11 @@ if jax is None:
         return f
 else:
     from openmdao.jax import act_tanh, smooth_abs, smooth_max, smooth_min, ks_max, ks_min
-    jjit = jax.jit
+    def jjit(f, *args, **kwargs):
+        if om.env_truthy('JAX_CPU') and 'backend' not in kwargs:
+            return jax.jit(f, *args, backend='cpu', **kwargs)
+        else:
+            return jax.jit(f, *args, **kwargs)
 
 
 @unittest.skipIf(jax is None, 'jax is not available.')
@@ -233,20 +236,6 @@ class MyCompJaxWithDiscrete(om.ExplicitComponent):
             outputs['zz'] = inputs['y'] * 2.5
         else:
             outputs['zz'] = inputs['y'] * 3.0
-
-
-class MyCompJaxImplicit(om.ImplicitComponent):
-    def setup(self):
-        self.add_input('a', shape_by_conn=True)
-        self.add_input('b', shape_by_conn=True)
-        self.add_input('c', shape_by_conn=True)
-        self.add_output('x', copy_shape='a')
-
-        self.declare_partials(of=['x'], wrt=['a', 'b', 'c'])
-
-    def compute_primal(a, b, c, x):
-        return a * x ** 2 + b * x + c
-
 
 
 x_shape = (2, 3)
@@ -516,34 +505,6 @@ class TestJaxComp(unittest.TestCase):
         assert_near_equal(p.get_val('comp.zz'), y * 2.5)
         p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'], method='fd', show_only_incorrect=True)
         p.check_partials(show_only_incorrect=True)
-
-    def test_jax_implicit_comp(self):
-
-        def apply_nl(a, b, c, x):
-            R_x = a * x ** 2 + b * x + c
-            return R_x
-
-        f = (omf.wrap(apply_nl)
-                .add_output('x', resid='R_x', val=0.0)
-                .declare_partials(of='*', wrt='*', method='cs')
-                )
-
-        p = om.Problem()
-        p.model.add_subsystem('comp', om.ImplicitFuncComp(f))
-
-        # need this since comp is implicit and doesn't have a solve_linear
-        p.model.linear_solver = om.DirectSolver()
-        p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, iprint=0)
-
-        p.setup()
-
-        p.set_val('comp.a', 2.)
-        p.set_val('comp.b', -8.)
-        p.set_val('comp.c', 6.)
-        p.run_model()
-
-        assert_check_partials(p.check_partials(includes=['comp'], out_stream=None), atol=1e-5)
-        assert_check_totals(p.check_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'], out_stream=None))
 
 
 @unittest.skipIf(jax is None or sys.version_info < (3, 9), 'jax is not available or python < 3.9.')

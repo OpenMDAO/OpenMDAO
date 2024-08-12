@@ -90,3 +90,7 @@ class TestJaxUtils(unittest.TestCase):
         p.run_model()
         assert_near_equal(p.get_val('c.f'), c_x ** 3)
         assert_check_partials(p.check_partials(method='cs', show_only_incorrect=True))
+
+
+if __name__ == '__main__':
+    unittest.main()

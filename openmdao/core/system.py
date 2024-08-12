@@ -2729,6 +2729,10 @@ class System(object):
         """
         Set this system's nonlinear solver.
         """
+        # from openmdao.core.group import Group
+        # if not isinstance(self, Group):
+        #     raise TypeError("nonlinear_solver can only be set on a Group.")
+
         self._nonlinear_solver = solver
 
     @property

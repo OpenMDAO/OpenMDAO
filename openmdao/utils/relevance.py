@@ -494,6 +494,8 @@ class Relevance(object):
         self._single_seed2relsys = {'fwd': {}, 'rev': {}}
 
         if not fwd_meta or not rev_meta:
+            self._sys2idx = {}
+            self._var2idx = {}
             return
 
         # this set contains all variables and some or all components

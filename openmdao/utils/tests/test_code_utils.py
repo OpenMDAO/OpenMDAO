@@ -3,8 +3,13 @@ import unittest
 import sys
 import os
 import pickle
+import inspect
 
-from openmdao.utils.code_utils import get_nested_calls, LambdaPickleWrapper
+import numpy as np
+
+import openmdao.api as om
+from openmdao.utils.code_utils import get_nested_calls, LambdaPickleWrapper, get_return_names, \
+    get_func_graph, get_partials_deps
 from openmdao.core.group import Group
 
 
@@ -58,6 +63,171 @@ class TestLambdaPickleWrapper(unittest.TestCase):
         self.assertEqual(wrapper2(1), 2)
 
 
+class TestGetReturnNames(unittest.TestCase):
+
+    def test_single_return(self):
+        def func():
+            a = 1
+            return a
+
+        result = get_return_names(func)
+        self.assertEqual(result, ['a'])
+
+    def test_multiple_same_return(self):
+        def func():
+            a = 1
+            if a > 0:
+                return a
+            else:
+                return a
+
+        result = get_return_names(func)
+        self.assertEqual(result, ['a'])
+
+    def test_tuple_return(self):
+        def func():
+            a = 1
+            b = 2
+            return a, b
+
+        result = get_return_names(func)
+        self.assertEqual(result, ['a', 'b'])
+
+    def test_different_return_values(self):
+        def func():
+            a = 1
+            b = 2
+            if a > 0:
+                return a
+            else:
+                return b
+
+        with self.assertRaises(RuntimeError) as cm:
+            get_return_names(func)
+
+        self.assertEqual(cm.exception.args[0],
+                         "Function has multiple return statements with different return value names of ['a', 'b'] for return value 0.")
+
+    def test_mixed_return_values(self):
+        class _Foo(object):
+            def __init__(self, x):
+                self.x = x
+
+        def func():
+            a = 1
+            f = _Foo(a)
+            if a > 0:
+                return a, 2
+            else:
+                return a, f.x
+
+        result = get_return_names(func)
+        self.assertEqual(result, ['a', None])
+
+
+class TestGraphFunction(unittest.TestCase):
+
+    def test_single_return(self):
+        def func():
+            a = 1
+            return a
+
+        graph = get_func_graph(func)
+        self.assertEqual(0, len(graph.edges()))
+
+    def test_unconected_output(self):
+        def func(a, b):
+            c = a + b
+            return c, 2
+
+        graph = get_func_graph(func)
+        self.assertIn(('a', 'c'), graph.edges())
+        self.assertIn(('b', 'c'), graph.edges())
+        self.assertEqual(0, len(graph.edges('out1')))
+
+    def test_complicated(self):
+        class _Foo(object):
+            def __init__(self, a):
+                self.a = a
+        foo = _Foo(1)
+        def func(a, b):
+            c = np.tan(a + np.sin(b))
+            x = np.array([a, b])
+            d = c[0] + 1
+            e = 1./np.cos(d*foo.a) * 2
+            f = d
+            f[0] = x * x
+            return e
+
+        graph = get_func_graph(func)
+        expected = [('a', 'c'), ('a', 'x'), ('b', 'c'), ('b', 'x'), ('c', 'd'), ('d', 'e'), ('d', 'f'), ('x', 'f')]
+        self.assertEqual(sorted(graph.edges()), sorted(expected))
+        self.assertEqual(sorted(graph.nodes()), sorted(['a', 'b', 'c', 'd', 'e', 'f', 'x']))
+        
+        partials = sorted(get_partials_deps(func))
+
+    def test_multiple_returns(self):
+        def func(a, b):
+            return a, b
+
+        graph = get_func_graph(func)
+        self.assertIn(('a', 'out0'), graph.edges())
+        self.assertIn(('b', 'out1'), graph.edges())
+
+    def test_conditional_return(self):
+        def func(a):
+            if a > 0:
+                return a
+            else:
+                return -a
+
+        graph = get_func_graph(func)
+        self.assertIn(('a', 'out0'), graph.edges())
+
+    def test_no_return(self):
+        def func(a):
+            b = a + 1
+
+        graph = get_func_graph(func)
+        self.assertIn(('a', 'b'), graph.edges())
+
+    def test_function_with_args(self):
+        def func(a, b):
+            c = a + b
+            return c
+
+        graph = get_func_graph(func)
+        self.assertIn(('a', 'c'), graph.edges())
+        self.assertIn(('b', 'c'), graph.edges())
+
+    def test_nested_function(self):
+        def func(a):
+            def nested(b):
+                return b + 1
+            return nested(a)
+
+        with self.assertRaises(RuntimeError) as cm:
+            get_func_graph(func)
+        self.assertEqual(str(cm.exception), "Function contains nested functions, which are not supported.")
+
+    def test_function_with_tuple_return(self):
+        def func(a, b):
+            return a, b
+
+        graph = get_func_graph(func)
+        self.assertIn(('a', 'out0'), graph.edges())
+        self.assertIn(('b', 'out1'), graph.edges())
+
+    def test_function_with_mixed_return(self):
+        def func(a):
+            if a > 0:
+                return a, 2
+            else:
+                return a, -2
+
+        graph = get_func_graph(func)
+        self.assertIn(('a', 'out0'), graph.edges())
+
+
 if __name__ == '__main__':
     unittest.main()
-

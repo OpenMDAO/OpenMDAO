@@ -1,4 +1,5 @@
 """Define the ExplicitComponent class."""
+import inspect
 
 import numpy as np
 from types import MethodType
@@ -604,6 +605,13 @@ class ExplicitComponent(Component):
             yield from discrete_inputs.values()
         yield from inputs.values()
 
+    def _get_compute_primal_argnames(self):
+        argnames = []
+        if self._discrete_inputs:
+            argnames.extend(self._discrete_inputs)
+        argnames.extend(self._var_rel_names['input'])
+        return argnames
+
     def _setup_jax(self):
         # we define compute_partials here instead of making this the base class version as we
         # did with compute, because the existence of a compute_partials method that is not the
@@ -651,10 +659,19 @@ class ExplicitComponent(Component):
             # replace existing compute method with base class method, so that compute_primal
             # will be called.
             self.compute = MethodType(ExplicitComponent.compute, self)
-        elif 'use_jit' in self.options and self.options['use_jit']:
+        else:
+            # check that compute_primal args are in the correct order
+            args = list(inspect.signature(self.compute_primal).parameters)
+            compargs = self._get_compute_primal_argnames()
+            if args != compargs:
+                raise RuntimeError(f"{self.msginfo}: compute_primal method args {args} don't match "
+                                   f"the expected args {compargs}.")
+
             static_argnums = tuple(range(len(self._var_discrete['input'])))
             self.compute_primal = self.compute_primal.__func__
-            self.compute_primal = jit(self.compute_primal, static_argnums=static_argnums)
+
+            if 'use_jit' in self.options and self.options['use_jit']:
+                self.compute_primal = jit(self.compute_primal, static_argnums=static_argnums)
 
         self.compute_partials = MethodType(compute_partials, self)
         self._has_compute_partials = True

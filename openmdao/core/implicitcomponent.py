@@ -1,9 +1,10 @@
 """Define the ImplicitComponent class."""
 
-from functools import partial
+import inspect
 from scipy.sparse import coo_matrix
 import numpy as np
 from types import MethodType
+from itertools import chain
 
 from openmdao.core.component import Component, _allowed_types
 from openmdao.core.constants import _UNDEFINED, _SetupStatus
@@ -15,7 +16,7 @@ from openmdao.utils.general_utils import format_as_float_or_array, _subjac_meta2
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.jax_utils import jax, jit, custom_jvp, JaxCompPyTreeWrapper
+from openmdao.utils.jax_utils import jax, jit, ImplicitCompJaxify, JaxCompPyTreeWrapper
 
 
 _tuplist = (tuple, list)
@@ -743,8 +744,6 @@ class ImplicitComponent(Component):
         discrete_outputs : dict or None
             If not None, dict containing discrete output values.
         """
-        global _tuplist
-
         if self.compute_primal is None:
             return
 
@@ -772,7 +771,10 @@ class ImplicitComponent(Component):
         outputs : Vector
             Unscaled, dimensional output variables read via outputs[key].
         """
-        pass
+        if self.compute_primal is None:
+            return
+        if self.nonlinear_solver is not None:
+            self.nonlinear_solver.solve()
 
     def guess_nonlinear(self, inputs, outputs, residuals,
                         discrete_inputs=None, discrete_outputs=None):
@@ -904,143 +906,19 @@ class ImplicitComponent(Component):
         yield from inputs.values()
         yield from outputs.values()
 
-    @partial(jax.custom_jvp, nondiff_argnums=(0,))
-    def _jax_solve_nl_jvp(self):
-        pass
-
-    @_jax_solve_nl_jvp.defjvp
-    def _solve_nl_custom_jvp(self, primals, tangents):
-        primal_out = self._jax_solve_nl_jvp()
+    def _get_compute_primal_argnames(self):
+        argnames = []
+        if self._discrete_inputs:
+            argnames.extend(self._discrete_inputs)
+        argnames.extend(name for name in self._var_rel_names['input'] if name not in self._discrete_inputs)
+        argnames.extend(name for name in self._var_rel_names['output'] if name not in self._discrete_outputs)
+        return argnames
 
     def _setup_jax(self):
-
-# @custom_jvp
-# def f(x, y):
-#   return jnp.sin(x) * y
-
-# @f.defjvp
-# def f_jvp(primals, tangents):
-#   x, y = primals
-#   x_dot, y_dot = tangents
-#   primal_out = f(x, y)
-#   tangent_out = jnp.cos(x) * x_dot * y + jnp.sin(x) * y_dot
-#   return primal_out, tangent_out
-
-
-# Equivalent alternative using the defjvps convenience wrapper
-# @custom_jvp
-# def f(x, y):
-#   return jnp.sin(x) * y
-
-# f.defjvps(lambda x_dot, primal_out, x, y: jnp.cos(x) * x_dot * y,
-#           lambda y_dot, primal_out, x, y: jnp.sin(x) * y_dot)
-
-
-
-
-# custom ode deriv using custom_jvp
-# odeint_rk4 = jax.custom_jvp(odeint_rk4, nondiff_argnums=(0,))
-
-# @odeint_rk4.defjvp
-# def odeint_rk4_jvp(f, primals, tangents):
-#   y0, t, *args = primals
-#   delta_y0, _, *delta_args = tangents
-#   nargs = len(args)
-
-#   def f_aug(aug_state, t, *args_and_delta_args):
-#     primal_state, tangent_state = aug_state
-#     args, delta_args = args_and_delta_args[:nargs], args_and_delta_args[nargs:]
-#     primal_dot, tangent_dot = jax.jvp(f, (primal_state, t, *args), (tangent_state, 0., *delta_args))
-#     return jnp.stack([primal_dot, tangent_dot])
-
-#   aug_init_state = jnp.stack([y0, delta_y0])
-#   aug_states = odeint_rk4(f_aug, aug_init_state, t, *args, *delta_args)
-#   ys, ys_dot = aug_states[:, 0, :], aug_states[:, 1, :]
-#   return ys, ys_dot
-
-
-# from ChatGPT:
-
-# # solver with custom JVP
-# @partial(custom_vjp, nondiff_argnums=(0,))
-# def solver(f, x_init, lr=0.1, num_iters=100):
-#     x = x_init
-#     for _ in range(num_iters):
-#         grad = jax.grad(f)(x)
-#         x = x - lr * grad
-#     return x
-
-# # Define the custom JVP rule
-# @solver.defjvp
-# def solver_jvp(primals, tangents):
-#     x_init, = primals
-#     t_init, = tangents
-
-#     def body_fun(x, _):
-#         grad = jax.grad(f)(x)
-#         return x - lr * grad, None
-
-#     # Forward pass
-#     x_final = solver(x_init, lr, num_iters)
-
-#     # Reverse-mode pass
-#     _, vjp_fun = jax.vjp(lambda x: jax.lax.scan(body_fun, x, None, length=num_iters)[0], x_init)
-#     x_final_dot = vjp_fun(t_init)[0]
-
-#     return x_final, x_final_dot
-
-# # Initial point
-# x_init = jnp.array(3.0)
-# v = jnp.array(1.0)  # Direction vector
-
-# # Compute the function value and the JVP
-# x_min, jvp_val = solver_jvp((x_init,), (v,))
-# print("Minimum found at x =", x_min)
-# print("Jacobian-vector product at x =", x_init, "with v =", v, "is", jvp_val)
-
-
-# iterative solver example
-
-# from jax import vjp
-
-# @partial(custom_vjp, nondiff_argnums=(0,))
-# def fixed_point(f, a, x_guess):
-#   def cond_fun(carry):
-#     x_prev, x = carry
-#     return jnp.abs(x_prev - x) > 1e-6
-
-#   def body_fun(carry):
-#     _, x = carry
-#     return x, f(a, x)
-
-#   _, x_star = while_loop(cond_fun, body_fun, (x_guess, f(a, x_guess)))
-#   return x_star
-
-# def fixed_point_fwd(f, a, x_init):
-#   x_star = fixed_point(f, a, x_init)
-#   return x_star, (a, x_star)
-
-# def fixed_point_rev(f, res, x_star_bar):
-#   a, x_star = res
-#   _, vjp_a = vjp(lambda a: f(a, x_star), a)
-#   a_bar, = vjp_a(fixed_point(partial(rev_iter, f),
-#                              (a, x_star, x_star_bar),
-#                              x_star_bar))
-#   return a_bar, jnp.zeros_like(x_star)
-
-# def rev_iter(f, packed, u):
-#   a, x_star, x_star_bar = packed
-#   _, vjp_x = vjp(lambda x: f(a, x), x_star)
-#   return x_star_bar + vjp_x(u)[0]
-
-# fixed_point.defvjp(fixed_point_fwd, fixed_point_rev)
-
-
-
         # we define linearize here instead of making this the base class version as we
         # did with apply_nonlinear, because the existence of a linearize method that is not the
         # base class method is used to determine if a given component computes its own partials.
-        def linearize(self, inputs, outputs, partials, discrete_inputs, discrete_outputs):
+        def linearize(self, inputs, outputs, partials, discrete_inputs=None, discrete_outputs=None):
             deriv_vals = self._get_jac_func()(*self._get_compute_primal_inputs(inputs, outputs,
                                                                                discrete_inputs))
             nested_tup = isinstance(deriv_vals, tuple) and len(deriv_vals) > 0 and \
@@ -1051,7 +929,7 @@ class ImplicitComponent(Component):
             for ofname in self._var_rel_names['output']:
                 ofidx += 1
                 ofmeta = self._var_rel2meta[ofname]
-                for wrtidx, wrtname in enumerate(self._var_rel_names['input']):
+                for wrtidx, wrtname in enumerate(chain(self._var_rel_names['input'], self._var_rel_names['output'])):
                     key = (ofname, wrtname)
                     if key not in partials:
                         # FIXME: this means that we computed a derivative that we didn't need
@@ -1065,6 +943,7 @@ class ImplicitComponent(Component):
                     if nof > 1 or nested_tup:
                         dvals = dvals[ofidx]
 
+                    # print(ofidx, ofname, ofmeta['shape'], wrtidx, wrtname, wrtmeta['shape'], 'subjac_shape', dvals[wrtidx].shape)
                     dvals = dvals[wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
 
                     sjmeta = partials.get_metadata(key)
@@ -1076,13 +955,28 @@ class ImplicitComponent(Component):
 
         if self.compute_primal is None:
             raise RuntimeError("Automatic conversion of the apply_nonlinear method to a JAX "
-                               "compatible compute_primal method is not currently supported for "
-                               "ImplicitComponent. You must provide a compute_primal method.")
-        elif 'use_jit' in self.options and self.options['use_jit']:
+                               "compatible compute_primal method is not currently supported for ")
+            # jaxifier = ImplicitCompJaxify(self, verbose=False)
+
+            # self.compute_primal = jaxifier.compute_primal
+            # if jaxifier.get_self_statics:
+            #     self.get_self_statics = MethodType(jaxifier.get_self_statics, self)
+            # # replace existing apply_nonlinear method with base class method, so that compute_primal
+            # # will be called.
+        else:
+            # check that compute_primal args are in the correct order
+            args = list(inspect.signature(self.compute_primal).parameters)
+            compargs = self._get_compute_primal_argnames()
+            if args != compargs:
+                raise RuntimeError(f"{self.msginfo}: compute_primal method args {args} don't match "
+                                   f"the expected args {compargs}.")
+
             static_argnums = tuple(range(len(self._var_discrete['input'])))
             self.compute_primal = self.compute_primal.__func__
-            self.compute_primal = jit(self.compute_primal, static_argnums=static_argnums)
+            if 'use_jit' in self.options and self.options['use_jit']:
+                self.compute_primal = jit(self.compute_primal, static_argnums=static_argnums)
 
+        self.apply_nonlinear = MethodType(ImplicitComponent.apply_nonlinear, self)
         self.linearize = MethodType(linearize, self)
 
     def _get_jac_func(self):
@@ -1232,6 +1126,9 @@ class _JacobianWrapper(object):
 
     def __setattr__(self, name, val):
         setattr(self._jac, name, val)
+
+    def __contains__(self, key):
+        return key in self._jac
 
 
 def _get_sparse_slice(meta, oslc, rslc):

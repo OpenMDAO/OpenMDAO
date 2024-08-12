@@ -365,7 +365,7 @@ class _TotalJacInfo(object):
     def _check_discrete_dependence(self):
         model = self.model
         # raise an exception if we depend on any discrete outputs
-        if model._var_allprocs_discrete['output']:
+        if model._var_allprocs_discrete['output'] and model._relevance._active:
             # discrete_outs at the model level are absolute names
             relevance = model._relevance
             discrete_outs = model._var_allprocs_discrete['output']

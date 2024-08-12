@@ -13,7 +13,7 @@ import numpy as np
 
 from openmdao.visualization.tables.table_builder import generate_table
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.code_utils import _get_long_name, replace_method
+from openmdao.utils.code_utils import _get_long_name, replace_method, get_partials_deps
 
 
 def jit_stub(f, *args, **kwargs):
@@ -161,46 +161,12 @@ def get_func_graph(func, *args, **kwargs):
                             i += 1
                         graph.add_edge(n2index[inp], n2index[out])
 
-    return graph
-
-
-def get_partials_deps(func, outputs, *args, **kwargs):
-    """
-    Generate a list of tuples of the form (output, input) for the given function.
-
-    Only tuples where the output depends on the input are yielded. This can be used to
-    determine which partials need to be declared.
-
-    Parameters
-    ----------
-    func : Callable
-        The function to be analyzed.
-    outputs : list
-        The list of output variable names.
-    *args : list
-        Positional arguments.
-    **kwargs : dict
-        Keyword arguments.
-
-    Yields
-    ------
-    tuple
-        A tuple of the form (output, input).
-    """
-    graph = get_func_graph(func, *args, **kwargs)
-
     # show the function graph visually
     # from openmdao.visualization.graph_viewer import write_graph, _to_pydot_graph
     # G = _to_pydot_graph(graph)
     # write_graph(G)
 
-    inputs = list(inspect.signature(func).parameters)
-    n2index = {n: i for i, n in enumerate(chain(inputs, outputs))}
-    for inp in inputs:
-        for out in outputs:
-            # TODO: not sure how efficient this is...
-            if nx.has_path(graph, n2index[inp], n2index[out]):
-                yield (out, inp)
+    return graph
 
 
 class CompJaxifyBase(ast.NodeTransformer):
@@ -325,8 +291,7 @@ class CompJaxifyBase(ast.NodeTransformer):
         tuple
             A tuple of the form (output, input), where output depends on the input.
         """
-        yield from get_partials_deps(self.compute_primal, self._compute_primal_returns,
-                                     *self._get_arg_values())
+        yield from get_partials_deps(self.compute_primal)
 
     def _get_self_statics_func(self, static_attrs, static_dcts):
         fsrc = ['def get_self_statics(self):']
@@ -340,7 +305,7 @@ class CompJaxifyBase(ast.NodeTransformer):
                 tupargs.append('')  # so we'll get a trailing comma for a 1 item tuple
         fsrc.append(f'    return ({", ".join(tupargs)})')
         fsrc = '\n'.join(fsrc)
-        namespace = self._comp().compute.__globals__.copy()
+        namespace = getattr(self._comp(), self._funcname).__globals__.copy()
         exec(fsrc, namespace)  # nosec
         return namespace['get_self_statics']
 
@@ -719,7 +684,7 @@ else:
                 The flattened representation of this object.
             """
             # we include the self_statics data here because otherwise if a static value changes,
-            # e.g. an option value, then the jit-compiled function would not get recompiled.
+            # e.g. an option value, then the jit-compiled function won't be recompiled.
             return ((), {'_comp_': self._comp, '_self_statics_': self._comp.get_self_statics()})
 
         @staticmethod

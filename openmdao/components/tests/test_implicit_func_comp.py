@@ -218,6 +218,10 @@ class TestImplicitFuncComp(unittest.TestCase):
         p.set_val('comp.c', 6.)
         p.run_model()
 
+        #FIXME: just put a 0 value in here but havent' determined what the currect value is yet.
+        # Added this test because I noticed we were only checking derivs and not computed NL values.
+        assert_near_equal(p.get_val('comp.x'), 0.)
+
         assert_check_partials(p.check_partials(includes=['comp'], out_stream=None), atol=1e-5)
         assert_check_totals(p.check_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'], out_stream=None))
 
