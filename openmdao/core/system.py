@@ -4736,18 +4736,6 @@ class System(object):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        # if self.pathname == '' and (self._owns_approx_jac or
-        #                             self.options['derivs_method'] == 'jax') and driver is not None:
-        #     self._tot_jac = _TotalJacInfo(driver._problem(), None, None, 'flat_dict', approx=True)
-
-        # try:
-        #     with self._scaled_context_all():
-        #         self._linearize(self._assembled_jac, sub_do_ln=self._linear_solver is not None and
-        #                         self._linear_solver._linearize_children())
-        #         if self._linear_solver is not None and sub_do_ln:
-        #             self._linear_solver._linearize()
-        # finally:
-        #     self._tot_jac = None
         with self._scaled_context_all():
             self._linearize(self._assembled_jac, sub_do_ln=self._linear_solver is not None and
                             self._linear_solver._linearize_children())

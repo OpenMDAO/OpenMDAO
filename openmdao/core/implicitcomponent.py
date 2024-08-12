@@ -745,7 +745,8 @@ class ImplicitComponent(Component):
             If not None, dict containing discrete output values.
         """
         if self.compute_primal is None:
-            return
+            raise NotImplementedError('ImplicitComponent.apply_nonlinear() must be overridden '
+                                      'by the child class.')
 
         returns = \
             self.compute_primal(*self._get_compute_primal_inputs(inputs, outputs, discrete_inputs))
@@ -910,8 +911,10 @@ class ImplicitComponent(Component):
         argnames = []
         if self._discrete_inputs:
             argnames.extend(self._discrete_inputs)
-        argnames.extend(name for name in self._var_rel_names['input'] if name not in self._discrete_inputs)
-        argnames.extend(name for name in self._var_rel_names['output'] if name not in self._discrete_outputs)
+        argnames.extend(name for name in self._var_rel_names['input']
+                        if name not in self._discrete_inputs)
+        argnames.extend(name for name in self._var_rel_names['output']
+                        if name not in self._discrete_outputs)
         return argnames
 
     def _setup_jax(self):
@@ -929,7 +932,8 @@ class ImplicitComponent(Component):
             for ofname in self._var_rel_names['output']:
                 ofidx += 1
                 ofmeta = self._var_rel2meta[ofname]
-                for wrtidx, wrtname in enumerate(chain(self._var_rel_names['input'], self._var_rel_names['output'])):
+                for wrtidx, wrtname in enumerate(chain(self._var_rel_names['input'],
+                                                       self._var_rel_names['output'])):
                     key = (ofname, wrtname)
                     if key not in partials:
                         # FIXME: this means that we computed a derivative that we didn't need
@@ -943,7 +947,8 @@ class ImplicitComponent(Component):
                     if nof > 1 or nested_tup:
                         dvals = dvals[ofidx]
 
-                    # print(ofidx, ofname, ofmeta['shape'], wrtidx, wrtname, wrtmeta['shape'], 'subjac_shape', dvals[wrtidx].shape)
+                    # print(ofidx, ofname, ofmeta['shape'], wrtidx, wrtname, wrtmeta['shape'],
+                    #       'subjac_shape', dvals[wrtidx].shape)
                     dvals = dvals[wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
 
                     sjmeta = partials.get_metadata(key)
@@ -961,8 +966,8 @@ class ImplicitComponent(Component):
             # self.compute_primal = jaxifier.compute_primal
             # if jaxifier.get_self_statics:
             #     self.get_self_statics = MethodType(jaxifier.get_self_statics, self)
-            # # replace existing apply_nonlinear method with base class method, so that compute_primal
-            # # will be called.
+            # # replace existing apply_nonlinear method with base class method, so that
+            # # compute_primal will be called.
         else:
             # check that compute_primal args are in the correct order
             args = list(inspect.signature(self.compute_primal).parameters)

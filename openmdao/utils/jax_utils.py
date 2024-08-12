@@ -43,8 +43,11 @@ try:
     import jax.numpy as jnp
     from jax import jit, tree_util, custom_jvp
 except ImportError:
+
+    def custom_jvp(f):
+        return f
+
     jax = None
-    custom_jvp = lambda f: f
     jnp = np
     jit = jit_stub
 

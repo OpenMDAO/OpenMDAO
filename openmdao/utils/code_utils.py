@@ -380,15 +380,15 @@ def _get_return_names(outs):
     for lst in outs[1:]:
         if len(lst) != length:
             raise RuntimeError("Function has multiple return statements with differing numbers "
-                            "of return values.")
+                               "of return values.")
 
         for i, (name, newname) in enumerate(zip(names, lst)):
             if name is None:
                 names[i] = newname
             elif newname is not None and name != newname:
                 raise RuntimeError("Function has multiple return statements with different "
-                                f"return value names of {sorted((name, newname))} for "
-                                f"return value {i}.")
+                                   f"return value names of {sorted((name, newname))} for "
+                                   f"return value {i}.")
     return names
 
 
@@ -415,8 +415,8 @@ def get_return_names(func):
         Attributes
         ----------
         _ret_infos : list
-            List containing one entry for each return statement, with each entry containing a list of
-            name (or None) for each function return value.
+            List containing one entry for each return statement, with each entry containing a list
+            of name (or None) for each function return value.
         """
 
         def __init__(self, func):
@@ -428,9 +428,9 @@ def get_return_names(func):
             """
             Return a list of (name or None) for each return value.
 
-            If there are multiple returns that differ by name or number of return values, an exception
-            will be raised.  If one entry in one return list has a name and another is None, the name
-            will take precedence and no exception will be raised.
+            If there are multiple returns that differ by name or number of return values, an
+            exception will be raised.  If one entry in one return list has a name and another is
+            None, the name will take precedence and no exception will be raised.
 
             Returns
             -------
