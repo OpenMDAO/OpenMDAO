@@ -822,10 +822,37 @@ class MPITests(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.setup()
 
-        msg = 'Distributed component input "C.invec" requires an IndepVarComp.'
-
         err_msg = str(context.exception).split(':')[-1]
-        self.assertEqual(err_msg, msg)
+        self.assertEqual(err_msg, 'Distributed component input "C.invec" is not connected.')
+
+    def test_bad_distrib_connect(self):
+        class Adder(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', shape_by_conn=True, distributed=True)
+                self.add_output('x_sum', shape=1)
+
+            def compute(self, inputs, outputs):
+                outputs['x_sum'] = np.sum(inputs['x'])
+
+        prob = om.Problem(name='bad_distrib_problem')
+        ivc = prob.model.add_subsystem('ivc',om.IndepVarComp())
+        ivc.add_output('x', val = np.ones(10), distributed=True)
+
+        prob.model.add_subsystem('adder', Adder())
+
+        prob.model.connect('ivc.x0','adder.x')
+
+        try:
+            prob.setup()
+        except Exception as err:
+            self.assertTrue(
+                "\nCollected errors for problem 'bad_distrib_problem':"
+                "\n   <model> <class Group>: Attempted to connect from 'ivc.x0' to 'adder.x', but "
+                "'ivc.x0' doesn't exist. Perhaps you meant to connect to one of the following outputs: ['ivc.x']."
+                "\n   <model> <class Group>: Failed to resolve shapes for ['adder.x']. To see the "
+                "dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'." in str(err))
+        else:
+            self.fail("Exception expected.")
 
 
 class NonParallelTests(unittest.TestCase):

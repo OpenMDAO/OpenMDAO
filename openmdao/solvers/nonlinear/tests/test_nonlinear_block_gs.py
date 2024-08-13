@@ -349,7 +349,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         self.assertTrue(model.nonlinear_solver._theta_n_1 == 0.33)
 
 
-        model.nonlinear_solver.options['maxiter'] = 10
+        model.nonlinear_solver.options['maxiter'] = 14
         prob.run_model()
 
         # should converge to the same solution
@@ -357,11 +357,10 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
         # in more iterations
-        self.assertTrue(model.nonlinear_solver._iter_count == 7)
+        self.assertTrue(model.nonlinear_solver._iter_count == 12)
 
         #check that the relaxation factor is updated correctly (should tend towards 1)
-        assert_near_equal(model.nonlinear_solver._theta_n_1, 1.00, 0.001)
-
+        self.assertGreater(model.nonlinear_solver._theta_n_1, 0.99)
 
     def test_NLBGS_Aitken_min_max_factor(self):
 
@@ -386,8 +385,6 @@ class TestNLBGaussSeidel(unittest.TestCase):
         prob.run_model()
         self.assertTrue(model.nonlinear_solver._theta_n_1 == 0.7)
 
-
-
     def test_NLBGS_Aitken_cs(self):
 
         prob = om.Problem(model=SellarDerivatives(nonlinear_solver=om.NonlinearBlockGS))
@@ -408,6 +405,61 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         J = prob.compute_totals(of=['y1'], wrt=['x'])
         assert_near_equal(J['y1', 'x'][0][0], 0.98061448, 1e-6)
+
+    def test_aitken_bug(self):
+        class Spring(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('dz')
+                self.add_output('f')
+                self.z0 = 0.0
+
+            def compute(self, inputs, outputs):
+                outputs['f'] = inputs['dz'] - self.z0
+
+        class Forcer(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('f')
+                self.add_output('dz', val=0.0)
+
+            def compute(self, inputs, outputs):
+                f = inputs['f']
+                if f > 1.0:
+                    raise RuntimeError("Aitken should have prevented this.")
+                outputs['dz'] = -10.0 * f + 3.5
+                print('dz', outputs['dz'])
+
+        class Coupled(om.Group):
+            def setup(self):
+                self.add_subsystem('spring', Spring())
+                self.add_subsystem('forcer', Forcer())
+                self.connect('spring.f', 'forcer.f')
+                self.connect('forcer.dz', 'spring.dz')
+
+        def create_model():
+            model = om.Group()
+
+            nonlinear_solver = om.NonlinearBlockGS(
+                maxiter=250,
+                iprint=2,
+                use_aitken=True,
+                aitken_min_factor=0.1,
+                aitken_max_factor=1.0,
+                aitken_initial_factor=0.1,
+                rtol=1e-7,
+                atol=1e-8,
+            )
+
+            coupling = model.add_subsystem('coupled_springs', Coupled())
+            coupling.nonlinear_solver = nonlinear_solver
+            return model
+
+        prob = om.Problem()
+        prob.model = create_model()
+        prob.setup()
+        prob.set_solver_print(0)
+
+        # Will raise an exception if the bug is present.
+        prob.run_model()
 
     def test_NLBGS_cs(self):
 
