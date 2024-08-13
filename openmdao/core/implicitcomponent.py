@@ -977,7 +977,8 @@ class ImplicitComponent(Component):
             if 'use_jit' in self.options and self.options['use_jit']:
                 self.compute_primal = jit(self.compute_primal, static_argnums=static_argnums)
 
-        # replace existing apply_nonlinear method with base class method, so that compute_primal will be called.
+        # replace existing apply_nonlinear method with base class method, so that compute_primal
+        # will be called.
         self.apply_nonlinear = MethodType(ImplicitComponent.apply_nonlinear, self)
 
         self.linearize = MethodType(linearize, self)
