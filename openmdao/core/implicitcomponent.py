@@ -959,15 +959,11 @@ class ImplicitComponent(Component):
                         partials[ofname, wrtname] = dvals[rows, sjmeta['cols']]
 
         if self.compute_primal is None:
-            raise RuntimeError("Automatic conversion of the apply_nonlinear method to a JAX "
-                               "compatible compute_primal method is not currently supported for ")
-            # jaxifier = ImplicitCompJaxify(self, verbose=False)
+            jaxifier = ImplicitCompJaxify(self)
 
-            # self.compute_primal = jaxifier.compute_primal
-            # if jaxifier.get_self_statics:
-            #     self.get_self_statics = MethodType(jaxifier.get_self_statics, self)
-            # # replace existing apply_nonlinear method with base class method, so that
-            # # compute_primal will be called.
+            self.compute_primal = jaxifier.compute_primal
+            if jaxifier.get_self_statics:
+                self.get_self_statics = MethodType(jaxifier.get_self_statics, self)
         else:
             # check that compute_primal args are in the correct order
             args = list(inspect.signature(self.compute_primal).parameters)
@@ -981,7 +977,9 @@ class ImplicitComponent(Component):
             if 'use_jit' in self.options and self.options['use_jit']:
                 self.compute_primal = jit(self.compute_primal, static_argnums=static_argnums)
 
+        # replace existing apply_nonlinear method with base class method, so that compute_primal will be called.
         self.apply_nonlinear = MethodType(ImplicitComponent.apply_nonlinear, self)
+
         self.linearize = MethodType(linearize, self)
 
     def _get_jac_func(self):

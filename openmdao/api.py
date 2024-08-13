@@ -35,6 +35,7 @@ from openmdao.components.mux_comp import MuxComp
 from openmdao.components.vector_magnitude_comp import VectorMagnitudeComp
 from openmdao.components.submodel_comp import SubmodelComp
 from openmdao.components.jax_explicit_comp import JaxExplicitComponent
+from openmdao.components.jax_implicit_comp import JaxImplicitComponent
 
 
 # Solvers
