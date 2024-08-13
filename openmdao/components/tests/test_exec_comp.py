@@ -10,8 +10,6 @@ from numpy.testing import assert_almost_equal
 import scipy
 from io import StringIO
 
-from packaging.version import Version
-
 try:
     from parameterized import parameterized
 except ImportError:
@@ -20,8 +18,7 @@ except ImportError:
 import openmdao.api as om
 from openmdao.components.exec_comp import _expr_dict, _temporary_expr_dict
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_warning
-from openmdao.utils.general_utils import env_truthy
-from openmdao.utils.testing_utils import force_check_partials
+from openmdao.utils.testing_utils import force_check_partials, use_tempdirs
 from openmdao.utils.om_warnings import SetupWarning
 
 _ufunc_test_data = {
@@ -1807,7 +1804,7 @@ def setup_sparsity(mask):
     return sparsity * mask
 
 
-
+@use_tempdirs
 class TestFunctionRegistrationColoring(unittest.TestCase):
     def setUp(self):
         np.random.seed(11)
@@ -1849,6 +1846,9 @@ class TestFunctionRegistrationColoring(unittest.TestCase):
             assert_near_equal(J['comp.y', 'comp.x'], sparsity)
 
             self.assertTrue(np.all(comp._coloring_info['coloring'].get_dense_sparsity() == _MASK))
+            self.assertEqual(self.tempdir, str(prob.get_coloring_dir(mode='input')))
+            self.assertEqual(str(prob.get_outputs_dir('coloring_files', mkdir=False)),
+                             str(prob.get_coloring_dir(mode='output')))
 
     def test_auto_coloring(self):
         with _temporary_expr_dict():
