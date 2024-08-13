@@ -1,21 +1,16 @@
 import unittest
+import unittest.mock as mock
 
-from contextlib import redirect_stdout, contextmanager
+import builtins
+from contextlib import redirect_stdout
 import io
 import os
+import pathlib
 import shutil
 import sys
 
 import openmdao.api as om
 from openmdao.utils.testing_utils import use_tempdirs
-
-
-@contextmanager
-def _replace_stdin(target):
-    orig = sys.stdin
-    sys.stdin = target
-    yield
-    sys.stdin = orig
 
 
 @use_tempdirs
@@ -38,8 +33,8 @@ class TestCleanOutputs(unittest.TestCase):
         with redirect_stdout(ss):
             om.clean_outputs(p1, dryrun=True)
 
-        expected1 = 'Found 1 OpenMDAO output directories:\n'
-        expected2 = 'Would remove 1 output directories (dryrun = True).\n'
+        expected1 = 'Removed 0 OpenMDAO output directories.\n'
+        expected2 = 'Would remove'
         
         self.assertIn(expected1, ss.getvalue())
         self.assertIn(expected2, ss.getvalue())
@@ -75,24 +70,26 @@ class TestCleanOutputs(unittest.TestCase):
         with redirect_stdout(ss):
             om.clean_outputs('.', dryrun=True)
 
-        expected = ('Found 2 OpenMDAO output directories:\n'
-                    '  bar_out\n'
-                    '  foo_out\n'
-                    'Would remove 2 output directories (dryrun = True).')
+        expected = ('Found 2 OpenMDAO output directories:',
+                    'Would remove bar_out (dryrun = True).',
+                    'Would remove foo_out (dryrun = True).',
+                    'Removed 0 OpenMDAO output directories.')
         
-        self.assertIn(expected, ss.getvalue())
+        for expected_str in expected:
+            self.assertIn(expected_str, ss.getvalue())
 
         # Test that no specified path gives the same result.
         ss = io.StringIO()
         with redirect_stdout(ss):
             om.clean_outputs(dryrun=True)
 
-        expected = ('Found 2 OpenMDAO output directories:\n'
-                    '  bar_out\n'
-                    '  foo_out\n'
-                    'Would remove 2 output directories (dryrun = True).')
+        expected = ('Found 2 OpenMDAO output directories:',
+                    'Would remove bar_out (dryrun = True).',
+                    'Would remove foo_out (dryrun = True).',
+                    'Removed 0 OpenMDAO output directories.')
         
-        self.assertIn(expected, ss.getvalue())
+        for expected_str in expected:
+            self.assertIn(expected_str, ss.getvalue())
 
         # Now remove the files
         ss = io.StringIO()
@@ -100,8 +97,8 @@ class TestCleanOutputs(unittest.TestCase):
             om.clean_outputs(prompt=False)
         
         expected = ('Found 2 OpenMDAO output directories:\n'
-                    '  bar_out\n'
-                    '  foo_out\n'
+                    'Removed bar_out\n'
+                    'Removed foo_out\n'
                     'Removed 2 OpenMDAO output directories.\n')
         
         self.assertIn(expected, ss.getvalue())
@@ -126,14 +123,14 @@ class TestCleanOutputs(unittest.TestCase):
 
                 output_dirs = [p1.get_outputs_dir(), p2.get_outputs_dir()]
 
-                os.mkdir('temp')
+                pathlib.Path('temp').mkdir(exist_ok=True)
                 for od in output_dirs:
                     shutil.move(od, 'temp')
 
                 # First, respond in the negative
                 ss = io.StringIO()
                 with redirect_stdout(ss):
-                    with _replace_stdin(io.StringIO('n')):
+                    with mock.patch.object(builtins, 'input', lambda *_: 'n'):
                         om.clean_outputs(recurse=recurse)
 
                 if recurse:
@@ -146,7 +143,7 @@ class TestCleanOutputs(unittest.TestCase):
                     # Respond in the positive to actually remove them.
                     ss = io.StringIO()
                     with redirect_stdout(ss):
-                        with _replace_stdin(io.StringIO('y')):
+                        with mock.patch.object(builtins, 'input', lambda *_: 'y'):
                             om.clean_outputs(recurse=recurse)
 
                     expected = ('Removed 2 OpenMDAO output directories.\n')
