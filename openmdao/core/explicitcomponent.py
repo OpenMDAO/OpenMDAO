@@ -612,7 +612,7 @@ class ExplicitComponent(Component):
         argnames.extend(self._var_rel_names['input'])
         return argnames
 
-    def _setup_jax(self):
+    def _setup_jax(self, force=False):
         # we define compute_partials here instead of making this the base class version as we
         # did with compute, because the existence of a compute_partials method that is not the
         # base class method is used to determine if a given component computes its own partials.

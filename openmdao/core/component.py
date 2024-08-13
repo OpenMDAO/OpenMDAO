@@ -334,7 +334,7 @@ class Component(System):
         if self.options['derivs_method'] == 'jax':
             self._setup_jax()
 
-    def _setup_jax(self):
+    def _setup_jax(self, force=False):
         raise NotImplementedError("JAX support is not yet implemented for this component.")
 
     def _missing_vars_error(self, allnames):

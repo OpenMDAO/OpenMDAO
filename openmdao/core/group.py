@@ -2381,7 +2381,7 @@ class Group(System):
 
         return ins
 
-    def _setup_jax(self):
+    def _setup_jax(self, force=False):
         """
         If jax is active, jaxify this group and all subgroups.
 
@@ -2394,7 +2394,7 @@ class Group(System):
 
         from openmdao.core.indepvarcomp import IndepVarComp
 
-        if not self.options['derivs_method'] == 'jax':
+        if not (force or self.options['derivs_method'] == 'jax'):
             for subgroup in self._subgroups_myproc:
                 subgroup._setup_jax()
             return
@@ -4028,12 +4028,12 @@ class Group(System):
                         approximation.compute_approximations(self, jac=jac)
 
         else:
-            if self._assembled_jac is not None:
-                jac = self._assembled_jac
-
             if self.options['derivs_method'] == 'jax':
                 self._jax_linearize(self._inputs, self._jacobian)
                 return
+
+            if self._assembled_jac is not None:
+                jac = self._assembled_jac
 
             relevance = self._relevance
             with relevance.active(self._linear_solver.use_relevance()):
