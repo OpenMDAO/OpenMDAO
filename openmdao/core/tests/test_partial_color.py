@@ -1,6 +1,7 @@
 import os
 import tempfile
 import shutil
+from turtle import clear
 import unittest
 import itertools
 from fnmatch import fnmatchcase
@@ -1710,6 +1711,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
                 _check_partial_matrix(comp, jac, sparsity, method)
 
     def test_simple_partials_explicit(self):
+        from openmdao.utils.reports_system import clear_report_registry
         for method in ['fd', 'cs']:
             with self.subTest(msg=f'{method=}'):
                 prob = Problem(name=f'test_simple_partials_explicit_{method}')
@@ -1750,6 +1752,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
 
                 # now create a new problem and use the previously generated coloring
                 _clear_problem_names()
+                clear_report_registry()
                 prob = Problem(name=f'test_simple_partials_explicit_{method}')
                 model = prob.model
 
