@@ -417,6 +417,9 @@ class System(object):
                                   'if using an assembled jacobian, will use this type.')
         self.options.declare('derivs_method', default=None, values=['jax', 'cs', 'fd', None],
                              desc='The method to use for computing derivatives')
+        self.options.declare('use_jit', types=bool, default=True,
+                             desc='If True, attempt to use jit on compute_primal, assuming jax or '
+                             'some other AD package is active.')
 
         # Case recording options
         self.recording_options = OptionsDictionary(parent_name=type(self).__name__)
@@ -1636,13 +1639,7 @@ class System(object):
 
         info = self._coloring_info
 
-        use_jax = False
-        try:
-            if self.options['use_jax']:
-                info['method'] = 'jax'
-                use_jax = True
-        except KeyError:
-            pass
+        use_jax = self.options['derivs_method'] == 'jax'
 
         info.update(overrides)
 

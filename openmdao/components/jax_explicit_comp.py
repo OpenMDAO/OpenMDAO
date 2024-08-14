@@ -24,5 +24,3 @@ class JaxExplicitComponent(ExplicitComponent):
             raise RuntimeError("JaxExplicitComponent requires Python 3.9 or newer.")
         super().__init__(**kwargs)
         self.options['derivs_method'] = 'jax' if jax else fallback_deriv_method
-        self.options.declare('use_jit', types=bool, default=True,
-                             desc='If True, use jit on the function')

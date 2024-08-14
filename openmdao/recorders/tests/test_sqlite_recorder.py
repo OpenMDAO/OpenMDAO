@@ -443,9 +443,11 @@ class TestSqliteRecorder(unittest.TestCase):
             "    Subsystem : root",
             "        assembled_jac_type: csc",
             "        derivs_method: None",
+            "        use_jit: True",
             "        auto_order: False",
             "    Subsystem : p1",
             "        derivs_method: None",
+            "        use_jit: True",
             "        distributed: False",
             "        run_root_only: False",
             "        always_opt: False",
@@ -463,6 +465,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        tags: None",
             "    Subsystem : p2",
             "        derivs_method: None",
+            "        use_jit: True",
             "        distributed: False",
             "        run_root_only: False",
             "        always_opt: False",
@@ -480,11 +483,13 @@ class TestSqliteRecorder(unittest.TestCase):
             "        tags: None",
             "    Subsystem : comp",
             "        derivs_method: None",
+            "        use_jit: True",
             "        distributed: False",
             "        run_root_only: False",
             "        always_opt: False",
             "    Subsystem : con",
             "        derivs_method: None",
+            "        use_jit: True",
             "        run_root_only: False",
             "        always_opt: False",
             "        has_diag_partials: False",
@@ -496,7 +501,7 @@ class TestSqliteRecorder(unittest.TestCase):
         ]
 
         for i, line in enumerate(text):
-            self.assertEqual(line, expected[i])
+            self.assertEqual(line, expected[i], f"line {i}: {line} != {expected[i]}")
 
         stream = StringIO()
 
@@ -509,12 +514,13 @@ class TestSqliteRecorder(unittest.TestCase):
             "    Subsystem : root",
             "        assembled_jac_type: dense",
             "        derivs_method: None",
+            "        use_jit: True",
             "        auto_order: False",
             ""
         ]
 
         for i, line in enumerate(text):
-            self.assertEqual(line, expected[i])
+            self.assertEqual(line, expected[i], f"line {i}: {line} != {expected[i]}")
 
     def test_double_run_model_option_overwrite(self):
         prob = ParaboloidProblem()
@@ -550,9 +556,11 @@ class TestSqliteRecorder(unittest.TestCase):
             "    Subsystem : root",
             "        assembled_jac_type: csc",
             "        derivs_method: None",
+            "        use_jit: True",
             "        auto_order: False",
             "    Subsystem : p1",
             "        derivs_method: None",
+            "        use_jit: True",
             "        distributed: False",
             "        run_root_only: False",
             "        always_opt: False",
@@ -570,6 +578,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        tags: None",
             "    Subsystem : p2",
             "        derivs_method: None",
+            "        use_jit: True",
             "        distributed: False",
             "        run_root_only: False",
             "        always_opt: False",
@@ -587,11 +596,13 @@ class TestSqliteRecorder(unittest.TestCase):
             "        tags: None",
             "    Subsystem : comp",
             "        derivs_method: None",
+            "        use_jit: True",
             "        distributed: False",
             "        run_root_only: False",
             "        always_opt: False",
             "    Subsystem : con",
             "        derivs_method: None",
+            "        use_jit: True",
             "        run_root_only: False",
             "        always_opt: False",
             "        has_diag_partials: False",
@@ -603,7 +614,7 @@ class TestSqliteRecorder(unittest.TestCase):
         ]
 
         for i, line in enumerate(text):
-            self.assertEqual(line, expected[i])
+            self.assertEqual(line, expected[i], f"line {i}: {line} != {expected[i]}")
 
         stream = StringIO()
 
@@ -616,12 +627,13 @@ class TestSqliteRecorder(unittest.TestCase):
             "    Subsystem : root",
             "        assembled_jac_type: dense",
             "        derivs_method: None",
+            "        use_jit: True",
             "        auto_order: False",
             ""
         ]
 
         for i, line in enumerate(text):
-            self.assertEqual(line, expected[i])
+            self.assertEqual(line, expected[i], f"line {i}: {line} != {expected[i]}")
 
     def test_simple_driver_recording_with_prefix(self):
         prob = ParaboloidProblem()

@@ -253,14 +253,14 @@ class CompJaxifyBase(ast.NodeTransformer):
 
         # warn if jitting a function that has discrete inputs, because it will cause the function
         # to be recompiled whenever the discrete inputs change.
-        if 'use_jit' in comp.options and comp.options['use_jit'] is True:
+        if comp.options['use_jit']:
             if comp._discrete_inputs:
                 issue_warning("Jitting a function with discrete inputs can cause the function to "
                               "be recompiled whenever the discrete inputs change.  This can be "
                               "slow if the discrete inputs change often. You may want to consider "
                               "'use_jit=False' for component '{comp.pathname}' if performance "
                               "issues arise.")
-            static_argnums = tuple(range(len(comp._var_discrete['input']) + 1 + len(self_statics)))
+            static_argnums = tuple(range(len(comp._var_discrete['input']) + 1))
             self.compute_primal = jit(self.compute_primal, static_argnums=static_argnums)
 
     def get_compute_primal_src(self):

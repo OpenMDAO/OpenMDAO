@@ -7,7 +7,7 @@ import numpy as np
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.constants import INT_DTYPE
 import openmdao.func_api as omf
-from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore, _add_options, \
+from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore, \
     jac_forward, jac_reverse, _get_tangents, _ensure_iter
 from openmdao.utils.array_utils import shape_to_len
 
@@ -91,19 +91,19 @@ class ImplicitFuncComp(ImplicitComponent):
             self.solve_linear = self._user_solve_linear
 
         if self._apply_nonlinear_func._use_jax:
-            self.options['use_jax'] = True
+            self.options['derivs_method'] = 'jax'
 
         # setup requires an undecorated, unjitted function, so do it now
         if self._apply_nonlinear_func._call_setup:
             self._apply_nonlinear_func._setup()
 
-        if self.options['use_jax']:
+        if self.options['derivs_method'] == 'jax':
             if jax is None:
                 raise RuntimeError(f"{self.msginfo}: jax is not installed. "
                                    "Try 'pip install openmdao[jax]' with Python>=3.8.")
             self._apply_nonlinear_func_jax = omf.jax_decorate(self._apply_nonlinear_func._f)
 
-        if self.options['use_jax'] and self.options['use_jit']:
+        if self.options['derivs_method'] == 'jax' and self.options['use_jit']:
             static_argnums = [i for i, m in enumerate(self._apply_nonlinear_func._inputs.values())
                               if 'is_option' in m]
             try:
@@ -113,13 +113,6 @@ class ImplicitFuncComp(ImplicitComponent):
             except Exception as err:
                 raise RuntimeError(f"{self.msginfo}: failed jit compile of solve_nonlinear "
                                    f"function: {err}")
-
-    def _declare_options(self):
-        """
-        Declare options before kwargs are processed in the init method.
-        """
-        super()._declare_options()
-        _add_options(self)
 
     def setup(self):
         """
@@ -141,6 +134,11 @@ class ImplicitFuncComp(ImplicitComponent):
             _check_var_name(self, name)
             kwargs = _copy_with_ignore(meta, omf._allowed_add_output_args, ignore=('resid',))
             self.add_output(name, **kwargs)
+
+    def _setup_jax(self):
+        # TODO: this is here to prevent the ImplicitComponent base class from trying to do its
+        # own jax setup if derivs_method is 'jax'. We should probably refactor this...
+        pass
 
     def declare_partials(self, *args, **kwargs):
         """
@@ -217,7 +215,7 @@ class ImplicitFuncComp(ImplicitComponent):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        if self.options['use_jax']:
+        if self.options['derivs_method'] == 'jax':
             if self._mode != self._tangent_direction:
                 # force recomputation of coloring and tangents
                 self._first_call_to_linearize = True

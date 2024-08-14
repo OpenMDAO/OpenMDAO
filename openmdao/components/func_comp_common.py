@@ -68,22 +68,6 @@ def _check_var_name(comp, name):
                         "it's a reserved keyword.")
 
 
-def _add_options(comp):
-    """
-    Add function component specific options to the given component.
-
-    Parameters
-    ----------
-    comp : ImplicitFuncComp or ExplicitFuncComp
-        The function component having options added.
-    """
-    comp.options.declare('use_jax', types=bool, default=False,
-                         desc='If True, use jax to compute derivatives.')
-    comp.options.declare('use_jit', types=bool, default=False,
-                         desc='If True, attempt to use jit on the function. This is ignored if '
-                              'use_jax is False.')
-
-
 def jac_forward(fun, argnums, tangents):
     """
     Similar to the jax.jacfwd function but allows specification of the tangent matrix.
