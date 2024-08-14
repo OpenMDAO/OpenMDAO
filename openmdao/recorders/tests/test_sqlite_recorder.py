@@ -27,7 +27,7 @@ from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRe
 
 from openmdao.recorders.tests.recorder_test_utils import run_driver
 from openmdao.utils.assert_utils import assert_near_equal, assert_equal_arrays, \
-    assert_warning, assert_no_warning
+    assert_no_warning
 from openmdao.utils.general_utils import determine_adder_scaler
 from openmdao.utils.testing_utils import use_tempdirs, require_pyoptsparse
 from openmdao.utils.om_warnings import OMDeprecationWarning
@@ -36,9 +36,6 @@ from openmdao.utils.om_warnings import OMDeprecationWarning
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
-
-if OPTIMIZER:
-    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 
 class Cycle(om.Group):
@@ -362,7 +359,7 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_simple_driver_recording_pyoptsparse(self):
         prob = ParaboloidProblem()
 
-        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        driver = prob.driver = om.pyOptSparseDriver(optimizer='SLSQP')
         driver.options['print_results'] = False
         driver.opt_settings['ACC'] = 1e-9
 
@@ -412,7 +409,7 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_double_run_driver_option_overwrite(self):
         prob = ParaboloidProblem()
 
-        driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+        prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
 
         prob.model.add_recorder(self.recorder)
 
@@ -513,7 +510,7 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_double_run_model_option_overwrite(self):
         prob = ParaboloidProblem()
 
-        driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+        prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
 
         prob.model.add_recorder(self.recorder)
 
@@ -3093,7 +3090,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         model.add_constraint('con2', upper=0.0)
 
         # setup the optimization
-        driver = prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         # Create a recorder variable
         recorder = om.SqliteRecorder('cases.sql')
@@ -3107,8 +3104,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         # Instantiate your CaseReader
         cr = om.CaseReader("cases.sql")
-        # Isolate "problem" as your source
-        driver_cases = cr.list_cases('problem')
+
         # Get the first case from the recorder
         case = cr.get_case('after_run_driver')
 
@@ -3516,8 +3512,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.set_val('test_sys.x', np.random.rand(vec_size))
 
         prob.run_driver()
-
-        y0 = prob.get_val('test_sys.y')
 
         test_sys.options['vec_size'] = 10
 

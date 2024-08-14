@@ -7,8 +7,6 @@ import openmdao.api as om
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.proc_allocators.default_allocator import DefaultAllocator
-from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.utils.assert_utils import assert_near_equal
 
 
@@ -21,8 +19,6 @@ if MPI:
 
 # check that pyoptsparse is installed. if it is, try to use SLSQP.
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
-if OPTIMIZER:
-    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -330,8 +326,8 @@ class ProbRemote4TestCase(unittest.TestCase):
         p1.add_design_var('x', lower=-50.0, upper=50.0)
 
         par = model.add_subsystem('par', om.ParallelGroup())
-        c1 = par.add_subsystem('C1', om.ExecComp('y = x*x'))
-        c2 = par.add_subsystem('C2', om.ExecComp('y = x*x'))
+        par.add_subsystem('C1', om.ExecComp('y = x*x'))
+        par.add_subsystem('C2', om.ExecComp('y = x*x'))
 
         model.add_subsystem('obj', om.ExecComp('o = a + b + 2.'))
 

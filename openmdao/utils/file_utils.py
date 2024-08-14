@@ -1,19 +1,16 @@
 """
 Utilities for working with files.
 """
-from collections.abc import Iterable
-from itertools import chain
-from multiprocessing import Value
 import sys
 import os
 import importlib
 import types
+from collections.abc import Iterable
 from fnmatch import fnmatch
 from os.path import join, basename, dirname, isfile, split, splitext, abspath
 import pathlib
 import shutil
 
-import openmdao
 from openmdao.utils.om_warnings import issue_warning
 
 

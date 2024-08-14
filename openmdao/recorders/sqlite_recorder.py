@@ -207,7 +207,7 @@ class SqliteRecorder(CaseRecorder):
                         print("Note: Metadata is being recorded separately as "
                               f"{metadata_filepath}.")
                         try:
-                            rc = os.remove(metadata_filepath)
+                            os.remove(metadata_filepath)
                             issue_warning("The existing case recorder metadata file, "
                                           f"{metadata_filepath}, is being overwritten.",
                                           category=UserWarning)

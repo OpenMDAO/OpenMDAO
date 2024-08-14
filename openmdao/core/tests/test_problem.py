@@ -181,7 +181,7 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
 
         with self.assertRaises(KeyError) as cm:
-            totals = prob.compute_totals(of='comp.f_xy', wrt="p1.x, p2.y")
+            prob.compute_totals(of='comp.f_xy', wrt="p1.x, p2.y")
         self.assertEqual(str(cm.exception), "'p1.x, p2.y'")
 
     def test_compute_totals_cleanup(self):
@@ -445,12 +445,12 @@ class TestProblem(unittest.TestCase):
             seed_names = wrt
             result_names = of
             rvec = prob.model._vectors['output']['linear']
-            lvec = prob.model._vectors['residual']['linear']
+            # lvec = prob.model._vectors['residual']['linear']
         else:
             seed_names = of
             result_names = wrt
             rvec = prob.model._vectors['residual']['linear']
-            lvec = prob.model._vectors['output']['linear']
+            # lvec = prob.model._vectors['output']['linear']
 
         J = prob.compute_totals(of, wrt, return_format='array')
 
@@ -1074,7 +1074,7 @@ class TestProblem(unittest.TestCase):
         # using the promoted name of the inputs will raise an exception because the two promoted
         # inputs have different units and set_input_defaults was not called to disambiguate.
         with self.assertRaises(RuntimeError) as cm:
-            x = prob['G1.x']
+            prob['G1.x']
 
         msg = "<model> <class Group>: The following inputs, ['G1.C1.x', 'G1.C2.x'], promoted to 'G1.x', are connected but their metadata entries ['units'] differ. Call <group>.set_input_defaults('x', units=?), where <group> is the Group named 'G1' to remove the ambiguity."
         self.assertEqual(cm.exception.args[0], msg)
@@ -1750,7 +1750,7 @@ class TestProblem(unittest.TestCase):
         strout = StringIO()
         sys.stdout = strout
         try:
-            l = prob.list_driver_vars(print_arrays=True,
+            dv = prob.list_driver_vars(print_arrays=True,
                                        desvar_opts=['lower', 'upper', 'ref', 'ref0',
                                                     'indices', 'adder', 'scaler',
                                                     'parallel_deriv_color',
@@ -1763,7 +1763,7 @@ class TestProblem(unittest.TestCase):
                                                    'indices', 'adder', 'scaler',
                                                    'parallel_deriv_color',
                                                    'cache_linear_solution'],
-                                   )
+                                       )
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
@@ -1775,37 +1775,37 @@ class TestProblem(unittest.TestCase):
         self.assertRegex(output[13], r'^\s+array+\(+\[[0-9., e+-]+\]+\)')
 
         # design vars
-        self.assertEqual(l['design_vars'][0][1]['name'], 'z')
-        self.assertEqual(l['design_vars'][0][1]['size'], 2)
-        assert(all(l['design_vars'][0][1]['val'] == prob.get_val('z')))
-        self.assertEqual(l['design_vars'][0][1]['scaler'], None)
-        self.assertEqual(l['design_vars'][0][1]['adder'], None)
+        self.assertEqual(dv['design_vars'][0][1]['name'], 'z')
+        self.assertEqual(dv['design_vars'][0][1]['size'], 2)
+        assert(all(dv['design_vars'][0][1]['val'] == prob.get_val('z')))
+        self.assertEqual(dv['design_vars'][0][1]['scaler'], None)
+        self.assertEqual(dv['design_vars'][0][1]['adder'], None)
 
-        self.assertEqual(l['design_vars'][1][1]['name'], 'x')
-        self.assertEqual(l['design_vars'][1][1]['size'], 1)
-        assert(all(l['design_vars'][1][1]['val'] == prob.get_val('x')))
-        self.assertEqual(l['design_vars'][1][1]['scaler'], None)
-        self.assertEqual(l['design_vars'][1][1]['adder'], None)
+        self.assertEqual(dv['design_vars'][1][1]['name'], 'x')
+        self.assertEqual(dv['design_vars'][1][1]['size'], 1)
+        assert(all(dv['design_vars'][1][1]['val'] == prob.get_val('x')))
+        self.assertEqual(dv['design_vars'][1][1]['scaler'], None)
+        self.assertEqual(dv['design_vars'][1][1]['adder'], None)
 
         # constraints
-        self.assertEqual(l['constraints'][0][1]['name'], 'con1')
-        self.assertEqual(l['constraints'][0][1]['size'], 1)
-        assert(all(l['constraints'][0][1]['val'] == prob.get_val('con1')))
-        self.assertEqual(l['constraints'][0][1]['scaler'], None)
-        self.assertEqual(l['constraints'][0][1]['adder'], None)
+        self.assertEqual(dv['constraints'][0][1]['name'], 'con1')
+        self.assertEqual(dv['constraints'][0][1]['size'], 1)
+        assert(all(dv['constraints'][0][1]['val'] == prob.get_val('con1')))
+        self.assertEqual(dv['constraints'][0][1]['scaler'], None)
+        self.assertEqual(dv['constraints'][0][1]['adder'], None)
 
-        self.assertEqual(l['constraints'][1][1]['name'], 'con2')
-        self.assertEqual(l['constraints'][1][1]['size'], 1)
-        assert(all(l['constraints'][1][1]['val'] == prob.get_val('con2')))
-        self.assertEqual(l['constraints'][1][1]['scaler'], None)
-        self.assertEqual(l['constraints'][1][1]['adder'], None)
+        self.assertEqual(dv['constraints'][1][1]['name'], 'con2')
+        self.assertEqual(dv['constraints'][1][1]['size'], 1)
+        assert(all(dv['constraints'][1][1]['val'] == prob.get_val('con2')))
+        self.assertEqual(dv['constraints'][1][1]['scaler'], None)
+        self.assertEqual(dv['constraints'][1][1]['adder'], None)
 
         # objectives
-        self.assertEqual(l['objectives'][0][1]['name'], 'obj')
-        self.assertEqual(l['objectives'][0][1]['size'], 1)
-        assert(all(l['objectives'][0][1]['val'] == prob.get_val('obj')))
-        self.assertEqual(l['objectives'][0][1]['scaler'], None)
-        self.assertEqual(l['objectives'][0][1]['adder'], None)
+        self.assertEqual(dv['objectives'][0][1]['name'], 'obj')
+        self.assertEqual(dv['objectives'][0][1]['size'], 1)
+        assert(all(dv['objectives'][0][1]['val'] == prob.get_val('obj')))
+        self.assertEqual(dv['objectives'][0][1]['scaler'], None)
+        self.assertEqual(dv['objectives'][0][1]['adder'], None)
 
     def test_list_problem_vars_deprecated(self):
         model = SellarDerivatives()

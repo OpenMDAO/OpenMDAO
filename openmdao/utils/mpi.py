@@ -31,14 +31,14 @@ def _redirect_streams(to_fd):
     try:
         original_stdout_fd = sys.stdout.fileno()
         sys.stdout.close()
-    except (AttributeError, io.UnsupportedOperation) as err:
+    except (AttributeError, io.UnsupportedOperation):
         with open(os.devnull) as devnull:
             original_stdout_fd = devnull.fileno()
 
     try:
         original_stderr_fd = sys.stderr.fileno()
         sys.stderr.close()
-    except (AttributeError, io.UnsupportedOperation) as err:
+    except (AttributeError, io.UnsupportedOperation):
         with open(os.devnull) as devnull:
             original_stderr_fd = devnull.fileno()
 

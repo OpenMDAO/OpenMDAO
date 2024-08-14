@@ -309,7 +309,7 @@ class TestPrePostIter(unittest.TestCase):
         coloring_info.coloring = None
         coloring_info.dynamic = True
 
-        J = prob.compute_totals(of=['iter2.y', 'iter3.y'], wrt=['iter1.x3'], coloring_info=coloring_info)
+        prob.compute_totals(of=['iter2.y', 'iter3.y'], wrt=['iter1.x3'], coloring_info=coloring_info)
 
         data = prob.check_totals(of=['iter2.y', 'iter3.y'], wrt=['iter1.x3'], out_stream=None)
         assert_check_totals(data)

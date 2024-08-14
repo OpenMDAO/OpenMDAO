@@ -245,8 +245,6 @@ class HooksTestCase(unittest.TestCase):
 
         hooks._unregister_hook('setup', 'Problem')
 
-        msg = "No hook found for method 'final_setup' for class 'Problem' and instance 'None'."
-
         hooks._unregister_hook('run_model', 'Problem')
         prob.calls = []
 
@@ -307,7 +305,7 @@ class HooksTestCase(unittest.TestCase):
 
         of=['comp.f_xy']
         wrt=['p1.x', 'p2.y']
-        J = prob.compute_totals(of=of, wrt=wrt, return_format='array')
+        prob.compute_totals(of=of, wrt=wrt, return_format='array')
         self.assertEqual(len(prob.calls), 2)
         self.assertEqual(prob.calls[0],  ('pre_totals', (), {'of': ['comp.f_xy'], 'wrt': ['p1.x', 'p2.y'], 'return_format': 'array'}))
         self.assertEqual(prob.calls[1],  ('post_totals', (), {'of': ['comp.f_xy'], 'wrt': ['p1.x', 'p2.y'], 'return_format': 'array'}))

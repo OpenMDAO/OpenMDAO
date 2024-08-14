@@ -2,7 +2,6 @@
 import inspect
 import os
 import sys
-import pathlib
 from operator import itemgetter
 
 import networkx as nx

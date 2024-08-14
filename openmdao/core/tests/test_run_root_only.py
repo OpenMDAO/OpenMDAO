@@ -316,7 +316,7 @@ class TestRunRootOnlyErrors(unittest.TestCase):
         p.setup()
         with self.assertRaises(Exception) as cm:
             p.run_model()
-        self.assertEqual(cm.exception.args[0], f"'comp' <class MyComp>: Can't set 'run_root_only' option when a component has distributed variables.")
+        self.assertEqual(cm.exception.args[0], "'comp' <class MyComp>: Can't set 'run_root_only' option when a component has distributed variables.")
 
     def test_parallel_fd_err(self):
         class MyComp(om.ExplicitComponent):
@@ -336,7 +336,7 @@ class TestRunRootOnlyErrors(unittest.TestCase):
         p.setup()
         with self.assertRaises(Exception) as cm:
             p.run_model()
-        self.assertEqual(cm.exception.args[0], f"'comp' <class MyComp>: Can't set 'run_root_only' option when using parallel FD.")
+        self.assertEqual(cm.exception.args[0], "'comp' <class MyComp>: Can't set 'run_root_only' option when using parallel FD.")
 
     def test_parallel_deriv_color(self):
         class MyComp(om.ExplicitComponent):
@@ -358,6 +358,6 @@ class TestRunRootOnlyErrors(unittest.TestCase):
         p.setup(mode='rev')
         with self.assertRaises(Exception) as cm:
             p.run_model()
-        self.assertEqual(cm.exception.args[0], f"'comp' <class MyComp>: Can't set 'run_root_only' option when using parallel_deriv_color.")
+        self.assertEqual(cm.exception.args[0], "'comp' <class MyComp>: Can't set 'run_root_only' option when using parallel_deriv_color.")
 
 

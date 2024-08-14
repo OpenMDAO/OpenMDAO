@@ -763,7 +763,7 @@ class FileParserFeature(unittest.TestCase):
         parser.mark_anchor("LOAD CASE")
         var = parser.transfer_var(1, 4)
 
-        from numpy import isnan, isinf
+        from numpy import isnan
         self.assertEqual(isnan(var), True)
 
     def test_parse_string(self):

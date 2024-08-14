@@ -6,7 +6,6 @@ import os.path
 from os.path import exists, abspath, dirname, join
 import sys
 import fnmatch
-import logging
 from subprocess import Popen
 from configparser import ConfigParser
 from optparse import OptionParser
@@ -65,13 +64,13 @@ def _find_wing():
         try:
             locs = [os.path.join(tdir, p, 'bin') for p in
                     fnmatch.filter(os.listdir(tdir), r'Wing IDE ?.?')]
-        except:
+        except Exception:
             locs = []
         tdir = r'C:\Program Files'
         try:
             locs.extend([os.path.join(tdir, p, 'bin') for p in
                          fnmatch.filter(os.listdir(tdir), r'Wing IDE ?.?')])
-        except:
+        except Exception:
             pass
     elif sys.platform == 'darwin':
         wname = 'wing'
@@ -90,7 +89,7 @@ def _find_wing():
     for path in all_locs:
         try:
             matches = fnmatch.filter(os.listdir(path), wname)
-        except:
+        except Exception:
             continue
         if matches:
             return os.path.join(path, sorted(matches)[-1])
@@ -163,7 +162,7 @@ def run_wing():
     try:
         print("wing command: ", ' '.join(cmd))
         Popen(cmd, env=env)
-    except Exception as err:
+    except Exception:
         print("Failed to run command '%s'." % ' '.join(cmd))
 
 if __name__ == '__main__':

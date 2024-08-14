@@ -4,11 +4,8 @@ vs. time, with highligting of a specified function.
 """
 
 if __name__ == '__main__':
-    import sys
     import argparse
     import matplotlib.pyplot as plt
-    import numpy as np
-    from collections import defaultdict
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', '--func', action='store', dest='func',

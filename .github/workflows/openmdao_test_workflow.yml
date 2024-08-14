@@ -517,6 +517,15 @@ jobs:
           python -m pip install ruff
           ruff check . --select NPY201
 
+      - name: Perform linting with Ruff
+        if: ${{ matrix.NAME == 'Ubuntu Baseline' }}
+        run: |
+          echo "============================================================="
+          echo "Lint OpenMDAO code per settings in pyproject.toml"
+          echo "============================================================="
+          python -m pip install ruff
+          ruff check . --config pyproject.toml
+
       - name: Slack env change
         if: steps.env_info.outputs.errors != ''
         uses: act10ns/slack@v2.0.0

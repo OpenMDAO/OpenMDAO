@@ -1,7 +1,6 @@
 """
 Utilities for the use of jax in combination with OpenMDAO.
 """
-from collections.abc import Callable
 
 try:
     import jax

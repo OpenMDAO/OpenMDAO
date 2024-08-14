@@ -437,9 +437,9 @@ class TestExecComp(unittest.TestCase):
     def test_units_varname_novalue(self):
         prob = om.Problem()
         prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
-        C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x+units+1.',
-                                                        x={'val': 2.0, 'units': 'm'},
-                                                        y={'units': 'm'}))
+        prob.model.add_subsystem('C1', om.ExecComp('y=x+units+1.',
+                                                   x={'val': 2.0, 'units': 'm'},
+                                                   y={'units': 'm'}))
         prob.model.connect('indep.x', 'C1.x')
 
         with self.assertRaises(NameError) as cm:
@@ -480,9 +480,9 @@ class TestExecComp(unittest.TestCase):
     def test_conflicting_units(self):
         prob = om.Problem()
         prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
-        C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x+z+1.', units='m',
-                                                        x={'val': 2.0, 'units': 'km'},
-                                                        z=2.0))
+        prob.model.add_subsystem('C1', om.ExecComp('y=x+z+1.', units='m',
+                                                   x={'val': 2.0, 'units': 'km'},
+                                                   z=2.0))
         prob.model.connect('indep.x', 'C1.x')
 
         with self.assertRaises(RuntimeError) as cm:
@@ -940,10 +940,10 @@ class TestExecComp(unittest.TestCase):
 
     def test_tags(self):
         prob = om.Problem(model=om.Group())
-        C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x+z+1.',
-                                                        x={'val': 1.0, 'units': 'm', 'tags': 'tagx'},
-                                                        y={'units': 'm', 'tags': ['tagy','tagq']},
-                                                        z={'val': 2.0, 'tags': 'tagz'}))
+        prob.model.add_subsystem('C1', om.ExecComp('y=x+z+1.',
+                                                   x={'val': 1.0, 'units': 'm', 'tags': 'tagx'},
+                                                   y={'units': 'm', 'tags': ['tagy','tagq']},
+                                                   z={'val': 2.0, 'tags': 'tagz'}))
 
         prob.setup(check=False)
 
@@ -1163,7 +1163,7 @@ class TestExecComp(unittest.TestCase):
         prob.run_model()
 
         stream = StringIO()
-        outputs = prob.model.list_outputs(residuals=True, residuals_tol=1e-5, out_stream=stream)
+        prob.model.list_outputs(residuals=True, residuals_tol=1e-5, out_stream=stream)
 
         text = stream.getvalue()
         self.assertTrue("balance" in text)
@@ -1486,7 +1486,7 @@ class TestFunctionRegistration(unittest.TestCase):
 
         om.ExecComp.register("myfunc", lambda x: x * x, complex_safe=True)
         p = om.Problem()
-        comp = p.model.add_subsystem("comp", om.ExecComp("y = 2 * myfunc(x)"))
+        p.model.add_subsystem("comp", om.ExecComp("y = 2 * myfunc(x)"))
 
         p.setup()
         p.run_model()
@@ -1555,7 +1555,7 @@ class TestFunctionRegistration(unittest.TestCase):
             size = 10
             om.ExecComp.register('area', lambda x: x**2, complex_safe=False)
             p = om.Problem()
-            comp = p.model.add_subsystem('comp', om.ExecComp('area_square = area(x)', shape=size))
+            p.model.add_subsystem('comp', om.ExecComp('area_square = area(x)', shape=size))
             p.setup()
             p['comp.x'] = 3.
             # calling run_model should NOT raise an exception
@@ -1563,7 +1563,7 @@ class TestFunctionRegistration(unittest.TestCase):
             assert_near_equal(p['comp.area_square'], np.ones(size) * 9., 1e-6)
 
             with self.assertRaises(Exception) as cm:
-                data = force_check_partials(p, out_stream=None)
+                force_check_partials(p, out_stream=None)
             self.assertEqual(cm.exception.args[0],
                              "'comp' <class ExecComp>: expression contains functions ['area'] that are not complex safe. To fix this, call declare_partials('*', ['x'], method='fd') on this component prior to setup.")
 
@@ -1617,7 +1617,7 @@ class TestFunctionRegistration(unittest.TestCase):
             assert_near_equal(p['comp.out2'], np.ones(size) * 21., 1e-6)
 
             with self.assertRaises(Exception) as cm:
-                data = force_check_partials(p, out_stream=None, step=1e-7)
+                force_check_partials(p, out_stream=None, step=1e-7)
             self.assertEqual(cm.exception.args[0],
                              "'comp' <class ExecComp>: expression contains functions ['unsafe'] that are not complex safe. To fix this, call declare_partials('*', ['z'], method='fd') on this component prior to setup.")
 
@@ -1719,7 +1719,7 @@ class TestFunctionRegistration(unittest.TestCase):
             # have to use regex to handle differences in numpy print formats for shape
             msg = "'comp' <class ExecComp>: Error occurred evaluating 'y = double\(x\) \* 3\.':\n" \
                   "could not broadcast input array from shape \(10.*\) into shape \(8.*\)"
-            with self.assertRaisesRegex(Exception, msg) as cm:
+            with self.assertRaisesRegex(Exception, msg):
                 p.run_model()
 
     def test_shape_by_conn_bug_has_diag_partials_bug(self):
@@ -1932,7 +1932,7 @@ class TestExecCompParameterized(unittest.TestCase):
         if 'check_val' not in test_data:
             try:
                 force_check_partials(prob, out_stream=None)
-            except TypeError as e:
+            except TypeError:
                 print(f, 'does not support complex-step differentiation')
 
     @parameterized.expand(itertools.product([

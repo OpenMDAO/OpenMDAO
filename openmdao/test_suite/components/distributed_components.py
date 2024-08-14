@@ -6,7 +6,6 @@ Components that are used in multiple places for testing distributed components.
 import numpy as np
 import openmdao.api as om
 
-from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
 
 

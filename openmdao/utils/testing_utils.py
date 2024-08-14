@@ -4,12 +4,10 @@ import functools
 import builtins
 import os
 import re
-import sys
 from itertools import zip_longest
 from contextlib import contextmanager
 
 import numpy as np
-from scipy.sparse import coo_matrix
 
 try:
     from parameterized import parameterized
