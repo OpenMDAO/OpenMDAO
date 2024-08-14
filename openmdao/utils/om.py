@@ -49,6 +49,7 @@ from openmdao.devtools.iprof_mem import _mem_prof_exec, _mem_prof_setup_parser, 
     _mempost_exec, _mempost_setup_parser
 from openmdao.error_checking.check_config import _check_config_cmd, _check_config_setup_parser
 from openmdao.utils.mpi import MPI
+from openmdao.utils.file_utils import clean_outputs
 from openmdao.utils.find_cite import print_citations
 from openmdao.utils.code_utils import _calltree_setup_parser, _calltree_exec
 from openmdao.utils.coloring import _total_coloring_setup_parser, _total_coloring_cmd, \
@@ -278,6 +279,40 @@ def _tree_setup_parser(parser):
                         help="Display input and output sizes.")
     parser.add_argument('--approx', action='store_true', dest='show_approx',
                         help="Show which components compute approximations.")
+
+
+def _clean_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao clean' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('path', nargs='*', default='.',
+                        help='Path(s) from which OpenMDAO output directories should be removed.')
+    parser.add_argument('-f', '--noprompt', action='store_false', dest='prompt',
+                        help='Remove output directories without confirmation.')
+    parser.add_argument('-n', '--norecurse', action='store_true', dest='no_recurse',
+                        help='Do not recurse into subdirectories to find directories to remove.')
+    parser.add_argument('-d', '--dryrun', action='store_true', dest='dryrun',
+                        help='Highlight directories to be removed but do not actually remove them.')
+
+
+def _clean_cmd(options, user_args):
+    """
+    Return the post_setup hook function for 'openmdao summary'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+    user_args : list of str
+        Args to be passed to the user script.
+    """
+    clean_outputs(options.path, recurse=not options.no_recurse, prompt=options.prompt,
+                  dryrun=options.dryrun)
 
 
 def _get_tree_filter(attrs, vecvars):
@@ -531,6 +566,7 @@ _command_map = {
     'check': (_check_config_setup_parser, _check_config_cmd,
               'Perform a number of configuration checks on the problem.'),
     'cite': (_cite_setup_parser, _cite_cmd, 'Print citations referenced by the problem.'),
+    'clean': (_clean_setup_parser, _clean_cmd, 'Remove OpenMDAO output directories.'),
     'comm_info': (_comm_info_setup_parser, _comm_info_cmd,
                   'Print MPI communicator info for systems.'),
     'compute_entry_points': (_compute_entry_points_setup_parser, _compute_entry_points_exec,

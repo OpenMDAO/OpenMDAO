@@ -26,7 +26,8 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.system import System
 from openmdao.core.group import Group
 from openmdao.core.total_jac import _TotalJacInfo
-from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
+from openmdao.core.constants import _DEFAULT_COLORING_DIR, _DEFAULT_OUT_STREAM, \
+    _UNDEFINED
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -955,7 +956,7 @@ class Problem(object):
             'name': self._name,  # the name of this Problem
             'pathname': None,  # the pathname of this Problem in the current tree of Problems
             'comm': comm,
-            'coloring_dir': self.options['coloring_dir'],  # directory for coloring files
+            'coloring_dir': _DEFAULT_COLORING_DIR,  # directory for input coloring files
             'recording_iter': _RecIteration(comm.rank),  # manager of recorder iterations
             'local_vector_class': local_vector_class,
             'distributed_vector_class': distributed_vector_class,
@@ -1025,7 +1026,7 @@ class Problem(object):
         # Start setup by deleting any existing reports so that the files
         # that are in that directory are all from this run and not a previous run
         reports_dirpath = self.get_reports_dir(force=False)
-        if self.comm.rank == 0:
+        if not MPI or (self.comm is not None and self.comm.rank == 0):
             if os.path.isdir(reports_dirpath):
                 try:
                     shutil.rmtree(reports_dirpath)
@@ -1033,6 +1034,10 @@ class Problem(object):
                     # Folder already removed by another proccess
                     pass
         self._metadata['reports_dir'] = self.get_reports_dir(force=False)
+
+        # Touch the .openmdao_out file for the output directory to ease identification.
+        if not MPI or (self.comm is not None and self.comm.rank == 0):
+            open(self.get_outputs_dir() / '.openmdao_out', 'w').close()
 
         try:
             model._setup(model_comm, self._metadata)
@@ -2543,6 +2548,33 @@ class Problem(object):
         """
         return _get_outputs_dir(self, *subdirs, mkdir=mkdir)
 
+    def get_coloring_dir(self, mode, mkdir=False):
+        """
+        Get the path to the directory for the coloring files.
+
+        Parameters
+        ----------
+        mode : str
+            Must be one of 'input' or 'output'. A problem will always write its coloring files to
+            its standard output directory in `{prob_name}_out/coloring_files`, but input coloring
+            files to be loaded may be read from a different directory specifed by the problem's
+            `coloring_dir` option.
+        mkdir : bool
+            If True, attempt to create this directory if it does not exist.
+
+        Returns
+        -------
+        pathlib.Path
+            The path to the directory where reports should be written.
+        """
+        if mode == 'input':
+            return pathlib.Path(self.options['coloring_dir'])
+        elif mode == 'output':
+            return self.get_outputs_dir('coloring_files', mkdir=mkdir)
+        else:
+            raise ValueError(f"{self.msginfo}: get_coloring_dir requires mode"
+                             "to be one of 'input' or 'output'.")
+
     def list_indep_vars(self, include_design_vars=True, options=None,
                         print_arrays=False, out_stream=_DEFAULT_OUT_STREAM):
         """
@@ -2798,7 +2830,8 @@ class Problem(object):
                     coloring = \
                         coloring_mod.dynamic_total_coloring(
                             self.driver, run_model=do_run,
-                            fname=self.driver._get_total_coloring_fname(), of=of, wrt=wrt)
+                            fname=self.driver._get_total_coloring_fname(mode='output'),
+                            of=of, wrt=wrt)
             else:
                 return coloring_info.coloring
 
