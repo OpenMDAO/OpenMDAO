@@ -10,7 +10,6 @@ import pickle
 import sys
 import tempfile
 import traceback
-import pathlib
 import webbrowser
 from itertools import combinations, groupby
 from contextlib import contextmanager
