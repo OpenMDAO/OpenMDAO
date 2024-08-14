@@ -249,7 +249,6 @@ def set_env_vars_context(**kwargs):
         for k, v in kwargs.items():
             saved[k] = os.environ.get(k)
             os.environ[k] = v  # will raise exception if v is not a string
-
         yield
 
     finally:

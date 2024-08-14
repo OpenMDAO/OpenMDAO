@@ -118,15 +118,6 @@ class NonlinearBlockGS(NonlinearSolver):
         use_aitken = self.options['use_aitken']
 
         if use_aitken:
-
-            aitken_min_factor = self.options['aitken_min_factor']
-            aitken_max_factor = self.options['aitken_max_factor']
-
-            # some variables that are used for Aitken's relaxation
-            delta_outputs_n_1 = self._delta_outputs_n_1
-            theta_n_1 = self._theta_n_1
-            theta_n = self.options['aitken_initial_factor']
-
             # store a copy of the outputs, used to compute the change in outputs later
             delta_outputs_n = outputs.asarray(copy=True)
 
@@ -143,62 +134,7 @@ class NonlinearBlockGS(NonlinearSolver):
         self._solver_info.pop()
 
         if use_aitken:
-            # compute the change in the outputs after the NLBGS iteration
-            delta_outputs_n -= outputs.asarray()
-            delta_outputs_n *= -1
-
-            if self._iter_count >= 2:
-                # Compute relaxation factor. This method is used by Kenway et al. in
-                # "Scalable Parallel Approach for High-Fidelity Steady-State Aero-
-                # elastic Analysis and Adjoint Derivative Computations" (ln 22 of Algo 1)
-
-                temp = delta_outputs_n.copy()
-                temp -= delta_outputs_n_1
-
-                # If MPI, piggyback on the residual vector to perform a distributed norm.
-                if system.comm.size > 1:
-                    backup_r = residuals.asarray(copy=True)
-                    residuals.set_val(temp)
-                    temp_norm = residuals.get_norm()
-                else:
-                    temp_norm = np.linalg.norm(temp)
-
-                if temp_norm == 0.:
-                    temp_norm = 1e-12  # prevent division by 0 below
-
-                # If MPI, piggyback on the output and residual vectors to perform a distributed
-                # dot product.
-                if system.comm.size > 1:
-                    backup_o = outputs.asarray(copy=True)
-                    outputs.set_val(delta_outputs_n)
-                    tddo = residuals.dot(outputs)
-                    residuals.set_val(backup_r)
-                    outputs.set_val(backup_o)
-                else:
-                    tddo = temp.dot(delta_outputs_n)
-
-                theta_n = theta_n_1 * (1 - tddo / temp_norm ** 2)
-
-            else:
-                # keep the initial the relaxation factor
-                pass
-
-            # limit relaxation factor to the specified range
-            theta_n = max(aitken_min_factor, min(aitken_max_factor, theta_n))
-            # save relaxation factor for the next iteration
-            self._theta_n_1 = theta_n
-
-            if not self.options['use_apply_nonlinear']:
-                with system._unscaled_context(outputs=[outputs]):
-                    outputs.set_val(outputs_n)
-            else:
-                outputs.set_val(outputs_n)
-
-            # compute relaxed outputs
-            outputs += theta_n * delta_outputs_n
-
-            # save update to use in next iteration
-            delta_outputs_n_1[:] = delta_outputs_n
+            self._aitken_relax(outputs, residuals, outputs_n, delta_outputs_n)
 
         if not self.options['use_apply_nonlinear']:
             # Residual is the change in the outputs vector.
@@ -230,6 +166,11 @@ class NonlinearBlockGS(NonlinearSolver):
             self._iter_count += 1
             outputs = system._outputs
             residuals = system._residuals
+            use_aitken = self.options['use_aitken']
+
+            if use_aitken:
+                # store a copy of the outputs, used to compute the change in outputs later
+                delta_outputs_n = outputs.asarray(copy=True)
 
             with system._unscaled_context(outputs=[outputs]):
                 outputs_n = outputs.asarray(copy=True)
@@ -240,6 +181,80 @@ class NonlinearBlockGS(NonlinearSolver):
                 if subsys._is_local:
                     subsys._solve_nonlinear()
 
+            if use_aitken:
+                self._aitken_relax(outputs, residuals, outputs_n, delta_outputs_n)
+
             self._solver_info.pop()
             with system._unscaled_context(residuals=[residuals], outputs=[outputs]):
                 residuals.set_val(outputs.asarray() - outputs_n)
+
+    def _aitken_relax(self, outputs, residuals, outputs_n, delta_outputs_n):
+        """
+        Apply the aitken relaxation.
+        """
+        system = self._system()
+
+        aitken_min_factor = self.options['aitken_min_factor']
+        aitken_max_factor = self.options['aitken_max_factor']
+
+        # some variables that are used for Aitken's relaxation
+        delta_outputs_n_1 = self._delta_outputs_n_1
+        theta_n_1 = self._theta_n_1
+        theta_n = self.options['aitken_initial_factor']
+
+        # compute the change in the outputs after the NLBGS iteration
+        delta_outputs_n -= outputs.asarray()
+        delta_outputs_n *= -1
+
+        if self._iter_count >= 2:
+            # Compute relaxation factor. This method is used by Kenway et al. in
+            # "Scalable Parallel Approach for High-Fidelity Steady-State Aero-
+            # elastic Analysis and Adjoint Derivative Computations" (ln 22 of Algo 1)
+
+            temp = delta_outputs_n.copy()
+            temp -= delta_outputs_n_1
+
+            # If MPI, piggyback on the residual vector to perform a distributed norm.
+            if system.comm.size > 1:
+                backup_r = residuals.asarray(copy=True)
+                residuals.set_val(temp)
+                temp_norm = residuals.get_norm()
+            else:
+                temp_norm = np.linalg.norm(temp)
+
+            if temp_norm == 0.:
+                temp_norm = 1e-12  # prevent division by 0 below
+
+            # If MPI, piggyback on the output and residual vectors to perform a distributed
+            # dot product.
+            if system.comm.size > 1:
+                backup_o = outputs.asarray(copy=True)
+                outputs.set_val(delta_outputs_n)
+                tddo = residuals.dot(outputs)
+                residuals.set_val(backup_r)
+                outputs.set_val(backup_o)
+            else:
+                tddo = temp.dot(delta_outputs_n)
+
+            theta_n = theta_n_1 * (1 - tddo / temp_norm ** 2)
+
+        else:
+            # keep the initial the relaxation factor
+            pass
+
+        # limit relaxation factor to the specified range
+        theta_n = max(aitken_min_factor, min(aitken_max_factor, theta_n))
+        # save relaxation factor for the next iteration
+        self._theta_n_1 = theta_n
+
+        if not self.options['use_apply_nonlinear']:
+            with system._unscaled_context(outputs=[outputs]):
+                outputs.set_val(outputs_n)
+        else:
+            outputs.set_val(outputs_n)
+
+        # compute relaxed outputs
+        outputs += theta_n * delta_outputs_n
+
+        # save update to use in next iteration
+        delta_outputs_n_1[:] = delta_outputs_n

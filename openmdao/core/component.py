@@ -17,6 +17,7 @@ from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_M
 from openmdao.core.constants import INT_DTYPE
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.array_utils import shape_to_len
+from openmdao.utils.class_util import overrides_method
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
@@ -406,6 +407,12 @@ class Component(System):
         This is meant to be overridden by component classes.  All partials should be
         declared here since this is called after all size/shape information is known for
         all variables.
+        """
+        pass
+
+    def _setup_residuals(self):
+        """
+        Process hook to call user-defined setup_residuals method if provided.
         """
         pass
 

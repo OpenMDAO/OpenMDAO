@@ -26,7 +26,8 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.system import System, _OptStatus
 from openmdao.core.group import Group
 from openmdao.core.total_jac import _TotalJacInfo
-from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
+from openmdao.core.constants import _DEFAULT_COLORING_DIR, _DEFAULT_OUT_STREAM, \
+    _UNDEFINED
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -54,6 +55,7 @@ from openmdao.utils.general_utils import pad_name, LocalRangeIterable, \
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.file_utils import _get_outputs_dir
 from openmdao.visualization.tables.table_builder import generate_table
 
 try:
@@ -225,8 +227,7 @@ class Problem(object):
         self._computing_coloring = False
 
         # Set the Problem name so that it can be referenced from command line tools (e.g. check)
-        # that accept a Problem argument, and to name the corresponding reports subdirectory.
-
+        # that accept a Problem argument, and to name the corresponding outputs subdirectory.
         if name:  # if name hasn't been used yet, use it. Otherwise, error
             if name not in _problem_names:
                 self._name = name
@@ -342,17 +343,6 @@ class Problem(object):
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
                                             '(processed post-includes). Uses fnmatch wildcards')
-
-        # Start a run by deleting any existing reports so that the files
-        #   that are in that directory are all from this run and not a previous run
-        reports_dirpath = pathlib.Path(get_reports_dir()).joinpath(f'{self._name}')
-        if self.comm.rank == 0:
-            if os.path.isdir(reports_dirpath):
-                try:
-                    shutil.rmtree(reports_dirpath)
-                except FileNotFoundError:
-                    # Folder already removed by another proccess
-                    pass
 
         # register hooks for any reports
         activate_reports(self._reports, self)
@@ -878,7 +868,7 @@ class Problem(object):
 
     def setup(self, check=False, logger=None, mode='auto', force_alloc_complex=False,
               distributed_vector_class=PETScVector, local_vector_class=DefaultVector,
-              derivatives=True):
+              derivatives=True, parent=None):
         """
         Set up the model hierarchy.
 
@@ -917,6 +907,8 @@ class Problem(object):
             and associated transfers involved in intraprocess communication.
         derivatives : bool
             If True, perform any memory allocations necessary for derivative computation.
+        parent : Problem, System, Solver, or None
+            The "parent" object of this problem instance in a tree of potentially nested problems.
 
         Returns
         -------
@@ -955,7 +947,7 @@ class Problem(object):
             'name': self._name,  # the name of this Problem
             'pathname': None,  # the pathname of this Problem in the current tree of Problems
             'comm': comm,
-            'coloring_dir': self.options['coloring_dir'],  # directory for coloring files
+            'coloring_dir': _DEFAULT_COLORING_DIR,  # directory for input coloring files
             'recording_iter': _RecIteration(comm.rank),  # manager of recorder iterations
             'local_vector_class': local_vector_class,
             'distributed_vector_class': distributed_vector_class,
@@ -986,7 +978,7 @@ class Problem(object):
                                      # a, a.b, and a.b.c, with one of the Nones replaced
                                      # by promotes info.  Dict entries are only created if
                                      # src_indices are applied to the variable somewhere.
-            'reports_dir': self.get_reports_dir(),  # directory where reports will be written
+            'reports_dir': None,  # directory where reports will be written
             'saved_errors': [],  # store setup errors here until after final_setup
             'checking': False,  # True if check_totals or check_partials is running
             'model_options': self.model_options,  # A dict of options passed to all systems in tree
@@ -1004,18 +996,42 @@ class Problem(object):
             'ncompute_totals': 0,  # number of times compute_totals has been called
         }
 
-        if _prob_setup_stack:
-            self._metadata['pathname'] = _prob_setup_stack[-1]._metadata['pathname'] + '/' + \
-                self._name
+        if parent:
+            if isinstance(parent, Problem):
+                parent_prob_meta = parent._metadata
+            elif isinstance(parent, System):
+                parent_prob_meta = parent._problem_meta
+            else:
+                raise ValueError('Problem parent must be another Problem or System instance.')
+        else:
+            parent_prob_meta = None
+
+        if parent_prob_meta and parent_prob_meta['pathname']:
+            self._metadata['pathname'] = parent_prob_meta['pathname'] + f'/{self._name}'
         else:
             self._metadata['pathname'] = self._name
 
-        _prob_setup_stack.append(self)
+        # We don't want to delete the outputs directory because we may be using the coloring files
+        # from a previous run.
+        # Start setup by deleting any existing reports so that the files
+        # that are in that directory are all from this run and not a previous run
+        reports_dirpath = self.get_reports_dir(force=False)
+        if not MPI or (self.comm is not None and self.comm.rank == 0):
+            if os.path.isdir(reports_dirpath):
+                try:
+                    shutil.rmtree(reports_dirpath)
+                except FileNotFoundError:
+                    # Folder already removed by another proccess
+                    pass
+        self._metadata['reports_dir'] = self.get_reports_dir(force=False)
+
+        # Touch the .openmdao_out file for the output directory to ease identification.
+        if not MPI or (self.comm is not None and self.comm.rank == 0):
+            open(self.get_outputs_dir() / '.openmdao_out', 'w').close()
+
         try:
             model._setup(model_comm, self._metadata)
         finally:
-            _prob_setup_stack.pop()
-
             # whenever we're outside of model._setup, static mode should be True so that anything
             # added outside of _setup will persist.
             self._metadata['static_mode'] = True
@@ -2444,7 +2460,8 @@ class Problem(object):
             return
 
         if logger is None:
-            logger = get_logger('check_config', out_file=out_file, use_format=True)
+            check_file_path = None if out_file is None else str(self.get_outputs_dir() / out_file)
+            logger = get_logger('check_config', out_file=check_file_path, use_format=True)
 
         if checks == 'all':
             checks = sorted(_all_non_redundant_checks)
@@ -2493,15 +2510,56 @@ class Problem(object):
 
         Returns
         -------
-        str
+        pathlib.Path
             The path to the directory where reports should be written.
         """
-        reports_dirpath = pathlib.Path(get_reports_dir()).joinpath(f'{self._name}')
+        return self.get_outputs_dir('reports', mkdir=force or self._reports)
 
-        if self.comm.rank == 0 and (force or self._reports):
-            pathlib.Path(reports_dirpath).mkdir(parents=True, exist_ok=True)
+    def get_outputs_dir(self, *subdirs, mkdir=True):
+        """
+        Get the path under which all output files of this problem are to be placed.
 
-        return reports_dirpath
+        Parameters
+        ----------
+        *subdirs : str
+            Subdirectories nested under the relevant problem output directory.
+            To create {prob_output_dir}/a/b one would pass `prob.get_outputs_dir('a', 'b')`.
+        mkdir : bool
+            If True, attempt to create this directory if it does not exist.
+
+        Returns
+        -------
+        pathlib.Path
+           The path of the outputs directory for the problem.
+        """
+        return _get_outputs_dir(self, *subdirs, mkdir=mkdir)
+
+    def get_coloring_dir(self, mode, mkdir=False):
+        """
+        Get the path to the directory for the coloring files.
+
+        Parameters
+        ----------
+        mode : str
+            Must be one of 'input' or 'output'. A problem will always write its coloring files to
+            its standard output directory in `{prob_name}_out/coloring_files`, but input coloring
+            files to be loaded may be read from a different directory specifed by the problem's
+            `coloring_dir` option.
+        mkdir : bool
+            If True, attempt to create this directory if it does not exist.
+
+        Returns
+        -------
+        pathlib.Path
+            The path to the directory where reports should be written.
+        """
+        if mode == 'input':
+            return pathlib.Path(self.options['coloring_dir'])
+        elif mode == 'output':
+            return self.get_outputs_dir('coloring_files', mkdir=mkdir)
+        else:
+            raise ValueError(f"{self.msginfo}: get_coloring_dir requires mode"
+                             "to be one of 'input' or 'output'.")
 
     def list_indep_vars(self, include_design_vars=True, options=None,
                         print_arrays=False, out_stream=_DEFAULT_OUT_STREAM):
@@ -2717,7 +2775,8 @@ class Problem(object):
                     coloring = \
                         coloring_mod.dynamic_total_coloring(
                             self.driver, run_model=do_run,
-                            fname=self.driver._get_total_coloring_fname(), of=of, wrt=wrt)
+                            fname=self.driver._get_total_coloring_fname(mode='output'),
+                            of=of, wrt=wrt)
             else:
                 return coloring_info.coloring
 

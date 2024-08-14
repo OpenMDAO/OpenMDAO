@@ -1,5 +1,6 @@
 """ Unit tests for the problem interface."""
 
+import pathlib
 import sys
 import unittest
 import itertools
@@ -26,6 +27,7 @@ except ImportError:
     from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 
+@use_tempdirs
 class TestProblem(unittest.TestCase):
     def test_simple_component_model_with_units(self):
         class TestComp(om.ExplicitComponent):
@@ -1207,12 +1209,12 @@ class TestProblem(unittest.TestCase):
     def test_setup_bad_mode(self):
         # Test error message when passing bad mode to setup.
 
-        prob = om.Problem(name='foo')
+        prob = om.Problem(name='xfoo')
 
         try:
             prob.setup(mode='junk')
         except ValueError as err:
-            msg = "Problem foo: Unsupported mode: 'junk'. Use either 'fwd' or 'rev'."
+            msg = "Problem xfoo: Unsupported mode: 'junk'. Use either 'fwd' or 'rev'."
             self.assertEqual(str(err), msg)
         else:
             self.fail('Expecting ValueError')
@@ -2113,6 +2115,36 @@ class TestProblem(unittest.TestCase):
         except RuntimeError:
             self.fail("'setup raised RuntimeError unexpectedly")
 
+    def test_get_outputs_dir(self):
+
+        prob = om.Problem(name='prob_name')
+        model = prob.model
+
+        model.add_subsystem('comp', Paraboloid())
+
+        model.set_input_defaults('comp.x', 3.0)
+        model.set_input_defaults('comp.y', -4.0)
+
+        with self.assertRaises(RuntimeError) as e:
+            prob.get_outputs_dir()
+
+        self.assertEqual('The output directory cannot be accessed before setup.',
+                         str(e.exception))
+
+        prob.setup()
+
+        d = prob.get_outputs_dir('subdir')
+        self.assertEqual(str(pathlib.Path('prob_name_out', 'subdir')), str(d))
+
+    def test_duplicate_prob_name(self):
+
+        om.Problem(name='prob_name2')
+
+        with self.assertRaises(ValueError) as e:
+            om.Problem(name='prob_name2')
+
+        self.assertEqual(str(e.exception), "The problem name 'prob_name2' already exists")
+
 
 @use_tempdirs
 class RelevanceTestCase(unittest.TestCase):
@@ -2321,25 +2353,34 @@ class NestedProblemTestCase(unittest.TestCase):
 
     def test_nested_prob(self):
 
+        self_test = self
+
         class _ProblemSolver(om.NonlinearRunOnce):
+
+            def __init__(self, parent=None, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self._parent = parent
+
             def solve(self):
                 # create a simple subproblem and run it to test for global solver_info bug
-                p = om.Problem()
+                p = om.Problem(name='abc123sub')
                 p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
                 p.model.add_subsystem('comp', om.ExecComp('y=2*x'))
                 p.model.connect('indep.x', 'comp.x')
-                p.setup()
+                p.setup(parent=self._parent)
+                self_test.assertEqual('abc123/abc123sub', p._metadata['pathname'])
                 p.run_model()
-
                 return super().solve()
 
-        p = om.Problem()
+        p = om.Problem(name='abc123')
         p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
         G = p.model.add_subsystem('G', om.Group())
         G.add_subsystem('comp', om.ExecComp('y=2*x'))
-        G.nonlinear_solver = _ProblemSolver()
+        G.nonlinear_solver = _ProblemSolver(parent=p)
         p.model.connect('indep.x', 'G.comp.x')
         p.setup()
+        self.assertEqual('abc123', p._metadata['pathname'])
+
         p.run_model()
 
     def test_cs_across_nested(self):

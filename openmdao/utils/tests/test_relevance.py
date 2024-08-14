@@ -1,5 +1,7 @@
 import unittest
 
+import numpy as np
+
 import openmdao.api as om
 from openmdao.utils.relevance import _vars2systems
 from openmdao.utils.assert_utils import assert_check_totals
@@ -63,3 +65,73 @@ class TestRelevanceEmptyGroups(unittest.TestCase):
         prob.run_driver()
 
         assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+
+
+class LinearEquation(om.ExplicitComponent):
+    """A linear equation y = Ax - b"""
+
+    def initialize(self):
+        self.options.declare("numInputs", types=int, default=3)
+        self.options.declare("numOutputs", types=int, default=2)
+
+    def setup(self):
+        np.random.seed(0)
+        nIn = self.options["numInputs"]
+        nOut = self.options["numOutputs"]
+        self.A = np.random.rand(nOut, nIn)
+        self.b = np.random.rand(nOut)
+        self.add_input("x", shape=nIn)
+        self.add_output("res", shape=nOut)
+
+        self.declare_partials("res", "x", val=self.A)
+
+    def compute(self, inputs, outputs):
+        outputs["res"] = self.A @ inputs["x"] - self.b
+
+
+class SquaredNorm(om.ExplicitComponent):
+    """The square of the L2 norm of a vector"""
+
+    def initialize(self):
+        self.options.declare("numInputs", types=int, default=3)
+
+    def setup(self):
+        nIn = self.options["numInputs"]
+        self.add_input("x", shape=nIn)
+        self.add_output("xNorm")
+
+        self.declare_partials("xNorm", "x")
+
+    def compute_partials(self, inputs, partials):
+        partials["xNorm", "x"] = 2 * inputs["x"]
+
+    def compute(self, inputs, outputs):
+        outputs["xNorm"] = np.dot(inputs["x"], inputs["x"])
+
+
+class UnderdeterminedSystem(om.Group):
+    def initialize(self):
+        self.options.declare("numInputs", types=int, default=3)
+        self.options.declare("numOutputs", types=int, default=2)
+
+    def setup(self):
+        nIn = self.options["numInputs"]
+        nOut = self.options["numOutputs"]
+
+        variables = om.IndepVarComp("x", np.random.rand(nIn))
+        self.add_subsystem("variables", variables, promotes=["*"])
+        self.add_design_var("x")
+
+        self.add_subsystem("linearEquation", LinearEquation(numInputs=nIn, numOutputs=nOut), promotes=["*"])
+        self.add_constraint("linearEquation.res", equals=0.0, linear=True)
+
+        self.add_subsystem("norm2", SquaredNorm(numInputs=nIn), promotes=["*"])
+        # self.add_objective("xNorm") # Uncomment this line to not have an error
+
+
+class TestRelevanceNoObjLinearConstraint(unittest.TestCase):
+    def test_relevance_no_obj_linear_constraint(self):
+        prob = om.Problem(model=UnderdeterminedSystem(numInputs=3, numOutputs=2))
+        prob.setup()
+        prob.run_model()
+        assert_check_totals(prob.check_totals(show_only_incorrect=True))

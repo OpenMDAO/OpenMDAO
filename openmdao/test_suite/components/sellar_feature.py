@@ -176,7 +176,6 @@ class SellarMDAWithUnits(om.Group):
 
             outputs['y1'] = z1**2 + z2 + x1 - 0.2*y2
 
-
     class SellarDis2Units(om.ExplicitComponent):
         """
         Component containing Discipline 2 -- no derivatives version.

@@ -258,6 +258,44 @@ class DistributedListVarsTest(unittest.TestCase):
                 self.assertEqual(1, text.count('Obj'))
                 self.assertEqual(1, text.count('  obj'))
 
+
+        stream = StringIO()
+        with multi_proc_exception_check(prob.comm):
+            vars = sorted(prob.model.list_vars(val=True,
+                                               units=True,
+                                               shape=True,
+                                               prom_name=False,
+                                               print_arrays=True,
+                                               all_procs=True,
+                                               out_stream=stream))
+
+            expected = [
+                "8 Variables(s) in 'model'",
+                "",
+                "varname             val     io      units  shape",
+                "------------------  ------  ------  -----  -----",
+                "par",
+                "  G1" if prob.comm.rank == 0 else "  G2",   # G1 on rank 0, G2 on rank 1
+                "    indep_var_comp",
+                "      x             [-5.]   output  None   (1,)",
+                "    Cy",
+                "      x             [-5.]   input   None   (1,)",
+                "      y             [-10.]  output  None   (1,)",
+                "    Cc",
+                "      x             [-5.]   input   None   (1,)",
+                "      c             [-3.]   output  None   (1,)",
+                "Obj",
+                "  y1                [-10.]  input   None   (1,)",
+                "  y2                [-10.]  input   None   (1,)",
+                "  obj               [-20.]  output  None   (1,)",
+                "",
+                ""
+            ]
+
+            text = stream.getvalue()
+            for i, line in enumerate(text.splitlines()):
+                self.assertEqual(line.rstrip(), expected[i].rstrip(), f"Actual output:\n{text}")
+
     def test_parallel_list_vars(self):
         print_opts = {'linewidth': 1024, 'precision': 1}
 

@@ -22,7 +22,7 @@ class ExecCompVOI(om.ExecComp):
         # add constraints
         for name in sorted(self._var_rel_names['output']):
             meta = rel2meta[name]
-            self.add_constraint(name, units=meta['units'])
+            self.add_constraint(name, lower=0., upper=10., units=meta['units'])
 
 
 class _Obj(object):
@@ -58,7 +58,7 @@ class TestDriverScalingReport(unittest.TestCase):
                           i in inperm])
                 exprs.append(f"out{iout} = {imults}")
 
-            comp = model.add_subsystem(f"comp{icomp}", ExecCompVOI(exprs, shape=shape))
+            model.add_subsystem(f"comp{icomp}", ExecCompVOI(exprs, shape=shape, do_coloring=False))
 
             if icomp == 0:
                 # add a comp for the objective

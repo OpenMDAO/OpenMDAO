@@ -122,7 +122,6 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
         indent = '    ' * (depth + tab)
         cprint(indent, end='')
 
-        info = ''
         if isinstance(s, Group):
             cprint("%s " % type(s).__name__, color=Fore.GREEN + Style.BRIGHT)
             cprint("%s" % s.name)
@@ -360,7 +359,7 @@ def config_summary(problem, stream=sys.stdout):
 
 
 def _summary_report(prob):
-    path = str(pathlib.Path(prob.get_reports_dir()).joinpath('summary.html'))
+    path = prob.get_reports_dir() / 'summary.html'
     s = StringIO()
     config_summary(prob, s)
     with open(path, 'w') as f:

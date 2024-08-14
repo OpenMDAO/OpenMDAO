@@ -20,7 +20,6 @@ from openmdao.visualization.tables.table_builder import generate_table
 _reports_registry = {}
 _default_reports = ['scaling', 'total_coloring', 'n2', 'optimizer', 'inputs']
 _active_reports = set()  # these reports will actually run (assuming their hook funcs are triggered)
-_reports_dir = os.environ.get('OPENMDAO_REPORTS_DIR', './reports')  # top dir for the reports
 _plugins_loaded = False  # use this to ensure plugins only loaded once
 
 
@@ -135,7 +134,8 @@ def reports_active():
     return not env_truthy('TESTFLO_RUNNING')
 
 
-def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=None, **kwargs):
+def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=None, predicate=None,
+                    **kwargs):
     """
     Register a report with the reporting system.
 
@@ -156,8 +156,18 @@ def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=N
     inst_id : str or None
         Either the instance ID of an OpenMDAO object (e.g. Problem, Driver) or None.
         If None, then this report will be run for all objects of type class_name.
+    predicate : function or None
+        If not None, this function will be called to determine if the report's hook function
+        should run. The predicate function should take the class instance as its only argument and
+        return True if the report should run.  Note that returning False does not disable the hook,
+        it just prevents the hook from running at that time.
     **kwargs : dict
         Keyword args passed to the report function.
+
+    Returns
+    -------
+    Report
+        The registered report object.
     """
     global _reports_registry
 
@@ -166,13 +176,16 @@ def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=N
     if pre_or_post not in ('pre', 'post'):
         raise ValueError("The argument 'pre_or_post' can only have values of 'pre' or 'post', "
                          f"but {pre_or_post} was given")
+    if pre_or_post == 'pre' and method == 'setup':
+        raise ValueError('Reports cannot be registered to execute pre-setup.')
 
     _reports_registry[name] = report = Report(name, desc)
 
     pre = func if pre_or_post == 'pre' else None
     post = func if pre_or_post == 'post' else None
     report.register_hook_args(fname=method, class_name=class_name, inst_id=inst_id, pre=pre,
-                              post=post, ncalls=1, **kwargs)
+                              post=post, ncalls=1, predicate=predicate, **kwargs)
+    return report
 
 
 def unregister_report(name):
@@ -374,14 +387,14 @@ def view_reports(probnames=None, level=2):
     level : int
         Expand the reports directory tree to this level.  Default is 2.
     """
-    tdir = _reports_dir
+    tdir = pathlib.Path(os.getcwd()) / 'reports'
     to_match = set()
     if probnames:
         if isinstance(probnames, str):
             probnames = (probnames,)
 
         for probname in probnames:
-            subdir = os.path.join(_reports_dir, probname)
+            subdir = f'{probname}_out/'
             if not os.path.isdir(subdir):
                 # see if they provided script name instead of problem name
                 dname = os.path.splitext(subdir)[0]
@@ -444,8 +457,8 @@ def set_reports_dir(reports_dir_path):
     reports_dir_path : str
         Path to the top level reports directory.
     """
-    global _reports_dir
-    _reports_dir = reports_dir_path
+    raise RuntimeError('The set_reports_dir function has been removed. Reports are now stored in '
+                       'the reports subdirectory under the enclosing problem\'s output directory')
 
 
 # -----------------------------------------
@@ -473,8 +486,8 @@ def _reset_reports_dir():
     This is used during testing, where environment variables are sometimes modified during
     the test.
     """
-    global _reports_dir
-    _reports_dir = os.environ.get('OPENMDAO_REPORTS_DIR', './reports')
+    raise RuntimeError('The _reset_reports_dir function in openmdao.api has been removed. '
+                       'Reports are now placed in the reports sub-directory of the problem.')
 
 
 def get_reports_dir():
@@ -486,7 +499,8 @@ def get_reports_dir():
     str
         Path to the top level reports directory.
     """
-    return _reports_dir
+    raise RuntimeError('The get_reports_dir function in openmdao.api has '
+                       'been replaced by the get_reports_dir method on Problem and System.')
 
 
 def _reports2list(reports, defaults):

@@ -262,7 +262,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 # connections report definition
 def _run_connections_report(prob, report_filename='connections.html'):
 
-    path = str(pathlib.Path(prob.get_reports_dir()).joinpath(report_filename))
+    path = prob.get_reports_dir() / report_filename
     view_connections(prob, show_browser=False, outfile=path,
                      title=f'Connection Viewer for {prob._name}')
 

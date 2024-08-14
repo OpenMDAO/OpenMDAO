@@ -5,6 +5,7 @@ import datetime
 import io
 import os
 import time
+import pathlib
 import pickle
 import sys
 import tempfile
@@ -110,6 +111,14 @@ _COLORING_VERSION = '1.0'
 # this dict can be checked for an existing class version of the coloring that can be used
 # for that instance.
 _CLASS_COLORINGS = {}
+
+
+class InvalidColoringError(Exception):
+    """
+    A custom error class that is raised in the event of an invalid coloring.
+    """
+
+    pass
 
 
 class ColoringMeta(object):
@@ -959,11 +968,11 @@ class Coloring(object):
 
         Parameters
         ----------
-        fname : str
+        fname : str or pathlib.Path
             File to save to.
         """
-        if isinstance(fname, str):
-            color_dir = os.path.dirname(os.path.abspath(fname))
+        if isinstance(fname, str) or isinstance(fname, pathlib.Path):
+            color_dir = pathlib.Path(fname).absolute().parent
             if not os.path.exists(color_dir):
                 try:
                     os.makedirs(color_dir)
@@ -985,6 +994,11 @@ class Coloring(object):
             Current driver object.
         model : Group
             Current model object.
+
+        Raises
+        ------
+        InvalidColoringError
+            Raised if the jacobian structure has changed and the coloring is invalid.
         """
         ofs = model._active_responses(driver._get_ordered_nl_responses(), driver._responses)
         of_sizes = [m['size'] for m in ofs.values()]
@@ -1002,6 +1016,11 @@ class Coloring(object):
         ----------
         system : System
             System being colored.
+
+        Raises
+        ------
+        InvalidColoringError
+            Raised if the jacobian structure has changed and the coloring is invalid.
         """
         # check the contents (vars and sizes) of the input and output vectors of system
         info = Partial_ColoringMeta(wrt_patterns=self._meta.get('wrt_patterns', ('*',)))
@@ -1072,7 +1091,7 @@ class Coloring(object):
 
         if len(msg) > 1:
             msg.append(msg_suffix)
-            raise RuntimeError('\n'.join(msg))
+            raise InvalidColoringError('\n'.join(msg))
 
     def __repr__(self):
         """
@@ -2822,12 +2841,14 @@ def dynamic_total_coloring(driver, run_model=True, fname=None, of=None, wrt=None
         driver._coloring_info.display()
         driver._setup_tot_jac_sparsity(coloring)
 
+    driver._total_jac = None
+
     return coloring
 
 
 def _run_total_coloring_report(driver):
     reports_dir = driver._problem().get_reports_dir()
-    htmlpath = pathlib.Path(reports_dir).joinpath('total_coloring.html')
+    htmlpath = reports_dir / 'total_coloring.html'
 
     display_coloring(source=driver, output_file=htmlpath,
                      as_text=bokeh_resources is None, show=False)
