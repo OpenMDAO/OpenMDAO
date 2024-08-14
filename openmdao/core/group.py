@@ -4407,7 +4407,7 @@ class Group(System):
 
                     if val is not value:
                         if val.shape:
-                            val = np.reshape(value, newshape=val.shape)
+                            val = np.reshape(value, val.shape)
                         else:
                             val = value
 
