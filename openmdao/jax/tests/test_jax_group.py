@@ -20,12 +20,13 @@ if jax is None:
 else:
     def jjit(f, *args, **kwargs):
         if om.env_truthy('JAX_CPU') and 'backend' not in kwargs:
+            # have to force this to 'cpu' else wing debugger stops at GPU check exception
             return jax.jit(f, *args, backend='cpu', **kwargs)
         else:
             return jax.jit(f, *args, **kwargs)
 
 
-class MyCompJax1(om.ExplicitComponent):
+class JaxExplicitComp1(om.ExplicitComponent):
     def setup(self):
         self.add_input('x', shape_by_conn=True)
         self.add_input('y', shape_by_conn=True)
@@ -37,7 +38,7 @@ class MyCompJax1(om.ExplicitComponent):
         outputs['z'] = np.dot(inputs['x'], inputs['y'])
 
 
-class MyCompJax1Shaped(om.ExplicitComponent):
+class JaxExplicitComp1Shaped(om.ExplicitComponent):
     def __init__(self, xshape, yshape, **kwargs):
         super().__init__(**kwargs)
         self.xshape = xshape
@@ -54,7 +55,7 @@ class MyCompJax1Shaped(om.ExplicitComponent):
         outputs['z'] = np.dot(inputs['x'], inputs['y'])
 
 
-class MyCompJax2(om.ExplicitComponent):
+class JaxExplicitComp2(om.ExplicitComponent):
     def setup(self):
         self.add_input('x', shape_by_conn=True)
         self.add_input('y', shape_by_conn=True)
@@ -68,7 +69,7 @@ class MyCompJax2(om.ExplicitComponent):
         outputs['zz'] = inputs['y'] * 2.5
 
 
-class MyCompJax2Shaped(om.ExplicitComponent):
+class JaxExplicitComp2Shaped(om.ExplicitComponent):
     def __init__(self, xshape, yshape, **kwargs):
         super().__init__(**kwargs)
         self.xshape = xshape
@@ -99,8 +100,8 @@ class TestJaxGroup(unittest.TestCase):
         ivc.add_output('y', val=np.ones(y_shape))
         G = p.model.add_subsystem('G', om.Group())
         G.options['derivs_method'] = 'jax'
-        G.add_subsystem('comp2', MyCompJax2())
-        G.add_subsystem('comp', MyCompJax1())
+        G.add_subsystem('comp2', JaxExplicitComp2())
+        G.add_subsystem('comp', JaxExplicitComp1())
 
         p.model.connect('ivc.x', ['G.comp.x', 'G.comp2.x'])
         p.model.connect('ivc.y', 'G.comp2.y')
@@ -125,8 +126,8 @@ class TestJaxGroup(unittest.TestCase):
         p = om.Problem()
         G = p.model.add_subsystem('G', om.Group())
         G.options['derivs_method'] = 'jax'
-        G.add_subsystem('comp2', MyCompJax2Shaped(x_shape, y_shape))
-        G.add_subsystem('comp', MyCompJax1Shaped(x_shape, y_shape))
+        G.add_subsystem('comp2', JaxExplicitComp2Shaped(x_shape, y_shape))
+        G.add_subsystem('comp', JaxExplicitComp1Shaped(x_shape, y_shape))
 
         G.connect('comp2.zz', 'comp.y')
 
@@ -153,8 +154,8 @@ class TestJaxGroup(unittest.TestCase):
         ivc = G.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
         ivc.add_output('y', val=np.ones(y_shape))
         G.options['derivs_method'] = 'jax'
-        G.add_subsystem('comp2', MyCompJax2())
-        G.add_subsystem('comp', MyCompJax1())
+        G.add_subsystem('comp2', JaxExplicitComp2())
+        G.add_subsystem('comp', JaxExplicitComp1())
 
         p.model.connect('G.ivc.x', ['G.comp.x', 'G.comp2.x'])
         p.model.connect('G.ivc.y', 'G.comp2.y')
@@ -183,8 +184,8 @@ class TestJaxGroup(unittest.TestCase):
         ivc.add_output('y', val=np.ones(y_shape))
         G = p.model
         G.options['derivs_method'] = 'jax'
-        G.add_subsystem('comp2', MyCompJax2())
-        G.add_subsystem('comp', MyCompJax1())
+        G.add_subsystem('comp2', JaxExplicitComp2())
+        G.add_subsystem('comp', JaxExplicitComp1())
 
         p.model.connect('ivc.x', ['comp.x', 'comp2.x'])
         p.model.connect('ivc.y', 'comp2.y')
@@ -209,5 +210,5 @@ if __name__ == '__main__':
     unittest.main()
 
     # from openmdao.utils.jax_utils import benchmark_component
-    # result = benchmark_component(MyCompJax2Shaped, methods=('jax', 'cs'),
+    # result = benchmark_component(JaxExplicitComp2Shaped, methods=('jax', 'cs'),
     #                              repeats=10, table_format='tabulator', xshape=(44, 330), yshape=(330, 55))
