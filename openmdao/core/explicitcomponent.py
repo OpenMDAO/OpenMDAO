@@ -538,7 +538,7 @@ class ExplicitComponent(Component):
             return
 
         returns = \
-            self.compute_primal(*self._get_compute_primal_inputs(inputs, discrete_inputs))
+            self.compute_primal(*self._get_compute_primal_invals(inputs, discrete_inputs))
 
         if not isinstance(returns, _tuplist):
             returns = (returns,)
@@ -599,7 +599,7 @@ class ExplicitComponent(Component):
         """
         return True
 
-    def _get_compute_primal_inputs(self, inputs, discrete_inputs):
+    def _get_compute_primal_invals(self, inputs, discrete_inputs):
         yield JaxCompPyTreeWrapper(self)
         if discrete_inputs:
             yield from discrete_inputs.values()
@@ -612,12 +612,12 @@ class ExplicitComponent(Component):
         argnames.extend(self._var_rel_names['input'])
         return argnames
 
-    def _setup_jax(self, force=False):
+    def _setup_jax(self):
         # we define compute_partials here instead of making this the base class version as we
         # did with compute, because the existence of a compute_partials method that is not the
         # base class method is used to determine if a given component computes its own partials.
         def compute_partials(self, inputs, partials, discrete_inputs=None):
-            deriv_vals = self._get_jac_func()(*self._get_compute_primal_inputs(inputs,
+            deriv_vals = self._get_jac_func()(*self._get_compute_primal_invals(inputs,
                                                                                discrete_inputs))
             nested_tup = isinstance(deriv_vals, tuple) and len(deriv_vals) > 0 and \
                 isinstance(deriv_vals[0], tuple)

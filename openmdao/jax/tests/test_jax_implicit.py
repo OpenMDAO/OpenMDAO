@@ -98,7 +98,7 @@ class SimpleLinearSystemComp(om.ImplicitComponent):
         residuals['x'] = inputs['A'].dot(outputs['x']) - inputs['b']
 
 
-class JaxPrimalLinearSystemComp(om.JaxImplicitComponent):
+class JaxLinearSystemCompPrimal(om.JaxImplicitComponent):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._lup = None
@@ -331,7 +331,7 @@ class TestJaxImplicitComp(unittest.TestCase):
         ivc.add_output('b', b)
 
         lingrp = prob.model.add_subsystem('lingrp', om.Group())
-        lingrp.add_subsystem('lin', JaxPrimalLinearSystemComp(size=3))
+        lingrp.add_subsystem('lin', JaxLinearSystemCompPrimal(size=3))
 
         prob.model.connect('ivc.A', 'lingrp.lin.A')
         prob.model.connect('ivc.b', 'lingrp.lin.b')

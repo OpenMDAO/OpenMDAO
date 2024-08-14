@@ -712,7 +712,7 @@ class Group(System):
         for subsys in self._sorted_sys_iter():
             states.extend(subsys._list_states())
 
-        return sorted(states)
+        return states
 
     def _list_states_allprocs(self):
         """
@@ -728,7 +728,7 @@ class Group(System):
             byproc = self.comm.allgather(self._list_states())
             for proc_states in byproc:
                 all_states.update(proc_states)
-            return sorted(all_states)
+            return all_states
         else:
             return self._list_states()
 
@@ -2300,22 +2300,27 @@ class Group(System):
         abs2meta = self._var_abs2meta['output'] if local else self._var_allprocs_abs2meta['output']
         return {n: meta for n, meta in abs2meta.items() if 'openmdao:indep_var' in meta['tags']}
 
-    def get_boundary_inputs(self, local):
+    def get_boundary_vars(self, io, local):
         """
-        Return a set of inputs connected to sources outside of this Group.
+        Return a set of inputs or outputs connected to variables outside of this Group.
 
         Parameters
         ----------
+        io : str
+            Either 'input' or 'output'.
         local : bool
             If True, return only the variables local to the current process.
 
         Returns
         -------
         set
-            Set of absolute inputs connected to sources outside of this Group.
+            Set of absolute inputs or outputs connected to variables outside of this Group.
         """
-        inputs = self._var_abs2meta['input'] if local else self._var_allprocs_abs2meta['input']
-        return set(inputs).difference(self._conn_global_abs_in2out)
+        assert io in ('input', 'output'), \
+            f"io must be either 'input' or 'output', but '{io}' was given."
+        # _var_*_abs2prom contains both continuous and discrete variables
+        vnames = self._var_abs2prom[io] if local else self._var_allprocs_abs2prom[io]
+        return set(vnames).difference(self._conn_global_abs_in2out)
 
     def _get_compute_primal_inputs(self):
         """
@@ -2335,10 +2340,15 @@ class Group(System):
             # top level has no boundary, so only inputs are ivcs
             ins = {n: (m['shape'], False) for n, m in ivcs.items()}
         else:
-            boundary_ins = self.get_boundary_inputs(local=True)
-            ins = {n: (m['shape'], True) for n, m in self._var_abs2meta['input'].items()
+            boundary_ins = self.get_boundary_vars('input', local=True)
+            a2m = self._var_abs2meta['input']
+            ins = {n: (a2m[n]['shape'] if n in a2m else None, True) for n in self._var_abs2prom['input']
                    if n in boundary_ins}
             ins.update({n: (m['shape'], False) for n, m in ivcs.items()})
+
+        states = set(self._list_states())
+        ins.update({n: (m['shape'], False) for n, m in self._var_abs2meta['output'].items()
+                    if n in states})
 
         return ins
 
@@ -2349,7 +2359,7 @@ class Group(System):
 
     def _get_compute_primal_invals(self, inputs, outputs):
         """
-        Return a list of input values that will be passed into compute_primal.
+        Return a list of 'input' values that will be passed into compute_primal.
 
         Parameters
         ----------
@@ -2361,7 +2371,7 @@ class Group(System):
         Returns
         -------
         list
-            List of input values that will be passed into compute_primal.
+            List of 'input' values that will be passed into compute_primal.
         """
         if self._compute_primal_in_slices is None:
             self._compute_primal_in_slices = []
@@ -2377,11 +2387,14 @@ class Group(System):
         oarray = outputs.asarray()
         ins = []
         for isinput, slc, shape in self._compute_primal_in_slices:
-            ins.append(iarray[slc].reshape(shape) if isinput else oarray[slc].reshape(shape))
+            if shape:
+                ins.append(iarray[slc].reshape(shape) if isinput else oarray[slc].reshape(shape))
+            else:
+                ins.append(iarray[slc] if isinput else oarray[slc])
 
         return ins
 
-    def _setup_jax(self, force=False):
+    def _setup_jax(self):
         """
         If jax is active, jaxify this group and all subgroups.
 
@@ -2394,9 +2407,12 @@ class Group(System):
 
         from openmdao.core.indepvarcomp import IndepVarComp
 
-        if not (force or self.options['derivs_method'] == 'jax'):
-            for subgroup in self._subgroups_myproc:
-                subgroup._setup_jax()
+        if self.options['derivs_method'] != 'jax':
+            for subsys in self._subsystems_myproc:
+                if isinstance(subsys, Group):
+                    subsys._setup_jax()
+                elif subsys.options['derivs_method'] == 'jax':
+                    subsys._setup_jax()
             return
 
         if self._contains_parallel_group or self._mpi_proc_allocator.parallel:
@@ -2409,8 +2425,8 @@ class Group(System):
 
         pathlen = len(self.pathname) + 1 if self.pathname else 0
 
-        # local var names within our compute_primal function
-        goutput_map = {n: f'o{i}' for i, n in enumerate(self._var_abs2meta['output'])}
+        # local var names within our compute_primal function since we can't use dotted names
+        goutput_map = {n: f'o{i}' for i, n in enumerate(self._var_abs2prom['output'])}
         ginput_map = {}
         for i, name in enumerate(self._compute_primal_ins):
             if self._compute_primal_ins[name][1]:  # input
@@ -2432,10 +2448,15 @@ class Group(System):
                 system.options['derivs_method'] = 'jax'
                 system._setup_jax()
 
-            ins = [f"self.{system.pathname[pathlen:]}"]
-            for n in system._var_abs2meta['input']:
+            #ins = [f"self.{system.pathname[pathlen:]}"]
+            ins = []
+            sysprefix = system.pathname + '.'
+            for n in system._get_compute_primal_argnames():  # system._var_abs2meta['input']:
+                n = sysprefix + n
                 if n in self._conn_global_abs_in2out:
                     ins.append(goutput_map[self._conn_global_abs_in2out[n]])
+                elif n in goutput_map:
+                    ins.append(goutput_map[n])
                 else:
                     ins.append(ginput_map[n])
 
@@ -3779,11 +3800,11 @@ class Group(System):
         """
         Compute outputs. The model is assumed to be in a scaled state.
         """
-        if self.options['derivs_method'] == 'jax':
-            # TODO: figure out recording and relevance
-            self._outputs.set_vals(
-                self.compute_primal(*self._get_compute_primal_invals(self._inputs, self._outputs)))
-            return
+        # if self.options['derivs_method'] == 'jax':
+        #     # TODO: figure out recording and relevance
+        #     self._outputs.set_vals(
+        #         self.compute_primal(*self._get_compute_primal_invals(self._inputs, self._outputs)))
+        #     return
 
         name = self.pathname if self.pathname else 'root'
 

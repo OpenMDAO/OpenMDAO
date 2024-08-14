@@ -331,10 +331,10 @@ class Component(System):
         self._serial_idxs = None
         self._inconsistent_keys = set()
 
-        if self.options['derivs_method'] == 'jax':
-            self._setup_jax()
+        #if self.options['derivs_method'] == 'jax':
+            #self._setup_jax()
 
-    def _setup_jax(self, force=False):
+    def _setup_jax(self):
         raise NotImplementedError("JAX support is not yet implemented for this component.")
 
     def _missing_vars_error(self, allnames):

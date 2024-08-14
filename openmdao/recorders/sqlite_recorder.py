@@ -349,7 +349,7 @@ class SqliteRecorder(CaseRecorder):
             raise ValueError('Driver encountered a recording_requester it cannot handle'
                              ': {0}'.format(recording_requester))
 
-        states = system._list_states_allprocs()
+        states = set(system._list_states_allprocs())
 
         if driver is None:
             desvars = system.get_design_vars(True, get_sizes=False, use_prom_ivc=False)

@@ -1,13 +1,13 @@
 import unittest
 import sys
-import itertools
-from collections.abc import Iterable
 
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
 import openmdao.api as om
 
-from openmdao.utils.jax_utils import jax, jnp
+from openmdao.utils.jax_utils import jax
+from openmdao.jax.tests.test_jax_implicit import QuadraticComp, JaxQuadraticCompPrimal, \
+    SimpleLinearSystemComp, JaxLinearSystemCompPrimal
 
 try:
     from parameterized import parameterized
@@ -205,6 +205,39 @@ class TestJaxGroup(unittest.TestCase):
         assert_check_partials(p.check_partials(show_only_incorrect=True))
         assert_check_totals(p.check_totals(of=['comp.z','comp2.z', 'comp2.zz'],
                                              wrt=['ivc.x', 'comp2.y'], method='fd', show_only_incorrect=True))
+
+    def test_jax_implicit_comp_group(self):
+        p = om.Problem()
+        # create an IVC manually so we can set the shapes.  Otherwise must set shape in the component
+        # itself.
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('a'))
+        ivc.add_output('b')
+        ivc.add_output('c')
+        G = p.model.add_subsystem('G', om.Group(derivs_method='jax'))
+        G.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        G.linear_solver = om.ScipyKrylov()
+        comp = G.add_subsystem('comp', JaxQuadraticCompPrimal())
+        p.model.connect('ivc.a', 'G.comp.a')
+        p.model.connect('ivc.b', 'G.comp.b')
+        p.model.connect('ivc.c', 'G.comp.c')
+        p.setup()
+
+        p.set_val('ivc.a', 1.0)
+        p.set_val('ivc.b', -4.0)
+        p.set_val('ivc.c', 3.0)
+
+        p.final_setup()
+        p.run_model()
+
+        assert_near_equal(p.get_val('G.comp.x'), 3.0)
+        assert_check_totals(p.check_totals(of=['G.comp.x'],
+                                           wrt=['G.comp.a', 'G.comp.b', 'G.comp.c'],
+                                           method='fd',
+                                           show_only_incorrect=True,
+                                           abs_err_tol=3e-5,
+                                           rel_err_tol=5e-6),
+                            atol=3e-5, rtol=5e-6)
+        assert_check_partials(p.check_partials(show_only_incorrect=True))
 
 if __name__ == '__main__':
     unittest.main()

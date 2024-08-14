@@ -749,7 +749,7 @@ class ImplicitComponent(Component):
                                       'by the child class.')
 
         returns = \
-            self.compute_primal(*self._get_compute_primal_inputs(inputs, outputs, discrete_inputs))
+            self.compute_primal(*self._get_compute_primal_invals(inputs, outputs, discrete_inputs))
 
         if not isinstance(returns, _tuplist):
             returns = (returns,)
@@ -886,8 +886,8 @@ class ImplicitComponent(Component):
             List of all states.
         """
         prefix = self.pathname + '.'
-        return sorted(list(self._var_abs2meta['output']) +
-                      [prefix + n for n in self._var_discrete['output']])
+        return list(self._var_abs2meta['output']) + \
+            [prefix + n for n in self._var_discrete['output']]
 
     def _list_states_allprocs(self):
         """
@@ -900,7 +900,7 @@ class ImplicitComponent(Component):
         """
         return self._list_states()
 
-    def _get_compute_primal_inputs(self, inputs, outputs, discrete_inputs):
+    def _get_compute_primal_invals(self, inputs, outputs, discrete_inputs):
         yield JaxCompPyTreeWrapper(self)
         if discrete_inputs:
             yield from discrete_inputs.values()
@@ -922,7 +922,7 @@ class ImplicitComponent(Component):
         # did with apply_nonlinear, because the existence of a linearize method that is not the
         # base class method is used to determine if a given component computes its own partials.
         def linearize(self, inputs, outputs, partials, discrete_inputs=None, discrete_outputs=None):
-            deriv_vals = self._get_jac_func()(*self._get_compute_primal_inputs(inputs, outputs,
+            deriv_vals = self._get_jac_func()(*self._get_compute_primal_invals(inputs, outputs,
                                                                                discrete_inputs))
             nested_tup = isinstance(deriv_vals, tuple) and len(deriv_vals) > 0 and \
                 isinstance(deriv_vals[0], tuple)
