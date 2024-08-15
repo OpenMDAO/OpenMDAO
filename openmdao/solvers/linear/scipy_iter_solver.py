@@ -259,7 +259,7 @@ class ScipyKrylov(LinearSolver):
         elif info > 0:
             self._convergence_failure()
         else:
-            msg = (f"Solver '{self.SOLVER}' on system '{self._system()._user_pathname()}': "
+            msg = (f"Solver '{self.SOLVER}' on system '{self._system().true_pathname}': "
                    f"had an illegal input or breakdown (info={info}) after {self._iter_count} "
                    "iterations.")
             self.report_failure(msg)

@@ -76,7 +76,7 @@ def _check_ubcs(group, warnings):
     """
     out_of_order = group._check_order()
     if out_of_order:
-        syspath = group._user_pathname(verbose=False)
+        syspath = group.true_pathname
         prefix = f"   In System '{syspath}', subsystem " if syspath else "   System "
 
         for tgt, srcs in out_of_order.items():

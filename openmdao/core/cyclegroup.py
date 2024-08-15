@@ -43,6 +43,8 @@ class CycleGroup(Group):
         The linear solver to use for this cycle group.
     name : str
         The name of the parent group.
+    true_name : str
+        The name of this cycle group.
     pathname : str
         The pathname of the parent group.
     comm : MPI.Comm or <FakeComm>
@@ -64,11 +66,13 @@ class CycleGroup(Group):
         self.cycle = scc
         self.cycle_key = tuple(sorted(scc))  # for use in hashes
         self.cycle_index = index
+        self.true_name = self._cycle_info()
         self.nonlinear_solver = nonlinear_solver
         self.linear_solver = linear_solver
 
         self.name = parent.name
         self.pathname = parent.pathname
+        self.true_pathname = parent.true_pathname + '.' + self.true_name
         self._set_problem_meta(parent._problem_meta)
         self.comm = parent.comm
 
@@ -120,6 +124,7 @@ class CycleGroup(Group):
                 self._var_allprocs_prom2abs_list[io].setdefault(prom_name, []).append(abs_name)
 
         self._update_parent(parent)
+        self._update_children()
 
     @property
     def msginfo(self):
@@ -132,12 +137,12 @@ class CycleGroup(Group):
             Either our instance pathname or class name.
         """
         if self.pathname is not None:
-            return f"'{self._user_pathname()}' <class {type(self).__name__}>"
+            return f"'{self.true_pathname}' <class {type(self).__name__}>"
         if self.name:
             return f"'{self.name} {self._cycle_info()}' <class {type(self).__name__}>"
         return f"<class {type(self).__name__}>"
 
-    def _cycle_info(self, verbose=True):
+    def _cycle_info(self, verbose=True, width=25):
         """
         Return cycle information in string form.
 
@@ -145,6 +150,8 @@ class CycleGroup(Group):
         ----------
         verbose : bool
             If True, include cycle system names in the output.
+        width : int
+            Maximum width of the cycle string.
 
         Returns
         -------
@@ -152,26 +159,10 @@ class CycleGroup(Group):
             The string containing cycle info.
         """
         if verbose:
-            cycle = truncate(f"{self.cycle_key}", 50)
+            cycle = truncate(f"{self.cycle_key}", width)
             return f"cycle {self.cycle_index} {cycle}"
         else:
             return f"cycle {self.cycle_index}"
-
-    def _user_pathname(self, verbose=True):
-        """
-        Return the pathname of this system intended for user facing output.
-
-        Parameters
-        ----------
-        verbose : bool
-            If True, include cycle system names in the output.
-
-        Returns
-        -------
-        str
-            The pathname of this system intended for user facing output.
-        """
-        return f"{self.pathname} {self._cycle_info(verbose)}"
 
     def _update_parent(self, parent):
         # update parent group's _subsystems_myproc
@@ -204,6 +195,10 @@ class CycleGroup(Group):
             parent.nonlinear_solver = NonlinearRunOnce()
         if not isinstance(parent.linear_solver, LinearRunOnce):
             parent.linear_solver = LinearRunOnce()
+
+    def _update_children(self):
+        for system in self.system_iter():
+            system.true_pathname = self.true_pathname + '.' + system.name
 
     def _setup_ordering(self, parent):
         for system in self._subsystems_myproc:

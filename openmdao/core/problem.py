@@ -2324,7 +2324,7 @@ class Problem(object):
         system_overrides = {}
         for subsys in model.system_iter(include_self=False, recurse=True):
             if overrides_method('load_case', subsys, System):
-                system_overrides[subsys._user_pathname(verbose=False)] = subsys
+                system_overrides[subsys.true_pathname] = subsys
 
         def set_later(var_name):
             # determine if variable should be set later via an overridden load_case method
@@ -3097,7 +3097,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         else:
             raise RuntimeError(f"Object type {type(system).__name__} is not a Component or Group.")
 
-        sys_name = system._user_pathname()
+        sys_name = system.true_pathname
         sys_class_name = type(system).__name__
         matrix_free = system.matrix_free
 

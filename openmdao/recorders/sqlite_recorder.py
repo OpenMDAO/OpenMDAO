@@ -757,7 +757,7 @@ class SqliteRecorder(CaseRecorder):
                           "for this system."
                     issue_warning(msg, prefix=system.msginfo, category=CaseRecorderWarning)
 
-            path = system._user_pathname(verbose=False)
+            path = system.true_pathname
             if not path:
                 path = 'root'
 

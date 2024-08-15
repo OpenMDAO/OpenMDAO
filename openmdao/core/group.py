@@ -372,7 +372,7 @@ class Group(System):
         if excl_sub is None:
             cache_key = None
         else:
-            cache_key = excl_sub._user_pathname()
+            cache_key = excl_sub.true_pathname
 
         try:
             iovars, excl = self._scope_cache[cache_key]
@@ -646,13 +646,14 @@ class Group(System):
             sub_comm = comm
             self._subsystems_myproc = [s for s, _ in self._subsystems_allprocs.values()]
 
+        prefix = self.pathname + '.' if self.pathname else ''
+        for s in self._subsystems_myproc:
+            s._setup_procs(prefix + s.name, sub_comm, prob_meta)
+
         # need to set pathname correctly even for non-local subsystems
         for s, _ in self._subsystems_allprocs.values():
-            s.pathname = '.'.join((self.pathname, s.name)) if self.pathname else s.name
-
-        # Perform recursion
-        for subsys in self._subsystems_myproc:
-            subsys._setup_procs(subsys.pathname, sub_comm, prob_meta)
+            if not s._is_local:
+                s.true_pathname = s.pathname = prefix + s.name
 
         # build a list of local subgroups to speed up later loops
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
@@ -1593,7 +1594,7 @@ class Group(System):
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
 
         for n, lst in self._group_inputs.items():
-            lst[0]['path'] = self._user_pathname()  # used for error reporting
+            lst[0]['path'] = self.true_pathname  # used for error reporting
             self._group_inputs[n] = lst.copy()  # must copy the list manually
 
         self._has_distrib_vars = False
@@ -3191,7 +3192,7 @@ class Group(System):
                 type_exc, exc, tb = sys.exc_info()
                 self._collect_error(f"{self.msginfo}: When promoting {promoted} from "
                                     f"'{subsys_name}': {exc}", exc_type=type_exc, tback=tb,
-                                    ident=(self._user_pathname(), tuple(promoted)))
+                                    ident=(self.true_pathname, tuple(promoted)))
 
             if outputs:
                 self._collect_error(f"{self.msginfo}: Trying to promote outputs {outputs} while "
@@ -3207,7 +3208,7 @@ class Group(System):
                 if inputs is not None:
                     lst.extend(inputs)
                 self._collect_error(f"{self.msginfo}: When promoting {sorted(lst)}: {err}",
-                                    ident=(self._user_pathname(), tuple(lst)))
+                                    ident=(self.true_pathname, tuple(lst)))
                 return
 
         try:
@@ -3317,7 +3318,7 @@ class Group(System):
         if match is None or match.group() != name:
             raise NameError(f"{self.msginfo}: '{name}' is not a valid sub-system name.")
 
-        subsys.name = subsys.pathname = name
+        subsys.name = subsys.true_name = subsys.pathname = subsys.true_pathname = name
 
         if isinstance(promotes, str) or \
            isinstance(promotes_inputs, str) or \
@@ -3564,7 +3565,7 @@ class Group(System):
         """
         Compute outputs. The model is assumed to be in a scaled state.
         """
-        name = self._user_pathname(verbose=False)
+        name = self.true_pathname
         if not name:
             name = 'root'
 
@@ -3796,7 +3797,7 @@ class Group(System):
         if self._owns_approx_jac:
 
             jac = self._jacobian
-            if self._user_pathname() == "":
+            if self.true_pathname == "":
                 for approximation in self._approx_schemes.values():
                     approximation.compute_approximations(self, jac=jac)
             else:
@@ -4526,7 +4527,7 @@ class Group(System):
                                 f"{src_idx_found} is unknown. You can specify the src shape for "
                                 "these inputs by setting 'val' or 'src_shape' in a call to "
                                 "set_input_defaults, or by adding an IndepVarComp as the source.",
-                                ident=(self._user_pathname(), tuple(src_idx_found)))
+                                ident=(self.true_pathname, tuple(src_idx_found)))
             return None
 
         return info
@@ -4792,7 +4793,7 @@ class Group(System):
             meta = sorted(metadata)
         inputs = sorted(tgts)
         gpath = common_subpath(tgts)
-        if gpath == self._user_pathname():
+        if gpath == self.true_pathname:
             g = self
         else:
             g = self._get_subsystem(gpath)
@@ -4859,9 +4860,9 @@ class Group(System):
             even if they aren't relevant in terms of data flow.
         """
         if self.nonlinear_solver is not None and self.nonlinear_solver.supports['gradients']:
-            grad_groups.add(self._user_pathname(verbose=False))
+            grad_groups.add(self.true_pathname)
         elif self.linear_solver is not None and isinstance(self.linear_solver, DirectSolver):
-            grad_groups.add(self._user_pathname(verbose=False))
+            grad_groups.add(self.true_pathname)
 
         for s in self._subsystems_myproc:
             if isinstance(s, Group):

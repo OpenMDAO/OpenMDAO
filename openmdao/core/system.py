@@ -194,8 +194,13 @@ class System(object):
     ----------
     name : str
         Name of the system, must be different from siblings.
+    true_name : str
+        The actual name of the system, which in general is just name, but for a CycleGroup it
+        includes information about the cycle.
     pathname : str
-        Global name of the system, including the path.
+        Global name of the system, including the path, but excluding CycleGroups.
+    true_pathname : str
+        Global name of the system, including the path, for all Systems.
     comm : MPI.Comm or <FakeComm>
         MPI communicator object.
     options : OptionsDictionary
@@ -402,7 +407,9 @@ class System(object):
         Initialize all attributes.
         """
         self.name = ''
+        self.true_name = ''
         self.pathname = None
+        self.true_pathname = None
         self.comm = None
         self._is_local = False
 
@@ -568,22 +575,6 @@ class System(object):
         if self.name:
             return f"'{self.name}' <class {type(self).__name__}>"
         return f"<class {type(self).__name__}>"
-
-    def _user_pathname(self, verbose=True):
-        """
-        Return the pathname of this system intended for user facing output.
-
-        Parameters
-        ----------
-        verbose : bool
-            Ignored.
-
-        Returns
-        -------
-        str
-            The pathname of this system intended for user facing output.
-        """
-        return self.pathname
 
     def _get_inst_id(self):
         return self.pathname if self.pathname is not None else ''
@@ -2065,7 +2056,7 @@ class System(object):
         """
         self._reset_setup_vars()
 
-        self.pathname = pathname
+        self.pathname = self.true_pathname = pathname
         self._set_problem_meta(prob_meta)
         self.load_model_options()
 

@@ -115,7 +115,7 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
             if ret is None:
                 continue
 
-        depth = len(s.pathname.split('.')) if s.pathname else 0
+        depth = len(s.true_pathname.replace('...', '').split('.')) if s.true_pathname else 0
         if max_depth != 0 and depth > max_depth:
             continue
 
@@ -124,7 +124,7 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
 
         if isinstance(s, Group):
             cprint("%s " % type(s).__name__, color=Fore.GREEN + Style.BRIGHT)
-            cprint("%s" % s.name)
+            cprint("%s" % s.true_name)
         else:
             if isinstance(s, ImplicitComponent):
                 colr = Back.CYAN + Fore.BLACK + Style.BRIGHT
@@ -228,12 +228,12 @@ def config_summary(problem, stream=sys.stdout):
     locsystems = list(model.system_iter(recurse=True, include_self=True))
     locgroups = [s for s in locsystems if isinstance(s, Group)]
 
-    grpnames = [s.pathname for s in locgroups]
-    sysnames = [s.pathname for s in locsystems]
-    ln_solvers = [(s.pathname, type(s.linear_solver).__name__) for s in locsystems
-                              if s.linear_solver is not None]
-    nl_solvers = [(s.pathname, type(s.nonlinear_solver).__name__) for s in locsystems
-                         if s.nonlinear_solver is not None]
+    grpnames = [s.true_pathname for s in locgroups]
+    sysnames = [s.true_pathname for s in locsystems]
+    ln_solvers = [(s.true_pathname, type(s.linear_solver).__name__) for s in locsystems
+                  if s.linear_solver is not None]
+    nl_solvers = [(s.true_pathname, type(s.nonlinear_solver).__name__) for s in locsystems
+                  if s.nonlinear_solver is not None]
 
     max_depth = max([len(name.split('.')) for name in sysnames])
     setup_done = model._problem_meta['setup_status'] >= _SetupStatus.POST_FINAL_SETUP
