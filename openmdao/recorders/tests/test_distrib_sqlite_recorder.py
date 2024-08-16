@@ -320,7 +320,7 @@ class DistributedRecorderTest(unittest.TestCase):
     def test_sql_meta_file_exists(self):
         # Check that an existing sql_meta file will be deleted/overwritten
         # if it already exists before a run. (see Issue #2062)
-        prob = om.Problem()
+        prob = om.Problem(name='foo')
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
         prob.model.add_design_var('x', lower=0.0, upper=1.0)
@@ -331,14 +331,17 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.driver.options['run_parallel'] = True
         prob.driver.options['procs_per_model'] = 1
 
-        prob.driver.add_recorder(om.SqliteRecorder("./cases.sql"))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.setup()
         prob.run_driver()
         prob.cleanup()
 
+        from openmdao.core.problem import _clear_problem_names
+        _clear_problem_names()
+
         # Run this again. It should NOT throw an exception.
-        prob = om.Problem()
+        prob = om.Problem(name='foo')
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
         prob.model.add_design_var('x', lower=0.0, upper=1.0)
@@ -349,7 +352,7 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.driver.options['run_parallel'] = True
         prob.driver.options['procs_per_model'] = 1
 
-        prob.driver.add_recorder(om.SqliteRecorder("./cases.sql"))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.setup()
 

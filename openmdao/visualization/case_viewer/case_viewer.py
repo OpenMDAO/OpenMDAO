@@ -1,5 +1,6 @@
 """Widgets for accessing CaseReader in a Jupyter notebook."""
 
+import pathlib
 import re
 
 import numpy as np
@@ -312,7 +313,7 @@ class CaseViewer(object):
 
         get_ipython().run_line_magic('matplotlib', 'widget')
 
-        self._case_reader = CaseReader(f) if isinstance(f, str) else f
+        self._case_reader = CaseReader(f) if isinstance(f, (str, pathlib.Path)) else f
 
         self._cmap = cm.viridis
 

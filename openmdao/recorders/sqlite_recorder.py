@@ -5,7 +5,6 @@ Class definition for SqliteRecorder, which provides dictionary backed by SQLite.
 from io import BytesIO
 
 import os.path
-import pathlib
 import gc
 import sqlite3
 from itertools import chain
@@ -156,6 +155,8 @@ class SqliteRecorder(CaseRecorder):
         Flag indicating whether or not the database has been initialized.
     _started : set
         set of recording requesters for which this recorder has been started.
+    _use_outputs_dir : bool
+        Flag indicating if the database is being saved in the problem outputs dir.
     """
 
     def __init__(self, filepath, append=False, pickle_version=PICKLE_VER, record_viewer_data=True):
@@ -174,7 +175,10 @@ class SqliteRecorder(CaseRecorder):
         self._prom2abs = {'input': {}, 'output': {}}
         self._abs2meta = {}
         self._pickle_version = pickle_version
-        self._filepath = pathlib.Path(filepath)
+        self._filepath = str(filepath)
+
+        self._use_outputs_dir = not (os.path.sep in str(filepath) or '/' in str(filepath))
+
         self._database_initialized = False
         self._started = set()
 
@@ -347,7 +351,7 @@ class SqliteRecorder(CaseRecorder):
             raise ValueError('Driver encountered a recording_requester it cannot handle'
                              ': {0}'.format(recording_requester))
 
-        if os.path.sep not in str(self._filepath):
+        if self._use_outputs_dir:
             self._filepath = system.get_outputs_dir() / self._filepath
 
         if not self._database_initialized:

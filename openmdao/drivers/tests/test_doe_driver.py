@@ -1797,13 +1797,13 @@ class TestParallelDOE4Proc(unittest.TestCase):
             # a separate case file will be written by rank 0 of each parallel model
             # (the top two global ranks)
             rank = prob.comm.rank
-            filename = "cases.sql_%d" % rank
+            filename = prob.get_outputs_dir() / f"cases.sql_{rank}"
 
             if rank < num_models:
-                expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
-                self.assertTrue(expect_msg in output)
+                expect_msg = f"Cases from rank {rank} are being written to {filename}."
+                self.assertIn(expect_msg, output)
 
-                cr = om.CaseReader(prob.get_outputs_dir() / filename)
+                cr = om.CaseReader(filename)
                 cases = cr.list_cases('driver')
 
                 # cases recorded on this proc
@@ -1870,15 +1870,15 @@ class TestParallelDOE4Proc(unittest.TestCase):
 
         # there will be a separate case file for each proc, containing the cases
         # run by the instance of the model that runs in serial mode on that proc
-        filename = "cases.sql_%d" % rank
+        filename = prob.get_outputs_dir() / f"cases.sql_{rank}"
 
-        expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
+        expect_msg = f"Cases from rank {rank} are being written to {filename}."
         self.assertTrue(expect_msg in output)
 
         # we are running 4 models in parallel, each using 1 proc
         num_models = prob.comm.size // procs_per_model
 
-        cr = om.CaseReader(prob.get_outputs_dir() / filename)
+        cr = om.CaseReader(filename)
         cases = cr.list_cases('driver', out_stream=None)
 
         # cases recorded on this proc
@@ -2051,10 +2051,10 @@ class TestParallelDOE4Proc(unittest.TestCase):
         prob.cleanup()
 
         # verify we have the single case recording file
-        self.assertTrue(os.path.exists("cases_sequential.sql"))
+        self.assertTrue(os.path.exists(prob.get_outputs_dir() / "cases_sequential.sql"))
 
         # verify we do not have multiple/parallel case recording files
-        filenames = glob.glob('./cases_sequential.sql_*')
+        filenames = glob.glob(f'{prob.get_outputs_dir()}/cases_sequential.sql_*')
         self.assertEqual(len(filenames), 0, f'Found multiple recording files: {filenames}')
 
 
@@ -2204,7 +2204,7 @@ class TestParallelDistribDOE(unittest.TestCase):
         # check recorded cases from each case file
         rank = prob.comm.rank
         if rank == 0:
-            filename0 = "cases.sql_0"
+            filename0 = prob.get_outputs_dir() / "cases.sql_0"
             values = []
 
             cr = om.CaseReader(filename0)
@@ -2222,7 +2222,7 @@ class TestParallelDistribDOE(unittest.TestCase):
                         self.assertEqual(x_inputs.count([n1, n2, n3]), 8)
 
         elif rank == 1:
-            filename0 = "cases.sql_1"
+            filename0 = prob.get_outputs_dir() / "cases.sql_1"
             values = []
 
             cr = om.CaseReader(filename0)
