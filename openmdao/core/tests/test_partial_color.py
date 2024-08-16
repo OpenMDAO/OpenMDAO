@@ -15,18 +15,16 @@ try:
 except ImportError:
     jax = None
 
-from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent, ExecComp, \
-    ExplicitComponent, NonlinearBlockGS, ScipyOptimizeDriver, NewtonSolver, DirectSolver, \
-        ImplicitFuncComp
+from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent, ExplicitComponent, \
+    NonlinearBlockGS, ScipyOptimizeDriver, NewtonSolver, DirectSolver, ImplicitFuncComp
 from openmdao.core.problem import _clear_problem_names
 import openmdao.func_api as omf
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.testing_utils import require_pyoptsparse, use_tempdirs
 from openmdao.utils.mpi import MPI
-from openmdao.utils.coloring import compute_total_coloring, Coloring
+from openmdao.utils.coloring import compute_total_coloring
 
-from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -347,7 +345,6 @@ _BIGMASK = np.array(
 )
 
 
-@use_tempdirs
 class TestColoringExplicit(unittest.TestCase):
     def setUp(self):
         np.random.seed(11)
@@ -358,7 +355,7 @@ class TestColoringExplicit(unittest.TestCase):
                                                                          [1,2,7,19],
                                                                          [1,2,5,11],
                                                                          [True, False]):
-            
+
             with self.subTest(msg=f'{method=} {isplit=} {osplit=} {sparse_partials=}'):
                 prob = Problem(name=f'test_partials_explicit_{method}_'
                                f'{isplit}_{osplit}_{sparse_partials}')
@@ -391,7 +388,7 @@ class TestColoringExplicit(unittest.TestCase):
         for method, isplit, osplit in itertools.product(['fd', 'cs'],
                                                         [1,2,7,19],
                                                         [1,2,5,11]):
-            
+
             with self.subTest(msg=f'{method=} {isplit=} {osplit=}'):
                 probname = f'test_partials_explicit_static_{method}_{isplit}_{osplit}'
                 prob = Problem(name=probname)
@@ -618,7 +615,7 @@ class TestColoringSemitotals(unittest.TestCase):
         np.random.seed(11)
 
     def test_simple_semitotals(self):
-        self.skipTest('Semi-total coloring currently not supported.')          
+        self.skipTest('Semi-total coloring currently not supported.')
         for method, isplit, osplit, sparse_partials in itertools.product(['fd', 'cs'],[1,2,19],[1,2,11],[True, False]):
             with self.subTest(f'{method=} {isplit=} {osplit=} {sparse_partials=}'):
                 probname = f'test_simple_semitotals_{method}_{isplit}_{osplit}_{sparse_partials}'
@@ -631,8 +628,8 @@ class TestColoringSemitotals(unittest.TestCase):
                 model.add_subsystem('indeps', indeps)
                 sub = model.add_subsystem('sub', CounterGroup())
                 sub.declare_coloring('*', method=method)
-                comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=osplit,
-                                                                    sparse_partials=sparse_partials))
+                sub.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=osplit,
+                                                             sparse_partials=sparse_partials))
 
                 for conn in conns:
                     model.connect(*conn)
@@ -647,10 +644,10 @@ class TestColoringSemitotals(unittest.TestCase):
                 prob.set_solver_print(level=0)
                 prob.run_model()
 
-                derivs = prob.driver._compute_totals()  # this is when the dynamic coloring update happens
+                prob.driver._compute_totals()  # this is when the dynamic coloring update happens
 
                 start_nruns = sub._nruns
-                derivs = prob.driver._compute_totals()
+                prob.driver._compute_totals()
                 _check_partial_matrix(sub, sub._jacobian._subjacs_info, sparsity, method)
                 self.assertEqual(sub._nruns - start_nruns, 10)
 
@@ -715,7 +712,7 @@ class TestColoringSemitotals(unittest.TestCase):
                 prob.run_model()
 
                 start_nruns = comp._nruns
-                derivs = prob.driver._compute_totals()
+                prob.driver._compute_totals()
 
                 nruns = comp._nruns - start_nruns
                 self.assertEqual(nruns, 10)
@@ -731,8 +728,8 @@ class TestColoringSemitotals(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         sub = model.add_subsystem('sub', CounterGroup())
         sub.declare_coloring('*', method='fd')
-        comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, 'fd', isplit=1, osplit=1,
-                                                            sparse_partials=False))
+        sub.add_subsystem('comp', SparseCompExplicit(sparsity, 'fd', isplit=1, osplit=1,
+                                                     sparse_partials=False))
         for conn in conns:
             model.connect(*conn)
 
@@ -899,7 +896,7 @@ class TestColoring(unittest.TestCase):
                 indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
 
                 model.add_subsystem('indeps', indeps)
-                comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=2))
+                model.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=2))
                 model.connect('indeps.x0', 'comp.x0')
                 model.connect('indeps.x1', 'comp.x1')
                 model.declare_coloring('*', method=method, step=1e-6 if method=='fd' else None)
@@ -950,7 +947,7 @@ class TestColoring(unittest.TestCase):
                 indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
 
                 model.add_subsystem('indeps', indeps)
-                comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, 'cs', isplit=isplit, osplit=2))
+                model.add_subsystem('comp', SparseCompExplicit(sparsity, 'cs', isplit=isplit, osplit=2))
                 model.connect('indeps.x0', 'comp.x0')
                 model.connect('indeps.x1', 'comp.x1')
 
@@ -1001,7 +998,7 @@ class TestColoring(unittest.TestCase):
 
                 model.nonlinear_solver = NonlinearBlockGS()
                 model.add_subsystem('indeps', indeps)
-                comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, method, isplit=isplit, osplit=2))
+                model.add_subsystem('comp', SparseCompImplicit(sparsity, method, isplit=isplit, osplit=2))
                 model.connect('indeps.x0', 'comp.x0')
                 model.connect('indeps.x1', 'comp.x1')
 
@@ -1050,9 +1047,9 @@ class TestColoring(unittest.TestCase):
                 indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
 
                 model.add_subsystem('indeps', indeps)
-                comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, method,
-                                                                    isplit=isplit, osplit=2,
-                                                                    sparse_partials=sparse_partials))
+                model.add_subsystem('comp', SparseCompExplicit(sparsity, method,
+                                                               isplit=isplit, osplit=2,
+                                                               sparse_partials=sparse_partials))
 
                 model.connect('indeps.x0', 'comp.x0')
                 model.connect('indeps.x1', 'comp.x1')
@@ -1261,7 +1258,7 @@ class TestStaticColoring(unittest.TestCase):
                                                         [1,2,11]):
             with self.subTest(msg=f'{method=}_{isplit=}_{osplit=}'):
                 prob = Problem(name=f'test_static_totals_over_implicit_comp_{method}_{isplit}_{osplit}')
-                        
+
                 model = prob.model
 
                 sparsity = setup_sparsity(_BIGMASK)
@@ -1288,7 +1285,7 @@ class TestStaticColoring(unittest.TestCase):
                 model._save_coloring(compute_total_coloring(prob))
 
                 _clear_problem_names()
-                prob = Problem(name=f'test_static_totals_over_implicit_comp_{method}_{isplit}_{osplit}')      
+                prob = Problem(name=f'test_static_totals_over_implicit_comp_{method}_{isplit}_{osplit}')
                 model = prob.model
 
                 indeps, conns = setup_indeps(isplit, _BIGMASK.shape[1], 'indeps', 'comp')
@@ -1328,7 +1325,7 @@ class TestStaticColoring(unittest.TestCase):
         for method in ['fd', 'cs']:
             with self.subTest(msg=f'{method=}'):
                 prob = Problem(name=f'test_totals_of_indices_{method}')
-                
+
                 model = prob.model
 
                 mask = np.array(
@@ -1559,7 +1556,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
     # semi-total coloring feature disabled.
 
     def test_simple_semitotals_all_local_vars(self):
-        raise self.skipTest('Semi-total coloring currently not supported.')          
+        raise self.skipTest('Semi-total coloring currently not supported.')
         for method in ['fd', 'cs']:
             with self.subTest(msg=f'{method=}'):
                 MPI.COMM_WORLD.barrier()
@@ -1710,6 +1707,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
                 _check_partial_matrix(comp, jac, sparsity, method)
 
     def test_simple_partials_explicit(self):
+        from openmdao.utils.reports_system import clear_report_registry
         for method in ['fd', 'cs']:
             with self.subTest(msg=f'{method=}'):
                 prob = Problem(name=f'test_simple_partials_explicit_{method}')
@@ -1744,12 +1742,13 @@ class TestStaticColoringParallelCS(unittest.TestCase):
                 prob.run_model()
                 coloring = comp._compute_coloring(wrt_patterns='x*', method=method)[0]
                 comp._save_coloring(coloring)
-                
+
                 # make sure coloring file exists by the time we try to load the spec
                 MPI.COMM_WORLD.barrier()
 
                 # now create a new problem and use the previously generated coloring
                 _clear_problem_names()
+                clear_report_registry()
                 prob = Problem(name=f'test_simple_partials_explicit_{method}')
                 model = prob.model
 

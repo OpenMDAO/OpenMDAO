@@ -1,7 +1,6 @@
 """Base class used to define the interface for derivative approximation schemes."""
 import time
 from collections import defaultdict
-from itertools import repeat
 import numpy as np
 
 from openmdao.core.constants import INT_DTYPE

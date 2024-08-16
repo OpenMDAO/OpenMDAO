@@ -116,8 +116,8 @@ class CmdlineTestCase(unittest.TestCase):
         # check the expected output at all.  The underlying functions that implement the
         # commands should be tested seperately.
         try:
-            output = subprocess.check_output(cmd.split(),
-                                             stderr=subprocess.STDOUT)  # nosec: trusted input
+            subprocess.check_output(cmd.split(),
+                                    stderr=subprocess.STDOUT)  # nosec: trusted input
         except subprocess.CalledProcessError as err:
             self.fail(f"Command '{cmd}' failed.  Return code: {err.returncode}: "
                       f"Output was: \n{err.output.decode('utf-8')}")
@@ -204,7 +204,7 @@ class CmdlineTestfuncTestCase(unittest.TestCase):
         # check the expected output at all.  The underlying functions that implement the
         # commands should be tested seperately.
         try:
-            output = subprocess.check_output(cmd.split())  # nosec: trusted input
+            subprocess.check_output(cmd.split())  # nosec: trusted input
         except subprocess.CalledProcessError as err:
             self.fail(f"Command '{cmd}' failed.  Return code: {err.returncode} "
                       f"Output was: \n{err.output.decode('utf-8')}")

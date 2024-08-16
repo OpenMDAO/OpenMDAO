@@ -1132,7 +1132,7 @@ class ShapedMultiIndexer(Indexer):
             The index array into a flat array.
         """
         if self._src_shape is None:
-            raise ValueError(f"Can't determine extent of array because source shape is not known.")
+            raise ValueError("Can't determine extent of array because source shape is not known.")
 
         idxs = np.arange(shape_to_len(self._src_shape), dtype=np.int32).reshape(self._src_shape)
 
@@ -1243,7 +1243,7 @@ class MultiIndexer(ShapedMultiIndexer):
             self._shaped_inst = ShapedMultiIndexer(tuple(idxer.shaped_instance()()
                                                          for idxer in self._idx_list),
                                                    flat_src=self._flat_src)
-        except Exception as err:
+        except Exception:
             self._shaped_inst = None
         else:
             self._shaped_inst.set_src_shape(self._src_shape)

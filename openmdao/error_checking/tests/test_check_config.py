@@ -49,21 +49,11 @@ class TestCheckConfig(unittest.TestCase):
         p.setup(check=['cycles', 'out_of_order'], logger=testlogger)
         p.final_setup()
 
-        expected_info = (
-            "The following groups contain cycles:\n"
-            "   Group '' has the following cycles: [['C1', 'C2', 'C4']]\n"
-        )
-
-        expected_warning = (
-            "The following systems are executed out-of-order:\n"
-            "   System 'C3' executes out-of-order with respect to its source systems ['C4']\n"
-        )
-
-        msg = '\n'.join(testlogger._msgs['info'])
         testlogger.find_in('info', "The following groups contain cycles:")
         testlogger.find_in('info', "   Group '' has the following cycles:")
         testlogger.find_in('info', "      ['C1', 'C2', 'C4']")
-        testlogger.find_in('warning', expected_warning)
+        testlogger.find_in('warning', "The following systems are executed out-of-order:\n"
+            "   System 'C3' executes out-of-order with respect to its source systems ['C4']\n")
 
     def test_parallel_group_order(self):
         prob = om.Problem()

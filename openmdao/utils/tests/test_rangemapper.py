@@ -1,7 +1,6 @@
 import unittest
 
-from openmdao.utils.assert_utils import assert_near_equal
-from openmdao.utils.rangemapper import RangeMapper, RangeTree, FlatRangeMapper, MAX_FLAT_RANGE_SIZE
+from openmdao.utils.rangemapper import RangeMapper, RangeTree, FlatRangeMapper
 
 
 _data = {

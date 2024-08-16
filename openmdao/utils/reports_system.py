@@ -2,12 +2,10 @@
 Utility functions related to the reporting system which generates reports by default for all runs.
 """
 
-from collections import namedtuple
 import os
 import inspect
+import pathlib
 from itertools import chain
-
-from numpy import isin
 
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.hooks import _register_hook, _unregister_hook
@@ -655,7 +653,7 @@ def _add_dir_to_tree(dirpath, lines, explevel, level, to_match):
             lines.append('</li>')
             return
 
-    lines.append(f'<ul>')
+    lines.append('<ul>')
 
     for f in chain(files, sorted(directories)):
         path = os.path.join(dirpath, f)

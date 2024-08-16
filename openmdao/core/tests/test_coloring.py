@@ -470,7 +470,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         SIZE = 0
         p = om.Problem()
 
-        arctan_yox = p.model.add_subsystem('arctan_yox', DynamicPartialsComp(SIZE))
+        p.model.add_subsystem('arctan_yox', DynamicPartialsComp(SIZE))
 
         p.driver = om.ScipyOptimizeDriver()
         p.driver.options['optimizer'] = 'SLSQP'
@@ -511,7 +511,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         SIZE = 0
         p = om.Problem()
 
-        arctan_yox = p.model.add_subsystem('arctan_yox', DynamicPartialsComp(SIZE))
+        p.model.add_subsystem('arctan_yox', DynamicPartialsComp(SIZE))
 
         p.driver = om.ScipyOptimizeDriver()
         p.driver.options['optimizer'] = 'SLSQP'
@@ -535,7 +535,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
         try:
             OPT('SLSQP')
-        except:
+        except Exception:
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
         p_color = run_opt(pyOptSparseDriver, 'auto', optimizer='SLSQP', print_results=False,
@@ -581,7 +581,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_print_options_total_with_coloring_rev(self):
         # first, run w/o coloring
-        p = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False)
+        run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False)
         p_color = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False,
                           dynamic_total_coloring=True, debug_print=['totals'])
 
@@ -654,7 +654,7 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
 
         try:
             OPT('SLSQP')
-        except:
+        except Exception:
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
         p_color = run_opt(pyOptSparseDriver, 'rev', optimizer='SLSQP', print_results=False,
@@ -686,7 +686,7 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
 
         try:
             OPT('SLSQP')
-        except:
+        except Exception:
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
         # run w/o coloring
@@ -740,7 +740,7 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
 
         try:
             OPT('SLSQP')
-        except:
+        except Exception:
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
         p = run_opt(pyOptSparseDriver, 'auto', optimizer='SLSQP', print_results=False, con_alias=True)
@@ -773,7 +773,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         coloring = p_color_fwd.driver._coloring_info.coloring
 
         with self.assertRaises(Exception) as context:
-            p_color = run_opt(om.ScipyOptimizeDriver, 'rev', color_info=coloring, optimizer='SLSQP', disp=False)
+            run_opt(om.ScipyOptimizeDriver, 'rev', color_info=coloring, optimizer='SLSQP', disp=False)
         self.assertEqual(str(context.exception),
                          "Simultaneous coloring does forward solves but mode has been set to 'rev'")
 
@@ -1098,7 +1098,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
         coloring = p_color_rev.driver._coloring_info.coloring
 
         with self.assertRaises(Exception) as context:
-            p_color = run_opt(om.ScipyOptimizeDriver, 'fwd', color_info=coloring, optimizer='SLSQP', disp=False)
+            run_opt(om.ScipyOptimizeDriver, 'fwd', color_info=coloring, optimizer='SLSQP', disp=False)
         self.assertEqual(str(context.exception),
                          "Simultaneous coloring does reverse solves but mode has been set to 'fwd'")
 
@@ -1122,8 +1122,8 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
 
     def test_dynamic_total_coloring_no_derivs(self):
         with self.assertRaises(Exception) as context:
-            p_color = run_opt(om.ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False,
-                              dynamic_total_coloring=True, derivs=False)
+            run_opt(om.ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False,
+                    dynamic_total_coloring=True, derivs=False)
         self.assertEqual(str(context.exception),
                          "Derivative support has been turned off but compute_totals was called.")
 
@@ -1133,7 +1133,7 @@ def _test_func_name(func, num, param):
     for p in param.args:
         try:
             arg = p.__name__
-        except:
+        except Exception:
             arg = str(p)
         args.append(arg)
     return func.__name__ + '_'.join(args)
@@ -1562,7 +1562,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
         with open('_bad_format_', 'w') as f:
             f.write('asdfas asdfasdf;lkjasdflkjas df sadf;jasdf;lkja')
         with self.assertRaises(RuntimeError) as ctx:
-            c = Coloring.load('_bad_format_')
+            Coloring.load('_bad_format_')
 
         self.assertEqual(ctx.exception.args[0], "File '_bad_format_' is not a valid coloring file.")
 
@@ -1572,7 +1572,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
             pickle.dump(s, f)
 
         with self.assertRaises(RuntimeError) as ctx:
-            c = Coloring.load('_bad_pickle_')
+            Coloring.load('_bad_pickle_')
 
         self.assertEqual(ctx.exception.args[0], "File '_bad_pickle_' is not a valid coloring file.")
 

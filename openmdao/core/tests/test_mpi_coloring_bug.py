@@ -12,9 +12,6 @@ from openmdao.utils.testing_utils import use_tempdirs
 # check that pyoptsparse is installed
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 
-if OPTIMIZER:
-    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
-
 
 class TrajDesignParameterOptionsDictionary(om.OptionsDictionary):
 

@@ -33,7 +33,7 @@ classifiers = [
 ]
 dependencies = [
     "networkx>=2.0",
-    "numpy<2",
+    "numpy",
     "packaging",
     "requests",
     "scipy",
@@ -176,3 +176,22 @@ path = "openmdao/__init__.py"
 include = [
     "/openmdao",
 ]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.format]
+line-ending = "lf"
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+# Ignore `F401` (unused import) in api files.
+"api.py" = ["F401"]
+"parallel_api.py" = ["F401"]
+"__init__.py" = ["F401"]
+# Ignore files in the test suite.
+"**/test_suite/**" = ["E","F"]
+# Allow variable name I for current
+"**/extcode_resistor.py" = ["E741"]

@@ -1,9 +1,7 @@
 """Define the LinearBlockGS class."""
 
-import sys
 import numpy as np
 
-from openmdao.core.constants import _UNDEFINED
 from openmdao.solvers.solver import BlockLinearSolver
 
 

@@ -106,8 +106,8 @@ class FanInGrouped2(om.Group):
     def __init__(self):
         super().__init__()
 
-        p1 = self.add_subsystem('p1', om.IndepVarComp('x', 1.0))
-        p2 = self.add_subsystem('p2', om.IndepVarComp('x', 1.0))
+        self.add_subsystem('p1', om.IndepVarComp('x', 1.0))
+        self.add_subsystem('p2', om.IndepVarComp('x', 1.0))
 
         self.sub = self.add_subsystem('sub', om.ParallelGroup())
         self.sub.add_subsystem('c1', om.ExecComp(['y=-2.0*x']))

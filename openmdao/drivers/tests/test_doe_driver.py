@@ -1271,8 +1271,6 @@ class TestDOEDriver(unittest.TestCase):
         prob.cleanup()
 
         cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
-        cases = cr.list_cases('problem', out_stream=None)
-
         case = cr.get_case('end')
         inputs = case.inputs
         outputs = case.outputs
@@ -1565,43 +1563,6 @@ class TestDOEDriver(unittest.TestCase):
         for case in cases:
             derivs = cr.get_case(case).derivatives
             self.assertIsNone(derivs)
-
-
-@use_tempdirs
-class TestDOEDriverListVars(unittest.TestCase):
-
-    def test_list_driver_vars(self):
-        # this passes if no exception is raised
-
-        prob = om.Problem()
-        model = prob.model
-
-        # Add independent variables
-        indeps = model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
-        indeps.add_discrete_output('x', 4)
-        indeps.add_discrete_output('y', 3)
-
-        # Add components
-        model.add_subsystem('parab', ParaboloidDiscrete(), promotes=['*'])
-
-        # Specify design variable range and objective
-        model.add_design_var('x')
-        model.add_design_var('y')
-        model.add_objective('f_xy')
-
-        samples = [[('x', 5), ('y', 1)],
-                   [('x', 3), ('y', 6)],
-                   [('x', -1), ('y', 3)],
-        ]
-
-        # Setup driver for 3 cases at a time
-        prob.driver = om.DOEDriver(om.ListGenerator(samples))
-
-        prob.setup(derivatives=False)
-        prob.run_driver()
-        prob.cleanup()
-
-        prob.list_driver_vars()
 
 
 @use_tempdirs

@@ -22,36 +22,36 @@ class TestCodeUtils(unittest.TestCase):
 class TestLambdaPickleWrapper(unittest.TestCase):
 
     def test_init(self):
-        func = lambda x: x + 1
+        func = lambda x: x + 1  # noqa
         wrapper = LambdaPickleWrapper(func)
         self.assertEqual(wrapper._func, func)
 
     def test_call(self):
-        func = lambda x: x + 1
+        func = lambda x: x + 1  # noqa
         wrapper = LambdaPickleWrapper(func)
         self.assertEqual(wrapper(1), 2)
 
     def test_getstate(self):
-        func = lambda x: x + 1
+        func = lambda x: x + 1  # noqa
         wrapper = LambdaPickleWrapper(func)
         state = wrapper.__getstate__()
         self.assertEqual(state['_func'], wrapper._getsrc())
 
     def test_setstate(self):
-        func = lambda x: x + 1
+        func = lambda x: x + 1  # noqa
         wrapper = LambdaPickleWrapper(func)
         state = {'_func': 'lambda x: x + 2', '_src': None}
         wrapper.__setstate__(state)
         self.assertEqual(wrapper(1), 3)
 
     def test_getsrc(self):
-        func = lambda x: x + 1
+        func = lambda x: x + 1  # noqa
         wrapper = LambdaPickleWrapper(func)
         src = wrapper._getsrc()
         self.assertEqual(src, 'lambda x: x + 1')
 
     def test_pickle(self):
-        func = lambda x: x + 1
+        func = lambda x: x + 1  # noqa
         wrapper = LambdaPickleWrapper(func)
         pkl = pickle.dumps(wrapper)
         wrapper2 = pickle.loads(pkl)

@@ -209,7 +209,7 @@ class TestSystem(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             prob.model.list_inputs(return_format=dict)
 
-        msg = f"Invalid value (<class 'dict'>) for return_format, " \
+        msg = "Invalid value (<class 'dict'>) for return_format, " \
               "must be a string value of 'list' or 'dict'"
 
         self.assertEqual(str(cm.exception), msg)
@@ -217,7 +217,7 @@ class TestSystem(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             prob.model.list_outputs(return_format='dct')
 
-        msg = f"Invalid value ('dct') for return_format, " \
+        msg = "Invalid value ('dct') for return_format, " \
               "must be a string value of 'list' or 'dict'"
 
         self.assertEqual(str(cm.exception), msg)

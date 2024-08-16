@@ -1,9 +1,5 @@
-import unittest
 
 from openmdao.api import ExplicitComponent
-from openmdao.api import Problem, IndepVarComp
-
-from openmdao.utils.mpi import MPI
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector

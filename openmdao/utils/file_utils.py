@@ -1,19 +1,16 @@
 """
 Utilities for working with files.
 """
-from collections.abc import Iterable
-from itertools import chain
-from multiprocessing import Value
 import sys
 import os
 import importlib
 import types
+from collections.abc import Iterable
 from fnmatch import fnmatch
 from os.path import join, basename, dirname, isfile, split, splitext, abspath
 import pathlib
 import shutil
 
-import openmdao
 from openmdao.utils.om_warnings import issue_warning
 
 
@@ -588,18 +585,19 @@ def clean_outputs(obj='.', recurse=False, prompt=True, dryrun=False):
     else:
         print(f'Found {len(output_dirs)} OpenMDAO output directories:')
 
+    removed_count = 0
     for dir_path in sorted(output_dirs):
-        print(f"  {dir_path}")
+        if dryrun:
+            print(f'Would remove {dir_path} (dryrun = True).')
+        elif prompt:
+            response = input(f"Remove {dir_path}? [y/N] ").strip().lower()
+            if response == 'y':
+                shutil.rmtree(dir_path)
+                print(f'Removed {dir_path}')
+                removed_count += 1
+        else:
+            shutil.rmtree(dir_path)
+            print(f'Removed {dir_path}')
+            removed_count += 1
 
-    if dryrun:
-        print(f'Would remove {len(output_dirs)} output directories (dryrun = True).')
-        return
-    if prompt:
-        response = input(f"Do you want to remove {len(output_dirs)} output "
-                         "directories? [y/N] ").strip().lower()
-        if response != 'y':
-            return
-    for dir_path in sorted(output_dirs):
-        shutil.rmtree(dir_path)
-
-    print(f"Removed {len(output_dirs)} OpenMDAO output directories.")
+    print(f'Removed {removed_count} OpenMDAO output directories.')

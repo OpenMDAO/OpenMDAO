@@ -1,8 +1,7 @@
 from openmdao.visualization.htmlpp import HtmlPreprocessor
 from num2words import num2words
-import json
 import os
-import inspect 
+import inspect
 import sys
 
 default_output_filename = 'gen_diag.html' if len(sys.argv) < 2 else sys.argv[1]
@@ -48,7 +47,7 @@ for x in range (1,3):
                 'type': 'output',
                 'val': 1111 * z + 20 * y + x
             }
-            ch1.append(newchild3) 
+            ch1.append(newchild3)
 
 model_data['connections_list'] = (
     { 'src': 'grp_one.child_one.output_1_1', 'tgt': 'grp_one.child_two.input_2_1'},
@@ -56,7 +55,7 @@ model_data['connections_list'] = (
     { 'src': 'grp_one.child_three.output_3_1', 'tgt': 'grp_two.child_four.input_4_1'},
     { 'src': 'grp_one.child_one.output_1_2', 'tgt': 'grp_two.child_two.input_2_1'},
     { 'src': 'grp_two.child_two.output_2_1', 'tgt': 'grp_one.child_two.input_2_1'},
-    
+
 )
 
 # pretty = json.dumps(model_data, indent=2)
@@ -72,7 +71,7 @@ html_vars = {
     'model_data': model_data
 }
 
-import openmdao
+import openmdao  # noqa: E402
 openmdao_dir = os.path.dirname(inspect.getfile(openmdao))
 vis_dir = os.path.join(openmdao_dir, "visualization/n2_viewer")
 

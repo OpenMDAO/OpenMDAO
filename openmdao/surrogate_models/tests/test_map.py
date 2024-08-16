@@ -1,4 +1,4 @@
-from openmdao.api import Group, Problem, MetaModelUnStructuredComp, NearestNeighbor
+from openmdao.api import Problem, MetaModelUnStructuredComp, NearestNeighbor
 from openmdao.utils.assert_utils import assert_near_equal
 
 import numpy as np

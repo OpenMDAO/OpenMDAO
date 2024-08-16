@@ -15,7 +15,6 @@ from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatV
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 from openmdao.test_suite.components.array_comp import ArrayComp
-from openmdao.test_suite.scripts.circle_opt import CircleOpt
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_no_warning, \
      assert_check_partials
 from openmdao.utils.om_warnings import DerivativesWarning, OMInvalidCheckDerivativesOptionsWarning
@@ -1235,7 +1234,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count('n/a'), 25)
         self.assertEqual(stream.getvalue().count('rev'), 15)
         self.assertEqual(stream.getvalue().count('Component'), 2)
-        self.assertEqual(len([l for l in stream.getvalue().splitlines() if l.startswith('| ')]), 12) # counts rows (including headers)
+        self.assertEqual(len([ln for ln in stream.getvalue().splitlines() if ln.startswith('| ')]), 12) # counts rows (including headers)
 
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=False)
@@ -1321,7 +1320,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count('n/a'), 10)
         self.assertEqual(stream.getvalue().count('rev'), 15)
         self.assertEqual(stream.getvalue().count('Component'), 2)
-        self.assertEqual(len([l for l in stream.getvalue().splitlines() if l.startswith('| ')]), 8)
+        self.assertEqual(len([ln for ln in stream.getvalue().splitlines() if ln.startswith('| ')]), 8)
 
         stream = StringIO()
         partials_data = prob.check_partials(out_stream=stream, compact_print=False)
@@ -1458,7 +1457,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         assert_check_partials(data, atol=1.0E-8, rtol=1.0E-8)
 
         stream = StringIO()
-        J = prob.check_partials(out_stream=stream, compact_print=True)
+        prob.check_partials(out_stream=stream, compact_print=True)
         output = stream.getvalue()
         self.assertTrue("(d)'x1'" in output)
         self.assertTrue("(d)'x2'" in output)
@@ -1570,7 +1569,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        mycomp = model.add_subsystem('mycomp', ArrayCompMatrixFree(), promotes=['*'])
+        model.add_subsystem('mycomp', ArrayCompMatrixFree(), promotes=['*'])
 
         np.random.seed(1)
 
@@ -1632,7 +1631,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        mycomp = model.add_subsystem('mycomp', ArrayCompMatrixFree(), promotes=['*'])
+        model.add_subsystem('mycomp', ArrayCompMatrixFree(), promotes=['*'])
 
         np.random.seed(1)
 
@@ -1707,13 +1706,13 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        mycomp = model.add_subsystem('mycomp', ArrayCompMatrixFree(), promotes=['*'])
+        model.add_subsystem('mycomp', ArrayCompMatrixFree(), promotes=['*'])
 
         prob.setup()
         prob.run_model()
 
         with self.assertRaises(ValueError) as cm:
-            J = prob.check_partials(method='fd', out_stream=None)
+            prob.check_partials(method='fd', out_stream=None)
 
         msg = "'mycomp' <class ArrayCompMatrixFree>: For matrix free components, directional should be set to True for all inputs."
         self.assertEqual(str(cm.exception), msg)
@@ -1836,7 +1835,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup()
 
         stream = StringIO()
-        data = prob.check_partials(out_stream=stream)
+        prob.check_partials(out_stream=stream)
         lines = stream.getvalue().splitlines()
 
         self.assertTrue("Relative Error (Jfor - Jfd) / Jfor : 1." in lines[10])
@@ -1959,7 +1958,7 @@ class TestCheckPartialsDistribDirectional(unittest.TestCase):
         prob.setup(force_alloc_complex=True, mode='rev')
         prob.run_model()
         # this test passes if this call doesn't raise an exception
-        partials = prob.check_partials(compact_print=True, method='cs')
+        prob.check_partials(compact_print=True, method='cs')
 
 
 class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
@@ -2322,7 +2321,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        data = prob.check_partials(out_stream=None, compact_print=True)
+        prob.check_partials(out_stream=None, compact_print=True)
 
     def test_set_step_on_comp(self):
 
@@ -2406,9 +2405,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        stream = StringIO()
-        prob.check_partials(form='central', compact_print=True, out_stream=stream)
-        contents = stream.getvalue()
+        prob.check_partials(form='central', compact_print=True)
 
     def test_set_step_calc_global(self):
 
@@ -2500,12 +2497,12 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        mycomp = model.add_subsystem('mycomp', ArrayComp(), promotes=['*'])
+        model.add_subsystem('mycomp', ArrayComp(), promotes=['*'])
 
         prob.setup()
         prob.run_model()
 
-        data = prob.check_partials()
+        prob.check_partials()
 
     def test_directional_matrix_free(self):
 
@@ -2564,7 +2561,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        data = prob.check_partials()
+        prob.check_partials()
 
     def test_directional_sparse_deriv(self):
 
@@ -2743,7 +2740,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
     def test_single_fd_step_fwd(self):
         p = self.setup_model()
         stream = StringIO()
-        J = p.check_partials(step=[1e-6], out_stream=stream)
+        p.check_partials(step=[1e-6], out_stream=stream)
         contents = stream.getvalue()
         ncomps = 2
         nderivs = ncomps * 2
@@ -2759,7 +2756,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
     def test_single_fd_step_compact(self):
         p = self.setup_model()
         stream = StringIO()
-        J = p.check_partials(step=[1e-6], compact_print=True, out_stream=stream)
+        p.check_partials(step=[1e-6], compact_print=True, out_stream=stream)
         contents = stream.getvalue()
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
@@ -2779,7 +2776,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
     def test_single_cs_step_compact(self):
         p = self.setup_model()
         stream = StringIO()
-        J = p.check_partials(method='cs', step=[1e-30], compact_print=True, out_stream=stream)
+        p.check_partials(method='cs', step=[1e-30], compact_print=True, out_stream=stream)
         contents = stream.getvalue()
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
@@ -2799,7 +2796,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
     def test_multi_fd_steps(self):
         p = self.setup_model()
         stream = StringIO()
-        J = p.check_partials(step=[1e-6, 1e-7], out_stream=stream)
+        p.check_partials(step=[1e-6, 1e-7], out_stream=stream)
         contents = stream.getvalue()
         ncomps = 2
         nderivs = ncomps * 2
@@ -2813,7 +2810,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
     def test_multi_fd_steps_compact(self):
         p = self.setup_model()
         stream = StringIO()
-        J = p.check_partials(step=[1e-6, 1e-7], compact_print=True, out_stream=stream)
+        p.check_partials(step=[1e-6, 1e-7], compact_print=True, out_stream=stream)
         contents = stream.getvalue()
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
@@ -2833,7 +2830,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
     def test_multi_cs_steps_compact(self):
         p = self.setup_model()
         stream = StringIO()
-        J = p.check_partials(method='cs', step=[1e-6, 1e-7], compact_print=True, out_stream=stream)
+        p.check_partials(method='cs', step=[1e-6, 1e-7], compact_print=True, out_stream=stream)
         contents = stream.getvalue()
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
@@ -2853,7 +2850,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
     def test_multi_fd_steps_compact_directional(self):
         p = self.setup_model(directional=True)
         stream = StringIO()
-        J = p.check_partials(step=[1e-6, 1e-7], compact_print=True, out_stream=stream)
+        p.check_partials(step=[1e-6, 1e-7], compact_print=True, out_stream=stream)
         contents = stream.getvalue()
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)

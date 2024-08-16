@@ -324,7 +324,7 @@ class LintTestCase(unittest.TestCase):
             return []
 
         doc_returns = numpy_doc_string['Returns']
-        doc_yields = numpy_doc_string['Yields']
+        # doc_yields = numpy_doc_string['Yields']
 
         # TODO:  Enforce Yields in docs for contextmanagers
         if _is_context_manager(func):
@@ -340,11 +340,9 @@ class LintTestCase(unittest.TestCase):
             # Check formatting
             for (name, typ, desc) in doc_returns:
                 if name_required and not name:
-                    new_failures.append('no detectable name for Return '
-                                        'value'.format(name))
+                    new_failures.append('no detectable name for Return value')
                 if desc == '':
-                    new_failures.append('no description given for Return '
-                                        '{0}'.format(name))
+                    new_failures.append(f'no description given for Return {name}')
 
         return new_failures
 
@@ -517,6 +515,7 @@ class LintTestCase(unittest.TestCase):
 
     def test_docstrings(self):
         failures = {}
+
         # Loop over directories
         for dirpath in sorted(directories):
 
@@ -550,7 +549,7 @@ class LintTestCase(unittest.TestCase):
                         full_class_path = f'{module_name}.{class_name}'
                         try:
                             result = validate.validate(full_class_path)
-                        except:
+                        except Exception:
                             continue
 
                         failures.update(self._failure_dict(full_class_path, result))
@@ -569,7 +568,7 @@ class LintTestCase(unittest.TestCase):
                                 full_method_path = f'{module_name}.{class_name}.{method_name}'
                                 try:
                                     result = validate.validate(full_method_path)
-                                except:
+                                except Exception:
                                     continue
 
                                 failures.update(self._failure_dict(full_method_path, result))
@@ -587,7 +586,7 @@ class LintTestCase(unittest.TestCase):
                             full_function_path = f'{module_name}.{func_name}'
                             try:
                                 result = validate.validate(full_function_path)
-                            except:
+                            except Exception:
                                 continue
 
                             failures.update(self._failure_dict(full_function_path, result))
@@ -596,12 +595,20 @@ class LintTestCase(unittest.TestCase):
             msg = '\n'
             count = 0
             for key in failures:
+                # numpydoc 1.8.0rc2 introduces a bug that causes this decorator to fail the YD01 check
+                # (https://github.com/numpy/numpydoc/pull/541)
+                if key == 'openmdao.utils.options_dictionary.OptionsDictionary.temporary':
+                    try:
+                        failures[key].remove('YD01: No Yields section found')
+                    except ValueError:
+                        pass
                 msg += f'{key}\n'
                 count += len(failures[key])
                 for failure in failures[key]:
                     msg += f'    {failure}\n'
-            msg += f'Found {count} issues in docstrings'
-            self.fail(msg)
+            if count:
+                msg += f'Found {count} issues in docstrings'
+                self.fail(msg)
 
 
 if __name__ == '__main__':

@@ -9,8 +9,6 @@ from packaging.version import Version
 import numpy as np
 from scipy import __version__ as scipy_version
 
-ScipyVersion = Version(scipy_version)
-
 import openmdao.api as om
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense, TestExplCompArraySparse, TestExplCompArrayJacVec
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -31,6 +29,10 @@ try:
 except ImportError:
     vector_class = om.DefaultVector
     PETScVector = None
+
+
+ScipyVersion = Version(scipy_version)
+
 
 def rosenbrock(x):
     x_0 = x[:-1]
@@ -156,7 +158,6 @@ class TestMPIScatter(unittest.TestCase):
 
         prob.run_driver()
 
-        desvar = prob.driver.get_design_var_values()
         con = prob.driver.get_constraint_values()
         obj = prob.driver.get_objective_values()
 
@@ -1650,7 +1651,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
-        failed = not prob.run_driver().success
+        prob.run_driver()
 
         assert_near_equal(prob['z'][0], 1.9776, 1e-3)
         assert_near_equal(prob['z'][1], 0.0, 1e-3)

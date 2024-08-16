@@ -12,7 +12,6 @@ import networkx as nx
 
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
-from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.general_utils import all_ancestors
 from openmdao.utils.file_utils import _load_and_exec
 import openmdao.utils.hooks as hooks
@@ -572,7 +571,7 @@ def write_graph(G, prog='dot', display=True, outfile='graph.html'):
         The graph that was written.
     """
     if pydot is None:
-        raise RuntimeError(f"write_graph requires pydot.  Install pydot using "
+        raise RuntimeError("write_graph requires pydot.  Install pydot using "
                            "'pip install pydot'. Note that pydot requires graphviz, which is a "
                            "non-Python application.\nIt can be installed at the system level "
                            "or via a package manager like conda.")

@@ -291,8 +291,8 @@ def _clean_setup_parser(parser):
         The parser we're adding options to.
     """
     parser.add_argument('path', nargs='*', default='.',
-                        help='Path(s) from which OpenMDAO output directories should be remove.')
-    parser.add_argument('-f', '--force', action='store_true', dest='force',
+                        help='Path(s) from which OpenMDAO output directories should be removed.')
+    parser.add_argument('-f', '--noprompt', action='store_false', dest='prompt',
                         help='Remove output directories without confirmation.')
     parser.add_argument('-n', '--norecurse', action='store_true', dest='no_recurse',
                         help='Do not recurse into subdirectories to find directories to remove.')
@@ -311,7 +311,7 @@ def _clean_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    clean_outputs(options.path, recurse=not options.no_recurse, prompt=not options.force,
+    clean_outputs(options.path, recurse=not options.no_recurse, prompt=options.prompt,
                   dryrun=options.dryrun)
 
 
