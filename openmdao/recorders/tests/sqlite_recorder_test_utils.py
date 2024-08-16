@@ -70,11 +70,11 @@ def get_format_version_abs2meta(db_cur):
     return f_version, abs2meta, prom2abs, conns
 
 
-def assertProblemDataRecorded(test, expected, tolerance):
+def assertProblemDataRecorded(test, filepath, expected, tolerance):
     """
     Expected can be from multiple cases.
     """
-    with database_cursor(test.filename) as db_cur:
+    with database_cursor(filepath) as db_cur:
         f_version, abs2meta, prom2abs, conns = get_format_version_abs2meta(db_cur)
 
         # iterate through the cases

@@ -353,19 +353,21 @@ class DistributedRecorderTest(unittest.TestCase):
 
         prob.setup()
 
+        outputs_dir = prob.get_outputs_dir()
+
         if prob.comm.rank == 0:
             expected_warnings = [
                 (UserWarning,
-                'The existing case recorder metadata file, ./cases.sql_meta, '
+                f'The existing case recorder metadata file, {outputs_dir}/cases.sql_meta, '
                 'is being overwritten.'),
                 (UserWarning,
-                'The existing case recorder file, ./cases.sql_0, is being '
+                f'The existing case recorder file, {outputs_dir}/cases.sql_0, is being '
                 'overwritten.'),
             ]
         else:
             expected_warnings = [
                 (UserWarning,
-                    'The existing case recorder file, ./cases.sql_1, is being '
+                    f'The existing case recorder file, {outputs_dir}/cases.sql_1, is being '
                     'overwritten.'),
             ]
         with assert_warnings(expected_warnings):
