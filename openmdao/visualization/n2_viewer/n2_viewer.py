@@ -1,6 +1,7 @@
 """Code for generating N2 diagram."""
 import inspect
 import os
+import pathlib
 import sys
 from operator import itemgetter
 

@@ -225,7 +225,7 @@ class SqliteRecorder(CaseRecorder):
             try:
                 os.remove(filepath)
                 issue_warning(f'The existing case recorder file, {filepath},'
-                            ' is being overwritten.', category=UserWarning)
+                              ' is being overwritten.', category=UserWarning)
             except OSError:
                 pass
 
@@ -236,47 +236,47 @@ class SqliteRecorder(CaseRecorder):
             with self.connection as c:
                 # used to keep track of the order of the case records across all case tables
                 c.execute("CREATE TABLE global_iterations(id INTEGER PRIMARY KEY, "
-                        "record_type TEXT, rowid INT, source TEXT)")
+                          "record_type TEXT, rowid INT, source TEXT)")
 
                 c.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
-                        "counter INT, iteration_coordinate TEXT, timestamp REAL, "
-                        "success INT, msg TEXT, inputs TEXT, outputs TEXT, residuals TEXT)")
+                          "counter INT, iteration_coordinate TEXT, timestamp REAL, "
+                          "success INT, msg TEXT, inputs TEXT, outputs TEXT, residuals TEXT)")
                 c.execute("CREATE TABLE driver_derivatives(id INTEGER PRIMARY KEY, "
-                        "counter INT, iteration_coordinate TEXT, timestamp REAL, "
-                        "success INT, msg TEXT, derivatives BLOB)")
+                          "counter INT, iteration_coordinate TEXT, timestamp REAL, "
+                          "success INT, msg TEXT, derivatives BLOB)")
                 c.execute("CREATE INDEX driv_iter_ind on driver_iterations(iteration_coordinate)")
 
                 c.execute("CREATE TABLE problem_cases(id INTEGER PRIMARY KEY, "
-                        "counter INT, case_name TEXT, timestamp REAL, "
-                        "success INT, msg TEXT, inputs TEXT, outputs TEXT, residuals TEXT, "
-                        "jacobian BLOB, abs_err REAL, rel_err REAL)")
+                          "counter INT, case_name TEXT, timestamp REAL, "
+                          "success INT, msg TEXT, inputs TEXT, outputs TEXT, residuals TEXT, "
+                          "jacobian BLOB, abs_err REAL, rel_err REAL)")
                 c.execute("CREATE INDEX prob_name_ind on problem_cases(case_name)")
 
                 c.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
-                        "counter INT, iteration_coordinate TEXT, timestamp REAL, "
-                        "success INT, msg TEXT, inputs TEXT, outputs TEXT, residuals TEXT)")
+                          "counter INT, iteration_coordinate TEXT, timestamp REAL, "
+                          "success INT, msg TEXT, inputs TEXT, outputs TEXT, residuals TEXT)")
                 c.execute("CREATE INDEX sys_iter_ind on system_iterations(iteration_coordinate)")
 
                 c.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, "
-                        "counter INT, iteration_coordinate TEXT, timestamp REAL, "
-                        "success INT, msg TEXT, abs_err REAL, rel_err REAL, "
-                        "solver_inputs TEXT, solver_output TEXT, solver_residuals TEXT)")
+                          "counter INT, iteration_coordinate TEXT, timestamp REAL, "
+                          "success INT, msg TEXT, abs_err REAL, rel_err REAL, "
+                          "solver_inputs TEXT, solver_output TEXT, solver_residuals TEXT)")
                 c.execute("CREATE INDEX solv_iter_ind on solver_iterations(iteration_coordinate)")
 
                 if self._record_metadata:
                     with self.metadata_connection as m:
-                        m.execute("CREATE TABLE metadata(format_version INT, openmdao_version TEXT, "
-                                "abs2prom BLOB, prom2abs BLOB, abs2meta BLOB, var_settings BLOB,"
-                                "conns BLOB)")
-                        m.execute("INSERT INTO metadata(format_version, openmdao_version, abs2prom,"
-                                " prom2abs) VALUES(?,?,?,?)", (format_version, openmdao_version,
-                                                                None, None))
+                        m.execute("CREATE TABLE metadata(format_version INT, openmdao_version "
+                                  "TEXT, abs2prom BLOB, prom2abs BLOB, abs2meta BLOB, "
+                                  "var_settings BLOB,conns BLOB)")
+                        m.execute("INSERT INTO metadata(format_version, openmdao_version, "
+                                  "abs2prom, prom2abs) VALUES(?,?,?,?)",
+                                  (format_version, openmdao_version, None, None))
                         m.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
-                                "model_viewer_data TEXT)")
+                                  "model_viewer_data TEXT)")
                         m.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, "
-                                "scaling_factors BLOB, component_metadata BLOB)")
+                                  "scaling_factors BLOB, component_metadata BLOB)")
                         m.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
-                                "solver_options BLOB, solver_class TEXT)")
+                                  "solver_options BLOB, solver_class TEXT)")
 
         self._database_initialized = True
         if MPI and comm and comm.size > 1:
