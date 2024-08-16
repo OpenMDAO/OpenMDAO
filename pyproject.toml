@@ -66,6 +66,7 @@ notebooks = [
     "idna>=3.7",
 ]
 test = [
+    "pre-commit",
     "aiounittest",
     "num2words",
     "numpydoc>=1.1",
@@ -179,6 +180,8 @@ include = [
 
 [tool.ruff]
 line-length = 100
+indent-width = 4
+indent-style = "space"
 
 [tool.ruff.format]
 line-ending = "lf"
