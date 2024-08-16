@@ -181,9 +181,9 @@ include = [
 [tool.ruff]
 line-length = 100
 indent-width = 4
-indent-style = "space"
 
 [tool.ruff.format]
+indent-style = "space"
 line-ending = "lf"
 
 [tool.ruff.lint.pydocstyle]
