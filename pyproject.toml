@@ -198,3 +198,6 @@ convention = "numpy"
 "**/test_suite/**" = ["E","F"]
 # Allow variable name I for current
 "**/extcode_resistor.py" = ["E741"]
+"**/circuit_analysis_examples.ipynb" = ["E741"]
+# Ignore unused vars and imports in docs
+"**/openmdao_book/**" = ["F401","E402","F811","F841"]
