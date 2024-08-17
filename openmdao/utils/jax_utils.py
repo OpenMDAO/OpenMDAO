@@ -10,6 +10,7 @@ from collections import defaultdict
 
 import networkx as nx
 import numpy as np
+from numpy import ndarray
 
 from openmdao.visualization.tables.table_builder import generate_table
 from openmdao.utils.om_warnings import issue_warning
@@ -41,7 +42,7 @@ try:
     import jax
     jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
     import jax.numpy as jnp
-    from jax import jit, tree_util, custom_jvp
+    from jax import jit, tree_util, custom_jvp, Array
 except ImportError:
 
     def custom_jvp(f):
@@ -249,19 +250,7 @@ class CompJaxifyBase(ast.NodeTransformer):
         self.compute_primal = namespace['compute_primal']
 
         if verbose:
-            print(f"\n{self.get_compute_primal_src()}\n")
-
-        # warn if jitting a function that has discrete inputs, because it will cause the function
-        # to be recompiled whenever the discrete inputs change.
-        if comp.options['use_jit']:
-            if comp._discrete_inputs:
-                issue_warning("Jitting a function with discrete inputs can cause the function to "
-                              "be recompiled whenever the discrete inputs change.  This can be "
-                              "slow if the discrete inputs change often. You may want to consider "
-                              "'use_jit=False' for component '{comp.pathname}' if performance "
-                              "issues arise.")
-            static_argnums = tuple(range(len(comp._var_discrete['input']) + 1))
-            self.compute_primal = jit(self.compute_primal, static_argnums=static_argnums)
+            print(f"\n{comp.pathname}:\n{self.get_compute_primal_src()}\n")
 
     def get_compute_primal_src(self):
         """
@@ -626,89 +615,6 @@ class SelfAttrFinder(ast.NodeVisitor):
             self.visit(arg)
 
 
-if jax is None:
-    def JaxCompPyTreeWrapper(comp):
-        """
-        Return the given Component.
-
-        Parameters
-        ----------
-        comp : Component
-            The Component to be wrapped.
-
-        Returns
-        -------
-        Component
-            The given Component.
-        """
-        return comp
-else:
-    class JaxCompPyTreeWrapper(object):
-        """
-        Wraps a component in a pytree for use with jax.
-
-        Parameters
-        ----------
-        comp : Component
-            The Component to be wrapped.
-
-        Attributes
-        ----------
-        _comp : Component
-            The Component being wrapped.
-        """
-
-        def __init__(self, comp):  # noqa
-            self._comp = comp
-
-        def __getattr__(self, name):
-            """
-            Get the attribute with the given name from the underlying Component.
-
-            Parameters
-            ----------
-            name : str
-                The name of the attribute to be retrieved.
-
-            Returns
-            -------
-            object
-                The attribute with the given name.
-            """
-            return getattr(self._comp, name)
-
-        def _tree_flatten(self):
-            """
-            Get the flattened representation of this object.
-
-            Returns
-            -------
-            tuple (tuple, dict)
-                The flattened representation of this object.
-            """
-            # we include the self_statics data here because otherwise if a static value changes,
-            # e.g. an option value, then the jit-compiled function won't be recompiled.
-            return ((), {'_comp_': self._comp, '_self_statics_': self._comp.get_self_statics()})
-
-        @staticmethod
-        def _tree_unflatten(aux_data, children):
-            """
-            Reconstruct this object from the given data.
-
-            Parameters
-            ----------
-            aux_data : tuple
-                The auxiliary (static) data.
-            children : dict
-                The children of this object. This should always be empty for this class.
-            """
-            return JaxCompPyTreeWrapper(aux_data['_comp_'])
-
-    tree_util.register_pytree_node(JaxCompPyTreeWrapper,
-                                   JaxCompPyTreeWrapper._tree_flatten,
-                                   JaxCompPyTreeWrapper._tree_unflatten)
-
-
 def get_self_static_attrs(method):
     """
     Get the set of attribute names accessed on `self` in the given method.
@@ -871,6 +777,55 @@ def jax_deriv_shape(derivs):
             else:
                 dims.append(jax_deriv_shape(d))
     return dims
+
+
+class JaxifyMetaclass(type):
+    """
+    A metaclass that registers the class with jax as a pytree_node.
+    """
+
+    #TODO: provide a global flag to turn this machinery on/off
+    def __new__(metaclass, name, bases, attrs):
+        if '_tree_flatten' not in attrs:
+            attrs['_tree_flatten'] = lambda self: ((), {'_self_': self,
+                                                        '_statics_': self.get_self_statics()})
+            attrs['_tree_unflatten'] = staticmethod(lambda aux_data, children: aux_data['_self_'])
+
+        # if 'compute_primal' in attrs:
+        #     attrs['compute_primal'] = DelayedJit(attrs['compute_primal'])
+
+        cls = super().__new__(metaclass, name, bases, attrs)
+
+        # register with jax so we can flatten/unflatten self
+        tree_util.register_pytree_node(cls, attrs['_tree_flatten'], attrs['_tree_unflatten'])
+
+        return cls
+
+
+if jax is None:
+    def DelayedJit(func):
+        return func
+else:
+    class DelayedJit:
+        def __init__(self, func):
+            self.func = func
+            self.jfunc = None  # jitted function
+
+        def __call__(self, *args, **kwargs):
+            # jit the function on the first call after we know which args are static
+            if self.jfunc is None:
+                params =  list(inspect.signature(self.func).parameters)
+                # we don't want to treat 'self' as static because we want tree(flatten/unflatten)
+                # to be called on it so 'get_self_statics' will be called.
+                offset = 1 if params and params[0] == 'self' else 0
+                # static args are those that are not jax or numpy arrays
+                static_argnums = [i for (i, arg) in enumerate(args)
+                                       if i >= offset and not isinstance(arg, (Array, ndarray))]
+                static_argnames = [n for (n, v) in kwargs.items()
+                                   if not isinstance(v, (Array, ndarray))]
+                self.jfunc = jit(self.func, static_argnums=static_argnums,
+                                 static_argnames=static_argnames)
+            return self.jfunc(*args, **kwargs)
 
 
 if __name__ == '__main__':

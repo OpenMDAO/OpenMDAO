@@ -948,8 +948,6 @@ class Problem(object):
 
         self._orig_mode = mode
 
-        model_comm = self.driver._setup_comm(comm)
-
         # this metadata will be shared by all Systems/Solvers in the system tree
         self._metadata = {
             'name': self._name,  # the name of this Problem
@@ -1003,7 +1001,10 @@ class Problem(object):
             'relevance_cache': {},  # cache of relevance objects
             'rel_array_cache': {},  # cache of relevance arrays
             'ncompute_totals': 0,  # number of times compute_totals has been called
+            'jax_group': None,  # not None if a Group is currently performing a jax operation
         }
+
+        model_comm = self.driver._setup_comm(comm)
 
         if parent:
             if isinstance(parent, Problem):

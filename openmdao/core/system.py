@@ -16,6 +16,11 @@ from numbers import Integral
 
 import numpy as np
 
+# try:
+#     from jax import tree_util
+# except ImportError:
+#     tree_util = None
+
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE, INF_BOUND, \
     _SetupStatus
 from openmdao.jacobians.jacobian import Jacobian
@@ -39,6 +44,7 @@ from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, all_ancestors, match_prom_or_abs, \
     ensure_compatible, env_truthy, make_traceback, _is_slicer_op
 from openmdao.utils.file_utils import _get_outputs_dir
+from openmdao.utils.jax_utils import JaxifyMetaclass
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -171,7 +177,7 @@ def collect_errors(method):
     return wrapper
 
 
-class System(object):
+class System(object, metaclass=JaxifyMetaclass):
     """
     Base class for all systems in OpenMDAO.
 
@@ -2769,6 +2775,14 @@ class System(object):
     @property
     def _relevance(self):
         return self._problem_meta['relevance']
+
+    @property
+    def _jax_group(self):
+        return self._problem_meta['jax_group']
+
+    @_jax_group.setter
+    def _jax_group(self, val):
+        self._problem_meta['jax_group'] = val
 
     @property
     def _static_mode(self):
@@ -6560,3 +6574,58 @@ class System(object):
             Array of sizes of the variable on all procs.
         """
         return self._var_sizes[io][:, self._var_allprocs_abs2idx[name]]
+
+    def get_self_statics(self):
+        """
+        Override this in derived classes if compute_primal references static values.
+
+        Do NOT include self._discrete_inputs in the returned tuple.  Include things like
+        self.options['opt_name'], etc., that are used in compute_primal but are assumed to be
+        constant during derivative computation.
+
+        Return value MUST be a tuple. Don't forget the trailing comma if tuple has only one item.
+        Return value MUST be hashable.
+
+        The order of these values doesn't matter.  They are only checked (by computing their hash)
+        to see if they have changed since the last time compute_primal was jitted, and if so,
+        compute_primal will be re-jitted.
+
+        Returns
+        -------
+        tuple
+            Tuple containing all static values required by compute_primal.
+        """
+        return ()
+
+    # def _tree_flatten(self):
+    #     """
+    #     Get the flattened representation of this object.
+
+    #     We include the get_self_statics() data here because otherwise if a static value changes,
+    #     e.g. an option value, then the jit-compiled function won't be recompiled because jax
+    #     won't realize that the static data has changed.
+
+    #     Returns
+    #     -------
+    #     tuple (children, aux_data)
+    #         The flattened representation of this object.
+    #     """
+    #     return ((), {'_self_': self, '_self_statics_': self.get_self_statics()})
+
+    # @staticmethod
+    # def _tree_unflatten(aux_data, children):
+    #     """
+    #     Reconstruct this object from the given data.
+
+    #     Parameters
+    #     ----------
+    #     aux_data : tuple
+    #         The auxiliary (static) data.
+    #     children : tuple
+    #         The differentiable children of this object. This should be empty.
+    #     """
+    #     return aux_data['_self_']
+
+
+# if tree_util is not None:
+#     tree_util.register_pytree_node(System, System._tree_flatten, System._tree_unflatten)

@@ -2368,10 +2368,10 @@ class Group(System):
         outputs : <Vector>
             Outputs vector.
 
-        Returns
-        -------
-        list
-            List of 'input' values that will be passed into compute_primal.
+        Yields
+        ------
+        ndarray
+            The next input value to be passed to compute_primal.
         """
         if self._compute_primal_in_slices is None:
             self._compute_primal_in_slices = []
@@ -2383,18 +2383,17 @@ class Group(System):
                 else:
                     self._compute_primal_in_slices.append((False, oslices[absname], shape))
 
+        yield self
+
         iarray = inputs.asarray()
         oarray = outputs.asarray()
-        ins = []
         for isinput, slc, shape in self._compute_primal_in_slices:
             if shape:
-                ins.append(iarray[slc].reshape(shape) if isinput else oarray[slc].reshape(shape))
+                yield iarray[slc].reshape(shape) if isinput else oarray[slc].reshape(shape)
             else:
-                ins.append(iarray[slc] if isinput else oarray[slc])
+                yield iarray[slc] if isinput else oarray[slc]
 
-        return ins
-
-    def _setup_jax(self):
+    def _setup_jax(self, from_group=False):
         """
         If jax is active, jaxify this group and all subgroups.
 
@@ -2407,12 +2406,12 @@ class Group(System):
 
         from openmdao.core.indepvarcomp import IndepVarComp
 
-        if self.options['derivs_method'] != 'jax':
+        if from_group or self.options['derivs_method'] != 'jax':
             for subsys in self._subsystems_myproc:
                 if isinstance(subsys, Group):
-                    subsys._setup_jax()
+                    subsys._setup_jax(from_group)
                 elif subsys.options['derivs_method'] == 'jax':
-                    subsys._setup_jax()
+                    subsys._setup_jax(from_group)
             return
 
         if self._contains_parallel_group or self._mpi_proc_allocator.parallel:
@@ -2446,7 +2445,9 @@ class Group(System):
 
             if system.compute_primal is None:
                 system.options['derivs_method'] = 'jax'
-                system._setup_jax()
+                system._setup_jax(from_group=False)
+            else:
+                system.compute_primal = system.compute_primal.__func__
 
             #ins = [f"self.{system.pathname[pathlen:]}"]
             ins = []
@@ -2465,6 +2466,7 @@ class Group(System):
                              if 'openmdao:indep_var' not in m['tags'])
             if len(system._var_abs2meta['output']) == 1:
                 outs += ','
+            # src.append(f"    {outs} = self.{system.pathname[pathlen:]}._compute_primal_wrapper({ins})")
             src.append(f"    {outs} = self.{system.pathname[pathlen:]}.compute_primal({ins})")
 
         src.append('    return ' + ', '.join([goutput_map[n] for n in self._compute_primal_outs]))
@@ -2473,14 +2475,14 @@ class Group(System):
 
         src = '\n'.join(src)
 
-        # print(f"{self.msginfo} compute_primal:\n" + src)
+        print(f"{self.msginfo} compute_primal:\n" + src)
 
         # compile the function
         namespace = {}
         exec(compile(src, '<string>', 'exec'), namespace)  # nosec trusted input
         compute_primal = namespace['compute_primal']
         compute_primal = jax.jit(compute_primal, static_argnums=[0])
-        self.compute_primal = MethodType(compute_primal, self)
+        self.compute_primal = compute_primal # MethodType(compute_primal, self)
 
     def _jax_linearize(self, inputs, partials):
         if self._jac_func_ is None:
@@ -2543,7 +2545,7 @@ class Group(System):
 
     def _setup_jax_derivs(self):
         fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
-        wrt_idxs = list(range(len(self._compute_primal_ins)))
+        wrt_idxs = list(range(1, len(self._compute_primal_ins) + 1))
         self._jac_func_ = fjax(self.compute_primal, argnums=wrt_idxs)
         self._subjac_key_map = {}
 
@@ -3804,7 +3806,7 @@ class Group(System):
         #     # TODO: figure out recording and relevance
         #     self._outputs.set_vals(
         #         self.compute_primal(*self._get_compute_primal_invals(self._inputs, self._outputs)))
-        #     return
+        #    return
 
         name = self.pathname if self.pathname else 'root'
 

@@ -2,7 +2,6 @@
 
 import sys
 import types
-from types import LambdaType
 from collections import defaultdict
 from collections.abc import Iterable
 from itertools import product
@@ -17,9 +16,8 @@ from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_M
 from openmdao.core.constants import INT_DTYPE
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.array_utils import shape_to_len
-from openmdao.utils.class_util import overrides_method
 from openmdao.utils.units import simplify_unit
-from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_name2abs_name
+from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     find_matches, make_set, inconsistent_across_procs
@@ -334,7 +332,7 @@ class Component(System):
         #if self.options['derivs_method'] == 'jax':
             #self._setup_jax()
 
-    def _setup_jax(self):
+    def _setup_jax(self, from_group=False):
         raise NotImplementedError("JAX support is not yet implemented for this component.")
 
     def _missing_vars_error(self, allnames):
@@ -1887,28 +1885,6 @@ class Component(System):
         meta = super()._get_graph_node_meta()
         meta['base'] = 'ExplicitComponent' if self.is_explicit() else 'ImplicitComponent'
         return meta
-
-    def get_self_statics(self):
-        """
-        Override this in derived classes if compute_primal references static values.
-
-        Do NOT include self._discrete_inputs in the returned tuple.  Include things like
-        self.options['opt_name'], etc., that are used in compute_primal but are assumed to be
-        constant during derivative computation.
-
-        Return value MUST be a tuple. Don't forget the trailing comma if tuple has only one item.
-        Return value MUST be hashable.
-
-        The order of these values doesn't matter.  They are only checked (by computing their hash)
-        to see if they have changed since the last time compute_primal was jitted, and if so,
-        compute_primal will be re-jitted.
-
-        Returns
-        -------
-        tuple
-            Tuple containing all static values required by compute_primal.
-        """
-        return ()
 
 
 class _DictValues(object):

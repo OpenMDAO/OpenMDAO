@@ -32,6 +32,7 @@ class QuadraticComp(om.ImplicitComponent):
         residuals['x'] = a * x ** 2 + b * x + c
 
 
+
 class JaxQuadraticCompPrimal(om.JaxImplicitComponent):
     def __init__(self, shape=(), **kwargs):
         super().__init__(**kwargs)
@@ -50,6 +51,7 @@ class JaxQuadraticCompPrimal(om.JaxImplicitComponent):
 
     def compute_primal(self, a, b, c, x):
         return a * x ** 2 + b * x + c
+
 
 
 class SimpleLinearSystemComp(om.ImplicitComponent):
@@ -96,6 +98,7 @@ class SimpleLinearSystemComp(om.ImplicitComponent):
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         residuals['x'] = inputs['A'].dot(outputs['x']) - inputs['b']
+
 
 
 class JaxLinearSystemCompPrimal(om.JaxImplicitComponent):

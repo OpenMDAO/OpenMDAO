@@ -120,7 +120,7 @@ class ExplicitFuncComp(ExplicitComponent):
                 self._dev_arrays_to_np_arrays(kwargs)
             self.add_output(name, **kwargs)
 
-    def _setup_jax(self):
+    def _setup_jax(self, from_group=False):
         # TODO: this is here to prevent the ExplicitComponent base class from trying to do its
         # own jax setup if derivs_method is 'jax'. We should probably refactor this...
         pass

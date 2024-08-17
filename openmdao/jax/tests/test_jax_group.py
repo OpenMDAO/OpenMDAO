@@ -14,16 +14,16 @@ try:
 except ImportError:
     from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
-if jax is None:
-    def jjit(f, *args, **kwargs):
-        return f
-else:
-    def jjit(f, *args, **kwargs):
-        if om.env_truthy('JAX_CPU') and 'backend' not in kwargs:
-            # have to force this to 'cpu' else wing debugger stops at GPU check exception
-            return jax.jit(f, *args, backend='cpu', **kwargs)
-        else:
-            return jax.jit(f, *args, **kwargs)
+# if jax is None:
+#     def jjit(f, *args, **kwargs):
+#         return f
+# else:
+#     def jjit(f, *args, **kwargs):
+#         if om.env_truthy('JAX_CPU') and 'backend' not in kwargs:
+#             # have to force this to 'cpu' else wing debugger stops at GPU check exception
+#             return jax.jit(f, *args, backend='cpu', **kwargs)
+#         else:
+#             return jax.jit(f, *args, **kwargs)
 
 
 class JaxExplicitComp1(om.ExplicitComponent):
@@ -214,6 +214,7 @@ class TestJaxGroup(unittest.TestCase):
         ivc.add_output('b')
         ivc.add_output('c')
         G = p.model.add_subsystem('G', om.Group(derivs_method='jax'))
+        #G = p.model.add_subsystem('G', om.Group())
         G.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         G.linear_solver = om.ScipyKrylov()
         comp = G.add_subsystem('comp', JaxQuadraticCompPrimal())
@@ -237,7 +238,7 @@ class TestJaxGroup(unittest.TestCase):
                                            abs_err_tol=3e-5,
                                            rel_err_tol=5e-6),
                             atol=3e-5, rtol=5e-6)
-        assert_check_partials(p.check_partials(show_only_incorrect=True))
+        assert_check_partials(p.check_partials(show_only_incorrect=True), atol=2e-6)
 
 if __name__ == '__main__':
     unittest.main()

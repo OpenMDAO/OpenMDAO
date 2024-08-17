@@ -16,7 +16,7 @@ from openmdao.utils.general_utils import format_as_float_or_array, _subjac_meta2
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.jax_utils import jax, jit, ImplicitCompJaxify, JaxCompPyTreeWrapper
+from openmdao.utils.jax_utils import jax, jit, ImplicitCompJaxify, DelayedJit
 
 
 _tuplist = (tuple, list)
@@ -901,7 +901,7 @@ class ImplicitComponent(Component):
         return self._list_states()
 
     def _get_compute_primal_invals(self, inputs, outputs, discrete_inputs):
-        yield JaxCompPyTreeWrapper(self)
+        # yield self
         if discrete_inputs:
             yield from discrete_inputs.values()
         yield from inputs.values()
@@ -917,7 +917,7 @@ class ImplicitComponent(Component):
                         if name not in self._discrete_outputs)
         return argnames
 
-    def _setup_jax(self):
+    def _setup_jax(self, from_group=False):
         # we define linearize here instead of making this the base class version as we
         # did with apply_nonlinear, because the existence of a linearize method that is not the
         # base class method is used to determine if a given component computes its own partials.
@@ -958,37 +958,41 @@ class ImplicitComponent(Component):
                     else:
                         partials[ofname, wrtname] = dvals[rows, sjmeta['cols']]
 
-        if self.compute_primal is None:
-            jaxifier = ImplicitCompJaxify(self)
+        self.linearize = MethodType(linearize, self)
 
-            self.compute_primal = jaxifier.compute_primal
+        if self.compute_primal is None:
+            jaxifier = ImplicitCompJaxify(self, verbose=True)
+
             if jaxifier.get_self_statics:
                 self.get_self_statics = MethodType(jaxifier.get_self_statics, self)
+
+            # replace existing apply_nonlinear method with base class method, so that compute_primal
+            # will be called.
+            self.apply_nonlinear = MethodType(ImplicitComponent.apply_nonlinear, self)
+
+            self.compute_primal = MethodType(jaxifier.compute_primal, self)
         else:
             # check that compute_primal args are in the correct order
             args = list(inspect.signature(self.compute_primal).parameters)
+            if args and args[0] == 'self':
+                args = args[1:]
             compargs = self._get_compute_primal_argnames()
             if args != compargs:
                 raise RuntimeError(f"{self.msginfo}: compute_primal method args {args} don't match "
                                    f"the expected args {compargs}.")
 
-            static_argnums = tuple(range(len(self._var_discrete['input'])))
-            self.compute_primal = self.compute_primal.__func__
-            if 'use_jit' in self.options and self.options['use_jit']:
-                self.compute_primal = jit(self.compute_primal, static_argnums=static_argnums)
-
-        # replace existing apply_nonlinear method with base class method, so that compute_primal
-        # will be called.
-        self.apply_nonlinear = MethodType(ImplicitComponent.apply_nonlinear, self)
-
-        self.linearize = MethodType(linearize, self)
+        if not from_group and self.options['use_jit']:
+            self.compute_primal = MethodType(DelayedJit(self.compute_primal.__func__), self)
+        #     static_argnums = tuple(range(len(self._var_discrete['input']) + 1))
+        #     self.compute_primal = MethodType(jit(self.compute_primal.__func__,
+        #                                          static_argnums=static_argnums), self)
 
     def _get_jac_func(self):
         # TODO: modify this to use relevance and possibly compile multiple jac functions depending
         # on DV/response so that we don't compute any derivatives that are always zero.
         if self._jac_func_ is None:
             fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
-            nstatic = len(self._discrete_inputs) + 1
+            nstatic = len(self._discrete_inputs) #+ 1
             wrt_idxs = list(range(nstatic, len(self._var_abs2meta['input']) +
                                   len(self._var_abs2meta['output']) + nstatic))
             static_argnums = tuple(range(nstatic))

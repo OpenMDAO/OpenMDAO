@@ -7,23 +7,23 @@ import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
 import openmdao.api as om
 
-from openmdao.utils.jax_utils import jax, jnp, ExplicitCompJaxify
-
+from openmdao.utils.jax_utils import jax, jit, jnp, ExplicitCompJaxify
 try:
     from parameterized import parameterized
 except ImportError:
     from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
-if jax is None:
-    def jjit(f, *args, **kwargs):
-        return f
-else:
-    from openmdao.jax import act_tanh, smooth_abs, smooth_max, smooth_min, ks_max, ks_min
-    def jjit(f, *args, **kwargs):
-        if om.env_truthy('JAX_CPU') and 'backend' not in kwargs:
-            return jax.jit(f, *args, backend='cpu', **kwargs)
-        else:
-            return jax.jit(f, *args, **kwargs)
+# if jax is None:
+#     def jjit(f, *args, **kwargs):
+#         return f
+# else:
+#     from openmdao.jax import act_tanh, smooth_abs, smooth_max, smooth_min, ks_max, ks_min
+#     def jjit(f, *args, **kwargs):
+#         if om.env_truthy('JAX_CPU') and 'backend' not in kwargs:
+#             return jax.jit(f, *args, backend='cpu', **kwargs)
+#         else:
+#             return jax.jit(f, *args, **kwargs)
+
 
 
 class MyCompJax1(om.ExplicitComponent):
@@ -36,6 +36,7 @@ class MyCompJax1(om.ExplicitComponent):
 
     def compute(self, inputs, outputs):
         outputs['z'] = np.dot(inputs['x'], inputs['y'])
+
 
 
 class MyCompJax1Shaped(om.ExplicitComponent):
@@ -55,6 +56,7 @@ class MyCompJax1Shaped(om.ExplicitComponent):
         outputs['z'] = np.dot(inputs['x'], inputs['y'])
 
 
+
 class MyCompJax2(om.ExplicitComponent):
     def setup(self):
         self.add_input('x', shape_by_conn=True)
@@ -67,6 +69,7 @@ class MyCompJax2(om.ExplicitComponent):
     def compute(self, inputs, outputs):
         outputs['z'] = np.dot(inputs['x'], inputs['y'])
         outputs['zz'] = inputs['y'] * 2.5
+
 
 
 class MyCompJax2Shaped(om.ExplicitComponent):
@@ -86,6 +89,7 @@ class MyCompJax2Shaped(om.ExplicitComponent):
     def compute(self, inputs, outputs):
         outputs['z'] = np.dot(inputs['x'], inputs['y'])
         outputs['zz'] = inputs['y'] * 2.5
+
 
 
 class MyCompJax2Primal(om.JaxExplicitComponent):
@@ -146,6 +150,7 @@ class MyCompJaxWithOption(om.ExplicitComponent):
         outputs['zz'] = inputs['y'] * self.options['mult']
 
 
+
 class MyCompJaxWithDiscrete(om.ExplicitComponent):
     def setup(self):
         self.add_input('x', shape_by_conn=True)
@@ -169,6 +174,33 @@ class MyCompJaxWithDiscrete(om.ExplicitComponent):
         else:
             outputs['zz'] = inputs['y'] * 3.0
 
+
+
+class MyCompJaxWithDiscretePrimal(om.ExplicitComponent):
+    def setup(self):
+        self.add_input('x', shape_by_conn=True)
+        self.add_input('y', shape_by_conn=True)
+        self.add_discrete_input('disc_in', val=2)
+        self.add_output('z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
+        self.add_output('zz', copy_shape='y')
+        self.add_discrete_output('disc_out', val=3)
+
+        self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
+
+    def compute_primal(self, disc_in, x, y):
+        disc_out = -disc_in
+        if disc_in > 0:
+           z = jnp.dot(x, y)
+        else:
+           z = -jnp.dot(x, y)
+
+        if disc_out > 0:
+            zz = y * 2.5
+        else:
+            zz = y * 3.0
+            
+        self._discrete_outputs.set_vals((disc_out,))
+        return (disc_out, z, zz)
 
 x_shape = (2, 3)
 y_shape = (3, 4)
@@ -397,7 +429,8 @@ class TestJaxComp(unittest.TestCase):
 
         assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
         assert_near_equal(p.get_val('comp.zz'), y * 1.7)
-        p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'], method='fd', show_only_incorrect=True)
+        p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'], method='fd',
+                       show_only_incorrect=True)
         p.check_partials(show_only_incorrect=True)
 
         p.set_val('ivc.x', x)
@@ -438,8 +471,40 @@ class TestJaxComp(unittest.TestCase):
         p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'], method='fd', show_only_incorrect=True)
         p.check_partials(show_only_incorrect=True)
 
+    def test_jax_explicit_comp_with_discrete_primal(self):
+        p = om.Problem()
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
+        ivc.add_output('y', val=np.ones(y_shape))
+        ivc.add_discrete_output('disc_out', val=3)
+        p.model.add_subsystem('comp', MyCompJaxWithDiscretePrimal(derivs_method='jax'))
+        p.model.connect('ivc.x', 'comp.x')
+        p.model.connect('ivc.y', 'comp.y')
+        p.model.connect('ivc.disc_out', 'comp.disc_in')
+
+        p.setup(mode='rev')
+
+        x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
+        y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
+        p.set_val('ivc.x', x)
+        p.set_val('ivc.y', y)
+        p.final_setup()
+        p.run_model()
+
+        assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
+        assert_near_equal(p.get_val('comp.zz'), y * 3.0)
+        p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'], method='fd', show_only_incorrect=True)
+        p.check_partials(show_only_incorrect=True)
+
+        p.set_val('ivc.disc_out', -2)
+        p.run_model()
+        assert_near_equal(p.get_val('comp.z'), -np.dot(x, y))
+        assert_near_equal(p.get_val('comp.zz'), y * 2.5)
+        p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'], method='fd', show_only_incorrect=True)
+        p.check_partials(show_only_incorrect=True)
+
 
 if sys.version_info >= (3, 9):
+
 
     class CompRetValue(om.JaxExplicitComponent):
         def __init__(self, shape, nins=1, nouts=1, **kwargs):
@@ -476,6 +541,7 @@ if sys.version_info >= (3, 9):
 
         def compute_primal_2_2(self, x0, x1):
             return x0**2, x1**2
+
 
     class CompRetTuple(om.JaxExplicitComponent):
         def __init__(self, shape, nins=1, nouts=1, **kwargs):
