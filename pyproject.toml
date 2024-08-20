@@ -199,5 +199,5 @@ convention = "numpy"
 # Allow variable name I for current
 "**/extcode_resistor.py" = ["E741"]
 "**/circuit_analysis_examples.ipynb" = ["E741"]
-# Ignore unused vars and imports in docs
+# Ignore some import related conventions in docs
 "**/openmdao_book/**" = ["E402","F811"]
