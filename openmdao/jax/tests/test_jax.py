@@ -14,16 +14,8 @@ try:
 except ImportError:
     from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
-# if jax is None:
-#     def jjit(f, *args, **kwargs):
-#         return f
-# else:
-#     from openmdao.jax import act_tanh, smooth_abs, smooth_max, smooth_min, ks_max, ks_min
-#     def jjit(f, *args, **kwargs):
-#         if om.env_truthy('JAX_CPU') and 'backend' not in kwargs:
-#             return jax.jit(f, *args, backend='cpu', **kwargs)
-#         else:
-#             return jax.jit(f, *args, **kwargs)
+if jax is not None:
+    from openmdao.jax import act_tanh, smooth_abs, smooth_max, smooth_min, ks_max, ks_min
 
 
 @unittest.skipIf(jax is None, 'jax is not available.')

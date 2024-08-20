@@ -333,7 +333,7 @@ class Component(System):
             #self._setup_jax()
 
     def _setup_jax(self, from_group=False):
-        raise NotImplementedError("JAX support is not yet implemented for this component.")
+        raise NotImplementedError("JAX support is not implemented for this component.")
 
     def _missing_vars_error(self, allnames):
         msg = ''

@@ -16,7 +16,9 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE, _UNDEFINED
-from openmdao.utils.jax_utils import jax, jit, ExplicitCompJaxify, DelayedJit
+from openmdao.utils.jax_utils import jax, jit, ExplicitCompJaxify, DelayedJit, \
+    compute_partials as _jax_compute_partials, \
+    compute_jacvec_product as _jax_compute_jacvec_product
 from openmdao.utils.array_utils import submat_sparsity_iter
 from openmdao.utils.om_warnings import issue_warning
 
@@ -606,7 +608,6 @@ class ExplicitComponent(Component):
         return True
 
     def _get_compute_primal_invals(self, inputs, discrete_inputs):
-        # yield self
         if discrete_inputs:
             yield from discrete_inputs.values()
         yield from inputs.values()
@@ -619,45 +620,11 @@ class ExplicitComponent(Component):
         return argnames
 
     def _setup_jax(self, from_group=False):
-        # we define compute_partials here instead of making this the base class version as we
-        # did with compute, because the existence of a compute_partials method that is not the
-        # base class method is used to determine if a given component computes its own partials.
-        def compute_partials(self, inputs, partials, discrete_inputs=None):
-            deriv_vals = self._get_jac_func()(*self._get_compute_primal_invals(inputs,
-                                                                               discrete_inputs))
-            nested_tup = isinstance(deriv_vals, tuple) and len(deriv_vals) > 0 and \
-                isinstance(deriv_vals[0], tuple)
-
-            nof = len(self._var_rel_names['output'])
-            ofidx = len(self._discrete_outputs) - 1
-            for ofname in self._var_rel_names['output']:
-                ofidx += 1
-                ofmeta = self._var_rel2meta[ofname]
-                for wrtidx, wrtname in enumerate(self._var_rel_names['input']):
-                    key = (ofname, wrtname)
-                    if key not in partials:
-                        # FIXME: this means that we computed a derivative that we didn't need
-                        continue
-
-                    wrtmeta = self._var_rel2meta[wrtname]
-                    dvals = deriv_vals
-                    # if there's only one 'of' value, we only take the indexed value if the
-                    # return value of compute_primal is single entry tuple. If a single array or
-                    # scalar is returned, we don't apply the 'of' index.
-                    if nof > 1 or nested_tup:
-                        dvals = dvals[ofidx]
-
-                    dvals = dvals[wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
-
-                    sjmeta = partials.get_metadata(key)
-                    rows = sjmeta['rows']
-                    if rows is None:
-                        partials[ofname, wrtname] = dvals
-                    else:
-                        partials[ofname, wrtname] = dvals[rows, sjmeta['cols']]
-
-        self.compute_partials = MethodType(compute_partials, self)
-        self._has_compute_partials = True
+        if self.matrix_free is True:
+            self.compute_jacvec_product = MethodType(_jax_compute_jacvec_product, self)
+        else:
+            self.compute_partials = MethodType(_jax_compute_partials, self)
+            self._has_compute_partials = True
 
         if self.compute_primal is None:
             jaxifier = ExplicitCompJaxify(self, verbose=True)
@@ -681,22 +648,28 @@ class ExplicitComponent(Component):
 
         if not from_group and self.options['use_jit']:
             self.compute_primal = MethodType(DelayedJit(self.compute_primal.__func__), self)
-            # static_argnums = tuple(range(len(self._var_discrete['input'])))
-            # self.compute_primal = MethodType(jit(self.compute_primal.__func__,
-            #                                      static_argnums=static_argnums), self)
 
-        # self.compute_primal = MethodType(compute_primal, self)
+        statics = self.get_self_statics()
+        if not statics:
+            self._self_statics_hash = None
 
     def _get_jac_func(self):
+        self._check_jac_func_changed()
+
         # TODO: modify this to use relevance and possibly compile multiple jac functions depending
         # on DV/response so that we don't compute any derivatives that are always zero.
         if self._jac_func_ is None:
             fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
-            nstatic = len(self._discrete_inputs) #  + 1  # + 1 for self
+            nstatic = len(self._discrete_inputs)
             wrt_idxs = list(range(nstatic, len(self._var_abs2meta['input']) + nstatic))
             static_argnums = tuple(range(nstatic))
-            self._jac_func_ = jit(fjax(self.compute_primal, argnums=wrt_idxs),
+            primal_func = self.compute_primal.__func__
+            if isinstance(primal_func, DelayedJit):
+                primal_func = primal_func.get_func()
+            primal_func = MethodType(primal_func, self)
+            self._jac_func_ = jit(fjax(primal_func, argnums=wrt_idxs),
                                        static_argnums=static_argnums)
+
         return self._jac_func_
 
     def get_compute_sparsity(self):

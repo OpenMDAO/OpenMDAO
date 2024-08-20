@@ -213,15 +213,12 @@ class ImplicitComponent(Component):
                     d_inputs.set_val(new_ins)
                     d_outputs.set_val(new_outs)
         else:
-            dochk = mode == 'rev' and self._problem_meta['checking'] and self.comm.size > 1
-
-            if dochk:
+            if self.comm.size > 1 and mode == 'rev' and self._problem_meta['checking']:
                 nzdresids = self._get_dist_nz_dresids()
-
-            self.apply_linear(inputs, outputs, d_inputs, d_outputs, d_residuals, mode)
-
-            if dochk:
+                self.apply_linear(inputs, outputs, d_inputs, d_outputs, d_residuals, mode)
                 self._check_consistent_serial_dinputs(nzdresids)
+            else:
+                self.apply_linear(inputs, outputs, d_inputs, d_outputs, d_residuals, mode)
 
     def _apply_linear(self, jac, mode, scope_out=None, scope_in=None):
         """
@@ -983,21 +980,24 @@ class ImplicitComponent(Component):
 
         if not from_group and self.options['use_jit']:
             self.compute_primal = MethodType(DelayedJit(self.compute_primal.__func__), self)
-        #     static_argnums = tuple(range(len(self._var_discrete['input']) + 1))
-        #     self.compute_primal = MethodType(jit(self.compute_primal.__func__,
-        #                                          static_argnums=static_argnums), self)
 
     def _get_jac_func(self):
+        self._check_jac_func_changed()
+
         # TODO: modify this to use relevance and possibly compile multiple jac functions depending
         # on DV/response so that we don't compute any derivatives that are always zero.
         if self._jac_func_ is None:
             fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
-            nstatic = len(self._discrete_inputs) #+ 1
+            nstatic = len(self._discrete_inputs)
             wrt_idxs = list(range(nstatic, len(self._var_abs2meta['input']) +
                                   len(self._var_abs2meta['output']) + nstatic))
             static_argnums = tuple(range(nstatic))
-            self._jac_func_ = jit(fjax(self.compute_primal, argnums=wrt_idxs),
-                                  static_argnums=static_argnums)
+            primal_func = self.compute_primal.__func__
+            if isinstance(primal_func, DelayedJit):
+                primal_func = primal_func.get_func()
+            primal_func = MethodType(primal_func, self)
+            self._jac_func_ = jit(fjax(primal_func, argnums=wrt_idxs),
+                                       static_argnums=static_argnums)
         return self._jac_func_
 
 

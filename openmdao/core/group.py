@@ -39,7 +39,7 @@ from openmdao.utils.relevance import get_relevance
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     PromotionWarning, MPIWarning, DerivativesWarning
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.jax_utils import jax
+from openmdao.utils.jax_utils import jax, DelayedJit
 from openmdao.core.total_jac import _TotalJacInfo
 
 # regex to check for valid names.
@@ -2399,18 +2399,18 @@ class Group(System):
 
         Any Components directly or indirectly within this group will also be jaxified.
 
-        This is still experimental and may not work in all cases.
+        This is still experimental and may not work in many cases.
         """
         if jax is None:
             return
 
         from openmdao.core.indepvarcomp import IndepVarComp
 
+        # if jax has NOT been turned on for this Group, just recurse down the tree and setup
+        # jax anywhere below where it's active, then return.
         if from_group or self.options['derivs_method'] != 'jax':
             for subsys in self._subsystems_myproc:
-                if isinstance(subsys, Group):
-                    subsys._setup_jax(from_group)
-                elif subsys.options['derivs_method'] == 'jax':
+                if isinstance(subsys, Group) or subsys.options['derivs_method'] == 'jax':
                     subsys._setup_jax(from_group)
             return
 
@@ -2437,17 +2437,17 @@ class Group(System):
         src = [''.join(["def compute_primal(self, ", instrs, "):"])]
 
         # this will call compute_primal on all Components directly or indirectly under this group
-        sys_iter = self.system_iter(recurse=True, include_self=False, typ=Component)
-
-        for system in sys_iter:
+        for system in self.system_iter(recurse=True, include_self=False, typ=Component):
             if isinstance(system, IndepVarComp):
                 continue
 
-            if system.compute_primal is None:
-                system.options['derivs_method'] = 'jax'
-                system._setup_jax(from_group=False)
-            else:
-                system.compute_primal = system.compute_primal.__func__
+            #if system.compute_primal is None:
+                #system.options['derivs_method'] = 'jax'
+                #system._setup_jax(from_group=False)
+            #else:
+                #system.compute_primal = system.compute_primal.__func__
+
+            system._setup_jax()
 
             #ins = [f"self.{system.pathname[pathlen:]}"]
             ins = []
@@ -2466,7 +2466,6 @@ class Group(System):
                              if 'openmdao:indep_var' not in m['tags'])
             if len(system._var_abs2meta['output']) == 1:
                 outs += ','
-            # src.append(f"    {outs} = self.{system.pathname[pathlen:]}._compute_primal_wrapper({ins})")
             src.append(f"    {outs} = self.{system.pathname[pathlen:]}.compute_primal({ins})")
 
         src.append('    return ' + ', '.join([goutput_map[n] for n in self._compute_primal_outs]))
@@ -2483,6 +2482,7 @@ class Group(System):
         compute_primal = namespace['compute_primal']
         compute_primal = jax.jit(compute_primal, static_argnums=[0])
         self.compute_primal = compute_primal # MethodType(compute_primal, self)
+        # self.compute_primal = MethodType(DelayedJit(compute_primal), self)
 
     def _jax_linearize(self, inputs, partials):
         if self._jac_func_ is None:
@@ -2546,6 +2546,7 @@ class Group(System):
     def _setup_jax_derivs(self):
         fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
         wrt_idxs = list(range(1, len(self._compute_primal_ins) + 1))
+        # self._jac_func_ = fjax(self.compute_primal.func, argnums=wrt_idxs)
         self._jac_func_ = fjax(self.compute_primal, argnums=wrt_idxs)
         self._subjac_key_map = {}
 
@@ -3806,7 +3807,7 @@ class Group(System):
         #     # TODO: figure out recording and relevance
         #     self._outputs.set_vals(
         #         self.compute_primal(*self._get_compute_primal_invals(self._inputs, self._outputs)))
-        #    return
+        #     return
 
         name = self.pathname if self.pathname else 'root'
 

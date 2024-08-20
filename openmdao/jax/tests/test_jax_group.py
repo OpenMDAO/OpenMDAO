@@ -5,25 +5,15 @@ import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
 import openmdao.api as om
 
-from openmdao.utils.jax_utils import jax
+from openmdao.utils.jax_utils import jax, jnp
 from openmdao.jax.tests.test_jax_implicit import QuadraticComp, JaxQuadraticCompPrimal, \
     SimpleLinearSystemComp, JaxLinearSystemCompPrimal
+from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped
 
 try:
     from parameterized import parameterized
 except ImportError:
     from openmdao.utils.assert_utils import SkipParameterized as parameterized
-
-# if jax is None:
-#     def jjit(f, *args, **kwargs):
-#         return f
-# else:
-#     def jjit(f, *args, **kwargs):
-#         if om.env_truthy('JAX_CPU') and 'backend' not in kwargs:
-#             # have to force this to 'cpu' else wing debugger stops at GPU check exception
-#             return jax.jit(f, *args, backend='cpu', **kwargs)
-#         else:
-#             return jax.jit(f, *args, **kwargs)
 
 
 class JaxExplicitComp1(om.ExplicitComponent):
@@ -88,6 +78,67 @@ class JaxExplicitComp2Shaped(om.ExplicitComponent):
         outputs['zz'] = inputs['y'] * 2.5
 
 
+class SellarDis1Primal(om.ExplicitComponent):
+    def __init__(self, units=None, ref=1.):
+        super().__init__()
+        self._units = units
+        self._ref = ref
+
+    def setup(self):
+        self.add_input('z', val=np.zeros(2), units=self._units)
+        self.add_input('x', val=0., units=self._units)
+        self.add_input('y2', val=1.0, units=self._units)
+        self.add_output('y1', val=1.0, lower=0.1, upper=1000., units=self._units, ref=self._ref)
+
+        self.declare_partials('*', '*')
+
+    def compute_primal(self, z, x, y2):
+        y1 = z[0]**2 + z[1] + x - 0.2*y2
+        return y1
+
+
+class SellarDis2Primal(om.ExplicitComponent):
+    def __init__(self, units=None, ref=1.):
+        super().__init__()
+        self._units = units
+        self._ref = ref
+
+    def setup(self):
+        self.add_input('z', val=np.zeros(2), units=self._units)
+        self.add_input('y1', val=1.0, units=self._units)
+        self.add_output('y2', val=1.0, lower=0.1, upper=1000., units=self._units, ref=self._ref)
+
+        self.declare_partials('*', '*')
+
+    def compute_primal(self, z, y1):
+        # Note: this may cause some issues. However, y1 is constrained to be
+        # above 3.16, so lets just let it converge, and the optimizer will
+        # throw it out
+        newy1 = jnp.select(condlist=[y1.real > 0.0], choicelist=[y1], default=-y1)
+        y2 = newy1**.5 + z[0] + z[1]
+        return y2
+
+
+class SellarPrimalGrouped(om.Group):
+    def setup(self):
+        self.mda = mda = self.add_subsystem('mda', om.Group(), promotes=['x', 'z', 'y1', 'y2'])
+        mda.add_subsystem('d1', SellarDis1Primal(), promotes=['x', 'z', 'y1', 'y2'])
+        mda.add_subsystem('d2', SellarDis2Primal(), promotes=['z', 'y1', 'y2'])
+
+        self.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                  z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
+                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        self.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        self.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        self.set_input_defaults('x', 1.0)
+        self.set_input_defaults('z', np.array([5.0, 2.0]))
+
+        self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        self.linear_solver = om.ScipyKrylov()
+
+
 x_shape = (2, 3)
 y_shape = (3, 4)
 
@@ -126,6 +177,9 @@ class TestJaxGroup(unittest.TestCase):
         p = om.Problem()
         G = p.model.add_subsystem('G', om.Group())
         G.options['derivs_method'] = 'jax'
+        # G.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        # G.linear_solver = om.ScipyKrylov()
+
         G.add_subsystem('comp2', JaxExplicitComp2Shaped(x_shape, y_shape))
         G.add_subsystem('comp', JaxExplicitComp1Shaped(x_shape, y_shape))
 
@@ -231,6 +285,8 @@ class TestJaxGroup(unittest.TestCase):
         p.run_model()
 
         assert_near_equal(p.get_val('G.comp.x'), 3.0)
+        assert_check_partials(p.check_partials(show_only_incorrect=True), atol=2e-6)
+
         assert_check_totals(p.check_totals(of=['G.comp.x'],
                                            wrt=['G.comp.a', 'G.comp.b', 'G.comp.c'],
                                            method='fd',
@@ -238,7 +294,54 @@ class TestJaxGroup(unittest.TestCase):
                                            abs_err_tol=3e-5,
                                            rel_err_tol=5e-6),
                             atol=3e-5, rtol=5e-6)
-        assert_check_partials(p.check_partials(show_only_incorrect=True), atol=2e-6)
+
+    def test_jax_sellar_group(self):
+        p = om.Problem()
+        p.model.add_subsystem('G', SellarDerivatives(), promotes=['*'])
+        p.setup(mode='fwd')
+        p.run_model()
+        assert_check_partials(p.check_partials(show_only_incorrect=True))
+
+        p.run_model()
+        assert_check_totals(p.check_totals(of=['obj', 'con1', 'con2'],
+                                           wrt=['x', 'z'],
+                                           method='fd',
+                                           show_only_incorrect=True))
+
+    def test_jax_sellar_primal_grouped(self):
+        p = om.Problem()
+        p.model.add_subsystem('G', SellarPrimalGrouped(), promotes=['*'])
+        p.setup()
+        p.run_model()
+        assert_check_partials(p.check_partials(show_only_incorrect=True))
+
+        p.run_model()
+        assert_check_totals(p.check_totals(of=['obj', 'con1', 'con2'],
+                                           wrt=['x', 'z'],
+                                           method='fd',
+                                           show_only_incorrect=True))
+
+    def test_sellar_grouped(self):
+        # Tests basic Newton solution on Sellar in a subgroup
+
+        prob = om.Problem(model=SellarDerivativesGrouped(nonlinear_solver=om.NewtonSolver(solve_subsystems=False),
+                                                         linear_solver=om.ScipyKrylov))
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
+
+        assert_check_partials(prob.check_partials(show_only_incorrect=True, abs_err_tol=2e-6), atol=2e-6)
+
+        prob.run_model()
+        assert_check_totals(prob.check_totals(of=['obj', 'con1', 'con2'],
+                                           wrt=['x', 'z'],
+                                           method='fd',
+                                           show_only_incorrect=True), atol=2e-6)
+
 
 if __name__ == '__main__':
     unittest.main()

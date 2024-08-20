@@ -779,42 +779,41 @@ def jax_deriv_shape(derivs):
     return dims
 
 
-class JaxifyMetaclass(type):
-    """
-    A metaclass that registers the class with jax as a pytree_node.
-    """
-
-    #TODO: provide a global flag to turn this machinery on/off
-    def __new__(metaclass, name, bases, attrs):
-        if '_tree_flatten' not in attrs:
-            attrs['_tree_flatten'] = lambda self: ((), {'_self_': self,
-                                                        '_statics_': self.get_self_statics()})
-            attrs['_tree_unflatten'] = staticmethod(lambda aux_data, children: aux_data['_self_'])
-
-        # if 'compute_primal' in attrs:
-        #     attrs['compute_primal'] = DelayedJit(attrs['compute_primal'])
-
-        cls = super().__new__(metaclass, name, bases, attrs)
-
-        # register with jax so we can flatten/unflatten self
-        tree_util.register_pytree_node(cls, attrs['_tree_flatten'], attrs['_tree_unflatten'])
-
-        return cls
-
-
 if jax is None:
     def DelayedJit(func):
         return func
+
+    JaxifyMetaclass = type
 else:
+    class JaxifyMetaclass(type):
+        """
+        A metaclass to auto-register a class descended from System as a pytree_node.
+        """
+
+        #TODO: provide a global flag to turn this machinery on/off
+        def __new__(metaclass, name, bases, attrs):
+            if '_tree_flatten' not in attrs:
+                attrs['_tree_flatten'] = lambda self: ((), {'_self_': self,
+                                                            '_statics_': self.get_self_statics()})
+                attrs['_tree_unflatten'] = staticmethod(lambda aux_data, children: aux_data['_self_'])
+
+            cls = super().__new__(metaclass, name, bases, attrs)
+
+            # register with jax so we can flatten/unflatten self
+            tree_util.register_pytree_node(cls, attrs['_tree_flatten'], attrs['_tree_unflatten'])
+
+            return cls
+
+
     class DelayedJit:
         def __init__(self, func):
-            self.func = func
-            self.jfunc = None  # jitted function
+            self._func = func
+            self._jfunc = None  # jitted function
 
         def __call__(self, *args, **kwargs):
             # jit the function on the first call after we know which args are static
-            if self.jfunc is None:
-                params =  list(inspect.signature(self.func).parameters)
+            if self._jfunc is None:
+                params =  list(inspect.signature(self._func).parameters)
                 # we don't want to treat 'self' as static because we want tree(flatten/unflatten)
                 # to be called on it so 'get_self_statics' will be called.
                 offset = 1 if params and params[0] == 'self' else 0
@@ -823,9 +822,67 @@ else:
                                        if i >= offset and not isinstance(arg, (Array, ndarray))]
                 static_argnames = [n for (n, v) in kwargs.items()
                                    if not isinstance(v, (Array, ndarray))]
-                self.jfunc = jit(self.func, static_argnums=static_argnums,
-                                 static_argnames=static_argnames)
-            return self.jfunc(*args, **kwargs)
+                self._jfunc = jit(self._func, static_argnums=static_argnums,
+                                  static_argnames=static_argnames)
+            return self._jfunc(*args, **kwargs)
+
+        def get_func(self):
+            return self._func
+
+
+# we define compute_partials here instead of making this the base class version as we
+# did with compute, because the existence of a compute_partials method that is not the
+# base class method is used to determine if a given component computes its own partials.
+def compute_partials(self, inputs, partials, discrete_inputs=None):
+    deriv_vals = self._get_jac_func()(*self._get_compute_primal_invals(inputs, discrete_inputs))
+    nested_tup = isinstance(deriv_vals, tuple) and len(deriv_vals) > 0 and \
+        isinstance(deriv_vals[0], tuple)
+
+    nof = len(self._var_rel_names['output'])
+    ofidx = len(self._discrete_outputs) - 1
+    for ofname in self._var_rel_names['output']:
+        ofidx += 1
+        ofmeta = self._var_rel2meta[ofname]
+        for wrtidx, wrtname in enumerate(self._var_rel_names['input']):
+            key = (ofname, wrtname)
+            if key not in partials:
+                # FIXME: this means that we computed a derivative that we didn't need
+                continue
+
+            wrtmeta = self._var_rel2meta[wrtname]
+            dvals = deriv_vals
+            # if there's only one 'of' value, we only take the indexed value if the
+            # return value of compute_primal is single entry tuple. If a single array or
+            # scalar is returned, we don't apply the 'of' index.
+            if nof > 1 or nested_tup:
+                dvals = dvals[ofidx]
+
+            dvals = dvals[wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
+
+            sjmeta = partials.get_metadata(key)
+            rows = sjmeta['rows']
+            if rows is None:
+                partials[ofname, wrtname] = dvals
+            else:
+                partials[ofname, wrtname] = dvals[rows, sjmeta['cols']]
+
+
+def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode, discrete_inputs=None):
+
+    if mode == 'fwd':
+        _, deriv_vals = jax.jvp(self.compute_primal,
+                                primals=tuple(self._get_compute_primal_invals(inputs,
+                                                                              discrete_inputs)),
+                                tangents=tuple(d_inputs.values()))
+
+        d_outputs.set_vals(deriv_vals)
+    else:
+        # TODO: cache the vjp_fun at each NL point since the inputs won't change during the
+        # computation of the jacobian rows.
+        _, vjp_fun = jax.vjp(self.compute_primal,
+                             *self._get_compute_primal_invals(inputs, discrete_inputs))
+
+        d_inputs.set_vals(vjp_fun(tuple(d_outputs.values())))
 
 
 if __name__ == '__main__':

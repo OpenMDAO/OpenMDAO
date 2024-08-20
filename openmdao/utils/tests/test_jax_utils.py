@@ -64,8 +64,6 @@ class TestJaxUtils(unittest.TestCase):
                 self.add_input('x', shape=(n,))
                 self.add_output('f', shape=(n,))
 
-                # The partials are a dense row in this case (1 row x N inputs)
-                # There is no need to specify a sparsity pattern.
                 ar = np.arange(n, dtype=int)
                 self.declare_partials(of='f', wrt='x', rows=ar, cols=ar)
 
@@ -78,18 +76,18 @@ class TestJaxUtils(unittest.TestCase):
         p = om.Problem()
         powcomp = p.model.add_subsystem('c', PowComp(derivs_method='jax', vec_size=11, pow=2))
         # deriv shape: [(11, 1, 11, 1)]
-        p.setup(force_alloc_complex=True)
-        c_x = np.linspace(0, 10, 11)#.reshape(11, 1)
+        p.setup(mode='fwd', force_alloc_complex=True)
+        c_x = np.linspace(1, 10, 11)#.reshape(11, 1)
         p.set_val('c.x', c_x)
         p.run_model()
         assert_near_equal(p.get_val('c.f'), c_x ** 2)
-        assert_check_partials(p.check_partials(method='cs', show_only_incorrect=True))
+        assert_check_partials(p.check_partials(method='cs', show_only_incorrect=False))
 
         p.set_val('c.x', c_x)
         powcomp.options['pow'] = 3  # change the option to verify that re-jit happens
         p.run_model()
         assert_near_equal(p.get_val('c.f'), c_x ** 3)
-        assert_check_partials(p.check_partials(method='cs', show_only_incorrect=True))
+        assert_check_partials(p.check_partials(method='cs', show_only_incorrect=False))
 
 
 if __name__ == '__main__':
