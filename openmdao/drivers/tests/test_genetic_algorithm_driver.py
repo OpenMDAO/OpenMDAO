@@ -1457,10 +1457,10 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
         # a separate case file should have been written by rank 0 of each parallel model
         # (the top two global ranks)
         rank = prob.comm.rank
-        filename = "cases.sql_%d" % rank
+        filename = prob.get_outputs_dir() / f"cases.sql_{rank}"
 
         if rank < num_models:
-            expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
+            expect_msg = f"Cases from rank {rank} are being written to {filename}."
             self.assertTrue(expect_msg in output)
 
             cr = om.CaseReader(filename)

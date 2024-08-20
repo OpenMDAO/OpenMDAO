@@ -179,6 +179,7 @@ include = [
 
 [tool.ruff]
 line-length = 100
+extend-exclude = ["**/openmdao_book/**"]
 
 [tool.ruff.format]
 line-ending = "lf"

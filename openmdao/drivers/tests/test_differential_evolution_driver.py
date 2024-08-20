@@ -1110,7 +1110,7 @@ class MPITestDifferentialEvolution4Procs(unittest.TestCase):
         # a separate case file should have been written by rank 0 of each parallel model
         # (the top two global ranks)
         rank = prob.comm.rank
-        filename = "cases.sql_%d" % rank
+        filename = f"{prob.get_outputs_dir()}/cases.sql_{rank}"
 
         if rank < num_models:
             expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
