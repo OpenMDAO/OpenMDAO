@@ -197,7 +197,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 0)
@@ -225,7 +225,7 @@ class TestDOEDriver(unittest.TestCase):
 
         expected = self.expected_fullfact3
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 9)
@@ -339,7 +339,7 @@ class TestDOEDriver(unittest.TestCase):
 
         expected = self.expected_fullfact3
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 9)
@@ -408,7 +408,7 @@ class TestDOEDriver(unittest.TestCase):
             {'p1.x': np.array([1., 1.]), 'p2.y': np.array([1., 1.])},
         ]
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 16)
@@ -519,7 +519,7 @@ class TestDOEDriver(unittest.TestCase):
             {'x': np.array([9.27325521]), 'y': np.array([-2.33116962])},
         ]
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 5)
@@ -550,7 +550,7 @@ class TestDOEDriver(unittest.TestCase):
 
         expected = self.expected_fullfact3
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 9)
@@ -597,7 +597,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         objs = [cr.get_case(case).outputs['f'].item() for case in cases]
@@ -639,7 +639,7 @@ class TestDOEDriver(unittest.TestCase):
             {'xy': np.array([10.,  50.])},
         ]
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 9)
@@ -680,7 +680,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 6)
@@ -717,7 +717,7 @@ class TestDOEDriver(unittest.TestCase):
             {'x': np.array([1.0]), 'y': np.array([1.0]), 'f_xy': np.array([27.0])},
         ]
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver')
 
         self.assertEqual(len(cases), 2)
@@ -760,7 +760,7 @@ class TestDOEDriver(unittest.TestCase):
             {'x': np.array([0.5]), 'y': np.array([1.]), 'f_xy': np.array([28.75])},
         ]
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver')
 
         self.assertEqual(len(cases), 9)
@@ -808,7 +808,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         objs = [cr.get_case(case).outputs['f'].item() for case in cases]
@@ -844,7 +844,7 @@ class TestDOEDriver(unittest.TestCase):
             {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         ]
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 4)
@@ -882,7 +882,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         # The Box-Behnken design for 3 factors involves three blocks, in each of
@@ -966,7 +966,7 @@ class TestDOEDriver(unittest.TestCase):
             {'x': np.array([-0.72559325]), 'y': np.array([-2.27558409])},
         ]
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 4)
@@ -1035,7 +1035,7 @@ class TestDOEDriver(unittest.TestCase):
             {'xy': np.array([-7.25593248, -11.37792043])},
         ]
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 4)
@@ -1086,7 +1086,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), samples)
@@ -1142,7 +1142,7 @@ class TestDOEDriver(unittest.TestCase):
 
         prob.run_driver()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         final_case = cr.list_cases('driver', out_stream=None)[-1]
         outputs = cr.get_case(final_case).outputs
 
@@ -1180,7 +1180,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         expected = [{'x': 5, 'y': 1, 'f_xy': 31},
@@ -1231,7 +1231,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         expected = ['abc', None]
@@ -1270,8 +1270,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.record("end")
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
-
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         case = cr.get_case('end')
         inputs = case.inputs
         outputs = case.outputs
@@ -1310,7 +1309,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         expected = [{'x': np.array([5, 1]), 'y': np.array([1, 4]), 'f_xy': np.array([31, 69])},
@@ -1360,7 +1359,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         expected = [{'x': 5, 'y': 1, 'f_xy': 31},
@@ -1425,7 +1424,7 @@ class TestDOEDriver(unittest.TestCase):
         prob2.run_driver()
         prob2.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob2.get_outputs_dir() / "cases.sql")
         outputs = cr.get_case(0).outputs
 
         for name in ('x', 'y', 'z'):
@@ -1450,7 +1449,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver')
 
         for case in cases:
@@ -1479,7 +1478,7 @@ class TestDOEDriver(unittest.TestCase):
         expected_vals = self.expected_fullfact3
         expected_derivs = self.expected_fullfact3_derivs
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 9)
@@ -1516,7 +1515,7 @@ class TestDOEDriver(unittest.TestCase):
         expected_vals = self.expected_fullfact3
         expected_derivs = self.expected_fullfact3_derivs
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 9)
@@ -1556,7 +1555,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 9)
@@ -1721,9 +1720,9 @@ class TestParallelDOE4Proc(unittest.TestCase):
         rank = prob.comm.rank
 
         # cases will be split across files for each proc
-        filename = "cases.sql_%d" % rank
+        filename = prob.get_outputs_dir() / f"cases.sql_{rank}"
 
-        expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
+        expect_msg = f"Cases from rank {rank} are being written to {filename}."
         self.assertTrue(expect_msg in output)
 
         cr = om.CaseReader(filename)
@@ -1798,11 +1797,11 @@ class TestParallelDOE4Proc(unittest.TestCase):
             # a separate case file will be written by rank 0 of each parallel model
             # (the top two global ranks)
             rank = prob.comm.rank
-            filename = "cases.sql_%d" % rank
+            filename = prob.get_outputs_dir() / f"cases.sql_{rank}"
 
             if rank < num_models:
-                expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
-                self.assertTrue(expect_msg in output)
+                expect_msg = f"Cases from rank {rank} are being written to {filename}."
+                self.assertIn(expect_msg, output)
 
                 cr = om.CaseReader(filename)
                 cases = cr.list_cases('driver')
@@ -1871,9 +1870,9 @@ class TestParallelDOE4Proc(unittest.TestCase):
 
         # there will be a separate case file for each proc, containing the cases
         # run by the instance of the model that runs in serial mode on that proc
-        filename = "cases.sql_%d" % rank
+        filename = prob.get_outputs_dir() / f"cases.sql_{rank}"
 
-        expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
+        expect_msg = f"Cases from rank {rank} are being written to {filename}."
         self.assertTrue(expect_msg in output)
 
         # we are running 4 models in parallel, each using 1 proc
@@ -1948,7 +1947,7 @@ class TestParallelDOE4Proc(unittest.TestCase):
             # redundant recordings will not be made on any other procs
             filename = "cases.sql"
 
-            cr = om.CaseReader(filename)
+            cr = om.CaseReader(prob.get_outputs_dir() / filename)
             cases = cr.list_cases('driver', out_stream=None)
 
             # cases recorded on proc 0
@@ -2014,7 +2013,7 @@ class TestParallelDOE4Proc(unittest.TestCase):
             # redundant recordings will not be made on any other procs
             filename = "cases.sql"
 
-            cr = om.CaseReader(filename)
+            cr = om.CaseReader(prob.get_outputs_dir() / filename)
             cases = cr.list_cases('driver', out_stream=None)
 
             # cases recorded on proc 0
@@ -2052,10 +2051,10 @@ class TestParallelDOE4Proc(unittest.TestCase):
         prob.cleanup()
 
         # verify we have the single case recording file
-        self.assertTrue(os.path.exists("cases_sequential.sql"))
+        self.assertTrue(os.path.exists(prob.get_outputs_dir() / "cases_sequential.sql"))
 
         # verify we do not have multiple/parallel case recording files
-        filenames = glob.glob('./cases_sequential.sql_*')
+        filenames = glob.glob(f'{prob.get_outputs_dir()}/cases_sequential.sql_*')
         self.assertEqual(len(filenames), 0, f'Found multiple recording files: {filenames}')
 
 
@@ -2136,7 +2135,8 @@ class TestParallelDOE2proc(unittest.TestCase):
         # SqliteCaseReader will automatically look for cases.sql_meta if
         # metadata_filename is not specified, but test by explicitly
         # using it here.
-        cr = om.CaseReader(filename, metadata_filename='cases.sql_meta')
+        cr = om.CaseReader(prob.get_outputs_dir() / filename,
+                           metadata_filename=prob.get_outputs_dir() / 'cases.sql_meta')
         cases = cr.list_cases('driver')
         self.assertEqual(len(cases), 5 if rank == 0 else 4)
 
@@ -2152,7 +2152,7 @@ class TestParallelDOE2proc(unittest.TestCase):
 
         # Test for missing metadata db file error
         try:
-            om.CaseReader(filename, metadata_filename='nonexistant_filename')
+            om.CaseReader(prob.get_outputs_dir() / filename, metadata_filename='nonexistant_filename')
             found_metadata = True
         except IOError:
             found_metadata = False
@@ -2204,7 +2204,7 @@ class TestParallelDistribDOE(unittest.TestCase):
         # check recorded cases from each case file
         rank = prob.comm.rank
         if rank == 0:
-            filename0 = "cases.sql_0"
+            filename0 = prob.get_outputs_dir() / "cases.sql_0"
             values = []
 
             cr = om.CaseReader(filename0)
@@ -2222,7 +2222,7 @@ class TestParallelDistribDOE(unittest.TestCase):
                         self.assertEqual(x_inputs.count([n1, n2, n3]), 8)
 
         elif rank == 1:
-            filename0 = "cases.sql_1"
+            filename0 = prob.get_outputs_dir() / "cases.sql_1"
             values = []
 
             cr = om.CaseReader(filename0)

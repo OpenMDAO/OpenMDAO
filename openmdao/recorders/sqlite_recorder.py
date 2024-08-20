@@ -4,7 +4,7 @@ Class definition for SqliteRecorder, which provides dictionary backed by SQLite.
 
 from io import BytesIO
 
-import os
+import os.path
 import gc
 import sqlite3
 from itertools import chain
@@ -121,7 +121,7 @@ class SqliteRecorder(CaseRecorder):
 
     Parameters
     ----------
-    filepath : str
+    filepath : str or Path
         Path to the recorder file.
     append : bool, optional
         Optional. If True, append to an existing case recorder file.
@@ -155,6 +155,8 @@ class SqliteRecorder(CaseRecorder):
         Flag indicating whether or not the database has been initialized.
     _started : set
         set of recording requesters for which this recorder has been started.
+    _use_outputs_dir : bool
+        Flag indicating if the database is being saved in the problem outputs dir.
     """
 
     def __init__(self, filepath, append=False, pickle_version=PICKLE_VER, record_viewer_data=True):
@@ -173,7 +175,10 @@ class SqliteRecorder(CaseRecorder):
         self._prom2abs = {'input': {}, 'output': {}}
         self._abs2meta = {}
         self._pickle_version = pickle_version
-        self._filepath = filepath
+        self._filepath = str(filepath)
+
+        self._use_outputs_dir = not (os.path.sep in str(filepath) or '/' in str(filepath))
+
         self._database_initialized = False
         self._started = set()
 
@@ -262,20 +267,20 @@ class SqliteRecorder(CaseRecorder):
                           "solver_inputs TEXT, solver_output TEXT, solver_residuals TEXT)")
                 c.execute("CREATE INDEX solv_iter_ind on solver_iterations(iteration_coordinate)")
 
-            if self._record_metadata:
-                with self.metadata_connection as m:
-                    m.execute("CREATE TABLE metadata(format_version INT, openmdao_version TEXT, "
-                              "abs2prom BLOB, prom2abs BLOB, abs2meta BLOB, var_settings BLOB,"
-                              "conns BLOB)")
-                    m.execute("INSERT INTO metadata(format_version, openmdao_version, abs2prom,"
-                              " prom2abs) VALUES(?,?,?,?)", (format_version, openmdao_version,
-                                                             None, None))
-                    m.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
-                              "model_viewer_data TEXT)")
-                    m.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, "
-                              "scaling_factors BLOB, component_metadata BLOB)")
-                    m.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
-                              "solver_options BLOB, solver_class TEXT)")
+                if self._record_metadata:
+                    with self.metadata_connection as m:
+                        m.execute("CREATE TABLE metadata(format_version INT, openmdao_version "
+                                  "TEXT, abs2prom BLOB, prom2abs BLOB, abs2meta BLOB, "
+                                  "var_settings BLOB,conns BLOB)")
+                        m.execute("INSERT INTO metadata(format_version, openmdao_version, "
+                                  "abs2prom, prom2abs) VALUES(?,?,?,?)",
+                                  (format_version, openmdao_version, None, None))
+                        m.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
+                                  "model_viewer_data TEXT)")
+                        m.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, "
+                                  "scaling_factors BLOB, component_metadata BLOB)")
+                        m.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
+                                  "solver_options BLOB, solver_class TEXT)")
 
         self._database_initialized = True
         if MPI and comm and comm.size > 1:
@@ -329,9 +334,6 @@ class SqliteRecorder(CaseRecorder):
 
         super().startup(recording_requester, comm)
 
-        if not self._database_initialized:
-            self._initialize_database(comm)
-
         # grab the system and driver
         if isinstance(recording_requester, Driver):
             system = recording_requester._problem().model
@@ -348,6 +350,12 @@ class SqliteRecorder(CaseRecorder):
         else:
             raise ValueError('Driver encountered a recording_requester it cannot handle'
                              ': {0}'.format(recording_requester))
+
+        if self._use_outputs_dir:
+            self._filepath = system.get_outputs_dir() / self._filepath
+
+        if not self._database_initialized:
+            self._initialize_database(comm)
 
         states = system._list_states_allprocs()
 
