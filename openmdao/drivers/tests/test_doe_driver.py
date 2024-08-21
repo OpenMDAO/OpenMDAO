@@ -11,6 +11,8 @@ import csv
 
 import numpy as np
 
+from packaging.version import Version
+
 import openmdao.api as om
 
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -891,24 +893,45 @@ class TestDOEDriver(unittest.TestCase):
         # ref: https://en.wikipedia.org/wiki/Box-Behnken_design
         self.assertEqual(len(cases), (3*4)+center)
 
-        expected = [
-            {'x': np.array([0.]), 'y': np.array([0.]), 'z': np.array([5.])},
-            {'x': np.array([10.]), 'y': np.array([0.]), 'z': np.array([5.])},
-            {'x': np.array([0.]), 'y': np.array([10.]), 'z': np.array([5.])},
-            {'x': np.array([10.]), 'y': np.array([10.]), 'z': np.array([5.])},
+        # slight change in order from refactor in pyDOE3 v1.0.4 (PR #15)
+        if Version(pyDOE3.__version__) >= Version("1.0.4"):
+            expected = [
+                {'x': np.array([0.]), 'y': np.array([0.]), 'z': np.array([5.])},
+                {'x': np.array([0.]), 'y': np.array([10.]), 'z': np.array([5.])},
+                {'x': np.array([10.]), 'y': np.array([0.]), 'z': np.array([5.])},
+                {'x': np.array([10.]), 'y': np.array([10.]), 'z': np.array([5.])},
 
-            {'x': np.array([0.]), 'y': np.array([5.]), 'z': np.array([0.])},
-            {'x': np.array([10.]), 'y': np.array([5.]), 'z': np.array([0.])},
-            {'x': np.array([0.]), 'y': np.array([5.]), 'z': np.array([10.])},
-            {'x': np.array([10.]), 'y': np.array([5.]), 'z': np.array([10.])},
+                {'x': np.array([0.]), 'y': np.array([5.]), 'z': np.array([0.])},
+                {'x': np.array([0.]), 'y': np.array([5.]), 'z': np.array([10.])},
+                {'x': np.array([10.]), 'y': np.array([5.]), 'z': np.array([0.])},
+                {'x': np.array([10.]), 'y': np.array([5.]), 'z': np.array([10.])},
 
-            {'x': np.array([5.]), 'y': np.array([0.]), 'z': np.array([0.])},
-            {'x': np.array([5.]), 'y': np.array([10.]), 'z': np.array([0.])},
-            {'x': np.array([5.]), 'y': np.array([0.]), 'z': np.array([10.])},
-            {'x': np.array([5.]), 'y': np.array([10.]), 'z': np.array([10.])},
+                {'x': np.array([5.]), 'y': np.array([0.]), 'z': np.array([0.])},
+                {'x': np.array([5.]), 'y': np.array([0.]), 'z': np.array([10.])},
+                {'x': np.array([5.]), 'y': np.array([10.]), 'z': np.array([0.])},
+                {'x': np.array([5.]), 'y': np.array([10.]), 'z': np.array([10.])},
 
-            {'x': np.array([5.]), 'y': np.array([5.]), 'z': np.array([5.])},
-        ]
+                {'x': np.array([5.]), 'y': np.array([5.]), 'z': np.array([5.])}
+            ]
+        else:
+            expected = [
+                {'x': np.array([0.]), 'y': np.array([0.]), 'z': np.array([5.])},
+                {'x': np.array([10.]), 'y': np.array([0.]), 'z': np.array([5.])},
+                {'x': np.array([0.]), 'y': np.array([10.]), 'z': np.array([5.])},
+                {'x': np.array([10.]), 'y': np.array([10.]), 'z': np.array([5.])},
+
+                {'x': np.array([0.]), 'y': np.array([5.]), 'z': np.array([0.])},
+                {'x': np.array([10.]), 'y': np.array([5.]), 'z': np.array([0.])},
+                {'x': np.array([0.]), 'y': np.array([5.]), 'z': np.array([10.])},
+                {'x': np.array([10.]), 'y': np.array([5.]), 'z': np.array([10.])},
+
+                {'x': np.array([5.]), 'y': np.array([0.]), 'z': np.array([0.])},
+                {'x': np.array([5.]), 'y': np.array([10.]), 'z': np.array([0.])},
+                {'x': np.array([5.]), 'y': np.array([0.]), 'z': np.array([10.])},
+                {'x': np.array([5.]), 'y': np.array([10.]), 'z': np.array([10.])},
+
+                {'x': np.array([5.]), 'y': np.array([5.]), 'z': np.array([5.])},
+            ]
 
         for case, expected_case in zip(cases, expected):
             outputs = cr.get_case(case).outputs

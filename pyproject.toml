@@ -66,6 +66,7 @@ notebooks = [
     "idna>=3.7",
 ]
 test = [
+    "pre-commit",
     "aiounittest",
     "num2words",
     "numpydoc>=1.1",
@@ -179,9 +180,10 @@ include = [
 
 [tool.ruff]
 line-length = 100
-extend-exclude = ["**/openmdao_book/**"]
+indent-width = 4
 
 [tool.ruff.format]
+indent-style = "space"
 line-ending = "lf"
 
 [tool.ruff.lint.pydocstyle]
@@ -196,3 +198,6 @@ convention = "numpy"
 "**/test_suite/**" = ["E","F"]
 # Allow variable name I for current
 "**/extcode_resistor.py" = ["E741"]
+"**/circuit_analysis_examples.ipynb" = ["E741"]
+# Ignore some import related conventions in docs
+"**/openmdao_book/**" = ["E402","F811"]

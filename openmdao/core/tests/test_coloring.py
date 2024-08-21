@@ -1,6 +1,7 @@
 
 import os
 import sys
+import pathlib
 import itertools
 import pickle
 
@@ -600,12 +601,14 @@ class SimulColoringRecordingTestCase(unittest.TestCase):
     def test_recording(self):
         # coloring involves an underlying call to run_model (and final_setup),
         # this verifies that it is handled properly by the recording setup logic
-        recorder = om.SqliteRecorder('cases.sql')
+        cases_file = pathlib.Path.cwd() / 'cases.sql'
+
+        recorder = om.SqliteRecorder(cases_file)
 
         p = run_opt(pyOptSparseDriver, 'auto', assemble_type='csc', optimizer='SNOPT',
                     dynamic_total_coloring=True, print_results=False, recorder=recorder)
 
-        cr = om.CaseReader('cases.sql')
+        cr = om.CaseReader(cases_file)
 
         self.assertEqual(cr.list_cases(out_stream=None), ['rank0:pyOptSparse_SNOPT|%d' % i for i in range(p.driver.iter_count)])
 
