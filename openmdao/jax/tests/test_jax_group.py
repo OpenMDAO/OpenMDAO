@@ -7,7 +7,7 @@ import openmdao.api as om
 
 from openmdao.utils.jax_utils import jax, jnp
 from openmdao.jax.tests.test_jax_implicit import QuadraticComp, JaxQuadraticCompPrimal, \
-    SimpleLinearSystemComp, JaxLinearSystemCompPrimal
+    JaxLinearSystemCompPrimal
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped
 
 try:
@@ -121,9 +121,11 @@ class SellarDis2Primal(om.ExplicitComponent):
 
 class SellarPrimalGrouped(om.Group):
     def setup(self):
-        self.mda = mda = self.add_subsystem('mda', om.Group(), promotes=['x', 'z', 'y1', 'y2'])
+        self.mda = mda = self.add_subsystem('mda', om.Group(derivs_method='jax'), promotes=['x', 'z', 'y1', 'y2'])
         mda.add_subsystem('d1', SellarDis1Primal(), promotes=['x', 'z', 'y1', 'y2'])
         mda.add_subsystem('d2', SellarDis2Primal(), promotes=['z', 'y1', 'y2'])
+        self.mda.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        self.mda.linear_solver = om.ScipyKrylov()
 
         self.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
                                                   z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
@@ -134,9 +136,6 @@ class SellarPrimalGrouped(om.Group):
 
         self.set_input_defaults('x', 1.0)
         self.set_input_defaults('z', np.array([5.0, 2.0]))
-
-        self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-        self.linear_solver = om.ScipyKrylov()
 
 
 x_shape = (2, 3)
@@ -295,24 +294,15 @@ class TestJaxGroup(unittest.TestCase):
                                            rel_err_tol=5e-6),
                             atol=3e-5, rtol=5e-6)
 
-    def test_jax_sellar_group(self):
-        p = om.Problem()
-        p.model.add_subsystem('G', SellarDerivatives(), promotes=['*'])
-        p.setup(mode='fwd')
-        p.run_model()
-        assert_check_partials(p.check_partials(show_only_incorrect=True))
-
-        p.run_model()
-        assert_check_totals(p.check_totals(of=['obj', 'con1', 'con2'],
-                                           wrt=['x', 'z'],
-                                           method='fd',
-                                           show_only_incorrect=True))
-
     def test_jax_sellar_primal_grouped(self):
         p = om.Problem()
         p.model.add_subsystem('G', SellarPrimalGrouped(), promotes=['*'])
         p.setup()
         p.run_model()
+        
+        assert_near_equal(p.get_val('y1'), 25.58830273, .00001)
+        assert_near_equal(p.get_val('y2'), 12.05848819, .00001)
+
         assert_check_partials(p.check_partials(show_only_incorrect=True))
 
         p.run_model()

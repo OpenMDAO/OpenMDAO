@@ -39,7 +39,7 @@ from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, all_ancestors, match_prom_or_abs, \
     ensure_compatible, env_truthy, make_traceback, _is_slicer_op
 from openmdao.utils.file_utils import _get_outputs_dir
-from openmdao.utils.jax_utils import JaxifyMetaclass
+from openmdao.utils.jax_utils import PytreeNodeMetaclass
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -172,7 +172,7 @@ def collect_errors(method):
     return wrapper
 
 
-class System(object, metaclass=JaxifyMetaclass):
+class System(object, metaclass=PytreeNodeMetaclass):
     """
     Base class for all systems in OpenMDAO.
 

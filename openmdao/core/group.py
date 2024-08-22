@@ -2342,8 +2342,8 @@ class Group(System):
         else:
             boundary_ins = self.get_boundary_vars('input', local=True)
             a2m = self._var_abs2meta['input']
-            ins = {n: (a2m[n]['shape'] if n in a2m else None, True) for n in self._var_abs2prom['input']
-                   if n in boundary_ins}
+            ins = {n: (a2m[n]['shape'] if n in a2m else None, True)
+                   for n in self._var_abs2prom['input'] if n in boundary_ins}
             ins.update({n: (m['shape'], False) for n, m in ivcs.items()})
 
         states = set(self._list_states())
@@ -2383,7 +2383,7 @@ class Group(System):
                 else:
                     self._compute_primal_in_slices.append((False, oslices[absname], shape))
 
-        yield self
+        # yield self
 
         iarray = inputs.asarray()
         oarray = outputs.asarray()
@@ -2433,56 +2433,62 @@ class Group(System):
             else:  # output
                 ginput_map[name] = goutput_map[name]
 
-        instrs = ", ".join(ginput_map.values())
-        src = [''.join(["def compute_primal(self, ", instrs, "):"])]
+        seen = set(ginput_map.values())
+
+        lines = ['']
 
         # this will call compute_primal on all Components directly or indirectly under this group
         for system in self.system_iter(recurse=True, include_self=False, typ=Component):
             if isinstance(system, IndepVarComp):
                 continue
 
-            #if system.compute_primal is None:
-                #system.options['derivs_method'] = 'jax'
-                #system._setup_jax(from_group=False)
-            #else:
-                #system.compute_primal = system.compute_primal.__func__
-
             system._setup_jax()
 
-            #ins = [f"self.{system.pathname[pathlen:]}"]
             ins = []
             sysprefix = system.pathname + '.'
-            for n in system._get_compute_primal_argnames():  # system._var_abs2meta['input']:
+            for n in system._get_compute_primal_argnames():
                 n = sysprefix + n
+                src = None
                 if n in self._conn_global_abs_in2out:
-                    ins.append(goutput_map[self._conn_global_abs_in2out[n]])
+                    src =  self._conn_global_abs_in2out[n]
+                    gname = goutput_map[src]
                 elif n in goutput_map:
-                    ins.append(goutput_map[n])
+                    gname = goutput_map[n]
                 else:
-                    ins.append(ginput_map[n])
+                    gname = ginput_map[n]
+
+                ins.append(gname)
+
+                if src is not None and gname not in seen:
+                    lines.append(f"    {gname} = self._outputs['{self._var_abs2prom['output'][src]}']")
 
             ins = ', '.join(ins)
-            outs = ', '.join(goutput_map[n] for n, m in system._var_abs2meta['output'].items()
-                             if 'openmdao:indep_var' not in m['tags'])
+            outs = [goutput_map[n] for n, m in system._var_abs2meta['output'].items()
+                    if 'openmdao:indep_var' not in m['tags']]
+            seen.update(outs)
+            outs = ', '.join(outs)
             if len(system._var_abs2meta['output']) == 1:
                 outs += ','
-            src.append(f"    {outs} = self.{system.pathname[pathlen:]}.compute_primal({ins})")
+            lines.append(f"    {outs} = self.{system.pathname[pathlen:]}.compute_primal({ins})")
 
-        src.append('    return ' + ', '.join([goutput_map[n] for n in self._compute_primal_outs]))
+        lines.append('    return ' + ', '.join([goutput_map[n] for n in self._compute_primal_outs]))
         if len(goutput_map) == 1:
-            src[-1] += ','  # make the output a tuple
+            lines[-1] += ','  # make the output a tuple
 
-        src = '\n'.join(src)
+        instrs = ", ".join(ginput_map.values())
+        lines[0] = ''.join(["def compute_primal(self, ", instrs, "):"])
 
-        print(f"{self.msginfo} compute_primal:\n" + src)
+        lines = '\n'.join(lines)
+
+        print(f"{self.msginfo} compute_primal:\n" + lines)
 
         # compile the function
         namespace = {}
-        exec(compile(src, '<string>', 'exec'), namespace)  # nosec trusted input
+        exec(compile(lines, '<string>', 'exec'), namespace)  # nosec trusted input
         compute_primal = namespace['compute_primal']
-        compute_primal = jax.jit(compute_primal, static_argnums=[0])
-        self.compute_primal = compute_primal # MethodType(compute_primal, self)
-        # self.compute_primal = MethodType(DelayedJit(compute_primal), self)
+        # compute_primal = jax.jit(compute_primal, static_argnums=[0])
+        # self.compute_primal = compute_primal  # MethodType(compute_primal, self)
+        self.compute_primal = MethodType(DelayedJit(compute_primal), self)
 
     def _jax_linearize(self, inputs, partials):
         if self._jac_func_ is None:
@@ -2546,8 +2552,9 @@ class Group(System):
     def _setup_jax_derivs(self):
         fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
         wrt_idxs = list(range(1, len(self._compute_primal_ins) + 1))
-        # self._jac_func_ = fjax(self.compute_primal.func, argnums=wrt_idxs)
-        self._jac_func_ = fjax(self.compute_primal, argnums=wrt_idxs)
+        # wrt_idxs = list(range(len(self._compute_primal_ins)))
+        self._jac_func_ = MethodType(fjax(self.compute_primal._func, argnums=wrt_idxs), self)
+        # self._jac_func_ = fjax(self.compute_primal, argnums=wrt_idxs)
         self._subjac_key_map = {}
 
         if self._tot_jac is None:  # doing semitotals
@@ -3803,12 +3810,6 @@ class Group(System):
         """
         Compute outputs. The model is assumed to be in a scaled state.
         """
-        # if self.options['derivs_method'] == 'jax':
-        #     # TODO: figure out recording and relevance
-        #     self._outputs.set_vals(
-        #         self.compute_primal(*self._get_compute_primal_invals(self._inputs, self._outputs)))
-        #     return
-
         name = self.pathname if self.pathname else 'root'
 
         with Recording(name + '._solve_nonlinear', self.iter_count, self):

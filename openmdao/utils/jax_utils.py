@@ -1,6 +1,7 @@
 """
 Utilities for the use of jax in combination with OpenMDAO.
 """
+import os
 import ast
 import textwrap
 import inspect
@@ -779,23 +780,46 @@ def jax_deriv_shape(derivs):
     return dims
 
 
-if jax is None:
+if jax is None or bool(os.environ.get('JAX_DISABLE_JIT', '')):
     def DelayedJit(func):
         return func
 
-    JaxifyMetaclass = type
+    PytreeNodeMetaclass = type
 else:
-    class JaxifyMetaclass(type):
+    class PytreeNodeMetaclass(type):
         """
-        A metaclass to auto-register a class descended from System as a pytree_node.
+        A metaclass to auto-register a class as a pytree_node.
+
+        The class must define the 'get_self_statics' method, which returns a tuple of static
+        attributes of the class. This metaclass will register the class with jax so
+        that the class can be used with jax.jit and will will cause a jitted method to be
+        re-jitted if any of the self static attributes change.
+
+        A 'self static' attribute is one that is accessed on 'self' within the jitted method
+        but is not passed in as an argument to the method.
+
+        Parameters
+        ----------
+        name : str
+            The name of the class.
+        bases : tuple
+            The base classes of the class.
+        attrs : dict
+            The attributes of the class.
+
+        Returns
+        -------
+        class
+            The class with the metaclass applied.
         """
 
-        #TODO: provide a global flag to turn this machinery on/off
+        # TODO: provide a global flag to turn this machinery on/off
         def __new__(metaclass, name, bases, attrs):
             if '_tree_flatten' not in attrs:
                 attrs['_tree_flatten'] = lambda self: ((), {'_self_': self,
                                                             '_statics_': self.get_self_statics()})
-                attrs['_tree_unflatten'] = staticmethod(lambda aux_data, children: aux_data['_self_'])
+                attrs['_tree_unflatten'] = \
+                    staticmethod(lambda aux_data, children: aux_data['_self_'])
 
             cls = super().__new__(metaclass, name, bases, attrs)
 
@@ -804,8 +828,28 @@ else:
 
             return cls
 
-
     class DelayedJit:
+        """
+        A wrapper that provides a delayed jit capability for methods of a class.
+
+        This decorator is used to delay the jit compilation of a method until the first time it is
+        called. This allows the method to be compiled with the correct static arguments, which are
+        not known until the first call. This is necessary for methods of a class that are jit
+        compiled and that reference attributes of the class, such as `self.options`.
+
+        Parameters
+        ----------
+        func : Callable
+            The function or method to be wrapped.
+
+        Attributes
+        ----------
+        _func : Callable
+            The function or method to be wrapped.
+        _jfunc : Callable
+            The jitted function.
+        """
+
         def __init__(self, func):
             self._func = func
             self._jfunc = None  # jitted function
@@ -813,27 +857,36 @@ else:
         def __call__(self, *args, **kwargs):
             # jit the function on the first call after we know which args are static
             if self._jfunc is None:
-                params =  list(inspect.signature(self._func).parameters)
-                # we don't want to treat 'self' as static because we want tree(flatten/unflatten)
+                params = list(inspect.signature(self._func).parameters)
+                # we don't want to treat 'self' as static because we want _tree_(flatten/unflatten)
                 # to be called on it so 'get_self_statics' will be called.
                 offset = 1 if params and params[0] == 'self' else 0
                 # static args are those that are not jax or numpy arrays
                 static_argnums = [i for (i, arg) in enumerate(args)
-                                       if i >= offset and not isinstance(arg, (Array, ndarray))]
+                                  if i >= offset and not isinstance(arg, (Array, ndarray))]
                 static_argnames = [n for (n, v) in kwargs.items()
                                    if not isinstance(v, (Array, ndarray))]
                 self._jfunc = jit(self._func, static_argnums=static_argnums,
                                   static_argnames=static_argnames)
             return self._jfunc(*args, **kwargs)
 
-        def get_func(self):
-            return self._func
-
 
 # we define compute_partials here instead of making this the base class version as we
 # did with compute, because the existence of a compute_partials method that is not the
 # base class method is used to determine if a given component computes its own partials.
 def compute_partials(self, inputs, partials, discrete_inputs=None):
+    """
+    Compute sub-jacobian parts. The model is assumed to be in an unscaled state.
+
+    Parameters
+    ----------
+    inputs : Vector
+        Unscaled, dimensional input variables read via inputs[key].
+    partials : Jacobian
+        Sub-jac components written to partials[output_name, input_name]..
+    discrete_inputs : dict or None
+        If not None, dict containing discrete input values.
+    """
     deriv_vals = self._get_jac_func()(*self._get_compute_primal_invals(inputs, discrete_inputs))
     nested_tup = isinstance(deriv_vals, tuple) and len(deriv_vals) > 0 and \
         isinstance(deriv_vals[0], tuple)
@@ -868,7 +921,27 @@ def compute_partials(self, inputs, partials, discrete_inputs=None):
 
 
 def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode, discrete_inputs=None):
+    r"""
+    Compute jac-vector product. The model is assumed to be in an unscaled state.
 
+    If mode is:
+        'fwd': d_inputs \|-> d_outputs
+
+        'rev': d_outputs \|-> d_inputs
+
+    Parameters
+    ----------
+    inputs : Vector
+        Unscaled, dimensional input variables read via inputs[key].
+    d_inputs : Vector
+        See inputs; product must be computed only if var_name in d_inputs.
+    d_outputs : Vector
+        See outputs; product must be computed only if var_name in d_outputs.
+    mode : str
+        Either 'fwd' or 'rev'.
+    discrete_inputs : dict or None
+        If not None, dict containing discrete input values.
+    """
     if mode == 'fwd':
         _, deriv_vals = jax.jvp(self.compute_primal,
                                 primals=tuple(self._get_compute_primal_invals(inputs,

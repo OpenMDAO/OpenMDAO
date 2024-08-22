@@ -994,10 +994,10 @@ class ImplicitComponent(Component):
             static_argnums = tuple(range(nstatic))
             primal_func = self.compute_primal.__func__
             if isinstance(primal_func, DelayedJit):
-                primal_func = primal_func.get_func()
+                primal_func = primal_func._func
             primal_func = MethodType(primal_func, self)
             self._jac_func_ = jit(fjax(primal_func, argnums=wrt_idxs),
-                                       static_argnums=static_argnums)
+                                  static_argnums=static_argnums)
         return self._jac_func_
 
 
