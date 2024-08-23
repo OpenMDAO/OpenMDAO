@@ -79,8 +79,9 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
         ycp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
         n = 50
         x = np.linspace(1.0, 12.0, n)
+        x_normalized = x / x[-1]  # normalize x to range 0 to 1
 
-        interp = InterpND(method='bsplines', num_cp=6, x_interp=x)
+        interp = InterpND(method='bsplines', num_cp=6, x_interp=x_normalized)
 
         y = interp.evaluate_spline(ycp)
 
@@ -136,7 +137,13 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
             if method.startswith('scipy'):
                 continue
 
-            interp = InterpND(method=method, points=xcp, x_interp=x)
+            # Normalize x_interp to 0 to 1 range for bsplines
+            if method == "bsplines":
+                x_interp = x / x[-1]
+            else:
+                x_interp = x
+
+            interp = InterpND(method=method, points=xcp, x_interp=x_interp)
             y, dy = interp.evaluate_spline(ycp, compute_derivative=True)
 
             self.assertTrue(y.dtype == complex)
@@ -563,12 +570,13 @@ class TestInterpNDPython(unittest.TestCase):
 
         t = np.linspace(0, 3.0*np.pi, n_cp)
         tt = np.linspace(0, 3.0*np.pi, n_point)
+        tt_normalized = tt / tt[-1]  # normalize tt to range 0 to 1
 
         x = np.sin(t)
 
         # Now, test newer interface for order_reducing spline.
 
-        interp = InterpND(method='bsplines', points=t, x_interp=tt)
+        interp = InterpND(method='bsplines', points=t, x_interp=tt_normalized)
         computed = interp.evaluate_spline(x)
 
         x_expected = np.sin(tt)
@@ -583,16 +591,16 @@ class TestInterpNDPython(unittest.TestCase):
         n_cp = 12
         n_point = 21
 
-        t = np.linspace(0, 3.0*np.pi, n_cp)
-        tt = np.linspace(0, 3.0*np.pi, n_point)
+        t = np.linspace(0, 1.0, n_cp)
+        tt = np.linspace(0, 1.0, n_point)
 
-        x = np.sin(t)
+        x = np.sin(3.0 * np.pi * t)
 
         for method in self.spline_methods:
             interp = InterpND(method=method, points=t, x_interp=tt)
             computed, deriv = interp.evaluate_spline(x, compute_derivative=True)
 
-            x_expected = np.sin(tt)
+            x_expected = np.sin(3.0 * np.pi * tt)
             delta = computed.flatten() - x_expected
 
             # Here we test that we don't have crazy interpolation error.
