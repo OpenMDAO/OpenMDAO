@@ -30,7 +30,7 @@ from openmdao.utils.general_utils import common_subpath, \
     meta2src_iter, get_rev_conns
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
-from openmdao.utils.graph_utils import get_out_of_order_nodes
+from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
@@ -4248,32 +4248,28 @@ class Group(System):
                                                             self._var_allprocs_abs2prom['input']))
             graph.add_nodes_from(comps)
 
-            edge_data = defaultdict(lambda: defaultdict(list))
-            for in_abs, src_abs in self._conn_global_abs_in2out.items():
-                src_sys = src_abs.rpartition('.')[0]
-                tgt_sys = in_abs.rpartition('.')[0]
-
-                # store var connection data in each system to system edge.
-                if add_edge_info:
-                    edge_data[(src_sys, tgt_sys)][src_abs].append(in_abs)
-                else:
-                    graph.add_edge(src_sys, tgt_sys)
-
             if add_edge_info:
+                edge_data = defaultdict(lambda: defaultdict(list))
+                for in_abs, src_abs in self._conn_global_abs_in2out.items():
+                    src_sys = src_abs.rpartition('.')[0]
+                    tgt_sys = in_abs.rpartition('.')[0]
+
+                    # store var connection data in each system to system edge.
+                    edge_data[(src_sys, tgt_sys)][src_abs].append(in_abs)
+
                 for (src_sys, tgt_sys), data in edge_data.items():
                     graph.add_edge(src_sys, tgt_sys, conns=data)
+            else:
+                for in_abs, src_abs in self._conn_global_abs_in2out.items():
+                    graph.add_edge(src_abs.rpartition('.')[0], in_abs.rpartition('.')[0])
         else:
-            glen = self.pathname.count('.') + 1 if self.pathname else 0
-            var2sys = {v: v.split('.', glen + 1)[glen]
-                       for v in chain(self._var_allprocs_abs2prom['output'],
-                                      self._var_allprocs_abs2prom['input'])}
-
             # add all systems as nodes in the graph so they'll be there even if unconnected.
-            graph.add_nodes_from(var2sys.values())
+            graph.add_nodes_from(self._subsystems_allprocs)
 
+            glen = self.pathname.count('.') + 1 if self.pathname else 0
             for in_abs, src_abs in self._conn_global_abs_in2out.items():
-                src_sys = var2sys[src_abs]
-                tgt_sys = var2sys[in_abs]
+                src_sys = src_abs.split('.', glen + 1)[glen]
+                tgt_sys = in_abs.split('.', glen + 1)[glen]
                 if src_sys != tgt_sys:
                     graph.add_edge(src_sys, tgt_sys)
 
@@ -5278,3 +5274,62 @@ class Group(System):
         # inside of the group or its children.
         meta['base'] = 'Group'
         return meta
+
+    def iter_group_sccs(self, recurse=True, use_abs_names=True, all_groups=False, show_full=False):
+        """
+        Yield strongly connected components of the group's subsystem graph.
+
+        Only groups containing 1 or more SCCs with more than one node are included.
+
+        Parameters
+        ----------
+        recurse : bool
+            If True, recurse into subgroups.
+        use_abs_names : bool
+            If True, return absolute names, otherwise return relative names.
+        all_groups : bool
+            If True, yield all groups, not just those with SCCs.
+        show_full : bool
+            If True, for groups with sccs, include those groups where all subsystems form a cycle.
+
+        Yields
+        ------
+        str, list of sets of str
+            Group pathname and list of sets of subsystems in any strongly connected components
+            in this Group.
+        """
+        sccs = [s for s in get_sccs_topo(self.compute_sys_graph()) if len(s) > 1]
+        missing = set()
+        if sccs:
+            if len(sccs) == 1:
+                if len(sccs[0]) == len(self._subsystems_allprocs) and not all_groups:
+                    sccs = []  # whole group is a cycle, so no need to assign solver(s) to cycle(s)
+            for scc in sccs:
+                missing.update(scc)
+
+            missing = set(s.system.name for s in self._subsystems_allprocs.values()) - missing
+
+        if sccs and use_abs_names and self.pathname:
+            prefix = self.pathname + '.'
+            abs_sccs = []
+            for scc in sccs:
+                abs_sccs.append({prefix + n for n in scc})
+            sccs = abs_sccs
+
+        if all_groups or sccs:
+            lnslvname = self.linear_solver.__class__.__name__ if self.linear_solver else None
+            nlnslvname = self.nonlinear_solver.__class__.__name__ if self.nonlinear_solver else None
+            lnmaxiter = nlmaxiter = 1
+            if lnslvname and 'maxiter' in self.linear_solver.options:
+                lnmaxiter = self.linear_solver.options['maxiter']
+            if nlnslvname and 'maxiter' in self.nonlinear_solver.options:
+                nlmaxiter = self.nonlinear_solver.options['maxiter']
+            yield (self.pathname, self.__class__.__name__, sccs, lnslvname, nlnslvname, lnmaxiter,
+                   nlmaxiter, missing)
+
+        if recurse:
+            for s in self._subsystems_myproc:
+                if isinstance(s, Group):
+                    yield from s.iter_group_sccs(recurse=recurse, use_abs_names=use_abs_names,
+                                                 all_groups=all_groups)
+

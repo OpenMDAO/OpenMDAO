@@ -22,6 +22,7 @@ from openmdao.utils.units import _has_val_mismatch
 from openmdao.utils.file_utils import _load_and_exec, text2html
 from openmdao.utils.om_warnings import issue_warning, SetupWarning
 from openmdao.utils.reports_system import register_report
+from openmdao.utils.graph_utils import list_groups_with_subcycles
 
 
 _UNSET = object()
@@ -120,7 +121,7 @@ def _check_parallel_solvers(group, parallel_solvers):
                           category=SetupWarning)
 
 
-def _check_cycles_prob(prob, logger):
+def _check_subcycles_prob(prob, logger):
     """
     Report any cycles.
 
@@ -616,12 +617,12 @@ _default_checks = {
     'missing_recorders': _check_missing_recorders,
     'unserializable_options': _check_unserializable_options,
     'comp_has_no_outputs': _check_comp_has_no_outputs,
-    'auto_ivc_warnings': _check_auto_ivc_warnings
+    'auto_ivc_warnings': _check_auto_ivc_warnings,
+    'cycles': _check_subcycles_prob,
 }
 
 _all_checks = _default_checks.copy()
 _all_checks.update({
-    'cycles': _check_cycles_prob,
     'unconnected_inputs': _check_hanging_inputs,
     'promotions': _check_explicitly_connected_promoted_inputs,
     'all_unserializable_options': _check_all_unserializable_options,
