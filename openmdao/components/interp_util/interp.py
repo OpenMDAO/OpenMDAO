@@ -197,6 +197,19 @@ class InterpND(object):
                 if values.shape[i] != n_p:
                     raise ValueError("There are %d points and %d values in "
                                      "dimension %d" % (len(p), values.shape[i], i))
+        else:
+            # Check limits for x_interp with bsplines
+            if method == 'bsplines':
+                if np.min(x_interp) < 0:
+                    msg = "Splines that use the 'bsplines' method support only " \
+                        "x_interp_val values between 0 and 1 (inclusive), but the minimum " \
+                        f"of the supplied x_interp_val points is {np.min(x_interp)}"
+                    raise ValueError(msg)
+                if np.max(x_interp) > 1:
+                    msg = "Splines that use the 'bsplines' method support only " \
+                        "x_interp_val values between 0 and 1 (inclusive), but the maximum " \
+                        f"of the supplied x_interp_val points is {np.max(x_interp)}"
+                    raise ValueError(msg)
 
         self.grid = tuple([np.asarray(p) for p in points])
         self.values = values
