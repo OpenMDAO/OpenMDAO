@@ -51,14 +51,18 @@ class SplineComp(ExplicitComponent):
         self.options.declare('method', values=SPLINE_METHODS, default='akima',
                              desc='Spline interpolation method to use for all outputs.')
         self.options.declare('x_interp_val', types=(list, np.ndarray),
-                             desc='List/array of x interpolated point values.')
+                             desc='List/array of x interpolated point values. For bsplines the '
+                             'spline goes from x = 0 to x = 1, so the x_interp_val values must '
+                             'be within that range (inclusive).')
         self.options.declare('x_cp_val', default=None, types=(list, np.ndarray), allow_none=True,
                              desc='List/array of x control point values, must be monotonically '
-                             'increasing. Not applicable for bsplines.')
+                             'increasing. Not applicable for bsplines. If x_cp_val is supplied, '
+                             'num_cp is set to the length of the supplied x_cp_val input. If '
+                             'None, will be a linspace from 0 to 1 of length num_cp.')
         self.options.declare('num_cp', default=None, types=(int, ), allow_none=True,
                              desc='Number of spline control points. Optional alternative to '
-                             'x_cp_val. Required for bsplines. If None, num_cp will be a linspace '
-                             'from 0 to 1.')
+                             'x_cp_val. Required for bsplines. If None, num_cp will be the length '
+                             'of the supplied x_cp_val input.')
         self.options.declare('interp_options', types=dict, default={},
                              desc='Dict contains the name and value of options specific to the '
                              'chosen interpolation method.')
