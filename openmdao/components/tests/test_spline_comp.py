@@ -194,13 +194,14 @@ class SplineCompTestCase(unittest.TestCase):
 
         t = np.linspace(0, 3.0*np.pi, n_cp)
         tt = np.linspace(0, 3.0*np.pi, n_point)
+        tt_normalized = tt / tt[-1]  # normalize to 0 to 1 range
         x = np.sin(t)
 
         model.add_subsystem('px', om.IndepVarComp('x', val=x))
 
         bspline_options = {'order': 4}
-        comp = om.SplineComp(method='bsplines', x_interp_val=tt, num_cp=n_cp,
-                            interp_options=bspline_options)
+        comp = om.SplineComp(method='bsplines', x_interp_val=tt_normalized,
+                            num_cp=n_cp, interp_options=bspline_options)
 
         prob.model.add_subsystem('interp', comp)
 
@@ -212,7 +213,6 @@ class SplineCompTestCase(unittest.TestCase):
         prob.run_model()
 
         xx = prob['interp.h'].flatten()
-        tt = np.linspace(0, 3.0*np.pi, n_point)
 
         x_expected = np.sin(tt)
         delta = xx - x_expected
@@ -239,10 +239,11 @@ class SplineCompTestCase(unittest.TestCase):
         x[1, :] = 2.0 * np.sin(t)
 
         t_sin = (0.5 * (1.0 + np.sin(-0.5 * np.pi + 2.0 * tt))) * np.pi * 0.5
+        t_sin_normalized = t_sin / t_sin[-1]  # normalize to 0 to 1 range
 
         model.add_subsystem('px', om.IndepVarComp('x', val=x))
         bspline_options = {'order': 4}
-        comp = om.SplineComp(method='bsplines', x_interp_val=t_sin, num_cp=n_cp,
+        comp = om.SplineComp(method='bsplines', x_interp_val=t_sin_normalized, num_cp=n_cp,
                              vec_size=2, interp_options=bspline_options)
 
         prob.model.add_subsystem('interp', comp)
@@ -281,7 +282,7 @@ class SplineCompTestCase(unittest.TestCase):
         # Tests a bug fix where the interp_options weren't passed into
         # the bspline interp comp
         bspline_options = {'order': 3}
-        comp = om.SplineComp(method='bsplines', num_cp=6, x_interp_val=self.x,
+        comp = om.SplineComp(method='bsplines', num_cp=6, x_interp_val=self.x / self.x[-1],
                              interp_options=bspline_options)
 
         self.prob.model.add_subsystem('atmosphere', comp)
@@ -297,8 +298,8 @@ class SplineCompTestCase(unittest.TestCase):
         n_cp = 80
         n_point = 160
 
-        t = np.linspace(0, 3.0*np.pi, n_cp)
-        tt = np.linspace(0, 3.0*np.pi, n_point)
+        t = np.linspace(0, 1, n_cp)
+        tt = np.linspace(0, 1, n_point)
         x = np.sin(t)
 
         prob = om.Problem()
@@ -477,8 +478,8 @@ class SplineCompFeatureTestCase(unittest.TestCase):
         n_cp = 80
         n_point = 160
 
-        t = np.linspace(0, 3.0*np.pi, n_cp)
-        tt = np.linspace(0, 3.0*np.pi, n_point)
+        t = np.linspace(0, 1, n_cp)
+        tt = np.linspace(0, 1, n_point)
         x = np.sin(t)
 
         # Set options specific to bsplines
@@ -533,10 +534,11 @@ class SplineCompFeatureTestCase(unittest.TestCase):
 
         # In 2.x, the BsplinesComp had a built-in sinusoidal distribution.
         t_sin = sine_distribution(n_point) * np.pi * 0.5
+        t_sin_normalized = t_sin / t_sin[-1]  # normalize to 0 to 1 range
 
         bspline_options = {'order': 4}
         comp = om.SplineComp(method='bsplines',
-                             x_interp_val=t_sin,
+                             x_interp_val=t_sin_normalized,
                              num_cp=n_cp,
                              vec_size=2,
                              interp_options=bspline_options)
