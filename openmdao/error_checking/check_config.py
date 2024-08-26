@@ -474,12 +474,13 @@ def _check_solvers(problem, logger):
             lines.append('')
 
     if lines:
-        logger.warning("The following groups contain sub-cycles. Performance and/or convergence "
-                       "may improve")
-        logger.warning("if these sub-cycles are solved separately in their own group.")
-        logger.warning('')
-        for line in lines:
-            logger.warning(line)
+        final = []
+        final.append("The following groups contain sub-cycles. Performance and/or convergence "
+                     "may improve")
+        final.append("if these sub-cycles are solved separately in their own group.")
+        final.append('')
+        final.extend(lines)
+        logger.warning('\n'.join(final))
 
 
 def _check_missing_recorders(problem, logger):
