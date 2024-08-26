@@ -453,6 +453,7 @@ def _check_solvers(problem, logger):
             has_nl_solver[path] = (nlslv, nlmaxiter)
 
     seen = set()
+    lines = []
     for tup in lst:
         path, pathclass, sccs, lnslv, nlslv, lnmaxiter, nlmaxiter, missing, isgrp, \
             nl_cansolve, lin_cansolve = tup
@@ -463,14 +464,22 @@ def _check_solvers(problem, logger):
                 continue  # don't show groups without sub-cycles
 
             seen.add(pathclass)
-            logger.warning(f"'{path}' ({pathclass})  NL: {nlslv} (maxiter={nlmaxiter}), LN: "
-                           f"{lnslv} (maxiter={lnmaxiter}):")
+            lines.append(f"'{path}' ({pathclass})  NL: {nlslv} (maxiter={nlmaxiter}), LN: "
+                         f"{lnslv} (maxiter={lnmaxiter}):")
 
             for i, scc in enumerate(sccs):
-                logger.warning(f"   Cycle {i}: {sorted(scc)}")
+                lines.append(f"   Cycle {i}: {sorted(scc)}")
             if missing:
-                logger.warning(f"   Number of non-cycle subsystems: {missing}")
-            logger.warning('')
+                lines.append(f"   Number of non-cycle subsystems: {missing}")
+            lines.append('')
+
+    if lines:
+        logger.warning("The following groups contain sub-cycles. Performance and/or convergence "
+                       "may improve")
+        logger.warning("if these sub-cycles are solved separately in their own group.")
+        logger.warning('')
+        for line in lines:
+            logger.warning(line)
 
 
 def _check_missing_recorders(problem, logger):
