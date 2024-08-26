@@ -223,7 +223,7 @@ class TestCleanOutputs(unittest.TestCase):
             om.clean_outputs('.', pattern='*', dryrun=True, recurse=True)
 
         expected = ('Found 2 OpenMDAO output directories:',
-                    'Would remove baz_out/foo_out2 (dryrun = True).',
+                    'Would remove baz_out/foo_out (dryrun = True).',
                     'Would remove baz_out/bar_out (dryrun = True).',
                     'Removed 0 OpenMDAO output directories.')
         
@@ -256,6 +256,40 @@ class TestCleanOutputs(unittest.TestCase):
             om.clean_outputs('.', dryrun=True, recurse=False)
 
         expected = ('No OpenMDAO output directories found.',)
+
+        try:
+            for expected_str in expected:
+                self.assertIn(expected_str, ss.getvalue())
+        finally:
+            shutil.rmtree('baz_out')
+
+    def test_multiple_paths(self):
+
+        p1 = om.Problem(name='foo')
+        p1.model.add_subsystem('exec', om.ExecComp('y = a + b'))
+        p1.setup()
+        p1.run_model()
+
+        p2 = om.Problem(name='bar')
+        p2.model.add_subsystem('exec', om.ExecComp('z = a * b'))
+        p2.setup()
+        p2.run_model()
+
+        # Make another non-openmdao outut directory to test recursion.
+        pathlib.Path('baz_out').mkdir(exist_ok=True)
+        shutil.move('foo_out', 'baz_out')
+        shutil.move('bar_out', 'baz_out')
+
+        # First Test that a dryrun on p1 works as expected.
+        ss = io.StringIO()
+        with redirect_stdout(ss):
+            om.clean_outputs(('baz_out/foo_out', 'baz_out/bar_out'),
+                             dryrun=True, recurse=False)
+
+        expected = ('Found 2 OpenMDAO output directories:',
+                    'Would remove baz_out/foo_out (dryrun = True).',
+                    'Would remove baz_out/bar_out (dryrun = True).',
+                    'Removed 0 OpenMDAO output directories.')
 
         try:
             for expected_str in expected:
