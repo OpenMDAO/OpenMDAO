@@ -5284,12 +5284,6 @@ class Group(System):
         meta['base'] = 'Group'
         return meta
 
-    def iter_solver_info(self, recurse=True):
-        yield from self._sys_tree_visitor(iter_solver_info,
-                                          predicate=lambda s: isinstance(s, Group),
-                                          yield_none=False,
-                                          recurse=recurse)
-
 
 def iter_solver_info(system):
     """
@@ -5300,30 +5294,30 @@ def iter_solver_info(system):
     system : System
         Return solver information for this System.
 
-    Return
+    Returns
     -------
     str
-        System pathname
+        System pathname.
     str
-        Class name
+        Class name.
     list of sets of str
         Strongly connected components in this Group's subsystem graph.  If not a Group, this will
         be an empty list.
     str
-        Linear solver class name
+        Linear solver class name.
     str
-        Nonlinear solver class name
+        Nonlinear solver class name.
     int
-        Linear solver max iterations
+        Linear solver max iterations.
     int
-        Nonlinear solver max iterations
+        Nonlinear solver max iterations.
     int
         Number of subsystems that are not part of any strongly connected component. If this
         number is greater than 0 and strongly connected components exist in this group, it
         indicates that this group contains subcycles and that it may be more efficient to
         separate those subcyles into their own groups and apply iterative solvers to them.
     bool
-        True if this is a Group, False if it is an ImplicitComponent
+        True if this is a Group, False if it is an ImplicitComponent.
     bool
         True if the linear solver found for this System can solve a cycle or implicit component.
     bool

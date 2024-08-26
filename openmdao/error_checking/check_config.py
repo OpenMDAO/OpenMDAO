@@ -438,9 +438,9 @@ def _check_solvers(problem, logger):
                            f"{missing} solver.")
                 else:
                     fncs = []
-                    if nlslv != 'solve_nonlinear':
+                    if 'nonlinear' in missing and nlslv != 'solve_nonlinear':
                         fncs.append('solve_nonlinear')
-                    if lnslv != 'solve_linear':
+                    if 'linear' in missing and lnslv != 'solve_linear':
                         fncs.append('solve_linear')
                     fncs = ' or '.join(fncs)
                     msg = (f"{pathclass} '{path}' contains implicit variables but does "
@@ -463,14 +463,15 @@ def _check_solvers(problem, logger):
                 continue  # don't show groups without sub-cycles
 
             seen.add(pathclass)
-            logger.warning(f"'{path}' ({pathclass})  NL: {nlslv} (maxiter={nlmaxiter}), LN: {lnslv} "
-                           f"(maxiter={lnmaxiter}):")
+            logger.warning(f"'{path}' ({pathclass})  NL: {nlslv} (maxiter={nlmaxiter}), LN: "
+                           f"{lnslv} (maxiter={lnmaxiter}):")
 
             for i, scc in enumerate(sccs):
                 logger.warning(f"   Cycle {i}: {sorted(scc)}")
             if missing:
                 logger.warning(f"   Number of non-cycle subsystems: {missing}")
             logger.warning('')
+
 
 def _check_missing_recorders(problem, logger):
     """

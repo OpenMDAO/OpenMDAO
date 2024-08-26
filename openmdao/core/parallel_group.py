@@ -221,7 +221,7 @@ class ParallelGroup(Group):
         """
         if self.comm.size > 1:
             lst = list(super()._sys_tree_visitor(func, predicate, recurse=recurse,
-                                                  include_self=include_self *args, **kwargs))
+                                                 include_self=include_self, *args, **kwargs))
             if self._gather_full_data():
                 gathered = self.comm.allgather(lst)
             else:
@@ -232,4 +232,4 @@ class ParallelGroup(Group):
                     yield obj
         else:
             yield from super()._sys_tree_visitor(func, predicate, recurse=recurse,
-                                                  include_self=include_self, *args, **kwargs)
+                                                 include_self=include_self, *args, **kwargs)

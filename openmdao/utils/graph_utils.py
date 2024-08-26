@@ -1,12 +1,8 @@
 """
 Various graph related utilities.
 """
-import sys
 import networkx as nx
-from openmdao.core.constants import _DEFAULT_OUT_STREAM
 from openmdao.utils.general_utils import all_ancestors, common_subpath
-from openmdao.utils.file_utils import _load_and_exec
-import openmdao.utils.hooks as hooks
 
 
 def get_sccs_topo(graph):
@@ -78,6 +74,8 @@ def get_cycle_tree(group):
         A mapping of group path name to a tuple of the form
         (children, recursive_scc, unique_scc, scc_index, path, parent path or None).
     """
+    from openmdao.core.group import iter_solver_info, Group
+
     G = group.compute_sys_graph(comps_only=True, add_edge_info=False)
 
     topo = get_sccs_topo(G)
@@ -95,7 +93,9 @@ def get_cycle_tree(group):
         group_tree_dict[cpath] = [([], scc, set(scc), i, cpath, None)
                                   for i, scc in enumerate(cpsccs)]
 
-    for tup in sorted(group.iter_solver_info(), key=lambda x: (x[0].count('.'), len(x[0]))):
+    it = group._sys_tree_visitor(iter_solver_info, predicate=lambda s: isinstance(s, Group),
+                                 yield_none=False)
+    for tup in sorted(it, key=lambda x: (x[0].count('.'), len(x[0]))):
         path = tup[0]
         for ans in all_ancestors(path):
             if ans in group_tree_dict:
