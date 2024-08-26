@@ -298,6 +298,8 @@ def _clean_setup_parser(parser):
                         help='Do not recurse into subdirectories to find directories to remove.')
     parser.add_argument('-d', '--dryrun', action='store_true', dest='dryrun',
                         help='Highlight directories to be removed but do not actually remove them.')
+    parser.add_argument('-p', '--pattern', action='store', dest='pattern', default='*_out',
+                        help="Directory name glob pattern to match.")
 
 
 def _clean_cmd(options, user_args):
@@ -312,7 +314,7 @@ def _clean_cmd(options, user_args):
         Args to be passed to the user script.
     """
     clean_outputs(options.path, recurse=not options.no_recurse, prompt=options.prompt,
-                  dryrun=options.dryrun)
+                  pattern=options.pattern, dryrun=options.dryrun)
 
 
 def _get_tree_filter(attrs, vecvars):
