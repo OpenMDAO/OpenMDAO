@@ -248,6 +248,17 @@ class DirectSolver(LinearSolver):
         """
         return False
 
+    def can_solve_implicit(self):
+        """
+        Return True if this solver can solve implicit components or groups with cycles.
+
+        Returns
+        -------
+        bool
+            True if this solver can solve implicit components or groups with cycles.
+        """
+        return True
+
     def use_relevance(self):
         """
         Return True if relevance should be active.

@@ -43,15 +43,9 @@ class TestCheckSolvers(unittest.TestCase):
 
         # should trigger warnings due to having states without solves
 
-        self.assertTrue(testlogger.contains('warning',
-                        "StateConnection 'statecomp' contains implicit variables, "
-                        "but does not have an iterative nonlinear solver and does not "
-                        "implement 'solve_nonlinear'."))
-
-        self.assertTrue(testlogger.contains('warning',
-                        "StateConnection 'statecomp' contains implicit variables, "
-                        "but does not have an iterative linear solver and does not "
-                        "implement 'solve_linear'."))
+        self.assertTrue(testlogger.contains('error',
+                        "StateConnection 'statecomp' contains implicit variables but does not implement solve_nonlinear "
+                        "or solve_linear or have an iterative nonlinear or linear solver."))
 
     def test_implicit_without_solve_linear(self):
         prob = Problem()
@@ -68,10 +62,8 @@ class TestCheckSolvers(unittest.TestCase):
         prob.final_setup()
 
         # should trigger solver warning because there is no linear solve
-        self.assertTrue(testlogger.contains('warning',
-                        "StateConnWithSolveNonlinear 'statecomp' contains implicit "
-                        "variables, but does not have an iterative linear solver "
-                        "and does not implement 'solve_linear'."))
+        self.assertTrue(testlogger.contains('error',
+                        "StateConnWithSolveNonlinear 'statecomp' contains implicit variables but does not implement solve_linear or have an iterative linear solver."))
 
     def test_implicit_without_solve_nonlinear(self):
         prob = Problem()
@@ -88,10 +80,8 @@ class TestCheckSolvers(unittest.TestCase):
         prob.final_setup()
 
         # should trigger solver warning because there is no nonlinear solve
-        self.assertTrue(testlogger.contains('warning',
-                        "StateConnWithSolveLinear 'statecomp' contains implicit "
-                        "variables, but does not have an iterative nonlinear solver "
-                        "and does not implement 'solve_nonlinear'."))
+        self.assertTrue(testlogger.contains('error',
+                        "StateConnWithSolveLinear 'statecomp' contains implicit variables but does not implement solve_nonlinear or have an iterative nonlinear solver."))
 
     def test_implicit_with_solves(self):
         prob = Problem()
@@ -187,10 +177,8 @@ class TestCheckSolvers(unittest.TestCase):
         prob.final_setup()
 
         # should trigger a linear solver warning only for group 2
-        self.assertTrue(testlogger.contains('warning',
-                        "StateConnection 'G2.statecomp2' contains implicit "
-                        "variables, but does not have an iterative linear solver "
-                        "and does not implement 'solve_linear'."))
+        self.assertTrue(testlogger.contains('error',
+                        "StateConnection 'G2.statecomp2' contains implicit variables but does not implement solve_linear or have an iterative linear solver."))
 
     def test_cycle(self):
         prob = Problem()
@@ -210,12 +198,8 @@ class TestCheckSolvers(unittest.TestCase):
         prob.final_setup()
 
         # should trigger warnings because cycle requires iterative solvers
-        self.assertTrue(testlogger.contains('warning',
-                        "Group '' contains cycles [['C1', 'C2', 'C3']], but "
-                        "does not have an iterative nonlinear solver."))
-        self.assertTrue(testlogger.contains('warning',
-                        "Group '' contains cycles [['C1', 'C2', 'C3']], but "
-                        "does not have an iterative linear solver."))
+        self.assertTrue(testlogger.contains('error',
+                        "Group '' contains cycles [('C1', 'C2', 'C3')], but does not have an iterative nonlinear or linear solver."))
 
     def test_cycle_iter(self):
         prob = Problem()

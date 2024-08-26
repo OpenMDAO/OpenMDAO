@@ -14,6 +14,7 @@ import networkx as nx
 from openmdao.core.configinfo import _ConfigInfo
 from openmdao.core.system import System, collect_errors
 from openmdao.core.component import Component, _DictValues
+from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.constants import _UNDEFINED, INT_DTYPE, _SetupStatus
 from openmdao.vectors.vector import _full_slice
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
@@ -202,6 +203,8 @@ class Group(System):
         in the larger model are being solved using reverse mode.
     _bad_conn_vars : set
         Set of variables involved in invalid connections.
+    _sys_graph_cache : dict
+        Cache for the system graph.
     """
 
     def __init__(self, **kwargs):
@@ -232,6 +235,7 @@ class Group(System):
         self._iterated_components = None
         self._fd_rev_xfer_correction_dist = {}
         self._bad_conn_vars = None
+        self._sys_graph_cache = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -721,6 +725,7 @@ class Group(System):
         # save a ref to the problem level options.
         self._problem_meta = prob_meta
         self._initial_condition_cache = {}
+        self._sys_graph_cache = None
 
         # reset any coloring if a Coloring object was not set explicitly
         if self._coloring_info.dynamic or self._coloring_info.static is not None:
@@ -4263,15 +4268,19 @@ class Group(System):
                 for in_abs, src_abs in self._conn_global_abs_in2out.items():
                     graph.add_edge(src_abs.rpartition('.')[0], in_abs.rpartition('.')[0])
         else:
-            # add all systems as nodes in the graph so they'll be there even if unconnected.
-            graph.add_nodes_from(self._subsystems_allprocs)
+            if self._sys_graph_cache is None:
+                # add all systems as nodes in the graph so they'll be there even if unconnected.
+                graph.add_nodes_from(self._subsystems_allprocs)
 
-            glen = self.pathname.count('.') + 1 if self.pathname else 0
-            for in_abs, src_abs in self._conn_global_abs_in2out.items():
-                src_sys = src_abs.split('.', glen + 1)[glen]
-                tgt_sys = in_abs.split('.', glen + 1)[glen]
-                if src_sys != tgt_sys:
-                    graph.add_edge(src_sys, tgt_sys)
+                glen = self.pathname.count('.') + 1 if self.pathname else 0
+                for in_abs, src_abs in self._conn_global_abs_in2out.items():
+                    src_sys = src_abs.split('.', glen + 1)[glen]
+                    tgt_sys = in_abs.split('.', glen + 1)[glen]
+                    if src_sys != tgt_sys:
+                        graph.add_edge(src_sys, tgt_sys)
+                self._sys_graph_cache = graph
+            else:
+                graph = self._sys_graph_cache
 
         return graph
 
@@ -5275,61 +5284,90 @@ class Group(System):
         meta['base'] = 'Group'
         return meta
 
-    def iter_group_sccs(self, recurse=True, use_abs_names=True, all_groups=False, show_full=False):
-        """
-        Yield strongly connected components of the group's subsystem graph.
+    def iter_solver_info(self, recurse=True):
+        yield from self._sys_tree_visitor(iter_solver_info,
+                                          predicate=lambda s: isinstance(s, Group),
+                                          yield_none=False,
+                                          recurse=recurse)
 
-        Only groups containing 1 or more SCCs with more than one node are included.
 
-        Parameters
-        ----------
-        recurse : bool
-            If True, recurse into subgroups.
-        use_abs_names : bool
-            If True, return absolute names, otherwise return relative names.
-        all_groups : bool
-            If True, yield all groups, not just those with SCCs.
-        show_full : bool
-            If True, for groups with sccs, include those groups where all subsystems form a cycle.
+def iter_solver_info(system):
+    """
+    Return solver information for this System.
 
-        Yields
-        ------
-        str, list of sets of str
-            Group pathname and list of sets of subsystems in any strongly connected components
-            in this Group.
-        """
-        sccs = [s for s in get_sccs_topo(self.compute_sys_graph()) if len(s) > 1]
-        missing = set()
-        if sccs:
-            if len(sccs) == 1:
-                if len(sccs[0]) == len(self._subsystems_allprocs) and not all_groups:
-                    sccs = []  # whole group is a cycle, so no need to assign solver(s) to cycle(s)
-            for scc in sccs:
-                missing.update(scc)
+    Parameters
+    ----------
+    system : System
+        Return solver information for this System.
 
-            missing = set(s.system.name for s in self._subsystems_allprocs.values()) - missing
+    Return
+    -------
+    str
+        System pathname
+    str
+        Class name
+    list of sets of str
+        Strongly connected components in this Group's subsystem graph.  If not a Group, this will
+        be an empty list.
+    str
+        Linear solver class name
+    str
+        Nonlinear solver class name
+    int
+        Linear solver max iterations
+    int
+        Nonlinear solver max iterations
+    int
+        Number of subsystems that are not part of any strongly connected component. If this
+        number is greater than 0 and strongly connected components exist in this group, it
+        indicates that this group contains subcycles and that it may be more efficient to
+        separate those subcyles into their own groups and apply iterative solvers to them.
+    bool
+        True if this is a Group, False if it is an ImplicitComponent
+    bool
+        True if the linear solver found for this System can solve a cycle or implicit component.
+    bool
+        True if the nonlinear solver found for this System can solve a cycle or implicit component.
+    """
+    sccs = []
+    missing = 0
+    lnmaxiter = nlmaxiter = 1
+    nl_can_solve = lin_can_solve = False
+    nlslvname = lnslvname = None
 
-        if sccs and use_abs_names and self.pathname:
-            prefix = self.pathname + '.'
-            abs_sccs = []
-            for scc in sccs:
-                abs_sccs.append({prefix + n for n in scc})
-            sccs = abs_sccs
+    if isinstance(system, Group):
+        isgrp = True
+        for s in get_sccs_topo(system.compute_sys_graph()):
+            if len(s) > 1:
+                sccs.append(s)
+            else:
+                missing += 1
+    elif isinstance(system, ImplicitComponent):
+        isgrp = False
+    else:
+        return (system.pathname, system.__class__.__name__, sccs, None, None, 0, 0, 0, False,
+                False, False)
 
-        if all_groups or sccs:
-            lnslvname = self.linear_solver.__class__.__name__ if self.linear_solver else None
-            nlnslvname = self.nonlinear_solver.__class__.__name__ if self.nonlinear_solver else None
-            lnmaxiter = nlmaxiter = 1
-            if lnslvname and 'maxiter' in self.linear_solver.options:
-                lnmaxiter = self.linear_solver.options['maxiter']
-            if nlnslvname and 'maxiter' in self.nonlinear_solver.options:
-                nlmaxiter = self.nonlinear_solver.options['maxiter']
-            yield (self.pathname, self.__class__.__name__, sccs, lnslvname, nlnslvname, lnmaxiter,
-                   nlmaxiter, missing)
+    if system.nonlinear_solver:
+        nl_can_solve = system.nonlinear_solver.can_solve_implicit()
+        nlslvname = system.nonlinear_solver.__class__.__name__
+        if 'maxiter' in system.nonlinear_solver.options:
+            nlmaxiter = system.nonlinear_solver.options['maxiter']
 
-        if recurse:
-            for s in self._subsystems_myproc:
-                if isinstance(s, Group):
-                    yield from s.iter_group_sccs(recurse=recurse, use_abs_names=use_abs_names,
-                                                 all_groups=all_groups)
+    if system.linear_solver:
+        lin_can_solve = system.linear_solver.can_solve_implicit()
+        lnslvname = system.linear_solver.__class__.__name__
 
+    if lnslvname and 'maxiter' in system.linear_solver.options:
+        lnmaxiter = system.linear_solver.options['maxiter']
+
+    if not isgrp:
+        if lnslvname is None and system._has_solve_linear:
+            lnslvname = 'solve_linear'
+            lin_can_solve = True
+        if nlslvname is None and system._has_solve_nl:
+            nlslvname = 'solve_nonlinear'
+            nl_can_solve = True
+
+    return (system.pathname, system.__class__.__name__, sccs, lnslvname, nlslvname, lnmaxiter,
+            nlmaxiter, missing, isgrp, nl_can_solve, lin_can_solve)
