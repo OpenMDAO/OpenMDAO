@@ -11,10 +11,14 @@ import sys
 
 import openmdao.api as om
 from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.core.problem import _clear_problem_names
 
 
 @use_tempdirs
 class TestCleanOutputs(unittest.TestCase):
+
+    def setUp(self):
+        _clear_problem_names()
 
     def test_specify_prob(self):
 
@@ -264,7 +268,6 @@ class TestCleanOutputs(unittest.TestCase):
             shutil.rmtree('baz_out')
 
     def test_multiple_paths(self):
-
         p1 = om.Problem(name='foo')
         p1.model.add_subsystem('exec', om.ExecComp('y = a + b'))
         p1.setup()
