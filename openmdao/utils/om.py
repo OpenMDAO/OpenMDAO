@@ -299,7 +299,10 @@ def _clean_setup_parser(parser):
     parser.add_argument('-d', '--dryrun', action='store_true', dest='dryrun',
                         help='Highlight directories to be removed but do not actually remove them.')
     parser.add_argument('-p', '--pattern', action='store', dest='pattern', default='*_out',
-                        help="Directory name glob pattern to match.")
+                        help='Only directories whose name matches this glob pattern will be '
+                        'removed. This glob pattern applies to directory names found when '
+                        'recursing through the given paths. Surround this argument with quotation '
+                        'marks to prevent the OS from interpreting the glob pattern.')
 
 
 def _clean_cmd(options, user_args):

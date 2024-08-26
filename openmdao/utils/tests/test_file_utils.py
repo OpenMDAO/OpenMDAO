@@ -227,8 +227,8 @@ class TestCleanOutputs(unittest.TestCase):
             om.clean_outputs('.', pattern='*', dryrun=True, recurse=True)
 
         expected = ('Found 2 OpenMDAO output directories:',
-                    'Would remove baz_out/foo_out (dryrun = True).',
-                    'Would remove baz_out/bar_out (dryrun = True).',
+                    f'Would remove baz_out{os.sep}foo_out (dryrun = True).',
+                    f'Would remove baz_out{os.sep}bar_out (dryrun = True).',
                     'Removed 0 OpenMDAO output directories.')
         
         try:
@@ -290,8 +290,8 @@ class TestCleanOutputs(unittest.TestCase):
                              dryrun=True, recurse=False)
 
         expected = ('Found 2 OpenMDAO output directories:',
-                    'Would remove baz_out/foo_out (dryrun = True).',
-                    'Would remove baz_out/bar_out (dryrun = True).',
+                    f'Would remove baz_out{os.sep}foo_out (dryrun = True).',
+                    f'Would remove baz_out{os.sep}bar_out (dryrun = True).',
                     'Removed 0 OpenMDAO output directories.')
 
         try:
