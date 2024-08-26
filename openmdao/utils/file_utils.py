@@ -570,8 +570,7 @@ def clean_outputs(obj='.', recurse=False, prompt=True, pattern='*_out', dryrun=F
         If True, prompt the user to confirm directories to be removed.
         This option is ignored if obj is a Problem, System, or Solver.
     pattern : str
-        A glob pattern used for matching directories. This is "*_out" by default,
-        but users may specify it to only remove select output directories.
+        A glob pattern used for matching directories.
     dryrun : bool
         If True, report which directories would be removed without actually removing them.
     """
