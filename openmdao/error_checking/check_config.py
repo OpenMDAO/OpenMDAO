@@ -709,7 +709,8 @@ class _Log2File(object):
 
 def _run_check_report(prob):
     s = StringIO()
-    for c in _get_checks(prob._check):
+    chk = prob._check if prob._check is not None else True
+    for c in _get_checks(chk):
         if c not in _all_checks:
             print(f"WARNING: '{c}' is not a recognized check.  Available checks are: "
                   f"{sorted(_all_checks)}")

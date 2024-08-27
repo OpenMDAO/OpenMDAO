@@ -10,7 +10,7 @@ from itertools import chain
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.hooks import _register_hook, _unregister_hook
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.file_utils import _iter_entry_points
+from openmdao.utils.file_utils import _iter_entry_points, _find_openmdao_output_dirs
 from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import env_truthy, is_truthy
 from openmdao.visualization.tables.table_builder import generate_table
@@ -385,34 +385,34 @@ def view_reports(probnames=None, level=2):
     level : int
         Expand the reports directory tree to this level.  Default is 2.
     """
-    tdir = pathlib.Path(os.getcwd()) / 'reports'
-    to_match = set()
+    tdir = os.getcwd()
+    om_out_dirs = set(str(p) for p in _find_openmdao_output_dirs(tdir, True))
     if probnames:
+        matches = set()
         if isinstance(probnames, str):
             probnames = (probnames,)
 
         for probname in probnames:
-            subdir = f'{probname}_out/'
-            if not os.path.isdir(subdir):
-                # see if they provided script name instead of problem name
-                dname = os.path.splitext(subdir)[0]
-                if os.path.isdir(dname):
-                    subdir = dname
+            subdir = os.path.join(tdir, f'{probname}_out')
+            if subdir in om_out_dirs:
+                match = subdir
+            else:
+                pdir = os.path.join(tdir, probname)
+                if pdir in om_out_dirs:
+                    match = pdir
                 else:
-                    print(f"Can't find report dir '{subdir}'.")
+                    print(f"Can't find problem dir '{subdir}'.")
                     continue
 
-            to_match.add(subdir)
-    else:
-        to_match = set(os.listdir(tdir))
+            matches.add(match)
 
-    if not to_match:
+        om_out_dirs = matches
+
+    if not om_out_dirs:
         print("No matching report dirs found.")
         return
 
-    to_match = {os.path.basename(m) for m in to_match}
-
-    gen_index_file(tdir, level, to_match)
+    gen_reports_index_file(tdir, level, om_out_dirs)
 
     webview(os.path.join(tdir, 'index.html'))
 
@@ -428,8 +428,8 @@ def _view_reports_setup_parser(parser):
     """
     parser.add_argument('problem', metavar='problem', nargs='*',
                         help='View reports only for the specified Problem(s).')
-    parser.add_argument('-l', '--level', action='store', dest='level', type=int, default=2,
-                        help='Expand the reports directory tree to this level. Default is 2.')
+    parser.add_argument('-l', '--level', action='store', dest='level', type=int, default=1,
+                        help='Expand the reports directory tree to this level. Default is 1.')
 
 
 def _view_reports_cmd(options, user_args):
@@ -617,73 +617,68 @@ def _load_report_plugins():
         register_func()  # this runs the function that calls register_report
 
 
-def _add_dir_to_tree(dirpath, lines, explevel, level, to_match):
+def _get_reports_dir_files_html(reports_dir, explevel, level):
+    lines = []
+    files = os.listdir(reports_dir)
+
+    if files:
+        lines.append('<ul>')
+
+        for f in files:
+            if f.endswith('.html') and f != 'index.html':
+                path = os.path.join(reports_dir, f)
+                lines.append(f'<li> <a href="file:///{path}">{f}</a> </li>')
+
+        lines.append('</ul>')
+
+    return lines
+
+
+def _add_dir_to_tree(startdir, explevel, level):
     """
     Create nested lists of directories with links to files.
 
     Parameters
     ----------
-    dirpath : str
+    startdir : str
         Starting directory.
-    lines : list of str
-        List of lines in the final html.
     explevel : int
         Expand the tree to this level.
     level : int
         The current level of the tree.
-    to_match : set
-        Directory names to show.
+
+    Returns
+    -------
+    list of str
+        List of lines in the final html.
     """
-    dlist = os.listdir(dirpath)
+    repdir = os.path.join(startdir, 'reports')
+    if not os.path.isdir(repdir):
+        return []
 
-    if not dlist:  # don't include empty dirs in the index
-        return
+    flines = _get_reports_dir_files_html(repdir, explevel, level)
+    subdirs = [str(d) for d in _find_openmdao_output_dirs(startdir, False) if str(d) != startdir]
 
-    # split into files and dirs to make page look better
-    directories = {f for f in dlist if os.path.isdir(os.path.join(dirpath, f))}
+    sublines = []
+    for sub in subdirs:
+        sublines.extend(_add_dir_to_tree(sub, explevel, level + 1))
 
-    files = sorted(f for f in dlist if os.path.isfile(os.path.join(dirpath, f)))
+    lines = []
+    if flines or sublines:
 
-    if level == 1 and os.path.basename(dirpath) not in to_match:
-        return
-    else:
         op = 'open' if level < explevel else ''
-        lines.append(f'<li><details {op}><summary>{os.path.basename(dirpath)}</summary>')
-        if not dlist:
-            lines.append('</li>')
-            return
+        lines.append(f'<li><details {op}><summary>{os.path.basename(startdir)}</summary>')
 
-    lines.append('<ul>')
+        lines.extend(flines)
+        lines.extend(sublines)
 
-    for f in chain(files, sorted(directories)):
-        path = os.path.join(dirpath, f)
-        if os.path.isdir(path):
-            _add_dir_to_tree(path, lines, explevel, level + 1, to_match)
-        elif f.endswith('.html') and f != 'index.html':
-            lines.append(f'<li> <a href="file:///{path}">{f}</a> </li>')
+        lines.append('</details></li>')
 
-    lines.append('</ul></details></li>')
+    return lines
 
 
-def gen_index_file(reports_dir, level, to_match):
-    """
-    Generate an index.html file that will have links to all of the reports.
-
-    Parameters
-    ----------
-    reports_dir : str
-        The top directory containing the reports.
-    level : int
-        Expand the reports directory tree to this level.
-    to_match : set
-        Set of subdirectory names to show.
-    """
-    reports_dir = os.path.abspath(reports_dir)
-
-    # tree view courtesy of: https://iamkate.com/code/tree-views/
-
-    parts = [
-        """
+def _get_pre_body():
+    return """
         <!DOCTYPE html>
         <html lang="en">
         <head>
@@ -773,13 +768,34 @@ def gen_index_file(reports_dir, level, to_match):
         </script>
         </head>
         <body>
-        """
-    ]
+    """
+
+
+def gen_reports_index_file(start_dir, level, to_match):
+    """
+    Generate an index.html file that will have links to all of the reports.
+
+    Parameters
+    ----------
+    start_dir : str
+        The top directory containing the reports.
+    level : int
+        Expand the reports directory tree to this level.
+    to_match : set
+        Set of subdirectory names to show.
+    """
+    start_dir = os.path.abspath(start_dir)
+
+    # tree view courtesy of: https://iamkate.com/code/tree-views/
+
+    parts = [_get_pre_body()]
     lines = ['<ul class="tree">']
-    _add_dir_to_tree(reports_dir, lines, explevel=level, level=0, to_match=to_match)
+
+    for outdir in sorted(to_match):
+        lines.extend(_add_dir_to_tree(outdir, explevel=level, level=0))
 
     parts.append('\n'.join(lines))
-    parts.append('</body>\n</html>')
+    parts.append('</ul></body>\n</html>')
 
-    with open(os.path.join(reports_dir, 'index.html'), 'w') as f:
+    with open(os.path.join(start_dir, 'index.html'), 'w') as f:
         f.write('\n'.join(parts))

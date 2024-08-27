@@ -55,7 +55,7 @@ from openmdao.utils.general_utils import pad_name, LocalRangeIterable, \
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.file_utils import _get_outputs_dir
+from openmdao.utils.file_utils import _get_outputs_dir, text2html
 from openmdao.visualization.tables.table_builder import generate_table
 
 try:
@@ -875,7 +875,7 @@ class Problem(object):
         """
         return create_local_meta(case_name)
 
-    def setup(self, check=False, logger=None, mode='auto', force_alloc_complex=False,
+    def setup(self, check=None, logger=None, mode='auto', force_alloc_complex=False,
               distributed_vector_class=PETScVector, local_vector_class=DefaultVector,
               derivatives=True, parent=None):
         """
@@ -890,7 +890,9 @@ class Problem(object):
         ----------
         check : None, bool, list of str, or the strs ‘all’
             Determines what config checks, if any, are run after setup is complete.
-            If None or False, no checks are run
+            If None: no checks are run unless the 'checks' report is active, in which case the
+            default reports will be run.
+            If False, no checks are run
             If True, the default checks ('out_of_order', 'system', 'solvers', 'dup_inputs',
             'missing_recorders', 'unserializable_options', 'comp_has_no_outputs',
             'auto_ivc_warnings') are run
@@ -2474,7 +2476,7 @@ class Problem(object):
             return
 
         if logger is None:
-            check_file_path = None if out_file is None else str(self.get_outputs_dir() / out_file)
+            check_file_path = None if out_file is None else str(self.get_reports_dir() / out_file)
             logger = get_logger('check_config', out_file=check_file_path, use_format=True)
 
         if checks == 'all':
@@ -2487,6 +2489,16 @@ class Problem(object):
                 continue
             logger.info(f'checking {c}')
             _all_checks[c](self, logger)
+
+        if checks:
+            # turn text file written to reports dir into an html file to be viewable from the
+            # 'openmdao view_reports' command
+            with open(check_file_path, 'r') as f:
+                txt = f.read()
+
+            path = pathlib.Path(self.get_reports_dir() / 'checks.html')
+            with open(path, 'w') as f:
+                f.write(text2html(txt))
 
     def set_complex_step_mode(self, active):
         """
