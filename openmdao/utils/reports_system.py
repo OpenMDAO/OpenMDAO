@@ -4,8 +4,6 @@ Utility functions related to the reporting system which generates reports by def
 
 import os
 import inspect
-import pathlib
-from itertools import chain
 
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.hooks import _register_hook, _unregister_hook
@@ -408,13 +406,12 @@ def view_reports(probnames=None, level=2):
 
         om_out_dirs = matches
 
-    if not om_out_dirs:
+    if om_out_dirs:
+        gen_reports_index_file(tdir, level, om_out_dirs)
+        webview(os.path.join(tdir, 'index.html'))
+    else:
         print("No matching report dirs found.")
         return
-
-    gen_reports_index_file(tdir, level, om_out_dirs)
-
-    webview(os.path.join(tdir, 'index.html'))
 
 
 def _view_reports_setup_parser(parser):

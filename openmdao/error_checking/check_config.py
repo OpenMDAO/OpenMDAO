@@ -11,13 +11,11 @@ import pickle
 from openmdao.core.group import Group
 from openmdao.core.component import Component
 from openmdao.core.implicitcomponent import ImplicitComponent
-from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.graph_utils import get_sccs_topo
 from openmdao.utils.logger_utils import get_logger
-from openmdao.utils.class_util import overrides_method
 from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook
-from openmdao.utils.general_utils import printoptions, all_ancestors
+from openmdao.utils.general_utils import printoptions
 from openmdao.utils.units import _has_val_mismatch
 from openmdao.utils.file_utils import _load_and_exec, text2html
 from openmdao.utils.om_warnings import issue_warning, SetupWarning
