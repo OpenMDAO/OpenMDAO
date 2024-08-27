@@ -2475,8 +2475,14 @@ class Problem(object):
         if checks is None:
             return
 
+        reports_dir_exists =  os.path.isdir(self.get_reports_dir())
+        check_file_path = None
         if logger is None:
-            check_file_path = None if out_file is None else str(self.get_reports_dir() / out_file)
+            if out_file is not None:
+                if reports_dir_exists:
+                    check_file_path = str(self.get_reports_dir() / out_file)
+                else:
+                    check_file_path = out_file
             logger = get_logger('check_config', out_file=check_file_path, use_format=True)
 
         if checks == 'all':
@@ -2490,13 +2496,13 @@ class Problem(object):
             logger.info(f'checking {c}')
             _all_checks[c](self, logger)
 
-        if checks:
+        if checks and check_file_path is not None and reports_dir_exists:
             # turn text file written to reports dir into an html file to be viewable from the
             # 'openmdao view_reports' command
             with open(check_file_path, 'r') as f:
                 txt = f.read()
 
-            path = pathlib.Path(self.get_reports_dir() / 'checks.html')
+            path = self.get_reports_dir() / 'checks.html'
             with open(path, 'w') as f:
                 f.write(text2html(txt))
 
