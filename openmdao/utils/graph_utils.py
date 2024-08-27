@@ -97,6 +97,8 @@ def get_cycle_tree(group):
                                  yield_none=False)
     for tup in sorted(it, key=lambda x: (x[0].count('.'), len(x[0]))):
         path = tup[0]
+        if not tup[2]:  # no sccs
+            continue
         for ans in all_ancestors(path):
             if ans in group_tree_dict:
                 parent_tree = group_tree_dict[ans]
