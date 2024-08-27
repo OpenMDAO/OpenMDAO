@@ -6616,14 +6616,3 @@ class System(object):
                         res = func(s, *args, **kwargs)
                         if res is not None:
                             yield res
-
-    def is_top(self):
-        """
-        Return True if this system is a top level system.
-
-        Returns
-        -------
-        bool
-            True if this system is a top level system.
-        """
-        return self.pathname == ''
