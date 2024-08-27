@@ -150,7 +150,7 @@ def print_cycle_tree(group):
             for tup in children:
                 _print_tree(tup, len(group_tree_dict[tup[4]]), indent + '  ')
 
-    for path, lst in group_tree_dict.items():
+    for lst in group_tree_dict.values():
         for _, _, _, idx, _, parpath in lst:
             if parpath is None:  # this is a top level scc
                 _print_tree(lst[idx], len(lst))

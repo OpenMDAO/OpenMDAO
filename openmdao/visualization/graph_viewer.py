@@ -836,7 +836,7 @@ def _graph_setup_parser(parser):
     parser.add_argument('-o', action='store', dest='outfile', help='file containing graph output.')
     parser.add_argument('--group', action='store', dest='group', help='pathname of group to graph.')
     parser.add_argument('--type', action='store', dest='type', default='dataflow',
-                        help='type of graph (dataflow, tree). Default is dataflow.')
+                        help='type of graph (dataflow, tree, cycle). Default is dataflow.')
     parser.add_argument('--no-display', action='store_false', dest='show',
                         help="don't display the graph.")
     parser.add_argument('--no-recurse', action='store_false', dest='recurse',
