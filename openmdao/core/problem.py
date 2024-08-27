@@ -2475,7 +2475,7 @@ class Problem(object):
         if checks is None:
             return
 
-        reports_dir_exists =  os.path.isdir(self.get_reports_dir())
+        reports_dir_exists = os.path.isdir(self.get_reports_dir())
         check_file_path = None
         if logger is None:
             if out_file is not None:
