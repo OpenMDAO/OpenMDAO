@@ -186,7 +186,8 @@ class DistributedRecorderTest(unittest.TestCase):
             expected_outputs.update(expected_objectives)
 
             expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
-            assertDriverIterDataRecorded(self, expected_data, self.eps)
+            recorder_filepath = os.path.join(self.filename)
+            assertDriverIterDataRecorded(self, recorder_filepath, expected_data, self.eps)
 
     def test_recording_remote_voi(self):
         # Create a parallel model
@@ -272,10 +273,11 @@ class DistributedRecorderTest(unittest.TestCase):
             coordinate = [0, 'ScipyOptimize_SLSQP', (driver.iter_count-1,)]
 
             expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
-            assertDriverIterDataRecorded(self, expected_data, self.eps)
+            recorder_filepath = os.path.join(self.filename)
+            assertDriverIterDataRecorded(self, recorder_filepath, expected_data, self.eps)
 
             expected_data = (('final', (t1, t2), expected_outputs),)
-            assertProblemDataRecorded(self, expected_data, self.eps)
+            assertProblemDataRecorded(self, recorder_filepath, expected_data, self.eps)
 
     def test_input_desvar(self):
         # this failed with a KeyError before the fix
@@ -298,7 +300,7 @@ class DistributedRecorderTest(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        geom = model.add_subsystem('tcomp', TopComp())
+        model.add_subsystem('tcomp', TopComp())
 
         model.add_design_var('tcomp.theta_c2_C', lower=-20., upper=20., indices=range(2, 9))
         model.add_constraint('tcomp.c_ae', lower=0.e0,)
@@ -318,7 +320,7 @@ class DistributedRecorderTest(unittest.TestCase):
     def test_sql_meta_file_exists(self):
         # Check that an existing sql_meta file will be deleted/overwritten
         # if it already exists before a run. (see Issue #2062)
-        prob = om.Problem()
+        prob = om.Problem(name='foo')
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
         prob.model.add_design_var('x', lower=0.0, upper=1.0)
@@ -335,8 +337,11 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
+        from openmdao.core.problem import _clear_problem_names
+        _clear_problem_names()
+
         # Run this again. It should NOT throw an exception.
-        prob = om.Problem()
+        prob = om.Problem(name='foo')
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
         prob.model.add_design_var('x', lower=0.0, upper=1.0)
@@ -351,19 +356,21 @@ class DistributedRecorderTest(unittest.TestCase):
 
         prob.setup()
 
+        outputs_dir = prob.get_outputs_dir()
+
         if prob.comm.rank == 0:
             expected_warnings = [
                 (UserWarning,
-                'The existing case recorder metadata file, cases.sql_meta, '
+                f'The existing case recorder metadata file, {outputs_dir}/cases.sql_meta, '
                 'is being overwritten.'),
                 (UserWarning,
-                'The existing case recorder file, cases.sql_0, is being '
+                f'The existing case recorder file, {outputs_dir}/cases.sql_0, is being '
                 'overwritten.'),
             ]
         else:
             expected_warnings = [
                 (UserWarning,
-                    'The existing case recorder file, cases.sql_1, is being '
+                    f'The existing case recorder file, {outputs_dir}/cases.sql_1, is being '
                     'overwritten.'),
             ]
         with assert_warnings(expected_warnings):
@@ -382,7 +389,7 @@ class DistributedRecorderTest(unittest.TestCase):
 
         def run_sequential():
             # problem will run in the single proc comm for this rank
-            prob = om.Problem(comm=my_comm)
+            prob = om.Problem(name='test_record_on_one_proc', comm=my_comm)
 
             prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
             prob.model.add_design_var('x', lower=0.0, upper=1.0)
@@ -400,7 +407,7 @@ class DistributedRecorderTest(unittest.TestCase):
 
         def run_parallel():
             # process cases.sql in parallel
-            cr = om.CaseReader("cases.sql")
+            cr = om.CaseReader('test_record_on_one_proc_out/cases.sql')
 
             cases = cr.list_cases()
             self.assertEqual(len(cases), 9)

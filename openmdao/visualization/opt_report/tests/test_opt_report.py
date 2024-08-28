@@ -1,5 +1,4 @@
 import os
-import pathlib
 import unittest
 
 import numpy as np
@@ -134,7 +133,7 @@ class TestOptimizationReport(unittest.TestCase):
             else:
                 try:
                     value = int(value)
-                except ValueError as err:
+                except ValueError:
                     pass
             return value
 

@@ -22,12 +22,12 @@ class ListVarsTest(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        case = om.CaseReader('test_list_outputs.db').get_case(-1)
+        case = om.CaseReader(prob.get_outputs_dir() / 'test_list_outputs.db').get_case(-1)
 
         with self.assertRaises(ValueError) as cm:
             case.list_inputs(return_format=dict)
 
-        msg = f"Invalid value (<class 'dict'>) for return_format, " \
+        msg = "Invalid value (<class 'dict'>) for return_format, " \
               "must be a string value of 'list' or 'dict'"
 
         self.assertEqual(str(cm.exception), msg)
@@ -35,7 +35,7 @@ class ListVarsTest(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             case.list_outputs(return_format='dct')
 
-        msg = f"Invalid value ('dct') for return_format, " \
+        msg = "Invalid value ('dct') for return_format, " \
               "must be a string value of 'list' or 'dict'"
 
         self.assertEqual(str(cm.exception), msg)
@@ -53,7 +53,7 @@ class ListVarsTest(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        case = om.CaseReader('test_list_outputs.db').get_case(-1)
+        case = om.CaseReader(prob.get_outputs_dir() / 'test_list_outputs.db').get_case(-1)
 
         prob_out = io.StringIO()
         rec_out = io.StringIO()
@@ -131,7 +131,7 @@ class ListVarsTest(unittest.TestCase):
         p.run_driver()
         p.cleanup()
 
-        cr = om.CaseReader("driver_cases.db")
+        cr = om.CaseReader(p.get_outputs_dir() / "driver_cases.db")
         case = cr.get_case(-1)
 
         prob_out = io.StringIO()
@@ -175,7 +175,7 @@ class ListVarsTest(unittest.TestCase):
 
         expected = prob.model.list_vars(units=True, out_stream=None, return_format='dict')
 
-        case = om.CaseReader('list_vars.db').get_case(0)
+        case = om.CaseReader(prob.get_outputs_dir() / 'list_vars.db').get_case(0)
 
         io_vars = case.list_vars(units=True, out_stream=None, return_format='dict')
 
@@ -209,7 +209,7 @@ class ListVarsTest(unittest.TestCase):
 
         p.run_model()
 
-        case = om.CaseReader('addsubtags.db').get_case(0)
+        case = om.CaseReader(p.get_outputs_dir() / 'addsubtags.db').get_case(0)
 
         a = p['a']
         b = p['b']
@@ -254,7 +254,7 @@ class ListVarsTest(unittest.TestCase):
         prob.run_model()
         prob.cleanup()
 
-        case = om.CaseReader('list_vars.db').get_case(0)
+        case = om.CaseReader(prob.get_outputs_dir() / 'list_vars.db').get_case(0)
 
         import inspect
         func_sig = inspect.signature(case.list_vars)

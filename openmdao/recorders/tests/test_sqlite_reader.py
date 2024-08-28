@@ -2,7 +2,6 @@
 
 import sys
 import os
-import sys
 import unittest
 
 from io import StringIO
@@ -35,8 +34,6 @@ from openmdao.utils.testing_utils import use_tempdirs
 
 # check that pyoptsparse is installed
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
-if OPTIMIZER:
-    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 
 def count_keys(d):
@@ -146,7 +143,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         self.assertEqual(cr._format_version, format_version,
                          msg='format version not read correctly')
 
@@ -158,7 +155,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         self.assertTrue(isinstance(cr, SqliteCaseReader),
                         msg='CaseReader not returning the correct subclass.')
 
@@ -172,7 +169,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         case = cr.get_case(0)
 
         self.assertEqual(case.source, 'driver')
@@ -205,7 +202,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         # check that driver is our only source
         self.assertEqual(cr.list_sources(out_stream=None), ['driver'])
@@ -251,7 +248,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         # check that we only have driver cases
         self.assertEqual(cr.list_sources(out_stream=None), ['driver'])
@@ -313,7 +310,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.set_solver_print(0)
         prob.run_driver()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         # check that we only have driver cases
         self.assertEqual(cr.list_sources(out_stream=None), ['driver'])
@@ -346,7 +343,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.set_solver_print(0)
         prob.run_driver()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         # check that we only have driver cases
         self.assertEqual(cr.list_sources(out_stream=None), ['driver'])
@@ -384,7 +381,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         # check that we only have the three system sources
         self.assertEqual(sorted(cr.list_sources(out_stream=None)), ['root', 'root.d1', 'root.obj_cmp'])
@@ -439,7 +436,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         # check that we only have the one solver source
         self.assertEqual(sorted(cr.list_sources(out_stream=None)), ['root.nonlinear_solver'])
@@ -482,7 +479,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        metadata = om.CaseReader(self.filename).solver_metadata
+        metadata = om.CaseReader(prob.get_outputs_dir() / self.filename).solver_metadata
 
         self.assertEqual(
             sorted(metadata.keys()),
@@ -507,7 +504,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         # Test values from the last case
         driver_cases = cr.list_cases('driver', out_stream=None)
@@ -524,7 +521,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                                                        linear_solver=om.ScipyKrylov,
                                                        mda_nonlinear_solver=om.NonlinearBlockGS)
 
-        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP', print_results=False)
+        driver = prob.driver = om.pyOptSparseDriver(optimizer='SLSQP', print_results=False)
         driver.recording_options['record_desvars'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
@@ -539,7 +536,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         # check driver cases
         expected_coords = [
@@ -654,7 +651,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         parent_coord = 'rank0:ScipyOptimize_SLSQP|2|root._solve_nonlinear|2'
         coord = parent_coord + '|NLRunOnce|0'
@@ -702,7 +699,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         # get total iteration count to check against
         global_iterations = len(cr._global_iterations)
@@ -825,7 +822,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         # get total iteration count to check against
         global_iterations = len(cr._global_iterations)
@@ -866,7 +863,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         # get total iteration count to check against
         global_iterations = len(cr._global_iterations)
@@ -915,7 +912,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         # get total iteration count to check against
         global_iterations = len(cr._global_iterations)
@@ -1035,7 +1032,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         # check the system case for 'd1' (there should be only one output, 'd1.y1')
         system_cases = cr.list_cases('root.d1', out_stream=None)
@@ -1126,7 +1123,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         p.model.run_apply_nonlinear()
         p.record('final')
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(p.get_outputs_dir() / self.filename)
         case = cr.get_case('final')
 
         # list outputs with residuals
@@ -1209,7 +1206,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         expected_inputs_case = {
             'd1.z': {'val': [5., 2.], 'desc': ''},
@@ -1250,7 +1247,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         case = cr.get_case(-1)
 
         # check that output from the Case methods match output from the System methods
@@ -1278,7 +1275,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_model()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         case = cr.get_case(-1)
 
         indeps = case.list_inputs(is_indep_var=True, prom_name=True, out_stream=None)
@@ -1328,7 +1325,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.get_cases()
         case = cases[0]
 
@@ -1377,7 +1374,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         system_cases = cr.list_cases('root.d1', out_stream=None)
         case = cr.get_case(system_cases[-1])
@@ -1433,7 +1430,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_model()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         case = cr.get_case(0)
 
         #
@@ -1532,7 +1529,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_model()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         case = cr.get_case(0)
 
         #
@@ -1603,7 +1600,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_model()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         case = cr.get_case(0)
 
         #
@@ -1673,7 +1670,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             "d1.z": [5., 2.],
         }
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         # driver will record design vars, objectives and constraints
         cases = cr.list_cases('driver', recurse=False, out_stream=None)
@@ -1742,7 +1739,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_model()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         case = cr.get_case(0)
 
@@ -1786,7 +1783,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         case = cr.get_case(0)
 
@@ -1812,7 +1809,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.set_val('comp.x', val=100.0, units='s*ft/s')
         prob.run_model()
         prob.cleanup()
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         case = cr.get_case(0)
 
         for datasrc in [case, prob, prob.model]:
@@ -1841,7 +1838,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_model()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         case = cr.get_case(0)
 
         assert_near_equal(case.get_val('x'), 1., 1e-6)
@@ -1897,7 +1894,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         driver_cases = cr.list_cases('driver', out_stream=None)
         driver_case = cr.get_case(driver_cases[0])
@@ -1947,7 +1944,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             prob.run_model()
 
         prob.cleanup()
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         subs_options = cr._system_options['subs']['component_options']
 
         # no options should have been recorded for d1
@@ -1971,7 +1968,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.cleanup()
 
         # without pre_load, we should get format_version and metadata but no cases
-        cr = om.CaseReader(self.filename, pre_load=False)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename, pre_load=False)
 
         num_driver_cases = len(cr.list_cases('driver', recurse=False, out_stream=None))
         num_system_cases = len(cr.list_cases('root', recurse=False, out_stream=None))
@@ -1999,7 +1996,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(len(cr._problem_cases._cases), 0)
 
         # with pre_load, we should get format_version, metadata and all cases
-        cr = om.CaseReader(self.filename, pre_load=True)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename, pre_load=True)
 
         num_driver_cases = len(cr.list_cases('driver', recurse=False, out_stream=None))
         num_system_cases = len(cr.list_cases('root', recurse=False, out_stream=None))
@@ -2047,7 +2044,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.record('c_2')
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename, pre_load=False)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename, pre_load=False)
 
         self.assertEqual(len(cr._driver_cases._cases), 0)
         self.assertEqual(len(cr._system_cases._cases), 0)
@@ -2118,7 +2115,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         # Test values from the last case
         driver_cases = cr.list_cases('driver', out_stream=None)
@@ -2189,7 +2186,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertFalse(fail, 'Problem optimization failed.')
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         #
         # check sources
@@ -2415,7 +2412,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_model()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         case = cr.get_case(cr.list_cases()[-1])
 
         norm =  nl._iter_get_norm()
@@ -2470,7 +2467,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             'rank0:root._solve_nonlinear|0'
         ]
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         for i, c in enumerate(cr.list_cases(out_stream=None)):
             case = cr.get_case(c)
@@ -2525,7 +2522,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         system_cases = cr.list_cases(out_stream=None)
         case = cr.get_case(system_cases[0])
 
@@ -2731,7 +2728,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         prob.cleanup()
 
-        cr = om.CaseReader('cases.sql')
+        cr = om.CaseReader(prob.get_outputs_dir() / 'cases.sql')
 
         num_problem_cases = len(cr.list_cases('problem', out_stream=None))
         self.assertEqual(num_problem_cases, 1)
@@ -2774,7 +2771,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         J = p.compute_totals()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(p.get_outputs_dir() / "cases.sql")
         case = cr.get_case('final')
 
         for deriv_key in J:
@@ -2794,7 +2791,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.record('final')
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         cases_set = set(cr.list_cases(out_stream=None))
 
@@ -2825,7 +2822,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.record('final')
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         expected_cases = [
             'system',
@@ -2844,7 +2841,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         ]
 
         stream = StringIO()
-        cases = cr.list_cases(out_stream=stream)
+        cr.list_cases(out_stream=stream)
         text = stream.getvalue().split('\n')
         for i, line in enumerate(expected_cases):
             self.assertEqual(text[i], line)
@@ -2862,7 +2859,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.record('final')
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         expected_sources = [
             'driver',
@@ -2875,7 +2872,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertTrue(str(cm.exception), "Invalid output stream specified for 'out_stream'.")
 
         stream = StringIO()
-        cases = cr.list_sources(out_stream=stream)
+        cr.list_sources(out_stream=stream)
         text = stream.getvalue().split('\n')
         for i, line in enumerate(expected_sources):
             self.assertEqual(text[i], line)
@@ -2893,7 +2890,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.record('final')
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         expected_cases = [
             'outputs',
@@ -2905,7 +2902,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         ]
 
         stream = StringIO()
-        cases = cr.list_source_vars('driver', out_stream=stream)
+        cr.list_source_vars('driver', out_stream=stream)
         text = sorted(stream.getvalue().split('\n'), reverse=True)
         for i, line in enumerate(expected_cases):
             self.assertEqual(text[i], line)
@@ -2921,7 +2918,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         print(cr.openmdao_version)
         self.assertEqual(openmdao_version, cr.openmdao_version)
@@ -2941,7 +2938,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         prob.run_model()
 
-        reader = om.CaseReader(self.filename)
+        reader = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         # check that sources are recorded properly
         sources = sorted(reader.list_sources(out_stream=None), reverse=True)
@@ -2985,7 +2982,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        reader = om.CaseReader(self.filename)
+        reader = om.CaseReader(p.get_outputs_dir() / self.filename)
 
         # check that sources are recorded properly
         sources = sorted(reader.list_sources(out_stream=None))
@@ -3040,7 +3037,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         p.run_driver()
 
         p.cleanup()
-        cr = om.CaseReader('cases.sql')
+        cr = om.CaseReader(p.get_outputs_dir() / 'cases.sql')
         case = cr.get_case(1)
         derivs = case.derivatives
 
@@ -3090,7 +3087,7 @@ class DummyClass(object):
                 def initialize(self):
                     self.options.declare('dummy', types=mymodule.DummyClass, default=mymodule.DummyClass())
 
-            prob = om.Problem()
+            prob = om.Problem(name='test_reading_non_importable_objects_in_system_options')
             recorder = om.SqliteRecorder('cases.sql')
             prob.add_recorder(recorder)
 
@@ -3114,6 +3111,7 @@ class DummyClass(object):
             # Really remove the module!
             del sys.modules['mymodule']
             os.remove(module_path)
+            return
 
         # need to do this because the use_tempdirs decorator does not
         #  update the python path and so "." is not included and this
@@ -3134,7 +3132,7 @@ class DummyClass(object):
 
         # need to check for warning being issued about not being able to read it
         with assert_warning(RuntimeWarning, "While reading system options from case recorder, the following errors occurred: No module named 'mymodule'"):
-            cr = om.CaseReader('cases.sql')
+            cr = om.CaseReader('test_reading_non_importable_objects_in_system_options_out/cases.sql')
 
         # Check to see that all the component options for the DummyClass are retrievable from the case recorder file
         parab_component_options = cr._system_options['parab_with_dummy_metadata']['component_options']
@@ -3172,7 +3170,7 @@ class DummyClass(object):
         prob.setup(mode='rev')
         prob.run_driver()
 
-        case = om.CaseReader('cases.sql').get_case(0)
+        case = om.CaseReader(prob.get_outputs_dir() / 'cases.sql').get_case(0)
 
         dvs = case.get_design_vars()
         self.assertEqual(set(dvs.keys()), {'x'})
@@ -3208,7 +3206,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader('cases.sql')
+        cr = om.CaseReader(prob.get_outputs_dir() / 'cases.sql')
 
         case_names = cr.list_cases(out_stream=None)
 
@@ -3240,7 +3238,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader('cases.sql')
+        cr = om.CaseReader(prob.get_outputs_dir() / 'cases.sql')
 
         cases = cr.get_cases()
 
@@ -3278,7 +3276,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob.cleanup()
 
         # get the last driver case
-        cr = om.CaseReader('cases.sql')
+        cr = om.CaseReader(prob.get_outputs_dir() / 'cases.sql')
 
         driver_cases = cr.list_cases('driver')
         last_driver_case = driver_cases[-1]
@@ -3325,7 +3323,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob.cleanup()
 
         # examine cases to see what was recorded
-        cr = om.CaseReader('cases.sql')
+        cr = om.CaseReader(prob.get_outputs_dir() / 'cases.sql')
 
         sources = cr.list_sources()
         self.assertEqual(sorted(sources), ['driver', 'root', 'root.cycle.nonlinear_solver', 'root.nonlinear_solver'])
@@ -3364,7 +3362,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader('cases.sql')
+        cr = om.CaseReader(prob.get_outputs_dir() / 'cases.sql')
 
         # Get derivatives associated with the last iteration.
         derivs = cr.get_case(-1).derivatives
@@ -3411,7 +3409,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob.cleanup()
 
         # First case with record_desvars = True and includes = []
-        cr = om.CaseReader(filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / filename)
         case = cr.get_case(-1)
 
         self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy', 'x', 'y'])
@@ -3427,7 +3425,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / filename)
         case = cr.get_case(0)
 
         self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy'])
@@ -3443,7 +3441,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / filename)
         case = cr.get_case(0)
 
         self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy', 'x', 'y'])
@@ -3459,7 +3457,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / filename)
         case = cr.get_case(0)
 
         self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy', 'x', 'y'])
@@ -3492,7 +3490,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         driver_cases = cr.list_cases('driver')
         case = cr.get_case(driver_cases[0])
@@ -3537,7 +3535,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         system_cases = cr.list_cases('root.d1')
 
@@ -3587,7 +3585,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         cases = cr.get_cases()
         case = cases[0]
@@ -3621,7 +3619,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         cases = cr.get_cases()
         case = cases[0]
@@ -3660,7 +3658,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob.run_model()
         prob.cleanup()
 
-        cr = om.CaseReader('cases.sql')
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         case = cr.get_case(0)
 
         assert_near_equal(case['x'], 100., 1e-6)
@@ -3708,7 +3706,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob.record(case_name_2)
         prob.cleanup()
 
-        cr = om.CaseReader('cases.sql')
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         num_problem_cases = len(cr.list_cases('problem'))
         self.assertEqual(num_problem_cases, 2)
@@ -3744,7 +3742,7 @@ class TestPromAbsDict(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         driver_cases = cr.list_cases('driver', out_stream=None)
         driver_case = cr.get_case(driver_cases[-1])
@@ -3832,7 +3830,7 @@ class TestPromAbsDict(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         driver_cases = cr.list_cases('driver', out_stream=None)
         driver_case = cr.get_case(driver_cases[-1])
@@ -3912,10 +3910,10 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         cr = om.CaseReader(filename)
 
         with assert_warning(UserWarning, 'System options not recorded.'):
-            options = cr.list_model_options()
+            cr.list_model_options()
 
         with assert_warning(UserWarning, 'Solver options not recorded.'):
-            options = cr.list_solver_options()
+            cr.list_solver_options()
 
         # The case reader should handle a v11 database that had a
         # different separator for runs in the model option keys

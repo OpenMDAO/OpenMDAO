@@ -7,9 +7,7 @@ from scipy.sparse import issparse
 
 from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.name_maps import key2abs_key
-from openmdao.utils.array_utils import sparse_subinds
 from openmdao.matrices.matrix import sparse_types
-from openmdao.vectors.vector import _full_slice
 
 SUBJAC_META_DEFAULTS = {
     'rows': None,

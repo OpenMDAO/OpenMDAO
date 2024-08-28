@@ -236,7 +236,7 @@ class ImplicitFuncComp(ImplicitComponent):
         func = self._apply_nonlinear_func
         # argnums specifies which position args are to be differentiated
         inames = list(func.get_input_names())
-        argnums = aa = [i for i, m in enumerate(func._inputs.values()) if 'is_option' not in m]
+        argnums = [i for i, m in enumerate(func._inputs.values()) if 'is_option' not in m]
         if len(argnums) == len(inames):
             argnums = None  # speedup if there are no static args
         osize = len(self._outputs)

@@ -192,7 +192,6 @@ class Component(System):
                 self._num_par_fd = 1
 
         self.comm = comm
-        nprocs = comm.size
 
         # Clear out old variable information so that we can call setup on the component.
         self._var_rel_names = {'input': [], 'output': []}

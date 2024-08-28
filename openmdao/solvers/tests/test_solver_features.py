@@ -129,11 +129,11 @@ class TestSolverFeatures(unittest.TestCase):
 
         prob.setup()
 
-        msg = (f"Your model has stalled three times and may be violating the bounds. "
-                f"In the future, turn on print_bound_enforce in your solver options "
-                f"here: \nnonlinear_solver.linesearch.options"
-                f"['print_bound_enforce']=True. "
-                f"\nThe bound(s) being violated now are:\n")
+        msg = ("Your model has stalled three times and may be violating the bounds. "
+               "In the future, turn on print_bound_enforce in your solver options "
+               "here: \nnonlinear_solver.linesearch.options"
+               "['print_bound_enforce']=True. "
+               "\nThe bound(s) being violated now are:\n")
         with assert_warning(UserWarning, msg):
             prob.run_model()
 
@@ -166,11 +166,11 @@ class TestSolverFeatures(unittest.TestCase):
 
         prob.setup()
 
-        msg = (f"Your model has stalled three times and may be violating the bounds. "
-                f"In the future, turn on print_bound_enforce in your solver options "
-                f"here: \nbalance_group.nonlinear_solver.linesearch.options"
-                f"['print_bound_enforce']=True. "
-                f"\nThe bound(s) being violated now are:\n")
+        msg = ("Your model has stalled three times and may be violating the bounds. "
+               "In the future, turn on print_bound_enforce in your solver options "
+               "here: \nbalance_group.nonlinear_solver.linesearch.options"
+               "['print_bound_enforce']=True. "
+               "\nThe bound(s) being violated now are:\n")
 
         with assert_warning(UserWarning, msg):
             prob.run_model()

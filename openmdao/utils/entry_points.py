@@ -12,7 +12,6 @@ from inspect import getmembers, isclass
 import textwrap
 
 from openmdao.utils.file_utils import package_iter, get_module_path, _iter_entry_points
-from openmdao.utils.om_warnings import issue_warning
 
 from openmdao.core.component import Component
 from openmdao.core.explicitcomponent import ExplicitComponent

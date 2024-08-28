@@ -571,7 +571,7 @@ def write_graph(G, prog='dot', display=True, outfile='graph.html'):
         The graph that was written.
     """
     if pydot is None:
-        raise RuntimeError(f"write_graph requires pydot.  Install pydot using "
+        raise RuntimeError("write_graph requires pydot.  Install pydot using "
                            "'pip install pydot'. Note that pydot requires graphviz, which is a "
                            "non-Python application.\nIt can be installed at the system level "
                            "or via a package manager like conda.")

@@ -87,7 +87,7 @@ jobs:
             OS: ubuntu-latest
             PY: '3.12'
             NUMPY: '1.26'
-            SCIPY: '1.13'
+            SCIPY: '1.14'
             PETSc: '3.20'
             PYOPTSPARSE: 'v2.11.0'
             # PAROPT: true
@@ -117,7 +117,7 @@ jobs:
             OS: macos-14
             PY: '3.12'
             NUMPY: '1.26'
-            SCIPY: '1.13'
+            SCIPY: '1.14'
             PETSc: '3.20'
             # PYOPTSPARSE: 'v2.11.0'
             # PAROPT: true
@@ -131,7 +131,7 @@ jobs:
             OS: ubuntu-latest
             PY: '3.12'
             NUMPY: '1.26'
-            SCIPY: '1.13'
+            SCIPY: '1.14'
             OPTIONAL: '[test]'
             TESTS: true
             EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Minimal }}
@@ -207,7 +207,6 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: ${{ matrix.PY }}
-          conda-version: "*"
           channels: conda-forge
 
       - name: Install OpenMDAO
@@ -330,7 +329,7 @@ jobs:
               echo "SNOPT version ${{ matrix.SNOPT }} was requested but source is not available"
             fi
 
-            build_pyoptsparse $BRANCH $PAROPT $SNOPT
+            build_pyoptsparse -v $BRANCH $PAROPT $SNOPT
           fi
 
       - name: Install optional dependencies
@@ -517,6 +516,15 @@ jobs:
           python -m pip install ruff
           ruff check . --select NPY201
 
+      - name: Perform linting with Ruff
+        if: ${{ matrix.NAME == 'Ubuntu Baseline' }}
+        run: |
+          echo "============================================================="
+          echo "Lint OpenMDAO code per settings in pyproject.toml"
+          echo "============================================================="
+          python -m pip install ruff
+          ruff check . --config pyproject.toml
+
       - name: Slack env change
         if: steps.env_info.outputs.errors != ''
         uses: act10ns/slack@v2.0.0
@@ -624,7 +632,6 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: ${{ matrix.PY }}
-          conda-version: "*"
           channels: conda-forge
 
       - name: Install OpenDMAO
@@ -746,14 +753,30 @@ jobs:
         parallel-finished: true
 
 
-  dymos_tests:
-    name: Run Dymos Tests
+  related_tests:
+    name: Run Dymos & pyCycle Tests
     needs: [tests, windows_tests]
     runs-on: ubuntu-latest
+
     steps:
     - uses: benc-uk/workflow-dispatch@v1
       with:
         workflow: Dymos Tests
         repo: ${{ github.repository_owner }}/dymos
+        token: ${{ secrets.ACCESS_TOKEN }}
+      if: github.event_name == 'push'
+
+    - uses: benc-uk/workflow-dispatch@v1
+      with:
+        workflow: pyCycle Tests
+        repo: ${{ github.repository_owner }}/pycycle
+        inputs: >
+          {
+            "run_name": "Test Latest OpenMDAO Development Version",
+            "Ubuntu_Baseline": false,
+            "MacOS_Baseline": false,
+            "Windows_Baseline": false,
+            "OpenMDAO_Dev": true
+           }
         token: ${{ secrets.ACCESS_TOKEN }}
       if: github.event_name == 'push'

@@ -124,7 +124,6 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: ${{ matrix.PY }}
-          conda-version: "*"
           channels: conda-forge
 
       - name: Install MacOS-specific dependencies
@@ -157,7 +156,6 @@ jobs:
           else
             conda install mpich mpi4py petsc4py -q -y
           fi
-
 
           echo "============================================================="
           echo "Check MPI and PETSc installation"
@@ -378,6 +376,7 @@ jobs:
           echo "See: https://numpy.org/devdocs/numpy_2_0_migration_guide.html"
           echo "============================================================="
           python -m pip install ruff
+          cd ${{ github.workspace }}
           ruff check . --select NPY201
 
       - name: Slack env change

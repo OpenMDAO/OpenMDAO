@@ -4,12 +4,10 @@ import functools
 import builtins
 import os
 import re
-import sys
 from itertools import zip_longest
 from contextlib import contextmanager
 
 import numpy as np
-from scipy.sparse import coo_matrix
 
 try:
     from parameterized import parameterized
@@ -25,7 +23,7 @@ def _new_setup(self):
 
     from openmdao.utils.mpi import MPI, multi_proc_exception_check
     self.startdir = os.getcwd()
-    self.workdir = os.environ.get('OPENMDAO_WORKDIR')
+    self.workdir = os.environ.get('OPENMDAO_WORKDIR', '')
 
     if MPI is None:
         self.tempdir = tempfile.mkdtemp(prefix='testdir-')
@@ -254,7 +252,6 @@ def set_env_vars_context(**kwargs):
         for k, v in kwargs.items():
             saved[k] = os.environ.get(k)
             os.environ[k] = v  # will raise exception if v is not a string
-
         yield
 
     finally:

@@ -4,7 +4,6 @@ Class definitions for Relevance and related classes.
 
 from contextlib import contextmanager
 from collections import defaultdict
-import atexit
 
 import numpy as np
 

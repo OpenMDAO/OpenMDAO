@@ -5,11 +5,11 @@ import datetime
 import io
 import os
 import time
+import pathlib
 import pickle
 import sys
 import tempfile
 import traceback
-import pathlib
 import webbrowser
 from itertools import combinations, groupby
 from contextlib import contextmanager
@@ -21,8 +21,8 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM
-from openmdao.utils.general_utils import _src_name_iter, _src_or_alias_item_iter, \
-    _convert_auto_ivc_to_conn_name, pattern_filter
+from openmdao.utils.general_utils import _src_name_iter, _convert_auto_ivc_to_conn_name, \
+    pattern_filter
 import openmdao.utils.hooks as hooks
 from openmdao.utils.file_utils import _load_and_exec
 from openmdao.utils.om_warnings import issue_warning, OMDeprecationWarning, DerivativesWarning
@@ -111,6 +111,14 @@ _COLORING_VERSION = '1.0'
 # this dict can be checked for an existing class version of the coloring that can be used
 # for that instance.
 _CLASS_COLORINGS = {}
+
+
+class InvalidColoringError(Exception):
+    """
+    A custom error class that is raised in the event of an invalid coloring.
+    """
+
+    pass
 
 
 class ColoringMeta(object):
@@ -960,11 +968,11 @@ class Coloring(object):
 
         Parameters
         ----------
-        fname : str
+        fname : str or pathlib.Path
             File to save to.
         """
-        if isinstance(fname, str):
-            color_dir = os.path.dirname(os.path.abspath(fname))
+        if isinstance(fname, str) or isinstance(fname, pathlib.Path):
+            color_dir = pathlib.Path(fname).absolute().parent
             if not os.path.exists(color_dir):
                 try:
                     os.makedirs(color_dir)
@@ -986,6 +994,11 @@ class Coloring(object):
             Current driver object.
         model : Group
             Current model object.
+
+        Raises
+        ------
+        InvalidColoringError
+            Raised if the jacobian structure has changed and the coloring is invalid.
         """
         ofs = model._active_responses(driver._get_ordered_nl_responses(), driver._responses)
         of_sizes = [m['size'] for m in ofs.values()]
@@ -1003,6 +1016,11 @@ class Coloring(object):
         ----------
         system : System
             System being colored.
+
+        Raises
+        ------
+        InvalidColoringError
+            Raised if the jacobian structure has changed and the coloring is invalid.
         """
         # check the contents (vars and sizes) of the input and output vectors of system
         info = Partial_ColoringMeta(wrt_patterns=self._meta.get('wrt_patterns', ('*',)))
@@ -1073,7 +1091,7 @@ class Coloring(object):
 
         if len(msg) > 1:
             msg.append(msg_suffix)
-            raise RuntimeError('\n'.join(msg))
+            raise InvalidColoringError('\n'.join(msg))
 
     def __repr__(self):
         """
@@ -1287,8 +1305,8 @@ class Coloring(object):
                 print('</pre>\n', file=out_stream)
 
         if html:
-            out_stream.write(f'</body>\n'
-                             f'</html>')
+            out_stream.write('</body>\n'
+                             '</html>')
 
         if has_overlap:
             raise RuntimeError("Internal coloring bug: jacobian has entries where fwd and rev "
@@ -2958,7 +2976,6 @@ def _partial_coloring_cmd(options, user_args):
         Args to be passed to the user script.
 
     """
-    from openmdao.core.problem import Problem
     from openmdao.core.component import Component
     from openmdao.devtools.debug import profiling
     from openmdao.utils.general_utils import do_nothing_context

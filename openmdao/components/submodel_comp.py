@@ -1,7 +1,5 @@
 """Define the SubmodelComp class for evaluating OpenMDAO systems within components."""
 
-import numpy as np
-
 from openmdao.core.constants import _SetupStatus
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.total_jac import _TotalJacInfo

@@ -746,7 +746,7 @@ class MetaModelVisualization(object):
 
         # Normalize so each dimension spans [0, 1]
         points = np.divide(points, self.limit_range)
-        dist_limit = np.linalg.norm(self.dist_range * self.limit_range)
+        # dist_limit = np.linalg.norm(self.dist_range * self.limit_range)
         scaled_x0 = np.divide(self.input_point_list, self.limit_range)
 
         # Query the nearest neighbors tree for the closest points to the scaled x0 array
@@ -811,7 +811,7 @@ class MetaModelVisualization(object):
 
         # Normalize so each dimension spans [0, 1]
         points = np.divide(points, self.limit_range)
-        dist_limit = np.linalg.norm(self.dist_range * self.limit_range)
+        # dist_limit = np.linalg.norm(self.dist_range * self.limit_range)
         scaled_x0 = np.divide(self.input_point_list, self.limit_range)
 
         # Query the nearest neighbors tree for the closest points to the scaled x0 array

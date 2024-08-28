@@ -69,7 +69,7 @@ class MultipointBeamGroup(om.Group):
         E = self.options['E']
         L = self.options['L']
         b = self.options['b']
-        volume = self.options['volume']
+        # volume = self.options['volume']
         max_bending = self.options['max_bending']
         num_elements = self.options['num_elements']
         num_nodes = num_elements + 1

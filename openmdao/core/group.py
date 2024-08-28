@@ -26,9 +26,9 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len, ValueRepeater
-from openmdao.utils.general_utils import common_subpath, all_ancestors, \
+from openmdao.utils.general_utils import common_subpath, \
     convert_src_inds, shape2tuple, get_connection_owner, ensure_compatible, \
-    meta2src_iter, get_rev_conns, _contains_all
+    meta2src_iter, get_rev_conns
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
 from openmdao.utils.graph_utils import get_out_of_order_nodes
@@ -206,6 +206,8 @@ class Group(System):
         True if neither this Group nor any of its descendants contains implicit systems or cycles.
     _ivcs : dict
         Dict containing metadata for each independent variable.
+    _bad_conn_vars : set
+        Set of variables involved in invalid connections.
     """
 
     def __init__(self, **kwargs):
@@ -237,6 +239,7 @@ class Group(System):
         self._fd_rev_xfer_correction_dist = {}
         self._is_explicit = None
         self._ivcs = {}
+        self._bad_conn_vars = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -1415,7 +1418,7 @@ class Group(System):
 
         self._resolve_src_indices()
 
-        if self.comm.size > 1:
+        if self.comm.size > 1 and not self._bad_conn_vars:
             abs2idx = self._var_allprocs_abs2idx
             all_abs2meta = self._var_allprocs_abs2meta
             all_abs2meta_in = all_abs2meta['input']
@@ -2143,6 +2146,8 @@ class Group(System):
         abs2meta = self._var_abs2meta['input']
         allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
 
+        self._bad_conn_vars = set()
+
         # Add explicit connections (only ones declared by this group)
         for prom_in, (prom_out, src_indices, flat) in self._manual_connections.items():
 
@@ -2159,6 +2164,8 @@ class Group(System):
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_out}' doesn't exist. Perhaps you meant " + \
                           f"to connect to one of the following outputs: {guesses}."
+
+                self._bad_conn_vars.update((prom_in, prom_out))
                 self._collect_error(msg)
                 continue
 
@@ -2173,6 +2180,8 @@ class Group(System):
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_in}' doesn't exist. Perhaps you meant " + \
                           f"to connect to one of the following inputs: {guesses}."
+
+                self._bad_conn_vars.update((prom_in, prom_out))
                 self._collect_error(msg)
                 continue
 
@@ -2189,6 +2198,7 @@ class Group(System):
                     self._collect_error(
                         f"{self.msginfo}: Output and input are in the same System for connection "
                         f"from '{prom_out}' to '{prom_in}'.")
+                    self._bad_conn_vars.update((prom_in, prom_out))
                     continue
 
                 if src_indices is not None:
@@ -2198,6 +2208,7 @@ class Group(System):
                             f"{self.msginfo}: Setting of 'src_indices' along with 'shape_by_conn', "
                             f"'copy_shape', or 'compute_shape' for variable '{abs_in}' "
                             "is unsupported.")
+                        self._bad_conn_vars.update((prom_in, prom_out))
                         continue
 
                     if abs_in in abs2meta:
@@ -2213,6 +2224,7 @@ class Group(System):
                                 self._collect_error(
                                     f"When connecting from '{prom_out}' to '{prom_in}': {exc}",
                                     exc_type=type_exc, tback=tb, ident=(abs_out, abs_in))
+                                self._bad_conn_vars.update((prom_in, prom_out))
                                 continue
 
                         meta = abs2meta[abs_in]
@@ -2227,6 +2239,7 @@ class Group(System):
                         f"{self.msginfo}: Input '{abs_in}' cannot be connected to '{abs_out}' "
                         f"because it's already connected to '{abs_in2out[abs_in]}'.",
                         ident=(abs_out, abs_in))
+                    self._bad_conn_vars.update((prom_in, prom_out))
                     continue
 
                 abs_in2out[abs_in] = abs_out
@@ -2450,7 +2463,7 @@ class Group(System):
                 n = sysprefix + n
                 src = None
                 if n in self._conn_global_abs_in2out:
-                    src =  self._conn_global_abs_in2out[n]
+                    src = self._conn_global_abs_in2out[n]
                     gname = goutput_map[src]
                 elif n in goutput_map:
                     gname = goutput_map[n]
@@ -2907,7 +2920,7 @@ class Group(System):
                                                                **meta2node_data(all_abs2meta_in[n]))
                                                 graph.add_edge(n, name, multi=False)
                                                 break
-                            if fail:
+                            if fail and name not in self._bad_conn_vars:
                                 self._collect_error(
                                     f"{self.msginfo}: 'shape_by_conn' was set for "
                                     f"unconnected variable '{name}'.")
@@ -3433,7 +3446,7 @@ class Group(System):
         if src_indices is None:
             prominfo = None
             if flat_src_indices is not None or src_shape is not None:
-                issue_warning(f"ignored flat_src_indices and/or src_shape because"
+                issue_warning("ignored flat_src_indices and/or src_shape because"
                               " src_indices was not specified.", prefix=self.msginfo,
                               category=UnusedOptionWarning)
 
@@ -4736,7 +4749,7 @@ class Group(System):
 
                     if val is not value:
                         if val.shape:
-                            val = np.reshape(value, newshape=val.shape)
+                            val = np.reshape(value, val.shape)
                         else:
                             val = value
 
@@ -4792,14 +4805,15 @@ class Group(System):
         auto_conns = {}
 
         for tgt in all_abs2meta:
-            if tgt in conns:
+            if tgt in conns or tgt in self._bad_conn_vars:
                 continue
 
             all_meta = all_abs2meta[tgt]
             if all_meta['distributed']:
                 # OpenMDAO currently can't create an automatic IndepVarComp for inputs on
                 # distributed components.
-                raise RuntimeError(f'Distributed component input "{tgt}" requires an IndepVarComp.')
+                if tgt not in self._bad_conn_vars:
+                    raise RuntimeError(f'Distributed component input "{tgt}" is not connected.')
 
             prom = abs2prom[tgt]
             if prom in prom2auto:

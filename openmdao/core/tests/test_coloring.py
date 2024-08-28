@@ -1,6 +1,7 @@
 
 import os
 import sys
+import pathlib
 import itertools
 import pickle
 
@@ -16,6 +17,7 @@ except ImportError:
     load_npz = None
 
 import openmdao.api as om
+from openmdao.core.problem import _clear_problem_names
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.array_utils import array_viz
 from openmdao.utils.coloring import _compute_coloring, compute_total_coloring, Coloring
@@ -469,7 +471,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         SIZE = 0
         p = om.Problem()
 
-        arctan_yox = p.model.add_subsystem('arctan_yox', DynamicPartialsComp(SIZE))
+        p.model.add_subsystem('arctan_yox', DynamicPartialsComp(SIZE))
 
         p.driver = om.ScipyOptimizeDriver()
         p.driver.options['optimizer'] = 'SLSQP'
@@ -510,7 +512,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         SIZE = 0
         p = om.Problem()
 
-        arctan_yox = p.model.add_subsystem('arctan_yox', DynamicPartialsComp(SIZE))
+        p.model.add_subsystem('arctan_yox', DynamicPartialsComp(SIZE))
 
         p.driver = om.ScipyOptimizeDriver()
         p.driver.options['optimizer'] = 'SLSQP'
@@ -534,7 +536,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
         try:
             OPT('SLSQP')
-        except:
+        except Exception:
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
         p_color = run_opt(pyOptSparseDriver, 'auto', optimizer='SLSQP', print_results=False,
@@ -580,7 +582,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_print_options_total_with_coloring_rev(self):
         # first, run w/o coloring
-        p = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False)
+        run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False)
         p_color = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False,
                           dynamic_total_coloring=True, debug_print=['totals'])
 
@@ -599,12 +601,14 @@ class SimulColoringRecordingTestCase(unittest.TestCase):
     def test_recording(self):
         # coloring involves an underlying call to run_model (and final_setup),
         # this verifies that it is handled properly by the recording setup logic
-        recorder = om.SqliteRecorder('cases.sql')
+        cases_file = pathlib.Path.cwd() / 'cases.sql'
+
+        recorder = om.SqliteRecorder(cases_file)
 
         p = run_opt(pyOptSparseDriver, 'auto', assemble_type='csc', optimizer='SNOPT',
                     dynamic_total_coloring=True, print_results=False, recorder=recorder)
 
-        cr = om.CaseReader('cases.sql')
+        cr = om.CaseReader(cases_file)
 
         self.assertEqual(cr.list_cases(out_stream=None), ['rank0:pyOptSparse_SNOPT|%d' % i for i in range(p.driver.iter_count)])
 
@@ -653,7 +657,7 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
 
         try:
             OPT('SLSQP')
-        except:
+        except Exception:
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
         p_color = run_opt(pyOptSparseDriver, 'rev', optimizer='SLSQP', print_results=False,
@@ -685,7 +689,7 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
 
         try:
             OPT('SLSQP')
-        except:
+        except Exception:
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
         # run w/o coloring
@@ -739,7 +743,7 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
 
         try:
             OPT('SLSQP')
-        except:
+        except Exception:
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
         p = run_opt(pyOptSparseDriver, 'auto', optimizer='SLSQP', print_results=False, con_alias=True)
@@ -772,7 +776,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         coloring = p_color_fwd.driver._coloring_info.coloring
 
         with self.assertRaises(Exception) as context:
-            p_color = run_opt(om.ScipyOptimizeDriver, 'rev', color_info=coloring, optimizer='SLSQP', disp=False)
+            run_opt(om.ScipyOptimizeDriver, 'rev', color_info=coloring, optimizer='SLSQP', disp=False)
         self.assertEqual(str(context.exception),
                          "Simultaneous coloring does forward solves but mode has been set to 'rev'")
 
@@ -1097,7 +1101,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
         coloring = p_color_rev.driver._coloring_info.coloring
 
         with self.assertRaises(Exception) as context:
-            p_color = run_opt(om.ScipyOptimizeDriver, 'fwd', color_info=coloring, optimizer='SLSQP', disp=False)
+            run_opt(om.ScipyOptimizeDriver, 'fwd', color_info=coloring, optimizer='SLSQP', disp=False)
         self.assertEqual(str(context.exception),
                          "Simultaneous coloring does reverse solves but mode has been set to 'fwd'")
 
@@ -1121,8 +1125,8 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
 
     def test_dynamic_total_coloring_no_derivs(self):
         with self.assertRaises(Exception) as context:
-            p_color = run_opt(om.ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False,
-                              dynamic_total_coloring=True, derivs=False)
+            run_opt(om.ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False,
+                    dynamic_total_coloring=True, derivs=False)
         self.assertEqual(str(context.exception),
                          "Derivative support has been turned off but compute_totals was called.")
 
@@ -1132,7 +1136,7 @@ def _test_func_name(func, num, param):
     for p in param.args:
         try:
             arg = p.__name__
-        except:
+        except Exception:
             arg = str(p)
         args.append(arg)
     return func.__name__ + '_'.join(args)
@@ -1369,14 +1373,14 @@ class DumbComp(om.ExplicitComponent):
 
 @use_tempdirs
 class SimulColoringConfigCheckTestCase(unittest.TestCase):
-    def _build_model(self, ofnames, wrtnames, sizes, color, fixed):
+    def _build_model(self, ofnames, wrtnames, sizes, color, fixed, probname=None):
         """
         Build a model consisting of an IndepVarComp and an ExecComp with customizable vars and sizes.
         """
         assert len(ofnames) == len(wrtnames), 'Must have same number of OF and WRT names'
         assert len(ofnames) == len(sizes), 'names and sizes must have same length'
 
-        p = om.Problem()
+        p = om.Problem(name=probname)
         model = p.model
         p.driver = om.ScipyOptimizeDriver()
         p.driver.options['optimizer'] = 'SLSQP'
@@ -1416,67 +1420,84 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
 
     def test_good_total(self):
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
-                              sizes=[3, 4, 5], color='total', fixed=False)
+                              sizes=[3, 4, 5], color='total', fixed=False,
+                              probname='test_good_total')
         p.run_driver()
 
+        _clear_problem_names()
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
-                              sizes=[3, 4, 5], color='total', fixed=True)
+                              sizes=[3, 4, 5], color='total', fixed=True,
+                              probname='test_good_total')
         p.run_driver()
 
     def test_good_partial(self):
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
-                              sizes=[3, 4, 5], color='partial', fixed=False)
+                              sizes=[3, 4, 5], color='partial', fixed=False,
+                              probname='test_good_partial')
         p.run_driver()
 
+        _clear_problem_names()
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
-                              sizes=[3, 4, 5], color='partial', fixed=True)
+                              sizes=[3, 4, 5], color='partial', fixed=True,
+                              probname='test_good_partial')
         p.run_driver()
 
     def test_added_name_total(self):
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
-                              sizes=[3, 4, 5], color='total', fixed=False)
+                              sizes=[3, 4, 5], color='total', fixed=False,
+                              probname='test_added_name_total')
         p.run_driver()
 
-        with self.assertRaises(RuntimeError) as ctx:
+        _clear_problem_names()
+        with self.assertRaises(om.InvalidColoringError) as ctx:
             p = self._build_model(ofnames=['w', 'x', 'y', 'z'], wrtnames=['a', 'b', 'c', 'd'],
-                                sizes=[3, 4, 5, 6], color='total', fixed=True)
+                                  sizes=[3, 4, 5, 6], color='total', fixed=True,
+                                  probname='test_added_name_total')
 
         self.assertEqual(str(ctx.exception),
                          "ScipyOptimizeDriver: Current coloring configuration does not match the configuration of the current model.\n   The following row vars were added: ['comp.z'].\n   The following column vars were added: ['indeps.d'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
 
     def test_added_name_partial(self):
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
-                              sizes=[3, 4, 5], color='partial', fixed=False)
+                              sizes=[3, 4, 5], color='partial', fixed=False,
+                              probname='test_added_name_partial')
         p.run_driver()
 
+        _clear_problem_names()
         p = self._build_model(ofnames=['w', 'x', 'y', 'z'], wrtnames=['a', 'b', 'c', 'd'],
-                              sizes=[3, 4, 5, 6], color='partial', fixed=True)
+                              sizes=[3, 4, 5, 6], color='partial', fixed=True,
+                              probname='test_added_name_partial')
 
-        with self.assertRaises(RuntimeError) as ctx:
+        with self.assertRaises(om.InvalidColoringError) as ctx:
             p.run_driver()
 
         self.assertEqual(str(ctx.exception), "'comp' <class DumbComp>: Current coloring configuration does not match the configuration of the current model.\n   The following row vars were added: ['z'].\n   The following column vars were added: ['z_in'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
 
     def test_removed_name_total(self):
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
-                              sizes=[3, 4, 5], color='total', fixed=False)
+                              sizes=[3, 4, 5], color='total', fixed=False,
+                              probname='test_removed_name_total')
         p.run_driver()
 
-
-        with self.assertRaises(RuntimeError) as ctx:
+        _clear_problem_names()
+        with self.assertRaises(om.InvalidColoringError) as ctx:
             p = self._build_model(ofnames=['w', 'y'], wrtnames=['a', 'c'],
-                                  sizes=[3, 5], color='total', fixed=True)
+                                  sizes=[3, 5], color='total', fixed=True,
+                                  probname='test_removed_name_total')
         self.assertEqual(str(ctx.exception), "ScipyOptimizeDriver: Current coloring configuration does not match the configuration of the current model.\n   The following row vars were removed: ['comp.x'].\n   The following column vars were removed: ['indeps.b'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
 
     def test_removed_name_partial(self):
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
-                              sizes=[3, 4, 5], color='partial', fixed=False)
+                              sizes=[3, 4, 5], color='partial', fixed=False,
+                              probname='test_removed_name_partial')
         p.run_driver()
 
+        _clear_problem_names()
         p = self._build_model(ofnames=['w', 'y'], wrtnames=['a', 'c'],
-                                sizes=[3, 5], color='partial', fixed=True)
+                              sizes=[3, 5], color='partial', fixed=True,
+                              probname='test_removed_name_partial')
 
-        with self.assertRaises(RuntimeError) as ctx:
+        with self.assertRaises(om.InvalidColoringError) as ctx:
             p.run_driver()
 
         self.assertEqual(str(ctx.exception),
@@ -1484,46 +1505,58 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
 
     def test_reordered_name_total(self):
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
-                              sizes=[3, 4, 5], color='total', fixed=False)
+                              sizes=[3, 4, 5], color='total', fixed=False,
+                              probname='test_reordered_name_total')
         p.run_driver()
 
-        with self.assertRaises(RuntimeError) as ctx:
+        _clear_problem_names()
+        with self.assertRaises(om.InvalidColoringError) as ctx:
             p = self._build_model(ofnames=['w', 'y', 'x'], wrtnames=['a', 'c', 'b'],
-                                  sizes=[3, 5, 4], color='total', fixed=True)
+                                  sizes=[3, 5, 4], color='total', fixed=True,
+                                  probname='test_reordered_name_total')
         self.assertEqual(str(ctx.exception), "ScipyOptimizeDriver: Current coloring configuration does not match the configuration of the current model.\n   The row vars have changed order.\n   The column vars have changed order.\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
 
     def test_reordered_name_partial(self):
         p = self._build_model(ofnames=['x', 'y', 'z'], wrtnames=['a', 'b', 'c'],
-                              sizes=[3, 4, 5], color='partial', fixed=False)
+                              sizes=[3, 4, 5], color='partial', fixed=False,
+                              probname='test_reordered_name_partial')
         p.run_driver()
 
+        _clear_problem_names()
         p = self._build_model(ofnames=['x', 'z', 'y'], wrtnames=['a', 'c', 'b'],
-                              sizes=[3, 4, 5], color='partial', fixed=True)
+                              sizes=[3, 4, 5], color='partial', fixed=True,
+                              probname='test_reordered_name_partial')
 
-        with self.assertRaises(RuntimeError) as ctx:
+        with self.assertRaises(om.InvalidColoringError) as ctx:
             p.run_driver()
 
         self.assertEqual(str(ctx.exception), "'comp' <class DumbComp>: Current coloring configuration does not match the configuration of the current model.\n   The row vars have changed order.\n   The column vars have changed order.\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
 
     def test_size_change_total(self):
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
-                              sizes=[3, 4, 5], color='total', fixed=False)
+                              sizes=[3, 4, 5], color='total', fixed=False,
+                              probname='test_size_change_total')
         p.run_driver()
 
-        with self.assertRaises(RuntimeError) as ctx:
+        _clear_problem_names()
+        with self.assertRaises(om.InvalidColoringError) as ctx:
             p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
-                                  sizes=[3, 7, 5], color='total', fixed=True)
+                                  sizes=[3, 7, 5], color='total', fixed=True,
+                                  probname='test_size_change_total')
         self.assertEqual(str(ctx.exception), "ScipyOptimizeDriver: Current coloring configuration does not match the configuration of the current model.\n   The following variables have changed sizes: ['comp.x', 'indeps.b'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
 
     def test_size_change_partial(self):
         p = self._build_model(ofnames=['x', 'y', 'z'], wrtnames=['a', 'b', 'c'],
-                              sizes=[3, 4, 5], color='partial', fixed=False)
+                              sizes=[3, 4, 5], color='partial', fixed=False,
+                              probname='test_size_change_partial')
         p.run_driver()
 
+        _clear_problem_names()
         p = self._build_model(ofnames=['x', 'y', 'z'], wrtnames=['a', 'b', 'c'],
-                              sizes=[3, 9, 5], color='partial', fixed=True)
+                              sizes=[3, 9, 5], color='partial', fixed=True,
+                              probname='test_size_change_partial')
 
-        with self.assertRaises(RuntimeError) as ctx:
+        with self.assertRaises(om.InvalidColoringError) as ctx:
             p.run_driver()
 
         self.assertEqual(str(ctx.exception), "'comp' <class DumbComp>: Current coloring configuration does not match the configuration of the current model.\n   The following variables have changed sizes: ['y', 'y_in'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
@@ -1532,7 +1565,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
         with open('_bad_format_', 'w') as f:
             f.write('asdfas asdfasdf;lkjasdflkjas df sadf;jasdf;lkja')
         with self.assertRaises(RuntimeError) as ctx:
-            c = Coloring.load('_bad_format_')
+            Coloring.load('_bad_format_')
 
         self.assertEqual(ctx.exception.args[0], "File '_bad_format_' is not a valid coloring file.")
 
@@ -1542,19 +1575,22 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
             pickle.dump(s, f)
 
         with self.assertRaises(RuntimeError) as ctx:
-            c = Coloring.load('_bad_pickle_')
+            Coloring.load('_bad_pickle_')
 
         self.assertEqual(ctx.exception.args[0], "File '_bad_pickle_' is not a valid coloring file.")
 
     def test_get_coloring(self):
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
-                            sizes=[3, 4, 5], color='total', fixed=False)
+                            sizes=[3, 4, 5], color='total', fixed=False,
+                            probname='test_get_coloring')
         p.run_driver()
 
         self.assertIsNotNone(p.driver._get_coloring())
 
+        _clear_problem_names()
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
-                            sizes=[3, 4, 5], color='total', fixed=True)
+                            sizes=[3, 4, 5], color='total', fixed=True,
+                            probname='test_get_coloring')
         p.run_driver()
 
         self.assertIsNotNone(p.driver._get_coloring())

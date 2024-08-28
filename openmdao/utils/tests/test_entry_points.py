@@ -13,14 +13,14 @@ _ep_bases = tuple(_epgroup_bases)
 def _is_ep_class(c):
     try:
         return issubclass(c, _ep_bases)
-    except:
+    except Exception:
         return False
 
 
 class TestEntryPoints(unittest.TestCase):
 
     def test_list_installed(self):
-        dct = list_installed()
+        list_installed()
 
     # test that all entry points are loadable and result in the correct type
     def test_ep_load(self):
@@ -29,13 +29,6 @@ class TestEntryPoints(unittest.TestCase):
     # test if all relevant classes have been registered as entry points
     def test_ep_registered(self):
         skip = set(['openmdao.surrogate_models.surrogate_model:MultiFiSurrogateModel'])
-
-        # if mpi4py isn't installed, then the pyopstsparse_driver import will fail
-        try:
-            import mpi4py
-            from pyoptsparse import Optimization
-        except ImportError:
-            skip.add('openmdao.drivers.pyoptsparse_driver:pyOptSparseDriver')
 
         # collect declared entry points for openmdao
         registered_eps = {}

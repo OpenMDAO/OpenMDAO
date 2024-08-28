@@ -1,5 +1,4 @@
 """Simple example demonstrating how to implement an implicit component."""
-import sys
 import unittest
 
 from io import StringIO
@@ -53,7 +52,6 @@ class QuadraticLinearize(QuadraticComp):
     def linearize(self, inputs, outputs, partials):
         a = inputs['a']
         b = inputs['b']
-        c = inputs['c']
         x = outputs['x']
 
         partials['x', 'a'] = x ** 2
@@ -85,7 +83,6 @@ class QuadraticJacVec(QuadraticComp):
                      d_inputs, d_outputs, d_residuals, mode):
         a = inputs['a']
         b = inputs['b']
-        c = inputs['c']
         x = outputs['x']
         if mode == 'fwd':
             if 'x' in d_residuals:
@@ -393,9 +390,9 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.prob.run_model()
 
         stream = StringIO()
-        states = self.prob.model.list_outputs(explicit=False, residuals=True,
-                                              prom_name=True, hierarchical=True,
-                                              out_stream=stream)
+        self.prob.model.list_outputs(explicit=False, residuals=True,
+                                     prom_name=True, hierarchical=True,
+                                     out_stream=stream)
 
         text = stream.getvalue()
         self.assertEqual(text.count('comp1.x'), 1)
@@ -535,7 +532,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
             def linearize(self, inputs, outputs, partials):
                 a = inputs['a']
                 b = inputs['b']
-                c = inputs['c']
+
                 x = outputs['x']
 
                 partials['x', 'a'] = x ** 2
@@ -612,7 +609,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
             def linearize(self, inputs, outputs, partials):
                 a = inputs['a']
                 b = inputs['b']
-                c = inputs['c']
+
                 x = outputs['x']
 
                 partials['x', 'a'] = x ** 2
@@ -665,7 +662,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
             def linearize(self, inputs, outputs, partials):
                 a = inputs['a']
                 b = inputs['b']
-                c = inputs['c']
+
                 x = outputs['x']
 
                 partials['x', 'a'] = x ** 2
@@ -847,7 +844,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
             def linearize(self, inputs, outputs, partials):
                 a = inputs['a']
                 b = inputs['b']
-                c = inputs['c']
+
                 x = outputs['x']
 
                 partials['x', 'a'] = x ** 2

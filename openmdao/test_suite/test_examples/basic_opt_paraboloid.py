@@ -1,7 +1,6 @@
 import unittest
 
 from openmdao.utils.assert_utils import assert_near_equal
-from openmdao.test_suite.components.paraboloid import Paraboloid
 
 
 class BasicOptParaboloid(unittest.TestCase):

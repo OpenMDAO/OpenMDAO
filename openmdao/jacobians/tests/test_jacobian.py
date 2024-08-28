@@ -1,7 +1,6 @@
 """ Test the Jacobian objects."""
 
 import itertools
-import sys
 import unittest
 
 import numpy as np
@@ -100,7 +99,7 @@ class MyExplicitComp2(ExplicitComponent):
 
     def compute_partials(self, inputs, partials):
         w = inputs['w']
-        z = inputs['z']
+
         jac = self._jac_type(np.array([[
             2.0*w[0] - 10.0,
             2.0*w[1] + 2.0,
@@ -222,7 +221,7 @@ def _test_func_name(func, num, param):
     for p in param.args:
         try:
             arg = p.__name__
-        except:
+        except Exception:
             arg = str(p)
         args.append(arg)
     return 'test_jacobian_src_indices_' + '_'.join(args)
@@ -446,7 +445,7 @@ class TestJacobian(unittest.TestCase):
         sub1 = sup.add_subsystem('sub1', Group(), promotes=['*'])
         sub2 = sup.add_subsystem('sub2', Group(), promotes=['*'])
 
-        d1 = sub1.add_subsystem('d1', TwoSellarDis1(), promotes=['x', 'z', 'y1', 'y2'])
+        sub1.add_subsystem('d1', TwoSellarDis1(), promotes=['x', 'z', 'y1', 'y2'])
         sub2.add_subsystem('d2', TwoSellarDis2(), promotes=['z', 'y1', 'y2'])
 
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1[0] - y1[1]', y1=np.array([0.0, 0.0])),
@@ -468,7 +467,7 @@ class TestJacobian(unittest.TestCase):
         wrt = ['x', 'z']
 
         # Make sure we don't get a size mismatch.
-        derivs = prob.compute_totals(of=of, wrt=wrt)
+        prob.compute_totals(of=of, wrt=wrt)
 
     def test_assembled_jac_bad_key(self):
         # this test fails if AssembledJacobian._update sets in_start with 'output' instead of 'input'
@@ -476,8 +475,8 @@ class TestJacobian(unittest.TestCase):
         prob.model = Group(assembled_jac_type='dense')
         prob.model.add_subsystem('indep', IndepVarComp('x', 1.0))
         prob.model.add_subsystem('C1', ExecComp('c=a*2.0+b', a=0., b=0., c=0.))
-        c2 = prob.model.add_subsystem('C2', ExecComp('d=a*2.0+b+c', a=0., b=0., c=0., d=0.))
-        c3 = prob.model.add_subsystem('C3', ExecComp('ee=a*2.0', a=0., ee=0.))
+        prob.model.add_subsystem('C2', ExecComp('d=a*2.0+b+c', a=0., b=0., c=0., d=0.))
+        prob.model.add_subsystem('C3', ExecComp('ee=a*2.0', a=0., ee=0.))
 
         prob.model.nonlinear_solver = NewtonSolver(solve_subsystems=False)
         prob.model.linear_solver = DirectSolver(assemble_jac=True)
@@ -775,12 +774,12 @@ class TestJacobian(unittest.TestCase):
 
         msg = 'Variable name pair \("{}", "{}"\) must first be declared.'
         with self.assertRaisesRegex(KeyError, msg.format('y', 'x')):
-            J = prob.compute_totals(of=['comp.y'], wrt=['p1.x'])
+            prob.compute_totals(of=['comp.y'], wrt=['p1.x'])
 
     def test_one_src_2_tgts_with_src_indices_densejac(self):
         size = 4
         prob = Problem(model=Group(assembled_jac_type='dense'))
-        indeps = prob.model.add_subsystem('indeps', IndepVarComp('x', np.ones(size)))
+        prob.model.add_subsystem('indeps', IndepVarComp('x', np.ones(size)))
 
         G1 = prob.model.add_subsystem('G1', Group())
         G1.add_subsystem('C1', ExecComp('z=2.0*y+3.0*x', x=np.zeros(size//2), y=np.zeros(size//2),
@@ -804,7 +803,7 @@ class TestJacobian(unittest.TestCase):
     def test_one_src_2_tgts_csc_error(self):
         size = 10
         prob = Problem()
-        indeps = prob.model.add_subsystem('indeps', IndepVarComp('x', np.ones(size)))
+        prob.model.add_subsystem('indeps', IndepVarComp('x', np.ones(size)))
 
         G1 = prob.model.add_subsystem('G1', Group())
         G1.add_subsystem('C1', ExecComp('z=2.0*y+3.0*x', x=np.zeros(size), y=np.zeros(size),
@@ -995,8 +994,6 @@ class TestJacobian(unittest.TestCase):
         for i, sz in enumerate(comp.wrtsizes):
             p[f'comp.x{i}'] = np.random.random(sz)
         p.run_model()
-        ofs = [f'comp.y{i}' for i in range(len(comp.ofsizes))]
-        wrts = [f'comp.x{i}' for i in range(len(comp.wrtsizes))]
         p.check_partials(out_stream=None, show_only_incorrect=True)
         p.model.comp._jacobian.set_col(p.model.comp, 5, comp.sparsity[:, 5] * 99)
 
@@ -1096,7 +1093,7 @@ class OverlappingPartialsTestCase(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        J = p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
+        p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
         np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix.toarray(),
                                        np.array([[-1.,  0.,  0.],
                                                  [ 0., -1.,  0.],
@@ -1116,7 +1113,7 @@ class OverlappingPartialsTestCase(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        J = p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
+        p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
         np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix,
                                        np.array([[-1.,  0.,  0.],
                                                  [ 0., -1.,  0.],
@@ -1135,7 +1132,7 @@ class OverlappingPartialsTestCase(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        J = p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
+        p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
         np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix.toarray(),
                                        np.array([[-1.,  0.,  0.,  0.],
                                                  [ 0., -1.,  0.,  0.],
@@ -1154,7 +1151,7 @@ class OverlappingPartialsTestCase(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        J = p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
+        p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
         np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix.toarray(),
                                        np.array([[-1.,  0.,  0.,  0.],
                                                  [ 0., -1.,  0.,  0.],
@@ -1173,7 +1170,7 @@ class OverlappingPartialsTestCase(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        J = p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
+        p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
         np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix.toarray(),
                                        np.array([[-1.,  0.,  9.,  8.],
                                                  [ 0., -1.,  5., 10.],
