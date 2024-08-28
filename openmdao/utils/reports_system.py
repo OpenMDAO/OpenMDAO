@@ -384,7 +384,7 @@ def view_reports(probnames=None, level=2):
         Expand the reports directory tree to this level.  Default is 2.
     """
     tdir = os.getcwd()
-    om_out_dirs = set(str(p) for p in _find_openmdao_output_dirs(tdir, True))
+    om_out_dirs = set(str(p) for p in _find_openmdao_output_dirs(tdir, recurse=True))
     if probnames:
         matches = set()
         if isinstance(probnames, str):
@@ -654,7 +654,8 @@ def _add_dir_to_tree(startdir, explevel, level):
         return []
 
     flines = _get_reports_dir_files_html(repdir, explevel, level)
-    subdirs = [str(d) for d in _find_openmdao_output_dirs(startdir, False) if str(d) != startdir]
+    subdirs = [str(d) for d in _find_openmdao_output_dirs(startdir, recurse=False)
+               if str(d) != startdir]
 
     sublines = []
     for sub in subdirs:

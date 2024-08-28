@@ -578,11 +578,12 @@ def clean_outputs(obj='.', recurse=False, prompt=True, pattern='*_out', dryrun=F
 
     if isinstance(obj, (str, pathlib.Path)):
         # A single pathname or path object was given.
-        output_dirs = _find_openmdao_output_dirs(obj, pattern, recurse)
+        output_dirs = _find_openmdao_output_dirs(obj, pattern=pattern, recurse=recurse)
     elif isinstance(obj, (Iterable,)):
         # Multiple paths given
         for dirname in obj:
-            output_dirs.extend(_find_openmdao_output_dirs(dirname, pattern, recurse))
+            output_dirs.extend(_find_openmdao_output_dirs(dirname, pattern=pattern,
+                                                          recurse=recurse))
     elif hasattr(obj, 'get_outputs_dir'):
         output_dir = obj.get_outputs_dir()
         prompt = False
