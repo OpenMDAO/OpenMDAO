@@ -2395,7 +2395,7 @@ class Group(System):
 
     def _setup_jax(self, from_group=False):
         """
-        If jax is active, jaxify this group and all subgroups.
+        If jax is active, jaxify this group.
 
         Any Components directly or indirectly within this group will also be jaxified.
 

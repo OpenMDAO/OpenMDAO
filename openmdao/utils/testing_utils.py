@@ -25,6 +25,8 @@ def _new_setup(self):
 
     from openmdao.utils.mpi import MPI, multi_proc_exception_check
     self.startdir = os.getcwd()
+    self.workdir = os.environ.get('OPENMDAO_WORKDIR')
+
     if MPI is None:
         self.tempdir = tempfile.mkdtemp(prefix='testdir-')
     elif MPI.COMM_WORLD.rank == 0:
@@ -32,6 +34,8 @@ def _new_setup(self):
         MPI.COMM_WORLD.bcast(self.tempdir, root=0)
     else:
         self.tempdir = MPI.COMM_WORLD.bcast(None, root=0)
+
+    os.environ['OPENMDAO_WORKDIR'] = self.tempdir
 
     os.chdir(self.tempdir)
     if hasattr(self, 'original_setUp'):
@@ -55,6 +59,7 @@ def _new_teardown(self):
             self.original_tearDown()
 
     os.chdir(self.startdir)
+    os.environ['OPENMDAO_WORKDIR'] = self.workdir
 
     if MPI is None:
         rank = 0

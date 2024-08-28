@@ -312,7 +312,7 @@ class TestJaxGroup(unittest.TestCase):
                                            show_only_incorrect=True))
 
     def test_sellar_grouped(self):
-        # Tests basic Newton solution on Sellar in a subgroup
+        # Tests basic Newton solution on Sellar in a subgroup without jax
 
         prob = om.Problem(model=SellarDerivativesGrouped(nonlinear_solver=om.NewtonSolver(solve_subsystems=False),
                                                          linear_solver=om.ScipyKrylov))

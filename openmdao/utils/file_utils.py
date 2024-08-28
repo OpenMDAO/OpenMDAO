@@ -451,7 +451,6 @@ def _get_outputs_dir(obj=None, *subdirs, mkdir=True):
     from openmdao.core.problem import Problem
     from openmdao.core.system import System
     from openmdao.solvers.solver import Solver
-    from openmdao.core.constants import _SetupStatus
 
     if isinstance(obj, Problem):
         prob_meta = obj._metadata
@@ -476,6 +475,8 @@ def _get_outputs_dir(obj=None, *subdirs, mkdir=True):
 
     dirpath = pathlib.Path(*[f'{p}_out'
                              for p in prob_pathname.split('/')]) / pathlib.Path(*subdirs)
+
+    dirpath = pathlib.Path(os.environ.get('OPENMDAO_WORKDIR'. os.getcwd())) / dirpath
 
     if comm.rank == 0 and mkdir:
         dirpath.mkdir(parents=True, exist_ok=True)
