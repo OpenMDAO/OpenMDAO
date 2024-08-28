@@ -2473,7 +2473,8 @@ class Group(System):
                 ins.append(gname)
 
                 if src is not None and gname not in seen:
-                    lines.append(f"    {gname} = self._outputs['{self._var_abs2prom['output'][src]}']")
+                    lines.append(f"    {gname} = self._outputs"
+                                 f"['{self._var_abs2prom['output'][src]}']")
 
             ins = ', '.join(ins)
             outs = [goutput_map[n] for n, m in system._var_abs2meta['output'].items()
