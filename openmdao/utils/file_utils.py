@@ -433,6 +433,22 @@ def image2html(imagefile, title='', alt=''):
 """
 
 
+def get_work_dir():
+    """
+    Return either os.getcwd() or the value of the OPENMDAO_WORKDIR environment variable.
+
+    Returns
+    -------
+    str
+        The working directory.
+    """
+    workdir = os.environ.get('OPENMDAO_WORKDIR', '')
+    if workdir:
+        return workdir
+
+    return os.getcwd()
+
+
 def _get_outputs_dir(obj=None, *subdirs, mkdir=True):
     """
     Return a pathlib.Path for the outputs directory related to the given problem or system.
@@ -479,11 +495,15 @@ def _get_outputs_dir(obj=None, *subdirs, mkdir=True):
 
     prob_pathname = prob_meta['pathname']
 
-    dirpath = pathlib.Path(*[f'{p}_out'
-                             for p in prob_pathname.split('/')]) / pathlib.Path(*subdirs)
+    outspath = pathlib.Path(get_work_dir()) / pathlib.Path(*[f'{p}_out'
+                                                             for p in prob_pathname.split('/')])
+    dirpath = outspath / pathlib.Path(*subdirs)
 
-    if comm.rank == 0 and mkdir:
+    if not dirpath.is_dir() and comm.rank == 0 and mkdir:
         dirpath.mkdir(parents=True, exist_ok=True)
+        # Touch the .openmdao_out file for the output directory to ease identification.
+        if not (outspath / '.openmdao_out').exists():
+            open(outspath / '.openmdao_out', 'w').close()
 
     return dirpath
 
@@ -581,10 +601,9 @@ def clean_outputs(obj='.', recurse=False, prompt=True, pattern='*_out', dryrun=F
         output_dirs = _find_openmdao_output_dirs(obj, pattern, recurse)
     elif isinstance(obj, (Iterable,)):
         # Multiple paths given
-        for dirname in obj:
-            output_dirs.extend(_find_openmdao_output_dirs(dirname, pattern, recurse))
+        output_dirs.extend(_find_openmdao_output_dirs(obj, pattern, recurse))
     elif hasattr(obj, 'get_outputs_dir'):
-        output_dir = obj.get_outputs_dir()
+        output_dir = obj.get_outputs_dir(mkdir=False)
         prompt = False
         if output_dir and _is_openmdao_output_dir(output_dir):
             output_dirs.append(pathlib.Path(output_dir))

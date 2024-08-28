@@ -7,6 +7,7 @@ import numpy as np
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_warnings
 from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.utils.file_utils import get_work_dir
 
 
 @use_tempdirs
@@ -691,7 +692,7 @@ class TestSystem(unittest.TestCase):
         prob.setup()
 
         d = prob.get_outputs_dir('subdir')
-        self.assertEqual(str(pathlib.Path('test_prob_name_out', 'subdir')), str(d))
+        self.assertEqual(str(pathlib.Path(get_work_dir(), 'test_prob_name_out', 'subdir')), str(d))
 
 
 if __name__ == "__main__":
