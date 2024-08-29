@@ -1,6 +1,4 @@
-import os
-import tempfile
-import shutil
+
 import unittest
 import itertools
 from fnmatch import fnmatchcase

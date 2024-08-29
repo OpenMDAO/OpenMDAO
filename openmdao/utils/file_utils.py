@@ -433,6 +433,22 @@ def image2html(imagefile, title='', alt=''):
 """
 
 
+def get_work_dir():
+    """
+    Return either os.getcwd() or the value of the OPENMDAO_WORKDIR environment variable.
+
+    Returns
+    -------
+    str
+        The working directory.
+    """
+    workdir = os.environ.get('OPENMDAO_WORKDIR', '')
+    if workdir:
+        return workdir
+
+    return os.getcwd()
+
+
 def _get_outputs_dir(obj=None, *subdirs, mkdir=True):
     """
     Return a pathlib.Path for the outputs directory related to the given problem or system.
@@ -480,7 +496,8 @@ def _get_outputs_dir(obj=None, *subdirs, mkdir=True):
 
     prob_pathname = prob_meta['pathname']
 
-    outs_dir = pathlib.Path(*[f'{p}_out' for p in prob_pathname.split('/')])
+    outs_dir = pathlib.Path(get_work_dir()) / pathlib.Path(*[f'{p}_out'
+                                                             for p in prob_pathname.split('/')])
     dirpath = outs_dir / pathlib.Path(*subdirs)
 
     if not dirpath.is_dir() and comm.rank == 0 and mkdir:

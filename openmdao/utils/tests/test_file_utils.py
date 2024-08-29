@@ -11,6 +11,7 @@ import sys
 
 import openmdao.api as om
 from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.utils.file_utils import get_work_dir
 from openmdao.core.problem import _clear_problem_names
 from openmdao.utils.reports_system import clear_reports
 
@@ -61,14 +62,14 @@ class TestCleanOutputs(unittest.TestCase):
         with redirect_stdout(ss):
             om.clean_outputs(p1)
 
-        self.assertEqual(len(os.listdir('.')), 1)
+        self.assertEqual(len(os.listdir(get_work_dir())), 1)
 
         # Now specify p2 with the output directory.
         ss = io.StringIO()
         with redirect_stdout(ss):
             om.clean_outputs(p2)
 
-        self.assertEqual(len(os.listdir('.')), 0)
+        self.assertEqual(len(os.listdir(get_work_dir())), 0)
 
     def test_specify_non_output_dir_no_prompt(self):
 
@@ -84,44 +85,49 @@ class TestCleanOutputs(unittest.TestCase):
 
         # First Test that a dryrun on '.' works as expected.
         ss = io.StringIO()
-        with redirect_stdout(ss):
-            om.clean_outputs('.', dryrun=True)
+        cwd = os.getcwd()
+        os.chdir(get_work_dir())
+        try:
+            with redirect_stdout(ss):
+                om.clean_outputs('.', dryrun=True)
 
-        expected = ('Found 2 OpenMDAO output directories:',
-                    'Would remove bar_out (dryrun = True).',
-                    'Would remove foo_out (dryrun = True).',
-                    'Removed 0 OpenMDAO output directories.')
+            expected = ('Found 2 OpenMDAO output directories:',
+                        'Would remove bar_out (dryrun = True).',
+                        'Would remove foo_out (dryrun = True).',
+                        'Removed 0 OpenMDAO output directories.')
 
-        for expected_str in expected:
-            self.assertIn(expected_str, ss.getvalue())
+            for expected_str in expected:
+                self.assertIn(expected_str, ss.getvalue())
 
-        # Test that no specified path gives the same result.
-        ss = io.StringIO()
-        with redirect_stdout(ss):
-            om.clean_outputs(dryrun=True)
+            # Test that no specified path gives the same result.
+            ss = io.StringIO()
+            with redirect_stdout(ss):
+                om.clean_outputs(dryrun=True)
 
-        expected = ('Found 2 OpenMDAO output directories:',
-                    'Would remove bar_out (dryrun = True).',
-                    'Would remove foo_out (dryrun = True).',
-                    'Removed 0 OpenMDAO output directories.')
+            expected = ('Found 2 OpenMDAO output directories:',
+                        'Would remove bar_out (dryrun = True).',
+                        'Would remove foo_out (dryrun = True).',
+                        'Removed 0 OpenMDAO output directories.')
 
-        for expected_str in expected:
-            self.assertIn(expected_str, ss.getvalue())
+            for expected_str in expected:
+                self.assertIn(expected_str, ss.getvalue())
 
-        # Now remove the files
-        ss = io.StringIO()
-        with redirect_stdout(ss):
-            om.clean_outputs(prompt=False)
+            # Now remove the files
+            ss = io.StringIO()
+            with redirect_stdout(ss):
+                om.clean_outputs(prompt=False)
 
-        expected = ('Found 2 OpenMDAO output directories:\n'
-                    'Removed bar_out\n'
-                    'Removed foo_out\n'
-                    'Removed 2 OpenMDAO output directories.\n')
+            expected = ('Found 2 OpenMDAO output directories:\n'
+                        'Removed bar_out\n'
+                        'Removed foo_out\n'
+                        'Removed 2 OpenMDAO output directories.\n')
 
-        self.assertIn(expected, ss.getvalue())
+            self.assertIn(expected, ss.getvalue())
 
-        self.assertNotIn('foo_out', os.listdir('.'))
-        self.assertNotIn('bar_out', os.listdir('.'))
+            self.assertNotIn('foo_out', os.listdir('.'))
+            self.assertNotIn('bar_out', os.listdir('.'))
+        finally:
+            os.chdir(cwd)
 
     @unittest.skipIf(sys.version_info  < (3, 9, 0), 'Requires Python 3.9.0 or later.')
     def test_specify_non_output_dir_prompt(self):

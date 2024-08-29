@@ -55,7 +55,7 @@ from openmdao.utils.general_utils import pad_name, LocalRangeIterable, \
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.file_utils import _get_outputs_dir
+from openmdao.utils.file_utils import _get_outputs_dir, get_work_dir
 from openmdao.visualization.tables.table_builder import generate_table
 
 try:
@@ -290,7 +290,7 @@ class Problem(object):
         # General options
         self.options = OptionsDictionary(parent_name=type(self).__name__)
         self.options.declare('coloring_dir', types=str,
-                             default=os.path.join(os.getcwd(), 'coloring_files'),
+                             default=os.path.join(get_work_dir(), 'coloring_files'),
                              desc='Directory containing coloring files (if any) for this Problem.')
         self.options.declare('group_by_pre_opt_post', types=bool,
                              default=False,

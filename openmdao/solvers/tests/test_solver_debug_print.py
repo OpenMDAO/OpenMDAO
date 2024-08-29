@@ -15,7 +15,7 @@ import openmdao.api as om
 from openmdao.test_suite.scripts.circuit_analysis import Circuit
 
 from openmdao.utils.general_utils import run_model, printoptions
-from openmdao.utils.assert_utils import use_tempdirs
+from openmdao.utils.testing_utils import use_tempdirs
 
 try:
     from parameterized import parameterized
