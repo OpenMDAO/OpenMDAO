@@ -1808,16 +1808,6 @@ def setup_sparsity(mask):
 class TestFunctionRegistrationColoring(unittest.TestCase):
     def setUp(self):
         np.random.seed(11)
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix=self.__class__.__name__ + '_')
-        os.chdir(self.tempdir)
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
 
     def test_manual_coloring(self):
         with _temporary_expr_dict():

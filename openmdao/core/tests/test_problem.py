@@ -1,5 +1,6 @@
 """ Unit tests for the problem interface."""
 
+import os
 import pathlib
 import sys
 import unittest
@@ -19,7 +20,6 @@ import openmdao.utils.hooks as hooks
 from openmdao.utils.units import convert_units
 from openmdao.utils.om_warnings import DerivativesWarning, OMDeprecationWarning
 from openmdao.utils.testing_utils import use_tempdirs
-from openmdao.utils.file_utils import get_work_dir
 from openmdao.utils.tests.test_hooks import hooks_active
 
 try:
@@ -2135,7 +2135,7 @@ class TestProblem(unittest.TestCase):
         prob.setup()
 
         d = prob.get_outputs_dir('subdir')
-        self.assertEqual(str(pathlib.Path(get_work_dir(), 'prob_name_out', 'subdir')), str(d))
+        self.assertEqual(str(pathlib.Path(os.getcwd(), 'prob_name_out', 'subdir')), str(d))
 
     def test_duplicate_prob_name(self):
 

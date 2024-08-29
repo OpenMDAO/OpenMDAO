@@ -6,7 +6,6 @@ import os
 import re
 from itertools import zip_longest
 from contextlib import contextmanager
-from pathlib import Path
 
 import numpy as np
 
@@ -64,10 +63,11 @@ def _new_teardown(self):
         rank = MPI.COMM_WORLD.rank
 
     if rank == 0:
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
+        if not os.environ.get('OPENMDAO_KEEPDIRS'):
+            try:
+                shutil.rmtree(self.tempdir)
+            except OSError:
+                pass
 
 
 def use_tempdirs(cls):
