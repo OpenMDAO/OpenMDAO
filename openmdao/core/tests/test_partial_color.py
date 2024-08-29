@@ -1531,12 +1531,26 @@ class TestStaticColoring(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc is required.")
-@use_tempdirs
 class TestStaticColoringParallelCS(unittest.TestCase):
     N_PROCS = 2
 
     def setUp(self):
         np.random.seed(11)
+        self.startdir = os.getcwd()
+        if MPI.COMM_WORLD.rank == 0:
+            self.tempdir = tempfile.mkdtemp(prefix=self.__class__.__name__ + '_')
+            MPI.COMM_WORLD.bcast(self.tempdir, root=0)
+        else:
+            self.tempdir = MPI.COMM_WORLD.bcast(None, root=0)
+        os.chdir(self.tempdir)
+
+    def tearDown(self):
+        os.chdir(self.startdir)
+        if MPI.COMM_WORLD.rank == 0:
+            try:
+                shutil.rmtree(self.tempdir)
+            except OSError:
+                pass
 
     # semi-total coloring feature disabled.
 
