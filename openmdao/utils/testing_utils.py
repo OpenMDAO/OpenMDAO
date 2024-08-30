@@ -16,7 +16,6 @@ except ImportError:
     parameterized = None
 
 from openmdao.utils.general_utils import env_truthy, env_none
-from openmdao.utils.file_utils import get_work_dir
 
 
 def _new_setup(self):

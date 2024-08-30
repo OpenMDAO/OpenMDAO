@@ -3,8 +3,6 @@ Testing the file wrapping utilities.
 """
 
 import os
-import tempfile
-import shutil
 
 import unittest
 

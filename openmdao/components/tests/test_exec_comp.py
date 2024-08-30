@@ -1,9 +1,6 @@
 import itertools
 import unittest
 import math
-import os
-import shutil
-import tempfile
 
 import numpy as np
 from numpy.testing import assert_almost_equal
