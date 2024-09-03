@@ -12,6 +12,7 @@ from openmdao.utils.mpi import MPI
 import openmdao.api as om
 
 from openmdao.utils.array_utils import evenly_distrib_idxs
+from openmdao.utils.file_utils import get_work_dir
 from openmdao.recorders.tests.sqlite_recorder_test_utils import \
     assertDriverIterDataRecorded, assertProblemDataRecorded
 from openmdao.recorders.tests.recorder_test_utils import run_driver
@@ -407,7 +408,7 @@ class DistributedRecorderTest(unittest.TestCase):
 
         def run_parallel():
             # process cases.sql in parallel
-            cr = om.CaseReader('test_record_on_one_proc_out/cases.sql')
+            cr = om.CaseReader(os.path.join(get_work_dir(), 'test_record_on_one_proc_out/cases.sql'))
 
             cases = cr.list_cases()
             self.assertEqual(len(cases), 9)

@@ -3,28 +3,15 @@ import unittest
 
 import logging
 import os.path
-import shutil
 import signal
 import sys
-import tempfile
 
 from openmdao.utils.shell_proc import call, check_call, CalledProcessError, ShellProc
+from openmdao.utils.testing_utils import use_tempdirs
 
-
+@use_tempdirs
 class TestCase(unittest.TestCase):
     """ Test ShellProc functions. """
-
-    def setUp(self):
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix='test_shellproc-')
-        os.chdir(self.tempdir)
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
 
     def test_call(self):
         logging.debug('')

@@ -3,12 +3,11 @@ Testing the file wrapping utilities.
 """
 
 import os
-import tempfile
-import shutil
 
 import unittest
 
 from openmdao.utils.assert_utils import assert_near_equal, assert_equal_arrays
+from openmdao.utils.testing_utils import use_tempdirs
 
 import numpy
 from numpy import array, isnan, isinf
@@ -24,23 +23,13 @@ DIRECTORY = os.path.dirname((os.path.abspath(__file__)))
 
 
 @unittest.skipUnless(pyparsing is not None, "Test requires pyparsing to be installed. (pip install pyparsing).")
+@use_tempdirs
 class TestCase(unittest.TestCase):
     """ Test file wrapping functions. """
 
     def setUp(self):
         self.templatename = 'template.dat'
         self.filename = 'filename.dat'
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix='omdao-')
-        os.chdir(self.tempdir)
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        if not os.environ.get('OPENMDAO_KEEPDIRS', False):
-            try:
-                shutil.rmtree(self.tempdir)
-            except OSError:
-                pass
 
     def test_templated_input(self):
         template = '\n'.join([

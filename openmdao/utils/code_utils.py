@@ -237,17 +237,21 @@ def _calltree_exec(options, user_args):
     func_name = parts[-1]
     modpath = '.'.join(parts[:-2])
 
+    old_syspath = sys.path[:]
     sys.path.append(os.getcwd())
 
-    mod = importlib.import_module(modpath)
-    klass = getattr(mod, class_name)
+    try:
+        mod = importlib.import_module(modpath)
+        klass = getattr(mod, class_name)
 
-    stream_map = {'stdout': sys.stdout, 'stderr': sys.stderr}
-    stream = stream_map.get(options.outfile)
-    if stream is None:
-        stream = open(options.outfile, 'w')
+        stream_map = {'stdout': sys.stdout, 'stderr': sys.stderr}
+        stream = stream_map.get(options.outfile)
+        if stream is None:
+            stream = open(options.outfile, 'w')
 
-    get_nested_calls(klass, func_name, stream)
+        get_nested_calls(klass, func_name, stream)
+    finally:
+        sys.path = old_syspath
 
 
 def _target_iter(targets):
