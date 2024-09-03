@@ -135,11 +135,12 @@ class CmdlineTestCase(unittest.TestCase):
         p2.setup()
         p2.run_model()
 
-        p1_outdir = p1.get_outputs_dir()
-        p2_outdir = p2.get_outputs_dir()
+        p1_outdir = os.path.basename(str(p1.get_outputs_dir()))
+        p2_outdir = os.path.basename(str(p2.get_outputs_dir()))
 
-        self.assertIn(str(p1_outdir), os.listdir(os.getcwd()))
-        self.assertIn(str(p2_outdir), os.listdir(os.getcwd()))
+        subdirs = os.listdir(os.getcwd())
+        self.assertIn(p1_outdir, subdirs)
+        self.assertIn(p2_outdir, subdirs)
 
         proc = subprocess.Popen('openmdao clean -f'.split(),  # nosec: trusted input
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -149,8 +150,9 @@ class CmdlineTestCase(unittest.TestCase):
             proc.kill()
             outs, errs = proc.communicate()
 
-        self.assertNotIn(str(p1_outdir), os.listdir(os.getcwd()))
-        self.assertNotIn(str(p2_outdir), os.listdir(os.getcwd()))
+        subdirs = os.listdir(os.getcwd())
+        self.assertNotIn(p1_outdir, subdirs)
+        self.assertNotIn(p2_outdir, subdirs)
 
     def test_n2_err(self):
         # command should raise exception but still produce an n2 html file

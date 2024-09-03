@@ -1,9 +1,6 @@
 """Tests the `debug_print` option for Nonlinear solvers."""
 
-import os
 import sys
-import shutil
-import tempfile
 
 import unittest
 from packaging.version import Version
@@ -14,8 +11,8 @@ import numpy as np
 import openmdao.api as om
 from openmdao.test_suite.scripts.circuit_analysis import Circuit
 
-from openmdao.utils.general_utils import run_model
-from openmdao.utils.general_utils import printoptions
+from openmdao.utils.general_utils import run_model, printoptions
+from openmdao.utils.testing_utils import use_tempdirs
 
 try:
     from parameterized import parameterized
@@ -29,16 +26,9 @@ nonlinear_solvers = [
     om.BroydenSolver
 ]
 
-
+@use_tempdirs
 class TestNonlinearSolvers(unittest.TestCase):
     def setUp(self):
-        import os
-        from tempfile import mkdtemp
-
-        # perform test in temporary directory
-        self.startdir = os.getcwd()
-        self.tempdir = mkdtemp(prefix='test_solver')
-        os.chdir(self.tempdir)
 
         # iteration coordinate, file name and variable data are common for all tests
         coord = 'rank0:root._solve_nonlinear|0|NLRunOnce|0|circuit._solve_nonlinear|0'
@@ -69,17 +59,6 @@ class TestNonlinearSolvers(unittest.TestCase):
             " 'circuit.n2.V': array([ 0.001+0.j])}",
             ""
         ])
-
-    def tearDown(self):
-        import os
-        from shutil import rmtree
-
-        # clean up the temporary directory
-        os.chdir(self.startdir)
-        try:
-            rmtree(self.tempdir)
-        except OSError:
-            pass
 
     @parameterized.expand([
         [solver.__name__, solver] for solver in nonlinear_solvers
@@ -209,27 +188,13 @@ class TestNonlinearSolvers(unittest.TestCase):
         # Should be empty since solver debugging printing was turned off
         self.assertEqual(output, '')
 
-
+@use_tempdirs
 class TestNonlinearSolversIsolated(unittest.TestCase):
     """
     This test needs to run isolated to preclude interactions in the underlying
     `warnings` module that is used to raise the singular entry error.
     """
     ISOLATED = True
-
-    def setUp(self):
-        # perform test in temporary directory
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix='test_solver')
-        os.chdir(self.tempdir)
-
-    def tearDown(self):
-        # clean up the temporary directory
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
 
     def test_debug_after_raised_error(self):
         prob = om.Problem()

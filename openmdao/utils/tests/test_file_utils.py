@@ -11,14 +11,28 @@ import sys
 
 import openmdao.api as om
 from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.utils.file_utils import get_work_dir
 from openmdao.core.problem import _clear_problem_names
+from openmdao.utils.reports_system import clear_reports
 
 
 @use_tempdirs
 class TestCleanOutputs(unittest.TestCase):
 
     def setUp(self):
-        _clear_problem_names()
+        # set things to a known initial state for all the test runs
+        _clear_problem_names()  # need to reset these to simulate separate runs
+        os.environ.pop('OPENMDAO_REPORTS', None)
+        # We need to remove the TESTFLO_RUNNING environment variable for these tests to run.
+        # The reports code checks to see if TESTFLO_RUNNING is set and will not do anything if set
+        # But we need to remember whether it was set so we can restore it
+        self.testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
+        clear_reports()
+
+    def tearDown(self):
+        # restore what was there before running the test
+        if self.testflo_running is not None:
+            os.environ['TESTFLO_RUNNING'] = self.testflo_running
 
     def test_specify_prob(self):
 
@@ -39,7 +53,7 @@ class TestCleanOutputs(unittest.TestCase):
 
         expected1 = 'Removed 0 OpenMDAO output directories.\n'
         expected2 = 'Would remove'
-        
+
         self.assertIn(expected1, ss.getvalue())
         self.assertIn(expected2, ss.getvalue())
 
@@ -48,14 +62,14 @@ class TestCleanOutputs(unittest.TestCase):
         with redirect_stdout(ss):
             om.clean_outputs(p1)
 
-        self.assertEqual(len(os.listdir(os.getcwd())), 1)
+        self.assertEqual(len(os.listdir(get_work_dir())), 1)
 
         # Now specify p2 with the output directory.
         ss = io.StringIO()
         with redirect_stdout(ss):
             om.clean_outputs(p2)
-        
-        self.assertEqual(len(os.listdir(os.getcwd())), 0)
+
+        self.assertEqual(len(os.listdir(get_work_dir())), 0)
 
     def test_specify_non_output_dir_no_prompt(self):
 
@@ -69,46 +83,51 @@ class TestCleanOutputs(unittest.TestCase):
         p2.setup()
         p2.run_model()
 
-        # First Test that a dryrun on p1 works as expected.
+        # First Test that a dryrun on '.' works as expected.
         ss = io.StringIO()
-        with redirect_stdout(ss):
-            om.clean_outputs('.', dryrun=True)
+        cwd = os.getcwd()
+        os.chdir(get_work_dir())
+        try:
+            with redirect_stdout(ss):
+                om.clean_outputs('.', dryrun=True)
 
-        expected = ('Found 2 OpenMDAO output directories:',
-                    'Would remove bar_out (dryrun = True).',
-                    'Would remove foo_out (dryrun = True).',
-                    'Removed 0 OpenMDAO output directories.')
-        
-        for expected_str in expected:
-            self.assertIn(expected_str, ss.getvalue())
+            expected = ('Found 2 OpenMDAO output directories:',
+                        'Would remove bar_out (dryrun = True).',
+                        'Would remove foo_out (dryrun = True).',
+                        'Removed 0 OpenMDAO output directories.')
 
-        # Test that no specified path gives the same result.
-        ss = io.StringIO()
-        with redirect_stdout(ss):
-            om.clean_outputs(dryrun=True)
+            for expected_str in expected:
+                self.assertIn(expected_str, ss.getvalue())
 
-        expected = ('Found 2 OpenMDAO output directories:',
-                    'Would remove bar_out (dryrun = True).',
-                    'Would remove foo_out (dryrun = True).',
-                    'Removed 0 OpenMDAO output directories.')
-        
-        for expected_str in expected:
-            self.assertIn(expected_str, ss.getvalue())
+            # Test that no specified path gives the same result.
+            ss = io.StringIO()
+            with redirect_stdout(ss):
+                om.clean_outputs(dryrun=True)
 
-        # Now remove the files
-        ss = io.StringIO()
-        with redirect_stdout(ss):
-            om.clean_outputs(prompt=False)
-        
-        expected = ('Found 2 OpenMDAO output directories:\n'
-                    'Removed bar_out\n'
-                    'Removed foo_out\n'
-                    'Removed 2 OpenMDAO output directories.\n')
-        
-        self.assertIn(expected, ss.getvalue())
+            expected = ('Found 2 OpenMDAO output directories:',
+                        'Would remove bar_out (dryrun = True).',
+                        'Would remove foo_out (dryrun = True).',
+                        'Removed 0 OpenMDAO output directories.')
 
-        self.assertNotIn('foo_out', os.listdir(os.getcwd()))
-        self.assertNotIn('bar_out', os.listdir(os.getcwd()))
+            for expected_str in expected:
+                self.assertIn(expected_str, ss.getvalue())
+
+            # Now remove the files
+            ss = io.StringIO()
+            with redirect_stdout(ss):
+                om.clean_outputs(prompt=False)
+
+            expected = ('Found 2 OpenMDAO output directories:\n'
+                        'Removed bar_out\n'
+                        'Removed foo_out\n'
+                        'Removed 2 OpenMDAO output directories.\n')
+
+            self.assertIn(expected, ss.getvalue())
+
+            self.assertNotIn('foo_out', os.listdir('.'))
+            self.assertNotIn('bar_out', os.listdir('.'))
+        finally:
+            os.chdir(cwd)
 
     @unittest.skipIf(sys.version_info  < (3, 9, 0), 'Requires Python 3.9.0 or later.')
     def test_specify_non_output_dir_prompt(self):
@@ -141,7 +160,7 @@ class TestCleanOutputs(unittest.TestCase):
                     expected = ('Found 2 OpenMDAO output directories:\n')
                     self.assertIn(expected, ss.getvalue())
 
-                    outdirs = [d for d in os.listdir('temp') if d.endswith('_out')]           
+                    outdirs = [d for d in os.listdir('temp') if d.endswith('_out')]
                     self.assertEqual(len(outdirs), 2)
 
                     # Respond in the positive to actually remove them.
@@ -151,14 +170,14 @@ class TestCleanOutputs(unittest.TestCase):
                             om.clean_outputs(recurse=recurse)
 
                     expected = ('Removed 2 OpenMDAO output directories.\n')
-                    
+
                     self.assertIn(expected, ss.getvalue())
 
-                    outdirs = [d for d in os.listdir('temp') if d.endswith('_out')]           
+                    outdirs = [d for d in os.listdir('temp') if d.endswith('_out')]
                     self.assertEqual(len(outdirs), 0)
                 else:
                     self.assertIn('No OpenMDAO output directories found.', ss.getvalue())
-                
+
                 shutil.rmtree('temp')
 
     def test_pattern(self):
@@ -184,7 +203,7 @@ class TestCleanOutputs(unittest.TestCase):
         expected = ('Found 1 OpenMDAO output directories:',
                     'Would remove foo_out (dryrun = True).',
                     'Removed 0 OpenMDAO output directories.')
-        
+
         for expected_str in expected:
             self.assertIn(expected_str, ss.getvalue())
 
@@ -197,7 +216,7 @@ class TestCleanOutputs(unittest.TestCase):
                     'Would remove foo_out (dryrun = True).',
                     'Would remove bar_out (dryrun = True).',
                     'Removed 0 OpenMDAO output directories.')
-        
+
         try:
             for expected_str in expected:
                 self.assertIn(expected_str, ss.getvalue())
@@ -230,7 +249,7 @@ class TestCleanOutputs(unittest.TestCase):
                     f'Would remove baz_out{os.sep}foo_out (dryrun = True).',
                     f'Would remove baz_out{os.sep}bar_out (dryrun = True).',
                     'Removed 0 OpenMDAO output directories.')
-        
+
         try:
             for expected_str in expected:
                 self.assertIn(expected_str, ss.getvalue())
@@ -268,17 +287,17 @@ class TestCleanOutputs(unittest.TestCase):
             shutil.rmtree('baz_out')
 
     def test_multiple_paths(self):
-        p1 = om.Problem(name='foo')
+        p1 = om.Problem(name='foo', reports=['summary'])
         p1.model.add_subsystem('exec', om.ExecComp('y = a + b'))
         p1.setup()
         p1.run_model()
 
-        p2 = om.Problem(name='bar')
+        p2 = om.Problem(name='bar', reports=['summary'])
         p2.model.add_subsystem('exec', om.ExecComp('z = a * b'))
         p2.setup()
         p2.run_model()
 
-        # Make another non-openmdao outut directory to test recursion.
+        # Make another non-openmdao output directory to test recursion.
         pathlib.Path('baz_out').mkdir(exist_ok=True)
         shutil.move('foo_out', 'baz_out')
         shutil.move('bar_out', 'baz_out')

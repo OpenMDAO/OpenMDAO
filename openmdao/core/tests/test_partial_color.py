@@ -1,13 +1,10 @@
-import os
-import tempfile
-import shutil
+
 import unittest
 import itertools
 from fnmatch import fnmatchcase
 
 import numpy as np
 from scipy.sparse import coo_matrix
-
 
 try:
     import jax
@@ -344,7 +341,7 @@ _BIGMASK = np.array(
      [0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1]]
 )
 
-
+@use_tempdirs
 class TestColoringExplicit(unittest.TestCase):
     def setUp(self):
         np.random.seed(11)
@@ -1478,7 +1475,6 @@ class TestStaticColoring(unittest.TestCase):
                 model.add_subsystem('indeps', indeps)
                 comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, method,
                                                                     isplit=isplit, osplit=2))
-                # model.declare_coloring('*', method=method)
                 model.connect('indeps.x0', 'comp.x0')
                 model.connect('indeps.x1', 'comp.x1')
 
@@ -1534,24 +1530,6 @@ class TestStaticColoring(unittest.TestCase):
 @use_tempdirs
 class TestStaticColoringParallelCS(unittest.TestCase):
     N_PROCS = 2
-
-    def setUp(self):
-        np.random.seed(11)
-        self.startdir = os.getcwd()
-        if MPI.COMM_WORLD.rank == 0:
-            self.tempdir = tempfile.mkdtemp(prefix=self.__class__.__name__ + '_')
-            MPI.COMM_WORLD.bcast(self.tempdir, root=0)
-        else:
-            self.tempdir = MPI.COMM_WORLD.bcast(None, root=0)
-        os.chdir(self.tempdir)
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        if MPI.COMM_WORLD.rank == 0:
-            try:
-                shutil.rmtree(self.tempdir)
-            except OSError:
-                pass
 
     # semi-total coloring feature disabled.
 

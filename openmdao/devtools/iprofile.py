@@ -9,6 +9,7 @@ from openmdao.utils.mpi import MPI
 
 from openmdao.devtools.iprof_utils import func_group, find_qualified_name, _collect_methods, \
      _setup_func_group, _get_methods, _Options
+from openmdao.utils.file_utils import get_work_dir
 
 
 def _prof_node(fpath, parts):
@@ -43,7 +44,7 @@ def _setup(options, finalize=True):
     if _profile_setup:
         raise RuntimeError("profiling is already set up.")
 
-    _profile_prefix = os.path.join(os.getcwd(), 'iprof')
+    _profile_prefix = os.path.join(get_work_dir(), 'iprof')
     _profile_setup = True
 
     methods = _get_methods(options, default='openmdao')
