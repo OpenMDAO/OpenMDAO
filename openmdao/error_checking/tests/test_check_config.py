@@ -1,8 +1,5 @@
-import errno
-import os
 import unittest
-from tempfile import mkdtemp, TemporaryFile
-from shutil import rmtree
+from tempfile import TemporaryFile
 
 import numpy as np
 

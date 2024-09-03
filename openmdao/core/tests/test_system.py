@@ -1,7 +1,6 @@
 """ Unit tests for the system interface."""
 
 import unittest
-import os
 
 import numpy as np
 

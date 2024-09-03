@@ -1,6 +1,5 @@
 """ Unit tests for the problem interface."""
 
-import os
 import pathlib
 import sys
 import unittest
