@@ -55,7 +55,7 @@ from openmdao.utils.general_utils import pad_name, LocalRangeIterable, \
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.file_utils import _get_outputs_dir, text2html
+from openmdao.utils.file_utils import _get_outputs_dir, text2html, get_work_dir
 from openmdao.visualization.tables.table_builder import generate_table
 
 try:
@@ -290,7 +290,7 @@ class Problem(object):
         # General options
         self.options = OptionsDictionary(parent_name=type(self).__name__)
         self.options.declare('coloring_dir', types=str,
-                             default=os.path.join(os.getcwd(), 'coloring_files'),
+                             default=os.path.join(get_work_dir(), 'coloring_files'),
                              desc='Directory containing coloring files (if any) for this Problem.')
         self.options.declare('group_by_pre_opt_post', types=bool,
                              default=False,
@@ -1036,10 +1036,6 @@ class Problem(object):
                     # Folder already removed by another proccess
                     pass
         self._metadata['reports_dir'] = self.get_reports_dir(force=False)
-
-        # Touch the .openmdao_out file for the output directory to ease identification.
-        if not MPI or (self.comm is not None and self.comm.rank == 0):
-            open(self.get_outputs_dir() / '.openmdao_out', 'w').close()
 
         try:
             model._setup(model_comm, self._metadata)
@@ -2488,6 +2484,10 @@ class Problem(object):
         if checks == 'all':
             checks = sorted(_all_non_redundant_checks)
 
+        if logger is None and checks:
+            check_file_path = None if out_file is None else str(self.get_outputs_dir() / out_file)
+            logger = get_logger('check_config', out_file=check_file_path, use_format=True)
+
         for c in checks:
             if c not in _all_checks:
                 print(f"WARNING: '{c}' is not a recognized check.  Available checks are: "
@@ -2545,7 +2545,7 @@ class Problem(object):
         pathlib.Path
             The path to the directory where reports should be written.
         """
-        return self.get_outputs_dir('reports', mkdir=force or self._reports)
+        return self.get_outputs_dir('reports', mkdir=force or len(self._reports) > 0)
 
     def get_outputs_dir(self, *subdirs, mkdir=True):
         """

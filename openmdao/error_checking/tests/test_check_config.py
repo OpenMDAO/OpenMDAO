@@ -1,8 +1,5 @@
-import errno
-import os
 import unittest
-from tempfile import mkdtemp, TemporaryFile
-from shutil import rmtree
+from tempfile import TemporaryFile
 
 import numpy as np
 
@@ -11,6 +8,7 @@ from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
 from openmdao.error_checking.check_config import get_sccs_topo
 from openmdao.utils.assert_utils import assert_warning, assert_no_warning
 from openmdao.utils.logger_utils import TestLogger
+from openmdao.utils.testing_utils import use_tempdirs
 
 
 class MyComp(om.ExecComp):
@@ -211,8 +209,8 @@ class TestCheckConfig(unittest.TestCase):
         p.final_setup()
 
         expected_info = (
-            "The following groups contain cycles:", 
-            "   Group '' has the following cycles:", 
+            "The following groups contain cycles:",
+            "   Group '' has the following cycles:",
             "      ['G1', 'C4']"
         )
 
@@ -361,8 +359,8 @@ class TestCheckConfig(unittest.TestCase):
         p.final_setup()
 
         expected_info = (
-            "The following groups contain cycles:", 
-            "   Group 'G1' has the following cycles:", 
+            "The following groups contain cycles:",
+            "   Group 'G1' has the following cycles:",
             "      ['C13', 'C12', 'C11']",
             "      ['C23', 'C22', 'C21']",
             "      ['C3', 'C2', 'C1']"
@@ -550,25 +548,11 @@ class TestCheckConfig(unittest.TestCase):
         testlogger.find_in('warning', msg4)
         testlogger.find_in('warning', msg5)
 
-
+@use_tempdirs
 class TestRecorderCheckConfig(unittest.TestCase):
 
     def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.temp_dir = mkdtemp()
-        os.chdir(self.temp_dir)
-
-        self.filename = os.path.join(self.temp_dir, "sqlite_test")
-        self.recorder = om.SqliteRecorder(self.filename)
-
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        try:
-            rmtree(self.temp_dir)
-        except OSError as e:
-            # If directory already deleted, keep going
-            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
-                raise e
+        self.recorder = om.SqliteRecorder("sqlite_test")
 
     def test_check_no_recorder_set(self):
         p = om.Problem()

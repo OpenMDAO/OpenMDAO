@@ -6,7 +6,6 @@ from fnmatch import fnmatchcase
 import numpy as np
 from scipy.sparse import coo_matrix
 
-
 try:
     import jax
     import jax.numpy as jnp
@@ -342,7 +341,7 @@ _BIGMASK = np.array(
      [0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1]]
 )
 
-
+@use_tempdirs
 class TestColoringExplicit(unittest.TestCase):
     def setUp(self):
         np.random.seed(11)
@@ -1476,7 +1475,6 @@ class TestStaticColoring(unittest.TestCase):
                 model.add_subsystem('indeps', indeps)
                 comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, method,
                                                                     isplit=isplit, osplit=2))
-                # model.declare_coloring('*', method=method)
                 model.connect('indeps.x0', 'comp.x0')
                 model.connect('indeps.x1', 'comp.x1')
 
