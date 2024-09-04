@@ -49,10 +49,8 @@ def _new_setup(self):
 
     if MPI is None:
         self.tempdir = tempfile.mkdtemp()
-        # self.tempdir = tempfile.mkdtemp(prefix=f'{self._testMethodName}-')
     elif MPI.COMM_WORLD.rank == 0:
         self.tempdir = tempfile.mkdtemp()
-        # self.tempdir = tempfile.mkdtemp(prefix=f'{self._testMethodName}-')
         MPI.COMM_WORLD.bcast(self.tempdir, root=0)
     else:
         self.tempdir = MPI.COMM_WORLD.bcast(None, root=0)
