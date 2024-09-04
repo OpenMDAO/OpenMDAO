@@ -38,7 +38,8 @@ from openmdao.utils.om_warnings import issue_warning, \
     DerivativesWarning, PromotionWarning, UnusedOptionWarning, UnitsWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, all_ancestors, match_prom_or_abs, \
-    ensure_compatible, env_truthy, make_traceback, _is_slicer_op
+    ensure_compatible, env_truthy, make_traceback, _is_slicer_op, _wrap_comm, _unwrap_comm, \
+    _om_mpi_debug, SystemMeta
 from openmdao.utils.file_utils import _get_outputs_dir
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -172,7 +173,7 @@ def collect_errors(method):
     return wrapper
 
 
-class System(object):
+class System(object, metaclass=SystemMeta):
     """
     Base class for all systems in OpenMDAO.
 
@@ -196,7 +197,7 @@ class System(object):
         Name of the system, must be different from siblings.
     pathname : str
         Global name of the system, including the path.
-    comm : MPI.Comm or <FakeComm>
+    _comm : MPI.Comm or <FakeComm>
         MPI communicator object.
     options : OptionsDictionary
         options dictionary
@@ -403,7 +404,7 @@ class System(object):
         """
         self.name = ''
         self.pathname = None
-        self.comm = None
+        self._comm = None
         self._is_local = False
 
         # System options
@@ -538,6 +539,23 @@ class System(object):
         self._promotion_tree = None
 
         self._during_sparsity = False
+
+    if _om_mpi_debug:
+        @property
+        def comm(self):
+            return _wrap_comm(self._comm, self.msginfo)
+
+        @comm.setter
+        def comm(self, comm):
+            self._comm = _unwrap_comm(comm)
+    else:
+        @property
+        def comm(self):
+            return self._comm
+
+        @comm.setter
+        def comm(self, comm):
+            self._comm = comm
 
     @property
     def under_approx(self):
@@ -1835,10 +1853,13 @@ class System(object):
         coloring : Coloring
             See Coloring class docstring.
         """
+        # have to call get_coloring_fname (and internally get_outputs_dir) in all ranks
+        # to prevent MPI hangs
+        coloring_fname = self.get_coloring_fname(mode='output')
         # under MPI, only save on proc 0
         if ((self._full_comm is not None and self._full_comm.rank == 0) or
                 (self._full_comm is None and self.comm.rank == 0)):
-            coloring.save(self.get_coloring_fname(mode='output'))
+            coloring.save(coloring_fname)
 
     def _get_static_coloring(self):
         """

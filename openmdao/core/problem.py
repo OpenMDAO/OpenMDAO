@@ -51,7 +51,8 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
     clear_reports, _load_report_plugins
 from openmdao.utils.general_utils import pad_name, LocalRangeIterable, \
-    _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs
+    _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs, \
+    ProblemMeta
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
@@ -130,7 +131,7 @@ def _default_prob_name():
     return name.stem
 
 
-class Problem(object):
+class Problem(object, metaclass=ProblemMeta):
     """
     Top-level container for the systems and drivers.
 
@@ -226,27 +227,6 @@ class Problem(object):
         self._warned = False
         self._computing_coloring = False
 
-        # Set the Problem name so that it can be referenced from command line tools (e.g. check)
-        # that accept a Problem argument, and to name the corresponding outputs subdirectory.
-        if name:  # if name hasn't been used yet, use it. Otherwise, error
-            if name not in _problem_names:
-                self._name = name
-            else:
-                raise ValueError(f"The problem name '{name}' already exists")
-        else:  # No name given: look for a name, of the form, 'problemN', that hasn't been used
-            problem_counter = len(_problem_names) + 1 if _problem_names else ''
-            base = _default_prob_name()
-            _name = f"{base}{problem_counter}"
-            if _name in _problem_names:  # need to make it unique so append string of form '.N'
-                i = 1
-                while True:
-                    _name = f"{base}{problem_counter}.{i}"
-                    if _name not in _problem_names:
-                        break
-                    i += 1
-            self._name = _name
-        _problem_names.append(self._name)
-
         if comm is None:
             use_mpi = check_mpi_env()
             if use_mpi is False:
@@ -257,6 +237,10 @@ class Problem(object):
                     comm = MPI.COMM_WORLD
                 except ImportError:
                     comm = FakeComm()
+
+        self.comm = comm
+
+        self._set_name(name)
 
         if model is None:
             self.model = Group()
@@ -280,8 +264,6 @@ class Problem(object):
 
         # can't use driver property here without causing a lint error, so just do it manually
         self._driver = driver
-
-        self.comm = comm
 
         self._metadata = {'setup_status': _SetupStatus.PRE_SETUP}
         self._run_counter = -1
@@ -357,6 +339,33 @@ class Problem(object):
 
         # So Problem and driver can have hooks attached to their methods
         _setup_hooks(self)
+
+    def _set_name(self, name):
+        if not MPI or self.comm.rank == 0:
+            # Set the Problem name so that it can be referenced from command line tools (e.g. check)
+            # that accept a Problem argument, and to name the corresponding outputs subdirectory.
+            if name:  # if name hasn't been used yet, use it. Otherwise, error
+                if name not in _problem_names:
+                    self._name = name
+                else:
+                    raise ValueError(f"The problem name '{name}' already exists")
+            else:  # No name given: look for a name, of the form, 'problemN', that hasn't been used
+                problem_counter = len(_problem_names) + 1 if _problem_names else ''
+                base = _default_prob_name()
+                _name = f"{base}{problem_counter}"
+                if _name in _problem_names:  # need to make it unique so append string of form '.N'
+                    i = 1
+                    while True:
+                        _name = f"{base}{problem_counter}.{i}"
+                        if _name not in _problem_names:
+                            break
+                        i += 1
+                self._name = _name
+            self._name = self.comm.bcast(self._name, root=0)
+        else:
+            self._name = self.comm.bcast(None, root=0)
+
+        _problem_names.append(self._name)
 
     def _has_active_report(self, name):
         """

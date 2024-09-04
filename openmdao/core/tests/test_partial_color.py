@@ -1130,7 +1130,7 @@ class TestStaticColoring(unittest.TestCase):
     def test_partials_explicit_shape_bug(self):
         for method in ['fd', 'cs']:
             with self.subTest(msg=f'{method=}'):
-                prob = Problem(name=f'test_partials_explicit_shape_bug_{method}')
+                prob = Problem(name=f'test_partials_explicit_shape_bug_static_{method}')
                 model = prob.model
 
                 # create sparsity with last row and col all zeros.
@@ -1161,7 +1161,7 @@ class TestStaticColoring(unittest.TestCase):
 
                 # now make a second problem to use the coloring
                 _clear_problem_names()
-                prob = Problem(name=f'test_partials_explicit_shape_bug_{method}')
+                prob = Problem(name=f'test_partials_explicit_shape_bug_static_{method}')
                 model = prob.model
                 indeps = IndepVarComp()
                 indeps.add_output('x0', np.ones(4))

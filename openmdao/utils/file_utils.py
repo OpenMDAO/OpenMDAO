@@ -12,6 +12,7 @@ import pathlib
 import shutil
 
 from openmdao.utils.om_warnings import issue_warning
+from openmdao.utils.general_utils import om_dump
 
 
 def get_module_path(fpath):
@@ -443,13 +444,14 @@ def get_work_dir():
         The working directory.
     """
     workdir = os.environ.get('OPENMDAO_WORKDIR', '')
+
     if workdir:
         return workdir
 
     return os.getcwd()
 
 
-def _get_outputs_dir(obj=None, *subdirs, mkdir=True):
+def _get_outputs_dir(obj, *subdirs, mkdir=True):
     """
     Return a pathlib.Path for the outputs directory related to the given problem or system.
 
@@ -463,7 +465,7 @@ def _get_outputs_dir(obj=None, *subdirs, mkdir=True):
 
     Parameters
     ----------
-    obj : Problem or System or Solver or None
+    obj : Problem or System or Solver
         The problem or system or Solver from which we are opening a file.
     subdirs : str
         Additional subdirectories under the top level directory for the relevant problem. Each
@@ -477,35 +479,64 @@ def _get_outputs_dir(obj=None, *subdirs, mkdir=True):
 
     if isinstance(obj, Problem):
         prob_meta = obj._metadata
-        comm = obj.comm
+        # comm = obj.comm
     elif isinstance(obj, System):
         prob_meta = obj._problem_meta
-        comm = obj.comm
+        # comm = obj.comm
     elif isinstance(obj, Solver):
         system = obj._system
         if system is None:
             raise RuntimeError('The output directory for Solvers cannot be accessed '
                                'before final_setup.')
         prob_meta = system()._problem_meta
-        comm = system().comm
+        # comm = system().comm
     else:
         raise RuntimeError(f'Cannot get problem metadata for object: {obj}')
 
     if prob_meta is None or prob_meta.get('pathname', None) is None:
         raise RuntimeError('The output directory cannot be accessed before setup.')
 
+    om_dump(f"Getting outputs dir for obj {obj.msginfo}, mkdir={mkdir}")
+
+    # prob_comm = prob_meta['comm']
     prob_pathname = prob_meta['pathname']
 
-    outs_dir = pathlib.Path(get_work_dir()) / pathlib.Path(*[f'{p}_out'
-                                                             for p in prob_pathname.split('/')])
+    work_dir = pathlib.Path(get_work_dir())
+    if mkdir and not work_dir.is_dir():  # and prob_comm.rank == 0:
+        om_dump(f"Creating work_dir {work_dir}")
+        work_dir.mkdir(exist_ok=True)
+
+    outs_dir = work_dir
+
+    # it's possible that a sub-problem requests the output directory before its parent problem,
+    # so we need to check existence of the parent directories for all parent problems and create
+    # them (ensuring the .openmdao_out file is present) if they don't exist.  Otherwise they
+    # won't be properly identified during cleanup.
+    for p in prob_pathname.split('/'):
+        outs_dir = outs_dir / f'{p}_out'
+        if mkdir and not outs_dir.exists():  # and prob_comm.rank == 0:
+            om_dump(f"Creating outs dir {outs_dir}")
+            outs_dir.mkdir(exist_ok=True)
+
+            # Touch the .openmdao_out file for the output directory to ease identification.
+            outs_file = outs_dir / '.openmdao_out'
+            if not outs_file.exists():
+                om_dump(f"Creating .openmdao_out file in {outs_dir}")
+                try:
+                    open(outs_file, 'w').close()
+                except IOError as err:
+                    om_dump(f"Error creating .openmdao_out file in {outs_dir}: {err}")
+                    pass
+
     dirpath = outs_dir / pathlib.Path(*subdirs)
 
-    if not dirpath.is_dir() and comm.rank == 0 and mkdir:
-        dirpath.mkdir(parents=True, exist_ok=True)
-        # Touch the .openmdao_out file for the output directory to ease identification.
-        if not (outs_dir / '.openmdao_out').exists():
-            open(outs_dir / '.openmdao_out', 'w').close()
+    if mkdir:
+        if dirpath != outs_dir:
+            if not dirpath.exists():
+                om_dump(f"Creating dirpath {dirpath}")
+                dirpath.mkdir(parents=True, exist_ok=True)
 
+    om_dump(f"Returning dirpath {dirpath}")
     return dirpath
 
 

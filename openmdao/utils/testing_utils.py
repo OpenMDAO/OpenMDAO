@@ -3,6 +3,7 @@ import json
 import functools
 import builtins
 import os
+import shutil
 import re
 from itertools import zip_longest
 from contextlib import contextmanager
@@ -15,8 +16,31 @@ try:
 except ImportError:
     parameterized = None
 
-from openmdao.utils.general_utils import env_truthy, env_none
-from openmdao.utils.file_utils import get_work_dir
+from openmdao.utils.general_utils import env_truthy, env_none, om_dump
+from openmdao.utils.mpi import MPI
+
+
+def _cleanup_workdir(self):
+    if self.old_workdir:
+        os.environ['OPENMDAO_WORKDIR'] = self.old_workdir
+
+    if MPI is None:
+        rank = 0
+    else:
+        # make sure everyone's out of that directory before rank 0 deletes it
+        om_dump("PRE barrier before deleting temporary directory:", self.tempdir)
+        MPI.COMM_WORLD.barrier()
+        om_dump("POST barrier before deleting temporary directory:", self.tempdir)
+        rank = MPI.COMM_WORLD.rank
+
+    if rank == 0:
+        if not os.environ.get('OPENMDAO_KEEPDIRS'):
+            try:
+                om_dump("removing temporary directory:", self.tempdir)
+                shutil.rmtree(self.tempdir)
+            except OSError:
+                om_dump("Couldn't remove temporary directory:", self.tempdir)
+                pass
 
 
 def _new_setup(self):
@@ -25,59 +49,50 @@ def _new_setup(self):
 
     from openmdao.utils.mpi import MPI, multi_proc_exception_check
     self.startdir = os.getcwd()
-    self.workdir = os.environ.get('OPENMDAO_WORKDIR', '')
+    self.old_workdir = os.environ.get('OPENMDAO_WORKDIR', '')
 
     if MPI is None:
-        self.tempdir = tempfile.mkdtemp(prefix='testdir-')
+        self.tempdir = tempfile.mkdtemp()
+        # self.tempdir = tempfile.mkdtemp(prefix=f'{self._testMethodName}-')
     elif MPI.COMM_WORLD.rank == 0:
-        self.tempdir = tempfile.mkdtemp(prefix='testdir-')
+        self.tempdir = tempfile.mkdtemp()
+        # self.tempdir = tempfile.mkdtemp(prefix=f'{self._testMethodName}-')
         MPI.COMM_WORLD.bcast(self.tempdir, root=0)
     else:
         self.tempdir = MPI.COMM_WORLD.bcast(None, root=0)
 
+    om_dump("Changing to temporary directory:", self.tempdir)
     os.chdir(self.tempdir)
     # on mac tempdir is a symlink which messes some things up, so
     # use resolve to get the real directory path
     os.environ['OPENMDAO_WORKDIR'] = str(Path(self.tempdir).resolve())
-    if hasattr(self, 'original_setUp'):
-        if MPI is not None and MPI.COMM_WORLD.size > 1:
-            with multi_proc_exception_check(MPI.COMM_WORLD):
+    try:
+        if hasattr(self, 'original_setUp'):
+            if MPI is not None and MPI.COMM_WORLD.size > 1:
+                with multi_proc_exception_check(MPI.COMM_WORLD):
+                    self.original_setUp()
+            else:
                 self.original_setUp()
-        else:
-            self.original_setUp()
+    except Exception:
+        _cleanup_workdir(self)
+        raise
 
 
 def _new_teardown(self):
     import os
-    import shutil
-
     from openmdao.utils.mpi import MPI, multi_proc_exception_check
-    if hasattr(self, 'original_tearDown'):
-        if MPI is not None and MPI.COMM_WORLD.size > 1:
-            with multi_proc_exception_check(MPI.COMM_WORLD):
+
+    try:
+        if hasattr(self, 'original_tearDown'):
+            if MPI is not None and MPI.COMM_WORLD.size > 1:
+                with multi_proc_exception_check(MPI.COMM_WORLD):
+                    self.original_tearDown()
+            else:
                 self.original_tearDown()
-        else:
-            self.original_tearDown()
-
-    os.chdir(self.startdir)
-    if self.workdir:
-        os.environ['OPENMDAO_WORKDIR'] = self.workdir
-    elif os.environ['OPENMDAO_WORKDIR'] == self.tempdir:
-        del os.environ['OPENMDAO_WORKDIR']
-
-    if MPI is None:
-        rank = 0
-    else:
-        # make sure everyone's out of that directory before rank 0 deletes it
-        MPI.COMM_WORLD.barrier()
-        rank = MPI.COMM_WORLD.rank
-
-    if rank == 0:
-        if not os.environ.get('OPENMDAO_KEEPDIRS'):
-            try:
-                shutil.rmtree(self.tempdir)
-            except OSError:
-                pass
+    finally:
+        om_dump("Returning to start directory:", self.startdir)
+        os.chdir(self.startdir)
+        _cleanup_workdir(self)
 
 
 def use_tempdirs(cls):

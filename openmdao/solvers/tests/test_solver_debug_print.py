@@ -1,9 +1,6 @@
 """Tests the `debug_print` option for Nonlinear solvers."""
 
-import os
 import sys
-import shutil
-import tempfile
 
 import unittest
 from packaging.version import Version
@@ -32,9 +29,6 @@ nonlinear_solvers = [
 @use_tempdirs
 class TestNonlinearSolvers(unittest.TestCase):
     def setUp(self):
-        import os
-        from tempfile import mkdtemp
-
         # iteration coordinate, file name and variable data are common for all tests
         coord = 'rank0:root._solve_nonlinear|0|NLRunOnce|0|circuit._solve_nonlinear|0'
         self.filename = 'solver_errors.0.out'
