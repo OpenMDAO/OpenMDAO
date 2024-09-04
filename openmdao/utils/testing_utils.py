@@ -61,8 +61,6 @@ def _new_teardown(self):
     os.chdir(self.startdir)
     if self.workdir:
         os.environ['OPENMDAO_WORKDIR'] = self.workdir
-    elif os.environ['OPENMDAO_WORKDIR'] == self.tempdir:
-        del os.environ['OPENMDAO_WORKDIR']
 
     if MPI is None:
         rank = 0
