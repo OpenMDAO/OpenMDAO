@@ -1530,7 +1530,6 @@ def _decorate_functs(attrs, predicate, decorator):
 
 
 if env_truthy('OPENMDAO_DUMP'):
-    from openmdao.utils.mpi import MPI
     # OPENMDAO_DUMP can have values like 'stdout', 'stderr', 'rank', 'pid', 'mpi' or
     # combos like 'rank,pid' or 'stdout,mpi'
     # mpi means to wrap (most) comm calls with debug printouts
@@ -1548,9 +1547,14 @@ if env_truthy('OPENMDAO_DUMP'):
     elif 'stderr' in parts:
         _dump_stream = sys.stderr
     else:
-        rank = MPI.COMM_WORLD.rank if MPI else 0
-        rankstr = f"_{rank}" if 'rank' in parts else ''
-        pidstr = f"_{os.getpid()}" if 'pid' in parts else ''
+        rankstr = pidstr = ''
+        if 'rank' in parts:
+            from openmdao.utils.mpi import MPI
+            rankstr = f"_{MPI.COMM_WORLD.rank if MPI else 0}"
+
+        if 'pid' in parts:
+            pidstr = f"_{os.getpid()}"
+
         _dump_stream = open(f'om_dump{rankstr}{pidstr}.out', 'w')
 
     def om_dump(*args, **kwargs):
@@ -1590,10 +1594,11 @@ if env_truthy('OPENMDAO_DUMP'):
             except Exception:
                 path = ''
             indent = call_depth2indent()
-            om_dump(f"{indent}calling {path}{funct.__name__}")
+            om_dump(f"{indent}--> {path}{funct.__name__}")
             ret = funct(*args, **kwargs)
-            om_dump(f"{indent}returning from {path}{funct.__name__}")
+            om_dump(f"{indent}<-- {path}{funct.__name__}")
             return ret
+
         return wrapper
 
     class DebugMeta(type):
@@ -1666,9 +1671,9 @@ def _debug_decorator(fn, scope):  # pragma no cover
     def _wrap(*args, **kwargs):
         sc = '' if scope is None else f"{scope}."
         indent = call_depth2indent()
-        om_dump(f"{indent}calling {sc}{fn.__name__}")
+        om_dump(f"{indent}--> {sc}{fn.__name__}")
         ret = fn(*args, **kwargs)
-        om_dump(f"{indent}returning from {sc}{fn.__name__}")
+        om_dump(f"{indent}<-- {sc}{fn.__name__}")
         return ret
     return _wrap
 
@@ -1690,7 +1695,6 @@ class _DebugComm(object):  # pragma no cover
             self.__dict__[name] = _debug_decorator(getattr(self._comm, name), scope)
 
     def __getattr__(self, name):
-        # om_dump("missed attr:", name)
         return getattr(self._comm, name)
 
     def __setattr__(self, name, val):

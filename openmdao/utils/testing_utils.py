@@ -16,7 +16,7 @@ try:
 except ImportError:
     parameterized = None
 
-from openmdao.utils.general_utils import env_truthy, env_none, om_dump
+from openmdao.utils.general_utils import env_truthy, env_none
 from openmdao.utils.mpi import MPI
 
 
@@ -28,18 +28,14 @@ def _cleanup_workdir(self):
         rank = 0
     else:
         # make sure everyone's out of that directory before rank 0 deletes it
-        om_dump("PRE barrier before deleting temporary directory:", self.tempdir)
         MPI.COMM_WORLD.barrier()
-        om_dump("POST barrier before deleting temporary directory:", self.tempdir)
         rank = MPI.COMM_WORLD.rank
 
     if rank == 0:
         if not os.environ.get('OPENMDAO_KEEPDIRS'):
             try:
-                om_dump("removing temporary directory:", self.tempdir)
                 shutil.rmtree(self.tempdir)
             except OSError:
-                om_dump("Couldn't remove temporary directory:", self.tempdir)
                 pass
 
 
@@ -61,7 +57,6 @@ def _new_setup(self):
     else:
         self.tempdir = MPI.COMM_WORLD.bcast(None, root=0)
 
-    om_dump("Changing to temporary directory:", self.tempdir)
     os.chdir(self.tempdir)
     # on mac tempdir is a symlink which messes some things up, so
     # use resolve to get the real directory path
@@ -90,7 +85,6 @@ def _new_teardown(self):
             else:
                 self.original_tearDown()
     finally:
-        om_dump("Returning to start directory:", self.startdir)
         os.chdir(self.startdir)
         _cleanup_workdir(self)
 

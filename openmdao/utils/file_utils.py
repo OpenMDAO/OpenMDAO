@@ -12,7 +12,6 @@ import pathlib
 import shutil
 
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.general_utils import om_dump
 
 
 def get_module_path(fpath):
@@ -496,14 +495,11 @@ def _get_outputs_dir(obj, *subdirs, mkdir=True):
     if prob_meta is None or prob_meta.get('pathname', None) is None:
         raise RuntimeError('The output directory cannot be accessed before setup.')
 
-    om_dump(f"Getting outputs dir for obj {obj.msginfo}, mkdir={mkdir}")
-
     # prob_comm = prob_meta['comm']
     prob_pathname = prob_meta['pathname']
 
     work_dir = pathlib.Path(get_work_dir())
     if mkdir and not work_dir.is_dir():  # and prob_comm.rank == 0:
-        om_dump(f"Creating work_dir {work_dir}")
         work_dir.mkdir(exist_ok=True)
 
     outs_dir = work_dir
@@ -515,17 +511,14 @@ def _get_outputs_dir(obj, *subdirs, mkdir=True):
     for p in prob_pathname.split('/'):
         outs_dir = outs_dir / f'{p}_out'
         if mkdir and not outs_dir.exists():  # and prob_comm.rank == 0:
-            om_dump(f"Creating outs dir {outs_dir}")
             outs_dir.mkdir(exist_ok=True)
 
             # Touch the .openmdao_out file for the output directory to ease identification.
             outs_file = outs_dir / '.openmdao_out'
             if not outs_file.exists():
-                om_dump(f"Creating .openmdao_out file in {outs_dir}")
                 try:
                     open(outs_file, 'w').close()
-                except IOError as err:
-                    om_dump(f"Error creating .openmdao_out file in {outs_dir}: {err}")
+                except OSError:
                     pass
 
     dirpath = outs_dir / pathlib.Path(*subdirs)
@@ -533,10 +526,8 @@ def _get_outputs_dir(obj, *subdirs, mkdir=True):
     if mkdir:
         if dirpath != outs_dir:
             if not dirpath.exists():
-                om_dump(f"Creating dirpath {dirpath}")
                 dirpath.mkdir(parents=True, exist_ok=True)
 
-    om_dump(f"Returning dirpath {dirpath}")
     return dirpath
 
 

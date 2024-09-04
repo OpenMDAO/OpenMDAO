@@ -29,7 +29,6 @@ from openmdao.utils.om_warnings import issue_warning, OMDeprecationWarning, Deri
 from openmdao.utils.reports_system import register_report
 from openmdao.devtools.memory import mem_usage
 from openmdao.utils.name_maps import rel_name2abs_name
-from openmdao.utils.general_utils import om_dump
 
 try:
     import matplotlib as mpl
@@ -971,11 +970,9 @@ class Coloring(object):
         fname : str or pathlib.Path
             File to save to.
         """
-        om_dump(f"Saving coloring to file: {fname}")
         if isinstance(fname, str) or isinstance(fname, pathlib.Path):
             color_dir = pathlib.Path(fname).absolute().parent
             if not color_dir.exists():
-                om_dump(f"Creating coloring directory: {color_dir}")
                 color_dir.mkdir(parents=True, exist_ok=True)
 
             with open(fname, 'wb') as f:
