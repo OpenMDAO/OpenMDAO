@@ -478,28 +478,24 @@ def _get_outputs_dir(obj, *subdirs, mkdir=True):
 
     if isinstance(obj, Problem):
         prob_meta = obj._metadata
-        # comm = obj.comm
     elif isinstance(obj, System):
         prob_meta = obj._problem_meta
-        # comm = obj.comm
     elif isinstance(obj, Solver):
         system = obj._system
         if system is None:
             raise RuntimeError('The output directory for Solvers cannot be accessed '
                                'before final_setup.')
         prob_meta = system()._problem_meta
-        # comm = system().comm
     else:
         raise RuntimeError(f'Cannot get problem metadata for object: {obj}')
 
     if prob_meta is None or prob_meta.get('pathname', None) is None:
         raise RuntimeError('The output directory cannot be accessed before setup.')
 
-    # prob_comm = prob_meta['comm']
     prob_pathname = prob_meta['pathname']
 
     work_dir = pathlib.Path(get_work_dir())
-    if mkdir and not work_dir.is_dir():  # and prob_comm.rank == 0:
+    if mkdir and not work_dir.is_dir():
         work_dir.mkdir(exist_ok=True)
 
     outs_dir = work_dir
@@ -508,9 +504,15 @@ def _get_outputs_dir(obj, *subdirs, mkdir=True):
     # so we need to check existence of the parent directories for all parent problems and create
     # them (ensuring the .openmdao_out file is present) if they don't exist.  Otherwise they
     # won't be properly identified during cleanup.
+
+    # Also, we don't check if rank==0 here because when mkdir is True, we need to ensure that the
+    # directory has been created by the time we return, so just letting any rank create the file
+    # and gracefully handling it by using exist_ok=True works better than trying to limit creation
+    # to rank==0 and performing some sort of barrier operation to ensure that the file is created
+    # before returning in all ranks.
     for p in prob_pathname.split('/'):
         outs_dir = outs_dir / f'{p}_out'
-        if mkdir and not outs_dir.exists():  # and prob_comm.rank == 0:
+        if mkdir and not outs_dir.exists():
             outs_dir.mkdir(exist_ok=True)
 
             # Touch the .openmdao_out file for the output directory to ease identification.
