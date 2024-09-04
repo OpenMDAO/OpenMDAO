@@ -1853,13 +1853,10 @@ class System(object, metaclass=SystemMeta):
         coloring : Coloring
             See Coloring class docstring.
         """
-        # have to call get_coloring_fname (and internally get_outputs_dir) in all ranks
-        # to prevent MPI hangs
-        coloring_fname = self.get_coloring_fname(mode='output')
         # under MPI, only save on proc 0
         if ((self._full_comm is not None and self._full_comm.rank == 0) or
                 (self._full_comm is None and self.comm.rank == 0)):
-            coloring.save(coloring_fname)
+            coloring.save(self.get_coloring_fname(mode='output'))
 
     def _get_static_coloring(self):
         """

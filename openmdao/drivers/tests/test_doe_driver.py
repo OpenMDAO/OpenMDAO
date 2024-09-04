@@ -1964,14 +1964,13 @@ class TestParallelDOE4Proc(unittest.TestCase):
         num_cases = 0
 
         rank = prob.comm.rank
-        outs_dir = prob.get_outputs_dir()
 
         if rank == 0:
             # there will be a single case recording file from proc 0
             # redundant recordings will not be made on any other procs
             filename = "cases.sql"
 
-            cr = om.CaseReader(outs_dir / filename)
+            cr = om.CaseReader(prob.get_outputs_dir() / filename)
             cases = cr.list_cases('driver', out_stream=None)
 
             # cases recorded on proc 0
@@ -2032,14 +2031,12 @@ class TestParallelDOE4Proc(unittest.TestCase):
 
         rank = prob.comm.rank
 
-        outs_dir = prob.get_outputs_dir()
-
         if rank == 0:
             # there will be a single case recording file from proc 0
             # redundant recordings will not be made on any other procs
             filename = "cases.sql"
 
-            cr = om.CaseReader(outs_dir / filename)
+            cr = om.CaseReader(prob.get_outputs_dir() / filename)
             cases = cr.list_cases('driver', out_stream=None)
 
             # cases recorded on proc 0
@@ -2227,12 +2224,10 @@ class TestParallelDistribDOE(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        outs_dir = prob.get_outputs_dir()
-
         # check recorded cases from each case file
         rank = prob.comm.rank
         if rank == 0:
-            filename0 = outs_dir / "cases.sql_0"
+            filename0 = prob.get_outputs_dir() / "cases.sql_0"
             values = []
 
             cr = om.CaseReader(filename0)
@@ -2250,7 +2245,7 @@ class TestParallelDistribDOE(unittest.TestCase):
                         self.assertEqual(x_inputs.count([n1, n2, n3]), 8)
 
         elif rank == 1:
-            filename0 = outs_dir / "cases.sql_1"
+            filename0 = prob.get_outputs_dir() / "cases.sql_1"
             values = []
 
             cr = om.CaseReader(filename0)

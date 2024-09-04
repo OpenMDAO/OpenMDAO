@@ -495,7 +495,7 @@ def _get_outputs_dir(obj, *subdirs, mkdir=True):
     prob_pathname = prob_meta['pathname']
 
     work_dir = pathlib.Path(get_work_dir())
-    if mkdir and not work_dir.is_dir():
+    if mkdir and not work_dir.exists():
         work_dir.mkdir(exist_ok=True)
 
     outs_dir = work_dir
@@ -507,7 +507,7 @@ def _get_outputs_dir(obj, *subdirs, mkdir=True):
 
     # Also, we don't check if rank==0 here because when mkdir is True, we need to ensure that the
     # directory has been created by the time we return, so just letting any rank create the file
-    # and gracefully handling it by using exist_ok=True works better than trying to limit creation
+    # and handling race conditions by using exist_ok=True works better than trying to limit creation
     # to rank==0 and performing some sort of barrier operation to ensure that the file is created
     # before returning in all ranks.
     for p in prob_pathname.split('/'):
@@ -523,14 +523,15 @@ def _get_outputs_dir(obj, *subdirs, mkdir=True):
                 except OSError:
                     pass
 
-    dirpath = outs_dir / pathlib.Path(*subdirs)
+    if subdirs:
+        dirpath = outs_dir / pathlib.Path(*subdirs)
 
-    if mkdir:
-        if dirpath != outs_dir:
-            if not dirpath.exists():
-                dirpath.mkdir(parents=True, exist_ok=True)
+        if mkdir and not dirpath.exists():
+            dirpath.mkdir(parents=True, exist_ok=True)
 
-    return dirpath
+        return dirpath
+
+    return outs_dir
 
 
 def _is_openmdao_output_dir(directory):

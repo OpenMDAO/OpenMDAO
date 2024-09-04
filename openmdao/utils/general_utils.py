@@ -1494,7 +1494,6 @@ def _default_predicate(name, obj):
     return False
 
 
-# default function to determine if a given method should be traced
 _trace_predicate = _default_predicate
 
 
@@ -1603,7 +1602,7 @@ if env_truthy('OPENMDAO_DUMP'):
 
     class DebugMeta(type):
         """
-        A metaclass to add debugging printouts to some methods of the class.
+        A metaclass to add trace output to some methods of the class.
 
         Parameters
         ----------
@@ -1620,7 +1619,6 @@ if env_truthy('OPENMDAO_DUMP'):
             The class with the metaclass applied.
         """
 
-        # TODO: provide a global flag to turn this machinery on/off
         def __new__(metaclass, name, bases, attrs):
             _decorate_functs(attrs, _trace_predicate, dbg)
             return super().__new__(metaclass, name, bases, attrs)
@@ -1667,7 +1665,7 @@ else:
     _om_mpi_debug = False
 
 
-def _debug_decorator(fn, scope):  # pragma no cover
+def _comm_debug_decorator(fn, scope):  # pragma no cover
     def _wrap(*args, **kwargs):
         sc = '' if scope is None else f"{scope}."
         indent = call_depth2indent()
@@ -1692,7 +1690,7 @@ class _DebugComm(object):  # pragma no cover
         for name in ['bcast', 'Bcast', 'gather', 'Gather', 'scatter', 'Scatter',
                      'allgather', 'Allgather', 'allreduce', 'Allreduce',
                      'send', 'Send', 'recv', 'Recv', 'sendrecv', 'Sendrecv']:
-            self.__dict__[name] = _debug_decorator(getattr(self._comm, name), scope)
+            self.__dict__[name] = _comm_debug_decorator(getattr(self._comm, name), scope)
 
     def __getattr__(self, name):
         return getattr(self._comm, name)
@@ -1703,8 +1701,6 @@ class _DebugComm(object):  # pragma no cover
 
 if _om_mpi_debug:
     def _wrap_comm(comm, scope=None):  # pragma no cover
-        # introduce a random wait here to possibly help induce race conditions
-        # time.sleep(np.random.random() / 10)
         return _DebugComm(comm, scope)
 
     def _unwrap_comm(comm):  # pragma no cover

@@ -690,9 +690,8 @@ class TestReportsSystemMPI(unittest.TestCase):
 
         prob.run_driver()
 
-        problem_reports_dir = prob.get_reports_dir()
-
         if prob.comm.rank == 0:
+            problem_reports_dir = prob.get_reports_dir()
 
             path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
             self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
