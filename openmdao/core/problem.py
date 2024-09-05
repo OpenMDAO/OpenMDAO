@@ -361,7 +361,8 @@ class Problem(object, metaclass=ProblemMeta):
                             break
                         i += 1
                 self._name = _name
-            self._name = self.comm.bcast(self._name, root=0)
+            if self.comm.size > 1:
+                self._name = self.comm.bcast(self._name, root=0)
         else:
             self._name = self.comm.bcast(None, root=0)
 

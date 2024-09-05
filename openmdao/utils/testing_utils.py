@@ -21,6 +21,8 @@ from openmdao.utils.mpi import MPI
 
 
 def _cleanup_workdir(self):
+    os.chdir(self.startdir)
+
     if self.old_workdir:
         os.environ['OPENMDAO_WORKDIR'] = self.old_workdir
 
@@ -72,7 +74,6 @@ def _new_setup(self):
 
 
 def _new_teardown(self):
-    import os
     from openmdao.utils.mpi import MPI, multi_proc_exception_check
 
     try:
@@ -83,7 +84,6 @@ def _new_teardown(self):
             else:
                 self.original_tearDown()
     finally:
-        os.chdir(self.startdir)
         _cleanup_workdir(self)
 
 
