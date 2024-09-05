@@ -85,6 +85,12 @@ class InterpND(object):
     num_cp : None or int
         Optional. When specified, use a linear distribution of num_cp control points. If you
         are using 'bsplines' as the method, then num_cp must be set instead of points.
+    cp0 : None or float
+        Optional, for bsplines only. Location of first control point if not on the first
+        interpolation point.
+    cp1 : None or float
+        Optional, for bsplines only. Location of last control point if not on the first
+        interpolation point.
     **kwargs : dict
         Interpolator-specific options to pass onward.
 
@@ -120,7 +126,7 @@ class InterpND(object):
     """
 
     def __init__(self, method="slinear", points=None, values=None, x_interp=None, extrapolate=False,
-                 num_cp=None, **kwargs):
+                 num_cp=None, cp0=None, cp1=None, **kwargs):
         """
         Initialize an InterpND object.
 
@@ -197,6 +203,13 @@ class InterpND(object):
                 if values.shape[i] != n_p:
                     raise ValueError("There are %d points and %d values in "
                                      "dimension %d" % (len(p), values.shape[i], i))
+
+        else:
+            # interpolating spline
+
+            if method == 'bsplines':
+                kwargs['cp0'] = cp0
+                kwargs['cp1'] = cp1
 
         self.grid = tuple([np.asarray(p) for p in points])
         self.values = values

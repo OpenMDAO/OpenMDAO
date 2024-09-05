@@ -32,6 +32,12 @@ class InterpBSplines(InterpAlgorithm):
         Array containing the table values for all dimensions.
     interp : class
         Interpolation class to be used for subsequent table dimensions.
+    cp0 : None or float
+        Optional, for bsplines only. Location of first control point if not on the first
+        interpolation point.
+    cp1 : None or float
+        Optional, for bsplines only. Location of last control point if not on the first
+        interpolation point.
     **kwargs : dict
         Interpolator-specific options to pass onward.
 
@@ -41,7 +47,7 @@ class InterpBSplines(InterpAlgorithm):
         Matrix of b-spline coefficients.
     """
 
-    def __init__(self, grid, values, interp=None, **kwargs):
+    def __init__(self, grid, values, interp=None, cp0=None, cp1=None, **kwargs):
         """
         Initialize table and subtables.
         """
@@ -54,6 +60,8 @@ class InterpBSplines(InterpAlgorithm):
 
         # It doesn't make sense to define a grid for bsplines.
         self.grid = None
+        self.cp0 = cp0
+        self.cp1 = cp1
 
     def initialize(self):
         """
@@ -90,8 +98,26 @@ class InterpBSplines(InterpAlgorithm):
             Derivative of interpolated values with respect to grid.
         """
         if self._jac is None:
+
+            # Map onto [0, 1]
+
+            if self.cp0 is not None:
+                start = self.cp0
+            else:
+                start = x[0]
+
+            if self.cp1 is not None:
+                end = self.cp1
+            else:
+                end = x[-1]
+
+            scale = end - start
+            shift = min((start, end))
+
+            x_mapped = (x - shift) / scale
+
             n_cp = self.values.shape[-1]
-            self._jac = self.get_bspline_mtx(n_cp, x / x[-1],
+            self._jac = self.get_bspline_mtx(n_cp, x_mapped,
                                              order=self.options['order']).tocoo()
 
         result = np.einsum('ij,kj->ki', self._jac.toarray(), self.values)
