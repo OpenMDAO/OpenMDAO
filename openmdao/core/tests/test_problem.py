@@ -17,7 +17,7 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDeriv
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
 import openmdao.utils.hooks as hooks
 from openmdao.utils.units import convert_units
-from openmdao.utils.om_warnings import DerivativesWarning, OMDeprecationWarning
+from openmdao.utils.om_warnings import DerivativesWarning, OMDeprecationWarning, OpenMDAOWarning
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.file_utils import get_work_dir
 from openmdao.utils.tests.test_hooks import hooks_active
@@ -2141,10 +2141,10 @@ class TestProblem(unittest.TestCase):
 
         om.Problem(name='prob_name2')
 
-        with self.assertRaises(ValueError) as e:
-            om.Problem(name='prob_name2')
+        msg = "The problem name 'prob_name2' already exists"
 
-        self.assertEqual(str(e.exception), "The problem name 'prob_name2' already exists")
+        with assert_warning(OpenMDAOWarning, msg):
+            om.Problem(name='prob_name2')
 
 
 @use_tempdirs
@@ -2495,9 +2495,10 @@ class NestedProblemTestCase(unittest.TestCase):
         p.model.connect('indep.x', 'G.comp.x')
         p.setup()
 
-        with self.assertRaises(Exception) as context:
+        msg = f"The problem name '{defname}' already exists"
+
+        with assert_warning(OpenMDAOWarning, msg):
             p.run_model()
-        self.assertEqual(str(context.exception), f"The problem name '{defname}' already exists")
 
         # If the first Problem uses the default name of 'problem2'
         openmdao.core.problem._clear_problem_names()  # need to reset these to simulate separate runs
