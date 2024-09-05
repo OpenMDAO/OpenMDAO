@@ -45,6 +45,12 @@ class InterpBSplines(InterpAlgorithm):
     ----------
     _jac : ndarray
         Matrix of b-spline coefficients.
+    cp0 : None or float
+        Optional, for bsplines only. Location of first control point if not on the first
+        interpolation point.
+    cp1 : None or float
+        Optional, for bsplines only. Location of last control point if not on the first
+        interpolation point.
     """
 
     def __init__(self, grid, values, interp=None, cp0=None, cp1=None, **kwargs):
