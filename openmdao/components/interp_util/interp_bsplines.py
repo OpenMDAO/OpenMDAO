@@ -32,12 +32,6 @@ class InterpBSplines(InterpAlgorithm):
         Array containing the table values for all dimensions.
     interp : class
         Interpolation class to be used for subsequent table dimensions.
-    cp0 : None or float
-        Optional, for bsplines only. Location of first control point if not on the first
-        interpolation point.
-    cp1 : None or float
-        Optional, for bsplines only. Location of last control point if not on the first
-        interpolation point.
     **kwargs : dict
         Interpolator-specific options to pass onward.
 
@@ -45,15 +39,15 @@ class InterpBSplines(InterpAlgorithm):
     ----------
     _jac : ndarray
         Matrix of b-spline coefficients.
-    cp0 : None or float
+    x_cp_start : None or float
         Optional, for bsplines only. Location of first control point if not on the first
         interpolation point.
-    cp1 : None or float
-        Optional, for bsplines only. Location of last control point if not on the first
+    x_cp_end : None or float
+        Optional, for bsplines only. Location of last control point if not on the last
         interpolation point.
     """
 
-    def __init__(self, grid, values, interp=None, cp0=None, cp1=None, **kwargs):
+    def __init__(self, grid, values, interp=None, **kwargs):
         """
         Initialize table and subtables.
         """
@@ -66,8 +60,8 @@ class InterpBSplines(InterpAlgorithm):
 
         # It doesn't make sense to define a grid for bsplines.
         self.grid = None
-        self.cp0 = cp0
-        self.cp1 = cp1
+        self.x_cp_start = self.options['x_cp_start']
+        self.x_cp_end = self.options['x_cp_end']
 
     def initialize(self):
         """
@@ -75,6 +69,14 @@ class InterpBSplines(InterpAlgorithm):
         """
         self.options.declare('order', default=4,
                              desc='B-spline order.')
+        self.options.declare('x_cp_start', default=None, allow_none=True,
+                             types=(float, int),
+                             desc='Location of first control point. If None, use the first '
+                             'interpolation point.')
+        self.options.declare('x_cp_end', default=None, allow_none=True,
+                             types=(float, int),
+                             desc='Location of last control point. If None, use the last '
+                             'interpolation point.')
 
     def check_config(self):
         """
@@ -107,13 +109,13 @@ class InterpBSplines(InterpAlgorithm):
 
             # Map onto [0, 1]
 
-            if self.cp0 is not None:
-                start = self.cp0
+            if self.x_cp_start is not None:
+                start = self.x_cp_start
             else:
                 start = x[0]
 
-            if self.cp1 is not None:
-                end = self.cp1
+            if self.x_cp_end is not None:
+                end = self.x_cp_end
             else:
                 end = x[-1]
 

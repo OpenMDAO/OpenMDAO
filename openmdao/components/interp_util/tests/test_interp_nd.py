@@ -80,7 +80,7 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
         n = 50
         x = np.linspace(1.0, 12.0, n)
 
-        interp = InterpND(method='bsplines', num_cp=6, x_interp=x, cp0=0.0)
+        interp = InterpND(method='bsplines', num_cp=6, x_interp=x, x_cp_start=0.0)
 
         y = interp.evaluate_spline(ycp)
 
@@ -97,7 +97,7 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
                                      24.39192074, 25.40504312, 26.507523  , 27.70422156, 29.        ]),
                           tolerance=1e-6)
 
-    def test_interp_spline_bsplines_cp0_cp1(self):
+    def test_interp_spline_bsplines_cp_specify_ends(self):
 
         # xcp runs from ==20 to 20.
         ycp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
@@ -105,7 +105,7 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
         x = np.linspace(-5.0, 5.0, n)
 
         # This will put all the interp points betwen the 3rd and 4th cps.
-        interp = InterpND(method='bsplines', num_cp=6, x_interp=x, cp0=-30.0, cp1=30.0)
+        interp = InterpND(method='bsplines', num_cp=6, x_interp=x, x_cp_start=-30.0, x_cp_end=30.0)
 
         y = interp.evaluate_spline(ycp)
 
