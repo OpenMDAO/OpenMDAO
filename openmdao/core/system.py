@@ -543,18 +543,50 @@ class System(object, metaclass=SystemMeta):
     if _om_mpi_debug:
         @property
         def comm(self):
+            """
+            Return the wrapped MPI communicator object for the system.
+
+            Returns
+            -------
+            DebugComm
+                Wrapped MPI communicator object.
+            """
             return _wrap_comm(self._comm, self.msginfo)
 
         @comm.setter
         def comm(self, comm):
+            """
+            Set the MPI communicator object for the system.
+
+            Parameters
+            ----------
+            comm : MPI.Comm or DebugComm
+                Wrapped or unwrapped MPI communicator object.
+            """
             self._comm = _unwrap_comm(comm)
     else:
         @property
         def comm(self):
+            """
+            Return the MPI communicator object for the system.
+
+            Returns
+            -------
+            MPI.Comm
+                MPI communicator object.
+            """
             return self._comm
 
         @comm.setter
         def comm(self, comm):
+            """
+            Set the MPI communicator object for the system.
+
+            Parameters
+            ----------
+            comm : MPI.Comm
+                MPI communicator object.
+            """
             self._comm = comm
 
     @property

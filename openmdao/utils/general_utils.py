@@ -1473,7 +1473,7 @@ def vprint(it, end='\n', getter=None, file=None):
 
 def _default_predicate(name, obj):
     """
-    Default function to determine if a given method should be traced.
+    Determine if a given method should be traced.
 
     Parameters
     ----------
@@ -1575,7 +1575,7 @@ if env_truthy('OPENMDAO_DUMP'):
 
     def dbg(funct):
         """
-        Decorator to print function entry and exit.
+        Print function entry and exit.
 
         Parameters
         ----------
@@ -1620,6 +1620,23 @@ if env_truthy('OPENMDAO_DUMP'):
         """
 
         def __new__(metaclass, name, bases, attrs):
+            """
+            Add trace output to some methods of the class.
+
+            Parameters
+            ----------
+            name : str
+                The name of the class.
+            bases : tuple
+                The base classes of the class.
+            attrs : dict
+                The attributes of the class.
+
+            Returns
+            -------
+            class
+                The class with trace output added to some methods
+            """
             _decorate_functs(attrs, _trace_predicate, dbg)
             return super().__new__(metaclass, name, bases, attrs)
 
@@ -1643,7 +1660,7 @@ else:
 
     def dbg(funct):
         """
-        Decorator to print function entry and exit.
+        Print function entry and exit.
 
         Parameters
         ----------
