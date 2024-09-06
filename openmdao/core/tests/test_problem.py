@@ -18,7 +18,7 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_warning, asser
 import openmdao.utils.hooks as hooks
 from openmdao.utils.units import convert_units
 from openmdao.utils.om_warnings import DerivativesWarning, OMDeprecationWarning, OpenMDAOWarning
-from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.utils.testing_utils import use_tempdirs, set_env_vars
 from openmdao.utils.file_utils import get_work_dir
 from openmdao.utils.tests.test_hooks import hooks_active
 
@@ -784,11 +784,13 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob.get_val('z'), [1.977639, 0.000000], 1e-2)
         assert_near_equal(prob.get_val('obj'), 3.18339395, 1e-2)
 
+    @set_env_vars(TESTFLO_RUNNING='0', OPENMDAO_REPORTS='scaling')
     def test_duplicate_problem_name(self):
 
         def _make_and_run():
 
-            prob = om.Problem(name='test_duplicate_prob_name', model=SellarDerivatives())
+            prob = om.Problem(name='test_duplicate_prob_name',
+                              model=SellarDerivatives())
             model = prob.model
             model.nonlinear_solver = om.NonlinearBlockGS()
 

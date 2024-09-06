@@ -274,6 +274,8 @@ def activate_report(name, instance=None):
             inst_id = _inst_id
         elif inst_id != _inst_id:  # registered inst_id doesn't match current instance
             return
+        
+    print(_active_reports)
 
     if (name, inst_id) in _active_reports:
         issue_warning(f"A report with the name '{name}' for instance '{inst_id}' is already "
