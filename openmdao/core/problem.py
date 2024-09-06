@@ -1647,8 +1647,8 @@ class Problem(object, metaclass=ProblemMeta):
             issue_warning(msg, category=DerivativesWarning)
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
-                                  compact_print, comps, all_fd_options, indep_key=indep_key,
-                                  print_reverse=print_reverse,
+                                  compact_print, comps, all_fd_options, self.comm,
+                                  indep_key=indep_key, print_reverse=print_reverse,
                                   show_only_incorrect=show_only_incorrect)
 
         if not do_steps:
@@ -1934,7 +1934,7 @@ class Problem(object, metaclass=ProblemMeta):
                     data[''][key]['indices'] = resp[of]['indices'].indexed_src_size
 
         _assemble_derivative_data(data, rel_err_tol, abs_err_tol, out_stream, compact_print,
-                                  [model], {'': fd_args}, totals=total_info, lcons=lcons,
+                                  [model], {'': fd_args}, self.comm, totals=total_info, lcons=lcons,
                                   show_only_incorrect=show_only_incorrect, sort=sort)
 
         if not do_steps:
@@ -3099,7 +3099,7 @@ def _fix_check_data(data):
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
-                              compact_print, system_list, global_options, totals=False,
+                              compact_print, system_list, global_options, comm, totals=False,
                               indep_key=None, print_reverse=False,
                               show_only_incorrect=False, lcons=None, sort=False):
     """
@@ -3122,6 +3122,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         The systems (in the proper order) that were checked.
     global_options : dict
         Dictionary containing the options for the approximation.
+    comm : MPI.Comm or FakeComm
+        The MPI communicator.
     totals : bool or _TotalJacInfo
         Set to _TotalJacInfo if we are doing check_totals to skip a bunch of stuff.
     indep_key : dict of sets, optional
@@ -3414,8 +3416,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 if inconsistent:
                     out_buffer.write('\n    * Inconsistent value across ranks *\n')
 
-                if MPI and MPI.COMM_WORLD.size > 1:
-                    out_buffer.write(f'\n    MPI Rank {MPI.COMM_WORLD.rank}\n')
+                if MPI and comm.size > 1:
+                    out_buffer.write(f'\n    MPI Rank {comm.rank}\n')
                 out_buffer.write('\n')
 
                 with np.printoptions(linewidth=240):

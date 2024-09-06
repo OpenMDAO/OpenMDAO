@@ -1908,14 +1908,17 @@ class System(object, metaclass=SystemMeta):
 
         static = info.static
         if static is _STD_COLORING_FNAME or isinstance(static, str):
+            std_fname = self.get_coloring_fname(mode='input')
             if static is _STD_COLORING_FNAME:
-                fname = self.get_coloring_fname(mode='input')
+                fname = std_fname
             else:
                 fname = static
             print(f"{self.msginfo}: loading coloring from file {fname}")
             info.coloring = coloring = Coloring.load(fname)
 
-            self._save_coloring(coloring)
+            if fname != std_fname:
+                # save it in the standard location
+                self._save_coloring(coloring)
 
             if info.wrt_patterns != coloring._meta['wrt_patterns']:
                 raise RuntimeError("%s: Loaded coloring has different wrt_patterns (%s) than "

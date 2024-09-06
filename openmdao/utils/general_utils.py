@@ -1488,7 +1488,8 @@ def _default_predicate(name, obj):
         True if the method should be traced.
     """
     if isfunction(obj) or ismethod(obj):
-        for n in ['solve', 'apply', 'compute', 'setup', 'coloring', 'linearize', 'get_outputs_dir']:
+        for n in ['solve', 'apply', 'compute', 'setup', 'coloring', 'linearize', 'get_outputs_dir',
+                  'approx', 'static']:
             if n in name:
                 return True
     return False
@@ -1540,7 +1541,7 @@ if env_truthy('OPENMDAO_DUMP'):
     # if OPENMDAO_DUMP is just a plain truthy value, like '1', then we dump to a file
     # named om_dump.out.
     parts = [s.strip() for s in os.environ['OPENMDAO_DUMP'].split(',')]
-    _om_mpi_debug = 'mpi' in parts
+    _om_mpi_debug = 'mpi' in parts or 'rank' in parts
     if 'stdout' in parts:
         _dump_stream = sys.stdout
     elif 'stderr' in parts:
