@@ -14,7 +14,6 @@ import numpy as np
 from numpy import ndarray
 
 from openmdao.visualization.tables.table_builder import generate_table
-from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.code_utils import _get_long_name, replace_method, get_partials_deps
 
 
@@ -43,11 +42,8 @@ try:
     import jax
     jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
     import jax.numpy as jnp
-    from jax import jit, tree_util, custom_jvp, Array
+    from jax import jit, tree_util, Array
 except ImportError:
-
-    def custom_jvp(f):
-        return f
 
     jax = None
     jnp = np
@@ -782,21 +778,40 @@ def jax_deriv_shape(derivs):
 
 if jax is None or bool(os.environ.get('JAX_DISABLE_JIT', '')):
     def DelayedJit(func):
+        """
+        A dummy decorator that does nothing.
+
+        Parameters
+        ----------
+        func : Callable
+            The function or method to be wrapped.
+
+        Returns
+        -------
+        Callable
+            The original function or method.
+
+        """
         return func
 
-    PytreeNodeMetaclass = type
-else:
-    class PytreeNodeMetaclass(type):
-        """
-        A metaclass to auto-register a class as a pytree_node.
+    def _jax_update_class_attrs(name, bases, attrs):
+        pass
 
-        The class must define the 'get_self_statics' method, which returns a tuple of static
-        attributes of the class. This metaclass will register the class with jax so
-        that the class can be used with jax.jit and will will cause a jitted method to be
-        re-jitted if any of the self static attributes change.
+    def _jax_register_class(cls, name, bases, attrs):
+        pass
+
+else:
+
+    def _jax_update_class_attrs(name, bases, attrs):
+        """
+        Add _tree_flatten and _tree_unflatten methods if they're missing.
+
+        If a class has 'self static' attributes, it must define the 'get_self_statics' method,
+        which returns a tuple of static attributes of the class.
 
         A 'self static' attribute is one that is accessed on 'self' within the jitted method
         but is not passed in as an argument to the method.
+
 
         Parameters
         ----------
@@ -806,36 +821,40 @@ else:
             The base classes of the class.
         attrs : dict
             The attributes of the class.
-
-        Returns
-        -------
-        class
-            The class with the metaclass applied.
         """
+        attrs['_tree_flatten'] = lambda self: ((), {'_self_': self,
+                                                    '_statics_': self.get_self_statics()})
+        attrs['_tree_unflatten'] = \
+            staticmethod(lambda aux_data, children: aux_data['_self_'])
 
-        # TODO: provide a global flag to turn this machinery on/off
-        def __new__(metaclass, name, bases, attrs):
-            if '_tree_flatten' not in attrs:
-                attrs['_tree_flatten'] = lambda self: ((), {'_self_': self,
-                                                            '_statics_': self.get_self_statics()})
-                attrs['_tree_unflatten'] = \
-                    staticmethod(lambda aux_data, children: aux_data['_self_'])
 
-            cls = super().__new__(metaclass, name, bases, attrs)
+    def _jax_register_class(cls, name, bases, attrs):
+        """
+        Register a class with jax so that it can be used with jax.jit.
 
-            # register with jax so we can flatten/unflatten self
-            tree_util.register_pytree_node(cls, attrs['_tree_flatten'], attrs['_tree_unflatten'])
+        Parameters
+        ----------
+        cls : class
+            The class to be registered.
+        name : str
+            The name of the class.
+        bases : tuple
+            The base classes of the class.
+        attrs : dict
+            The attributes of the class.
+        """
+        # register with jax so we can flatten/unflatten self
+        tree_util.register_pytree_node(cls, attrs['_tree_flatten'], attrs['_tree_unflatten'])
 
-            return cls
 
     class DelayedJit:
         """
         A wrapper that provides a delayed jit capability for methods of a class.
 
         This decorator is used to delay the jit compilation of a method until the first time it is
-        called. This allows the method to be compiled with the correct static arguments, which are
-        not known until the first call. This is necessary for methods of a class that are jit
-        compiled and that reference attributes of the class, such as `self.options`.
+        called. This allows the method to be compiled with the correct static arguments, which can
+        be determined automatically on the first call. This is useful for methods of a class
+        that are jit compiled and that reference static attributes of the class.
 
         Parameters
         ----------

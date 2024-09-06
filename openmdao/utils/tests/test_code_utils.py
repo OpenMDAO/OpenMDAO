@@ -3,11 +3,9 @@ import unittest
 import sys
 import os
 import pickle
-import inspect
 
 import numpy as np
 
-import openmdao.api as om
 from openmdao.utils.code_utils import get_nested_calls, LambdaPickleWrapper, get_return_names, \
     get_func_graph, get_partials_deps
 from openmdao.core.group import Group
@@ -163,8 +161,9 @@ class TestGraphFunction(unittest.TestCase):
         expected = [('a', 'c'), ('a', 'x'), ('b', 'c'), ('b', 'x'), ('c', 'd'), ('d', 'e'), ('d', 'f'), ('x', 'f')]
         self.assertEqual(sorted(graph.edges()), sorted(expected))
         self.assertEqual(sorted(graph.nodes()), sorted(['a', 'b', 'c', 'd', 'e', 'f', 'x']))
-        
+
         partials = sorted(get_partials_deps(func))
+        self.assertEqual(sorted(partials), [('e', 'a'), ('e', 'b')])
 
     def test_multiple_returns(self):
         def func(a, b):
@@ -186,7 +185,7 @@ class TestGraphFunction(unittest.TestCase):
 
     def test_no_return(self):
         def func(a):
-            b = a + 1
+            b = a + 1  #noqa
 
         graph = get_func_graph(func)
         self.assertIn(('a', 'b'), graph.edges())

@@ -16,7 +16,6 @@ except ImportError:
     parameterized = None
 
 from openmdao.utils.general_utils import env_truthy, env_none
-from openmdao.utils.file_utils import get_work_dir
 
 
 def _new_setup(self):
@@ -62,8 +61,6 @@ def _new_teardown(self):
     os.chdir(self.startdir)
     if self.workdir:
         os.environ['OPENMDAO_WORKDIR'] = self.workdir
-    elif os.environ['OPENMDAO_WORKDIR'] == self.tempdir:
-        del os.environ['OPENMDAO_WORKDIR']
 
     if MPI is None:
         rank = 0
@@ -73,10 +70,11 @@ def _new_teardown(self):
         rank = MPI.COMM_WORLD.rank
 
     if rank == 0:
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
+        if not os.environ.get('OPENMDAO_KEEPDIRS'):
+            try:
+                shutil.rmtree(self.tempdir)
+            except OSError:
+                pass
 
 
 def use_tempdirs(cls):

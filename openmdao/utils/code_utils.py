@@ -10,7 +10,6 @@ import textwrap
 import importlib
 from types import LambdaType
 from collections import defaultdict, OrderedDict
-from itertools import chain
 
 import networkx as nx
 
@@ -238,17 +237,21 @@ def _calltree_exec(options, user_args):
     func_name = parts[-1]
     modpath = '.'.join(parts[:-2])
 
+    old_syspath = sys.path[:]
     sys.path.append(os.getcwd())
 
-    mod = importlib.import_module(modpath)
-    klass = getattr(mod, class_name)
+    try:
+        mod = importlib.import_module(modpath)
+        klass = getattr(mod, class_name)
 
-    stream_map = {'stdout': sys.stdout, 'stderr': sys.stderr}
-    stream = stream_map.get(options.outfile)
-    if stream is None:
-        stream = open(options.outfile, 'w')
+        stream_map = {'stdout': sys.stdout, 'stderr': sys.stderr}
+        stream = stream_map.get(options.outfile)
+        if stream is None:
+            stream = open(options.outfile, 'w')
 
-    get_nested_calls(klass, func_name, stream)
+        get_nested_calls(klass, func_name, stream)
+    finally:
+        sys.path = old_syspath
 
 
 def _target_iter(targets):
@@ -460,7 +463,74 @@ def get_return_names(func):
     return _FuncRetNameCollector(func).get_return_names()
 
 
-def get_func_graph(func, outnames=None):
+class _FuncGrapher(ast.NodeVisitor):
+    """
+    An ast.NodeVisitor that builds a graph between a function's inputs and outputs.
+    """
+
+    def __init__(self, node):
+        super().__init__()
+        self.rhs = []
+        self.lhs = []
+        self.names = None
+        self.graph = nx.DiGraph()
+        self.outs = []
+        self.fstack = []
+        self.visit(node)
+
+    def _update_graph(self):
+        for inp in self.rhs:
+            for out in self.lhs:
+                self.graph.add_edge(inp, out)
+        self.lhs = []
+        self.rhs = []
+
+    def visit_FunctionDef(self, node):
+        if self.fstack:
+            raise RuntimeError("Function contains nested functions, which are not supported.")
+        self.fstack.append(node)
+        for stmt in node.body:
+            self.visit(stmt)
+        self.fstack.pop()
+
+    def visit_Assign(self, node):
+        self.names = self.lhs
+        for t in _target_iter(node.targets):
+            self.visit(t)
+        self.names = self.rhs
+        self.visit(node.value)
+        self.names = None
+        self._update_graph()
+
+    def visit_Attribute(self, node):
+        pass  # skip any Name nodes that are part of an Attribute node
+
+    def visit_Call(self, node):
+        for arg in node.args:
+            self.visit(arg)
+
+    def visit_Name(self, node):
+        if self.names is not None:
+            self.names.append(node.id)
+
+    def visit_Return(self, node):
+        self.outs.append([])
+
+        if isinstance(node.value, ast.Tuple):
+            it = enumerate(node.value.elts)
+        else:
+            it = [(0, node.value)]
+
+        for i, n in it:
+            self.lhs = [f"@out{i}"]
+            self.rhs = []
+            self.names = self.rhs
+            self.visit(n)
+            self._update_graph()
+            self.outs[-1].append(_get_return_name(n))
+
+
+def get_func_graph(func, outnames=None, display=False):
     """
     Generate a graph between a function's inputs and outputs.
 
@@ -470,80 +540,17 @@ def get_func_graph(func, outnames=None):
         The function to be analyzed.
     outnames : list or None
         The list of expected output variable names.
+    display : bool
+        If True, display the graph using pydot.
 
     Returns
     -------
     networkx.DiGraph
         A graph containing edges from inputs to outputs.
     """
-    class FuncGrapher(ast.NodeVisitor):
-        """
-        An ast.NodeVisitor that builds a graph between a function's inputs and outputs.
-        """
-
-        def __init__(self, node):
-            super().__init__()
-            self.rhs = []
-            self.lhs = []
-            self.names = None
-            self.graph = nx.DiGraph()
-            self.outs = []
-            self.fstack = []
-            self.visit(node)
-
-        def _update_graph(self):
-            for inp in self.rhs:
-                for out in self.lhs:
-                    self.graph.add_edge(inp, out)
-            self.lhs = []
-            self.rhs = []
-
-        def visit_FunctionDef(self, node):
-            if self.fstack:
-                raise RuntimeError("Function contains nested functions, which are not supported.")
-            self.fstack.append(node)
-            for stmt in node.body:
-                self.visit(stmt)
-            self.fstack.pop()
-
-        def visit_Assign(self, node):
-            self.names = self.lhs
-            for t in _target_iter(node.targets):
-                self.visit(t)
-            self.names = self.rhs
-            self.visit(node.value)
-            self.names = None
-            self._update_graph()
-
-        def visit_Attribute(self, node):
-            pass  # skip any Name nodes that are part of an Attribute node
-
-        def visit_Call(self, node):
-            for arg in node.args:
-                self.visit(arg)
-
-        def visit_Name(self, node):
-            if self.names is not None:
-                self.names.append(node.id)
-
-        def visit_Return(self, node):
-            self.outs.append([])
-
-            if isinstance(node.value, ast.Tuple):
-                it = enumerate(node.value.elts)
-            else:
-                it = [(0, node.value)]
-
-            for i, n in it:
-                self.lhs = [f"@out{i}"]
-                self.rhs = []
-                self.names = self.rhs
-                self.visit(n)
-                self._update_graph()
-                self.outs[-1].append(_get_return_name(n))
 
     node = ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec')
-    visitor = FuncGrapher(node)
+    visitor = _FuncGrapher(node)
     retnames = _get_return_names(visitor.outs)
     inputs = set(inspect.signature(func).parameters)
 
@@ -573,10 +580,11 @@ def get_func_graph(func, outnames=None):
     visitor.graph.graph['inputs'] = inputs
     visitor.graph.graph['outputs'] = outnames
 
-    # show the function graph visually
-    # from openmdao.visualization.graph_viewer import write_graph, _to_pydot_graph
-    # G = _to_pydot_graph(visitor.graph)
-    # write_graph(G)
+    if display:
+        # show the function graph visually
+        from openmdao.visualization.graph_viewer import write_graph, _to_pydot_graph
+        G = _to_pydot_graph(visitor.graph)
+        write_graph(G)
 
     return visitor.graph
 
@@ -601,12 +609,27 @@ def get_partials_deps(func, outputs=None):
         A tuple of the form (output, input).
     """
     graph = get_func_graph(func, outputs)
+    outs = graph.graph['outputs']
+    successors = graph.successors
 
-    for inp in graph.graph['inputs']:
-        for out in graph.graph['outputs']:
-            # TODO: not sure how efficient this is...
-            if nx.has_path(graph, inp, out):
-                yield (out, inp)
+    for start in graph.graph['inputs']:
+        visited = set([start])
+        stack = [(start, successors(start))]
+        while stack:
+            _, succs = stack[-1]
+            for succ in succs:
+                if succ not in visited:
+                    visited.add(succ)
+                    if succ in outs:
+                        yield succ, start
+                    stack.append((succ, successors(succ)))
+                    break
+                else:
+                    if succ in outs:
+                        yield succ, start
+            else:
+                stack.pop()
+
 
 
 def replace_method(obj, method_name, new_method_src):

@@ -22,7 +22,7 @@ from openmdao.solvers.linesearch.tests.test_backtracking import ImplCompTwoState
 
 from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRecorded, \
     assertDriverIterDataRecorded, assertSystemIterDataRecorded, assertSolverIterDataRecorded, \
-    assertViewerDataRecorded, assertSystemMetadataIdsRecorded, assertSystemIterCoordsRecorded, \
+    assertViewerDataRecorded, assertSystemMetaclassdataIdsRecorded, assertSystemIterCoordsRecorded, \
     assertDriverDerivDataRecorded, assertProblemDerivDataRecorded
 
 from openmdao.recorders.tests.recorder_test_utils import run_driver
@@ -153,7 +153,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs = expected_objectives
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
-        assertDriverIterDataRecorded(self, 
+        assertDriverIterDataRecorded(self,
                                      prob.get_outputs_dir() / self.filename,
                                      expected_data,
                                      self.eps)
@@ -181,7 +181,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs = expected_constraints
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
-        assertDriverIterDataRecorded(self, 
+        assertDriverIterDataRecorded(self,
                                      prob.get_outputs_dir() / self.filename,
                                      expected_data,
                                      self.eps)
@@ -220,9 +220,9 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs, None),)
-        assertDriverIterDataRecorded(self, 
+        assertDriverIterDataRecorded(self,
                                      prob.get_outputs_dir() / self.filename,
-                                     expected_data, 
+                                     expected_data,
                                      self.eps)
 
         expected_derivs = {
@@ -233,9 +233,9 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_data = ((coordinate, (t0, t1), expected_derivs),)
-        assertDriverDerivDataRecorded(self, 
+        assertDriverDerivDataRecorded(self,
                                      prob.get_outputs_dir() / self.filename,
-                                     expected_data, 
+                                     expected_data,
                                      self.eps)
 
     def test_recorder_setup_timing(self):
@@ -370,9 +370,9 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs = expected_constraints
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
-        assertDriverIterDataRecorded(self, 
+        assertDriverIterDataRecorded(self,
                                      prob.get_outputs_dir() / self.filename,
-                                     expected_data, 
+                                     expected_data,
                                      self.eps)
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
@@ -415,9 +415,9 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs, None),)
-        assertDriverIterDataRecorded(self, 
+        assertDriverIterDataRecorded(self,
                                      prob.get_outputs_dir() / self.filename,
-                                     expected_data, 
+                                     expected_data,
                                      self.eps)
 
         expected_derivs = {
@@ -428,9 +428,9 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_data = ((coordinate, (t0, t1), expected_derivs),)
-        assertDriverDerivDataRecorded(self, 
+        assertDriverDerivDataRecorded(self,
                                      prob.get_outputs_dir() / self.filename,
-                                     expected_data, 
+                                     expected_data,
                                      self.eps)
 
     def test_double_run_driver_option_overwrite(self):
@@ -704,7 +704,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = (
             (run2_coord, (run2_t0, run2_t1), expected_outputs, expected_inputs, None),
         )
-        assertDriverIterDataRecorded(self, prob.get_outputs_dir() / self.filename, 
+        assertDriverIterDataRecorded(self, prob.get_outputs_dir() / self.filename,
                                      expected_data, self.eps, prefix='Run2')
 
         expected_derivs = {
@@ -717,10 +717,10 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = (
             (run1_coord, (run1_t0, run1_t1), expected_derivs),
         )
-        assertDriverDerivDataRecorded(self, 
+        assertDriverDerivDataRecorded(self,
                                      prob.get_outputs_dir() / self.filename,
-                                     expected_data, 
-                                     self.eps, 
+                                     expected_data,
+                                     self.eps,
                                      prefix='Run1')
 
     def test_driver_everything_recorded_by_default(self):
@@ -753,9 +753,9 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs.update(expected_constraints)
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs, None),)
-        assertDriverIterDataRecorded(self, 
+        assertDriverIterDataRecorded(self,
                                      prob.get_outputs_dir() / self.filename,
-                                     expected_data, 
+                                     expected_data,
                                      self.eps)
 
     def test_driver_records_metadata(self):
@@ -821,7 +821,7 @@ class TestSqliteRecorder(unittest.TestCase):
             'tree_children_length': 6,
             'abs2prom': abs2prom,
         }
-        assertViewerDataRecorded(self, 
+        assertViewerDataRecorded(self,
                                  prob.get_outputs_dir() / self.filename,
                                  expected_problem_metadata)
 
@@ -1291,7 +1291,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
                           expected_solver_output, expected_solver_residuals),)
-        assertSolverIterDataRecorded(self, prob.get_outputs_dir() / self.filename, 
+        assertSolverIterDataRecorded(self, prob.get_outputs_dir() / self.filename,
                                      expected_data, self.eps, prefix='run_again')
 
     def test_record_solver_includes_excludes(self):
@@ -1964,7 +1964,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         # Just make sure all Systems had some metadata recorded
-        assertSystemMetadataIdsRecorded(self, prob.get_outputs_dir() / self.filename, [
+        assertSystemMetaclassdataIdsRecorded(self, prob.get_outputs_dir() / self.filename, [
             'root',
             '_auto_ivc',
             'mda',
@@ -2003,7 +2003,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         # Just make sure all Systems had some metadata recorded
-        assertSystemMetadataIdsRecorded(self, prob.get_outputs_dir() / self.filename, [
+        assertSystemMetaclassdataIdsRecorded(self, prob.get_outputs_dir() / self.filename, [
             'root',
             '_auto_ivc',
             'mda',
@@ -3181,7 +3181,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         # Instantiate your CaseReader
         cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
-        
+
         # Get the first case from the recorder
         case = cr.get_case('after_run_driver')
 

@@ -465,10 +465,11 @@ def _get_outputs_dir(obj=None, *subdirs, mkdir=True):
     ----------
     obj : Problem or System or Solver or None
         The problem or system or Solver from which we are opening a file.
+    subdirs : str
+        Additional subdirectories under the top level directory for the relevant problem. Each
+        subdir is passed as a separate positional argument.
     mkdir : bool
         If True, force the creation of this directory.
-    subdirs : str
-        Additional subdirectories under the top level directory for the relevant problem.
     """
     from openmdao.core.problem import Problem
     from openmdao.core.system import System
@@ -495,15 +496,15 @@ def _get_outputs_dir(obj=None, *subdirs, mkdir=True):
 
     prob_pathname = prob_meta['pathname']
 
-    outspath = pathlib.Path(get_work_dir()) / pathlib.Path(*[f'{p}_out'
+    outs_dir = pathlib.Path(get_work_dir()) / pathlib.Path(*[f'{p}_out'
                                                              for p in prob_pathname.split('/')])
-    dirpath = outspath / pathlib.Path(*subdirs)
+    dirpath = outs_dir / pathlib.Path(*subdirs)
 
     if not dirpath.is_dir() and comm.rank == 0 and mkdir:
         dirpath.mkdir(parents=True, exist_ok=True)
         # Touch the .openmdao_out file for the output directory to ease identification.
-        if not (outspath / '.openmdao_out').exists():
-            open(outspath / '.openmdao_out', 'w').close()
+        if not (outs_dir / '.openmdao_out').exists():
+            open(outs_dir / '.openmdao_out', 'w').close()
 
     return dirpath
 

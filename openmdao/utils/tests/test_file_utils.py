@@ -124,8 +124,8 @@ class TestCleanOutputs(unittest.TestCase):
 
             self.assertIn(expected, ss.getvalue())
 
-            self.assertNotIn('foo_out', os.listdir(os.getcwd()))
-            self.assertNotIn('bar_out', os.listdir(os.getcwd()))
+            self.assertNotIn('foo_out', os.listdir('.'))
+            self.assertNotIn('bar_out', os.listdir('.'))
         finally:
             os.chdir(cwd)
 

@@ -40,6 +40,191 @@ class ListVarsTest(unittest.TestCase):
 
         self.assertEqual(str(cm.exception), msg)
 
+
+    def test_err_not_recorded(self):
+        prob = ParaboloidProblem()
+
+        # set abs_err and rel_err to not be recorded and make sure nothing blows up
+        prob.add_recorder(om.SqliteRecorder('test_err_not_recorded.db'))
+        prob.recording_options['record_abs_error'] = False
+        prob.recording_options['record_rel_error'] = False
+
+        prob.setup()
+        prob.run_driver()
+        prob.record('final')
+
+        cases = om.CaseReader(prob.get_outputs_dir() / 'test_err_not_recorded.db')
+        prob_case = cases.get_case(cases.list_cases('problem', out_stream=None)[-1])
+
+        prob_case.list_vars(out_stream=None)
+        prob_case.list_inputs(out_stream=None)
+        prob_case.list_outputs(out_stream=None)
+
+    def test_not_recorded(self):
+        prob = ParaboloidProblem()
+        model = prob.model
+        driver = prob.driver
+
+        rec = om.SqliteRecorder('test_not_recorded.db')
+
+        # record all inputs/outputs for problem, but set other record options to False
+        prob.add_recorder(rec)
+        prob.recording_options['record_desvars'] = False
+        prob.recording_options['record_objectives'] = False
+        prob.recording_options['record_constraints'] = False
+        prob.recording_options['record_inputs'] = True
+        prob.recording_options['record_residuals'] = False
+        prob.recording_options['record_derivatives'] = False
+        prob.recording_options['record_abs_error'] = False
+        prob.recording_options['record_rel_error'] = False
+
+        # record all inputs/outputs for model, but set residuals option to False
+        model.add_recorder(rec)
+        model.recording_options['record_residuals'] = False
+
+        # record all outputs for driver, but not the inputs
+        driver.add_recorder(rec)
+        driver.recording_options['record_inputs'] = False
+
+        prob.setup()
+        prob.run_driver()
+        prob.record('final')
+
+        cases = om.CaseReader(prob.get_outputs_dir() / 'test_not_recorded.db')
+        prob_case = cases.get_case(cases.list_cases('problem', out_stream=None)[-1])
+        drvr_case = cases.get_case(cases.list_cases('driver', out_stream=None)[-1])
+        modl_case = cases.get_case(cases.list_cases('root', out_stream=None)[-1])
+
+        # list vars with all options set to True and make sure nothing blows up
+        prob_case.list_vars(
+            residuals=True,
+            residuals_tol=1e-6,
+            units=True,
+            shape=True,
+            bounds=True,
+            scaling=True,
+            desc=True,
+            print_tags=True,
+            list_autoivcs=True,
+            print_min=True,
+            print_max=True,
+            out_stream=None
+        )
+        prob_case.list_inputs(
+            units=True,
+            shape=True,
+            global_shape=True,
+            desc=True,
+            hierarchical=True,
+            print_arrays=True,
+            print_tags=True,
+            print_min=True,
+            print_max=True,
+            out_stream=None
+        )
+        prob_case.list_outputs(
+            residuals=True,
+            residuals_tol=1e-6,
+            units=True,
+            shape=True,
+            global_shape=True,
+            bounds=True,
+            scaling=True,
+            desc=True,
+            print_arrays=True,
+            print_tags=True,
+            list_autoivcs=True,
+            print_min=True,
+            print_max=True,
+            out_stream=None
+        )
+
+        drvr_case.list_vars(
+            residuals=True,
+            residuals_tol=1e-6,
+            units=True,
+            shape=True,
+            bounds=True,
+            scaling=True,
+            desc=True,
+            print_tags=True,
+            list_autoivcs=True,
+            print_min=True,
+            print_max=True,
+            out_stream=None
+        )
+        drvr_case.list_inputs(
+            units=True,
+            shape=True,
+            global_shape=True,
+            desc=True,
+            hierarchical=True,
+            print_arrays=True,
+            print_tags=True,
+            print_min=True,
+            print_max=True,
+            out_stream=None
+        )
+        drvr_case.list_outputs(
+            residuals=True,
+            residuals_tol=1e-6,
+            units=True,
+            shape=True,
+            global_shape=True,
+            bounds=True,
+            scaling=True,
+            desc=True,
+            print_arrays=True,
+            print_tags=True,
+            list_autoivcs=True,
+            print_min=True,
+            print_max=True,
+            out_stream=None
+        )
+
+        modl_case.list_vars(
+            residuals=True,
+            residuals_tol=1e-6,
+            units=True,
+            shape=True,
+            bounds=True,
+            scaling=True,
+            desc=True,
+            print_tags=True,
+            list_autoivcs=True,
+            print_min=True,
+            print_max=True,
+            out_stream=None
+        )
+        modl_case.list_inputs(
+            units=True,
+            shape=True,
+            global_shape=True,
+            desc=True,
+            hierarchical=True,
+            print_arrays=True,
+            print_tags=True,
+            print_min=True,
+            print_max=True,
+            out_stream=None
+        )
+        modl_case.list_outputs(
+            residuals=True,
+            residuals_tol=1e-6,
+            units=True,
+            shape=True,
+            global_shape=True,
+            bounds=True,
+            scaling=True,
+            desc=True,
+            print_arrays=True,
+            print_tags=True,
+            list_autoivcs=True,
+            print_min=True,
+            print_max=True,
+            out_stream=None
+        )
+
     def test_list_outputs(self):
         """
         Confirm that includes/excludes has the same result between System.list_inputs() and
@@ -123,7 +308,7 @@ class ListVarsTest(unittest.TestCase):
         p.model.add_design_var('x')
         p.model.add_objective('f')
 
-        p.driver = om.ScipyOptimizeDriver(optimizer='SLSQP')
+        p.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False)
         p.driver.add_recorder(om.SqliteRecorder('driver_cases.db'))
         p.driver.recording_options['includes'] = ['*']
 

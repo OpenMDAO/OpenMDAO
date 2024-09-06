@@ -522,7 +522,7 @@ def assertViewerDataRecorded(test, filepath, expected):
 
         return model_viewer_data
 
-def assertSystemMetadataIdsRecorded(test, filepath, ids):
+def assertSystemMetaclassdataIdsRecorded(test, filepath, ids):
 
     with database_cursor(filepath) as cur:
 
