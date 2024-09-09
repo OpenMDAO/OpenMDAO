@@ -14,11 +14,11 @@ from openmdao.core.driver import Driver
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.misc_components import MultComp
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesConnected
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals, assert_warnings
 import openmdao.utils.hooks as hooks
 from openmdao.utils.units import convert_units
-from openmdao.utils.om_warnings import DerivativesWarning, OMDeprecationWarning
-from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.utils.om_warnings import DerivativesWarning, OMDeprecationWarning, OpenMDAOWarning
+from openmdao.utils.testing_utils import use_tempdirs, set_env_vars
 from openmdao.utils.file_utils import get_work_dir
 from openmdao.utils.tests.test_hooks import hooks_active
 
@@ -777,6 +777,50 @@ class TestProblem(unittest.TestCase):
 
         prob.setup()
         prob.run_driver()
+
+        assert_near_equal(prob.get_val('x'), 0.0, 1e-5)
+        assert_near_equal(prob.get_val('y1'), 3.160000, 1e-2)
+        assert_near_equal(prob.get_val('y2'), 3.755278, 1e-2)
+        assert_near_equal(prob.get_val('z'), [1.977639, 0.000000], 1e-2)
+        assert_near_equal(prob.get_val('obj'), 3.18339395, 1e-2)
+
+    @set_env_vars(TESTFLO_RUNNING='0', OPENMDAO_REPORTS='scaling')
+    def test_duplicate_problem_name(self):
+
+        def _make_and_run():
+
+            prob = om.Problem(name='test_duplicate_prob_name',
+                              model=SellarDerivatives())
+            model = prob.model
+            model.nonlinear_solver = om.NonlinearBlockGS()
+
+            prob.driver = om.ScipyOptimizeDriver()
+            prob.driver.options['optimizer'] = 'SLSQP'
+            prob.driver.options['tol'] = 1e-9
+
+            model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+            model.add_design_var('x', lower=0.0, upper=10.0)
+            model.add_objective('obj')
+            model.add_constraint('con1', upper=0.0)
+            model.add_constraint('con2', upper=0.0)
+
+            prob.setup()
+            prob.run_driver()
+
+            return prob
+
+        _make_and_run()
+
+        msg1 = "The problem name 'test_duplicate_prob_name' already exists"
+        
+        msg2 = ("A report with the name 'scaling' for instance "
+              "'test_duplicate_prob_name.driver' is already active.")
+
+        expected_warnings = [(OpenMDAOWarning, msg1),
+                             (OpenMDAOWarning, msg2)]
+
+        with assert_warnings(expected_warnings):
+            prob = _make_and_run()
 
         assert_near_equal(prob.get_val('x'), 0.0, 1e-5)
         assert_near_equal(prob.get_val('y1'), 3.160000, 1e-2)
@@ -2141,10 +2185,10 @@ class TestProblem(unittest.TestCase):
 
         om.Problem(name='prob_name2')
 
-        with self.assertRaises(ValueError) as e:
-            om.Problem(name='prob_name2')
+        msg = "The problem name 'prob_name2' already exists"
 
-        self.assertEqual(str(e.exception), "The problem name 'prob_name2' already exists")
+        with assert_warning(OpenMDAOWarning, msg):
+            om.Problem(name='prob_name2')
 
 
 @use_tempdirs
@@ -2495,9 +2539,10 @@ class NestedProblemTestCase(unittest.TestCase):
         p.model.connect('indep.x', 'G.comp.x')
         p.setup()
 
-        with self.assertRaises(Exception) as context:
+        msg = f"The problem name '{defname}' already exists"
+
+        with assert_warning(OpenMDAOWarning, msg):
             p.run_model()
-        self.assertEqual(str(context.exception), f"The problem name '{defname}' already exists")
 
         # If the first Problem uses the default name of 'problem2'
         openmdao.core.problem._clear_problem_names()  # need to reset these to simulate separate runs

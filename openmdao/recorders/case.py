@@ -677,11 +677,18 @@ class Case(object):
                             meta['max'] = np.round(np.max(meta['val']), np_precision)
 
                 if residuals or residuals_tol:
-                    resids = self.residuals[name]
-                    if residuals_tol and np.linalg.norm(resids) < residuals_tol:
-                        to_remove.append(name)
-                    elif residuals:
-                        meta['resids'] = resids
+                    if self.residuals is None:
+                        meta['resids'] = 'Not Recorded'
+                    else:
+                        try:
+                            resids = self.residuals[name]
+                            if residuals_tol and np.linalg.norm(resids) < residuals_tol:
+                                to_remove.append(name)
+                            elif residuals:
+                                meta['resids'] = resids
+                        except KeyError:
+                            if residuals:
+                                meta['resids'] = 'Not Recorded'
 
             # remove any outputs that don't pass the residuals_tol filter
             for name in to_remove:
@@ -1020,15 +1027,18 @@ class Case(object):
                             meta['max'] = np.round(np.max(meta['val']), np_precision)
 
                 if residuals or residuals_tol:
-                    try:
-                        resids = self.residuals[name]
-                        if residuals_tol and np.linalg.norm(resids) < residuals_tol:
-                            to_remove.append(name)
-                        elif residuals:
-                            meta['resids'] = resids
-                    except KeyError:
-                        if residuals:
-                            meta['resids'] = 'Not Recorded'
+                    if self.residuals is None:
+                        meta['resids'] = 'Not Recorded'
+                    else:
+                        try:
+                            resids = self.residuals[name]
+                            if residuals_tol and np.linalg.norm(resids) < residuals_tol:
+                                to_remove.append(name)
+                            elif residuals:
+                                meta['resids'] = resids
+                        except KeyError:
+                            if residuals:
+                                meta['resids'] = 'Not Recorded'
 
             # remove any outputs that don't pass the residuals_tol filter
             for name in to_remove:
