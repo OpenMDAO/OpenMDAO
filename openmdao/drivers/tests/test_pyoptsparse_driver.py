@@ -3496,7 +3496,8 @@ class TestLinearOnlyDVs(unittest.TestCase):
         p = self.setup_lin_only_dv_problem(driver=driver)
         p.run_model()
         p.run_driver()
-        p.check_totals(method='cs', show_only_incorrect=True)
+        self.assertEqual(p.driver._total_jac.nsolves, 12)  # verify coloring is actually happening
+        assert_check_totals(p.check_totals(method='cs', show_only_incorrect=True))
 
 if __name__ == "__main__":
     unittest.main()
