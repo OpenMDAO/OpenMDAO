@@ -29,7 +29,6 @@ nonlinear_solvers = [
 @use_tempdirs
 class TestNonlinearSolvers(unittest.TestCase):
     def setUp(self):
-
         # iteration coordinate, file name and variable data are common for all tests
         coord = 'rank0:root._solve_nonlinear|0|NLRunOnce|0|circuit._solve_nonlinear|0'
         self.filename = 'solver_errors.0.out'

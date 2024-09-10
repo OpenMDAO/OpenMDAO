@@ -35,9 +35,9 @@ class GlobalShapeErr(unittest.TestCase):
         expect_error: bool
             Whether this test is intended to produce an error or not.
         """
-        n0 = 3
-        n1 = 100 if MPI.COMM_WORLD.rank == 0 else 100 * n1_test_multiple
         prob = om.Problem()
+        n0 = 3
+        n1 = 100 if prob.comm.rank == 0 else 100 * n1_test_multiple
         ivc = prob.model.add_subsystem('ivc',om.IndepVarComp())
         ivc.add_output('x', val = np.ones((n0, n1)), distributed=True)
 

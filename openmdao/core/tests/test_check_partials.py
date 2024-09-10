@@ -1948,8 +1948,8 @@ class TestCheckPartialsDistribDirectional(unittest.TestCase):
                 if mode == 'rev':
                     d_inputs['u_g'] += d_outputs['sum']
 
-        num_nodes = 5 + MPI.COMM_WORLD.rank
         prob = om.Problem()
+        num_nodes = 5 + prob.comm.rank
         ivc = prob.model.add_subsystem('ivc', om.IndepVarComp(), promotes=['*'])
         ivc.add_output('u_g', val= np.random.rand(3*num_nodes), distributed=True)
 

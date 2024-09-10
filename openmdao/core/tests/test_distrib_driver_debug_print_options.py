@@ -73,7 +73,7 @@ class DistributedDriverDebugPrintOptionsTest(unittest.TestCase):
             sys.stdout = stdout
 
         output = strout.getvalue().split('\n')
-        if MPI.COMM_WORLD.rank == 0:
+        if prob.comm.rank == 0:
             # Just make sure we have more than one. Not sure we will always have the same number
             #    of iterations
             self.assertTrue(output.count("Design Vars") > 1,
