@@ -3436,16 +3436,9 @@ class TestPyoptSparseOutputFiles(unittest.TestCase):
                 self.run_and_test_user_set_output_dir(optimizer, output_files)
 
 
-class CountingDirectSolver(om.DirectSolver):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._nsolves = 0
-
-    def solve(self, *args, **kwargs):
-        self._nsolves += 1
-        super().solve( *args, **kwargs)
-
     
+@unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
+@use_tempdirs
 class TestLinearOnlyDVs(unittest.TestCase):
     def setup_lin_only_dv_problem(self, driver, shape=(2, 3)):
         prob = om.Problem()
@@ -3464,7 +3457,7 @@ class TestLinearOnlyDVs(unittest.TestCase):
         model.add_subsystem('con3', om.ExecComp('y=.2*x', shape=shape), promotes_inputs=['x'])
         model.add_subsystem('con4', om.ExecComp('y=cos(x)', shape=shape), promotes_inputs=['x'])
 
-        model.linear_solver = CountingDirectSolver(assemble_jac=True)
+        model.linear_solver = om.DirectSolver(assemble_jac=True)
 
         model.connect('ivc.x', 'comp.x')
         model.connect('ivc.y', 'comp.y')
