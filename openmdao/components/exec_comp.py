@@ -932,7 +932,7 @@ class ExecComp(ExplicitComponent):
         """
         if self._manual_decl_partials:
             # use framework approx coloring
-            return super()._compute_coloring(recurse=recurse, **overrides)
+            return super()._compute_coloring(**overrides)
 
         info = self._coloring_info
         info.update(overrides)

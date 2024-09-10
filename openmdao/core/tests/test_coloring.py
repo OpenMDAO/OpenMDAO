@@ -1199,16 +1199,16 @@ class BidirectionalTestCase(unittest.TestCase):
         self.assertEqual(tot_colors, expected_colors)
 
 
-def _get_random_mat(rows, cols, generator=None):
+def _get_random_mat(rows, cols, comm, generator=None):
     gen = generator if generator is not None else np.random.default_rng()
 
-    if MPI:
-        if MPI.COMM_WORLD.rank == 0:
+    if MPI and comm.size > 1:
+        if comm.rank == 0:
             mat = gen.random((rows, cols)) - 0.5
-            MPI.COMM_WORLD.bcast(mat, root=0)
+            comm.bcast(mat, root=0)
             return mat
         else:
-            return MPI.COMM_WORLD.bcast(None, root=0)
+            return comm.bcast(None, root=0)
     else:
         return gen.random((rows, cols)) - 0.5
 
@@ -1234,13 +1234,13 @@ def build_multipoint_problem(size=10, num_pts=4):
 
     par1 = model.add_subsystem('par1', om.ParallelGroup())
     for i in range(num_pts):
-        mat = _get_random_mat(5, size)
+        mat = _get_random_mat(5, size, p.comm)
         par1.add_subsystem('comp%d' % i, om.ExecComp('y=A.dot(x)', A=mat, x=np.ones(size), y=np.ones(5)))
         model.connect('indep%d.x' % i, 'par1.comp%d.x' % i)
 
     par2 = model.add_subsystem('par2', om.ParallelGroup())
     for i in range(num_pts):
-        mat = _get_random_mat(size, 5)
+        mat = _get_random_mat(size, 5, p.comm)
         par2.add_subsystem('comp%d' % i, om.ExecComp('y=A.dot(x)', A=mat, x=np.ones(5), y=np.ones(size)))
         model.connect('par1.comp%d.y' % i, 'par2.comp%d.x' % i)
         par2.add_constraint('comp%d.y' % i, lower=-1.)
@@ -1309,13 +1309,13 @@ class SimulColoringVarOutputTestClass(unittest.TestCase):
 
         par1 = model.add_subsystem('par1', om.ParallelGroup())
         for i in range(num_pts):
-            mat = _get_random_mat(5, size)
+            mat = _get_random_mat(5, size, p.comm)
             par1.add_subsystem('comp%d' % i, om.ExecComp('y=A.dot(x)', A=mat, x=np.ones(size), y=np.ones(5)))
             model.connect('indep%d.x' % i, 'par1.comp%d.x' % i)
 
         par2 = model.add_subsystem('par2', om.ParallelGroup())
         for i in range(num_pts):
-            mat = _get_random_mat(size, 5)
+            mat = _get_random_mat(size, 5, p.comm)
             par2.add_subsystem('comp%d' % i, om.ExecComp('y=A.dot(x)', A=mat, x=np.ones(5), y=np.ones(size)))
             model.connect('par1.comp%d.y' % i, 'par2.comp%d.x' % i)
             par2.add_constraint('comp%d.y' % i, lower=-1.)

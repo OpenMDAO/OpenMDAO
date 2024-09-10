@@ -82,14 +82,14 @@ else:
             data = self._data.real
 
             if self._alloc_complex:
-                self._petsc = PETSc.Vec().createWithArray(data.copy(), comm=self._system().comm)
+                self._petsc = PETSc.Vec().createWithArray(data.copy(), comm=self._system()._comm)
             else:
-                self._petsc = PETSc.Vec().createWithArray(data, comm=self._system().comm)
+                self._petsc = PETSc.Vec().createWithArray(data, comm=self._system()._comm)
 
             # Allocate imaginary for complex step
             if self._alloc_complex:
                 data = self._data.imag
-                self._imag_petsc = PETSc.Vec().createWithArray(data, comm=self._system().comm)
+                self._imag_petsc = PETSc.Vec().createWithArray(data, comm=self._system()._comm)
 
         def _get_dup_inds(self):
             """
