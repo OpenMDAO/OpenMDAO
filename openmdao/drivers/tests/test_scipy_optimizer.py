@@ -125,7 +125,7 @@ class TestMPIScatter(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        proc_vals = MPI.COMM_WORLD.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']])
+        proc_vals = prob.comm.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']])
         np.testing.assert_array_almost_equal(proc_vals[0], proc_vals[1])
 
     def test_opt_distcomp(self):
@@ -200,7 +200,7 @@ class TestScipyOptimizeDriverMPI(unittest.TestCase):
         output = strout.getvalue().split('\n')
 
         msg = "Optimization Complete"
-        if MPI.COMM_WORLD.rank == 0:
+        if prob.comm.rank == 0:
             self.assertEqual(msg, output[5])
             self.assertEqual(output.count(msg), 1)
         else:

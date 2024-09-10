@@ -779,7 +779,7 @@ def jax_deriv_shape(derivs):
 if jax is None or bool(os.environ.get('JAX_DISABLE_JIT', '')):
     def DelayedJit(func):
         """
-        A dummy decorator that does nothing.
+        Do nothing.
 
         Parameters
         ----------
@@ -827,7 +827,6 @@ else:
         attrs['_tree_unflatten'] = \
             staticmethod(lambda aux_data, children: aux_data['_self_'])
 
-
     def _jax_register_class(cls, name, bases, attrs):
         """
         Register a class with jax so that it can be used with jax.jit.
@@ -846,10 +845,9 @@ else:
         # register with jax so we can flatten/unflatten self
         tree_util.register_pytree_node(cls, attrs['_tree_flatten'], attrs['_tree_unflatten'])
 
-
     class DelayedJit:
         """
-        A wrapper that provides a delayed jit capability for methods of a class.
+        Wrap the method of a class, providing a delayed jit capability.
 
         This decorator is used to delay the jit compilation of a method until the first time it is
         called. This allows the method to be compiled with the correct static arguments, which can
@@ -870,11 +868,33 @@ else:
         """
 
         def __init__(self, func):
+            """
+            Initialize the DelayedJit object.
+
+            Parameters
+            ----------
+            func : Callable
+                The function or method to be wrapped.
+            """
             self._func = func
             self._jfunc = None  # jitted function
 
         def __call__(self, *args, **kwargs):
-            # jit the function on the first call after we know which args are static
+            """
+            Jit the function on the first call after we know which args are static.
+
+            Parameters
+            ----------
+            args : list
+                Positional arguments.
+            kwargs : dict
+                Keyword arguments.
+
+            Returns
+            -------
+            object
+                The result of the function call.
+            """
             if self._jfunc is None:
                 params = list(inspect.signature(self._func).parameters)
                 # we don't want to treat 'self' as static because we want _tree_(flatten/unflatten)
@@ -899,6 +919,8 @@ def compute_partials(self, inputs, partials, discrete_inputs=None):
 
     Parameters
     ----------
+    self : Component
+        The component instance.
     inputs : Vector
         Unscaled, dimensional input variables read via inputs[key].
     partials : Jacobian
@@ -950,6 +972,8 @@ def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode, discrete_inp
 
     Parameters
     ----------
+    self : Component
+        The component instance.
     inputs : Vector
         Unscaled, dimensional input variables read via inputs[key].
     d_inputs : Vector

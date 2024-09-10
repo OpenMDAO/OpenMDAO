@@ -548,7 +548,6 @@ def get_func_graph(func, outnames=None, display=False):
     networkx.DiGraph
         A graph containing edges from inputs to outputs.
     """
-
     node = ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec')
     visitor = _FuncGrapher(node)
     retnames = _get_return_names(visitor.outs)
@@ -583,8 +582,7 @@ def get_func_graph(func, outnames=None, display=False):
     if display:
         # show the function graph visually
         from openmdao.visualization.graph_viewer import write_graph, _to_pydot_graph
-        G = _to_pydot_graph(visitor.graph)
-        write_graph(G)
+        write_graph(_to_pydot_graph(visitor.graph))
 
     return visitor.graph
 
@@ -629,7 +627,6 @@ def get_partials_deps(func, outputs=None):
                         yield succ, start
             else:
                 stack.pop()
-
 
 
 def replace_method(obj, method_name, new_method_src):

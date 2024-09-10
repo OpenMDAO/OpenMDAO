@@ -10,8 +10,7 @@ try:
 except ImportError:
     ipy = display = HTML = IFrame = None
 
-from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.om_warnings import warn_deprecation
+from openmdao.utils.om_warnings import issue_warning, warn_deprecation
 
 colab = 'google.colab' in sys.modules
 

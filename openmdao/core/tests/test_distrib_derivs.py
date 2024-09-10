@@ -32,19 +32,11 @@ try:
 except ImportError:
     PETScVector = None
 
-if MPI:
-    rank = MPI.COMM_WORLD.rank
-else:
-    rank = 0
-
 
 class DistribCoordComp(om.ExplicitComponent):
 
     def setup(self):
-        comm = self.comm
-        rank = comm.rank
-
-        if rank == 0:
+        if self.comm.rank == 0:
             self.add_input('invec', np.zeros((5, 3)), distributed=True)
             self.add_output('outvec', np.zeros((5, 3)), distributed=True)
         else:
@@ -1257,13 +1249,13 @@ class MPITests2(unittest.TestCase):
             assert_check_totals(prob.check_totals(method='cs', out_stream=None), rtol=1e-13)
 
     def run_mixed_distrib2_prob(self, mode, klass=MixedDistrib2):
-        size = 5
-        comm = MPI.COMM_WORLD
-        rank = comm.rank
-        sizes, offsets = evenly_distrib_idxs(comm.size, size)
-
         prob = om.Problem()
         model = prob.model
+
+        size = 5
+        comm = prob.comm
+        rank = comm.rank
+        sizes, offsets = evenly_distrib_idxs(comm.size, size)
 
         ivc = om.IndepVarComp()
         ivc.add_output('x_dist', np.zeros(sizes[rank]), distributed=True)
@@ -1329,13 +1321,13 @@ class MPITests2(unittest.TestCase):
     def test_distrib_cascade_rev(self):
         # Tests the derivatives on a complicated model that is the distributed equivalent
         # of a double diamond.
-        size = 5
-        comm = MPI.COMM_WORLD
-        rank = comm.rank
-        sizes, offsets = evenly_distrib_idxs(comm.size, size)
-
         prob = om.Problem()
         model = prob.model
+
+        size = 5
+        comm = prob.comm
+        rank = comm.rank
+        sizes, offsets = evenly_distrib_idxs(comm.size, size)
 
         ivc = om.IndepVarComp()
         ivc.add_output('x_dist', np.zeros(sizes[rank]), distributed=True)
@@ -2431,11 +2423,13 @@ class TestDistribBugs(unittest.TestCase):
     def get_problem(self, comp_class, mode='auto', stacked=False):
         size = 5
 
-        comm = MPI.COMM_WORLD
+        prob = om.Problem()
+
+        comm = prob.comm
         rank = comm.rank
         sizes, offsets = evenly_distrib_idxs(comm.size, size)
 
-        model = om.Group()
+        model = prob.model
 
         ivc = om.IndepVarComp()
         ivc.add_output('x_dist', np.zeros(sizes[rank]), distributed=True)
@@ -2452,7 +2446,6 @@ class TestDistribBugs(unittest.TestCase):
             model.connect('D1.out_dist', 'D2.in_dist')
             model.connect('D1.out_nd', 'D2.in_nd')
 
-        prob = om.Problem(model)
         prob.setup(mode=mode, force_alloc_complex=True)
 
         self.x_dist_init = x_dist_init = (3.0 + np.arange(size)[offsets[rank]:offsets[rank] + sizes[rank]]) * .1

@@ -314,11 +314,11 @@ class ApproximationScheme(object):
             sinds, tinds, colsize, has_dist_data = system._get_jac_col_scatter()
             if has_dist_data:
                 src_vec = PETSc.Vec().createWithArray(np.zeros(len(system._outputs), dtype=float),
-                                                      comm=system.comm)
+                                                      comm=system._comm)
                 tgt_vec = PETSc.Vec().createWithArray(np.zeros(colsize, dtype=float),
-                                                      comm=system.comm)
-                src_inds = PETSc.IS().createGeneral(sinds, comm=system.comm)
-                tgt_inds = PETSc.IS().createGeneral(tinds, comm=system.comm)
+                                                      comm=system._comm)
+                src_inds = PETSc.IS().createGeneral(sinds, comm=system._comm)
+                tgt_inds = PETSc.IS().createGeneral(tinds, comm=system._comm)
                 self._jac_scatter = (has_dist_data,
                                      PETSc.Scatter().create(src_vec, src_inds, tgt_vec, tgt_inds),
                                      src_vec, tgt_vec)
