@@ -3436,7 +3436,57 @@ class TestPyoptSparseOutputFiles(unittest.TestCase):
                 self.run_and_test_user_set_output_dir(optimizer, output_files)
 
 
+class TestLinearOnlyDVs(unittest.TestCase):
+    def setup_lin_only_dv_problem(self, driver, shape=(2, 3)):
+        prob = om.Problem()
+        prob.driver = driver
+        model = prob.model
 
+        ivc = model.add_subsystem('ivc', om.IndepVarComp())
+        ivc.add_output('x', np.ones(shape))
+        ivc.add_output('y', np.ones(shape))
+        ivc.add_output('z', np.ones(shape))
+
+        model.add_subsystem('comp', om.ExecComp('f_xy=x*2.-y*3.', shape=shape))
+        model.add_subsystem('obj', om.ExecComp('obj = sum(x**2)', obj=1., x=np.ones(shape)))
+        model.add_subsystem('con', om.ExecComp('y=x', shape=shape))
+        model.add_subsystem('con2', om.ExecComp('y=sin(x)', shape=shape))
+        model.add_subsystem('con3', om.ExecComp('y=.2*x', shape=shape), promotes_inputs=['x'])
+        model.add_subsystem('con4', om.ExecComp('y=cos(x)', shape=shape), promotes_inputs=['x'])
+
+        model.linear_solver = om.DirectSolver(assemble_jac=True)
+
+        model.connect('ivc.x', 'comp.x')
+        model.connect('ivc.y', 'comp.y')
+        model.connect('comp.f_xy', 'obj.x')
+        model.connect('ivc.z', 'con.x')
+        model.connect('ivc.x', 'con2.x')
+
+        model.add_design_var('ivc.x', lower=0.0, upper=1.0)
+        model.add_design_var('ivc.y', lower=0.0, upper=1.0)
+        model.add_design_var('ivc.z', lower=0.0, upper=1.0)
+        model.add_design_var('x', lower=0.0, upper=1.0)
+
+        model.add_objective('obj.obj')
+
+        model.add_constraint('con.y', lower=0.0, linear=True)
+        model.add_constraint('con3.y', lower=0.0, linear=True)
+        model.add_constraint('con4.y', lower=0.0)
+        model.add_constraint('con2.y', lower=0.0)
+
+        prob.setup(force_alloc_complex=True, check=False)
+
+        return prob
+
+    def test_lin_only_dvs(self):
+        driver = om.pyOptSparseDriver(optimizer='IPOPT', print_results=False)
+        driver.opt_settings['print_level'] = 5
+        driver.opt_settings['max_iter'] = 1000
+        driver.declare_coloring()
+        p = self.setup_lin_only_dv_problem(driver=driver)
+        p.run_model()
+        p.run_driver()
+        p.check_totals(method='cs', show_only_incorrect=True)
 
 if __name__ == "__main__":
     unittest.main()

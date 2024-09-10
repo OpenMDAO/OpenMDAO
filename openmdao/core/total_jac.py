@@ -1275,6 +1275,7 @@ class _TotalJacInfo(object):
         meta : dict
             Metadata dict.
         """
+        print("COLORING JAC SETTER")
         row_col_map = self.simul_coloring.get_row_col_map(mode)
         fwd = mode == 'fwd'
         dist = self.comm.size > 1
