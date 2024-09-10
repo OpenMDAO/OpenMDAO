@@ -573,8 +573,8 @@ class SqliteRecorder(CaseRecorder):
             inputs_text = json.dumps(inputs)
             residuals_text = json.dumps(residuals)
 
-            abs_err = data['abs']
-            rel_err = data['rel']
+            abs_err = data['abs'] if 'abs' in data else None
+            rel_err = data['rel'] if 'rel' in data else None
 
             with self.connection as c:
                 c = c.cursor()  # need a real cursor for lastrowid
