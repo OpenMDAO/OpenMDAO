@@ -345,10 +345,9 @@ class Problem(object, metaclass=ProblemMeta):
             # Set the Problem name so that it can be referenced from command line tools (e.g. check)
             # that accept a Problem argument, and to name the corresponding outputs subdirectory.
             if name:  # if name hasn't been used yet, use it. Otherwise, error
-                if name not in _problem_names:
-                    self._name = name
-                else:
-                    raise ValueError(f"The problem name '{name}' already exists")
+                if name in _problem_names:
+                    issue_warning(f"The problem name '{name}' already exists")
+                self._name = name
             else:  # No name given: look for a name, of the form, 'problemN', that hasn't been used
                 problem_counter = len(_problem_names) + 1 if _problem_names else ''
                 base = _default_prob_name()

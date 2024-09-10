@@ -276,8 +276,9 @@ def activate_report(name, instance=None):
             return
 
     if (name, inst_id) in _active_reports:
-        raise ValueError(f"A report with the name '{name}' for instance '{inst_id}' is already "
-                         "active.")
+        issue_warning(f"A report with the name '{name}' for instance '{inst_id}' is already "
+                      "active.")
+        return
 
     report.register_hooks(instance)
     _active_reports.add((name, inst_id))
