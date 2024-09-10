@@ -24,7 +24,7 @@ from openmdao.utils.mpi import MPI
 
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
-OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
+OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver, UserRequestedException
@@ -3436,7 +3436,7 @@ class TestPyoptSparseOutputFiles(unittest.TestCase):
                 self.run_and_test_user_set_output_dir(optimizer, output_files)
 
 
-    
+
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 @use_tempdirs
 class TestLinearOnlyDVs(unittest.TestCase):
@@ -3482,15 +3482,30 @@ class TestLinearOnlyDVs(unittest.TestCase):
         return prob
 
     def test_lin_only_dvs(self):
+        shape = (2, 5)
+        # do first opt without coloring
+        driver = om.pyOptSparseDriver(optimizer='IPOPT', print_results=False)
+        driver.opt_settings['print_level'] = 5
+        driver.opt_settings['max_iter'] = 1000
+        p = self.setup_lin_only_dv_problem(driver=driver, shape=shape)
+        p.run_model()
+        p.run_driver()
+        nsolves_nocolor = p.driver._total_jac.nsolves
+        assert_check_totals(p.check_totals(method='cs', out_stream=None))
+
         driver = om.pyOptSparseDriver(optimizer='IPOPT', print_results=False)
         driver.opt_settings['print_level'] = 5
         driver.opt_settings['max_iter'] = 1000
         driver.declare_coloring()
-        p = self.setup_lin_only_dv_problem(driver=driver)
+        p = self.setup_lin_only_dv_problem(driver=driver, shape=shape)
         p.run_model()
         p.run_driver()
-        self.assertEqual(p.driver._total_jac.nsolves, 12)  # verify coloring is actually happening
-        assert_check_totals(p.check_totals(method='cs', show_only_incorrect=True))
+
+        jac_nrows = 21
+        rev_colors = 2
+        assert_near_equal(nsolves_nocolor / jac_nrows,
+                          p.driver._total_jac.nsolves / rev_colors)  # verify coloring is actually happening
+        assert_check_totals(p.check_totals(method='cs', out_stream=None))
 
 if __name__ == "__main__":
     unittest.main()
