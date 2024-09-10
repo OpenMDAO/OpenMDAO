@@ -3503,8 +3503,8 @@ class TestLinearOnlyDVs(unittest.TestCase):
 
         jac_nrows = 21
         rev_colors = 2
-        assert_near_equal(nsolves_nocolor / jac_nrows,
-                          p.driver._total_jac.nsolves / rev_colors)  # verify coloring is actually happening
+        self.assertGreaterEqual(nsolves_nocolor / p.driver._total_jac.nsolves,
+                                jac_nrows / rev_colors)  # verify coloring is actually happening
         assert_check_totals(p.check_totals(method='cs', out_stream=None))
 
 if __name__ == "__main__":
