@@ -435,10 +435,10 @@ class pyOptSparseDriver(Driver):
                         # since our linear constraint jacs are constant, so zeros won't become
                         # nonzero during the optimization.
                         mat = coo_matrix(subjac)
-                        # if mat.row.size > 0:
-                        #     # convert to 'coo' format here to avoid an emphatic warning
-                        #     # by pyoptsparse.
-                        jacdct[n] = {'coo': [mat.row, mat.col, mat.data], 'shape': mat.shape}
+                        if mat.row.size > 0:
+                            # convert to 'coo' format here to avoid an emphatic warning
+                            # by pyoptsparse.
+                            jacdct[n] = {'coo': [mat.row, mat.col, mat.data], 'shape': mat.shape}
 
         # # compute dynamic simul deriv coloring
         problem.get_total_coloring(self._coloring_info, run_model=not model_ran)
