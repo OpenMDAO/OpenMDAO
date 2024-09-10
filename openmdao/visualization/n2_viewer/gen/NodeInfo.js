@@ -336,7 +336,7 @@ class NodeConnectionInfo extends NodeInfo {
             newRow.append('td').html(conn.tgt);
         }
 
-        let title = (color == "black") ? "Jacobian" : "Connections";
+        let title = (color == OmStyle.color.declaredPartial) ? "Jacobian" : "Connections";
 
         if ( ! (cell.srcObj.isLeaf() || cell.tgtObj.isLeaf()) ) {
             title += ` from ${cell.srcObj.path} to ${cell.tgtObj.path}`;
