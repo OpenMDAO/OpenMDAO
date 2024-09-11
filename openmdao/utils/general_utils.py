@@ -2,13 +2,13 @@
 import os
 import re
 import sys
-import types
+from types import TracebackType
 import unittest
 from contextlib import contextmanager
 from fnmatch import fnmatchcase
 from io import StringIO
 from numbers import Integral
-from inspect import currentframe, getouterframes
+from inspect import currentframe, getouterframes, stack, isfunction, ismethod
 
 from collections.abc import Iterable
 
@@ -1347,7 +1347,7 @@ def make_traceback():
         The newly constructed traceback.
     """
     finfo = getouterframes(currentframe())[2]
-    return types.TracebackType(None, finfo.frame, finfo.frame.f_lasti, finfo.frame.f_lineno)
+    return TracebackType(None, finfo.frame, finfo.frame.f_lasti, finfo.frame.f_lineno)
 
 
 if env_truthy('OM_DBG'):
@@ -1469,3 +1469,284 @@ def vprint(it, end='\n', getter=None, file=None):
         if getter is not None:
             val = getter(val)
         print(val, end=end, file=file)
+
+
+def _default_predicate(name, obj):
+    """
+    Determine if a given method should be traced.
+
+    Parameters
+    ----------
+    name : str
+        Name of the method.
+    obj : object
+        The object being checked.
+
+    Returns
+    -------
+    bool
+        True if the method should be traced.
+    """
+    if isfunction(obj) or ismethod(obj):
+        for n in ['solve', 'apply', 'compute', 'setup', 'coloring', 'linearize', 'get_outputs_dir',
+                  'approx', 'static']:
+            if n in name:
+                return True
+    return False
+
+
+_trace_predicate = _default_predicate
+
+
+def set_trace_predicate(funct):
+    """
+    Set the function that determines which methods will be traced.
+
+    Parameters
+    ----------
+    funct : function
+        Set of functions to be traced.
+    """
+    global _trace_predicate
+    _trace_predicate = funct
+
+
+def _decorate_functs(attrs, predicate, decorator):
+    """
+    Decorate the functions in the given attribute dict.
+
+    Parameters
+    ----------
+    attrs : dict
+        The attribute dict containing the functions to be decorated.
+    predicate : function
+        Function returning True if the function should be decorated.
+    decorator : function
+        The decorator function.
+    """
+    for name, obj in attrs.items():
+        if predicate(name, obj):
+            attrs[name] = decorator(obj)
+
+
+if env_truthy('OPENMDAO_DUMP'):
+    # OPENMDAO_DUMP can have values like 'stdout', 'stderr', 'rank', 'pid', 'mpi' or
+    # combos like 'rank,pid' or 'stdout,mpi'
+    # mpi means to wrap (most) comm calls with debug printouts
+    # rank means to include the rank in the dump file name, e.g., om_dump_0.out
+    # pid means to include the pid in the dump file name, e.g., om_dump_12345.out
+    # if rank and pid are both included, the file name will be, e.g., om_dump_0_12345.out
+    # stdout means to dump to stdout (so rank and pid are ignored)
+    # stderr means to dump to stderr (so rank and pid are ignored)
+    # if OPENMDAO_DUMP is just a plain truthy value, like '1', then we dump to a file
+    # named om_dump.out.
+    parts = [s.strip() for s in os.environ['OPENMDAO_DUMP'].split(',')]
+    _om_mpi_debug = 'mpi' in parts or 'rank' in parts
+    if 'stdout' in parts:
+        _dump_stream = sys.stdout
+    elif 'stderr' in parts:
+        _dump_stream = sys.stderr
+    else:
+        rankstr = pidstr = ''
+        if 'rank' in parts:
+            from openmdao.utils.mpi import MPI
+            rankstr = f"_{MPI.COMM_WORLD.rank if MPI else 0}"
+
+        if 'pid' in parts:
+            pidstr = f"_{os.getpid()}"
+
+        _dump_stream = open(f'om_dump{rankstr}{pidstr}.out', 'w')
+
+    def om_dump(*args, **kwargs):
+        """
+        Dump to a stream if OPENMDAO_DUMP is truthy in the environment.
+
+        Depending on the value of OPENMDAO_DUMP, output will go to file(s), stdout, or stderr.
+
+        Parameters
+        ----------
+        args : list
+            Positional args.
+        kwargs : dict
+            Named args.
+        """
+        kwargs['file'] = _dump_stream
+        kwargs['flush'] = True
+        print(*args, **kwargs)
+
+    def dbg(funct):
+        """
+        Print function entry and exit.
+
+        Parameters
+        ----------
+        funct : function
+            The function being decorated.
+
+        Returns
+        -------
+        function
+            The decorated function.
+        """
+        def wrapper(*args, **kwargs):
+            try:
+                path = args[0].msginfo + '.'
+            except Exception:
+                path = ''
+            indent = call_depth2indent()
+            om_dump(f"{indent}--> {path}{funct.__name__}")
+            ret = funct(*args, **kwargs)
+            om_dump(f"{indent}<-- {path}{funct.__name__}")
+            return ret
+
+        return wrapper
+
+    class DebugMeta(type):
+        """
+        A metaclass to add trace output to some methods of the class.
+
+        Parameters
+        ----------
+        name : str
+            The name of the class.
+        bases : tuple
+            The base classes of the class.
+        attrs : dict
+            The attributes of the class.
+
+        Returns
+        -------
+        class
+            The class with the metaclass applied.
+        """
+
+        def __new__(metaclass, name, bases, attrs):
+            """
+            Add trace output to some methods of the class.
+
+            Parameters
+            ----------
+            name : str
+                The name of the class.
+            bases : tuple
+                The base classes of the class.
+            attrs : dict
+                The attributes of the class.
+
+            Returns
+            -------
+            class
+                The class with trace output added to some methods
+            """
+            _decorate_functs(attrs, _trace_predicate, dbg)
+            return super().__new__(metaclass, name, bases, attrs)
+
+    SystemMeta = DebugMeta
+    ProblemMeta = DebugMeta
+    SolverMeta = DebugMeta
+
+else:
+    def om_dump(*args, **kwargs):
+        """
+        Dump to 'om_dump<rank>_<pid>.out' if OPENMDAO_DUMP is truthy in the environment.
+
+        Parameters
+        ----------
+        args : list
+            Positional args.
+        kwargs : dict
+            Named args.
+        """
+        pass
+
+    def dbg(funct):
+        """
+        Print function entry and exit.
+
+        Parameters
+        ----------
+        funct : function
+            The function being decorated.
+
+        Returns
+        -------
+        function
+            The decorated function.
+        """
+        return funct
+
+    SystemMeta = type
+    ProblemMeta = type
+    SolverMeta = type
+    DebugMeta = type
+
+    _om_mpi_debug = False
+
+
+def _comm_debug_decorator(fn, scope):  # pragma no cover
+    def _wrap(*args, **kwargs):
+        sc = '' if scope is None else f"{scope}."
+        indent = call_depth2indent()
+        om_dump(f"{indent}--> {sc}{fn.__name__}")
+        ret = fn(*args, **kwargs)
+        om_dump(f"{indent}<-- {sc}{fn.__name__}")
+        return ret
+    return _wrap
+
+
+class _DebugComm(object):  # pragma no cover
+    """
+    Debugging wrapper for an MPI communicator.
+    """
+
+    def __init__(self, comm, scope):
+        if isinstance(comm, _DebugComm):
+            self.__dict__['_comm'] = comm._comm
+        else:
+            self.__dict__['_comm'] = comm
+        self.__dict__['_scope'] = scope
+        for name in ['bcast', 'Bcast', 'gather', 'Gather', 'scatter', 'Scatter',
+                     'allgather', 'Allgather', 'allreduce', 'Allreduce',
+                     'send', 'Send', 'recv', 'Recv', 'sendrecv', 'Sendrecv']:
+            self.__dict__[name] = _comm_debug_decorator(getattr(self._comm, name), scope)
+
+    def __getattr__(self, name):
+        return getattr(self._comm, name)
+
+    def __setattr__(self, name, val):
+        setattr(self._comm, name, val)
+
+
+if _om_mpi_debug:
+    def _wrap_comm(comm, scope=None):  # pragma no cover
+        return _DebugComm(comm, scope)
+
+    def _unwrap_comm(comm):  # pragma no cover
+        if isinstance(comm, _DebugComm):
+            return comm._comm
+        return comm
+else:
+    def _wrap_comm(comm, scope=None):
+        return comm
+
+    def _unwrap_comm(comm):
+        return comm
+
+
+def call_depth2indent(tabsize=2, offset=-1):
+    """
+    Return a string of spaces corresponding to the current call depth.
+
+    Parameters
+    ----------
+    tabsize : int
+        Number of spaces per tab.
+    offset : int
+        Offset to add to the call depth.
+
+    Returns
+    -------
+    str
+        A string of spaces.
+    """
+    return ' ' * ((len(stack()) + offset) * tabsize)

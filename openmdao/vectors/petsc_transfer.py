@@ -124,13 +124,13 @@ else:
                 # full transfer (transfer to all subsystems at once)
                 transfers[None] = PETScTransfer(group._vectors['input']['nonlinear'],
                                                 group._vectors['output']['nonlinear'],
-                                                full_xfer_in, full_xfer_out, group.comm)
+                                                full_xfer_in, full_xfer_out, group._comm)
 
                 # transfers to individual subsystems
                 for sname, inds in xfer_in.items():
                     transfers[sname] = PETScTransfer(group._vectors['input']['nonlinear'],
                                                      group._vectors['output']['nonlinear'],
-                                                     inds, xfer_out[sname], group.comm)
+                                                     inds, xfer_out[sname], group._comm)
 
             return transfers
 
@@ -304,13 +304,13 @@ else:
             transfers = {
                 None: PETScTransfer(vectors['input']['nonlinear'],
                                     vectors['output']['nonlinear'],
-                                    full_xfer_in, full_xfer_out, group.comm)
+                                    full_xfer_in, full_xfer_out, group._comm)
             }
 
             for sname, inds in xfer_out.items():
                 transfers[sname] = PETScTransfer(vectors['input']['nonlinear'],
                                                  vectors['output']['nonlinear'],
-                                                 xfer_in[sname], inds, group.comm)
+                                                 xfer_in[sname], inds, group._comm)
 
             if xfer_in_nocolor:
                 full_xfer_in, full_xfer_out = _setup_index_views(total_size_nocolor,
@@ -320,13 +320,13 @@ else:
                 transfers[(None, '@nocolor')] = PETScTransfer(vectors['input']['nonlinear'],
                                                               vectors['output']['nonlinear'],
                                                               full_xfer_in, full_xfer_out,
-                                                              group.comm)
+                                                              group._comm)
 
                 for sname, inds in xfer_out_nocolor.items():
                     transfers[(sname, '@nocolor')] = PETScTransfer(vectors['input']['nonlinear'],
                                                                    vectors['output']['nonlinear'],
                                                                    xfer_in_nocolor[sname], inds,
-                                                                   group.comm)
+                                                                   group._comm)
 
             return transfers
 

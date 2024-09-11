@@ -16,6 +16,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.om_warnings import issue_warning, SolverWarning
+from openmdao.utils.general_utils import SolverMeta
 
 
 class SolverInfo(object):
@@ -99,7 +100,7 @@ class SolverInfo(object):
         self.prefix, self.stack = cache
 
 
-class Solver(object):
+class Solver(object, metaclass=SolverMeta):
     """
     Base solver class.
 

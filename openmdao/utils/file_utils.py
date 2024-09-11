@@ -443,13 +443,14 @@ def get_work_dir():
         The working directory.
     """
     workdir = os.environ.get('OPENMDAO_WORKDIR', '')
+
     if workdir:
         return workdir
 
     return os.getcwd()
 
 
-def _get_outputs_dir(obj=None, *subdirs, mkdir=True):
+def _get_outputs_dir(obj, *subdirs, mkdir=True):
     """
     Return a pathlib.Path for the outputs directory related to the given problem or system.
 
@@ -463,7 +464,7 @@ def _get_outputs_dir(obj=None, *subdirs, mkdir=True):
 
     Parameters
     ----------
-    obj : Problem or System or Solver or None
+    obj : Problem or System or Solver
         The problem or system or Solver from which we are opening a file.
     subdirs : str
         Additional subdirectories under the top level directory for the relevant problem. Each
@@ -477,17 +478,14 @@ def _get_outputs_dir(obj=None, *subdirs, mkdir=True):
 
     if isinstance(obj, Problem):
         prob_meta = obj._metadata
-        comm = obj.comm
     elif isinstance(obj, System):
         prob_meta = obj._problem_meta
-        comm = obj.comm
     elif isinstance(obj, Solver):
         system = obj._system
         if system is None:
             raise RuntimeError('The output directory for Solvers cannot be accessed '
                                'before final_setup.')
         prob_meta = system()._problem_meta
-        comm = system().comm
     else:
         raise RuntimeError(f'Cannot get problem metadata for object: {obj}')
 
@@ -496,17 +494,44 @@ def _get_outputs_dir(obj=None, *subdirs, mkdir=True):
 
     prob_pathname = prob_meta['pathname']
 
-    outs_dir = pathlib.Path(get_work_dir()) / pathlib.Path(*[f'{p}_out'
-                                                             for p in prob_pathname.split('/')])
-    dirpath = outs_dir / pathlib.Path(*subdirs)
+    work_dir = pathlib.Path(get_work_dir())
+    if mkdir and not work_dir.exists():
+        work_dir.mkdir(exist_ok=True)
 
-    if not dirpath.is_dir() and comm.rank == 0 and mkdir:
-        dirpath.mkdir(parents=True, exist_ok=True)
-        # Touch the .openmdao_out file for the output directory to ease identification.
-        if not (outs_dir / '.openmdao_out').exists():
-            open(outs_dir / '.openmdao_out', 'w').close()
+    outs_dir = work_dir
 
-    return dirpath
+    # it's possible that a sub-problem requests the output directory before its parent problem,
+    # so we need to check existence of the parent directories for all parent problems and create
+    # them (ensuring the .openmdao_out file is present) if they don't exist.  Otherwise they
+    # won't be properly identified during cleanup.
+
+    # Also, we don't check if rank==0 here because when mkdir is True, we need to ensure that the
+    # directory has been created by the time we return, so just letting any rank create the file
+    # and handling race conditions by using exist_ok=True works better than trying to limit creation
+    # to rank==0 and performing some sort of barrier operation to ensure that the file is created
+    # before returning in all ranks.
+    for p in prob_pathname.split('/'):
+        outs_dir = outs_dir / f'{p}_out'
+        if mkdir and not outs_dir.exists():
+            outs_dir.mkdir(exist_ok=True)
+
+            # Touch the .openmdao_out file for the output directory to ease identification.
+            outs_file = outs_dir / '.openmdao_out'
+            if not outs_file.exists():
+                try:
+                    open(outs_file, 'w').close()
+                except OSError:
+                    pass
+
+    if subdirs:
+        dirpath = outs_dir / pathlib.Path(*subdirs)
+
+        if mkdir and not dirpath.exists():
+            dirpath.mkdir(parents=True, exist_ok=True)
+
+        return dirpath
+
+    return outs_dir
 
 
 def _is_openmdao_output_dir(directory):

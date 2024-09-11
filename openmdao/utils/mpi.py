@@ -7,11 +7,9 @@ import sys
 import traceback
 import unittest
 import functools
-from types import FunctionType, MethodType, BuiltinMethodType
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.utils.notebook_utils import notebook
-from openmdao.utils.general_utils import env_truthy
 
 
 def _redirect_streams(to_fd):
@@ -159,56 +157,6 @@ class FakeComm(object):
         """
         self.rank = 0
         self.size = 1
-
-
-# _debug_decorator, _DebugComm, _get_om_comm, and _get_true_comm are currently not being used
-# anywhere, but can be useful when debugging certain MPI issues so I'm leaving them here.
-
-_om_mpi_debug = env_truthy('OM_MPI_DEBUG')
-
-
-def _debug_decorator(fn, scope):  # pragma no cover
-    def _wrap(*args, **kwargs):
-        sc = '' if scope is None else f"{scope}."
-        print(f"calling {sc}{fn.__name__}", flush=True)
-        ret = fn(*args, **kwargs)
-        print(f"returning from {sc}{fn.__name__}", flush=True)
-        return ret
-    return _wrap
-
-
-class _DebugComm(object):  # pragma no cover
-    """
-    Debugging wrapper for an MPI communicator.
-    """
-
-    def __init__(self, comm, scope):
-        if isinstance(comm, _DebugComm):
-            self.__dict__['_comm'] = comm._comm
-        else:
-            self.__dict__['_comm'] = comm
-        self.__dict__['_scope'] = scope
-
-    def __getattr__(self, name):
-        obj = getattr(self._comm, name)
-        if isinstance(obj, (BuiltinMethodType, FunctionType, MethodType)):
-            return _debug_decorator(obj, self._scope)
-        return obj
-
-    def __setattr__(self, name, val):
-        setattr(self._comm, name, val)
-
-
-def _get_om_comm(comm, scope=None):  # pragma no cover
-    if _om_mpi_debug:
-        return _DebugComm(comm, scope)
-    return comm
-
-
-def _get_true_comm(comm):  # pragma no cover
-    if isinstance(comm, _DebugComm):
-        return comm._comm
-    return comm
 
 
 @contextmanager

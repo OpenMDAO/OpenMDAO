@@ -12,7 +12,7 @@ from openmdao.core.group import Group
 from openmdao.core.component import Component
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.graph_utils import get_sccs_topo
-from openmdao.utils.logger_utils import get_logger
+from openmdao.utils.logger_utils import get_logger, TestLogger
 from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook
 from openmdao.utils.general_utils import printoptions
@@ -747,19 +747,23 @@ def _check_config_cmd(options, user_args):
         The post-setup hook function.
     """
     def _check_config(prob):
-        if not MPI or MPI.COMM_WORLD.rank == 0:
+        if not options.checks:
+            options.checks = sorted(_default_checks)
+        elif 'all' in options.checks:
+            options.checks = sorted(_all_non_redundant_checks)
+
+        if not MPI or prob.comm.rank == 0:
             if options.outfile is None:
                 logger = get_logger('check_config', out_stream='stdout',
                                     out_file=None, use_format=True)
             else:
                 logger = get_logger('check_config', out_file=options.outfile, use_format=True)
+        else:
+            # if not rank 0, don't display anything, but still do the config check to prevent
+            # any MPI hangs due to collective calls
+            logger = TestLogger()
 
-            if not options.checks:
-                options.checks = sorted(_default_checks)
-            elif 'all' in options.checks:
-                options.checks = sorted(_all_non_redundant_checks)
-
-            prob.check_config(logger, options.checks)
+        prob.check_config(logger, options.checks)
 
     # register the hook
     _register_hook('final_setup', class_name='Problem', inst_id=options.problem, post=_check_config,
