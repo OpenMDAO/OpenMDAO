@@ -443,7 +443,7 @@ def _check_solvers(problem, logger):
                     fncs = ' or '.join(fncs)
                     msg = (f"{pathclass} '{path}' contains implicit variables but does "
                            f"not implement {fncs} or have an iterative {missing} solver.")
-                logger.error(msg)
+                logger.warning(msg)
 
         if isgrp and lin_cansolve:
             has_lin_solver[path] = (lnslv, lnmaxiter)
