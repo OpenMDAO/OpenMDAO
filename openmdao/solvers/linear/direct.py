@@ -221,6 +221,8 @@ class DirectSolver(LinearSolver):
         # Use an assembled jacobian by default.
         self.options['assemble_jac'] = True
 
+        self.supports['implicit_components'] = True
+
     def _setup_solvers(self, system, depth):
         """
         Assign system instance, set depth, and optionally perform setup.
@@ -248,14 +250,14 @@ class DirectSolver(LinearSolver):
         """
         return False
 
-    def can_solve_implicit(self):
+    def can_solve_cycle(self):
         """
-        Return True if this solver can solve implicit components or groups with cycles.
+        Return True if this solver can solve groups with cycles.
 
         Returns
         -------
         bool
-            True if this solver can solve implicit components or groups with cycles.
+            True if this solver can solve groups with cycles.
         """
         return True
 

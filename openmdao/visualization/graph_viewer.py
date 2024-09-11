@@ -100,10 +100,10 @@ class GraphViewer(object):
             The pydot graph that was created.
         """
         if pydot is None:
-            raise RuntimeError(f"{self.msginfo}: write_graph requires pydot.  Install pydot using "
-                               "'pip install pydot'. Note that pydot requires graphviz, which is a "
-                               "non-Python application.\nIt can be installed at the system level "
-                               "or via a package manager like conda.")
+            raise RuntimeError(f"{self._group.msginfo}: write_graph requires pydot.  Install pydot "
+                               "using 'pip install pydot'. Note that pydot requires graphviz, which"
+                               " is a non-Python application.\nIt can be installed at the system "
+                               "level or via a package manager like conda.")
 
         group = self._group
 

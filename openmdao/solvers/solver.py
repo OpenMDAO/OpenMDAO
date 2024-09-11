@@ -236,14 +236,14 @@ class Solver(object):
                f"in {self._iter_count} iterations.")
         self.report_failure(msg)
 
-    def can_solve_implicit(self):
+    def can_solve_cycle(self):
         """
-        Return True if this solver can solve implicit components or groups with cycles.
+        Return True if this solver can solve groups with cycles.
 
         Returns
         -------
         bool
-            True if this solver can solve implicit components or groups with cycles.
+            True if this solver can solve groups with cycles.
         """
         return 'maxiter' in self.options and self.options['maxiter'] > 1
 

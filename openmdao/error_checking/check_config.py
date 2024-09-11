@@ -420,7 +420,7 @@ def _check_solvers(problem, logger):
         if isgrp:
             lst.append(tup)
 
-        if (isgrp and sccs) or not isgrp:  # a group with cycles or an implicit component
+        if not isgrp or sccs:  # a group with cycles or an implicit component
             missing = []
             if not nl_cansolve and not _has_ancestor_solver(path, has_nl_solver):
                 missing.append('nonlinear')
@@ -453,8 +453,8 @@ def _check_solvers(problem, logger):
     seen = set()
     lines = []
     for tup in lst:
-        path, pathclass, sccs, lnslv, nlslv, lnmaxiter, nlmaxiter, missing, isgrp, \
-            nl_cansolve, lin_cansolve = tup
+        path, pathclass, sccs, lnslv, nlslv, lnmaxiter, nlmaxiter, missing, _, \
+            _, _ = tup
         if sccs:
             if pathclass in seen:
                 continue

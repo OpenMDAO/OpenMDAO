@@ -5343,13 +5343,19 @@ def iter_solver_info(system):
                 False, False)
 
     if system.nonlinear_solver:
-        nl_can_solve = system.nonlinear_solver.can_solve_implicit()
+        if isgrp:
+            nl_can_solve = system.nonlinear_solver.can_solve_cycle()
+        else:
+            nl_can_solve = system.nonlinear_solver.supports['implicit_components']
         nlslvname = system.nonlinear_solver.__class__.__name__
         if 'maxiter' in system.nonlinear_solver.options:
             nlmaxiter = system.nonlinear_solver.options['maxiter']
 
     if system.linear_solver:
-        lin_can_solve = system.linear_solver.can_solve_implicit()
+        if isgrp:
+            lin_can_solve = system.linear_solver.can_solve_cycle()
+        else:
+            lin_can_solve = system.linear_solver.supports['implicit_components']
         lnslvname = system.linear_solver.__class__.__name__
 
     if lnslvname and 'maxiter' in system.linear_solver.options:

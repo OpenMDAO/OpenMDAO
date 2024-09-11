@@ -224,6 +224,8 @@ class PETScKrylov(LinearSolver):
         # changing the default maxiter from the base class
         self.options['maxiter'] = 100
 
+        self.supports['implicit_components'] = True
+
     def _assembled_jac_solver_iter(self):
         """
         Return a generator of linear solvers using assembled jacs.
@@ -334,8 +336,7 @@ class PETScKrylov(LinearSolver):
         bool
             Flag for indicating child linerization
         """
-        precon = self.precon
-        return (precon is not None) and (precon._linearize_children())
+        return (self.precon is not None) and (self.precon._linearize_children())
 
     def _linearize(self):
         """
