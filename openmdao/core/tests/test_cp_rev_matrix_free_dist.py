@@ -39,7 +39,7 @@ class MixedDistrib2(om.ExplicitComponent):
         # We need to gather the summed values to compute the total sum over all procs.
         local_sum = np.array(np.sum(g_x))
         total_sum = local_sum.copy()
-        MPI.COMM_WORLD.Allreduce(local_sum, total_sum, op=MPI.SUM)
+        self.comm.Allreduce(local_sum, total_sum, op=MPI.SUM)
         outputs['out_nd'] = g_y * total_sum
 
     def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
@@ -136,13 +136,12 @@ class CheckPartialsRev(unittest.TestCase):
         [[62.49998444 62.49998444 62.49998444 62.49998444]]
         -----------------------------------------------------
         '''
-        size = 7
-        comm = MPI.COMM_WORLD
-        rank = comm.rank
-        sizes, offsets = evenly_distrib_idxs(comm.size, size)
-
         prob = om.Problem()
         model = prob.model
+
+        size = 7
+        rank = prob.comm.rank
+        sizes, offsets = evenly_distrib_idxs(prob.comm.size, size)
 
         # Create a distributed source for the distributed input.
         ivc = om.IndepVarComp()

@@ -7,6 +7,7 @@ from numpy import zeros, einsum
 import numpy as np
 from packaging.version import Version
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
+
 if Version(np.__version__) >= Version("1.20"):
     from numpy.linalg import lstsq
 else:

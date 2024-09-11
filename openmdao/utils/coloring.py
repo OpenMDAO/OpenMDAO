@@ -972,11 +972,9 @@ class Coloring(object):
         """
         if isinstance(fname, str) or isinstance(fname, pathlib.Path):
             color_dir = pathlib.Path(fname).absolute().parent
-            if not os.path.exists(color_dir):
-                try:
-                    os.makedirs(color_dir)
-                except FileExistsError:  # multiple systems could attempt this at the same time
-                    pass
+            if not color_dir.exists():
+                color_dir.mkdir(parents=True, exist_ok=True)
+
             with open(fname, 'wb') as f:
                 pickle.dump(self, f)
         else:

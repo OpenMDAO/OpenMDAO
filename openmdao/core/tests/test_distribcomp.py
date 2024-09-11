@@ -17,13 +17,6 @@ try:
 except ImportError:
     PETScVector = None
 
-if MPI:
-    rank = MPI.COMM_WORLD.rank
-    commsize = MPI.COMM_WORLD.size
-else:
-    rank = 0
-    commsize = 1
-
 
 class InOutArrayComp(om.ExplicitComponent):
 
@@ -59,10 +52,10 @@ class DistribCompSimple(om.ExplicitComponent):
         self.add_output('outvec', np.ones(arr_size, float), distributed=True)
 
     def compute(self, inputs, outputs):
-        if MPI and self.comm != MPI.COMM_NULL:
-            if rank == 0:
+        if MPI and self.comm.size > 1:
+            if self.comm.rank == 0:
                 outvec = inputs['invec'] * 0.25
-            elif rank == 1:
+            else:
                 outvec = inputs['invec'] * 0.5
 
             # now combine vecs from different processes
@@ -338,15 +331,15 @@ class DistributedIO(unittest.TestCase):
     N_PROCS = 2
 
     def test_driver_metadata(self):
-        self.comm = MPI.COMM_WORLD
-
         p = om.Problem()
+        comm = p.comm
+
         d_ivc = p.model.add_subsystem('distrib_ivc',
                                     om.IndepVarComp(distributed=True),
                                     promotes=['*'])
 
         # Sending different values to different ranks
-        if self.comm.rank == 0:
+        if comm.rank == 0:
             ndvs = 3
         else:
             ndvs = 2
@@ -660,8 +653,8 @@ class MPITests(unittest.TestCase):
         top = p.model
         top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribInputComp(arr_size=size))
-        top.add_subsystem("C3", om.ExecComp("y=x", x=np.zeros(size*commsize),
-                                                 y=np.zeros(size*commsize)))
+        top.add_subsystem("C3", om.ExecComp("y=x", x=np.zeros(size*p.comm.size),
+                                                 y=np.zeros(size*p.comm.size)))
 
         comm = p.comm
         rank = comm.rank
@@ -713,7 +706,7 @@ class MPITests(unittest.TestCase):
         top = p.model
         comm = p.comm
 
-        idxs = list(take_nth(rank, comm.size, range(size)))
+        idxs = list(take_nth(p.comm.rank, comm.size, range(size)))
 
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribNoncontiguousComp(size=len(idxs)))
@@ -743,8 +736,10 @@ class MPITests(unittest.TestCase):
         # entries are distributed to multiple processes
         size = 11
 
+        p = om.Problem()
+
         # need to initialize the input to have the correct local size
-        if rank == 0:
+        if p.comm.rank == 0:
             local_size = 8
             start = 0
             end = 8
@@ -753,7 +748,6 @@ class MPITests(unittest.TestCase):
             start = 4
             end = 11
 
-        p = om.Problem()
         top = p.model
         top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribOverlappingInputComp(arr_size=size, local_size=local_size))

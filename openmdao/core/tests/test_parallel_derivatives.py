@@ -835,12 +835,12 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         assert_near_equal(data[('dc2.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
         assert_near_equal(data[('dc3.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
 
-        comm = MPI.COMM_WORLD
+        comm = model.comm
         # should only need one jacvec product per linear solve
         dc1count = dc2count = dc3count = 0.0
-        dc1count = comm.allreduce(prob.model.pg.dc1.counter, op=MPI.SUM)
-        dc2count = comm.allreduce(prob.model.pg.dc2.counter, op=MPI.SUM)
-        dc3count = comm.allreduce(prob.model.pg.dc3.counter, op=MPI.SUM)
+        dc1count = comm.allreduce(model.pg.dc1.counter, op=MPI.SUM)
+        dc2count = comm.allreduce(model.pg.dc2.counter, op=MPI.SUM)
+        dc3count = comm.allreduce(model.pg.dc3.counter, op=MPI.SUM)
         # one linear solve on proc 0
         self.assertEqual(dc1count, 1)
         # two solves on proc 1
@@ -866,11 +866,11 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         assert_near_equal(data[('dc3.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
 
         # should only need one jacvec product per linear solve
-        comm = MPI.COMM_WORLD
+        comm = model.comm
         dc1count = dc2count = dc3count = 0.0
-        dc1count = comm.allreduce(prob.model.pg.dc1.counter, op=MPI.SUM)
-        dc2count = comm.allreduce(prob.model.pg.dc2.counter, op=MPI.SUM)
-        dc3count = comm.allreduce(prob.model.pg.dc3.counter, op=MPI.SUM)
+        dc1count = comm.allreduce(model.pg.dc1.counter, op=MPI.SUM)
+        dc2count = comm.allreduce(model.pg.dc2.counter, op=MPI.SUM)
+        dc3count = comm.allreduce(model.pg.dc3.counter, op=MPI.SUM)
         # five linear solves on proc 0
         self.assertEqual(dc1count, 5)
         # ten solves on proc 1

@@ -38,7 +38,8 @@ from openmdao.utils.om_warnings import issue_warning, \
     DerivativesWarning, PromotionWarning, UnusedOptionWarning, UnitsWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, all_ancestors, match_prom_or_abs, \
-    ensure_compatible, env_truthy, make_traceback, _is_slicer_op
+    ensure_compatible, env_truthy, make_traceback, _is_slicer_op, _wrap_comm, _unwrap_comm, \
+    _om_mpi_debug, SystemMeta
 from openmdao.utils.file_utils import _get_outputs_dir
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -172,7 +173,7 @@ def collect_errors(method):
     return wrapper
 
 
-class System(object):
+class System(object, metaclass=SystemMeta):
     """
     Base class for all systems in OpenMDAO.
 
@@ -196,7 +197,7 @@ class System(object):
         Name of the system, must be different from siblings.
     pathname : str
         Global name of the system, including the path.
-    comm : MPI.Comm or <FakeComm>
+    _comm : MPI.Comm or <FakeComm>
         MPI communicator object.
     options : OptionsDictionary
         options dictionary
@@ -403,7 +404,7 @@ class System(object):
         """
         self.name = ''
         self.pathname = None
-        self.comm = None
+        self._comm = None
         self._is_local = False
 
         # System options
@@ -538,6 +539,55 @@ class System(object):
         self._promotion_tree = None
 
         self._during_sparsity = False
+
+    if _om_mpi_debug:
+        @property
+        def comm(self):
+            """
+            Return the wrapped MPI communicator object for the system.
+
+            Returns
+            -------
+            DebugComm
+                Wrapped MPI communicator object.
+            """
+            return _wrap_comm(self._comm, self.msginfo)
+
+        @comm.setter
+        def comm(self, comm):
+            """
+            Set the MPI communicator object for the system.
+
+            Parameters
+            ----------
+            comm : MPI.Comm or DebugComm
+                Wrapped or unwrapped MPI communicator object.
+            """
+            self._comm = _unwrap_comm(comm)
+    else:
+        @property
+        def comm(self):
+            """
+            Return the MPI communicator object for the system.
+
+            Returns
+            -------
+            MPI.Comm
+                MPI communicator object.
+            """
+            return self._comm
+
+        @comm.setter
+        def comm(self, comm):
+            """
+            Set the MPI communicator object for the system.
+
+            Parameters
+            ----------
+            comm : MPI.Comm
+                MPI communicator object.
+            """
+            self._comm = comm
 
     @property
     def under_approx(self):
@@ -1858,14 +1908,17 @@ class System(object):
 
         static = info.static
         if static is _STD_COLORING_FNAME or isinstance(static, str):
+            std_fname = self.get_coloring_fname(mode='input')
             if static is _STD_COLORING_FNAME:
-                fname = self.get_coloring_fname(mode='input')
+                fname = std_fname
             else:
                 fname = static
             print(f"{self.msginfo}: loading coloring from file {fname}")
             info.coloring = coloring = Coloring.load(fname)
 
-            self._save_coloring(coloring)
+            if fname != std_fname:
+                # save it in the standard location
+                self._save_coloring(coloring)
 
             if info.wrt_patterns != coloring._meta['wrt_patterns']:
                 raise RuntimeError("%s: Loaded coloring has different wrt_patterns (%s) than "

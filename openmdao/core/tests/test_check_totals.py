@@ -109,13 +109,11 @@ class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
     N_PROCS = 2
 
     def _do_compute_totals(self, mode):
-        comm = MPI.COMM_WORLD
-
         p = om.Problem()
         d_ivc = p.model.add_subsystem('distrib_ivc',
                                     om.IndepVarComp(distributed=True),
                                     promotes=['*'])
-        if comm.rank == 0:
+        if p.comm.rank == 0:
             ndvs = 3
         else:
             ndvs = 2
@@ -150,13 +148,11 @@ class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
 
     def _do_compute_totals_2D(self, mode):
         # this test has some non-flat variables
-        comm = MPI.COMM_WORLD
-
         p = om.Problem()
         d_ivc = p.model.add_subsystem('distrib_ivc',
                                       om.IndepVarComp(distributed=True),
                                       promotes=['*'])
-        if comm.rank == 0:
+        if p.comm.rank == 0:
             ndvs = 6
             two_d = (3,2)
         else:

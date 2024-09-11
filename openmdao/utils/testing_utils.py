@@ -3,6 +3,7 @@ import json
 import functools
 import builtins
 import os
+import shutil
 import re
 from itertools import zip_longest
 from contextlib import contextmanager
@@ -16,51 +17,14 @@ except ImportError:
     parameterized = None
 
 from openmdao.utils.general_utils import env_truthy, env_none
+from openmdao.utils.mpi import MPI
 
 
-def _new_setup(self):
-    import os
-    import tempfile
-
-    from openmdao.utils.mpi import MPI, multi_proc_exception_check
-    self.startdir = os.getcwd()
-    self.workdir = os.environ.get('OPENMDAO_WORKDIR', '')
-
-    if MPI is None:
-        self.tempdir = tempfile.mkdtemp(prefix='testdir-')
-    elif MPI.COMM_WORLD.rank == 0:
-        self.tempdir = tempfile.mkdtemp(prefix='testdir-')
-        MPI.COMM_WORLD.bcast(self.tempdir, root=0)
-    else:
-        self.tempdir = MPI.COMM_WORLD.bcast(None, root=0)
-
-    os.chdir(self.tempdir)
-    # on mac tempdir is a symlink which messes some things up, so
-    # use resolve to get the real directory path
-    os.environ['OPENMDAO_WORKDIR'] = str(Path(self.tempdir).resolve())
-    if hasattr(self, 'original_setUp'):
-        if MPI is not None and MPI.COMM_WORLD.size > 1:
-            with multi_proc_exception_check(MPI.COMM_WORLD):
-                self.original_setUp()
-        else:
-            self.original_setUp()
-
-
-def _new_teardown(self):
-    import os
-    import shutil
-
-    from openmdao.utils.mpi import MPI, multi_proc_exception_check
-    if hasattr(self, 'original_tearDown'):
-        if MPI is not None and MPI.COMM_WORLD.size > 1:
-            with multi_proc_exception_check(MPI.COMM_WORLD):
-                self.original_tearDown()
-        else:
-            self.original_tearDown()
-
+def _cleanup_workdir(self):
     os.chdir(self.startdir)
-    if self.workdir:
-        os.environ['OPENMDAO_WORKDIR'] = self.workdir
+
+    if self.old_workdir:
+        os.environ['OPENMDAO_WORKDIR'] = self.old_workdir
 
     if MPI is None:
         rank = 0
@@ -75,6 +39,52 @@ def _new_teardown(self):
                 shutil.rmtree(self.tempdir)
             except OSError:
                 pass
+
+
+def _new_setup(self):
+    import os
+    import tempfile
+
+    from openmdao.utils.mpi import MPI, multi_proc_exception_check
+    self.startdir = os.getcwd()
+    self.old_workdir = os.environ.get('OPENMDAO_WORKDIR', '')
+
+    if MPI is None:
+        self.tempdir = tempfile.mkdtemp()
+    elif MPI.COMM_WORLD.rank == 0:
+        self.tempdir = tempfile.mkdtemp()
+        MPI.COMM_WORLD.bcast(self.tempdir, root=0)
+    else:
+        self.tempdir = MPI.COMM_WORLD.bcast(None, root=0)
+
+    os.chdir(self.tempdir)
+    # on mac tempdir is a symlink which messes some things up, so
+    # use resolve to get the real directory path
+    os.environ['OPENMDAO_WORKDIR'] = str(Path(self.tempdir).resolve())
+    try:
+        if hasattr(self, 'original_setUp'):
+            if MPI is not None and MPI.COMM_WORLD.size > 1:
+                with multi_proc_exception_check(MPI.COMM_WORLD):
+                    self.original_setUp()
+            else:
+                self.original_setUp()
+    except Exception:
+        _cleanup_workdir(self)
+        raise
+
+
+def _new_teardown(self):
+    from openmdao.utils.mpi import MPI, multi_proc_exception_check
+
+    try:
+        if hasattr(self, 'original_tearDown'):
+            if MPI is not None and MPI.COMM_WORLD.size > 1:
+                with multi_proc_exception_check(MPI.COMM_WORLD):
+                    self.original_tearDown()
+            else:
+                self.original_tearDown()
+    finally:
+        _cleanup_workdir(self)
 
 
 def use_tempdirs(cls):
