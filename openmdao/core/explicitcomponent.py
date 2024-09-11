@@ -49,6 +49,8 @@ class ExplicitComponent(Component):
 
         self._has_compute_partials = overrides_method('compute_partials', self, ExplicitComponent)
         self.options.undeclare('assembled_jac_type')
+        self._vjp_hash = None
+        self._vjp_fun = None
 
     @property
     def nonlinear_solver(self):
@@ -651,7 +653,7 @@ class ExplicitComponent(Component):
 
         statics = self.get_self_statics()
         if not statics:
-            self._self_statics_hash = None
+            self._self_statics_hash = None  # set to None to avoid computing any more hashes
 
     def _get_jac_func(self):
         self._check_jac_func_changed()

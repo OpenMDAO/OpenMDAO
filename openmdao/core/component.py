@@ -108,6 +108,7 @@ class Component(System):
         self._declared_partial_checks = []
         self._no_check_partials = False
         self._has_distrib_outputs = False
+        self._compute_primals_out_shape = None
 
     def _declare_options(self):
         """
@@ -327,9 +328,6 @@ class Component(System):
 
         self._serial_idxs = None
         self._inconsistent_keys = set()
-
-    def _setup_jax(self, from_group=False):
-        raise NotImplementedError("JAX support is not implemented for this component.")
 
     def _missing_vars_error(self, allnames):
         msg = ''

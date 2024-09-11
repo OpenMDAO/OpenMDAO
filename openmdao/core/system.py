@@ -6729,3 +6729,6 @@ class System(object, metaclass=SystemMetaclass):
         if newhash != self._self_statics_hash:
             self._self_statics_hash = newhash
             self._jac_func_ = None
+
+    def _setup_jax(self, from_group=False):
+        pass

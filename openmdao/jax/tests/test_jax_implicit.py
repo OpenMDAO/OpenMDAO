@@ -1,11 +1,18 @@
 import unittest
 import sys
-from scipy import linalg
+import itertools
 
 import numpy as np
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
 import openmdao.api as om
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
 from openmdao.utils.jax_utils import jax, ImplicitCompJaxify
+from openmdao.utils.testing_utils import parameterized_name
+
+
+try:
+    from parameterized import parameterized
+except ImportError:
+    from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 
 class QuadraticComp(om.ImplicitComponent):
@@ -34,9 +41,10 @@ class QuadraticComp(om.ImplicitComponent):
 
 
 class JaxQuadraticCompPrimal(om.JaxImplicitComponent):
-    def __init__(self, shape=(), **kwargs):
+    def __init__(self, shape=(), assemble_jac=True, **kwargs):
         super().__init__(**kwargs)
         self.shape = shape
+        self.assemble_jac = assemble_jac
 
     def setup(self):
         self.add_input('a', shape=self.shape)
@@ -46,8 +54,8 @@ class JaxQuadraticCompPrimal(om.JaxImplicitComponent):
 
         self.declare_partials(of=['*'], wrt=['*'])
 
+        self.linear_solver = om.DirectSolver(assemble_jac=self.assemble_jac)
         self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-        self.linear_solver = om.DirectSolver()
 
     def compute_primal(self, a, b, c, x):
         return a * x ** 2 + b * x + c
@@ -298,7 +306,7 @@ class TestJaxImplicitComp(unittest.TestCase):
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('a'))
         ivc.add_output('b')
         ivc.add_output('c')
-        comp = p.model.add_subsystem('comp', QuadraticComp(derivs_method='jax'))
+        p.model.add_subsystem('comp', QuadraticComp(derivs_method='jax'))
         p.model.connect('ivc.a', 'comp.a')
         p.model.connect('ivc.b', 'comp.b')
         p.model.connect('ivc.c', 'comp.c')
@@ -316,14 +324,16 @@ class TestJaxImplicitComp(unittest.TestCase):
                                            show_only_incorrect=True, abs_err_tol=3e-5, rel_err_tol=5e-6), atol=3e-5, rtol=5e-6)
         assert_check_partials(p.check_partials(show_only_incorrect=True))
 
-    def test_jax_quad_comp(self):
+    @parameterized.expand(itertools.product([True, False], [(), (3,), (2,3)]), name_func=parameterized_name)
+    def test_jax_quad_comp(self, matrix_free, shape):
         p = om.Problem()
         # create an IVC manually so we can set the shapes.  Otherwise must set shape in the component
         # itself.
-        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('a'))
-        ivc.add_output('b')
-        ivc.add_output('c')
-        comp = p.model.add_subsystem('comp', JaxQuadraticCompPrimal())
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('a', shape=shape))
+        ivc.add_output('b', shape=shape)
+        ivc.add_output('c', shape=shape)
+        comp = p.model.add_subsystem('comp', JaxQuadraticCompPrimal(shape=shape, assemble_jac=not matrix_free))
+        comp.matrix_free = matrix_free
         p.model.connect('ivc.a', 'comp.a')
         p.model.connect('ivc.b', 'comp.b')
         p.model.connect('ivc.c', 'comp.c')
@@ -336,13 +346,12 @@ class TestJaxImplicitComp(unittest.TestCase):
         p.final_setup()
         p.run_model()
 
-        assert_near_equal(p.get_val('comp.x'), 3.0)
+        assert_near_equal(p.get_val('comp.x'), np.full(shape, 3.0, np.float64))
         assert_check_totals(p.check_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'], method='fd',
-                                           show_only_incorrect=True, abs_err_tol=3e-5, rel_err_tol=5e-6), atol=3e-5, rtol=5e-6)
-        assert_check_partials(p.check_partials(show_only_incorrect=True))
+                                           show_only_incorrect=True, abs_err_tol=3.5e-5, rel_err_tol=5e-6), atol=3.5e-5, rtol=5e-6)
+        assert_check_partials(p.check_partials(show_only_incorrect=True), atol=2.5e-6)
 
     def test_lin_system_converted(self):
-        x = np.array([1, 1, 1])
         A = np.array([[1., 1., 1.], [1., 2., 3.], [0., 1., 3.]])
         b = np.array([1, 2, -3])
 
@@ -371,7 +380,6 @@ class TestJaxImplicitComp(unittest.TestCase):
         assert_check_partials(prob.check_partials(show_only_incorrect=True), rtol=1e-5)
 
     def test_jax_lin_system_primal(self):
-        x = np.array([1, 1, 1])
         A = np.array([[1., 1., 1.], [1., 2., 3.], [0., 1., 3.]])
         b = np.array([1, 2, -3])
 
@@ -400,7 +408,6 @@ class TestJaxImplicitComp(unittest.TestCase):
         assert_check_partials(prob.check_partials(show_only_incorrect=True), rtol=1e-5)
 
     def test_jax_lin_system_primal_w_option(self):
-        #x = np.array([1, 1, 1])
         A = np.array([[1., 1., 1.], [1., 2., 3.], [0., 1., 3.]])
         b = np.array([1, 2, -3])
 

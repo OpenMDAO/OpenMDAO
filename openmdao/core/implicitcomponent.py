@@ -4,7 +4,6 @@ import inspect
 from scipy.sparse import coo_matrix
 import numpy as np
 from types import MethodType
-from itertools import chain
 
 from openmdao.core.component import Component, _allowed_types
 from openmdao.core.constants import _UNDEFINED, _SetupStatus
@@ -16,7 +15,8 @@ from openmdao.utils.general_utils import format_as_float_or_array, _subjac_meta2
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.jax_utils import jax, jit, ImplicitCompJaxify, DelayedJit
+from openmdao.utils.jax_utils import jax, jit, ImplicitCompJaxify, DelayedJit, \
+    linearize as _jax_linearize, apply_linear as _jax_apply_linear
 
 
 _tuplist = (tuple, list)
@@ -73,6 +73,9 @@ class ImplicitComponent(Component):
         self._declared_residuals = {}
         super().__init__(**kwargs)
         self._has_solve_nl = _UNDEFINED
+        self._has_linearize = _UNDEFINED
+        self._vjp_hash = None
+        self._vjp_fun = None
 
     def _configure(self):
         """
@@ -81,6 +84,9 @@ class ImplicitComponent(Component):
         Also tag component if it provides a guess_nonlinear.
         """
         self._has_guess = overrides_method('guess_nonlinear', self, ImplicitComponent)
+
+        if self._has_linearize is _UNDEFINED:
+            self._has_linearize = overrides_method('linearize', self, ImplicitComponent)
 
         if self._has_solve_nl is _UNDEFINED:
             self._has_solve_nl = overrides_method('solve_nonlinear', self, ImplicitComponent)
@@ -898,7 +904,6 @@ class ImplicitComponent(Component):
         return self._list_states()
 
     def _get_compute_primal_invals(self, inputs, outputs, discrete_inputs):
-        # yield self
         if discrete_inputs:
             yield from discrete_inputs.values()
         yield from inputs.values()
@@ -915,47 +920,11 @@ class ImplicitComponent(Component):
         return argnames
 
     def _setup_jax(self, from_group=False):
-        # we define linearize here instead of making this the base class version as we
-        # did with apply_nonlinear, because the existence of a linearize method that is not the
-        # base class method is used to determine if a given component computes its own partials.
-        def linearize(self, inputs, outputs, partials, discrete_inputs=None, discrete_outputs=None):
-            deriv_vals = self._get_jac_func()(*self._get_compute_primal_invals(inputs, outputs,
-                                                                               discrete_inputs))
-            nested_tup = isinstance(deriv_vals, tuple) and len(deriv_vals) > 0 and \
-                isinstance(deriv_vals[0], tuple)
-
-            nof = len(self._var_rel_names['output'])
-            ofidx = len(self._discrete_outputs) - 1
-            for ofname in self._var_rel_names['output']:
-                ofidx += 1
-                ofmeta = self._var_rel2meta[ofname]
-                for wrtidx, wrtname in enumerate(chain(self._var_rel_names['input'],
-                                                       self._var_rel_names['output'])):
-                    key = (ofname, wrtname)
-                    if key not in partials:
-                        # FIXME: this means that we computed a derivative that we didn't need
-                        continue
-
-                    wrtmeta = self._var_rel2meta[wrtname]
-                    dvals = deriv_vals
-                    # if there's only one 'of' value, we only take the indexed value if the
-                    # return value of compute_primal is single entry tuple. If a single array or
-                    # scalar is returned, we don't apply the 'of' index.
-                    if nof > 1 or nested_tup:
-                        dvals = dvals[ofidx]
-
-                    # print(ofidx, ofname, ofmeta['shape'], wrtidx, wrtname, wrtmeta['shape'],
-                    #       'subjac_shape', dvals[wrtidx].shape)
-                    dvals = dvals[wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
-
-                    sjmeta = partials.get_metadata(key)
-                    rows = sjmeta['rows']
-                    if rows is None:
-                        partials[ofname, wrtname] = dvals
-                    else:
-                        partials[ofname, wrtname] = dvals[rows, sjmeta['cols']]
-
-        self.linearize = MethodType(linearize, self)
+        if self.matrix_free is True:
+            self.apply_linear = MethodType(_jax_apply_linear, self)
+        else:
+            self.linearize = MethodType(_jax_linearize, self)
+            self._has_linearize = True
 
         if self.compute_primal is None:
             jaxifier = ImplicitCompJaxify(self, verbose=True)
@@ -980,6 +949,10 @@ class ImplicitComponent(Component):
 
         if not from_group and self.options['use_jit']:
             self.compute_primal = MethodType(DelayedJit(self.compute_primal.__func__), self)
+
+        statics = self.get_self_statics()
+        if not statics:
+            self._self_statics_hash = None  # set to None to avoid computing any more hashes
 
     def _get_jac_func(self):
         self._check_jac_func_changed()

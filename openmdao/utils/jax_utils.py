@@ -928,7 +928,8 @@ def compute_partials(self, inputs, partials, discrete_inputs=None):
     discrete_inputs : dict or None
         If not None, dict containing discrete input values.
     """
-    deriv_vals = self._get_jac_func()(*self._get_compute_primal_invals(inputs, discrete_inputs))
+    deriv_vals = self._get_jac_func()(*self._get_compute_primal_invals(inputs,
+                                                                       self._discrete_inputs))
     nested_tup = isinstance(deriv_vals, tuple) and len(deriv_vals) > 0 and \
         isinstance(deriv_vals[0], tuple)
 
@@ -993,12 +994,132 @@ def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode, discrete_inp
 
         d_outputs.set_vals(deriv_vals)
     else:
-        # TODO: cache the vjp_fun at each NL point since the inputs won't change during the
-        # computation of the jacobian rows.
-        _, vjp_fun = jax.vjp(self.compute_primal,
-                             *self._get_compute_primal_invals(inputs, discrete_inputs))
+        inhash = inputs.get_hash()
+        if inhash != self._vjp_hash:
+            # recompute vjp function if inputs have changed
+            _, self._vjp_fun = jax.vjp(self.compute_primal,
+                                       *self._get_compute_primal_invals(inputs, discrete_inputs))
+            self._vjp_hash = inhash
 
-        d_inputs.set_vals(vjp_fun(tuple(d_outputs.values())))
+        d_inputs.set_vals(self._vjp_fun(tuple(d_outputs.values())))
+
+
+# we define linearize here instead of making this the base class version as we
+# did with apply_nonlinear, because the existence of a linearize method that is not the
+# base class method is used to determine if a given component computes its own partials.
+def linearize(self, inputs, outputs, partials, discrete_inputs=None, discrete_outputs=None):
+    """
+    Compute sub-jacobian parts and any applicable matrix factorizations.
+
+    The model is assumed to be in an unscaled state.
+
+    Parameters
+    ----------
+    inputs : Vector
+        Unscaled, dimensional input variables read via inputs[key].
+    outputs : Vector
+        Unscaled, dimensional output variables read via outputs[key].
+    partials : partial Jacobian
+        Sub-jac components written to jacobian[output_name, input_name].
+    discrete_inputs : dict or None
+        If not None, dict containing discrete input values.
+    discrete_outputs : dict or None
+        If not None, dict containing discrete output values.
+    """
+    deriv_vals = self._get_jac_func()(*self._get_compute_primal_invals(inputs, outputs,
+                                                                        discrete_inputs))
+    nested_tup = isinstance(deriv_vals, tuple) and len(deriv_vals) > 0 and \
+        isinstance(deriv_vals[0], tuple)
+
+    nof = len(self._var_rel_names['output'])
+    ofidx = len(self._discrete_outputs) - 1
+    for ofname in self._var_rel_names['output']:
+        ofidx += 1
+        ofmeta = self._var_rel2meta[ofname]
+        for wrtidx, wrtname in enumerate(chain(self._var_rel_names['input'],
+                                                self._var_rel_names['output'])):
+            key = (ofname, wrtname)
+            if key not in partials:
+                # FIXME: this means that we computed a derivative that we didn't need
+                continue
+
+            wrtmeta = self._var_rel2meta[wrtname]
+            dvals = deriv_vals
+            # if there's only one 'of' value, we only take the indexed value if the
+            # return value of compute_primal is single entry tuple. If a single array or
+            # scalar is returned, we don't apply the 'of' index.
+            if nof > 1 or nested_tup:
+                dvals = dvals[ofidx]
+
+            # print(ofidx, ofname, ofmeta['shape'], wrtidx, wrtname, wrtmeta['shape'],
+            #       'subjac_shape', dvals[wrtidx].shape)
+            dvals = dvals[wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
+
+            sjmeta = partials.get_metadata(key)
+            rows = sjmeta['rows']
+            if rows is None:
+                partials[ofname, wrtname] = dvals
+            else:
+                partials[ofname, wrtname] = dvals[rows, sjmeta['cols']]
+
+
+def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+    r"""
+    Compute jac-vector product. The model is assumed to be in an unscaled state.
+
+    If mode is:
+        'fwd': (d_inputs, d_outputs) \|-> d_residuals
+
+        'rev': d_residuals \|-> (d_inputs, d_outputs)
+
+    Parameters
+    ----------
+    inputs : Vector
+        Unscaled, dimensional input variables read via inputs[key].
+    outputs : Vector
+        Unscaled, dimensional output variables read via outputs[key].
+    d_inputs : Vector
+        See inputs; product must be computed only if var_name in d_inputs.
+    d_outputs : Vector
+        See outputs; product must be computed only if var_name in d_outputs.
+    d_residuals : Vector
+        See outputs.
+    mode : str
+        Either 'fwd' or 'rev'.
+    """
+    if mode == 'fwd':
+        invals = tuple(self._get_compute_primal_invals(inputs, outputs, self._discrete_inputs))
+        _, deriv_vals = jax.jvp(self.compute_primal,
+                                primals=invals,
+                                tangents=tuple(chain(d_inputs.values(), d_outputs.values())))
+        if deriv_vals.ndim > 0:
+            d_residuals.set_vals(deriv_vals)
+        else:
+            d_residuals.asarray()[:] = deriv_vals
+    else:
+        inhash = (inputs.get_hash(), self._outputs.get_hash()) + \
+            tuple(self._discrete_inputs.values())
+        if inhash != self._vjp_hash:
+            # recompute vjp function only if inputs or outputs have changed
+            invals = tuple(self._get_compute_primal_invals(inputs, outputs, self._discrete_inputs))
+            _, self._vjp_fun = jax.vjp(self.compute_primal, *invals)
+            self._vjp_hash = inhash
+
+        if self._compute_primals_out_shape is None:
+            self._compute_primals_out_shape = \
+                jax.eval_shape(self.compute_primal,
+                               *tuple(self._get_compute_primal_invals(inputs, outputs, self._discrete_inputs)))
+
+        if self._compute_primals_out_shape.shape == ():
+            deriv_vals = self._vjp_fun(d_residuals.asarray()[0])
+        elif d_residuals.nvars() == 1:
+            deriv_vals = self._vjp_fun(tuple(d_residuals.values())[0])
+        else:
+            deriv_vals = (self._vjp_fun(tuple(d_residuals.values())))
+
+        ninputs = len(self._var_rel_names['input'])
+        d_inputs.set_vals(deriv_vals[:ninputs])
+        d_outputs.set_vals(deriv_vals[ninputs:])
 
 
 if __name__ == '__main__':

@@ -2,7 +2,6 @@
 import sys
 from collections import Counter, defaultdict
 from collections.abc import Iterable
-from types import MethodType
 
 from itertools import product, chain
 from numbers import Number
@@ -39,7 +38,7 @@ from openmdao.utils.relevance import get_relevance
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     PromotionWarning, MPIWarning, DerivativesWarning
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.jax_utils import jax, DelayedJit
+from openmdao.utils.jax_utils import jax
 from openmdao.core.total_jac import _TotalJacInfo
 
 # regex to check for valid names.
@@ -2335,267 +2334,15 @@ class Group(System):
         vnames = self._var_abs2prom[io] if local else self._var_allprocs_abs2prom[io]
         return set(vnames).difference(self._conn_global_abs_in2out)
 
-    def _get_compute_primal_inputs(self):
-        """
-        Return a dict of 'inputs' that will be used to compute the primal.
-
-        This includes any inputs connected to a source outside the group boundary, plus any outputs
-        from IndepVarComps that are contained, directly or indirectly, within this group.
-
-        Returns
-        -------
-        dict
-            A dict of names of inputs passed to compute_primal mapped to a tuple of the form
-            (shape, is_input).
-        """
-        ivcs = self.get_indep_vars(local=True)
-        if self.pathname == '':
-            # top level has no boundary, so only inputs are ivcs
-            ins = {n: (m['shape'], False) for n, m in ivcs.items()}
-        else:
-            boundary_ins = self.get_boundary_vars('input', local=True)
-            a2m = self._var_abs2meta['input']
-            ins = {n: (a2m[n]['shape'] if n in a2m else None, True)
-                   for n in self._var_abs2prom['input'] if n in boundary_ins}
-            ins.update({n: (m['shape'], False) for n, m in ivcs.items()})
-
-        states = set(self._list_states())
-        ins.update({n: (m['shape'], False) for n, m in self._var_abs2meta['output'].items()
-                    if n in states})
-
-        return ins
-
-    def _get_compute_primal_outputs(self):
-        # return all outputs that are not indep vars
-        return {n: m for n, m in self._var_abs2meta['output'].items()
-                if 'openmdao:indep_var' not in m['tags']}
-
-    def _get_compute_primal_invals(self, inputs, outputs):
-        """
-        Return a list of 'input' values that will be passed into compute_primal.
-
-        Parameters
-        ----------
-        inputs : <Vector>
-            Inputs vector.
-        outputs : <Vector>
-            Outputs vector.
-
-        Yields
-        ------
-        ndarray
-            The next input value to be passed to compute_primal.
-        """
-        if self._compute_primal_in_slices is None:
-            self._compute_primal_in_slices = []
-            islices = inputs.get_slice_dict()
-            oslices = outputs.get_slice_dict()
-            for absname, (shape, isinput) in self._compute_primal_ins.items():
-                if isinput:
-                    self._compute_primal_in_slices.append((True, islices[absname], shape))
-                else:
-                    self._compute_primal_in_slices.append((False, oslices[absname], shape))
-
-        # yield self
-
-        iarray = inputs.asarray()
-        oarray = outputs.asarray()
-        for isinput, slc, shape in self._compute_primal_in_slices:
-            if shape:
-                yield iarray[slc].reshape(shape) if isinput else oarray[slc].reshape(shape)
-            else:
-                yield iarray[slc] if isinput else oarray[slc]
-
     def _setup_jax(self, from_group=False):
-        """
-        If jax is active, jaxify this group.
-
-        Any Components directly or indirectly within this group will also be jaxified.
-
-        This is still experimental and may not work in many cases.
-        """
         if jax is None:
             return
 
-        from openmdao.core.indepvarcomp import IndepVarComp
-
-        # if jax has NOT been turned on for this Group, just recurse down the tree and setup
+        # recurse down the tree and setup
         # jax anywhere below where it's active, then return.
-        if from_group or self.options['derivs_method'] != 'jax':
-            for subsys in self._subsystems_myproc:
-                if isinstance(subsys, Group) or subsys.options['derivs_method'] == 'jax':
-                    subsys._setup_jax(from_group)
-            return
-
-        if self._contains_parallel_group or self._mpi_proc_allocator.parallel:
-            raise RuntimeError(f"{self.msginfo}: JAX mode not currently supported for parallel "
-                               "groups or groups that contain them.")
-
-        self._compute_primal_ins = self._get_compute_primal_inputs()
-        self._compute_primal_in_slices = None
-        self._compute_primal_outs = self._get_compute_primal_outputs()
-
-        pathlen = len(self.pathname) + 1 if self.pathname else 0
-
-        # local var names within our compute_primal function since we can't use dotted names
-        goutput_map = {n: f'o{i}' for i, n in enumerate(self._var_abs2prom['output'])}
-        ginput_map = {}
-        for i, name in enumerate(self._compute_primal_ins):
-            if self._compute_primal_ins[name][1]:  # input
-                ginput_map[name] = f'v{i}'
-            else:  # output
-                ginput_map[name] = goutput_map[name]
-
-        seen = set(ginput_map.values())
-
-        lines = ['']
-
-        # this will call compute_primal on all Components directly or indirectly under this group
-        for system in self.system_iter(recurse=True, include_self=False, typ=Component):
-            if isinstance(system, IndepVarComp):
-                continue
-
-            system._setup_jax()
-
-            ins = []
-            sysprefix = system.pathname + '.'
-            for n in system._get_compute_primal_argnames():
-                n = sysprefix + n
-                src = None
-                if n in self._conn_global_abs_in2out:
-                    src = self._conn_global_abs_in2out[n]
-                    gname = goutput_map[src]
-                elif n in goutput_map:
-                    gname = goutput_map[n]
-                else:
-                    gname = ginput_map[n]
-
-                ins.append(gname)
-
-                if src is not None and gname not in seen:
-                    lines.append(f"    {gname} = self._outputs"
-                                 f"['{self._var_abs2prom['output'][src]}']")
-
-            ins = ', '.join(ins)
-            outs = [goutput_map[n] for n, m in system._var_abs2meta['output'].items()
-                    if 'openmdao:indep_var' not in m['tags']]
-            seen.update(outs)
-            outs = ', '.join(outs)
-            if len(system._var_abs2meta['output']) == 1:
-                outs += ','
-            lines.append(f"    {outs} = self.{system.pathname[pathlen:]}.compute_primal({ins})")
-
-        lines.append('    return ' + ', '.join([goutput_map[n] for n in self._compute_primal_outs]))
-        if len(goutput_map) == 1:
-            lines[-1] += ','  # make the output a tuple
-
-        instrs = ", ".join(ginput_map.values())
-        lines[0] = ''.join(["def compute_primal(self, ", instrs, "):"])
-
-        lines = '\n'.join(lines)
-
-        print(f"{self.msginfo} compute_primal:\n" + lines)
-
-        # compile the function
-        namespace = {}
-        exec(compile(lines, '<string>', 'exec'), namespace)  # nosec trusted input
-        compute_primal = namespace['compute_primal']
-        # compute_primal = jax.jit(compute_primal, static_argnums=[0])
-        # self.compute_primal = compute_primal  # MethodType(compute_primal, self)
-        self.compute_primal = MethodType(DelayedJit(compute_primal), self)
-
-    def _jax_linearize(self, inputs, partials):
-        if self._jac_func_ is None:
-            self._setup_jax_derivs()
-
-        total = self.pathname == ''
-
-        if total:
-            jdict = self._tot_jac
-            # allow keying by orig name or source to catch all possibilities
-            of_tot_meta = {m['source']: m for m in self._tot_jac.output_meta['fwd'].values()}
-            of_tot_meta.update(self._tot_jac.output_meta['fwd'].items())
-            wrt_tot_meta = {m['source']: m for m in self._tot_jac.input_meta['fwd'].values()}
-            wrt_tot_meta.update(self._tot_jac.input_meta['fwd'].items())
-        else:
-            jdict = self._subjacs_info
-
-        deriv_vals = self._jac_func_(*self._get_compute_primal_invals(inputs, self._outputs))
-        prefix_len = len(self.pathname) + 1 if self.pathname else 0
-        for ofidx, (ofabs, ofmeta) in enumerate(self._compute_primal_outs.items()):
-            of_size = shape_to_len(ofmeta['shape'])
-            if total:
-                if ofabs in of_tot_meta:
-                    ofname = of_tot_meta[ofabs]['name']
-                else:
-                    continue
-            else:
-                ofname = ofabs[prefix_len:]
-
-            for wrtidx, (wrtabs, wtup) in enumerate(self._compute_primal_ins.items()):
-                if total:
-                    if wrtabs in wrt_tot_meta:
-                        wrtname = wrt_tot_meta[wrtabs]['name']
-                        key = (ofname, wrtname)
-                    else:
-                        continue
-                else:
-                    wrtname = wrtabs[prefix_len:]
-                    key = (ofabs, wrtabs)
-                    if key not in self._subjacs_info and key in self._subjac_key_map:
-                        key = self._subjac_key_map[key]
-                        wrtname = key[1][prefix_len:]
-
-                if key in jdict:
-                    wrt_size = shape_to_len(wtup[0])
-                    shaped_val = deriv_vals[ofidx][wrtidx].reshape(of_size, wrt_size)
-                    if total:
-                        self._tot_jac[key] = shaped_val
-                    else:
-                        meta = jdict[key]
-                        rows = meta['rows']
-                        if rows is not None:
-                            cols = meta['cols']
-                            shaped_val = shaped_val[rows, cols]
-
-                        if meta['val'] is None:
-                            meta['val'] = np.array(shaped_val)  # convert back from jnp to np
-
-                        partials[ofname, wrtname] = shaped_val
-
-    def _setup_jax_derivs(self):
-        fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
-        wrt_idxs = list(range(1, len(self._compute_primal_ins) + 1))
-        # wrt_idxs = list(range(len(self._compute_primal_ins)))
-        self._jac_func_ = MethodType(fjax(self.compute_primal._func, argnums=wrt_idxs), self)
-        # self._jac_func_ = fjax(self.compute_primal, argnums=wrt_idxs)
-        self._subjac_key_map = {}
-
-        if self._tot_jac is None:  # doing semitotals
-            abs2meta_out = self._var_abs2meta['output']
-            conns = self._conn_global_abs_in2out
-            for key in self._subjacs_info:
-                of, wrt = key
-                if wrt in conns:
-                    src = conns[wrt]
-                    if src in self._ivcs and (of, src) not in self._subjacs_info:
-                        self._subjac_key_map[(of, src)] = (of, wrt)
-
-            # add any missing partials
-            for key in self._subjac_keys_iter():
-                if key not in self._subjacs_info and key not in self._subjac_key_map:
-                    of, wrt = key
-
-                    meta = SUBJAC_META_DEFAULTS.copy()
-
-                    if of == wrt:
-                        size = abs2meta_out[of]['size']
-                        meta['rows'] = meta['cols'] = np.arange(size)
-                        # All group approximations are treated as explicit components, so we
-                        # have a -1 on the diagonal.
-                        meta['val'] = np.full(size, -1.0)
-
-                    self._subjacs_info[key] = meta
+        for subsys in self._subsystems_myproc:
+            if isinstance(subsys, Group) or subsys.options['derivs_method'] == 'jax':
+                subsys._setup_jax(from_group)
 
     def _setup_dynamic_shapes(self):
         """
@@ -3906,7 +3653,6 @@ class Group(System):
             True if _apply_linear should be called from within a parent _apply_linear.
         """
         return (self._owns_approx_jac and self._jacobian is not None) or \
-            (self.options['derivs_method'] == 'jax' and self._jacobian is not None) or \
             self._assembled_jac is not None or not self._linear_solver.does_recursive_applies()
 
     def _apply_linear(self, jac, mode, scope_out=None, scope_in=None):
@@ -3926,9 +3672,7 @@ class Group(System):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        if self._owns_approx_jac or self.options['derivs_method'] == 'jax':
-            jac = self._jacobian
-        elif jac is None and self._assembled_jac is not None:
+        if jac is None and self._assembled_jac is not None:
             jac = self._assembled_jac
 
         if jac is not None:
@@ -4003,7 +3747,7 @@ class Group(System):
         scope_in : set, None, or _UNDEFINED
             Inputs relevant to possible lower level calls to _apply_linear on Components.
         """
-        if self._owns_approx_jac or self.options['derivs_method'] == 'jax':
+        if self._owns_approx_jac:
             # No subsolves if we are approximating our jacobian. Instead, we behave like an
             # ExplicitComponent and pass on the values in the derivatives vectors.
             d_outputs = self._doutputs
@@ -4044,8 +3788,7 @@ class Group(System):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        if self._tot_jac is not None and (self._owns_approx_jac or
-                                          self.options['derivs_method'] == 'jax'):
+        if self._tot_jac is not None and self._owns_approx_jac:
             self._jacobian = self._tot_jac
         elif self._jacobian is None:
             self._jacobian = DictionaryJacobian(self)
@@ -4067,10 +3810,6 @@ class Group(System):
                         approximation.compute_approximations(self, jac=jac)
 
         else:
-            if self.options['derivs_method'] == 'jax':
-                self._jax_linearize(self._inputs, self._jacobian)
-                return
-
             if self._assembled_jac is not None:
                 jac = self._assembled_jac
 
@@ -4230,16 +3969,12 @@ class Group(System):
                 wrt = ivc
 
         else:
-            if self.options['derivs_method'] == 'jax':
-                # no internal transfers used when jax is active
-                wrt = set(self._var_abs2meta['input'])
-            else:
-                for abs_inps in pro2abs['input'].values():
-                    if abs_inps[0] not in self._conn_abs_in2out:
-                        # If connection is inside of this Group, perturbation of all implicitly
-                        # connected inputs will be handled properly via internal transfers.
-                        # Otherwise, we need to add all implicitly connected inputs separately.
-                        wrt.update(abs_inps)
+            for abs_inps in pro2abs['input'].values():
+                if abs_inps[0] not in self._conn_abs_in2out:
+                    # If connection is inside of this Group, perturbation of all implicitly
+                    # connected inputs will be handled properly via internal transfers.
+                    # Otherwise, we need to add all implicitly connected inputs separately.
+                    wrt.update(abs_inps)
 
             # get rid of any old stuff in here
             self._owns_approx_of = self._owns_approx_wrt = None

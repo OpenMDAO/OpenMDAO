@@ -1,13 +1,14 @@
 import unittest
 import sys
 import itertools
-from collections.abc import Iterable
 
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
 import openmdao.api as om
 
-from openmdao.utils.jax_utils import jax, jit, jnp, ExplicitCompJaxify
+from openmdao.utils.jax_utils import jax, jnp, ExplicitCompJaxify
+from openmdao.utils.testing_utils import parameterized_name
+
 try:
     from parameterized import parameterized
 except ImportError:
@@ -675,28 +676,15 @@ if sys.version_info >= (3, 9):
                         self.connect(f'ivc.x{io}', f'comp.x{ii}')
 
 
-def _test_func_name(func, num, param):
-    args = []
-    for p in param.args:
-        if isinstance(p, str) or not isinstance(p, Iterable):
-            p = [p]
-        for item in p:
-            try:
-                arg = item.__name__
-            except:
-                arg = str(item)
-            args.append(arg)
-    return func.__name__ + '_' + '_'.join(args)
-
 
 @unittest.skipIf(jax is None or sys.version_info < (3, 9), 'jax is not available or python < 3.9.')
 class TestJaxShapesAndReturns(unittest.TestCase):
     @parameterized.expand(itertools.product([(), (2,), (2,3)], [(1, 1), (2, 2), (1, 2), (2, 1)],[True, False]),
-                          name_func=_test_func_name)
+                          name_func=parameterized_name)
     def test_compute_primal_return_shapes(self, shape, sizetup, ret_tuple):
         nins, nouts = sizetup
         prob = om.Problem()
-        prob.model = model = TopGrp(shape=shape, ret_tuple=ret_tuple, nins=nins, nouts=nouts)
+        prob.model = TopGrp(shape=shape, ret_tuple=ret_tuple, nins=nins, nouts=nouts)
 
         prob.set_solver_print(level=0)
 
@@ -714,7 +702,3 @@ class TestJaxShapesAndReturns(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
-    # from openmdao.utils.jax_utils import benchmark_component
-    # result = benchmark_component(MyCompJax2Shaped, methods=('jax', 'cs'),
-    #                              repeats=10, table_format='tabulator', xshape=(44, 330), yshape=(330, 55))

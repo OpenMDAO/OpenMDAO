@@ -4,7 +4,6 @@ import weakref
 import hashlib
 
 import numpy as np
-from numpy import size as npsize
 
 from openmdao.utils.name_maps import prom_name2abs_name
 from openmdao.utils.indexer import Indexer, indexer
@@ -214,10 +213,14 @@ class Vector(object):
             for n, v in self._views.items():
                 if n in self._names:
                     yield v
+                else:
+                    yield np.zeros_like(v)
         else:
             for n, v in self._views.items():
                 if n in self._names:
                     yield v.real
+                else:
+                    yield np.zeros_like(v.real)
 
     def items(self):
         """
