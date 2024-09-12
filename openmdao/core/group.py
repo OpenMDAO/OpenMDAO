@@ -3677,7 +3677,9 @@ class Group(System):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        if jac is None and self._assembled_jac is not None:
+        if self._owns_approx_jac:
+            jac = self._jacobian
+        elif jac is None and self._assembled_jac is not None:
             jac = self._assembled_jac
 
         if jac is not None:
