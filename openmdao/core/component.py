@@ -91,6 +91,8 @@ class Component(System):
         If True, the check_partials function will ignore this component.
     _has_distrib_outputs : bool
         If True, this component has at least one distributed output.
+    _compute_primals_out_shape : tuple or None
+        Cached shape of the output from compute_primal function.
     """
 
     def __init__(self, **kwargs):

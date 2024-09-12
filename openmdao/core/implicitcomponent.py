@@ -67,6 +67,13 @@ class ImplicitComponent(Component):
     _has_solve_linear : bool
         If True, this component has a solve_linear method that overrides the ImplicitComponent
         class method.
+    _has_linearize : bool
+        If True, this component has a linearize method that overrides the ImplicitComponent
+        class method.
+    _vjp_hash : int or None
+        Hash value for the last set of inputs to the compute_primal function.
+    _vjp_fun : function or None
+        The vector-Jacobian product function.
     """
 
     def __init__(self, **kwargs):

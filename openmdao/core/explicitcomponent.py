@@ -39,6 +39,10 @@ class ExplicitComponent(Component):
     ----------
     _has_compute_partials : bool
         If True, the instance overrides compute_partials.
+    _vjp_hash : int or None
+        Hash value for the last set of inputs to the compute_primal function.
+    _vjp_fun : function or None
+        The vector-Jacobian product function.
     """
 
     def __init__(self, **kwargs):

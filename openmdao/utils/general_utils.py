@@ -1659,7 +1659,6 @@ if env_truthy('OPENMDAO_DUMP'):
             return ret
         return _wrap
 
-
     class _DebugComm(object):  # pragma no cover
         """
         Debugging wrapper for an MPI communicator.
@@ -1672,8 +1671,8 @@ if env_truthy('OPENMDAO_DUMP'):
                 self.__dict__['_comm'] = comm
             self.__dict__['_scope'] = scope
             for name in ['bcast', 'Bcast', 'gather', 'Gather', 'scatter', 'Scatter',
-                        'allgather', 'Allgather', 'allreduce', 'Allreduce',
-                        'send', 'Send', 'recv', 'Recv', 'sendrecv', 'Sendrecv']:
+                         'allgather', 'Allgather', 'allreduce', 'Allreduce',
+                         'send', 'Send', 'recv', 'Recv', 'sendrecv', 'Sendrecv']:
                 self.__dict__[name] = _comm_debug_decorator(getattr(self._comm, name), scope)
 
         def __getattr__(self, name):
@@ -1681,7 +1680,6 @@ if env_truthy('OPENMDAO_DUMP'):
 
         def __setattr__(self, name, val):
             setattr(self._comm, name, val)
-
 
     def _wrap_comm(comm, scope=None):  # pragma no cover
         return _DebugComm(comm, scope)
