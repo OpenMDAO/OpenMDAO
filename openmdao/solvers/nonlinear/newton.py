@@ -33,11 +33,7 @@ class NewtonSolver(NonlinearSolver):
         """
         super().__init__(**kwargs)
 
-        # Slot for linear solver
         self.linear_solver = None
-
-        # Slot for linesearch
-        self.supports['linesearch'] = True
         self._linesearch = BoundsEnforceLS()
 
     def _declare_options(self):
@@ -58,6 +54,7 @@ class NewtonSolver(NonlinearSolver):
                              'AnalysisError that arises during subsolve; when false, it will '
                              'continue solving.')
 
+        self.supports['linesearch'] = True
         self.supports['gradients'] = True
         self.supports['implicit_components'] = True
 

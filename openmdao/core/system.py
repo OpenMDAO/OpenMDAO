@@ -6678,3 +6678,63 @@ class System(object, metaclass=SystemMetaclass):
 
     def _setup_jax(self, from_group=False):
         pass
+
+    def _sys_tree_visitor(self, func, predicate=None, recurse=True, include_self=True,
+                          yield_none=False, *args, **kwargs):
+        """
+        Yield the result of applying the given function to each System that satisfies the predicate.
+
+        The object yielded must be picklable if any System is running in a different process.
+
+        Parameters
+        ----------
+        func : callable
+            A callable that takes a System and args and kwargs and returns an object.
+        predicate : callable or None
+            A callable that takes a System as its only argument and returns -1, 0, or 1.
+            If it returns 1, apply the function to the system.
+            If it returns 0, don't apply the function, but continue on to the system's subsystems.
+            If it returns -1, don't apply the function and don't continue on to the system's
+            subsystems.
+            If predicate is None, the function is always applied.
+        recurse : bool
+            If True, function is applied to all subsystems of subsystems.
+        include_self : bool
+            If True, apply the function to the Group itself.
+        yield_none : bool
+            If False, don't yield None results.
+        args : tuple
+            Additional positional args to be passed to the function.
+        kwargs : dict
+            Additional keyword args to be passed to the function.
+
+        Yields
+        ------
+        object
+            The result of the function.
+        """
+        if include_self:
+            pred = 1 if predicate is None else predicate(self)
+            if pred == 1:
+                if yield_none:
+                    yield func(self, *args, **kwargs)
+                else:
+                    res = func(self, *args, **kwargs)
+                    if res is not None:
+                        yield res
+            elif pred == -1:
+                return
+
+        if recurse:
+            for s in self._subsystems_myproc:
+                yield from s._sys_tree_visitor(func, predicate, recurse=True, include_self=True,
+                                               *args, **kwargs)
+        else:
+            for s in self._subsystems_myproc:
+                if pred is None or predicate(s) == 1:
+                    if yield_none:
+                        yield func(s, *args, **kwargs)
+                    else:
+                        res = func(s, *args, **kwargs)
+                        if res is not None:
+                            yield res

@@ -237,6 +237,17 @@ class Solver(object, metaclass=SolverMetaclass):
                f"in {self._iter_count} iterations.")
         self.report_failure(msg)
 
+    def can_solve_cycle(self):
+        """
+        Return True if this solver can solve groups with cycles.
+
+        Returns
+        -------
+        bool
+            True if this solver can solve groups with cycles.
+        """
+        return 'maxiter' in self.options and self.options['maxiter'] > 1
+
     def report_failure(self, msg):
         """
         Report a failure that has occurred.
