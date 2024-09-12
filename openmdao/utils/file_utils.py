@@ -1,13 +1,17 @@
 """
 Utilities for working with files.
 """
-
 import sys
 import os
 import importlib
 import types
+from collections.abc import Iterable
 from fnmatch import fnmatch
 from os.path import join, basename, dirname, isfile, split, splitext, abspath
+import pathlib
+import shutil
+
+from openmdao.utils.om_warnings import issue_warning
 
 
 def get_module_path(fpath):
@@ -152,7 +156,7 @@ def _to_filename(spec):
     str
         The filename.
     """
-    if ':' in spec and not os.path.isfile(spec):
+    if ':' in spec and not isfile(spec):
         fname, _ = spec.rsplit(':', 1)
         if not fname.endswith('.py'):
             try:
@@ -176,10 +180,10 @@ def _load_and_exec(script_name, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    if ':' in script_name and not os.path.isfile(script_name):
+    if ':' in script_name and not isfile(script_name):
         return _load_and_run_test(script_name)
 
-    sys.path.insert(0, os.path.dirname(script_name))
+    sys.path.insert(0, dirname(script_name))
 
     sys.argv[:] = [script_name] + user_args
 
@@ -215,9 +219,9 @@ def fname2mod_name(fname):
                   ';', ':', '"', "'", '<', '>', '?', '/', '\\', '|']
 
     if not fname.endswith('.py'):
-        raise ValueError(f"'{s}' does not end with '.py'")
+        raise ValueError(f"'{fname}' does not end with '.py'")
 
-    s = os.path.basename(fname).rsplit('.', 1)[0]
+    s = basename(fname).rsplit('.', 1)[0]
 
     for c in to_replace:
         s = s.replace(c, '_')
@@ -427,3 +431,228 @@ def image2html(imagefile, title='', alt=''):
 </body>
 </html>
 """
+
+
+def get_work_dir():
+    """
+    Return either os.getcwd() or the value of the OPENMDAO_WORKDIR environment variable.
+
+    Returns
+    -------
+    str
+        The working directory.
+    """
+    workdir = os.environ.get('OPENMDAO_WORKDIR', '')
+
+    if workdir:
+        return workdir
+
+    return os.getcwd()
+
+
+def _get_outputs_dir(obj, *subdirs, mkdir=True):
+    """
+    Return a pathlib.Path for the outputs directory related to the given problem or system.
+
+    This path is based on the "problem path" in a hierarchy of problems.
+    The resulting outputs directory will be nested where each problem's output directory
+    contains its own output files and subdirectories as well as any subproblems.
+
+    This directory also will include a .openmdao_outputs hidden file that
+    marks this directory as being created by OpenMDAO. This makes identifying the
+    directory during cleanup more reliable.
+
+    Parameters
+    ----------
+    obj : Problem or System or Solver
+        The problem or system or Solver from which we are opening a file.
+    subdirs : str
+        Additional subdirectories under the top level directory for the relevant problem. Each
+        subdir is passed as a separate positional argument.
+    mkdir : bool
+        If True, force the creation of this directory.
+    """
+    from openmdao.core.problem import Problem
+    from openmdao.core.system import System
+    from openmdao.solvers.solver import Solver
+
+    if isinstance(obj, Problem):
+        prob_meta = obj._metadata
+    elif isinstance(obj, System):
+        prob_meta = obj._problem_meta
+    elif isinstance(obj, Solver):
+        system = obj._system
+        if system is None:
+            raise RuntimeError('The output directory for Solvers cannot be accessed '
+                               'before final_setup.')
+        prob_meta = system()._problem_meta
+    else:
+        raise RuntimeError(f'Cannot get problem metadata for object: {obj}')
+
+    if prob_meta is None or prob_meta.get('pathname', None) is None:
+        raise RuntimeError('The output directory cannot be accessed before setup.')
+
+    prob_pathname = prob_meta['pathname']
+
+    work_dir = pathlib.Path(get_work_dir())
+    if mkdir and not work_dir.exists():
+        work_dir.mkdir(exist_ok=True)
+
+    outs_dir = work_dir
+
+    # it's possible that a sub-problem requests the output directory before its parent problem,
+    # so we need to check existence of the parent directories for all parent problems and create
+    # them (ensuring the .openmdao_out file is present) if they don't exist.  Otherwise they
+    # won't be properly identified during cleanup.
+
+    # Also, we don't check if rank==0 here because when mkdir is True, we need to ensure that the
+    # directory has been created by the time we return, so just letting any rank create the file
+    # and handling race conditions by using exist_ok=True works better than trying to limit creation
+    # to rank==0 and performing some sort of barrier operation to ensure that the file is created
+    # before returning in all ranks.
+    for p in prob_pathname.split('/'):
+        outs_dir = outs_dir / f'{p}_out'
+        if mkdir and not outs_dir.exists():
+            outs_dir.mkdir(exist_ok=True)
+
+            # Touch the .openmdao_out file for the output directory to ease identification.
+            outs_file = outs_dir / '.openmdao_out'
+            if not outs_file.exists():
+                try:
+                    open(outs_file, 'w').close()
+                except OSError:
+                    pass
+
+    if subdirs:
+        dirpath = outs_dir / pathlib.Path(*subdirs)
+
+        if mkdir and not dirpath.exists():
+            dirpath.mkdir(parents=True, exist_ok=True)
+
+        return dirpath
+
+    return outs_dir
+
+
+def _is_openmdao_output_dir(directory):
+    """
+    Check if a directory is an OpenMDAO output directory.
+
+    Parameters
+    ----------
+    directory : str or Path
+        The directory to check.
+
+    Returns
+    -------
+    bool
+        True if the directory is an OpenMDAO output directory, False otherwise.
+    """
+    directory = pathlib.Path(directory)
+    return directory.is_dir() and (directory / '.openmdao_out').exists()
+
+
+def _find_openmdao_output_dirs(paths, pattern='*_out', recurse=False):
+    """
+    Find all OpenMDAO output directories in the given path.
+
+    Parameters
+    ----------
+    paths : str or Path or Iterable
+        The path to search for OpenMDAO output directories.
+    pattern : str
+        A glob pattern that the output directories are required to match.
+    recurse : bool
+        If True, search recursively.
+
+    Returns
+    -------
+    list
+        A list of OpenMDAO output directories.
+    """
+    if isinstance(paths, (str, pathlib.Path)):
+        paths = [paths]
+    elif not isinstance(paths, Iterable):
+        raise ValueError("The 'paths' parameter must be a string, Path, or an iterable of them.")
+
+    openmdao_dirs = []
+    for path in paths:
+        path = pathlib.Path(path)
+        if not path.is_dir():
+            continue
+
+        for root, dirs, _ in os.walk(path):
+            # Use a copy of the dirs list to avoid modifying it while iterating
+            root_path = pathlib.Path(root)
+            if _is_openmdao_output_dir(root) and fnmatch(root_path.name, pattern):
+                openmdao_dirs.append(root_path)
+            for d in dirs[:]:
+                dir_path = pathlib.Path(root) / d
+                if _is_openmdao_output_dir(dir_path):
+                    if fnmatch(dir_path.name, pattern):
+                        openmdao_dirs.append(dir_path)
+                    dirs.remove(d)  # Do not recurse into OpenMDAO output directories
+            if not recurse:
+                break
+    return openmdao_dirs
+
+
+def clean_outputs(obj='.', recurse=False, prompt=True, pattern='*_out', dryrun=False):
+    """
+    Remove output directories created by OpenMDAO.
+
+    A directory is determined to be an OpenMDAO output directory if its name
+    ends in `_out` and it contains the file `.openmdao_out`.
+
+    Parameters
+    ----------
+    obj : Problem or System or Solver or str or Path
+        The problem or system or solver whose output file should be removed.
+    recurse : bool
+        If True, and if obj is a string or Path, recurse into it
+        finding and removing OpenMDAO output directories along the way.
+        This option is ignored if obj is a Problem, System, or Solver.
+    prompt : bool
+        If True, prompt the user to confirm directories to be removed.
+        This option is ignored if obj is a Problem, System, or Solver.
+    pattern : str
+        A glob pattern used for matching directories.
+    dryrun : bool
+        If True, report which directories would be removed without actually removing them.
+    """
+    output_dirs = []
+
+    if isinstance(obj, (str, pathlib.Path)):
+        # A single pathname or path object was given.
+        output_dirs = _find_openmdao_output_dirs(obj, pattern=pattern, recurse=recurse)
+    elif isinstance(obj, (Iterable,)):
+        # Multiple paths given
+        output_dirs.extend(_find_openmdao_output_dirs(obj, pattern, recurse))
+    elif hasattr(obj, 'get_outputs_dir'):
+        output_dir = obj.get_outputs_dir(mkdir=False)
+        prompt = False
+        if output_dir and _is_openmdao_output_dir(output_dir):
+            output_dirs.append(pathlib.Path(output_dir))
+
+    if not output_dirs:
+        print('No OpenMDAO output directories found.')
+        return
+    else:
+        print(f'Found {len(output_dirs)} OpenMDAO output directories:')
+
+    removed_count = 0
+    for dir_path in sorted(output_dirs):
+        if dryrun:
+            print(f'Would remove {dir_path} (dryrun = True).')
+        elif prompt:
+            response = input(f"Remove {dir_path}? [y/N] ").strip().lower()
+            if response == 'y':
+                shutil.rmtree(dir_path)
+                print(f'Removed {dir_path}')
+                removed_count += 1
+        else:
+            shutil.rmtree(dir_path)
+            print(f'Removed {dir_path}')
+            removed_count += 1
+
+    print(f'Removed {removed_count} OpenMDAO output directories.')

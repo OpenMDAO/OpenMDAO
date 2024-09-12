@@ -7,8 +7,10 @@ import numpy as np
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_warnings
 from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.utils.file_utils import get_work_dir
 
 
+@use_tempdirs
 class TestSystem(unittest.TestCase):
 
     def test_vector_context_managers(self):
@@ -208,7 +210,7 @@ class TestSystem(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             prob.model.list_inputs(return_format=dict)
 
-        msg = f"Invalid value (<class 'dict'>) for return_format, " \
+        msg = "Invalid value (<class 'dict'>) for return_format, " \
               "must be a string value of 'list' or 'dict'"
 
         self.assertEqual(str(cm.exception), msg)
@@ -216,7 +218,7 @@ class TestSystem(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             prob.model.list_outputs(return_format='dct')
 
-        msg = f"Invalid value ('dct') for return_format, " \
+        msg = "Invalid value ('dct') for return_format, " \
               "must be a string value of 'list' or 'dict'"
 
         self.assertEqual(str(cm.exception), msg)
@@ -667,6 +669,30 @@ class TestSystem(unittest.TestCase):
 
         with assert_warnings(expected_warnings):
             prob.final_setup()
+
+    def test_get_outputs_dir(self):
+        import pathlib
+        import openmdao.api as om
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = om.Problem(name='test_prob_name')
+        model = prob.model
+
+        model.add_subsystem('comp', Paraboloid())
+
+        model.set_input_defaults('comp.x', 3.0)
+        model.set_input_defaults('comp.y', -4.0)
+
+        with self.assertRaises(RuntimeError) as e:
+            model.get_outputs_dir()
+
+        self.assertEqual('The output directory cannot be accessed before setup.',
+                         str(e.exception))
+
+        prob.setup()
+
+        d = prob.get_outputs_dir('subdir')
+        self.assertEqual(str(pathlib.Path(get_work_dir(), 'test_prob_name_out', 'subdir')), str(d))
 
 
 if __name__ == "__main__":

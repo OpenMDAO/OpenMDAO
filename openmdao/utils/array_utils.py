@@ -4,10 +4,8 @@ Utils for dealing with arrays.
 import sys
 from itertools import product
 import hashlib
-from math import isclose
 
 import numpy as np
-from numpy.linalg import norm
 
 from scipy.sparse import coo_matrix
 

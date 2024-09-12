@@ -11,10 +11,12 @@ from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.constants import _UNDEFINED
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.recorders.recording_manager import RecordingManager
+from openmdao.utils.file_utils import _get_outputs_dir
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.om_warnings import issue_warning, SolverWarning
+from openmdao.utils.general_utils import SolverMeta
 
 
 class SolverInfo(object):
@@ -98,7 +100,7 @@ class SolverInfo(object):
         self.prefix, self.stack = cache
 
 
-class Solver(object):
+class Solver(object, metaclass=SolverMeta):
     """
     Base solver class.
 
@@ -234,6 +236,17 @@ class Solver(object):
         msg = (f"Solver '{self.SOLVER}' on system '{self._system().pathname}' failed to converge "
                f"in {self._iter_count} iterations.")
         self.report_failure(msg)
+
+    def can_solve_cycle(self):
+        """
+        Return True if this solver can solve groups with cycles.
+
+        Returns
+        -------
+        bool
+            True if this solver can solve groups with cycles.
+        """
+        return 'maxiter' in self.options and self.options['maxiter'] > 1
 
     def report_failure(self, msg):
         """
@@ -558,6 +571,25 @@ class Solver(object):
             True if relevance should be active.
         """
         return True
+
+    def get_outputs_dir(self, *subdirs, mkdir=True):
+        """
+        Get the path under which all output files of this solver are to be placed.
+
+        Parameters
+        ----------
+        *subdirs : str
+            Subdirectories nested under the relevant problem output directory.
+            To create {prob_output_dir}/a/b one would pass `solver.get_outputs_dir('a', 'b')`.
+        mkdir : bool
+            If True, attempt to create this directory if it does not exist.
+
+        Returns
+        -------
+        pathlib.Path
+           The path of the outputs directory for the problem.
+        """
+        return _get_outputs_dir(self, *subdirs, mkdir=mkdir)
 
 
 class NonlinearSolver(Solver):

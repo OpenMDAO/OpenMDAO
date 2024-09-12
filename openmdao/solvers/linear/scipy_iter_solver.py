@@ -80,6 +80,8 @@ class ScipyKrylov(LinearSolver):
         self.options['maxiter'] = 1000
         self.options['atol'] = 1.0e-12
 
+        self.supports['implicit_components'] = True
+
     def _setup_solvers(self, system, depth):
         """
         Assign system instance, set depth, and optionally perform setup.
@@ -126,8 +128,7 @@ class ScipyKrylov(LinearSolver):
         bool
             Flag for indicating child linerization
         """
-        precon = self.precon
-        return (precon is not None) and (precon._linearize_children())
+        return (self.precon is not None) and (self.precon._linearize_children())
 
     def _linearize(self):
         """

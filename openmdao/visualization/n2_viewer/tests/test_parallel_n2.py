@@ -3,7 +3,6 @@
 import os
 import unittest
 import openmdao.api as om
-from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.utils.mpi import MPI
 
 try:
@@ -39,7 +38,7 @@ class Top(om.Group):
     def setup(self):
 
         indep_var = self.add_subsystem('indep_var', om.IndepVarComp())
-        myc = self.add_subsystem('myComp', myComp())
+        self.add_subsystem('myComp', myComp())
 
         indep_var.add_output('x1', 2.0)
 
@@ -60,8 +59,8 @@ class N2ParallelTestCase(unittest.TestCase):
         Verify that allgather() is called from all ranks and doesn't sit there blocking.
         """
         om.n2(self.p, show_browser=False, outfile=OUTFILE)
-        MPI.COMM_WORLD.barrier()
-        if MPI.COMM_WORLD.rank == 0:
+        self.p.comm.barrier()
+        if self.p.comm.rank == 0:
             self.assertTrue(os.path.exists(OUTFILE), msg=f"{OUTFILE} not found")
 
     def tearDown(self):

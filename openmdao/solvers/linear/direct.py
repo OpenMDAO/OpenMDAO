@@ -103,9 +103,9 @@ def format_singular_error(system, matrix):
             try:
                 u, _, _ = np.linalg.svd(matrix)
 
-            except Exception as err:
+            except Exception:
                 msg = f"Jacobian in '{system.pathname}' is not full rank, but OpenMDAO was " + \
-                    "not able to determine which rows or columns."
+                      "not able to determine which rows or columns."
                 return msg
 
             # Nonzero elements in the left singular vector show the rows that contribute strongly to
@@ -221,6 +221,8 @@ class DirectSolver(LinearSolver):
         # Use an assembled jacobian by default.
         self.options['assemble_jac'] = True
 
+        self.supports['implicit_components'] = True
+
     def _setup_solvers(self, system, depth):
         """
         Assign system instance, set depth, and optionally perform setup.
@@ -247,6 +249,17 @@ class DirectSolver(LinearSolver):
             Flag for indicating child linearization.
         """
         return False
+
+    def can_solve_cycle(self):
+        """
+        Return True if this solver can solve groups with cycles.
+
+        Returns
+        -------
+        bool
+            True if this solver can solve groups with cycles.
+        """
+        return True
 
     def use_relevance(self):
         """
@@ -318,7 +331,7 @@ class DirectSolver(LinearSolver):
             elif isinstance(matrix, csc_matrix):
                 try:
                     self._lu = scipy.sparse.linalg.splu(matrix)
-                except RuntimeError as err:
+                except RuntimeError:
                     raise RuntimeError(format_singular_error(system, matrix))
 
             elif isinstance(matrix, np.ndarray):  # dense
@@ -328,11 +341,11 @@ class DirectSolver(LinearSolver):
                         warnings.simplefilter('error', RuntimeWarning)
                     try:
                         self._lup = scipy.linalg.lu_factor(matrix)
-                    except RuntimeWarning as err:
+                    except RuntimeWarning:
                         raise RuntimeError(format_singular_error(system, matrix))
 
                     # NaN in matrix.
-                    except ValueError as err:
+                    except ValueError:
                         raise RuntimeError(format_nan_error(system, matrix))
 
             # Note: calling scipy.sparse.linalg.splu on a COO actually transposes
@@ -357,11 +370,11 @@ class DirectSolver(LinearSolver):
                 try:
                     self._lup = scipy.linalg.lu_factor(mtx)
 
-                except RuntimeWarning as err:
+                except RuntimeWarning:
                     raise RuntimeError(format_singular_error(system, mtx))
 
                 # NaN in matrix.
-                except ValueError as err:
+                except ValueError:
                     raise RuntimeError(format_nan_error(system, mtx))
 
         if self._lin_rhs_checker is not None:
@@ -399,17 +412,17 @@ class DirectSolver(LinearSolver):
                         warnings.simplefilter('error', RuntimeWarning)
                     try:
                         inv_jac = scipy.linalg.inv(matrix)
-                    except RuntimeWarning as err:
+                    except RuntimeWarning:
                         raise RuntimeError(format_singular_error(system, matrix))
 
                     # NaN in matrix.
-                    except ValueError as err:
+                    except ValueError:
                         raise RuntimeError(format_nan_error(system, matrix))
 
             elif isinstance(matrix, csc_matrix):
                 try:
                     inv_jac = scipy.sparse.linalg.inv(matrix)
-                except RuntimeError as err:
+                except RuntimeError:
                     raise RuntimeError(format_singular_error(system, matrix))
 
                 # to prevent broadcasting errors later, make sure inv_jac is 2D
@@ -435,11 +448,11 @@ class DirectSolver(LinearSolver):
                 try:
                     inv_jac = scipy.linalg.inv(mtx)
 
-                except RuntimeWarning as err:
+                except RuntimeWarning:
                     raise RuntimeError(format_singular_error(system, mtx))
 
                 # NaN in matrix.
-                except ValueError as err:
+                except ValueError:
                     raise RuntimeError(format_nan_error(system, mtx))
 
         return inv_jac

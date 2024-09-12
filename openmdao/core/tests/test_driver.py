@@ -184,7 +184,7 @@ class TestDriver(unittest.TestCase):
         model = prob.model
 
         model.add_subsystem('px', om.IndepVarComp(name="x", val=np.ones((2, ))))
-        comp = model.add_subsystem('comp', DoubleArrayComp())
+        model.add_subsystem('comp', DoubleArrayComp())
         model.connect('px.x', 'comp.x1')
 
         model.add_design_var('px.x', ref=np.array([.1, 1e-6]))
@@ -649,7 +649,7 @@ class TestDriver(unittest.TestCase):
 
         assert_check_totals(prob.check_totals(out_stream=None, driver_scaling=True))
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
         case = cr.get_case(cases[0])
 
@@ -793,7 +793,7 @@ class TestDriver(unittest.TestCase):
         prob.set_val('sub.x', 50.)
         prob.set_val('sub.y', 50.)
 
-        result = prob.run_driver()
+        prob.run_driver()
 
         assert_near_equal(prob['sub.x'], 6.66666667, 1e-6)
         assert_near_equal(prob['sub.y'], -7.3333333, 1e-6)
@@ -1073,7 +1073,7 @@ class TestDriverMPI(unittest.TestCase):
 
         p = om.Problem()
 
-        pg = p.model.add_subsystem('par_group', ParModel())
+        p.model.add_subsystem('par_group', ParModel())
         p.model.add_subsystem('obj', om.ExecComp('f = y0 + y1'))
 
         p.model.connect('par_group.g0.comp.y', 'obj.y0')

@@ -11,7 +11,7 @@ def get_tag_info():
     # using a pattern to only grab tags that are in version format "X.Y.Z"
     git_versions = subprocess.Popen(['git', 'tag', '-l', '*.*.*'],  # nosec: trusted input
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    cmd_out, cmd_err = git_versions.communicate()
+    cmd_out, _ = git_versions.communicate()
 
     cmd_out = cmd_out.decode('utf8')
     # take the output of git tag -l *.*.*, and split it from one string into a list.
@@ -29,7 +29,7 @@ def get_tag_info():
 
     cmd = subprocess.Popen(['git', 'rev-list', '-1', latest_tag, '-s'],  # nosec: trusted input
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    cmd_out, cmd_err = cmd.communicate()
+    cmd_out, _ = cmd.communicate()
 
     cmd_out = cmd_out.decode('utf8')
     commit_id = cmd_out.strip()
@@ -43,7 +43,7 @@ def get_commit_info():
     """
     git_commit = subprocess.Popen(['git', 'show', '--pretty=oneline', '-s'],  # nosec: trusted input
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    cmd_out, cmd_err = git_commit.communicate()
+    cmd_out, _ = git_commit.communicate()
 
     cmd_out = cmd_out.decode('utf8')
     commit_id = cmd_out.split()[0]
@@ -104,7 +104,7 @@ def upload_doc_version(source_dir, destination, *args):
 
     try:
         subprocess.run(cmd, shell=True, check=True)  # nosec: trusted input
-    except:
+    except Exception:
         raise Exception('Doc transfer failed.')
     else:
         print("Uploaded documentation for", name if rel else "latest")

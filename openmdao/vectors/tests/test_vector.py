@@ -4,7 +4,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.array_utils import evenly_distrib_idxs
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 
 try:
@@ -224,9 +224,9 @@ class TestPETScVector3Proc(unittest.TestCase):
         model.add_subsystem('des_vars', comp)
 
         sub = model.add_subsystem('pp', om.ParallelGroup())
-        c1 = sub.add_subsystem('calc1', om.ExecComp('y = 2.0*x', x=np.ones((3, )), y=np.ones((3, ))))
-        c2 = sub.add_subsystem('calc2', om.ExecComp('y = 5.0*x', x=np.ones((3, )), y=np.ones((3, ))))
-        c3 = sub.add_subsystem('calc3', om.ExecComp('y = 7.0*x', x=np.ones((3, )), y=np.ones((3, ))))
+        sub.add_subsystem('calc1', om.ExecComp('y = 2.0*x', x=np.ones((3, )), y=np.ones((3, ))))
+        sub.add_subsystem('calc2', om.ExecComp('y = 5.0*x', x=np.ones((3, )), y=np.ones((3, ))))
+        sub.add_subsystem('calc3', om.ExecComp('y = 7.0*x', x=np.ones((3, )), y=np.ones((3, ))))
 
         model.connect('des_vars.v1', 'pp.calc1.x')
         model.connect('des_vars.v1', 'pp.calc2.x')
@@ -246,7 +246,7 @@ class TestPETScVector3Proc(unittest.TestCase):
             assert_near_equal(norm_val, 89.61584681293817, 1e-10)
 
         with multi_proc_exception_check(prob.comm):
-            J = prob.compute_totals(of=['pp.calc1.y', 'pp.calc2.y', 'pp.calc3.y'], wrt=['des_vars.v1'])
+            prob.compute_totals(of=['pp.calc1.y', 'pp.calc2.y', 'pp.calc3.y'], wrt=['des_vars.v1'])
 
         with multi_proc_exception_check(prob.comm):
             vec = prob.model._vectors['output']['linear']

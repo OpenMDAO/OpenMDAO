@@ -8,9 +8,6 @@ import types
 import base64
 import zlib
 
-from shutil import rmtree
-from tempfile import mkdtemp
-
 import numpy as np
 
 import openmdao.api as om
@@ -101,7 +98,7 @@ class TestViewerData(unittest.TestCase):
                     val = np.asarray(tree[key])
                     try:
                         assert_near_equal(expected_val, val, tolerance=val_tol)
-                    except Exception as e:
+                    except Exception:
                         raise AssertionError(f'{_path + [key]} did not match to expected value')
 
         for i, key in enumerate(expected_tree.keys()):
@@ -306,7 +303,7 @@ class TestViewerData(unittest.TestCase):
         self.check_viewer_data(_get_viewer_data(p), 'sellar_initial_values.json')
 
         # recorded viewer data should match
-        self.check_viewer_data(_get_viewer_data(filename), 'sellar_initial_values.json')
+        self.check_viewer_data(_get_viewer_data(p.get_outputs_dir() / filename), 'sellar_initial_values.json')
 
         # there should be final values when data is generated after run_model
         p.run_model()
@@ -459,7 +456,7 @@ class TestViewerData(unittest.TestCase):
             subprob_data = extract_compressed_model('N2subprob.html')
 
             # check problem data generated from recording against data generated from problem
-            check_call(f"openmdao n2 {sql_filename} -o N2recording.html"
+            check_call(f"openmdao n2 {p.get_outputs_dir() / sql_filename} -o N2recording.html"
                        f"{' --no_browser' if not DEBUG_BROWSER else ''}")
             recording_data = extract_compressed_model('N2recording.html')
 
@@ -588,12 +585,14 @@ class TestN2(unittest.TestCase):
                 n2_from_prob_html = f"n2_from_prob_{values}.html"
                 n2_from_file_html = f"n2_from_file_{values}.html"
 
+                _sql_filename = p.get_outputs_dir() / sql_filename
+
                 if values is not None:
                     n2(p, outfile=n2_from_prob_html, show_browser=DEBUG_BROWSER, values=values)
-                    n2(sql_filename, outfile=n2_from_file_html, show_browser=DEBUG_BROWSER, values=values)
+                    n2(_sql_filename, outfile=n2_from_file_html, show_browser=DEBUG_BROWSER, values=values)
                 else:
                     n2(p, outfile=n2_from_prob_html, show_browser=DEBUG_BROWSER)
-                    n2(sql_filename, outfile=n2_from_file_html, show_browser=DEBUG_BROWSER)
+                    n2(_sql_filename, outfile=n2_from_file_html, show_browser=DEBUG_BROWSER)
 
                 # Compare models from the files generated from the Problem and the recording
                 model_data_from_prob = extract_compressed_model(n2_from_prob_html)
@@ -604,9 +603,9 @@ class TestN2(unittest.TestCase):
                 # also check data generated using n2 command
                 n2_from_cmd_html = f"n2_from_cmd_{values}.html"
                 if values is not False:
-                    cmd = f"openmdao n2 --no_browser -o {n2_from_cmd_html} {sql_filename}"
+                    cmd = f"openmdao n2 --no_browser -o {n2_from_cmd_html} {_sql_filename}"
                 else:
-                    cmd = f"openmdao n2 --no_values --no_browser  -o {n2_from_cmd_html} {sql_filename}"
+                    cmd = f"openmdao n2 --no_values --no_browser  -o {n2_from_cmd_html} {_sql_filename}"
                 check_call(cmd)
 
                 model_data_from_cmd = extract_compressed_model(n2_from_cmd_html)

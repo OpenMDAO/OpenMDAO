@@ -148,7 +148,7 @@ class IndexerTestCase(unittest.TestCase):
         assert_equal(src[ind.shaped_array()], np.array([5,3,7,9]))
         assert_equal(ind.shaped_instance()(), np.array([5,3,7,9]))
 
-    def test_neg_arr(self):
+    def test_neg_arr2(self):
         ind = indexer[[-1, -3, -5]]
         src = np.arange(10)
 

@@ -1,7 +1,6 @@
 
 """Define a function to view connections."""
 import os
-import pathlib
 import json
 from itertools import chain
 from collections import defaultdict
@@ -14,9 +13,7 @@ except ImportError:
     IFrame = display = None
 
 from openmdao.core.problem import Problem
-from openmdao.utils.units import convert_units
 from openmdao.utils.mpi import MPI
-from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.notebook_utils import notebook, colab
 from openmdao.utils.om_warnings import issue_warning
@@ -262,7 +259,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 # connections report definition
 def _run_connections_report(prob, report_filename='connections.html'):
 
-    path = str(pathlib.Path(prob.get_reports_dir()).joinpath(report_filename))
+    path = prob.get_reports_dir() / report_filename
     view_connections(prob, show_browser=False, outfile=path,
                      title=f'Connection Viewer for {prob._name}')
 

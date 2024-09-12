@@ -7,8 +7,7 @@ import warnings
 import openmdao.api as om
 from openmdao.utils.units import NumberDict, PhysicalUnit, _find_unit, import_library, \
     add_unit, add_offset_unit, unit_conversion, simplify_unit
-from openmdao.utils.assert_utils import assert_warning, assert_near_equal
-from openmdao.utils.om_warnings import OMDeprecationWarning
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestNumberDict(unittest.TestCase):

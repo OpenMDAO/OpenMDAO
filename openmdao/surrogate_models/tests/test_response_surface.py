@@ -1,6 +1,7 @@
 # pylint: disable-msg=C0111,C0103
 
-import unittest, itertools
+import unittest
+import itertools
 
 
 from numpy import array, linspace, sin, cos, pi

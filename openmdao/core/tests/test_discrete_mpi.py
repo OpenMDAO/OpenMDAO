@@ -1,16 +1,9 @@
 """ Unit tests for the problem interface."""
 
-import sys
 import unittest
-import warnings
 
-import numpy as np
-
-from openmdao.api import Problem, IndepVarComp, NonlinearBlockGS, ScipyOptimizeDriver, \
-    ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyKrylov, ExplicitComponent, ParallelGroup
+from openmdao.api import Problem, IndepVarComp, ParallelGroup
 from openmdao.utils.assert_utils import assert_near_equal
-from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.test_suite.components.sellar import SellarDerivatives
 
 from openmdao.utils.mpi import MPI
 
@@ -19,7 +12,7 @@ try:
 except ImportError:
     PETScVector = None
 
-from openmdao.core.tests.test_discrete import ModCompEx, ModCompIm, DiscretePromTestCase, PathCompEx
+from openmdao.core.tests.test_discrete import ModCompEx, ModCompIm, DiscretePromTestCase
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

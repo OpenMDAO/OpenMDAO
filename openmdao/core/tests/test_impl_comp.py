@@ -1,5 +1,4 @@
 """Simple example demonstrating how to implement an implicit component."""
-import sys
 import unittest
 
 from io import StringIO
@@ -52,7 +51,6 @@ class QuadraticLinearize(QuadraticComp):
     def linearize(self, inputs, outputs, partials):
         a = inputs['a']
         b = inputs['b']
-        c = inputs['c']
         x = outputs['x']
 
         partials['x', 'a'] = x ** 2
@@ -84,7 +82,6 @@ class QuadraticJacVec(QuadraticComp):
                      d_inputs, d_outputs, d_residuals, mode):
         a = inputs['a']
         b = inputs['b']
-        c = inputs['c']
         x = outputs['x']
         if mode == 'fwd':
             if 'x' in d_residuals:
@@ -391,9 +388,9 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.prob.run_model()
 
         stream = StringIO()
-        states = self.prob.model.list_outputs(explicit=False, residuals=True,
-                                              prom_name=True, hierarchical=True,
-                                              out_stream=stream)
+        self.prob.model.list_outputs(explicit=False, residuals=True,
+                                     prom_name=True, hierarchical=True,
+                                     out_stream=stream)
 
         text = stream.getvalue()
         self.assertEqual(text.count('comp1.x'), 1)
@@ -440,13 +437,8 @@ class ImplicitCompTestCase(unittest.TestCase):
         prob.run_model()
 
         # list outputs with residuals, p1 and d1 should not appear
-        sysout = sys.stdout
-        try:
-            stdout = StringIO()
-            sys.stdout = stdout
-            model.list_outputs(residuals_tol=0.01, residuals=True, prom_name=False, out_stream=stdout)
-        finally:
-            sys.stdout = sysout
+        stream = StringIO()
+        model.list_outputs(residuals_tol=0.01, residuals=True, prom_name=False, out_stream=stream)
 
         expected_text = [
             "0 Explicit Output(s) in 'model'",
@@ -460,10 +452,9 @@ class ImplicitCompTestCase(unittest.TestCase):
             "  y2",  # values removed from comparison
             "",
             "",
-            ""
         ]
-        captured_output = stdout.getvalue()
 
+        captured_output = stream.getvalue()
         for i, line in enumerate(captured_output.split('\n')):
             if line and not line.startswith('-'):
                 self.assertEqual(remove_whitespace(line.split('[')[0]),
@@ -539,7 +530,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
             def linearize(self, inputs, outputs, partials):
                 a = inputs['a']
                 b = inputs['b']
-                c = inputs['c']
+
                 x = outputs['x']
 
                 partials['x', 'a'] = x ** 2
@@ -616,7 +607,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
             def linearize(self, inputs, outputs, partials):
                 a = inputs['a']
                 b = inputs['b']
-                c = inputs['c']
+
                 x = outputs['x']
 
                 partials['x', 'a'] = x ** 2
@@ -669,7 +660,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
             def linearize(self, inputs, outputs, partials):
                 a = inputs['a']
                 b = inputs['b']
-                c = inputs['c']
+
                 x = outputs['x']
 
                 partials['x', 'a'] = x ** 2
@@ -851,7 +842,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
             def linearize(self, inputs, outputs, partials):
                 a = inputs['a']
                 b = inputs['b']
-                c = inputs['c']
+
                 x = outputs['x']
 
                 partials['x', 'a'] = x ** 2

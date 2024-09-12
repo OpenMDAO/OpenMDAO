@@ -21,12 +21,13 @@ import scipy.sparse as sparse
 
 from openmdao.core.constants import _SetupStatus
 from openmdao.core.component import Component
-from openmdao.core.driver import Driver, record_iteration, SaveOptResult
+from openmdao.core.driver import Driver, record_iteration
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.core.system import System, _OptStatus
+from openmdao.core.system import System
 from openmdao.core.group import Group
 from openmdao.core.total_jac import _TotalJacInfo
-from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
+from openmdao.core.constants import _DEFAULT_COLORING_DIR, _DEFAULT_OUT_STREAM, \
+    _UNDEFINED
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -48,12 +49,14 @@ from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.array_utils import scatter_dist_to_local
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
-    clear_reports, get_reports_dir, _load_report_plugins
+    clear_reports, _load_report_plugins
 from openmdao.utils.general_utils import pad_name, LocalRangeIterable, \
-    _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs
+    _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs, \
+    ProblemMeta
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.file_utils import _get_outputs_dir, text2html, get_work_dir
 from openmdao.visualization.tables.table_builder import generate_table
 
 try:
@@ -128,7 +131,7 @@ def _default_prob_name():
     return name.stem
 
 
-class Problem(object):
+class Problem(object, metaclass=ProblemMeta):
     """
     Top-level container for the systems and drivers.
 
@@ -224,28 +227,6 @@ class Problem(object):
         self._warned = False
         self._computing_coloring = False
 
-        # Set the Problem name so that it can be referenced from command line tools (e.g. check)
-        # that accept a Problem argument, and to name the corresponding reports subdirectory.
-
-        if name:  # if name hasn't been used yet, use it. Otherwise, error
-            if name not in _problem_names:
-                self._name = name
-            else:
-                raise ValueError(f"The problem name '{name}' already exists")
-        else:  # No name given: look for a name, of the form, 'problemN', that hasn't been used
-            problem_counter = len(_problem_names) + 1 if _problem_names else ''
-            base = _default_prob_name()
-            _name = f"{base}{problem_counter}"
-            if _name in _problem_names:  # need to make it unique so append string of form '.N'
-                i = 1
-                while True:
-                    _name = f"{base}{problem_counter}.{i}"
-                    if _name not in _problem_names:
-                        break
-                    i += 1
-            self._name = _name
-        _problem_names.append(self._name)
-
         if comm is None:
             use_mpi = check_mpi_env()
             if use_mpi is False:
@@ -256,6 +237,10 @@ class Problem(object):
                     comm = MPI.COMM_WORLD
                 except ImportError:
                     comm = FakeComm()
+
+        self.comm = comm
+
+        self._set_name(name)
 
         if model is None:
             self.model = Group()
@@ -280,8 +265,6 @@ class Problem(object):
         # can't use driver property here without causing a lint error, so just do it manually
         self._driver = driver
 
-        self.comm = comm
-
         self._metadata = {'setup_status': _SetupStatus.PRE_SETUP}
         self._run_counter = -1
         self._rec_mgr = RecordingManager()
@@ -289,7 +272,7 @@ class Problem(object):
         # General options
         self.options = OptionsDictionary(parent_name=type(self).__name__)
         self.options.declare('coloring_dir', types=str,
-                             default=os.path.join(os.getcwd(), 'coloring_files'),
+                             default=os.path.join(get_work_dir(), 'coloring_files'),
                              desc='Directory containing coloring files (if any) for this Problem.')
         self.options.declare('group_by_pre_opt_post', types=bool,
                              default=False,
@@ -351,22 +334,38 @@ class Problem(object):
                                        desc='Patterns for vars to exclude in recording '
                                             '(processed post-includes). Uses fnmatch wildcards')
 
-        # Start a run by deleting any existing reports so that the files
-        #   that are in that directory are all from this run and not a previous run
-        reports_dirpath = pathlib.Path(get_reports_dir()).joinpath(f'{self._name}')
-        if self.comm.rank == 0:
-            if os.path.isdir(reports_dirpath):
-                try:
-                    shutil.rmtree(reports_dirpath)
-                except FileNotFoundError:
-                    # Folder already removed by another proccess
-                    pass
-
         # register hooks for any reports
         activate_reports(self._reports, self)
 
         # So Problem and driver can have hooks attached to their methods
         _setup_hooks(self)
+
+    def _set_name(self, name):
+        if not MPI or self.comm.rank == 0:
+            # Set the Problem name so that it can be referenced from command line tools (e.g. check)
+            # that accept a Problem argument, and to name the corresponding outputs subdirectory.
+            if name:  # if name hasn't been used yet, use it. Otherwise, error
+                if name in _problem_names:
+                    issue_warning(f"The problem name '{name}' already exists")
+                self._name = name
+            else:  # No name given: look for a name, of the form, 'problemN', that hasn't been used
+                problem_counter = len(_problem_names) + 1 if _problem_names else ''
+                base = _default_prob_name()
+                _name = f"{base}{problem_counter}"
+                if _name in _problem_names:  # need to make it unique so append string of form '.N'
+                    i = 1
+                    while True:
+                        _name = f"{base}{problem_counter}.{i}"
+                        if _name not in _problem_names:
+                            break
+                        i += 1
+                self._name = _name
+            if self.comm.size > 1:
+                self._name = self.comm.bcast(self._name, root=0)
+        else:
+            self._name = self.comm.bcast(None, root=0)
+
+        _problem_names.append(self._name)
 
     def _has_active_report(self, name):
         """
@@ -885,9 +884,9 @@ class Problem(object):
         """
         return create_local_meta(case_name)
 
-    def setup(self, check=False, logger=None, mode='auto', force_alloc_complex=False,
+    def setup(self, check=None, logger=None, mode='auto', force_alloc_complex=False,
               distributed_vector_class=PETScVector, local_vector_class=DefaultVector,
-              derivatives=True):
+              derivatives=True, parent=None):
         """
         Set up the model hierarchy.
 
@@ -900,7 +899,9 @@ class Problem(object):
         ----------
         check : None, bool, list of str, or the strs ‘all’
             Determines what config checks, if any, are run after setup is complete.
-            If None or False, no checks are run
+            If None: no checks are run unless the 'checks' report is active, in which case the
+            default reports will be run.
+            If False, no checks are run
             If True, the default checks ('out_of_order', 'system', 'solvers', 'dup_inputs',
             'missing_recorders', 'unserializable_options', 'comp_has_no_outputs',
             'auto_ivc_warnings') are run
@@ -926,6 +927,8 @@ class Problem(object):
             and associated transfers involved in intraprocess communication.
         derivatives : bool
             If True, perform any memory allocations necessary for derivative computation.
+        parent : Problem, System, Solver, or None
+            The "parent" object of this problem instance in a tree of potentially nested problems.
 
         Returns
         -------
@@ -964,7 +967,7 @@ class Problem(object):
             'name': self._name,  # the name of this Problem
             'pathname': None,  # the pathname of this Problem in the current tree of Problems
             'comm': comm,
-            'coloring_dir': self.options['coloring_dir'],  # directory for coloring files
+            'coloring_dir': _DEFAULT_COLORING_DIR,  # directory for input coloring files
             'recording_iter': _RecIteration(comm.rank),  # manager of recorder iterations
             'local_vector_class': local_vector_class,
             'distributed_vector_class': distributed_vector_class,
@@ -995,7 +998,7 @@ class Problem(object):
                                      # a, a.b, and a.b.c, with one of the Nones replaced
                                      # by promotes info.  Dict entries are only created if
                                      # src_indices are applied to the variable somewhere.
-            'reports_dir': self.get_reports_dir(),  # directory where reports will be written
+            'reports_dir': None,  # directory where reports will be written
             'saved_errors': [],  # store setup errors here until after final_setup
             'checking': False,  # True if check_totals or check_partials is running
             'model_options': self.model_options,  # A dict of options passed to all systems in tree
@@ -1014,18 +1017,38 @@ class Problem(object):
             'ncompute_totals': 0,  # number of times compute_totals has been called
         }
 
-        if _prob_setup_stack:
-            self._metadata['pathname'] = _prob_setup_stack[-1]._metadata['pathname'] + '/' + \
-                self._name
+        if parent:
+            if isinstance(parent, Problem):
+                parent_prob_meta = parent._metadata
+            elif isinstance(parent, System):
+                parent_prob_meta = parent._problem_meta
+            else:
+                raise ValueError('Problem parent must be another Problem or System instance.')
+        else:
+            parent_prob_meta = None
+
+        if parent_prob_meta and parent_prob_meta['pathname']:
+            self._metadata['pathname'] = parent_prob_meta['pathname'] + f'/{self._name}'
         else:
             self._metadata['pathname'] = self._name
 
-        _prob_setup_stack.append(self)
+        # We don't want to delete the outputs directory because we may be using the coloring files
+        # from a previous run.
+        # Start setup by deleting any existing reports so that the files
+        # that are in that directory are all from this run and not a previous run
+        reports_dirpath = self.get_reports_dir(force=False)
+        if not MPI or (self.comm is not None and self.comm.rank == 0):
+            if os.path.isdir(reports_dirpath):
+                try:
+                    shutil.rmtree(reports_dirpath)
+                except FileNotFoundError:
+                    # Folder already removed by another proccess
+                    pass
+        self._metadata['reports_dir'] = self.get_reports_dir(force=False)
+
         try:
             model._setup(model_comm, self._metadata)
         finally:
-            _prob_setup_stack.pop()
-
             # whenever we're outside of model._setup, static mode should be True so that anything
             # added outside of _setup will persist.
             self._metadata['static_mode'] = True
@@ -1594,7 +1617,7 @@ class Problem(object):
                     # one.
                     if _wrt in local_opts and local_opts[_wrt]['directional']:
                         if i == 0:  # only do this on the first iteration
-                            deriv[f'J_fwd'] = np.atleast_2d(np.sum(deriv['J_fwd'], axis=1)).T
+                            deriv['J_fwd'] = np.atleast_2d(np.sum(deriv['J_fwd'], axis=1)).T
 
                         if comp.matrix_free:
                             if i == 0:  # only do this on the first iteration
@@ -1625,8 +1648,8 @@ class Problem(object):
             issue_warning(msg, category=DerivativesWarning)
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
-                                  compact_print, comps, all_fd_options, indep_key=indep_key,
-                                  print_reverse=print_reverse,
+                                  compact_print, comps, all_fd_options, self.comm,
+                                  indep_key=indep_key, print_reverse=print_reverse,
                                   show_only_incorrect=show_only_incorrect)
 
         if not do_steps:
@@ -1912,7 +1935,7 @@ class Problem(object):
                     data[''][key]['indices'] = resp[of]['indices'].indexed_src_size
 
         _assemble_derivative_data(data, rel_err_tol, abs_err_tol, out_stream, compact_print,
-                                  [model], {'': fd_args}, totals=total_info, lcons=lcons,
+                                  [model], {'': fd_args}, self.comm, totals=total_info, lcons=lcons,
                                   show_only_incorrect=show_only_incorrect, sort=sort)
 
         if not do_steps:
@@ -2457,11 +2480,22 @@ class Problem(object):
         if checks is None:
             return
 
+        reports_dir_exists = os.path.isdir(self.get_reports_dir())
+        check_file_path = None
         if logger is None:
-            logger = get_logger('check_config', out_file=out_file, use_format=True)
+            if out_file is not None:
+                if reports_dir_exists:
+                    check_file_path = str(self.get_reports_dir() / out_file)
+                else:
+                    check_file_path = out_file
+            logger = get_logger('check_config', out_file=check_file_path, use_format=True)
 
         if checks == 'all':
             checks = sorted(_all_non_redundant_checks)
+
+        if logger is None and checks:
+            check_file_path = None if out_file is None else str(self.get_outputs_dir() / out_file)
+            logger = get_logger('check_config', out_file=check_file_path, use_format=True)
 
         for c in checks:
             if c not in _all_checks:
@@ -2470,6 +2504,16 @@ class Problem(object):
                 continue
             logger.info(f'checking {c}')
             _all_checks[c](self, logger)
+
+        if checks and check_file_path is not None and reports_dir_exists:
+            # turn text file written to reports dir into an html file to be viewable from the
+            # 'openmdao view_reports' command
+            with open(check_file_path, 'r') as f:
+                txt = f.read()
+
+            path = self.get_reports_dir() / 'checks.html'
+            with open(path, 'w') as f:
+                f.write(text2html(txt))
 
     def set_complex_step_mode(self, active):
         """
@@ -2507,15 +2551,56 @@ class Problem(object):
 
         Returns
         -------
-        str
+        pathlib.Path
             The path to the directory where reports should be written.
         """
-        reports_dirpath = pathlib.Path(get_reports_dir()).joinpath(f'{self._name}')
+        return self.get_outputs_dir('reports', mkdir=force or len(self._reports) > 0)
 
-        if self.comm.rank == 0 and (force or self._reports):
-            pathlib.Path(reports_dirpath).mkdir(parents=True, exist_ok=True)
+    def get_outputs_dir(self, *subdirs, mkdir=True):
+        """
+        Get the path under which all output files of this problem are to be placed.
 
-        return reports_dirpath
+        Parameters
+        ----------
+        *subdirs : str
+            Subdirectories nested under the relevant problem output directory.
+            To create {prob_output_dir}/a/b one would pass `prob.get_outputs_dir('a', 'b')`.
+        mkdir : bool
+            If True, attempt to create this directory if it does not exist.
+
+        Returns
+        -------
+        pathlib.Path
+           The path of the outputs directory for the problem.
+        """
+        return _get_outputs_dir(self, *subdirs, mkdir=mkdir)
+
+    def get_coloring_dir(self, mode, mkdir=False):
+        """
+        Get the path to the directory for the coloring files.
+
+        Parameters
+        ----------
+        mode : str
+            Must be one of 'input' or 'output'. A problem will always write its coloring files to
+            its standard output directory in `{prob_name}_out/coloring_files`, but input coloring
+            files to be loaded may be read from a different directory specifed by the problem's
+            `coloring_dir` option.
+        mkdir : bool
+            If True, attempt to create this directory if it does not exist.
+
+        Returns
+        -------
+        pathlib.Path
+            The path to the directory where reports should be written.
+        """
+        if mode == 'input':
+            return pathlib.Path(self.options['coloring_dir'])
+        elif mode == 'output':
+            return self.get_outputs_dir('coloring_files', mkdir=mkdir)
+        else:
+            raise ValueError(f"{self.msginfo}: get_coloring_dir requires mode"
+                             "to be one of 'input' or 'output'.")
 
     def list_indep_vars(self, include_design_vars=True, options=None,
                         print_arrays=False, out_stream=_DEFAULT_OUT_STREAM):
@@ -2606,7 +2691,7 @@ class Problem(object):
                     out_stream = sys.stdout
                 hr = '-' * len(header)
                 print(f'{hr}\n{header}\n{hr}', file=out_stream)
-                print(f'None found', file=out_stream)
+                print('None found', file=out_stream)
 
         return problem_indep_vars
 
@@ -2772,7 +2857,8 @@ class Problem(object):
                     coloring = \
                         coloring_mod.dynamic_total_coloring(
                             self.driver, run_model=do_run,
-                            fname=self.driver._get_total_coloring_fname(), of=of, wrt=wrt)
+                            fname=self.driver._get_total_coloring_fname(mode='output'),
+                            of=of, wrt=wrt)
             else:
                 return coloring_info.coloring
 
@@ -3034,7 +3120,7 @@ def _fix_check_data(data):
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
-                              compact_print, system_list, global_options, totals=False,
+                              compact_print, system_list, global_options, comm, totals=False,
                               indep_key=None, print_reverse=False,
                               show_only_incorrect=False, lcons=None, sort=False):
     """
@@ -3057,6 +3143,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         The systems (in the proper order) that were checked.
     global_options : dict
         Dictionary containing the options for the approximation.
+    comm : MPI.Comm or FakeComm
+        The MPI communicator.
     totals : bool or _TotalJacInfo
         Set to _TotalJacInfo if we are doing check_totals to skip a bunch of stuff.
     indep_key : dict of sets, optional
@@ -3121,7 +3209,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             num_col_meta = {'format': num_format}
 
             if totals:
-                title = f"Total Derivatives"
+                title = "Total Derivatives"
             else:
                 title = f"{sys_type}: {sys_class_name} '{sys_name}'"
 
@@ -3349,8 +3437,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 if inconsistent:
                     out_buffer.write('\n    * Inconsistent value across ranks *\n')
 
-                if MPI and MPI.COMM_WORLD.size > 1:
-                    out_buffer.write(f'\n    MPI Rank {MPI.COMM_WORLD.rank}\n')
+                if MPI and comm.size > 1:
+                    out_buffer.write(f'\n    MPI Rank {comm.rank}\n')
                 out_buffer.write('\n')
 
                 with np.printoptions(linewidth=240):

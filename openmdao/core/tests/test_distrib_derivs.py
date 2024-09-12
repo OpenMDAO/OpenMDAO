@@ -32,19 +32,11 @@ try:
 except ImportError:
     PETScVector = None
 
-if MPI:
-    rank = MPI.COMM_WORLD.rank
-else:
-    rank = 0
-
 
 class DistribCoordComp(om.ExplicitComponent):
 
     def setup(self):
-        comm = self.comm
-        rank = comm.rank
-
-        if rank == 0:
+        if self.comm.rank == 0:
             self.add_input('invec', np.zeros((5, 3)), distributed=True)
             self.add_output('outvec', np.zeros((5, 3)), distributed=True)
         else:
@@ -285,7 +277,7 @@ def _test_func_name(func, num, param):
     for p in param.args:
         try:
             arg = p.__name__
-        except:
+        except Exception:
             arg = str(p)
         args.append(arg)
     return func.__name__ + '_' + '_'.join(args)
@@ -870,13 +862,13 @@ class MPITests2(unittest.TestCase):
 
         assert_check_totals(prob.check_totals(method='fd', out_stream=None), rtol=1e-5)
 
-    def test_distrib_voi_group_fd2(self):
+    def test_distrib_voi_group_fd2_fwd(self):
         prob = _setup_ivc_subivc_dist_parab_sum()
         prob.setup(mode='fwd', force_alloc_complex=True)
         prob.run_model()
         assert_check_totals(prob.check_totals(method='fd', out_stream=None))
 
-    def test_distrib_voi_group_fd2(self):
+    def test_distrib_voi_group_fd2_rev(self):
         prob = _setup_ivc_subivc_dist_parab_sum()
         prob.setup(mode='rev', force_alloc_complex=True)
         prob.run_model()
@@ -1257,13 +1249,13 @@ class MPITests2(unittest.TestCase):
             assert_check_totals(prob.check_totals(method='cs', out_stream=None), rtol=1e-13)
 
     def run_mixed_distrib2_prob(self, mode, klass=MixedDistrib2):
-        size = 5
-        comm = MPI.COMM_WORLD
-        rank = comm.rank
-        sizes, offsets = evenly_distrib_idxs(comm.size, size)
-
         prob = om.Problem()
         model = prob.model
+
+        size = 5
+        comm = prob.comm
+        rank = comm.rank
+        sizes, offsets = evenly_distrib_idxs(comm.size, size)
 
         ivc = om.IndepVarComp()
         ivc.add_output('x_dist', np.zeros(sizes[rank]), distributed=True)
@@ -1329,13 +1321,13 @@ class MPITests2(unittest.TestCase):
     def test_distrib_cascade_rev(self):
         # Tests the derivatives on a complicated model that is the distributed equivalent
         # of a double diamond.
-        size = 5
-        comm = MPI.COMM_WORLD
-        rank = comm.rank
-        sizes, offsets = evenly_distrib_idxs(comm.size, size)
-
         prob = om.Problem()
         model = prob.model
+
+        size = 5
+        comm = prob.comm
+        rank = comm.rank
+        sizes, offsets = evenly_distrib_idxs(comm.size, size)
 
         ivc = om.IndepVarComp()
         ivc.add_output('x_dist', np.zeros(sizes[rank]), distributed=True)
@@ -2191,7 +2183,7 @@ class TestBugs(unittest.TestCase):
                 outputs['func'] += np.sum(inputs['state'])
 
         prob = om.Problem()
-        dvs = prob.model.add_subsystem('dvs',DVS())
+        prob.model.add_subsystem('dvs', DVS())
         prob.model.add_subsystem('solver', SolverComp())
         prob.model.connect('dvs.state','solver.state')
         prob.model.add_design_var('dvs.state', indices=[0,2])
@@ -2431,11 +2423,13 @@ class TestDistribBugs(unittest.TestCase):
     def get_problem(self, comp_class, mode='auto', stacked=False):
         size = 5
 
-        comm = MPI.COMM_WORLD
+        prob = om.Problem()
+
+        comm = prob.comm
         rank = comm.rank
         sizes, offsets = evenly_distrib_idxs(comm.size, size)
 
-        model = om.Group()
+        model = prob.model
 
         ivc = om.IndepVarComp()
         ivc.add_output('x_dist', np.zeros(sizes[rank]), distributed=True)
@@ -2452,7 +2446,6 @@ class TestDistribBugs(unittest.TestCase):
             model.connect('D1.out_dist', 'D2.in_dist')
             model.connect('D1.out_nd', 'D2.in_nd')
 
-        prob = om.Problem(model)
         prob.setup(mode=mode, force_alloc_complex=True)
 
         self.x_dist_init = x_dist_init = (3.0 + np.arange(size)[offsets[rank]:offsets[rank] + sizes[rank]]) * .1
@@ -2472,8 +2465,8 @@ class TestDistribBugs(unittest.TestCase):
             Jname = 'J_fwd' if 'J_fwd' in val else 'J_rev'
             idx = 0 if 'J_fwd' in val else 1
             try:
-                analytic = val[Jname]
-                fd = val['J_fd']
+                val[Jname]  # analytic
+                val['J_fd']  # FD
             except Exception as err:
                 self.fail(f"For key {key}: {err}")
             try:
@@ -2595,14 +2588,14 @@ class TestDistribBugs(unittest.TestCase):
 
     def test_check_err(self):
         with self.assertRaises(RuntimeError) as cm:
-            prob = self.get_problem(Distrib_DerivsErr)
+            self.get_problem(Distrib_DerivsErr)
 
         msg = "'D1' <class Distrib_DerivsErr>: component has defined partial ('out_nd', 'in_dist') which is a non-distributed output wrt a distributed input. This is only supported using the matrix free API."
         self.assertEqual(str(cm.exception), msg)
 
     def test_fd_check_err(self):
         with self.assertRaises(RuntimeError) as cm:
-            prob = self.get_problem(Distrib_DerivsFD, mode='fwd')
+            self.get_problem(Distrib_DerivsFD, mode='fwd')
 
         msg = "'D1' <class Distrib_DerivsFD>: component has defined partial ('out_nd', 'in_dist') which is a non-distributed output wrt a distributed input. This is only supported using the matrix free API."
         self.assertEqual(str(cm.exception), msg)
@@ -2631,7 +2624,7 @@ class TestDistribBugs(unittest.TestCase):
 
         prob.run_driver()
 
-        desvar = prob.driver.get_design_var_values()
+        prob.driver.get_design_var_values()
         con = prob.driver.get_constraint_values()
 
         assert_near_equal(con['f_xy'], 24.0)

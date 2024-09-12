@@ -4,7 +4,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.test_suite.components.double_sellar import DoubleSellar
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.visualization.inputs_report.inputs_report import inputs_report
 
@@ -105,7 +105,6 @@ class TestInputReportsMPI(unittest.TestCase):
                 self.options.declare('n0')
 
             def setup(self):
-                n0 = self.options['n0']
                 self.add_input('x', shape_by_conn=True, distributed=True)
                 self.add_output('x_sum', shape=1)
 
@@ -113,8 +112,8 @@ class TestInputReportsMPI(unittest.TestCase):
                 outputs['x_sum'] = self.comm.allreduce(np.sum(inputs['x']))
 
 
-        n0 = (20,2) if MPI.COMM_WORLD.rank ==0 else (8,2)
         p = om.Problem()
+        n0 = (20,2) if p.comm.rank ==0 else (8,2)
         ivc = p.model.add_subsystem('ivc',om.IndepVarComp())
         ivc.add_output('x', val = np.random.random(n0), distributed=True)
 

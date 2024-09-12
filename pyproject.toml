@@ -33,7 +33,7 @@ classifiers = [
 ]
 dependencies = [
     "networkx>=2.0",
-    "numpy<2",
+    "numpy",
     "packaging",
     "requests",
     "scipy",
@@ -66,6 +66,7 @@ notebooks = [
     "idna>=3.7",
 ]
 test = [
+    "pre-commit",
     "aiounittest",
     "num2words",
     "numpydoc>=1.1",
@@ -107,6 +108,7 @@ externalcodecomp = "openmdao.components.external_code_comp:ExternalCodeComp"
 externalcodeimplicitcomp = "openmdao.components.external_code_comp:ExternalCodeImplicitComp"
 implicitfunccomp = "openmdao.components.implicit_func_comp:ImplicitFuncComp"
 indepvarcomp = "openmdao.core.indepvarcomp:IndepVarComp"
+inputresidscomp = "openmdao.components.input_resids_comp:InputResidsComp"
 kscomp = "openmdao.components.ks_comp:KSComp"
 linearsystemcomp = "openmdao.components.linear_system_comp:LinearSystemComp"
 matrixvectorproductcomp = "openmdao.components.matrix_vector_product_comp:MatrixVectorProductComp"
@@ -175,3 +177,27 @@ path = "openmdao/__init__.py"
 include = [
     "/openmdao",
 ]
+
+[tool.ruff]
+line-length = 100
+indent-width = 4
+
+[tool.ruff.format]
+indent-style = "space"
+line-ending = "lf"
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+# Ignore `F401` (unused import) in api files.
+"api.py" = ["F401"]
+"parallel_api.py" = ["F401"]
+"__init__.py" = ["F401"]
+# Ignore files in the test suite.
+"**/test_suite/**" = ["E","F"]
+# Allow variable name I for current
+"**/extcode_resistor.py" = ["E741"]
+"**/circuit_analysis_examples.ipynb" = ["E741"]
+# Ignore some import related conventions in docs
+"**/openmdao_book/**" = ["E402","F811"]

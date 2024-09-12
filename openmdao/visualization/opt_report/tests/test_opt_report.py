@@ -1,5 +1,4 @@
 import os
-import pathlib
 import unittest
 
 import numpy as np
@@ -113,7 +112,7 @@ class TestOptimizationReport(unittest.TestCase):
         """
         if prob is None:
             prob = self.prob
-        report_file_path = str(pathlib.Path(prob.get_reports_dir()).joinpath(_default_optimizer_report_filename))
+        report_file_path = prob.get_reports_dir() / _default_optimizer_report_filename
 
         check_rows = {
             # 'runtime': 'Wall clock run time:',
@@ -134,7 +133,7 @@ class TestOptimizationReport(unittest.TestCase):
             else:
                 try:
                     value = int(value)
-                except ValueError as err:
+                except ValueError:
                     pass
             return value
 
@@ -170,7 +169,7 @@ class TestOptimizationReport(unittest.TestCase):
         with assert_warning(DriverWarning, expected_warning_msg):
             opt_report(self.prob)
 
-        outfilepath = str(pathlib.Path(self.prob.get_reports_dir()).joinpath(_default_optimizer_report_filename))
+        outfilepath = self.prob.get_reports_dir() / _default_optimizer_report_filename
         self.assertFalse(os.path.exists(outfilepath))
 
     def test_opt_report_scipyopt_SLSQP(self):
@@ -256,7 +255,7 @@ class TestOptimizationReport(unittest.TestCase):
                                "which does not support optimization"
         with assert_warning(DriverWarning, expected_warning_msg):
             opt_report(prob)
-        outfilepath = str(pathlib.Path(prob.get_reports_dir()).joinpath(_default_optimizer_report_filename))
+        outfilepath = prob.get_reports_dir() / _default_optimizer_report_filename
         self.assertFalse(os.path.exists(outfilepath))
 
     @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
@@ -555,7 +554,7 @@ class TestOptimizationReport(unittest.TestCase):
         prob.run_driver()
 
         opt_report(self.prob)
-        report_file_path = str(pathlib.Path(prob.get_reports_dir()).joinpath(_default_optimizer_report_filename))
+        report_file_path = prob.get_reports_dir() / _default_optimizer_report_filename
 
         with open(report_file_path, 'r') as f:
             for line in f.readlines():

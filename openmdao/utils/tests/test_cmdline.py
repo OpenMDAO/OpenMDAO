@@ -64,6 +64,7 @@ cmd_tests = [
     ('openmdao check {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao comm_info {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao cite {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
+    ('openmdao clean --dryrun {}'.format(scriptdir), {}),
     ('openmdao compute_entry_points openmdao', {}),
     ('openmdao graph --no-display {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot, 'graphviz': graphviz}),
     ('openmdao graph --no-display --type=tree {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot, 'graphviz': graphviz}),
@@ -115,11 +116,43 @@ class CmdlineTestCase(unittest.TestCase):
         # check the expected output at all.  The underlying functions that implement the
         # commands should be tested seperately.
         try:
-            output = subprocess.check_output(cmd.split(),
-                                             stderr=subprocess.STDOUT)  # nosec: trusted input
+            subprocess.check_output(cmd.split(),
+                                    stderr=subprocess.STDOUT)  # nosec: trusted input
         except subprocess.CalledProcessError as err:
             self.fail(f"Command '{cmd}' failed.  Return code: {err.returncode}: "
                       f"Output was: \n{err.output.decode('utf-8')}")
+
+    def test_clean(self):
+        import openmdao.api as om
+
+        p1 = om.Problem()
+        p1.model.add_subsystem('exec', om.ExecComp('y = a + b'))
+        p1.setup()
+        p1.run_model()
+
+        p2 = om.Problem()
+        p2.model.add_subsystem('exec', om.ExecComp('z = a * b'))
+        p2.setup()
+        p2.run_model()
+
+        p1_outdir = os.path.basename(str(p1.get_outputs_dir()))
+        p2_outdir = os.path.basename(str(p2.get_outputs_dir()))
+
+        subdirs = os.listdir(os.getcwd())
+        self.assertIn(p1_outdir, subdirs)
+        self.assertIn(p2_outdir, subdirs)
+
+        proc = subprocess.Popen('openmdao clean -f'.split(),  # nosec: trusted input
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            outs, errs = proc.communicate(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            outs, errs = proc.communicate()
+
+        subdirs = os.listdir(os.getcwd())
+        self.assertNotIn(p1_outdir, subdirs)
+        self.assertNotIn(p2_outdir, subdirs)
 
     def test_n2_err(self):
         # command should raise exception but still produce an n2 html file
@@ -176,7 +209,7 @@ class CmdlineTestfuncTestCase(unittest.TestCase):
         # check the expected output at all.  The underlying functions that implement the
         # commands should be tested seperately.
         try:
-            output = subprocess.check_output(cmd.split())  # nosec: trusted input
+            subprocess.check_output(cmd.split())  # nosec: trusted input
         except subprocess.CalledProcessError as err:
             self.fail(f"Command '{cmd}' failed.  Return code: {err.returncode} "
                       f"Output was: \n{err.output.decode('utf-8')}")

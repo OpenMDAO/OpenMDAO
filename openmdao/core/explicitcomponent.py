@@ -66,8 +66,6 @@ class ExplicitComponent(Component):
         """
         Configure this system to assign children settings and detect if matrix_free.
         """
-        new_jacvec_prod = getattr(self, 'compute_jacvec_product', None)
-
         if self.matrix_free == _UNDEFINED:
             self.matrix_free = overrides_method('compute_jacvec_product', self, ExplicitComponent)
 
@@ -111,6 +109,15 @@ class ExplicitComponent(Component):
                 dist_sizes = sizes[:, toidx[wrt]] if meta['distributed'] else None
                 yield wrt, start, end, vec, _full_slice, dist_sizes
                 start = end
+
+    def _setup_residuals(self):
+        """
+        Prevent the user from implementing setup_residuals for explicit components.
+        """
+        if overrides_method('setup_residuals', self, ExplicitComponent):
+            raise RuntimeError(f'{self.msginfo}: Class overrides setup_residuals but '
+                               'is an ExplicitComponent. setup_residuals may only be '
+                               'overridden by ImplicitComponents.')
 
     def _setup_partials(self):
         """

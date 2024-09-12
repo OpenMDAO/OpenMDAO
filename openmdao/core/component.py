@@ -2,7 +2,6 @@
 
 import sys
 import types
-from types import LambdaType
 from collections import defaultdict
 from collections.abc import Iterable
 from itertools import product
@@ -18,7 +17,7 @@ from openmdao.core.constants import INT_DTYPE
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.units import simplify_unit
-from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_name2abs_name
+from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     find_matches, make_set, inconsistent_across_procs
@@ -193,7 +192,6 @@ class Component(System):
                 self._num_par_fd = 1
 
         self.comm = comm
-        nprocs = comm.size
 
         # Clear out old variable information so that we can call setup on the component.
         self._var_rel_names = {'input': [], 'output': []}
@@ -406,6 +404,12 @@ class Component(System):
         This is meant to be overridden by component classes.  All partials should be
         declared here since this is called after all size/shape information is known for
         all variables.
+        """
+        pass
+
+    def _setup_residuals(self):
+        """
+        Process hook to call user-defined setup_residuals method if provided.
         """
         pass
 

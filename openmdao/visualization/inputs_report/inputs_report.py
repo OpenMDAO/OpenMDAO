@@ -1,15 +1,9 @@
 """
 A Viewer for OpenMDAO inputs.
 """
-import pathlib
 import functools
 
 import numpy as np
-
-try:
-    from IPython.display import IFrame, display, HTML
-except ImportError:
-    IFrame = display = None
 
 from openmdao.core.problem import Problem
 from openmdao.utils.mpi import MPI
@@ -155,7 +149,7 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
 # inputs report definition
 def _run_inputs_report(prob, report_filename='inputs.html'):
 
-    path = str(pathlib.Path(prob.get_reports_dir()).joinpath(report_filename))
+    path = prob.get_reports_dir() / report_filename
     inputs_report(prob, display=False, outfile=path,
                   title=f'Inputs Report for {prob._name}', tablefmt='tabulator')
 

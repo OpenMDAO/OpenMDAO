@@ -2,7 +2,7 @@
 import unittest
 
 import openmdao.api as om
-from openmdao.test_suite.build4test import DynComp, create_dyncomps, make_subtree
+from openmdao.test_suite.build4test import make_subtree
 
 
 class BM(unittest.TestCase):

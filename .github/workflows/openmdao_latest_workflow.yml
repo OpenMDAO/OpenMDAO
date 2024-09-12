@@ -53,7 +53,7 @@ jobs:
             OS: ubuntu-latest
             PY: 3
             NUMPY: '<2'
-            PETSc: True
+            PETSc: true
             PYOPTSPARSE: true
             SNOPT: true
             BANDIT: true
@@ -71,7 +71,7 @@ jobs:
             OS: macos-13
             PY: 3
             NUMPY: '<2'
-            PETSc: True
+            PETSc: true
             PYOPTSPARSE: true
 
           # test latest versions on macos
@@ -124,7 +124,6 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: ${{ matrix.PY }}
-          conda-version: "*"
           channels: conda-forge
 
       - name: Install MacOS-specific dependencies
@@ -152,7 +151,11 @@ jobs:
           echo "============================================================="
           echo "Install latest PETSc"
           echo "============================================================="
-          conda install mpi4py petsc!=3.21.1 petsc4py -q -y
+          if [[ "${{ matrix.NUMPY }}" == "<2" ]]; then
+            conda install mpich mpi4py petsc4py=3.21.2 -q -y
+          else
+            conda install mpich mpi4py petsc4py -q -y
+          fi
 
           echo "============================================================="
           echo "Check MPI and PETSc installation"
@@ -373,6 +376,7 @@ jobs:
           echo "See: https://numpy.org/devdocs/numpy_2_0_migration_guide.html"
           echo "============================================================="
           python -m pip install ruff
+          cd ${{ github.workspace }}
           ruff check . --select NPY201
 
       - name: Slack env change

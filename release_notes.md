@@ -1,4 +1,53 @@
 ***********************************
+# Release Notes for OpenMDAO 3.34.2
+
+July 25, 2024
+
+OpenMDAO 3.34.2 is a patch release to fix an issue with ScipyOptimizeDriver introduced in the scaling report PR.
+
+## Bug Fixes
+
+- Fixed issue with ScipyOptimizeDriver introduced in the scaling report PR.  [#3307](https://github.com/OpenMDAO/OpenMDAO/pull/3307)
+
+***********************************
+# Release Notes for OpenMDAO 3.34.1
+
+July 23, 2024
+
+OpenMDAO 3.34.1 is a patch release to fix a bug with the scaling report when there are linear-only design variables.
+
+## Bug Fixes
+
+- Fixed issue with scaling report when there are linear-only design variables.  [#3302](https://github.com/OpenMDAO/OpenMDAO/pull/3302)
+
+***********************************
+# Release Notes for OpenMDAO 3.34.0
+
+July 19, 2024
+
+OpenMDAO 3.34.0 provides a new implicit component, and adds the `list_vars` method to Case objects for a consistent API between cases and Problems/models. The dependency check for discrete variables was made more performant, since it was being slow when many discrete variables were present, and some bugs with `load_case` were fixed for cases when discrete variables were present.
+
+## New Features
+
+- Optimizers now keep track of design vars that impact linear constraints and nonlinear responses separately. [#3275](https://github.com/OpenMDAO/OpenMDAO/pull/3275)
+- Updated the hook system to allow args and/or return value to be passed to hook functions [#3276](https://github.com/OpenMDAO/OpenMDAO/pull/3276)
+- Added the `list_vars` method to the Case object. [#3293](https://github.com/OpenMDAO/OpenMDAO/pull/3293)
+- Added InputResidsComp to the list of components. Added `setup_residuals method` for compatibility with dynamic shaping. [#3295](https://github.com/OpenMDAO/OpenMDAO/pull/3295)
+
+## Bug Fixes
+
+- Implemented a speed up for the discrete variable dependency check. [#3277](https://github.com/OpenMDAO/OpenMDAO/pull/3277)
+- Fixed test_scaffold test that didn't clean up site-packages installs on some machines [#3279](https://github.com/OpenMDAO/OpenMDAO/pull/3279)
+- Added Try Except for Report Dir removal [#3281](https://github.com/OpenMDAO/OpenMDAO/pull/3281)
+- Fixed Problem.load_case for discrete variables [#3284](https://github.com/OpenMDAO/OpenMDAO/pull/3284) [#3289](https://github.com/OpenMDAO/OpenMDAO/pull/3289)
+- Fixed an issue where the scaling report was causing an extra call to compute totals if there were linear constraints [#3296](https://github.com/OpenMDAO/OpenMDAO/pull/3296)
+
+## Miscellaneous
+
+- Removed 2.0.0 pin from pydocstyle dependency requirement [#3286](https://github.com/OpenMDAO/OpenMDAO/pull/3286)
+- Updated a couple of tests to pass the NumPy 2.x compatibility check [#3291](https://github.com/OpenMDAO/OpenMDAO/pull/3291)
+
+***********************************
 # Release Notes for OpenMDAO 3.33.0
 
 June 07, 2024

@@ -256,6 +256,7 @@ class ScipyOptimizeDriver(Driver):
         model = prob.model
         self.iter_count = 0
         self._total_jac = None
+        self._total_jac_linear = None
         self._desvar_array_cache = None
 
         self._check_for_missing_objective()
@@ -332,7 +333,7 @@ class ScipyOptimizeDriver(Driver):
 
         # Constraints
         constraints = []
-        i = 1  # start at 1 since row 0 is the objective.  Constraints start at row 1.
+        nl_i = 1  # start at 1 since row 0 is the objective.  Constraints start at row 1.
         lin_i = 0  # counter for linear constraint jacobian
         lincons = []  # list of linear constraints
         self._obj_and_nlcons = list(self._objs)
@@ -366,8 +367,8 @@ class ScipyOptimizeDriver(Driver):
                     lin_i += size
                 else:
                     self._obj_and_nlcons.append(name)
-                    self._con_idx[name] = i
-                    i += size
+                    self._con_idx[name] = nl_i
+                    nl_i += size
 
                 # In scipy constraint optimizers take constraints in two separate formats
 
@@ -552,8 +553,6 @@ class ScipyOptimizeDriver(Driver):
         except Exception as msg:
             if self._exc_info is None:
                 raise
-        finally:
-            self._total_jac = None
 
         if self._exc_info is not None:
             self._reraise()
@@ -627,7 +626,7 @@ class ScipyOptimizeDriver(Driver):
 
             self._update_design_vars(x_new)
 
-            with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
+            with RecordingDebugging(self._get_name(), self.iter_count, self):
                 self.iter_count += 1
                 with model._relevance.nonlinear_active('iter'):
                     self._run_solve_nonlinear()
@@ -639,7 +638,7 @@ class ScipyOptimizeDriver(Driver):
 
             self._con_cache = self.get_constraint_values()
 
-        except Exception as msg:
+        except Exception:
             if self._exc_info is None:  # only record the first one
                 self._exc_info = sys.exc_info()
             return 0

@@ -4,7 +4,6 @@ Class definitions for Relevance and related classes.
 
 from contextlib import contextmanager
 from collections import defaultdict
-import atexit
 
 import numpy as np
 
@@ -786,6 +785,9 @@ class Relevance(object):
         self._current_rel_varray = self._get_rel_array(self._seed_var_map,
                                                        self._single_seed2relvars,
                                                        fwd_seeds, rev_seeds)
+        if self._current_rel_varray.size == 0:
+            self._active = False
+
         self._current_rel_sarray = self._get_rel_array(self._seed_sys_map,
                                                        self._single_seed2relsys,
                                                        fwd_seeds, rev_seeds)

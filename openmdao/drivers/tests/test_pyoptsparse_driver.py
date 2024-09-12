@@ -17,7 +17,6 @@ from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
 from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
-from openmdao.utils.reports_system import get_reports_dir
 from openmdao.utils.testing_utils import use_tempdirs, require_pyoptsparse
 from openmdao.utils.om_warnings import OMDeprecationWarning
 from openmdao.utils.mpi import MPI
@@ -193,7 +192,7 @@ class TestMPIScatter(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        proc_vals = MPI.COMM_WORLD.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']])
+        proc_vals = prob.comm.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']])
         np.testing.assert_array_almost_equal(proc_vals[0], proc_vals[1])
 
     @require_pyoptsparse(OPTIMIZER)
@@ -227,14 +226,11 @@ class TestMPIScatter(unittest.TestCase):
 
         prob.run_driver()
 
-        desvar = prob.driver.get_design_var_values()
         con = prob.driver.get_constraint_values()
         obj = prob.driver.get_objective_values()
 
         assert_near_equal(obj['f_sum'], 0.0, 2e-6)
-        assert_near_equal(con['f_xy'],
-                          np.zeros(7),
-                          1e-5)
+        assert_near_equal(con['f_xy'], np.zeros(7), 1e-5)
 
     @require_pyoptsparse('ParOpt')
     def test_paropt_distcomp(self):
@@ -267,14 +263,11 @@ class TestMPIScatter(unittest.TestCase):
 
         prob.run_driver()
 
-        desvar = prob.driver.get_design_var_values()
         con = prob.driver.get_constraint_values()
         obj = prob.driver.get_objective_values()
 
         assert_near_equal(obj['sum.f_sum'], 0.0, 4e-6)
-        assert_near_equal(con['parab.f_xy'],
-                          np.zeros(7),
-                          1e-5)
+        assert_near_equal(con['parab.f_xy'], np.zeros(7), 1e-5)
 
 
 @require_pyoptsparse(OPTIMIZER)
@@ -2376,9 +2369,12 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_objective('exec.y', index=50)
         p.model.add_constraint('exec.z', indices=[0], equals=25)
 
-        msg = "Constraint 'exec.z' already exists. Use the 'alias' argument to apply a second constraint"
-        with self.assertRaises(RuntimeError) as msg:
+        with self.assertRaises(RuntimeError) as ctx:
             p.model.add_constraint('exec.z', indices=[-1], lower=20)
+
+        self.assertEqual(str(ctx.exception),
+                         "<class Group>: Constraint 'exec.z' already exists. "
+                         "Use the 'alias' argument to apply a second constraint")
 
     def test_obj_and_con_same_var_different_indices(self):
 
@@ -2573,7 +2569,6 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(force_alloc_complex=True)
         prob.run_model()
 
-        desvar = prob.driver.get_design_var_values()
         con = prob.driver.get_constraint_values()
 
         assert_near_equal(con['a1'], 24.0)
@@ -3255,7 +3250,6 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         import signal
 
         prob = om.Problem()
-        model = prob.model
 
         prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = "SNOPT"
@@ -3370,7 +3364,7 @@ class TestPyoptSparseOutputFiles(unittest.TestCase):
         return prob
 
     def run_and_test_default_output_dir(self, optimizer, output_file_names):
-        # default is to put the files in the reports directory under the problem name folder
+        # default is to put the files in the ouputs directory for the problem
         # output_file_names is a list of tuples of setting name and output file name
         prob = self.createParaboloidProblem()
         prob.driver = pyOptSparseDriver(optimizer=optimizer, print_results=False)
@@ -3379,7 +3373,7 @@ class TestPyoptSparseOutputFiles(unittest.TestCase):
             prob.driver.opt_settings['fileout'] = 3 # need this to be 3 to get the output files
 
         prob.run_driver()
-        default_output_dir = pathlib.Path(get_reports_dir()).joinpath(prob._name)
+        default_output_dir = prob.get_outputs_dir()
         for opt_setting_name, output_file_name in output_file_names:
             output_file = default_output_dir.joinpath(output_file_name)
             self.assertTrue(output_file.is_file(),
@@ -3398,14 +3392,14 @@ class TestPyoptSparseOutputFiles(unittest.TestCase):
 
         prob.run_driver()
         for opt_setting_name, output_file_name in output_file_names:
-            output_file = pathlib.Path(output_file_name)
+            output_file = prob.get_outputs_dir() / output_file_name
             self.assertTrue(output_file.is_file(),
                         f"{output_file_name} output file not found at {str(output_file)}")
 
     def run_and_test_user_set_output_dir(self, optimizer, output_file_names):
         # output_file_names is a list of tuples of setting name and output file name
 
-        user_directory_name = 'user_reports_dir'
+        user_directory_name = 'user_outputs_dir'
         pathlib.Path(user_directory_name).mkdir(exist_ok=True)
 
         prob = self.createParaboloidProblem()
@@ -3413,7 +3407,6 @@ class TestPyoptSparseOutputFiles(unittest.TestCase):
 
         if optimizer == 'ALPSO':
             prob.driver.opt_settings['fileout'] = 3
-
 
         prob.driver.options['output_dir'] = user_directory_name
 
@@ -3444,6 +3437,75 @@ class TestPyoptSparseOutputFiles(unittest.TestCase):
 
 
 
+@unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
+@use_tempdirs
+class TestLinearOnlyDVs(unittest.TestCase):
+    def setup_lin_only_dv_problem(self, driver, shape=(2, 3)):
+        prob = om.Problem()
+        prob.driver = driver
+        model = prob.model
+
+        ivc = model.add_subsystem('ivc', om.IndepVarComp())
+        ivc.add_output('x', np.ones(shape))
+        ivc.add_output('y', np.ones(shape))
+        ivc.add_output('z', np.ones(shape))
+
+        model.add_subsystem('comp', om.ExecComp('f_xy=x*2.-y*3.', shape=shape))
+        model.add_subsystem('obj', om.ExecComp('obj = sum(x**2)', obj=1., x=np.ones(shape)))
+        model.add_subsystem('con', om.ExecComp('y=x', shape=shape))
+        model.add_subsystem('con2', om.ExecComp('y=sin(x)', shape=shape))
+        model.add_subsystem('con3', om.ExecComp('y=.2*x', shape=shape), promotes_inputs=['x'])
+        model.add_subsystem('con4', om.ExecComp('y=cos(x)', shape=shape), promotes_inputs=['x'])
+
+        model.linear_solver = om.DirectSolver(assemble_jac=True)
+
+        model.connect('ivc.x', 'comp.x')
+        model.connect('ivc.y', 'comp.y')
+        model.connect('comp.f_xy', 'obj.x')
+        model.connect('ivc.z', 'con.x')
+        model.connect('ivc.x', 'con2.x')
+
+        model.add_design_var('ivc.x', lower=0.0, upper=1.0)
+        model.add_design_var('ivc.y', lower=0.0, upper=1.0)
+        model.add_design_var('ivc.z', lower=0.0, upper=1.0)
+        model.add_design_var('x', lower=0.0, upper=1.0)
+
+        model.add_objective('obj.obj')
+
+        model.add_constraint('con.y', lower=0.0, linear=True)
+        model.add_constraint('con3.y', lower=0.0, linear=True)
+        model.add_constraint('con4.y', lower=0.0)
+        model.add_constraint('con2.y', lower=0.0)
+
+        prob.setup(force_alloc_complex=True, check=False)
+
+        return prob
+
+    def test_lin_only_dvs(self):
+        shape = (2, 5)
+        # do first opt without coloring
+        driver = om.pyOptSparseDriver(optimizer='IPOPT', print_results=False)
+        driver.opt_settings['print_level'] = 5
+        driver.opt_settings['max_iter'] = 1000
+        p = self.setup_lin_only_dv_problem(driver=driver, shape=shape)
+        p.run_model()
+        p.run_driver()
+        nsolves_nocolor = p.driver._total_jac.nsolves
+        assert_check_totals(p.check_totals(method='cs', out_stream=None))
+
+        driver = om.pyOptSparseDriver(optimizer='IPOPT', print_results=False)
+        driver.opt_settings['print_level'] = 5
+        driver.opt_settings['max_iter'] = 1000
+        driver.declare_coloring()
+        p = self.setup_lin_only_dv_problem(driver=driver, shape=shape)
+        p.run_model()
+        p.run_driver()
+
+        jac_nrows = 21
+        rev_colors = 2
+        self.assertGreaterEqual(nsolves_nocolor / p.driver._total_jac.nsolves,
+                                jac_nrows / rev_colors)  # verify coloring is actually happening
+        assert_check_totals(p.check_totals(method='cs', out_stream=None))
 
 if __name__ == "__main__":
     unittest.main()

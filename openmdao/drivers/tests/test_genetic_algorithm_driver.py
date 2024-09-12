@@ -18,7 +18,7 @@ from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
 
 from openmdao.utils.general_utils import run_driver
-from openmdao.utils.testing_utils import use_tempdirs, set_env_vars_context
+from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 try:
     from parameterized import parameterized
@@ -541,9 +541,9 @@ class TestSimpleGA(unittest.TestCase):
             prob.final_setup()
 
         # A value of None for lower and upper is changed to +/- INF_BOUND in add_design_var()
-        if lower == None:
+        if lower is None:
             lower = -INF_BOUND
-        if upper == None:
+        if upper is None:
             upper = INF_BOUND
 
         msg = ("Invalid bounds for design variable 'x'. When using "
@@ -828,10 +828,10 @@ class TestConstrainedSimpleGA(unittest.TestCase):
 
         prob = om.Problem()
 
-        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
 
         # setup the optimization
-        driver = prob.driver = om.SimpleGADriver()
+        prob.driver = om.SimpleGADriver()
 
         with self.assertRaises(KeyError) as raises_msg:
             prob.driver.supports['equality_constraints'] = False
@@ -1038,9 +1038,9 @@ class TestConstrainedSimpleGA(unittest.TestCase):
             prob.final_setup()
 
         # A value of None for lower and upper is changed to +/- INF_BOUND in add_constraint()
-        if lower == None:
+        if lower is None:
             lower = -INF_BOUND
-        if upper == None:
+        if upper is None:
             upper = INF_BOUND
 
         msg = ("Invalid bounds for constraint 'const.g'. "
@@ -1251,9 +1251,6 @@ class D1(om.ExplicitComponent):
             outputs['y1'] = 28.0 - 0.2*y2 + x
 
     def compute_partials(self, inputs, partials, discrete_inputs=None):
-        y2 = inputs['y2']
-        x = inputs['x']
-
         partials['y1', 'y2'] = -0.2
         if self.comm.rank == 1:
             partials['y1', 'x'] = 2.0
@@ -1273,7 +1270,7 @@ class D2(om.ExplicitComponent):
         y1 = inputs['y1']
 
         if self.comm.rank == 1:
-            outputs['y2'] = y2 = y1**.5 - 3
+            outputs['y2'] = y1**.5 - 3
         else:
             outputs['y2'] = y1**.5 + 7
 
@@ -1460,10 +1457,10 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
         # a separate case file should have been written by rank 0 of each parallel model
         # (the top two global ranks)
         rank = prob.comm.rank
-        filename = "cases.sql_%d" % rank
+        filename = prob.get_outputs_dir() / f"cases.sql_{rank}"
 
         if rank < num_models:
-            expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
+            expect_msg = f"Cases from rank {rank} are being written to {filename}."
             self.assertTrue(expect_msg in output)
 
             cr = om.CaseReader(filename)
