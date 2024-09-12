@@ -52,7 +52,7 @@ from openmdao.utils.reports_system import get_reports_to_activate, activate_repo
     clear_reports, _load_report_plugins
 from openmdao.utils.general_utils import pad_name, LocalRangeIterable, \
     _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs, \
-    ProblemMeta
+    ProblemMetaclass
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
@@ -131,7 +131,7 @@ def _default_prob_name():
     return name.stem
 
 
-class Problem(object, metaclass=ProblemMeta):
+class Problem(object, metaclass=ProblemMetaclass):
     """
     Top-level container for the systems and drivers.
 

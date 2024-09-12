@@ -39,9 +39,8 @@ from openmdao.utils.om_warnings import issue_warning, \
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, all_ancestors, match_prom_or_abs, \
     ensure_compatible, env_truthy, make_traceback, _is_slicer_op, _wrap_comm, _unwrap_comm, \
-    _om_mpi_debug
+    _om_dump, SystemMetaclass
 from openmdao.utils.file_utils import _get_outputs_dir
-from openmdao.utils.jax_utils import _jax_update_class_attrs, _jax_register_class
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -172,59 +171,6 @@ def collect_errors(method):
             self._collect_error(str(exc), exc_type=type_exc, tback=tb)
 
     return wrapper
-
-
-class SystemMetaclass(type):
-    """
-    A metaclass for System.
-
-    If jax is active and outputs of the compute_primal of the class depend on 'self static'
-    attributes, then the class must define the 'get_self_statics' method, which returns a tuple of
-    static attributes of the class. This metaclass will also register the class as a PyTree node
-    with jax so that jax will be aware of changes in any self static data and will re-jit the
-    compute_primal in that case.
-
-    A 'self static' attribute is one that is accessed on 'self' within the method
-    but is not passed in as an argument to the method.
-
-    Parameters
-    ----------
-    name : str
-        The name of the class.
-    bases : tuple
-        The base classes of the class.
-    attrs : dict
-        The attributes of the class.
-
-    Returns
-    -------
-    class
-        The class with the metaclass applied.
-    """
-
-    def __new__(metaclass, name, bases, attrs):
-        """
-        Create a new class that has been registered as a pytree.
-
-        Parameters
-        ----------
-        name : str
-            The name of the class.
-        bases : tuple
-            The base classes of the class.
-        attrs : dict
-            The attributes of the class.
-
-        Returns
-        -------
-        class
-            The class with the metaclass applied.
-        """
-        _jax_update_class_attrs(name, bases, attrs)
-        cls = super().__new__(metaclass, name, bases, attrs)
-        _jax_register_class(cls, name, bases, attrs)
-
-        return cls
 
 
 class System(object, metaclass=SystemMetaclass):
@@ -612,7 +558,7 @@ class System(object, metaclass=SystemMetaclass):
         self._jac_func_ = None  # for computing jacobian using AD (jax)
         self._self_statics_hash = _UNDEFINED
 
-    if _om_mpi_debug:
+    if _om_dump:
         @property
         def comm(self):
             """

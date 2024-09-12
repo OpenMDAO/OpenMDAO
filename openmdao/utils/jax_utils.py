@@ -794,15 +794,15 @@ if jax is None or bool(os.environ.get('JAX_DISABLE_JIT', '')):
         """
         return func
 
-    def _jax_update_class_attrs(name, bases, attrs):
+    def _jax_update_class_attrs(cls):
         pass
 
-    def _jax_register_class(cls, name, bases, attrs):
+    def _jax_register_pytree_class(cls):
         pass
 
 else:
 
-    def _jax_update_class_attrs(name, bases, attrs):
+    def _jax_update_class_attrs(cls):
         """
         Add _tree_flatten and _tree_unflatten methods if they're missing.
 
@@ -815,19 +815,17 @@ else:
 
         Parameters
         ----------
-        name : str
-            The name of the class.
-        bases : tuple
-            The base classes of the class.
-        attrs : dict
-            The attributes of the class.
+        cls : class
+            The class being updated.
         """
-        attrs['_tree_flatten'] = lambda self: ((), {'_self_': self,
-                                                    '_statics_': self.get_self_statics()})
-        attrs['_tree_unflatten'] = \
-            staticmethod(lambda aux_data, children: aux_data['_self_'])
+        if not hasattr(cls, '_tree_flatten'):
+            cls._tree_flatten = lambda self: ((), {'_self_': self,
+                                                   '_statics_': self.get_self_statics()})
+        if not hasattr(cls, '_tree_unflatten'):
+            cls._tree_unflatten = \
+                staticmethod(lambda aux_data, children: aux_data['_self_'])
 
-    def _jax_register_class(cls, name, bases, attrs):
+    def _jax_register_pytree_class(cls):
         """
         Register a class with jax so that it can be used with jax.jit.
 
@@ -842,8 +840,10 @@ else:
         attrs : dict
             The attributes of the class.
         """
+        # make sure we have _tree_flatten and _tree_unflatten methods
+        _jax_update_class_attrs(cls)
         # register with jax so we can flatten/unflatten self
-        tree_util.register_pytree_node(cls, attrs['_tree_flatten'], attrs['_tree_unflatten'])
+        tree_util.register_pytree_node(cls, cls._tree_flatten, cls._tree_unflatten)
 
     class DelayedJit:
         """

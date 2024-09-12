@@ -26,6 +26,7 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
     DerivativesWarning, warn_deprecation
 from openmdao.utils.code_utils import is_lambda, LambdaPickleWrapper
+from openmdao.utils.jax_utils import _jax_register_pytree_class
 
 
 _forbidden_chars = {'.', '*', '?', '!', '[', ']'}
@@ -109,6 +110,13 @@ class Component(System):
         self._no_check_partials = False
         self._has_distrib_outputs = False
         self._compute_primals_out_shape = None
+
+    def __init_subclass__(cls, **kwargs):
+        """
+        Register any class inheriting from this one as a jax pytree class.
+        """
+        super().__init_subclass__(**kwargs)
+        _jax_register_pytree_class(cls)
 
     def _declare_options(self):
         """

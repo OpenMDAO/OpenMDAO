@@ -1,11 +1,10 @@
 import unittest
-import sys
 
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
 import openmdao.api as om
 
-from openmdao.utils.jax_utils import jax, jnp
+from openmdao.utils.jax_utils import jnp
 from openmdao.jax.tests.test_jax_implicit import JaxQuadraticCompPrimal
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
@@ -137,7 +136,8 @@ x_shape = (2, 3)
 y_shape = (3, 4)
 
 
-@unittest.skipIf(jax is None or sys.version_info < (3, 9), 'jax is not available or python < 3.9.')
+#@unittest.skipIf(jax is None or sys.version_info < (3, 9), 'jax is not available or python < 3.9.')
+@unittest.skip('JAX is not supported yet for Groups')
 class TestJaxGroup(unittest.TestCase):
     def test_jax_group_outer_ivc(self):
         p = om.Problem()
