@@ -285,19 +285,21 @@ def compute_primal(self, disc_in, in_scalar, in_array, in_array2):
 @unittest.skipIf(jax is None or sys.version_info < (3, 9), 'jax is not available or python < 3.9.')
 class TestJaxComp(unittest.TestCase):
 
-    def test_jax_explicit_comp(self):
+    @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]), name_func=parameterized_name)
+    def test_jax_explicit_comp(self, mode, matrix_free):
+        xshape = x_shape
+        yshape = y_shape
         p = om.Problem()
         # create an IVC manually so we can set the shapes.  Otherwise must set shape in the component
         # itself.
-        xshape = x_shape
-        yshape = y_shape
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(xshape)))
         ivc.add_output('y', val=np.ones(yshape))
-        p.model.add_subsystem('comp', MyCompJax1(derivs_method='jax'))
+        comp = p.model.add_subsystem('comp', MyCompJax1(derivs_method='jax'))
+        comp.matrix_free = matrix_free
         p.model.connect('ivc.x', 'comp.x')
         p.model.connect('ivc.y', 'comp.y')
 
-        p.setup(mode='rev', force_alloc_complex=True)
+        p.setup(mode=mode, force_alloc_complex=True)
 
         x = np.arange(1,np.prod(xshape)+1).reshape(xshape) * 2.0
         y = np.arange(1,np.prod(yshape)+1).reshape(yshape)* 3.0
@@ -310,40 +312,17 @@ class TestJaxComp(unittest.TestCase):
         p.check_totals(of=['comp.z'], wrt=['comp.x', 'comp.y'], method='cs', show_only_incorrect=True)
         assert_check_partials(p.check_partials(show_only_incorrect=True))
 
-    def test_jax_explicit_comp2(self):
-        p = om.Problem()
-        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
-        ivc.add_output('y', val=np.ones(y_shape))
-        p.model.add_subsystem('comp', MyCompJax2(derivs_method='jax'))
-        p.model.connect('ivc.x', 'comp.x')
-        p.model.connect('ivc.y', 'comp.y')
-
-        p.setup(mode='rev')
-
-        x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
-        y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
-        p.set_val('ivc.x', x)
-        p.set_val('ivc.y', y)
-        p.final_setup()
-        p.run_model()
-
-        assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
-        assert_near_equal(p.get_val('comp.zz'), y * 2.5)
-        assert_check_totals(p.check_totals(of=['comp.z','comp.zz'],
-                                           wrt=['comp.x', 'comp.y'], method='fd',
-                                           show_only_incorrect=True))
-        assert_check_partials(p.check_partials(show_only_incorrect=True))
-
-    def test_jax_explicit_comp2_matfree(self):
+    @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]), name_func=parameterized_name)
+    def test_jax_explicit_comp2(self, mode, matrix_free):
         p = om.Problem()
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
         ivc.add_output('y', val=np.ones(y_shape))
         comp = p.model.add_subsystem('comp', MyCompJax2(derivs_method='jax'))
-        comp.matrix_free = True
+        comp.matrix_free = matrix_free
         p.model.connect('ivc.x', 'comp.x')
         p.model.connect('ivc.y', 'comp.y')
 
-        p.setup(mode='rev')
+        p.setup(mode=mode)
 
         x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
         y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
@@ -359,41 +338,18 @@ class TestJaxComp(unittest.TestCase):
                                            show_only_incorrect=True))
         assert_check_partials(p.check_partials(show_only_incorrect=True))
 
-    def test_jax_explicit_comp2primal(self):
-        # this component defines its own compute_primal method
-        p = om.Problem()
-        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
-        ivc.add_output('y', val=np.ones(y_shape))
-        p.model.add_subsystem('comp', MyCompJax2Primal(derivs_method='jax'))
-        p.model.connect('ivc.x', 'comp.x')
-        p.model.connect('ivc.y', 'comp.y')
-
-        p.setup(mode='rev')
-
-        x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
-        y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
-        p.set_val('ivc.x', x)
-        p.set_val('ivc.y', y)
-        p.final_setup()
-        p.run_model()
-
-        assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
-        assert_near_equal(p.get_val('comp.zz'), y * 2.5)
-        assert_check_totals(p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'],
-                                           method='fd', show_only_incorrect=True))
-        assert_check_partials(p.check_partials(show_only_incorrect=True))
-
-    def test_jax_explicit_comp2primal_matfree(self):
+    @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]), name_func=parameterized_name)
+    def test_jax_explicit_comp2primal(self, mode, matrix_free):
         # this component defines its own compute_primal method
         p = om.Problem()
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
         ivc.add_output('y', val=np.ones(y_shape))
         comp = p.model.add_subsystem('comp', MyCompJax2Primal(derivs_method='jax'))
-        comp.matrix_free = True
+        comp.matrix_free = matrix_free
         p.model.connect('ivc.x', 'comp.x')
         p.model.connect('ivc.y', 'comp.y')
 
-        p.setup(mode='fwd')
+        p.setup(mode=mode)
 
         x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
         y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
@@ -408,17 +364,20 @@ class TestJaxComp(unittest.TestCase):
                                            method='fd', show_only_incorrect=True))
         assert_check_partials(p.check_partials(show_only_incorrect=True))
 
-    def test_jax_explicit_comp2primal_w_option(self):
+    @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]), name_func=parameterized_name)
+    def test_jax_explicit_comp2primal_w_option(self, mode, matrix_free):
         # this component defines its own compute_primal method
         p = om.Problem()
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
         ivc.add_output('y', val=np.ones(y_shape))
         comp = p.model.add_subsystem('comp', MyCompJax2PrimalOption(derivs_method='jax', mult=1.5))
+        comp.matrix_free = matrix_free
+
         # deriv shape: [[(2, 4, 2, 3), (2, 4, 3, 4)], [(3, 4, 2, 3), (3, 4, 3, 4)]]
         p.model.connect('ivc.x', 'comp.x')
         p.model.connect('ivc.y', 'comp.y')
 
-        p.setup(mode='rev')
+        p.setup(mode=mode)
 
         x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
         y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape) * 3.0
@@ -455,15 +414,18 @@ class TestJaxComp(unittest.TestCase):
                                            method='fd', show_only_incorrect=True))
         assert_check_partials(p.check_partials(show_only_incorrect=True))
 
-    def test_jax_explicit_comp_with_option(self):
+    @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]), name_func=parameterized_name)
+    def test_jax_explicit_comp_with_option(self, mode, matrix_free):
         p = om.Problem()
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
         ivc.add_output('y', val=np.ones(y_shape))
         comp = p.model.add_subsystem('comp', MyCompJaxWithOption(mult=1.7, derivs_method='jax'))
+        comp.matrix_free = matrix_free
+
         p.model.connect('ivc.x', 'comp.x')
         p.model.connect('ivc.y', 'comp.y')
 
-        p.setup(mode='rev')
+        p.setup(mode=mode)
 
         x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
         y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
@@ -488,17 +450,20 @@ class TestJaxComp(unittest.TestCase):
                                            method='fd', show_only_incorrect=True))
         assert_check_partials(p.check_partials(show_only_incorrect=True))
 
-    def test_jax_explicit_comp_with_discrete(self):
+    @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]), name_func=parameterized_name)
+    def test_jax_explicit_comp_with_discrete(self, mode, matrix_free):
         p = om.Problem()
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
         ivc.add_output('y', val=np.ones(y_shape))
         ivc.add_discrete_output('disc_out', val=3)
-        p.model.add_subsystem('comp', MyCompJaxWithDiscrete(derivs_method='jax'))
+        comp = p.model.add_subsystem('comp', MyCompJaxWithDiscrete(derivs_method='jax'))
+        comp.matrix_free = matrix_free
+
         p.model.connect('ivc.x', 'comp.x')
         p.model.connect('ivc.y', 'comp.y')
         p.model.connect('ivc.disc_out', 'comp.disc_in')
 
-        p.setup(mode='rev')
+        p.setup(mode=mode)
 
         x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
         y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
@@ -521,17 +486,20 @@ class TestJaxComp(unittest.TestCase):
                                            method='fd', show_only_incorrect=True))
         assert_check_partials(p.check_partials(show_only_incorrect=True))
 
-    def test_jax_explicit_comp_with_discrete_primal(self):
+    @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]), name_func=parameterized_name)
+    def test_jax_explicit_comp_with_discrete_primal(self, mode, matrix_free):
         p = om.Problem()
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
         ivc.add_output('y', val=np.ones(y_shape))
         ivc.add_discrete_output('disc_out', val=3)
-        p.model.add_subsystem('comp', MyCompJaxWithDiscretePrimal(derivs_method='jax'))
+        comp = p.model.add_subsystem('comp', MyCompJaxWithDiscretePrimal(derivs_method='jax'))
+        comp.matrix_free = matrix_free
+
         p.model.connect('ivc.x', 'comp.x')
         p.model.connect('ivc.y', 'comp.y')
         p.model.connect('ivc.disc_out', 'comp.disc_in')
 
-        p.setup(mode='rev')
+        p.setup(mode=mode)
 
         x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
         y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
@@ -670,9 +638,9 @@ if sys.version_info >= (3, 9):
 
 @unittest.skipIf(jax is None or sys.version_info < (3, 9), 'jax is not available or python < 3.9.')
 class TestJaxShapesAndReturns(unittest.TestCase):
-    @parameterized.expand(itertools.product([(), (2,), (2,3)], [(1, 1), (2, 2), (1, 2), (2, 1)],[True, False], [True, False]),
-                          name_func=parameterized_name)
-    def test_compute_primal_return_shapes(self, shape, sizetup, ret_tuple, matrix_free):
+    @parameterized.expand(itertools.product([(), (2,), (2,3)], [(1, 1), (2, 2), (1, 2), (2, 1)],
+                                            [True, False], [True, False], ['fwd', 'rev']), name_func=parameterized_name)
+    def test_compute_primal_return_shapes(self, shape, sizetup, ret_tuple, matrix_free, mode):
         nins, nouts = sizetup
         prob = om.Problem()
         prob.model = TopGrp(shape=shape, ret_tuple=ret_tuple, nins=nins, nouts=nouts, matrix_free=matrix_free)
@@ -681,7 +649,7 @@ class TestJaxShapesAndReturns(unittest.TestCase):
         ofs = [f'comp.y{i}' for i in range(nouts)]
         wrts = [f'ivc.x{i}' for i in range(nins)]
 
-        prob.setup(force_alloc_complex=True, check=False, mode='fwd')
+        prob.setup(force_alloc_complex=True, check=False, mode=mode)
         prob.final_setup()
         prob.compute_totals(of=ofs, wrt=wrts)
 

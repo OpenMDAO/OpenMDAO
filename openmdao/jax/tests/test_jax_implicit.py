@@ -41,10 +41,9 @@ class QuadraticComp(om.ImplicitComponent):
 
 
 class JaxQuadraticCompPrimal(om.JaxImplicitComponent):
-    def __init__(self, shape=(), assemble_jac=True, **kwargs):
+    def __init__(self, shape=(), **kwargs):
         super().__init__(**kwargs)
         self.shape = shape
-        self.assemble_jac = assemble_jac
 
     def setup(self):
         self.add_input('a', shape=self.shape)
@@ -54,7 +53,11 @@ class JaxQuadraticCompPrimal(om.JaxImplicitComponent):
 
         self.declare_partials(of=['*'], wrt=['*'])
 
-        self.linear_solver = om.DirectSolver(assemble_jac=self.assemble_jac)
+    def setup_partials(self):
+        if self.matrix_free:
+            self.linear_solver = om.ScipyKrylov()
+        else:
+            self.linear_solver = om.DirectSolver()
         self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
 
     def compute_primal(self, a, b, c, x):
@@ -63,9 +66,6 @@ class JaxQuadraticCompPrimal(om.JaxImplicitComponent):
 
 
 class JaxLinearSystemCompConverted(om.ImplicitComponent):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._lup = None
 
     def initialize(self):
         self.options.declare('size', default=1, types=int)
@@ -73,15 +73,11 @@ class JaxLinearSystemCompConverted(om.ImplicitComponent):
     def setup(self):
         size = self.options['size']
 
-        self._lup = None
         shape = (size, )
 
         self.add_input("A", val=np.eye(size))
         self.add_input("b", val=np.ones(shape))
         self.add_output("x", shape=shape, val=.1)
-
-        self.linear_solver = om.DirectSolver()
-        self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
 
     def setup_partials(self):
         size = self.options['size']
@@ -102,6 +98,12 @@ class JaxLinearSystemCompConverted(om.ImplicitComponent):
         cols += np.repeat(np.arange(1), mat_size) * size
 
         self.declare_partials(of='x', wrt='x', rows=rows, cols=cols)
+
+        if self.matrix_free:
+            self.linear_solver = om.ScipyKrylov()
+        else:
+            self.linear_solver = om.DirectSolver()
+        self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         residuals['x'] = inputs['A'].dot(outputs['x']) - inputs['b']
@@ -109,10 +111,6 @@ class JaxLinearSystemCompConverted(om.ImplicitComponent):
 
 
 class JaxLinearSystemCompPrimal(om.JaxImplicitComponent):
-    def __init__(self, assemble_jac=True, **kwargs):
-        super().__init__(**kwargs)
-        self._lup = None
-        self.assemble_jac = assemble_jac
 
     def initialize(self):
         self.options.declare('size', default=1, types=int)
@@ -120,15 +118,11 @@ class JaxLinearSystemCompPrimal(om.JaxImplicitComponent):
     def setup(self):
         size = self.options['size']
 
-        self._lup = None
         shape = (size, )
 
         self.add_input("A", val=np.eye(size))
         self.add_input("b", val=np.ones(shape))
         self.add_output("x", shape=shape, val=.1)
-
-        self.linear_solver = om.DirectSolver(assemble_jac=self.assemble_jac)
-        self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
 
     def setup_partials(self):
         size = self.options['size']
@@ -150,14 +144,17 @@ class JaxLinearSystemCompPrimal(om.JaxImplicitComponent):
 
         self.declare_partials(of='x', wrt='x', rows=rows, cols=cols)
 
+        if self.matrix_free:
+            self.linear_solver = om.ScipyKrylov()
+        else:
+            self.linear_solver = om.DirectSolver()
+        self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+
     def compute_primal(self, A, b, x):
         return A.dot(x) - b
 
 
 class JaxLinearSystemCompPrimalwOption(om.JaxImplicitComponent):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._lup = None
 
     def initialize(self):
         self.options.declare('size', default=1, types=int)
@@ -166,15 +163,11 @@ class JaxLinearSystemCompPrimalwOption(om.JaxImplicitComponent):
     def setup(self):
         size = self.options['size']
 
-        self._lup = None
         shape = (size, )
 
         self.add_input("A", val=np.eye(size))
         self.add_input("b", val=np.ones(shape))
         self.add_output("x", shape=shape, val=.1)
-
-        self.linear_solver = om.DirectSolver()
-        self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
 
     def setup_partials(self):
         size = self.options['size']
@@ -195,6 +188,12 @@ class JaxLinearSystemCompPrimalwOption(om.JaxImplicitComponent):
         cols += np.repeat(np.arange(1), mat_size) * size
 
         self.declare_partials(of='x', wrt='x', rows=rows, cols=cols)
+
+        if self.matrix_free:
+            self.linear_solver = om.ScipyKrylov()
+        else:
+            self.linear_solver = om.DirectSolver()
+        self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
 
     def get_self_statics(self):
         return (self.options['adder'], )
@@ -333,7 +332,7 @@ class TestJaxImplicitComp(unittest.TestCase):
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('a', shape=shape))
         ivc.add_output('b', shape=shape)
         ivc.add_output('c', shape=shape)
-        comp = p.model.add_subsystem('comp', JaxQuadraticCompPrimal(shape=shape, assemble_jac=not matrix_free))
+        comp = p.model.add_subsystem('comp', JaxQuadraticCompPrimal(shape=shape))
         comp.matrix_free = matrix_free
         p.model.connect('ivc.a', 'comp.a')
         p.model.connect('ivc.b', 'comp.b')
@@ -392,7 +391,7 @@ class TestJaxImplicitComp(unittest.TestCase):
         ivc.add_output('b', b)
 
         lingrp = prob.model.add_subsystem('lingrp', om.Group())
-        comp = lingrp.add_subsystem('lin', JaxLinearSystemCompPrimal(size=3, assemble_jac=not matrix_free))
+        comp = lingrp.add_subsystem('lin', JaxLinearSystemCompPrimal(size=3))
         comp.matrix_free = matrix_free
 
         prob.model.connect('ivc.A', 'lingrp.lin.A')
@@ -403,7 +402,7 @@ class TestJaxImplicitComp(unittest.TestCase):
 
         prob.run_model()
 
-        assert_near_equal(prob['lingrp.lin.x'], np.array([-4, 9, -4]))
+        assert_near_equal(prob['lingrp.lin.x'], np.array([-4, 9, -4]), tolerance=1e-14)
 
         assert_check_totals(prob.check_totals(of=['lingrp.lin.x'], wrt=['ivc.b', 'ivc.A'],
                                               abs_err_tol=2e-4, rel_err_tol=3e-6, show_only_incorrect=True),

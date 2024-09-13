@@ -866,7 +866,7 @@ class Component(System):
             raise TypeError(f"{self.msginfo}: The copy_shape argument should be a str or None but "
                             f"a '{type(copy_shape).__name__}' was given.")
 
-        if compute_shape and not isinstance(compute_shape, types.FunctionType):
+        if compute_shape and not isinstance(compute_shape, (types.FunctionType, types.MethodType)):
             raise TypeError(f"{self.msginfo}: The compute_shape argument should be a function but "
                             f"a '{type(compute_shape).__name__}' was given.")
 

@@ -1131,19 +1131,18 @@ def apply_linear(inst, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
                                    *tuple(inst._get_compute_primal_invals(inputs, outputs,
                                                                           inst._discrete_inputs)))
             if isinstance(shape, tuple):
-                shape = (tuple(s.shape for s in shape), True)
+                shape = (tuple(s.shape for s in shape), True, len(inst._var_rel_names['input']))
             else:
-                shape = (shape.shape, False)
+                shape = (shape.shape, False, len(inst._var_rel_names['input']))
             inst._compute_primals_out_shape = shape
 
-        shape, istup = inst._compute_primals_out_shape
+        shape, istup, ninputs = inst._compute_primals_out_shape
 
         if istup:
             deriv_vals = (inst._vjp_fun(tuple(d_residuals.values())))
         else:
             deriv_vals = inst._vjp_fun(tuple(d_residuals.values())[0])
 
-        ninputs = len(inst._var_rel_names['input'])
         d_inputs.set_vals(deriv_vals[:ninputs])
         d_outputs.set_vals(deriv_vals[ninputs:])
 
