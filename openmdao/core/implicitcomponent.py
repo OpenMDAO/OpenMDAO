@@ -105,7 +105,7 @@ class ImplicitComponent(Component):
         if self._has_solve_linear is _UNDEFINED:
             self._has_solve_linear = overrides_method('solve_linear', self, ImplicitComponent)
 
-        if self.matrix_free == _UNDEFINED:
+        if self.matrix_free is _UNDEFINED:
             self.matrix_free = overrides_method('apply_linear', self, ImplicitComponent)
 
         if self.matrix_free:

@@ -14,18 +14,6 @@ try:
 except ImportError:
     from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
-# if jax is None:
-#     def jjit(f, *args, **kwargs):
-#         return f
-# else:
-#     from openmdao.jax import act_tanh, smooth_abs, smooth_max, smooth_min, ks_max, ks_min
-#     def jjit(f, *args, **kwargs):
-#         if om.env_truthy('JAX_CPU') and 'backend' not in kwargs:
-#             return jax.jit(f, *args, backend='cpu', **kwargs)
-#         else:
-#             return jax.jit(f, *args, **kwargs)
-
-
 
 class MyCompJax1(om.ExplicitComponent):
     def setup(self):
@@ -645,12 +633,13 @@ if sys.version_info >= (3, 9):
 
 
     class TopGrp(om.Group):
-        def __init__(self, shape, ret_tuple=False, nins=1, nouts=1, **kwargs):
+        def __init__(self, shape, ret_tuple=False, nins=1, nouts=1, matrix_free=False, **kwargs):
             super().__init__(**kwargs)
             self.shape = shape
             self.ret_tuple = ret_tuple
             self.nins = nins
             self.nouts = nouts
+            self.matrix_free = matrix_free
 
         def setup(self):
             self.add_subsystem('ivc', om.IndepVarComp())
@@ -659,16 +648,18 @@ if sys.version_info >= (3, 9):
                     self.ivc.add_output(f'x{i}', 0.)
 
                 if self.ret_tuple:
-                    self.add_subsystem('comp', CompRetTuple(shape=self.shape, nins=self.nins, nouts=self.nouts))
+                    comp = self.add_subsystem('comp', CompRetTuple(shape=self.shape, nins=self.nins, nouts=self.nouts))
                 else:
-                    self.add_subsystem('comp', CompRetValue(shape=self.shape, nins=self.nins, nouts=self.nouts))
+                    comp = self.add_subsystem('comp', CompRetValue(shape=self.shape, nins=self.nins, nouts=self.nouts))
             else:
                 for i in range(self.nins):
                     self.ivc.add_output(f'x{i}', np.zeros(self.shape))
                 if self.ret_tuple:
-                    self.add_subsystem('comp', CompRetTuple(shape=self.shape, nins=self.nins, nouts=self.nouts))
+                    comp = self.add_subsystem('comp', CompRetTuple(shape=self.shape, nins=self.nins, nouts=self.nouts))
                 else:
-                    self.add_subsystem('comp', CompRetValue(shape=self.shape, nins=self.nins, nouts=self.nouts))
+                    comp = self.add_subsystem('comp', CompRetValue(shape=self.shape, nins=self.nins, nouts=self.nouts))
+
+            comp.matrix_free = self.matrix_free
 
             for io in range(self.nouts):
                 for ii in range(self.nins):
@@ -679,13 +670,12 @@ if sys.version_info >= (3, 9):
 
 @unittest.skipIf(jax is None or sys.version_info < (3, 9), 'jax is not available or python < 3.9.')
 class TestJaxShapesAndReturns(unittest.TestCase):
-    @parameterized.expand(itertools.product([(), (2,), (2,3)], [(1, 1), (2, 2), (1, 2), (2, 1)],[True, False]),
+    @parameterized.expand(itertools.product([(), (2,), (2,3)], [(1, 1), (2, 2), (1, 2), (2, 1)],[True, False], [True, False]),
                           name_func=parameterized_name)
-    def test_compute_primal_return_shapes(self, shape, sizetup, ret_tuple):
+    def test_compute_primal_return_shapes(self, shape, sizetup, ret_tuple, matrix_free):
         nins, nouts = sizetup
         prob = om.Problem()
-        prob.model = TopGrp(shape=shape, ret_tuple=ret_tuple, nins=nins, nouts=nouts)
-
+        prob.model = TopGrp(shape=shape, ret_tuple=ret_tuple, nins=nins, nouts=nouts, matrix_free=matrix_free)
         prob.set_solver_print(level=0)
 
         ofs = [f'comp.y{i}' for i in range(nouts)]

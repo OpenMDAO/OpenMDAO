@@ -92,7 +92,8 @@ class Component(System):
     _has_distrib_outputs : bool
         If True, this component has at least one distributed output.
     _compute_primals_out_shape : tuple or None
-        Cached shape of the output from compute_primal function.
+        Cached (shape, istuple) of the output from compute_primal function.  If istuple is True,
+        then shape is a tuple of shapes, otherwise it is a single shape.
     """
 
     def __init__(self, **kwargs):

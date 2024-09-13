@@ -995,13 +995,30 @@ def compute_jacvec_product(inst, inputs, d_inputs, d_outputs, mode, discrete_inp
         d_outputs.set_vals(deriv_vals)
     else:
         inhash = inputs.get_hash()
+        inhash = (inputs.get_hash(),) + tuple(inst._discrete_inputs.values())
         if inhash != inst._vjp_hash:
             # recompute vjp function if inputs have changed
             _, inst._vjp_fun = jax.vjp(inst.compute_primal,
                                        *inst._get_compute_primal_invals(inputs, discrete_inputs))
             inst._vjp_hash = inhash
 
-        d_inputs.set_vals(inst._vjp_fun(tuple(d_outputs.values())))
+        if inst._compute_primals_out_shape is None:
+            shape = jax.eval_shape(inst.compute_primal,
+                                   *tuple(inst._get_compute_primal_invals(inputs, discrete_inputs)))
+            if isinstance(shape, tuple):
+                shape = (tuple(s.shape for s in shape), True)
+            else:
+                shape = (shape.shape, False)
+            inst._compute_primals_out_shape = shape
+
+        shape, istup = inst._compute_primals_out_shape
+
+        if istup:
+            deriv_vals = inst._vjp_fun(tuple(d_outputs.values()))
+        else:
+            deriv_vals = inst._vjp_fun(tuple(d_outputs.values())[0])
+
+        d_inputs.set_vals(deriv_vals)
 
 
 # we define linearize here instead of making this the base class version as we
@@ -1110,17 +1127,21 @@ def apply_linear(inst, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
             inst._vjp_hash = inhash
 
         if inst._compute_primals_out_shape is None:
-            inst._compute_primals_out_shape = \
-                jax.eval_shape(inst.compute_primal,
-                               *tuple(inst._get_compute_primal_invals(inputs, outputs,
-                                                                      inst._discrete_inputs)))
+            shape = jax.eval_shape(inst.compute_primal,
+                                   *tuple(inst._get_compute_primal_invals(inputs, outputs,
+                                                                          inst._discrete_inputs)))
+            if isinstance(shape, tuple):
+                shape = (tuple(s.shape for s in shape), True)
+            else:
+                shape = (shape.shape, False)
+            inst._compute_primals_out_shape = shape
 
-        if inst._compute_primals_out_shape.shape == ():
-            deriv_vals = inst._vjp_fun(d_residuals.asarray()[0])
-        elif d_residuals.nvars() == 1:
-            deriv_vals = inst._vjp_fun(tuple(d_residuals.values())[0])
-        else:
+        shape, istup = inst._compute_primals_out_shape
+
+        if istup:
             deriv_vals = (inst._vjp_fun(tuple(d_residuals.values())))
+        else:
+            deriv_vals = inst._vjp_fun(tuple(d_residuals.values())[0])
 
         ninputs = len(inst._var_rel_names['input'])
         d_inputs.set_vals(deriv_vals[:ninputs])

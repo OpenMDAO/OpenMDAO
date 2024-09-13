@@ -2526,6 +2526,7 @@ class ParallelFDParametricTestCase(unittest.TestCase):
             totals = param_instance.compute_totals('rev')
             assert_near_equal(totals, expected_totals, 1e-4)
 
+
 class CheckTotalsParallelGroup(unittest.TestCase):
 
     N_PROCS = 3

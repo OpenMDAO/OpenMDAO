@@ -88,7 +88,7 @@ class ExplicitComponent(Component):
         """
         Configure this system to assign children settings and detect if matrix_free.
         """
-        if self.matrix_free == _UNDEFINED:
+        if self.matrix_free is _UNDEFINED:
             self.matrix_free = overrides_method('compute_jacvec_product', self, ExplicitComponent)
 
         if self.matrix_free:
@@ -513,7 +513,7 @@ class ExplicitComponent(Component):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        if not (self._has_compute_partials or self._approx_schemes):
+        if self.matrix_free or not (self._has_compute_partials or self._approx_schemes):
             return
 
         self._check_first_linearize()
