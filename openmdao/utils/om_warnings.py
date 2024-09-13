@@ -9,6 +9,8 @@ import sys
 import io
 import warnings
 
+from openmdao import __version__ as om_version
+
 
 __all__ = ['issue_warning', 'reset_warnings', 'reset_warning_registry', '_warn_simple_format',
            'OpenMDAOWarning', 'SetupWarning', 'DistributedComponentWarning', 'CaseRecorderWarning',
@@ -232,7 +234,7 @@ def _make_table(superclass=OpenMDAOWarning):
     return s.getvalue()
 
 
-def warn_deprecation(msg):
+def warn_deprecation(msg, expires=None):
     """
     Raise a warning and prints a deprecation message to stdout.
 
@@ -240,8 +242,15 @@ def warn_deprecation(msg):
     ----------
     msg : str
         Message that will be printed to stdout.
+    expires
     """
     # note, stack level 3 should take us back to original caller.
+    if expires is not None:
+        om_numeric = om_version.split('-')[0]
+        om_version_tuple = tuple([int(s) for s in om_numeric.split('.')])
+        expires_version_tuple = tuple([int(s) for s in expires.split('.')])
+        if om_version_tuple >= expires_version_tuple:
+            raise RuntimeError(f'Deprecation message expired in version {expires}')
     issue_warning(msg, stacklevel=3, category=OMDeprecationWarning)
 
 

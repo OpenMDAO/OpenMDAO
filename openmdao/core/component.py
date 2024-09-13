@@ -127,32 +127,6 @@ class Component(System):
                                   'included in the optimization loop even if this component is not '
                                   'relevant to the design variables and responses.')
 
-    def _check_matfree_deprecation(self):
-        # check for mixed distributed variables
-        has_dist_ins = has_nd_ins = has_dist_outs = has_nd_outs = False
-        for name in self._var_rel_names['input']:
-            meta = self._var_rel2meta[name]
-            if meta['distributed']:
-                has_dist_ins = True
-            else:
-                has_nd_ins = True
-
-        for name in self._var_rel_names['output']:
-            meta = self._var_rel2meta[name]
-            if meta['distributed']:
-                has_dist_outs = True
-            else:
-                has_nd_outs = True
-
-        if (has_nd_ins and has_dist_outs) or (has_dist_ins and has_nd_outs):
-            warn_deprecation(f"{self.msginfo}: It appears this component mixes "
-                             "distributed/non-distributed inputs and outputs, so it may break "
-                             "starting with OpenMDAO 3.25, where the convention "
-                             "used when passing data between distributed and non-distributed "
-                             "inputs and outputs within a matrix free component will change. "
-                             "See https://github.com/OpenMDAO/POEMs/blob/master/POEM_075.md for "
-                             "details.")
-
     def setup(self):
         """
         Declare inputs and outputs.
