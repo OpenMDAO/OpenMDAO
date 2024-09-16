@@ -18,7 +18,7 @@ from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE, _UNDEFINED
 from openmdao.utils.jax_utils import jax, jit, ExplicitCompJaxify, DelayedJit, \
     compute_partials as _jax_compute_partials, \
-    compute_jacvec_product as _jax_compute_jacvec_product
+    compute_jacvec_product as _jax_compute_jacvec_product, ReturnChecker
 from openmdao.utils.array_utils import submat_sparsity_iter
 from openmdao.utils.om_warnings import issue_warning
 
@@ -560,8 +560,8 @@ class ExplicitComponent(Component):
         if not discrete_outputs:
             outputs.set_vals(returns)
         else:
-            self._discrete_outputs.set_vals(returns[:len(self._discrete_outputs)])
-            outputs.set_vals(returns[len(self._discrete_outputs):])
+            outputs.set_vals(returns[:outputs.nvars()])
+            self._discrete_outputs.set_vals(returns[outputs.nvars():])
 
     def compute_partials(self, inputs, partials, discrete_inputs=None):
         """
@@ -614,15 +614,15 @@ class ExplicitComponent(Component):
         return True
 
     def _get_compute_primal_invals(self, inputs, discrete_inputs):
+        yield from inputs.values()
         if discrete_inputs:
             yield from discrete_inputs.values()
-        yield from inputs.values()
 
     def _get_compute_primal_argnames(self):
         argnames = []
+        argnames.extend(self._var_rel_names['input'])
         if self._discrete_inputs:
             argnames.extend(self._discrete_inputs)
-        argnames.extend(self._var_rel_names['input'])
         return argnames
 
     def _setup_jax(self, from_group=False):
@@ -633,6 +633,7 @@ class ExplicitComponent(Component):
             self._has_compute_partials = True
 
         if self.compute_primal is None:
+            # convert the compute method to a compute_primal method
             jaxifier = ExplicitCompJaxify(self, verbose=True)
 
             if jaxifier.get_self_statics:
@@ -642,6 +643,7 @@ class ExplicitComponent(Component):
             self.compute = MethodType(ExplicitComponent.compute, self)
 
             self.compute_primal = MethodType(jaxifier.compute_primal, self)
+            self._compute_primal_returns_tuple = True
         else:
             # check that compute_primal args are in the correct order
             args = list(inspect.signature(self.compute_primal).parameters)
@@ -651,6 +653,9 @@ class ExplicitComponent(Component):
             if args != compargs:
                 raise RuntimeError(f"{self.msginfo}: compute_primal method args {args} don't match "
                                    f"the expected args {compargs}.")
+
+            # determine if the compute_primal method returns a tuple
+            self._compute_primal_returns_tuple = ReturnChecker(self.compute_primal).returns_tuple()
 
         if not from_group and self.options['use_jit']:
             self.compute_primal = MethodType(DelayedJit(self.compute_primal.__func__), self)
@@ -667,8 +672,8 @@ class ExplicitComponent(Component):
         if self._jac_func_ is None:
             fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
             nstatic = len(self._discrete_inputs)
-            wrt_idxs = list(range(nstatic, len(self._var_abs2meta['input']) + nstatic))
-            static_argnums = tuple(range(nstatic))
+            wrt_idxs = list(range(len(self._var_abs2meta['input'])))
+            static_argnums = tuple(range(len(wrt_idxs), len(wrt_idxs) + nstatic))
             primal_func = self.compute_primal.__func__
             if isinstance(primal_func, DelayedJit):
                 primal_func = primal_func._func

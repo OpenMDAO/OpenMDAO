@@ -176,20 +176,18 @@ class MyCompJaxWithDiscretePrimal(om.ExplicitComponent):
 
         self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
 
-    def compute_primal(self, disc_in, x, y):
-        disc_out = -disc_in
-        if disc_in > 0:
-           z = jnp.dot(x, y)
-        else:
-           z = -jnp.dot(x, y)
+    def compute_primal(self, x, y, disc_in):
+        def pos(x, y):
+            return jnp.dot(x, y), y * 3.0
+        
+        def neg(x, y):
+            return -jnp.dot(x, y), y * 2.5
 
-        if disc_out > 0:
-            zz = y * 2.5
-        else:
-            zz = y * 3.0
+        disc_out = -disc_in
+        z, zz = jax.lax.cond(disc_in >= 0, pos, neg, x, y)
 
         self._discrete_outputs.set_vals((disc_out,))
-        return (disc_out, z, zz)
+        return (z, zz, disc_out)
 
 x_shape = (2, 3)
 y_shape = (3, 4)
@@ -262,7 +260,7 @@ def compute_primal(self, in_scalar, in_array, in_array2):
         converter = ExplicitCompJaxify(comp)
 
         expected = """
-def compute_primal(self, disc_in, in_scalar, in_array, in_array2):
+def compute_primal(self, in_scalar, in_array, in_array2, disc_in):
     disc_out, = self._discrete_outputs.values()
     out_scalar = in_scalar * 2.0
     out_array = in_array * 2.0
@@ -276,7 +274,7 @@ def compute_primal(self, disc_in, in_scalar, in_array, in_array2):
         out_array *= 3.0
         out_array2 *= 3.0
     self._discrete_outputs.set_vals((disc_out,))
-    return (disc_out, out_scalar, out_array, out_array2)
+    return (out_scalar, out_array, out_array2, disc_out)
 """.strip()
 
         self.assertEqual(converter.get_compute_primal_src().strip(), expected)

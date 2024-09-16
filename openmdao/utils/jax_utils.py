@@ -342,12 +342,13 @@ class CompJaxifyBase(ast.NodeTransformer):
         """
         Transform the compute function definition.
 
-        The function will be transformed from compute(self, inputs, outputs) to
-        compute_primal(self, arg1, arg2, ...) where args are the input values in the order they are
-        stored in inputs.  All subscript accesses into the input args will be replaced with the name
-        of the key being accessed, e.g., inputs['foo'] becomes foo. The new function will return a
-        tuple of the output values in the order they are stored in outputs.  If compute has the
-        additional args discrete_inputs and discrete_outputs, they will be handled similarly.
+        The function will be transformed from compute(self, inputs, outputs, ...) or
+        apply_nonlinear(self, ...) to compute_primal(self, arg1, arg2, ...) where args are the
+        input values in the order they are stored in inputs.  All subscript accesses into the input
+        args will be replaced with the name of the key being accessed, e.g., inputs['foo'] becomes
+        foo. The new function will return a tuple of the output values in the order they are stored
+        in outputs.  If compute has the additional args discrete_inputs and discrete_outputs, they
+        will be handled similarly.
 
         Parameters
         ----------
@@ -455,12 +456,12 @@ class ExplicitCompJaxify(CompJaxifyBase):
     def _get_compute_primal_args(self):
         # ensure that ordering of args and returns exactly matches the order of the inputs and
         # outputs vectors.
-        return [n for n in chain(self._comp()._discrete_inputs,
-                                 self._comp()._var_rel_names['input'])]
+        return [n for n in chain(self._comp()._var_rel_names['input'],
+                                 self._comp()._discrete_inputs)]
 
     def _get_compute_primal_returns(self):
-        return [n for n in chain(self._comp()._discrete_outputs,
-                                 self._comp()._var_rel_names['output'])]
+        return [n for n in chain(self._comp()._var_rel_names['output'],
+                                 self._comp()._discrete_outputs)]
 
 
 class ImplicitCompJaxify(CompJaxifyBase):
@@ -610,6 +611,56 @@ class SelfAttrFinder(ast.NodeVisitor):
 
         for arg in node.args:
             self.visit(arg)
+
+
+class ReturnChecker(ast.NodeVisitor):
+    """
+    An ast.NodeVisitor that determines if a method returns a tuple or not.
+
+    Parameters
+    ----------
+    method : method
+        The method to be analyzed.
+
+    Attributes
+    ----------
+    _returns : list
+        The list of boolean values indicating whether or not the method returns a tuple. One
+        entry for each return statement in the method.
+    """
+
+    def __init__(self, method):  # noqa
+        self._returns = []
+        self.visit(ast.parse(textwrap.dedent(inspect.getsource(method)), mode='exec'))
+
+    def returns_tuple(self):
+        """
+        Return whether or not the method returns a tuple.
+
+        Returns
+        -------
+        bool
+            True if the method returns a tuple, False otherwise.
+        """
+        if self._returns:
+            ret = self._returns[0]
+            for r in self._returns[1:]:
+                if r != ret:
+                    raise RuntimeError("ReturnChecker can't handle a method with multiple return "
+                                       "statements that return different types.")
+            return ret
+        return False
+
+    def visit_Return(self, node):
+        """
+        Visit a Return node.
+
+        Parameters
+        ----------
+        node : ASTnode
+            The return node being visited.
+        """
+        self._returns.append(isinstance(node.value, ast.Tuple))
 
 
 def get_self_static_attrs(method):
@@ -934,9 +985,7 @@ def compute_partials(inst, inputs, partials, discrete_inputs=None):
         isinstance(deriv_vals[0], tuple)
 
     nof = len(inst._var_rel_names['output'])
-    ofidx = len(inst._discrete_outputs) - 1
-    for ofname in inst._var_rel_names['output']:
-        ofidx += 1
+    for ofidx, ofname in enumerate(inst._var_rel_names['output']):
         ofmeta = inst._var_rel2meta[ofname]
         for wrtidx, wrtname in enumerate(inst._var_rel_names['input']):
             key = (ofname, wrtname)
@@ -987,34 +1036,44 @@ def compute_jacvec_product(inst, inputs, d_inputs, d_outputs, mode, discrete_inp
         If not None, dict containing discrete input values.
     """
     if mode == 'fwd':
-        _, deriv_vals = jax.jvp(inst.compute_primal,
-                                primals=tuple(inst._get_compute_primal_invals(inputs,
-                                                                              discrete_inputs)),
-                                tangents=tuple(d_inputs.values()))
+        dx = tuple(d_inputs.values())
+        full_invals = tuple(inst._get_compute_primal_invals(inputs, discrete_inputs))
+        x = full_invals[:len(dx)]
+        other = full_invals[len(dx):]
+        _, deriv_vals = jax.jvp(lambda *args: inst.compute_primal(*args, *other),
+                                primals=x, tangents=dx)
+        # _, deriv_vals = jax.jvp(inst.compute_primal,
+        #                         primals=tuple(inst._get_compute_primal_invals(inputs,
+        #                                                                       discrete_inputs)),
+        #                         tangents=tuple(inst._get_compute_primal_tangents()))
 
         d_outputs.set_vals(deriv_vals)
     else:
         inhash = inputs.get_hash()
         inhash = (inputs.get_hash(),) + tuple(inst._discrete_inputs.values())
         if inhash != inst._vjp_hash:
+            dx = tuple(d_inputs.values())
+            full_invals = tuple(inst._get_compute_primal_invals(inputs, discrete_inputs))
+            x = full_invals[:len(dx)]
+            other = full_invals[len(dx):]
             # recompute vjp function if inputs have changed
-            _, inst._vjp_fun = jax.vjp(inst.compute_primal,
-                                       *inst._get_compute_primal_invals(inputs, discrete_inputs))
+            _, inst._vjp_fun = jax.vjp(lambda *args: inst.compute_primal(*args, *other), *x)
             inst._vjp_hash = inhash
 
-        if inst._compute_primals_out_shape is None:
-            shape = jax.eval_shape(inst.compute_primal,
-                                   *tuple(inst._get_compute_primal_invals(inputs, discrete_inputs)))
-            if isinstance(shape, tuple):
-                shape = (tuple(s.shape for s in shape), True)
-            else:
-                shape = (shape.shape, False)
-            inst._compute_primals_out_shape = shape
+        #if inst._compute_primals_out_shape is None:
+            #shape = jax.eval_shape(inst.compute_primal,
+                                   #*tuple(inst._get_compute_primal_invals(inputs, discrete_inputs)))
+            #if isinstance(shape, tuple):
+                #shape = (tuple(s.shape for s in shape), True)
+            #else:
+                #shape = (shape.shape, False)
+            #inst._compute_primals_out_shape = shape
 
-        shape, istup = inst._compute_primals_out_shape
+        #shape, istup = inst._compute_primals_out_shape
 
-        if istup:
-            deriv_vals = inst._vjp_fun(tuple(d_outputs.values()))
+        # deriv_vals = inst._vjp_fun(*chain(d_outputs.values(), inst._discrete_outputs.values()))
+        if inst._compute_primal_returns_tuple:
+            deriv_vals = inst._vjp_fun(tuple(d_outputs.values()) + tuple(inst._discrete_outputs.values()))
         else:
             deriv_vals = inst._vjp_fun(tuple(d_outputs.values())[0])
 
