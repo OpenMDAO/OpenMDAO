@@ -10,6 +10,7 @@ import weakref
 import pathlib
 import textwrap
 import traceback
+import atexit
 
 from collections import defaultdict, namedtuple
 from itertools import product
@@ -339,6 +340,9 @@ class Problem(object, metaclass=ProblemMeta):
 
         # So Problem and driver can have hooks attached to their methods
         _setup_hooks(self)
+
+        # call cleanup at system exit
+        atexit.register(self.cleanup)
 
     def _set_name(self, name):
         if not MPI or self.comm.rank == 0:
