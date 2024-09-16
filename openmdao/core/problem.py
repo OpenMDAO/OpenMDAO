@@ -342,7 +342,7 @@ class Problem(object, metaclass=ProblemMeta):
         _setup_hooks(self)
 
         # call cleanup at system exit, if requested
-        if 'cleanup' in os.environ.get('OPENMDAO_ATEXIT', ',').split():
+        if 'cleanup' in os.environ.get('OPENMDAO_ATEXIT', '').split(','):
             atexit.register(self.cleanup)
 
     def _set_name(self, name):
