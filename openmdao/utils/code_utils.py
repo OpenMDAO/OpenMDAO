@@ -473,7 +473,7 @@ class _LambdaSrcFinder(ast.NodeVisitor):
             # it's possible to have multiple lambdas defined on the same line, so raise an error
             # if we find more than one.
             raise RuntimeError("Only one lambda function is allowed per line when using "
-                               "_LambdaWrapper.")
+                               "_LambdaSrcFinder.")
         try:
             self.src = ast.unparse(node)
         except AttributeError:

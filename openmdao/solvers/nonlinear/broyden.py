@@ -567,9 +567,8 @@ class BroydenSolver(NonlinearSolver):
         try:
             # Linearize model.
             ln_solver = self.linear_solver
-            do_sub_ln = ln_solver._linearize_children()
             my_asm_jac = ln_solver._assembled_jac
-            system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
+            system._linearize(my_asm_jac, sub_do_ln=ln_solver._linearize_children())
             if my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac:
                 my_asm_jac._update(system)
             self._linearize()

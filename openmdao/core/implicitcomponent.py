@@ -57,6 +57,9 @@ class ImplicitComponent(Component):
     _has_solve_nl : bool
         If True, this component has a solve_nonlinear method that overrides the ImplicitComponent
         class method.
+    _has_solve_linear : bool
+        If True, this component has a solve_linear method that overrides the ImplicitComponent
+        class method.
     """
 
     def __init__(self, **kwargs):
@@ -66,6 +69,7 @@ class ImplicitComponent(Component):
         self._declared_residuals = {}
         super().__init__(**kwargs)
         self._has_solve_nl = _UNDEFINED
+        self._has_solve_linear = _UNDEFINED
 
     def _configure(self):
         """
@@ -77,6 +81,9 @@ class ImplicitComponent(Component):
 
         if self._has_solve_nl is _UNDEFINED:
             self._has_solve_nl = overrides_method('solve_nonlinear', self, ImplicitComponent)
+
+        if self._has_solve_linear is _UNDEFINED:
+            self._has_solve_linear = overrides_method('solve_linear', self, ImplicitComponent)
 
         if self.matrix_free == _UNDEFINED:
             self.matrix_free = overrides_method('apply_linear', self, ImplicitComponent)

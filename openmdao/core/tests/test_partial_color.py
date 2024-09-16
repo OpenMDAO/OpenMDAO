@@ -1536,6 +1536,9 @@ class TestStaticColoring(unittest.TestCase):
 class TestStaticColoringParallelCS(unittest.TestCase):
     N_PROCS = 2
 
+    def setUp(self):
+        np.random.seed(11)
+
     # semi-total coloring feature disabled.
 
     def test_simple_semitotals_all_local_vars(self):

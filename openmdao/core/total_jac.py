@@ -120,6 +120,8 @@ class _TotalJacInfo(object):
         coloring_info : ColoringMeta, None, or False
             If None, use driver coloring if it exists.  If False, do no coloring. Otherwise, either
             use or generate a new coloring based on the state of the coloring_info object.
+        nsolves : int
+            Number of linear solves that have been performed.
         driver : <Driver>, None, or False
             The driver that owns the total jacobian.  If None, use the driver from the problem.
             If False, this total jacobian will be computed directly by the problem.
@@ -140,6 +142,8 @@ class _TotalJacInfo(object):
         self.initialize = True
         self.approx = approx
         self.coloring_info = coloring_info
+        self.nsolves = 0
+
         try:
             self._linear_only_dvs = set(driver._lin_dvs).difference(driver._nl_dvs)
         except AttributeError:
@@ -1448,6 +1452,8 @@ class _TotalJacInfo(object):
                                         self._save_linear_solution(cache_key, mode)
                                     else:
                                         model._solve_linear(mode)
+
+                            self.nsolves += 1
 
                             if debug_print:
                                 print(f'Elapsed Time: {time.perf_counter() - t0} secs\n',

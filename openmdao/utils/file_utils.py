@@ -156,7 +156,7 @@ def _to_filename(spec):
     str
         The filename.
     """
-    if ':' in spec and not os.path.isfile(spec):
+    if ':' in spec and not isfile(spec):
         fname, _ = spec.rsplit(':', 1)
         if not fname.endswith('.py'):
             try:
@@ -180,10 +180,10 @@ def _load_and_exec(script_name, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    if ':' in script_name and not os.path.isfile(script_name):
+    if ':' in script_name and not isfile(script_name):
         return _load_and_run_test(script_name)
 
-    sys.path.insert(0, os.path.dirname(script_name))
+    sys.path.insert(0, dirname(script_name))
 
     sys.argv[:] = [script_name] + user_args
 
@@ -221,7 +221,7 @@ def fname2mod_name(fname):
     if not fname.endswith('.py'):
         raise ValueError(f"'{fname}' does not end with '.py'")
 
-    s = os.path.basename(fname).rsplit('.', 1)[0]
+    s = basename(fname).rsplit('.', 1)[0]
 
     for c in to_replace:
         s = s.replace(c, '_')
@@ -624,7 +624,7 @@ def clean_outputs(obj='.', recurse=False, prompt=True, pattern='*_out', dryrun=F
 
     if isinstance(obj, (str, pathlib.Path)):
         # A single pathname or path object was given.
-        output_dirs = _find_openmdao_output_dirs(obj, pattern, recurse)
+        output_dirs = _find_openmdao_output_dirs(obj, pattern=pattern, recurse=recurse)
     elif isinstance(obj, (Iterable,)):
         # Multiple paths given
         output_dirs.extend(_find_openmdao_output_dirs(obj, pattern, recurse))

@@ -14,6 +14,7 @@ import networkx as nx
 from openmdao.core.configinfo import _ConfigInfo
 from openmdao.core.system import System, collect_errors
 from openmdao.core.component import Component, _DictValues
+from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.constants import _UNDEFINED, INT_DTYPE, _SetupStatus
 from openmdao.vectors.vector import _full_slice
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
@@ -30,7 +31,7 @@ from openmdao.utils.general_utils import common_subpath, \
     meta2src_iter, get_rev_conns
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
-from openmdao.utils.graph_utils import get_out_of_order_nodes
+from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
@@ -202,6 +203,8 @@ class Group(System):
         in the larger model are being solved using reverse mode.
     _bad_conn_vars : set
         Set of variables involved in invalid connections.
+    _sys_graph_cache : dict
+        Cache for the system graph.
     """
 
     def __init__(self, **kwargs):
@@ -232,6 +235,7 @@ class Group(System):
         self._iterated_components = None
         self._fd_rev_xfer_correction_dist = {}
         self._bad_conn_vars = None
+        self._sys_graph_cache = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -721,6 +725,7 @@ class Group(System):
         # save a ref to the problem level options.
         self._problem_meta = prob_meta
         self._initial_condition_cache = {}
+        self._sys_graph_cache = None
 
         # reset any coloring if a Coloring object was not set explicitly
         if self._coloring_info.dynamic or self._coloring_info.static is not None:
@@ -4248,34 +4253,34 @@ class Group(System):
                                                             self._var_allprocs_abs2prom['input']))
             graph.add_nodes_from(comps)
 
-            edge_data = defaultdict(lambda: defaultdict(list))
-            for in_abs, src_abs in self._conn_global_abs_in2out.items():
-                src_sys = src_abs.rpartition('.')[0]
-                tgt_sys = in_abs.rpartition('.')[0]
-
-                # store var connection data in each system to system edge.
-                if add_edge_info:
-                    edge_data[(src_sys, tgt_sys)][src_abs].append(in_abs)
-                else:
-                    graph.add_edge(src_sys, tgt_sys)
-
             if add_edge_info:
+                edge_data = defaultdict(lambda: defaultdict(list))
+                for in_abs, src_abs in self._conn_global_abs_in2out.items():
+                    src_sys = src_abs.rpartition('.')[0]
+                    tgt_sys = in_abs.rpartition('.')[0]
+
+                    # store var connection data in each system to system edge.
+                    edge_data[(src_sys, tgt_sys)][src_abs].append(in_abs)
+
                 for (src_sys, tgt_sys), data in edge_data.items():
                     graph.add_edge(src_sys, tgt_sys, conns=data)
+            else:
+                for in_abs, src_abs in self._conn_global_abs_in2out.items():
+                    graph.add_edge(src_abs.rpartition('.')[0], in_abs.rpartition('.')[0])
         else:
-            glen = self.pathname.count('.') + 1 if self.pathname else 0
-            var2sys = {v: v.split('.', glen + 1)[glen]
-                       for v in chain(self._var_allprocs_abs2prom['output'],
-                                      self._var_allprocs_abs2prom['input'])}
+            if self._sys_graph_cache is None:
+                # add all systems as nodes in the graph so they'll be there even if unconnected.
+                graph.add_nodes_from(self._subsystems_allprocs)
 
-            # add all systems as nodes in the graph so they'll be there even if unconnected.
-            graph.add_nodes_from(var2sys.values())
-
-            for in_abs, src_abs in self._conn_global_abs_in2out.items():
-                src_sys = var2sys[src_abs]
-                tgt_sys = var2sys[in_abs]
-                if src_sys != tgt_sys:
-                    graph.add_edge(src_sys, tgt_sys)
+                glen = self.pathname.count('.') + 1 if self.pathname else 0
+                for in_abs, src_abs in self._conn_global_abs_in2out.items():
+                    src_sys = src_abs.split('.', glen + 1)[glen]
+                    tgt_sys = in_abs.split('.', glen + 1)[glen]
+                    if src_sys != tgt_sys:
+                        graph.add_edge(src_sys, tgt_sys)
+                self._sys_graph_cache = graph
+            else:
+                graph = self._sys_graph_cache
 
         return graph
 
@@ -5114,29 +5119,24 @@ class Group(System):
 
         has_custom_derivs = False
         list_wrt = list(wrt) if wrt is not None else []
+        list_of = list(of) if of is not None else []
+
+        lincons = [d for d, meta in driver._cons.items() if meta['linear']]
+        if lincons and list_of == lincons:  # this is for a linear jacobian
+            driver_wrt = list(driver._get_lin_dvs())
+        else:
+            driver_wrt = list(driver._get_nl_dvs())
 
         if wrt is None:
-            lincons = [d for d, meta in driver._cons.items() if meta['linear']]
-            if lincons:
-                if len(lincons) == len(driver._responses):  # all 'ofs' are linear
-                    driver_wrt = list(driver._lin_dvs if driver.supports['linear_only_designvars']
-                                      else driver._designvars)
-                else:  # mixed linear and nonlinear constraints
-                    driver_wrt = list(driver._nl_dvs if driver.supports['linear_only_designvars']
-                                      else driver._designvars)
-            else:
-                driver_wrt = list(driver._nl_dvs if driver.supports['linear_only_designvars']
-                                  else driver._designvars)
-
             wrt = driver_wrt
             if not wrt:
                 raise RuntimeError("No design variables were passed to compute_totals and "
                                    "the driver is not providing any.")
         else:
-            driver_wrt = list(driver._designvars)
-            wrt_src_names = [m['source'] for m in driver._designvars.values()]
-            if list_wrt != driver_wrt and list_wrt != wrt_src_names:
-                has_custom_derivs = True
+            if list_wrt != driver_wrt:
+                wrt_src_names = [driver._designvars[n]['source'] for n in driver_wrt]
+                if list_wrt != wrt_src_names:
+                    has_custom_derivs = True
 
         driver_ordered_nl_resp_names = driver._get_ordered_nl_responses()
         if of is None:
@@ -5278,3 +5278,91 @@ class Group(System):
         # inside of the group or its children.
         meta['base'] = 'Group'
         return meta
+
+
+def iter_solver_info(system):
+    """
+    Return solver information for this System.
+
+    Parameters
+    ----------
+    system : System
+        Return solver information for this System.
+
+    Returns
+    -------
+    str
+        System pathname.
+    str
+        Class name.
+    list of sets of str
+        Strongly connected components in this Group's subsystem graph.  If not a Group, this will
+        be an empty list.
+    str
+        Linear solver class name.
+    str
+        Nonlinear solver class name.
+    int
+        Linear solver max iterations.
+    int
+        Nonlinear solver max iterations.
+    int
+        Number of subsystems that are not part of any strongly connected component. If this
+        number is greater than 0 and strongly connected components exist in this group, it
+        indicates that this group contains subcycles and that it may be more efficient to
+        separate those subcyles into their own groups and apply iterative solvers to them.
+    bool
+        True if this is a Group, False if it is an ImplicitComponent.
+    bool
+        True if the linear solver found for this System can solve a cycle or implicit component.
+    bool
+        True if the nonlinear solver found for this System can solve a cycle or implicit component.
+    """
+    sccs = []
+    missing = 0
+    lnmaxiter = nlmaxiter = 1
+    nl_can_solve = lin_can_solve = False
+    nlslvname = lnslvname = None
+
+    if isinstance(system, Group):
+        isgrp = True
+        for s in get_sccs_topo(system.compute_sys_graph()):
+            if len(s) > 1:
+                sccs.append(s)
+            else:
+                missing += 1
+    elif isinstance(system, ImplicitComponent):
+        isgrp = False
+    else:
+        return (system.pathname, system.__class__.__name__, sccs, None, None, 0, 0, 0, False,
+                False, False)
+
+    if system.nonlinear_solver:
+        if isgrp:
+            nl_can_solve = system.nonlinear_solver.can_solve_cycle()
+        else:
+            nl_can_solve = system.nonlinear_solver.supports['implicit_components']
+        nlslvname = system.nonlinear_solver.__class__.__name__
+        if 'maxiter' in system.nonlinear_solver.options:
+            nlmaxiter = system.nonlinear_solver.options['maxiter']
+
+    if system.linear_solver:
+        if isgrp:
+            lin_can_solve = system.linear_solver.can_solve_cycle()
+        else:
+            lin_can_solve = system.linear_solver.supports['implicit_components']
+        lnslvname = system.linear_solver.__class__.__name__
+
+    if lnslvname and 'maxiter' in system.linear_solver.options:
+        lnmaxiter = system.linear_solver.options['maxiter']
+
+    if not isgrp:
+        if lnslvname is None and system._has_solve_linear:
+            lnslvname = 'solve_linear'
+            lin_can_solve = True
+        if nlslvname is None and system._has_solve_nl:
+            nlslvname = 'solve_nonlinear'
+            nl_can_solve = True
+
+    return (system.pathname, system.__class__.__name__, sccs, lnslvname, nlslvname, lnmaxiter,
+            nlmaxiter, missing, isgrp, nl_can_solve, lin_can_solve)
