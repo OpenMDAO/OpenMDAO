@@ -1045,7 +1045,8 @@ def compute_jacvec_product(inst, inputs, d_inputs, d_outputs, mode, discrete_inp
         d_outputs.set_vals(deriv_vals)
     else:
         inhash = inputs.get_hash()
-        inhash = (inputs.get_hash(),) + tuple(inst._discrete_inputs.values())
+        inhash = ((inputs.get_hash(),) + tuple(inst._discrete_inputs.values()) +
+                  inst.get_self_statics())
         if inhash != inst._vjp_hash:
             dx = tuple(d_inputs.values())
             full_invals = tuple(inst._get_compute_primal_invals(inputs, discrete_inputs))
