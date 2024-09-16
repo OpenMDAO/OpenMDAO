@@ -1042,11 +1042,6 @@ def compute_jacvec_product(inst, inputs, d_inputs, d_outputs, mode, discrete_inp
         other = full_invals[len(dx):]
         _, deriv_vals = jax.jvp(lambda *args: inst.compute_primal(*args, *other),
                                 primals=x, tangents=dx)
-        # _, deriv_vals = jax.jvp(inst.compute_primal,
-        #                         primals=tuple(inst._get_compute_primal_invals(inputs,
-        #                                                                       discrete_inputs)),
-        #                         tangents=tuple(inst._get_compute_primal_tangents()))
-
         d_outputs.set_vals(deriv_vals)
     else:
         inhash = inputs.get_hash()
@@ -1060,18 +1055,6 @@ def compute_jacvec_product(inst, inputs, d_inputs, d_outputs, mode, discrete_inp
             _, inst._vjp_fun = jax.vjp(lambda *args: inst.compute_primal(*args, *other), *x)
             inst._vjp_hash = inhash
 
-        #if inst._compute_primals_out_shape is None:
-            #shape = jax.eval_shape(inst.compute_primal,
-                                   #*tuple(inst._get_compute_primal_invals(inputs, discrete_inputs)))
-            #if isinstance(shape, tuple):
-                #shape = (tuple(s.shape for s in shape), True)
-            #else:
-                #shape = (shape.shape, False)
-            #inst._compute_primals_out_shape = shape
-
-        #shape, istup = inst._compute_primals_out_shape
-
-        # deriv_vals = inst._vjp_fun(*chain(d_outputs.values(), inst._discrete_outputs.values()))
         if inst._compute_primal_returns_tuple:
             deriv_vals = inst._vjp_fun(tuple(d_outputs.values()) + tuple(inst._discrete_outputs.values()))
         else:
