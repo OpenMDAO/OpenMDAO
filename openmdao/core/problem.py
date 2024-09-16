@@ -341,8 +341,9 @@ class Problem(object, metaclass=ProblemMeta):
         # So Problem and driver can have hooks attached to their methods
         _setup_hooks(self)
 
-        # call cleanup at system exit
-        atexit.register(self.cleanup)
+        # call cleanup at system exit, if requested
+        if 'cleanup' in os.environ.get('OPENMDAO_ATEXIT', '').split():
+            atexit.register(self.cleanup)
 
     def _set_name(self, name):
         if not MPI or self.comm.rank == 0:

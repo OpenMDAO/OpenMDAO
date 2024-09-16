@@ -622,6 +622,10 @@ def _register_view_reports():
     """
     hooks.use_hooks = True
 
+    # request cleanup at exit
+    om_atexit = os.environ.get('OPENMDAO_ATEXIT')
+    os.environ['OPENMDAO_ATEXIT'] = ','.join([om_atexit, 'cleanup']) if om_atexit else 'cleanup'
+
     from openmdao.utils.reports_system import view_reports
 
     def run_problem_reports(problem):
