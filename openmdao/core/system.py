@@ -77,8 +77,8 @@ _recordable_funcs = frozenset(['_apply_linear', '_apply_nonlinear', '_solve_line
 
 # the following are local metadata that will also be accessible for vars on all procs
 global_meta_names = {
-    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc', 'shape_by_conn',
-              'compute_shape', 'copy_shape'),
+    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc', 'require_connection',
+              'shape_by_conn', 'compute_shape', 'copy_shape'),
     'output': ('units', 'shape', 'size', 'desc',
                'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags', 'shape_by_conn',
                'compute_shape', 'copy_shape'),

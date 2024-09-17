@@ -516,6 +516,7 @@ class Component(System):
                     self._subjacs_info[abs_key]['sparsity'] = tup
 
     def add_input(self, name, val=1.0, shape=None, units=None, desc='', tags=None,
+                  require_connection=False,
                   shape_by_conn=False, copy_shape=None, compute_shape=None, distributed=None):
         """
         Add an input variable to the component.
@@ -537,6 +538,8 @@ class Component(System):
         tags : str or list of strs
             User defined tags that can be used to filter what gets listed when calling
             list_inputs and list_outputs.
+        require_connection : bool
+            If True, this input must be connected to an output.
         shape_by_conn : bool
             If True, shape this input to match its connected output.
         copy_shape : str or None
@@ -619,6 +622,7 @@ class Component(System):
             'desc': desc,
             'distributed': distributed,
             'tags': make_set(tags),
+            'require_connection': require_connection,
             'shape_by_conn': shape_by_conn,
             'compute_shape': compute_shape,
             'copy_shape': copy_shape,
@@ -645,7 +649,7 @@ class Component(System):
 
         return metadata
 
-    def add_discrete_input(self, name, val, desc='', tags=None):
+    def add_discrete_input(self, name, val, desc='', tags=None, require_connection=False):
         """
         Add a discrete input variable to the component.
 
@@ -660,6 +664,8 @@ class Component(System):
         tags : str or list of strs
             User defined tags that can be used to filter what gets listed when calling
             list_inputs and list_outputs.
+        require_connection : bool
+            If True, this input must be connected to an output.
 
         Returns
         -------
@@ -681,6 +687,7 @@ class Component(System):
             'type': type(val),
             'desc': desc,
             'tags': make_set(tags),
+            'require_connection': require_connection,
         })
 
         if metadata['type'] == np.ndarray:

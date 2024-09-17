@@ -489,6 +489,46 @@ class TestGroup(unittest.TestCase):
         with self.assertRaisesRegex(Exception, msg):
             prob.setup()
 
+    def test_unconnected_input_required_connection(self):
+        class RequiredConnComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', require_connection=True)
+                self.add_output('y')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 2 * inputs['x']
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', RequiredConnComp())
+
+        with self.assertRaises(Exception) as cm:
+            p.setup()
+
+        msg = ("\nCollected errors for problem 'problem':\n"
+               '   <model> <class Group>: Input "comp.x" requires a connection but is not connected.')
+
+        self.assertEqual(str(cm.exception), msg)
+
+    def test_unconnected_input_required_connection_promoted(self):
+        class RequiredConnComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', require_connection=True)
+                self.add_output('y')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 2 * inputs['x']
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', RequiredConnComp(), promotes=['*'])
+
+        with self.assertRaises(Exception) as cm:
+            p.setup()
+
+        msg = ("\nCollected errors for problem 'problem':\n"
+               '   <model> <class Group>: Input "comp.x", promoted as "x", requires a connection but is not connected.')
+
+        self.assertEqual(str(cm.exception), msg)
+
     def test_unconnected_input_units_no_mismatch(self):
         p = om.Problem()
 
