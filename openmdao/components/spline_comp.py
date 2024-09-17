@@ -54,7 +54,8 @@ class SplineComp(ExplicitComponent):
                              desc='List/array of x interpolated point values.')
         self.options.declare('x_cp_val', default=None, types=(list, np.ndarray), allow_none=True,
                              desc='List/array of x control point values, must be monotonically '
-                             'increasing. Not applicable for bsplines.')
+                             'increasing. Optional alternative to num_cp. Not applicable for '
+                             'bsplines. ')
         self.options.declare('num_cp', default=None, types=(int, ), allow_none=True,
                              desc='Number of spline control points. Optional alternative to '
                              'x_cp_val. Required for bsplines. If None, num_cp will be a linspace '
