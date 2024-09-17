@@ -132,6 +132,8 @@ class TestGraphFunction(unittest.TestCase):
 
         graph = get_func_graph(func)
         self.assertEqual(0, len(graph.edges()))
+        partials = sorted(get_partials_deps(func))
+        self.assertEqual(sorted(partials), [])
 
     def test_unconected_output(self):
         def func(a, b):
@@ -142,6 +144,8 @@ class TestGraphFunction(unittest.TestCase):
         self.assertIn(('a', 'c'), graph.edges())
         self.assertIn(('b', 'c'), graph.edges())
         self.assertEqual(0, len(graph.edges('out1')))
+        partials = sorted(get_partials_deps(func))
+        self.assertEqual(sorted(partials), [('c', 'a'), ('c', 'b')])
 
     def test_complicated(self):
         class _Foo(object):
@@ -150,20 +154,20 @@ class TestGraphFunction(unittest.TestCase):
         foo = _Foo(1)
         def func(a, b):
             c = np.tan(a + np.sin(b))
-            x = np.array([a, b])
             d = c[0] + 1
+            x = np.array([a, d])
             e = 1./np.cos(d*foo.a) * 2
             f = d
             f[0] = x * x
-            return e
+            return e, f
 
         graph = get_func_graph(func)
-        expected = [('a', 'c'), ('a', 'x'), ('b', 'c'), ('b', 'x'), ('c', 'd'), ('d', 'e'), ('d', 'f'), ('x', 'f')]
+        expected = [('a', 'c'), ('a', 'x'), ('b', 'c'), ('d', 'x'), ('c', 'd'), ('d', 'e'), ('d', 'f'), ('x', 'f')]
         self.assertEqual(sorted(graph.edges()), sorted(expected))
         self.assertEqual(sorted(graph.nodes()), sorted(['a', 'b', 'c', 'd', 'e', 'f', 'x']))
 
         partials = sorted(get_partials_deps(func))
-        self.assertEqual(sorted(partials), [('e', 'a'), ('e', 'b')])
+        self.assertEqual(sorted(partials), [('e', 'a'), ('e', 'b'), ('f', 'a'), ('f', 'b')])
 
     def test_multiple_returns(self):
         def func(a, b):
@@ -172,6 +176,8 @@ class TestGraphFunction(unittest.TestCase):
         graph = get_func_graph(func)
         self.assertIn(('a', 'out0'), graph.edges())
         self.assertIn(('b', 'out1'), graph.edges())
+        partials = sorted(get_partials_deps(func))
+        self.assertEqual(sorted(partials), [('out0', 'a'), ('out1', 'b')])
 
     def test_conditional_return(self):
         def func(a):
@@ -182,6 +188,8 @@ class TestGraphFunction(unittest.TestCase):
 
         graph = get_func_graph(func)
         self.assertIn(('a', 'out0'), graph.edges())
+        partials = sorted(get_partials_deps(func))
+        self.assertEqual(sorted(partials), [('out0', 'a')])
 
     def test_no_return(self):
         def func(a):
@@ -189,6 +197,8 @@ class TestGraphFunction(unittest.TestCase):
 
         graph = get_func_graph(func)
         self.assertIn(('a', 'b'), graph.edges())
+        partials = sorted(get_partials_deps(func))
+        self.assertEqual(sorted(partials), [])
 
     def test_function_with_args(self):
         def func(a, b):
@@ -198,6 +208,8 @@ class TestGraphFunction(unittest.TestCase):
         graph = get_func_graph(func)
         self.assertIn(('a', 'c'), graph.edges())
         self.assertIn(('b', 'c'), graph.edges())
+        partials = sorted(get_partials_deps(func))
+        self.assertEqual(sorted(partials), [('c', 'a'), ('c', 'b')])
 
     def test_nested_function(self):
         def func(a):
@@ -216,6 +228,8 @@ class TestGraphFunction(unittest.TestCase):
         graph = get_func_graph(func)
         self.assertIn(('a', 'out0'), graph.edges())
         self.assertIn(('b', 'out1'), graph.edges())
+        partials = sorted(get_partials_deps(func))
+        self.assertEqual(sorted(partials), [('out0', 'a'), ('out1', 'b')])
 
     def test_function_with_mixed_return(self):
         def func(a):
@@ -226,6 +240,8 @@ class TestGraphFunction(unittest.TestCase):
 
         graph = get_func_graph(func)
         self.assertIn(('a', 'out0'), graph.edges())
+        partials = sorted(get_partials_deps(func))
+        self.assertEqual(sorted(partials), [('out0', 'a')])
 
 
 if __name__ == '__main__':

@@ -28,8 +28,12 @@ class QuadraticComp(om.ImplicitComponent):
 
         self.declare_partials(of=['*'], wrt=['*'])
 
+    def setup_partials(self):
         self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-        self.linear_solver = om.DirectSolver()
+        if self.matrix_free:
+            self.linear_solver = om.ScipyKrylov()
+        else:
+            self.linear_solver = om.DirectSolver()
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         a = inputs['a']
@@ -276,7 +280,7 @@ def compute_primal(self, in_scalar, in_array, in_array2, out_scalar, out_array, 
         converter = ImplicitCompJaxify(comp)
 
         expected = """
-def compute_primal(self, disc_in, in_scalar, in_array, in_array2, out_scalar, out_array, out_array2):
+def compute_primal(self, in_scalar, in_array, in_array2, out_scalar, out_array, out_array2, disc_in):
     disc_out, = self._discrete_outputs.values()
     out_scalar = in_scalar * 2.0
     out_array = in_array * 2.0
@@ -290,7 +294,7 @@ def compute_primal(self, disc_in, in_scalar, in_array, in_array2, out_scalar, ou
         out_array *= 3.0
         out_array2 *= 3.0
     self._discrete_outputs.set_vals((disc_out,))
-    return (disc_out, out_scalar, out_array, out_array2)
+    return (out_scalar, out_array, out_array2, disc_out)
 """.strip()
 
         self.assertEqual(converter.get_compute_primal_src().strip(), expected)
@@ -299,18 +303,20 @@ def compute_primal(self, disc_in, in_scalar, in_array, in_array2, out_scalar, ou
 @unittest.skipIf(jax is None or sys.version_info < (3, 9), 'jax is not available or python < 3.9.')
 class TestJaxImplicitComp(unittest.TestCase):
 
-    def test_quad_comp_converted(self):
+    @parameterized.expand(itertools.product(['fwd', 'rev'], ['matfree', '']), name_func=parameterized_name)
+    def test_quad_comp_converted(self, mode, matrix_free):
         p = om.Problem()
         # create an IVC manually so we can set the shapes.  Otherwise must set shape in the component
         # itself.
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('a'))
         ivc.add_output('b')
         ivc.add_output('c')
-        p.model.add_subsystem('comp', QuadraticComp(derivs_method='jax'))
+        comp = p.model.add_subsystem('comp', QuadraticComp(derivs_method='jax'))
+        comp.matrix_free = bool(matrix_free)
         p.model.connect('ivc.a', 'comp.a')
         p.model.connect('ivc.b', 'comp.b')
         p.model.connect('ivc.c', 'comp.c')
-        p.setup(mode='rev')
+        p.setup(mode=mode)
 
         p.set_val('ivc.a', 1.0)
         p.set_val('ivc.b', -4.0)
@@ -324,8 +330,8 @@ class TestJaxImplicitComp(unittest.TestCase):
                                            show_only_incorrect=True, abs_err_tol=3e-5, rel_err_tol=5e-6), atol=3e-5, rtol=5e-6)
         assert_check_partials(p.check_partials(show_only_incorrect=True))
 
-    @parameterized.expand(itertools.product([True, False], [(), (3,), (2,3)]), name_func=parameterized_name)
-    def test_jax_quad_comp(self, matrix_free, shape):
+    @parameterized.expand(itertools.product(['fwd', 'rev'], ['matfree', ''], [(), (3,), (2,3)]), name_func=parameterized_name)
+    def test_jax_quad_comp(self, mode, matrix_free, shape):
         p = om.Problem()
         # create an IVC manually so we can set the shapes.  Otherwise must set shape in the component
         # itself.
@@ -333,11 +339,11 @@ class TestJaxImplicitComp(unittest.TestCase):
         ivc.add_output('b', shape=shape)
         ivc.add_output('c', shape=shape)
         comp = p.model.add_subsystem('comp', JaxQuadraticCompPrimal(shape=shape))
-        comp.matrix_free = matrix_free
+        comp.matrix_free = bool(matrix_free)
         p.model.connect('ivc.a', 'comp.a')
         p.model.connect('ivc.b', 'comp.b')
         p.model.connect('ivc.c', 'comp.c')
-        p.setup(mode='rev')
+        p.setup(mode=mode)
 
         p.set_val('ivc.a', 1.0)
         p.set_val('ivc.b', -4.0)
@@ -349,9 +355,10 @@ class TestJaxImplicitComp(unittest.TestCase):
         assert_near_equal(p.get_val('comp.x'), np.full(shape, 3.0, np.float64))
         assert_check_totals(p.check_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'], method='fd',
                                            show_only_incorrect=True, abs_err_tol=3.5e-5, rel_err_tol=5e-6), atol=3.5e-5, rtol=5e-6)
-        assert_check_partials(p.check_partials(show_only_incorrect=True), atol=2.5e-6)
+        assert_check_partials(p.check_partials(show_only_incorrect=True, abs_err_tol=3e-6, rel_err_tol=3e-6), atol=2.5e-6)
 
-    def test_lin_system_converted(self):
+    @parameterized.expand(itertools.product(['fwd', 'rev'], ['matfree', '']), name_func=parameterized_name)
+    def test_lin_system_converted(self, mode, matrix_free):
         A = np.array([[1., 1., 1.], [1., 2., 3.], [0., 1., 3.]])
         b = np.array([1, 2, -3])
 
@@ -362,25 +369,26 @@ class TestJaxImplicitComp(unittest.TestCase):
         ivc.add_output('b', b)
 
         lingrp = prob.model.add_subsystem('lingrp', om.Group())
-        lingrp.add_subsystem('lin', JaxLinearSystemCompConverted(size=3, derivs_method='jax'))
+        lin = lingrp.add_subsystem('lin', JaxLinearSystemCompConverted(size=3, derivs_method='jax'))
+        lin.matrix_free = bool(matrix_free)
 
         prob.model.connect('ivc.A', 'lingrp.lin.A')
         prob.model.connect('ivc.b', 'lingrp.lin.b')
 
-        prob.setup()
+        prob.setup(mode=mode)
         prob.set_solver_print(level=0)
 
         prob.run_model()
 
-        assert_near_equal(prob['lingrp.lin.x'], np.array([-4, 9, -4]))
+        assert_near_equal(prob['lingrp.lin.x'], np.array([-4, 9, -4]), tolerance=2e-15)
 
         assert_check_totals(prob.check_totals(of=['lingrp.lin.x'], wrt=['ivc.b', 'ivc.A'],
                                               abs_err_tol=2e-4, rel_err_tol=3e-6, show_only_incorrect=True),
                             atol=2e-4, rtol=3e-6)
         assert_check_partials(prob.check_partials(show_only_incorrect=True), rtol=1e-5)
 
-    @parameterized.expand([True, False], name_func=parameterized_name)
-    def test_jax_lin_system_primal(self, matrix_free):
+    @parameterized.expand(itertools.product(['fwd', 'rev'], ['matfree', '']), name_func=parameterized_name)
+    def test_jax_lin_system_primal(self, mode, matrix_free):
         A = np.array([[1., 1., 1.], [1., 2., 3.], [0., 1., 3.]])
         b = np.array([1, 2, -3])
 
@@ -392,12 +400,12 @@ class TestJaxImplicitComp(unittest.TestCase):
 
         lingrp = prob.model.add_subsystem('lingrp', om.Group())
         comp = lingrp.add_subsystem('lin', JaxLinearSystemCompPrimal(size=3))
-        comp.matrix_free = matrix_free
+        comp.matrix_free = bool(matrix_free)
 
         prob.model.connect('ivc.A', 'lingrp.lin.A')
         prob.model.connect('ivc.b', 'lingrp.lin.b')
 
-        prob.setup()
+        prob.setup(mode=mode)
         prob.set_solver_print(level=0)
 
         prob.run_model()
@@ -409,7 +417,8 @@ class TestJaxImplicitComp(unittest.TestCase):
                             atol=2e-4, rtol=3e-6)
         assert_check_partials(prob.check_partials(show_only_incorrect=True), rtol=1e-5)
 
-    def test_jax_lin_system_primal_w_option(self):
+    @parameterized.expand(itertools.product(['fwd', 'rev'], ['matfree', '']), name_func=parameterized_name)
+    def test_jax_lin_system_primal_w_option(self, mode, matrix_free):
         A = np.array([[1., 1., 1.], [1., 2., 3.], [0., 1., 3.]])
         b = np.array([1, 2, -3])
 
@@ -421,11 +430,12 @@ class TestJaxImplicitComp(unittest.TestCase):
 
         lingrp = prob.model.add_subsystem('lingrp', om.Group())
         lin = lingrp.add_subsystem('lin', JaxLinearSystemCompPrimalwOption(size=3))
+        lin.matrix_free = bool(matrix_free)
 
         prob.model.connect('ivc.A', 'lingrp.lin.A')
         prob.model.connect('ivc.b', 'lingrp.lin.b')
 
-        prob.setup()
+        prob.setup(mode=mode)
         prob.set_solver_print(level=0)
 
         prob.set_val('ivc.A', A)

@@ -271,17 +271,6 @@ class CompJaxifyBase(ast.NodeTransformer):
         """
         return replace_method(self._comp().__class__, self._funcname, self.get_compute_primal_src())
 
-    def compute_dependency_iter(self):
-        """
-        Get (output, input) pairs where the output depends on the input for the compute function.
-
-        Yields
-        ------
-        tuple
-            A tuple of the form (output, input), where output depends on the input.
-        """
-        yield from get_partials_deps(self.compute_primal)
-
     def _get_self_statics_func(self, static_attrs, static_dcts):
         fsrc = ['def get_self_statics(self):']
         tupargs = []
@@ -494,7 +483,6 @@ class ImplicitCompJaxify(CompJaxifyBase):
 
     def _get_arg_values(self):
         discrete_inputs = self._comp()._discrete_inputs
-        yield from discrete_inputs.values()
 
         comp = self._comp()
         if comp._inputs is None:
@@ -511,16 +499,18 @@ class ImplicitCompJaxify(CompJaxifyBase):
         else:
             yield from comp._outputs.values()
 
+        yield from discrete_inputs.values()
+
     def _get_compute_primal_args(self):
         # ensure that ordering of args and returns exactly matches the order of the inputs,
         # outputs, and residuals vectors.
-        return [n for n in chain(self._comp()._discrete_inputs,
-                                 self._comp()._var_rel_names['input'],
-                                 self._comp()._var_rel_names['output'])]
+        return [n for n in chain(self._comp()._var_rel_names['input'],
+                                 self._comp()._var_rel_names['output'],
+                                 self._comp()._discrete_inputs)]
 
     def _get_compute_primal_returns(self):
-        return [n for n in chain(self._comp()._discrete_outputs,
-                                 self._comp()._var_rel_names['output'])]
+        return [n for n in chain(self._comp()._var_rel_names['output'],
+                                 self._comp()._discrete_outputs)]
 
 
 class SelfAttrFinder(ast.NodeVisitor):
@@ -1057,7 +1047,8 @@ def compute_jacvec_product(inst, inputs, d_inputs, d_outputs, mode, discrete_inp
             inst._vjp_hash = inhash
 
         if inst._compute_primal_returns_tuple:
-            deriv_vals = inst._vjp_fun(tuple(d_outputs.values()) + tuple(inst._discrete_outputs.values()))
+            deriv_vals = inst._vjp_fun(tuple(d_outputs.values()) + \
+                                       tuple(inst._discrete_outputs.values()))
         else:
             deriv_vals = inst._vjp_fun(tuple(d_outputs.values())[0])
 
@@ -1156,10 +1147,10 @@ def apply_linear(inst, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
         _, deriv_vals = jax.jvp(inst.compute_primal,
                                 primals=invals,
                                 tangents=tuple(chain(d_inputs.values(), d_outputs.values())))
-        if deriv_vals.ndim > 0:
+        if isinstance(deriv_vals, tuple):
             d_residuals.set_vals(deriv_vals)
         else:
-            d_residuals.asarray()[:] = deriv_vals
+            d_residuals.asarray()[:] = deriv_vals.flatten()
     else:
         inhash = (inputs.get_hash(), inst._outputs.get_hash()) + \
             tuple(inst._discrete_inputs.values())
@@ -1191,40 +1182,26 @@ def apply_linear(inst, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
 
 
 if __name__ == '__main__':
-    # import openmdao.api as om
+    import openmdao.api as om
 
-    # def func(x, y):  # noqa: D103
-    #     z = jnp.sin(x) * y
-    #     q = x * 1.5
-    #     zz = q + x * 1.5
-    #     return z, zz
+    def func(x, y):  # noqa: D103
+        z = jnp.sin(x) * y
+        q = x * 1.5
+        zz = q + x * 1.5
+        return z, zz
 
-    # shape = (3, 2)
-    # x = jnp.ones(shape)
-    # y = jnp.ones(shape) * 2.0
-    # jaxpr = jax.make_jaxpr(func)(x, y)
+    print('partials are:\n',list(get_partials_deps(func, ('z', 'zz'))))
 
-    # dump_jaxpr(jaxpr)
+    p = om.Problem()
+    comp = p.model.add_subsystem('comp', om.ExecComp('y = 2.0*x', x=np.ones(3), y=np.ones(3)))
+    comp.derivs_method='jax'
+    p.setup()
+    p.run_model()
 
-    # print(list(get_partials_deps(func, ('z', 'zz'), x, y)))
+    print(p.compute_totals(of=['comp.y'], wrt=['comp.x']))
 
-    # jac_func = jax.jacfwd(func)
+    # from openmdao.components.mux_comp import MuxComp
 
-    # jaxpr = jax.make_jaxpr(jac_func)(x, y)
-    # dump_jaxpr(jaxpr)
+    # c = MuxComp()
 
-    # print(list(get_partials_deps(jac_func, ('z', 'zz'), x, y)))
-
-    # p = om.Problem()
-    # comp = p.model.add_subsystem('comp', om.ExecComp('y = 2.0*x', x=np.ones(3), y=np.ones(3)))
-    # comp.derivs_method='jax'
-    # p.setup()
-    # p.run_model()
-
-    # print(p.compute_totals(of=['comp.y'], wrt=['comp.x']))
-
-    from openmdao.components.mux_comp import MuxComp
-
-    c = MuxComp()
-
-    sf = SelfAttrFinder(c.compute)
+    # sf = SelfAttrFinder(c.compute)

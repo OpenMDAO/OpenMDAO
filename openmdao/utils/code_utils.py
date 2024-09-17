@@ -534,6 +534,9 @@ def get_func_graph(func, outnames=None, display=False):
     """
     Generate a graph between a function's inputs and outputs.
 
+    Uses the AST to analyze the function and build a graph between inputs and outputs, so the
+    function source must be available.
+
     Parameters
     ----------
     func : Callable
@@ -589,10 +592,14 @@ def get_func_graph(func, outnames=None, display=False):
 
 def get_partials_deps(func, outputs=None):
     """
-    Generate a list of tuples of the form (output, input) for the given function.
+    Generate tuples of the form (output, input) for the given function.
 
     Only tuples where the output depends on the input are yielded. This can be used to
     determine which partials need to be declared.
+
+    Note that currently the function grapher doesn't recurse into functions and assumes that all
+    outputs of a sub-function are dependent on all inputs to that function. This may lead to
+    a conservative estimate of partials that need to be declared.
 
     Parameters
     ----------
@@ -622,9 +629,6 @@ def get_partials_deps(func, outputs=None):
                         yield succ, start
                     stack.append((succ, successors(succ)))
                     break
-                else:
-                    if succ in outs:
-                        yield succ, start
             else:
                 stack.pop()
 
