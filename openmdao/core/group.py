@@ -4475,7 +4475,10 @@ class Group(System):
                 # OpenMDAO currently can't create an automatic IndepVarComp for inputs on
                 # distributed components.
                 if tgt not in self._bad_conn_vars:
-                    raise RuntimeError(f'Distributed component input "{tgt}" is not connected.')
+                    prom_name = abs2prom[tgt]
+                    promoted_as = f', promoted as "{prom_name}",' if prom_name != tgt else ''
+                    raise RuntimeError(f'Distributed component input "{tgt}"'
+                                       f'{promoted_as} is not connected.')
 
             prom = abs2prom[tgt]
             if prom in prom2auto:
