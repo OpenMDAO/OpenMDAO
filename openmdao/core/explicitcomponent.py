@@ -673,13 +673,15 @@ class ExplicitComponent(Component):
             fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
             nstatic = len(self._discrete_inputs)
             wrt_idxs = list(range(len(self._var_abs2meta['input'])))
-            static_argnums = tuple(range(len(wrt_idxs), len(wrt_idxs) + nstatic))
             primal_func = self.compute_primal.__func__
             if isinstance(primal_func, DelayedJit):
                 primal_func = primal_func._func
             primal_func = MethodType(primal_func, self)
-            self._jac_func_ = jit(fjax(primal_func, argnums=wrt_idxs),
-                                  static_argnums=static_argnums)
+            self._jac_func_ = self._jac_func_ = fjax(primal_func, argnums=wrt_idxs)
+
+            if self.options['use_jit']:
+                static_argnums = tuple(range(len(wrt_idxs), len(wrt_idxs) + nstatic))
+                self._jac_func_ = jit(self._jac_func_, static_argnums=static_argnums)
 
         return self._jac_func_
 
