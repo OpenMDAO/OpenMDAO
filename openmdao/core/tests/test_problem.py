@@ -812,7 +812,7 @@ class TestProblem(unittest.TestCase):
         _make_and_run()
 
         msg1 = "The problem name 'test_duplicate_prob_name' already exists"
-        
+
         msg2 = ("A report with the name 'scaling' for instance "
               "'test_duplicate_prob_name.driver' is already active.")
 
@@ -2112,9 +2112,8 @@ class TestProblem(unittest.TestCase):
 
         c1.add_design_var('x', lower=0, upper=5)
 
-        prob.setup()
         with self.assertRaises(Exception) as cm:
-            prob.final_setup()
+            prob.setup()
 
         msg = "<model> <class Group>: Design variable 'x' is connected to 'initial_comp.x', " + \
               "but 'initial_comp.x' is not an IndepVarComp or ImplicitComp output."

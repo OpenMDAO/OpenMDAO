@@ -504,7 +504,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        msg = ("\nCollected errors for problem 'problem':\n"
+        msg = (F"\nCollected errors for problem '{p._get_inst_id()}':\n"
                '   <model> <class Group>: Input "comp.x" requires a connection but is not connected.')
 
         self.assertEqual(str(cm.exception), msg)
@@ -524,7 +524,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        msg = ("\nCollected errors for problem 'problem':\n"
+        msg = (F"\nCollected errors for problem '{p._get_inst_id()}':\n"
                '   <model> <class Group>: Input "comp.x", promoted as "x", requires a connection but is not connected.')
 
         self.assertEqual(str(cm.exception), msg)
