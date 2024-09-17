@@ -2115,7 +2115,8 @@ class TestProblem(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.setup()
 
-        msg = "<model> <class Group>: Design variable 'x' is connected to 'initial_comp.x', " + \
+        msg = "\nCollected errors for problem 'output_as_input_err':" + \
+              "\n   <model> <class Group>: Design variable 'x' is connected to 'initial_comp.x', " + \
               "but 'initial_comp.x' is not an IndepVarComp or ImplicitComp output."
         self.assertEqual(str(cm.exception), msg)
 
