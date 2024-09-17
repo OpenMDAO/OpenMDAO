@@ -2130,8 +2130,6 @@ class TestParallelDOE2proc(unittest.TestCase):
         ])
 
     def test_full_factorial(self):
-        from mpi4py import MPI
-
         prob = om.Problem()
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
@@ -2149,10 +2147,10 @@ class TestParallelDOE2proc(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        self.assertEqual(MPI.COMM_WORLD.size, 2)
+        self.assertEqual(prob.comm.size, 2)
 
         # check recorded cases from each case file
-        rank = MPI.COMM_WORLD.rank
+        rank = prob.comm.rank
         filename = "cases.sql_%d" % rank
 
         # SqliteCaseReader will automatically look for cases.sql_meta if

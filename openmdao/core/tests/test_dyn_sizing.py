@@ -856,7 +856,7 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         p = om.Problem()
         indeps = p.model.add_subsystem('indeps', om.IndepVarComp())
         sizes = [3,0,5]
-        indeps.add_output('x', np.random.random(sizes[MPI.COMM_WORLD.rank]), distributed=True)
+        indeps.add_output('x', np.random.random(sizes[p.comm.rank]), distributed=True)
         p.model.add_subsystem('comp', DistCompUnknownInput())
         p.model.connect('indeps.x', 'comp.x')
         p.setup()

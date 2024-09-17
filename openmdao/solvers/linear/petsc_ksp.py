@@ -224,6 +224,8 @@ class PETScKrylov(LinearSolver):
         # changing the default maxiter from the base class
         self.options['maxiter'] = 100
 
+        self.supports['implicit_components'] = True
+
     def _assembled_jac_solver_iter(self):
         """
         Return a generator of linear solvers using assembled jacs.
@@ -334,8 +336,7 @@ class PETScKrylov(LinearSolver):
         bool
             Flag for indicating child linerization
         """
-        precon = self.precon
-        return (precon is not None) and (precon._linearize_children())
+        return (self.precon is not None) and (self.precon._linearize_children())
 
     def _linearize(self):
         """
@@ -394,8 +395,8 @@ class PETScKrylov(LinearSolver):
         sol_array = x_vec.asarray(copy=True)
 
         # create PETSc vectors from numpy arrays
-        sol_petsc_vec = PETSc.Vec().createWithArray(sol_array, comm=system.comm)
-        rhs_petsc_vec = PETSc.Vec().createWithArray(rhs_array, comm=system.comm)
+        sol_petsc_vec = PETSc.Vec().createWithArray(sol_array, comm=system._comm)
+        rhs_petsc_vec = PETSc.Vec().createWithArray(rhs_array, comm=system._comm)
 
         # run PETSc solver
         self._iter_count = 0

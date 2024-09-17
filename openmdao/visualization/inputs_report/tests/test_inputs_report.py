@@ -112,8 +112,8 @@ class TestInputReportsMPI(unittest.TestCase):
                 outputs['x_sum'] = self.comm.allreduce(np.sum(inputs['x']))
 
 
-        n0 = (20,2) if MPI.COMM_WORLD.rank ==0 else (8,2)
         p = om.Problem()
+        n0 = (20,2) if p.comm.rank ==0 else (8,2)
         ivc = p.model.add_subsystem('ivc',om.IndepVarComp())
         ivc.add_output('x', val = np.random.random(n0), distributed=True)
 

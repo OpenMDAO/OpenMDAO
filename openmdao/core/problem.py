@@ -51,11 +51,12 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
     clear_reports, _load_report_plugins
 from openmdao.utils.general_utils import pad_name, LocalRangeIterable, \
-    _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs
+    _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs, \
+    ProblemMeta
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.file_utils import _get_outputs_dir, get_work_dir
+from openmdao.utils.file_utils import _get_outputs_dir, text2html, get_work_dir
 from openmdao.visualization.tables.table_builder import generate_table
 
 try:
@@ -130,7 +131,7 @@ def _default_prob_name():
     return name.stem
 
 
-class Problem(object):
+class Problem(object, metaclass=ProblemMeta):
     """
     Top-level container for the systems and drivers.
 
@@ -226,26 +227,6 @@ class Problem(object):
         self._warned = False
         self._computing_coloring = False
 
-        # Set the Problem name so that it can be referenced from command line tools (e.g. check)
-        # that accept a Problem argument, and to name the corresponding outputs subdirectory.
-        if name:  # if name hasn't been used yet, use it. Otherwise, error
-            if name in _problem_names:
-                issue_warning(f"The problem name '{name}' already exists")
-            self._name = name
-        else:  # No name given: look for a name, of the form, 'problemN', that hasn't been used
-            problem_counter = len(_problem_names) + 1 if _problem_names else ''
-            base = _default_prob_name()
-            _name = f"{base}{problem_counter}"
-            if _name in _problem_names:  # need to make it unique so append string of form '.N'
-                i = 1
-                while True:
-                    _name = f"{base}{problem_counter}.{i}"
-                    if _name not in _problem_names:
-                        break
-                    i += 1
-            self._name = _name
-        _problem_names.append(self._name)
-
         if comm is None:
             use_mpi = check_mpi_env()
             if use_mpi is False:
@@ -256,6 +237,10 @@ class Problem(object):
                     comm = MPI.COMM_WORLD
                 except ImportError:
                     comm = FakeComm()
+
+        self.comm = comm
+
+        self._set_name(name)
 
         if model is None:
             self.model = Group()
@@ -279,8 +264,6 @@ class Problem(object):
 
         # can't use driver property here without causing a lint error, so just do it manually
         self._driver = driver
-
-        self.comm = comm
 
         self._metadata = {'setup_status': _SetupStatus.PRE_SETUP}
         self._run_counter = -1
@@ -356,6 +339,33 @@ class Problem(object):
 
         # So Problem and driver can have hooks attached to their methods
         _setup_hooks(self)
+
+    def _set_name(self, name):
+        if not MPI or self.comm.rank == 0:
+            # Set the Problem name so that it can be referenced from command line tools (e.g. check)
+            # that accept a Problem argument, and to name the corresponding outputs subdirectory.
+            if name:  # if name hasn't been used yet, use it. Otherwise, error
+                if name in _problem_names:
+                    issue_warning(f"The problem name '{name}' already exists")
+                self._name = name
+            else:  # No name given: look for a name, of the form, 'problemN', that hasn't been used
+                problem_counter = len(_problem_names) + 1 if _problem_names else ''
+                base = _default_prob_name()
+                _name = f"{base}{problem_counter}"
+                if _name in _problem_names:  # need to make it unique so append string of form '.N'
+                    i = 1
+                    while True:
+                        _name = f"{base}{problem_counter}.{i}"
+                        if _name not in _problem_names:
+                            break
+                        i += 1
+                self._name = _name
+            if self.comm.size > 1:
+                self._name = self.comm.bcast(self._name, root=0)
+        else:
+            self._name = self.comm.bcast(None, root=0)
+
+        _problem_names.append(self._name)
 
     def _has_active_report(self, name):
         """
@@ -874,7 +884,7 @@ class Problem(object):
         """
         return create_local_meta(case_name)
 
-    def setup(self, check=False, logger=None, mode='auto', force_alloc_complex=False,
+    def setup(self, check=None, logger=None, mode='auto', force_alloc_complex=False,
               distributed_vector_class=PETScVector, local_vector_class=DefaultVector,
               derivatives=True, parent=None):
         """
@@ -889,7 +899,9 @@ class Problem(object):
         ----------
         check : None, bool, list of str, or the strs ‘all’
             Determines what config checks, if any, are run after setup is complete.
-            If None or False, no checks are run
+            If None: no checks are run unless the 'checks' report is active, in which case the
+            default reports will be run.
+            If False, no checks are run
             If True, the default checks ('out_of_order', 'system', 'solvers', 'dup_inputs',
             'missing_recorders', 'unserializable_options', 'comp_has_no_outputs',
             'auto_ivc_warnings') are run
@@ -1636,8 +1648,8 @@ class Problem(object):
             issue_warning(msg, category=DerivativesWarning)
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
-                                  compact_print, comps, all_fd_options, indep_key=indep_key,
-                                  print_reverse=print_reverse,
+                                  compact_print, comps, all_fd_options, self.comm,
+                                  indep_key=indep_key, print_reverse=print_reverse,
                                   show_only_incorrect=show_only_incorrect)
 
         if not do_steps:
@@ -1923,7 +1935,7 @@ class Problem(object):
                     data[''][key]['indices'] = resp[of]['indices'].indexed_src_size
 
         _assemble_derivative_data(data, rel_err_tol, abs_err_tol, out_stream, compact_print,
-                                  [model], {'': fd_args}, totals=total_info, lcons=lcons,
+                                  [model], {'': fd_args}, self.comm, totals=total_info, lcons=lcons,
                                   show_only_incorrect=show_only_incorrect, sort=sort)
 
         if not do_steps:
@@ -2468,6 +2480,16 @@ class Problem(object):
         if checks is None:
             return
 
+        reports_dir_exists = os.path.isdir(self.get_reports_dir())
+        check_file_path = None
+        if logger is None:
+            if out_file is not None:
+                if reports_dir_exists:
+                    check_file_path = str(self.get_reports_dir() / out_file)
+                else:
+                    check_file_path = out_file
+            logger = get_logger('check_config', out_file=check_file_path, use_format=True)
+
         if checks == 'all':
             checks = sorted(_all_non_redundant_checks)
 
@@ -2482,6 +2504,16 @@ class Problem(object):
                 continue
             logger.info(f'checking {c}')
             _all_checks[c](self, logger)
+
+        if checks and check_file_path is not None and reports_dir_exists:
+            # turn text file written to reports dir into an html file to be viewable from the
+            # 'openmdao view_reports' command
+            with open(check_file_path, 'r') as f:
+                txt = f.read()
+
+            path = self.get_reports_dir() / 'checks.html'
+            with open(path, 'w') as f:
+                f.write(text2html(txt))
 
     def set_complex_step_mode(self, active):
         """
@@ -3088,7 +3120,7 @@ def _fix_check_data(data):
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
-                              compact_print, system_list, global_options, totals=False,
+                              compact_print, system_list, global_options, comm, totals=False,
                               indep_key=None, print_reverse=False,
                               show_only_incorrect=False, lcons=None, sort=False):
     """
@@ -3111,6 +3143,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         The systems (in the proper order) that were checked.
     global_options : dict
         Dictionary containing the options for the approximation.
+    comm : MPI.Comm or FakeComm
+        The MPI communicator.
     totals : bool or _TotalJacInfo
         Set to _TotalJacInfo if we are doing check_totals to skip a bunch of stuff.
     indep_key : dict of sets, optional
@@ -3403,8 +3437,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 if inconsistent:
                     out_buffer.write('\n    * Inconsistent value across ranks *\n')
 
-                if MPI and MPI.COMM_WORLD.size > 1:
-                    out_buffer.write(f'\n    MPI Rank {MPI.COMM_WORLD.rank}\n')
+                if MPI and comm.size > 1:
+                    out_buffer.write(f'\n    MPI Rank {comm.rank}\n')
                 out_buffer.write('\n')
 
                 with np.printoptions(linewidth=240):

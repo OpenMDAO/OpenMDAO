@@ -15,6 +15,7 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.general_utils import all_ancestors
 from openmdao.utils.file_utils import _load_and_exec
 import openmdao.utils.hooks as hooks
+from openmdao.utils.graph_utils import get_cycle_tree
 
 
 # mapping of base system type to graph display properties
@@ -99,10 +100,10 @@ class GraphViewer(object):
             The pydot graph that was created.
         """
         if pydot is None:
-            raise RuntimeError(f"{self.msginfo}: write_graph requires pydot.  Install pydot using "
-                               "'pip install pydot'. Note that pydot requires graphviz, which is a "
-                               "non-Python application.\nIt can be installed at the system level "
-                               "or via a package manager like conda.")
+            raise RuntimeError(f"{self._group.msginfo}: write_graph requires pydot.  Install pydot "
+                               "using 'pip install pydot'. Note that pydot requires graphviz, which"
+                               " is a non-Python application.\nIt can be installed at the system "
+                               "level or via a package manager like conda.")
 
         group = self._group
 
@@ -215,9 +216,16 @@ class GraphViewer(object):
                 G = group.compute_sys_graph(comps_only=False, add_edge_info=False)
                 G, _ = self._decorate_graph_for_display(G, exclude=exclude, abs_graph_names=False)
                 G = _to_pydot_graph(G)
+
+        elif gtype == 'cycle':
+            Gcomps, group_tree_dict = get_cycle_tree(group)
+            G, node_info = self._decorate_graph_for_display(Gcomps, exclude=exclude,
+                                                            abs_graph_names=True,
+                                                            display_map=_base_display_map)
+            G = self._apply_scc_clusters(Gcomps, group_tree_dict, node_info)
         else:
             raise ValueError(f"unrecognized graph type '{gtype}'. Allowed types are ['tree', "
-                             "'dataflow'].")
+                             "'dataflow', 'cycle'].")
 
         if G is None:
             return
@@ -403,7 +411,7 @@ class GraphViewer(object):
         return pydot_graph
 
     def _decorate_graph_for_display(self, G, exclude=(), abs_graph_names=True, dvs=None,
-                                    responses=None):
+                                    responses=None, display_map=None):
         """
         Add metadata to the graph for display.
 
@@ -422,13 +430,15 @@ class GraphViewer(object):
             Dict of design var metadata keyed on promoted name.
         responses : list of str
             Dict of response var metadata keyed on promoted name.
+        display_map : dict or None
+            A map of classnames to pydot node attributes.
 
         Returns
         -------
         nx.DiGraph, dict
             The decorated graph and a dict of node metadata keyed by pathname.
         """
-        node_info = self._get_graph_display_info()
+        node_info = self._get_graph_display_info(display_map)
 
         exclude = set(exclude)
 
@@ -505,6 +515,78 @@ class GraphViewer(object):
                 pydot_graph.add_node(pdnode)
 
         for u, v, meta in G.edges(data=True):
+            pydot_graph.add_edge(pydot.Edge(pydot_nodes[u], pydot_nodes[v],
+                                            **_filter_meta4dot(meta,
+                                                               arrowhead='lnormal',
+                                                               arrowsize=0.5)))
+
+        # layout graph from left to right
+        pydot_graph.set_rankdir('LR')
+
+        return pydot_graph
+
+    def _add_sub_clusters(self, parent, group_tree_dict, path, idx, node_info, pydot_nodes):
+
+        children, scc, unique, pidx, _, _ = group_tree_dict[path][idx]
+        lstr = path if path else '<model>'
+        cluster = pydot.Cluster(f"{path}_{pidx}",
+                                label=f"{lstr} ({pidx + 1} of {len(group_tree_dict[path])})",
+                                style='filled', fillcolor=_cluster_color(path),
+                                tooltip=node_info[path]['tooltip'])
+        parent.add_subgraph(cluster)
+        for node in unique:
+            kwargs = _filter_meta4dot(node_info[node])
+            kwargs['label'] = f'"{node.rpartition(".")[2]}"'
+            pydot_nodes[node] = pydot.Node(node, **kwargs)
+            cluster.add_node(pydot_nodes[node])
+
+        for _, _, _, pidx, chpath, _ in children:
+            self._add_sub_clusters(cluster, group_tree_dict, chpath, pidx, node_info,
+                                   pydot_nodes)
+
+    def _apply_scc_clusters(self, G, group_tree_dict, node_info):
+        """
+        Group strongly connected nodes in the graph into clusters.
+
+        Parameters
+        ----------
+        G : nx.DiGraph
+            A pydot graph will be created based on this graph.
+        group_tree_dict : dict
+            A dict of group paths mapped to list of (scc, children) tuples.
+        node_info : dict
+            A dict of metadata keyed by pathname.
+
+        Returns
+        -------
+        pydot.Graph
+            The corresponding pydot graph with clusters added.
+        """
+        pydot_graph = pydot.Dot(graph_type='digraph')
+        pydot_nodes = {}
+
+        for path, lst in group_tree_dict.items():
+            for _, _, _, idx, _, parpath in lst:
+                if parpath is None:  # this is a top level scc
+                    self._add_sub_clusters(pydot_graph, group_tree_dict, path, idx, node_info,
+                                           pydot_nodes)
+
+        for u, v, meta in G.edges(data=True):
+            if u not in pydot_nodes:
+                if u.startswith('_auto_ivc'):
+                    continue
+                kwargs = _filter_meta4dot(node_info[u])
+                kwargs['label'] = f'"{u.rpartition(".")[2]}"'
+                pydot_nodes[u] = pydot.Node(u, **kwargs)
+                pydot_graph.add_node(pydot_nodes[u])
+            if v not in pydot_nodes:
+                if v.startswith('_auto_ivc'):
+                    continue
+                kwargs = _filter_meta4dot(node_info[v])
+                kwargs['label'] = f'"{v.rpartition(".")[2]}"'
+                pydot_nodes[v] = pydot.Node(v, **kwargs)
+                pydot_graph.add_node(pydot_nodes[v])
+
             pydot_graph.add_edge(pydot.Edge(pydot_nodes[u], pydot_nodes[v],
                                             **_filter_meta4dot(meta,
                                                                arrowhead='lnormal',
@@ -754,7 +836,7 @@ def _graph_setup_parser(parser):
     parser.add_argument('-o', action='store', dest='outfile', help='file containing graph output.')
     parser.add_argument('--group', action='store', dest='group', help='pathname of group to graph.')
     parser.add_argument('--type', action='store', dest='type', default='dataflow',
-                        help='type of graph (dataflow, tree). Default is dataflow.')
+                        help='type of graph (dataflow, tree, cycle). Default is dataflow.')
     parser.add_argument('--no-display', action='store_false', dest='show',
                         help="don't display the graph.")
     parser.add_argument('--no-recurse', action='store_false', dest='recurse',

@@ -28,7 +28,12 @@ try:
 except ImportError:
     PETScVector = None
 
-from openmdao.utils.general_utils import set_pyoptsparse_opt
+try:
+    from parameterized import parameterized
+except ImportError:
+    from openmdao.utils.assert_utils import SkipParameterized as parameterized
+
+from openmdao.utils.general_utils import set_pyoptsparse_opt, om_dump
 
 
 # check that pyoptsparse is installed. if it is, try to use SLSQP.
@@ -1130,7 +1135,7 @@ class TestStaticColoring(unittest.TestCase):
     def test_partials_explicit_shape_bug(self):
         for method in ['fd', 'cs']:
             with self.subTest(msg=f'{method=}'):
-                prob = Problem(name=f'test_partials_explicit_shape_bug_{method}')
+                prob = Problem(name=f'test_partials_explicit_shape_bug_static_{method}')
                 model = prob.model
 
                 # create sparsity with last row and col all zeros.
@@ -1161,7 +1166,7 @@ class TestStaticColoring(unittest.TestCase):
 
                 # now make a second problem to use the coloring
                 _clear_problem_names()
-                prob = Problem(name=f'test_partials_explicit_shape_bug_{method}')
+                prob = Problem(name=f'test_partials_explicit_shape_bug_static_{method}')
                 model = prob.model
                 indeps = IndepVarComp()
                 indeps.add_output('x0', np.ones(4))
@@ -1531,13 +1536,15 @@ class TestStaticColoring(unittest.TestCase):
 class TestStaticColoringParallelCS(unittest.TestCase):
     N_PROCS = 2
 
+    def setUp(self):
+        np.random.seed(11)
+
     # semi-total coloring feature disabled.
 
     def test_simple_semitotals_all_local_vars(self):
         raise self.skipTest('Semi-total coloring currently not supported.')
         for method in ['fd', 'cs']:
             with self.subTest(msg=f'{method=}'):
-                MPI.COMM_WORLD.barrier()
                 prob = Problem(name=f'test_simple_semitotals_all_local_vars_{method}')
 
                 model = prob.model
@@ -1549,11 +1556,11 @@ class TestStaticColoringParallelCS(unittest.TestCase):
                         [1, 0, 0, 0, 0],
                         [0, 1, 1, 0, 0]]
                 )
-                if MPI.COMM_WORLD.rank == 0:
+                if prob.comm.rank == 0:
                     sparsity = setup_sparsity(mask)
-                    MPI.COMM_WORLD.bcast(sparsity, root=0)
+                    prob.comm.bcast(sparsity, root=0)
                 else:
-                    sparsity = MPI.COMM_WORLD.bcast(None, root=0)
+                    sparsity = prob.comm.bcast(None, root=0)
 
                 isplit = 2
                 indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
@@ -1577,7 +1584,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
                 sub._save_coloring(coloring)
 
                 # make sure coloring file exists by the time we try to load the spec
-                MPI.COMM_WORLD.barrier()
+                prob.comm.barrier()
 
                 # now create a second problem and use the static coloring
                 prob = Problem(name=f'test_simple_semitotals_all_local_vars_{method}')
@@ -1614,146 +1621,177 @@ class TestStaticColoringParallelCS(unittest.TestCase):
                 _check_partial_matrix(sub, sub._jacobian._subjacs_info, sparsity, method)
                 self.assertEqual(nruns, 3)
 
-    def test_simple_partials_implicit(self):
-        for method in ['fd', 'cs']:
-            with self.subTest(msg=f'{method=}'):
-                prob = Problem(name=f'test_simple_partials_implicit_{method}')
-                model = prob.model
+    @parameterized.expand(['fd', 'cs'], name_func=lambda func, n, p: f'{func.__name__}_{p.args[0]}')
+    def test_simple_partials_implicit(self, method):
+        prob = Problem(name=f'test_simple_partials_implicit_{method}')
+        model = prob.model
 
-                mask = np.array(
-                    [[1, 0, 0, 1, 1, 1, 0],
-                        [0, 1, 0, 1, 0, 1, 1],
-                        [0, 1, 0, 1, 1, 1, 0],
-                        [1, 0, 0, 0, 0, 1, 0],
-                        [0, 1, 1, 0, 1, 1, 1]]
-                )
+        mask = np.array(
+            [[1, 0, 0, 1, 1, 1, 0],
+                [0, 1, 0, 1, 0, 1, 1],
+                [0, 1, 0, 1, 1, 1, 0],
+                [1, 0, 0, 0, 0, 1, 0],
+                [0, 1, 1, 0, 1, 1, 1]]
+        )
 
-                if MPI.COMM_WORLD.rank == 0:
-                    sparsity = setup_sparsity(mask)
-                    MPI.COMM_WORLD.bcast(sparsity, root=0)
-                else:
-                    sparsity = MPI.COMM_WORLD.bcast(None, root=0)
+        om_dump('---------- bcast sparsity')
+        if prob.comm.rank == 0:
+            sparsity = setup_sparsity(mask)
+            prob.comm.bcast(sparsity, root=0)
+        else:
+            sparsity = prob.comm.bcast(None, root=0)
+        om_dump('---------- bcast sparsity DONE')
 
-                isplit = 2
-                indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
+        isplit = 2
+        indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
 
-                model.add_subsystem('indeps', indeps)
-                comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, method,
-                                                                    isplit=isplit, osplit=2,
-                                                                    num_par_fd=self.N_PROCS))
-                model.connect('indeps.x0', 'comp.x0')
-                model.connect('indeps.x1', 'comp.x1')
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, method,
+                                                            isplit=isplit, osplit=2,
+                                                            num_par_fd=self.N_PROCS))
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
 
-                prob.setup(check=False, mode='fwd')
-                prob.set_solver_print(level=0)
-                prob.run_model()
-                coloring = comp._compute_coloring(wrt_patterns='x*', method=method)[0]
-                comp._save_coloring(coloring)
+        om_dump('---------------- problem setup')
 
-                _clear_problem_names()
-                prob = Problem(name=f'test_simple_partials_implicit_{method}')
-                model = prob.model
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
 
-                indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
+        om_dump('--------------- run model')
 
-                model.add_subsystem('indeps', indeps)
-                comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, method,
-                                                                        isplit=isplit, osplit=2,
-                                                                        num_par_fd=self.N_PROCS))
-                model.connect('indeps.x0', 'comp.x0')
-                model.connect('indeps.x1', 'comp.x1')
+        prob.run_model()
+        om_dump('--------------- run model DONE')
 
-                # make sure coloring file exists by the time we try to load the spec
-                MPI.COMM_WORLD.barrier()
+        coloring = comp._compute_coloring(wrt_patterns='x*', method=method)[0]
+        om_dump('--------------- compute_coloring DONE')
 
-                comp.declare_coloring(wrt='x*', method=method)
-                comp.use_fixed_coloring()
+        comp._save_coloring(coloring)
+        om_dump('--------------- save_coloring DONE')
 
-                prob.setup(check=False, mode='fwd')
-                prob.set_solver_print(level=0)
-                prob.run_model()
+        # make sure coloring file exists by the time we try to load the spec
+        prob.comm.barrier()
+        om_dump('--------------- barrier DONE')
 
-                start_nruns = comp._nruns
-                comp._linearize()   # colored
-                # number of runs = ncolors + number of outputs (only input columns were colored here)
-                nruns = comp._nruns - start_nruns
-                if comp._full_comm:
-                    nruns = comp._full_comm.allreduce(nruns)
-                self.assertEqual(nruns, 5 + sparsity.shape[0])
+        _clear_problem_names()
+        prob = Problem(name=f'test_simple_partials_implicit_{method}')
+        model = prob.model
 
-                jac = comp._jacobian._subjacs_info
-                _check_partial_matrix(comp, jac, sparsity, method)
+        indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
 
-    def test_simple_partials_explicit(self):
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, method,
+                                                                isplit=isplit, osplit=2,
+                                                                num_par_fd=self.N_PROCS))
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        comp.declare_coloring(wrt='x*', method=method)
+        comp.use_fixed_coloring()
+
+        om_dump('--------------- 2nd problem setup')
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        om_dump('---------------  2nd problem run_model')
+        prob.run_model()
+        om_dump('---------------  2nd problem run_model DONE')
+
+        start_nruns = comp._nruns
+        om_dump('---------------  comp linearize')
+        comp._linearize()   # colored
+        om_dump('---------------  comp linearize DONE')
+        # number of runs = ncolors + number of outputs (only input columns were colored here)
+        nruns = comp._nruns - start_nruns
+        if comp._full_comm is not None:
+            nruns = comp._full_comm.allreduce(nruns)
+        om_dump('---------------  allreduce DONE')
+        self.assertEqual(nruns, 5 + sparsity.shape[0])
+        om_dump('---------------  assert check DONE')
+
+        jac = comp._jacobian._subjacs_info
+        _check_partial_matrix(comp, jac, sparsity, method)
+        om_dump('---------------  check_partial_matrix DONE')
+
+    @parameterized.expand(['fd', 'cs'], name_func=lambda func, n, p: f'{func.__name__}_{p.args[0]}')
+    def test_simple_partials_explicit(self, method):
         from openmdao.utils.reports_system import clear_report_registry
-        for method in ['fd', 'cs']:
-            with self.subTest(msg=f'{method=}'):
-                prob = Problem(name=f'test_simple_partials_explicit_{method}')
-                model = prob.model
+        prob = Problem(name=f'test_simple_partials_explicit_{method}')
+        model = prob.model
 
-                mask = np.array(
-                        [[1, 0, 0, 1, 1, 1, 0],
-                            [0, 1, 0, 1, 0, 1, 1],
-                            [0, 1, 0, 1, 1, 1, 0],
-                            [1, 0, 0, 0, 0, 1, 0],
-                            [0, 1, 1, 0, 1, 1, 1]]
-                    )
+        mask = np.array(
+                [[1, 0, 0, 1, 1, 1, 0],
+                    [0, 1, 0, 1, 0, 1, 1],
+                    [0, 1, 0, 1, 1, 1, 0],
+                    [1, 0, 0, 0, 0, 1, 0],
+                    [0, 1, 1, 0, 1, 1, 1]]
+            )
 
-                if MPI.COMM_WORLD.rank == 0:
-                    sparsity = setup_sparsity(mask)
-                    MPI.COMM_WORLD.bcast(sparsity, root=0)
-                else:
-                    sparsity = MPI.COMM_WORLD.bcast(None, root=0)
+        if prob.comm.rank == 0:
+            sparsity = setup_sparsity(mask)
+            prob.comm.bcast(sparsity, root=0)
+        else:
+            sparsity = prob.comm.bcast(None, root=0)
+        om_dump('---------------  sparsity bcast DONE')
 
-                isplit = 2
-                indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
+        isplit = 2
+        indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
 
-                model.add_subsystem('indeps', indeps)
-                comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, method,
-                                                                    isplit=isplit, osplit=2,
-                                                                    num_par_fd=self.N_PROCS))
-                model.connect('indeps.x0', 'comp.x0')
-                model.connect('indeps.x1', 'comp.x1')
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, method,
+                                                            isplit=isplit, osplit=2,
+                                                            num_par_fd=self.N_PROCS))
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
 
-                prob.setup(check=False, mode='fwd')
-                prob.set_solver_print(level=0)
-                prob.run_model()
-                coloring = comp._compute_coloring(wrt_patterns='x*', method=method)[0]
-                comp._save_coloring(coloring)
+        prob.setup(check=False, mode='fwd')
+        om_dump('---------------  setup DONE')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        om_dump('---------------  run_model DONE')
+        coloring = comp._compute_coloring(wrt_patterns='x*', method=method)[0]
+        om_dump('---------------  compute_coloring DONE')
+        comp._save_coloring(coloring)
+        om_dump('---------------  save_coloring DONE')
 
-                # make sure coloring file exists by the time we try to load the spec
-                MPI.COMM_WORLD.barrier()
+        # make sure coloring file exists by the time we try to load the spec
+        prob.comm.barrier()
+        om_dump('---------------  barrier DONE')
 
-                # now create a new problem and use the previously generated coloring
-                _clear_problem_names()
-                clear_report_registry()
-                prob = Problem(name=f'test_simple_partials_explicit_{method}')
-                model = prob.model
+        # now create a new problem and use the previously generated coloring
+        _clear_problem_names()
+        clear_report_registry()
+        prob = Problem(name=f'test_simple_partials_explicit_{method}')
+        model = prob.model
 
-                indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
+        indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
 
-                model.add_subsystem('indeps', indeps)
-                comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, method,
-                                                                        isplit=isplit, osplit=2,
-                                                                        num_par_fd=self.N_PROCS))
-                model.connect('indeps.x0', 'comp.x0')
-                model.connect('indeps.x1', 'comp.x1')
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, method,
+                                                                isplit=isplit, osplit=2,
+                                                                num_par_fd=self.N_PROCS))
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
 
-                comp.declare_coloring(wrt='x*', method=method)
-                comp.use_fixed_coloring()
-                prob.setup(check=False, mode='fwd')
-                prob.set_solver_print(level=0)
-                prob.run_model()
+        comp.declare_coloring(wrt='x*', method=method)
+        comp.use_fixed_coloring()
+        prob.setup(check=False, mode='fwd')
+        om_dump('---------------  2nd prob setup DONE')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        om_dump('---------------  2nd prob run_model DONE')
 
-                start_nruns = comp._nruns
-                comp._linearize()
-                nruns = comp._nruns - start_nruns
-                if comp._full_comm:
-                    nruns = comp._full_comm.allreduce(nruns)
-                self.assertEqual(nruns, 5)
+        start_nruns = comp._nruns
+        comp._linearize()
+        om_dump('---------------  comp linearize DONE')
+        nruns = comp._nruns - start_nruns
+        if comp._full_comm is not None:
+            nruns = comp._full_comm.allreduce(nruns)
+        om_dump('---------------  allreduce DONE')
+        self.assertEqual(nruns, 5)
+        om_dump('---------------  assert check DONE')
 
-                jac = comp._jacobian._subjacs_info
-                _check_partial_matrix(comp, jac, sparsity, method)
+        jac = comp._jacobian._subjacs_info
+        _check_partial_matrix(comp, jac, sparsity, method)
+        om_dump('---------------  check_partial_matrix DONE')
 
 
 if __name__ == '__main__':

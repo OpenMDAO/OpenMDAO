@@ -268,16 +268,15 @@ class MatMultTestCase(unittest.TestCase):
     @parameterized.expand(itertools.product([20, 21, 22], [2, 3, 4], ['fd', 'cs']),
                           name_func=_test_func_name)
     def test_par_fd(self, size, num_par_fd, method):
+        p = om.Problem()
         if MPI:
-            if MPI.COMM_WORLD.rank == 0:
+            if p.comm.rank == 0:
                 mat = np.random.random(5 * size).reshape((5, size)) - 0.5
             else:
                 mat = None
-            mat = MPI.COMM_WORLD.bcast(mat, root=0)
+            mat = p.comm.bcast(mat, root=0)
         else:
             mat = np.random.random(5 * size).reshape((5, size)) - 0.5
-
-        p = om.Problem()
 
         model = p.model
 
@@ -298,7 +297,7 @@ class MatMultTestCase(unittest.TestCase):
         norm = np.linalg.norm(J['comp.y','indep.x'] - comp.mat)
         self.assertLess(norm, 1.e-7)
         if MPI:
-            self.assertEqual(MPI.COMM_WORLD.allreduce(ncomputes), size)
+            self.assertEqual(p.comm.allreduce(ncomputes), size)
 
         norm = np.linalg.norm(comp._jacobian['y', 'x'] - comp.mat)
         self.assertLess(norm, 1.e-7)
@@ -315,22 +314,22 @@ class MatMultParallelTestCase(unittest.TestCase):
     N_PROCS = 8
 
     def run_model(self, size, num_par_fd1, num_par_fd2, method, total=False):
-        if MPI:
-            if MPI.COMM_WORLD.rank == 0:
-                mat1 = np.random.random(5 * size).reshape((5, size)) - 0.5
-            else:
-                mat1 = None
-            mat1 = MPI.COMM_WORLD.bcast(mat1, root=0)
-        else:
-            mat1 = np.random.random(5 * size).reshape((5, size)) - 0.5
-
-        mat2 = mat1 * 5.0
-
         if total:
             grp = om.Group(num_par_fd=num_par_fd1)
         else:
             grp = om.Group()
         p = om.Problem(model=grp)
+
+        if MPI:
+            if p.comm.rank == 0:
+                mat1 = np.random.random(5 * size).reshape((5, size)) - 0.5
+            else:
+                mat1 = None
+            mat1 = p.comm.bcast(mat1, root=0)
+        else:
+            mat1 = np.random.random(5 * size).reshape((5, size)) - 0.5
+
+        mat2 = mat1 * 5.0
 
         model = p.model
         model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(mat1.shape[1])))
