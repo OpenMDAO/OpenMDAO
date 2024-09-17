@@ -9,7 +9,6 @@ import weakref
 from itertools import chain
 from collections import defaultdict
 
-import networkx as nx
 import numpy as np
 from numpy import ndarray
 
@@ -116,58 +115,6 @@ def dump_jaxpr(closed_jaxpr):
         print("equation:", eqn.invars, eqn.primitive, eqn.outvars, eqn.params)
     print()
     print("jaxpr:", jaxpr)
-
-
-def get_func_graph(func, *args, **kwargs):
-    """
-    Generate a networkx graph from a jax function.
-
-    Parameters
-    ----------
-    func : Callable
-        The function to be analyzed.
-    *args : list
-        Positional arguments.
-    **kwargs : dict
-        Keyword arguments.
-
-    Returns
-    -------
-    networkx.DiGraph
-        The graph representing the function.
-    """
-    closed_jaxpr = jax.make_jaxpr(func)(*args, **kwargs)
-    jaxpr = closed_jaxpr.jaxpr
-
-    graph = nx.DiGraph()
-    for i, name in enumerate(chain(jaxpr.invars, jaxpr.outvars)):
-        graph.add_node(i, label=f"({i}){name}")  # use index to map to real varnames later
-    n2index = {str(n): i for i, n in enumerate(chain(jaxpr.invars, jaxpr.outvars))}
-    i = len(n2index)
-
-    for eqn in jaxpr.eqns:
-        for inp in eqn.invars:
-            if type(inp) is jax._src.core.Var:
-                inp = str(inp)
-                if inp not in n2index:
-                    n2index[inp] = i
-                    graph.add_node(i, label=inp)
-                    i += 1
-                for out in eqn.outvars:
-                    if type(out) is jax._src.core.Var:
-                        out = str(out)
-                        if out not in n2index:
-                            n2index[out] = i
-                            graph.add_node(i, label=out)
-                            i += 1
-                        graph.add_edge(n2index[inp], n2index[out])
-
-    # show the function graph visually
-    # from openmdao.visualization.graph_viewer import write_graph, _to_pydot_graph
-    # G = _to_pydot_graph(graph)
-    # write_graph(G)
-
-    return graph
 
 
 class CompJaxifyBase(ast.NodeTransformer):
