@@ -361,10 +361,9 @@ class TestDesvarOnModel(unittest.TestCase):
         prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('junk')
-        prob.setup()
 
         with self.assertRaises(RuntimeError) as context:
-            prob.final_setup()
+            prob.setup()
 
         self.assertEqual(str(context.exception),
            "<model> <class SellarDerivatives>: Output not found for design variable 'junk'.")

@@ -789,6 +789,7 @@ class Group(System):
         conns = self._conn_global_abs_in2out
         abs2prom = self._var_allprocs_abs2prom['input']
         abs2meta_in = self._var_allprocs_abs2meta['input']
+        discrete_in = self._var_allprocs_discrete['input']
         desvar = self.get_design_vars()
 
         for abs_tgt, src in conns.items():
@@ -796,7 +797,7 @@ class Group(System):
                 prom_tgt = abs2prom[abs_tgt]
 
                 # Ignore inputs that are declared as design vars.
-                if desvar and prom_tgt in desvar:
+                if abs_tgt in discrete_in or (desvar and prom_tgt in desvar):
                     continue
 
                 if abs2meta_in[abs_tgt]['require_connection']:
