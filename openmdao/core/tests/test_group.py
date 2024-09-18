@@ -529,6 +529,24 @@ class TestGroup(unittest.TestCase):
 
         self.assertEqual(str(cm.exception), msg)
 
+    def test_unconnected_desvar_required_connection_promoted(self):
+        class RequiredConnComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', require_connection=True)
+                self.add_output('y')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 2 * inputs['x']
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', RequiredConnComp(), promotes=['*'])
+
+        p.model.add_design_var('x')
+
+        p.setup()
+
+        # no Esception should be raised due to 'require_connection=True' since x is a desvar
+
     def test_unconnected_input_units_no_mismatch(self):
         p = om.Problem()
 

@@ -521,7 +521,7 @@ class Component(System):
             A function taking a dict arg containing names and shapes of this component's outputs
             and returning the shape of this input.
         require_connection : bool
-            If True, this input must be connected to an output.
+            If True and this input is not a design variable, it must be connected to an output.
         distributed : bool
             If True, this variable is a distributed variable, so it can have different sizes/values
             across MPI processes.
