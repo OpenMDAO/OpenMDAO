@@ -545,7 +545,7 @@ class TestGroup(unittest.TestCase):
 
         p.setup()
 
-        # no Esception should be raised due to 'require_connection=True' since x is a desvar
+        # no Exception should be raised due to 'require_connection=True' since x is a desvar
 
     def test_unconnected_input_units_no_mismatch(self):
         p = om.Problem()
