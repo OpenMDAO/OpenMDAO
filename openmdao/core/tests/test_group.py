@@ -559,7 +559,6 @@ class TestGroup(unittest.TestCase):
                 self.add_subsystem('comp', RequiredConnComp())
 
             def configure(self):
-                print(f"{self}.configure()  connecting")
                 self.connect('indep.x', 'comp.x')
 
         p = om.Problem(RequiredConnGroup())
