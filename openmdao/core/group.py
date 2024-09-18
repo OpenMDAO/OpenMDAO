@@ -783,8 +783,6 @@ class Group(System):
         # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
 
-        self._check_required_connections()
-
     def _check_required_connections(self):
         conns = self._conn_global_abs_in2out
         abs2prom = self._var_allprocs_abs2prom['input']

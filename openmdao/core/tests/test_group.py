@@ -489,7 +489,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaisesRegex(Exception, msg):
             prob.setup()
 
-    def test_unconnected_input_required_connection(self):
+    def test_required_connection_input_unconnected(self):
         class RequiredConnComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x', require_connection=True)
@@ -500,52 +500,73 @@ class TestGroup(unittest.TestCase):
 
         p = om.Problem()
         p.model.add_subsystem('comp', RequiredConnComp())
-
-        with self.assertRaises(Exception) as cm:
-            p.setup()
-
-        msg = (F"\nCollected errors for problem '{p._get_inst_id()}':\n"
-               '   <model> <class Group>: Input "comp.x" requires a connection but is not connected.')
-
-        self.assertEqual(str(cm.exception), msg)
-
-    def test_unconnected_input_required_connection_promoted(self):
-        class RequiredConnComp(om.ExplicitComponent):
-            def setup(self):
-                self.add_input('x', require_connection=True)
-                self.add_output('y')
-
-            def compute(self, inputs, outputs):
-                outputs['y'] = 2 * inputs['x']
-
-        p = om.Problem()
-        p.model.add_subsystem('comp', RequiredConnComp(), promotes=['*'])
-
-        with self.assertRaises(Exception) as cm:
-            p.setup()
-
-        msg = (F"\nCollected errors for problem '{p._get_inst_id()}':\n"
-               '   <model> <class Group>: Input "comp.x", promoted as "x", requires a connection but is not connected.')
-
-        self.assertEqual(str(cm.exception), msg)
-
-    def test_unconnected_desvar_required_connection_promoted(self):
-        class RequiredConnComp(om.ExplicitComponent):
-            def setup(self):
-                self.add_input('x', require_connection=True)
-                self.add_output('y')
-
-            def compute(self, inputs, outputs):
-                outputs['y'] = 2 * inputs['x']
-
-        p = om.Problem()
-        p.model.add_subsystem('comp', RequiredConnComp(), promotes=['*'])
-
-        p.model.add_design_var('x')
-
         p.setup()
 
+        with self.assertRaises(Exception) as cm:
+            p.final_setup()
+
+        self.assertEqual(str(cm.exception),
+                         '<model> <class Group>: Input "comp.x" requires a connection but is not connected.')
+
+    def test_required_connection_promoted_input_unconnected(self):
+        class RequiredConnComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', require_connection=True)
+                self.add_output('y')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 2 * inputs['x']
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', RequiredConnComp(), promotes=['*'])
+        p.setup()
+
+        with self.assertRaises(Exception) as cm:
+            p.final_setup()
+
+        self.assertEqual(str(cm.exception),
+                         '<model> <class Group>: Input "comp.x", promoted as "x", requires a connection but is not connected.')
+
+    def test_required_connection_desvar(self):
+        class RequiredConnComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', require_connection=True)
+                self.add_output('y')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 2 * inputs['x']
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', RequiredConnComp(), promotes=['*'])
+        p.model.add_design_var('x')
+        p.setup()
+        p.run_model()
+
         # no Exception should be raised due to 'require_connection=True' since x is a desvar
+
+    def test_required_connection_connected_in_configure(self):
+        class RequiredConnComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', require_connection=True)
+                self.add_output('y')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 2 * inputs['x']
+
+        class RequiredConnGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('indep', om.IndepVarComp('x'))
+                self.add_subsystem('comp', RequiredConnComp())
+
+            def configure(self):
+                print(f"{self}.configure()  connecting")
+                self.connect('indep.x', 'comp.x')
+
+        p = om.Problem(RequiredConnGroup())
+        p.setup()
+        p.run_model()
+
+        # no Exception should be raised due to 'require_connection=True' since x is connected in configure()
 
     def test_unconnected_input_units_no_mismatch(self):
         p = om.Problem()
