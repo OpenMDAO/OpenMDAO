@@ -12,7 +12,8 @@ if __name__ == '__main__':
 
     num_elements = 50
 
-    prob = om.Problem(model=BeamGroup(E=E, L=L, b=b, volume=volume, num_elements=num_elements),
+    prob = om.Problem(name='beam_opt',
+                      model=BeamGroup(E=E, L=L, b=b, volume=volume, num_elements=num_elements),
                       driver=om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=True))
     prob.setup()
     prob.run_driver()

@@ -616,6 +616,24 @@ _command_map = {
 }
 
 
+def _register_view_reports():
+    """
+    Set hook to view reports after running an openmdao script.
+    """
+    hooks.use_hooks = True
+
+    # request cleanup at exit
+    om_atexit = os.environ.get('OPENMDAO_ATEXIT')
+    os.environ['OPENMDAO_ATEXIT'] = ','.join([om_atexit, 'cleanup']) if om_atexit else 'cleanup'
+
+    from openmdao.utils.reports_system import view_reports
+
+    def run_problem_reports(problem):
+        view_reports(problem._name)
+
+    hooks._register_hook('cleanup', 'Problem', post=run_problem_reports, exit=False)
+
+
 def openmdao_cmd():
     """
     Run an 'openmdao' sub-command or list help info for 'openmdao' command or sub-commands.
@@ -637,10 +655,14 @@ def openmdao_cmd():
                                      'For example: '
                                      '"openmdao n2 -o foo.html myscript.py -- -x --myarg=bar"')
 
-    ver_group = parser.add_mutually_exclusive_group()
-    ver_group.add_argument('--version', action='version', version=version)
-    ver_group.add_argument('--dependency_versions', action='store_true', default=False,
+    opt_group = parser.add_mutually_exclusive_group()
+    opt_group.add_argument('--version', action='version', version=version)
+    opt_group.add_argument('--dependency_versions', action='store_true', default=False,
                            help="show versions of OpenMDAO and all dependencies, then exit")
+    opt_group.add_argument('--view_reports', action='store_true', default=False,
+                           help="after running an OpenMDAO script, display any generated reports")
+
+    opts = ('-h', '--help', '--version', '--dependency_versions', '--view_reports')
 
     # setting 'dest' here will populate the Namespace with the active subparser name
     subs = parser.add_subparsers(title='Tools', metavar='', dest="subparser_name")
@@ -674,10 +696,13 @@ def openmdao_cmd():
         subp.set_defaults(executor=executor)
 
     args = [a for a in sys.argv[1:] if not a.startswith('-')]
-    cmdargs = [a for a in sys.argv[1:] if a not in ('-h', '--version', '--dependency_versions')]
+    cmdopts = [a for a in sys.argv[1:] if a in opts]
+    cmdargs = [a for a in sys.argv[1:] if a not in opts]
 
     # handle case where someone just runs `openmdao <script> [dashed-args]`
     if not set(args).intersection(subs.choices) and len(args) == 1 and os.path.isfile(cmdargs[0]):
+        if '--view_reports' in cmdopts:
+            _register_view_reports()
         _load_and_exec(args[0], user_args)
     else:
         hooks.use_hooks = True
