@@ -4,12 +4,14 @@ Tools for working with code.
 
 import sys
 import os
+import io
 import inspect
 import ast
 import textwrap
 import importlib
 from types import LambdaType
 from collections import defaultdict, OrderedDict
+from tokenize import NAME, tokenize, untokenize
 
 import networkx as nx
 
@@ -633,34 +635,145 @@ def get_partials_deps(func, outputs=None):
                 stack.pop()
 
 
-def replace_method(obj, method_name, new_method_src):
+def block_filter(tokiter, blocks_to_remove, block_start_tok):
     """
-    Replace the source code for an existing method with new source code.
+    Remove blocks of code from a stream of tokens.
+
+    Blocks are removed based on indentation level.  If a block's name matches one in
+    blocks_to_remove, all non-blank lines where the first token is indented to a greater level
+    than the block start token are removed.
 
     Parameters
     ----------
-    obj : object
-        The object containing the method to be replaced.
-    method_name : str
-        The name of the method to be replaced.
-    new_method_src : str
-        The new source code for the method.
+    tokiter : iterator
+        Iterator of tokens.
+    blocks_to_remove : set
+        Set of block names to remove.
+    block_start_tok : str
+        The name of the block start token, e.g., 'def' or 'class'.
+    """
+    indent = None
+    save = []
+    for tok in tokiter:
+        toktype, tokval, start, _, _ = tok
+        tokcol = start[1]
+        if save:  # we're on block start line after block start token
+            if toktype == NAME and tokval not in blocks_to_remove:
+                indent = None
+                yield from save
+                yield tok
+            save = []
+            continue
+        elif toktype == NAME and tokval == block_start_tok:  # block start line
+            indent = tokcol
+            save.append(tok)  # we might need to emit this token if block doesn't match
+            continue
+        elif indent is not None:
+            if tokcol > indent or not tokval.strip():  # skip lines that are indented or blank
+                continue
+            else:  # block is done
+                indent = None
+
+        yield tok
+
+
+def find_block_start(srccode, block_name, block_start_tok):
+    """
+    Find the start of a block of code.
+
+    Parameters
+    ----------
+    srccode : str
+        Source code to search for block.
+    block_name : str
+        The name of the block to find.
+    block_start_tok : str
+        The name of the block start token, e.g., 'def' or 'class'.
+
+    Returns
+    -------
+    tuple
+        A tuple of the form (line number, column number, block start line) or (None, None, None) if
+        the block was not found.
+    """
+    tokiter = tokenize(io.BytesIO(srccode.encode('utf-8')).readline)
+    for tok in tokiter:
+        toktype, tokval, start, _, _ = tok
+
+        if toktype == NAME and tokval == block_start_tok:  # block start line
+            try:
+                nxt = next(tokiter)
+            except StopIteration:
+                return (None, None, None)
+            ntoktype, ntokval, _, _, _ = nxt
+            if ntoktype == NAME and ntokval == block_name:
+                return start[0], start[1], tok[-1]
+
+    return (None, None, None)
+
+def remove_src_blocks(srccode, names, block_start_tok):
+    """
+    Remove blocks from a piece of source code.
+
+    Parameters
+    ----------
+    srccode : str
+        The source code.
+    names : list of str
+        List of blocks to be removed.
+    block_start : str
+        The name of the block start token, e.g., 'def' or 'class'.
 
     Returns
     -------
     str
-        The modified class definition for the given instance.
+        The modified source code.
     """
-    method = getattr(obj, method_name)
-    method_src = textwrap.indent(textwrap.dedent(inspect.getsource(method)), ' ' * 4)
-    new_method_src = textwrap.indent(textwrap.dedent(new_method_src), ' ' * 4)
+    if not names:
+        return srccode
+    return untokenize(block_filter(tokenize(io.BytesIO(srccode.encode('utf-8')).readline),
+                                   set(names), block_start_tok=block_start_tok)).decode()
 
-    try:
-        class_src = textwrap.dedent(inspect.getsource(obj))
-    except Exception:
-        raise RuntimeError(f"Couldn't obtain class source so can't replace method '{method_name}'.")
 
-    return class_src.replace(method_src, new_method_src)
+def replace_src_block(srccode, block_name, new_block, block_start_tok):
+    """
+    Replace a block in a piece of source code.
+
+    Parameters
+    ----------
+    srccode : str
+        The source code.
+    block_name : str
+        The name of the block to be replaced.
+    new_block : str
+        The replacement block.
+    block_start_tok : str
+        The name of the block start token, e.g., 'def' or 'class'.
+
+    Returns
+    -------
+    str
+        The modified source code.
+    """
+    linenum, _, _ = find_block_start(srccode, block_name, block_start_tok)
+    if linenum is None:
+        raise RuntimeError(f"Block '{block_start_tok} {block_name}' not found in source code.")
+
+    stream = io.StringIO(srccode)
+    lines = srccode.splitlines()
+    linenum -= 1  # i is zero indexed, so adjust linenum to be zero indexed
+    for i, line in enumerate(lines):
+        if i == linenum:
+            # insert new block
+            for subline in new_block.splitlines():
+                print(subline, file=stream)
+            print('', file=stream)
+        print(line, file=stream)
+
+    newsrc = stream.getvalue()
+    # now remove the old block
+    return untokenize(block_filter(tokenize(io.BytesIO(newsrc.encode('utf-8')).readline),
+                                   {block_name}, block_start_tok=block_start_tok)).decode()
 
 
 def is_lambda(f):

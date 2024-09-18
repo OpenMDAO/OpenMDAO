@@ -1,6 +1,7 @@
 """
 Utilities for the use of jax in combination with OpenMDAO.
 """
+import sys
 import os
 import ast
 import textwrap
@@ -8,12 +9,14 @@ import inspect
 import weakref
 from itertools import chain
 from collections import defaultdict
+import importlib
 
 import numpy as np
-from numpy import ndarray
 
 from openmdao.visualization.tables.table_builder import generate_table
-from openmdao.utils.code_utils import _get_long_name, replace_method, get_partials_deps
+from openmdao.utils.code_utils import _get_long_name, remove_src_blocks, replace_src_block, \
+    get_partials_deps
+from openmdao.utils.file_utils import get_module_path, _load_and_exec
 
 
 def jit_stub(f, *args, **kwargs):
@@ -41,7 +44,7 @@ try:
     import jax
     jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
     import jax.numpy as jnp
-    from jax import jit, tree_util, Array
+    from jax import jit, tree_util
 except ImportError:
 
     jax = None
@@ -145,10 +148,6 @@ class CompJaxifyBase(ast.NodeTransformer):
         A weak reference to the Component whose function is being transformed.
     _funcname : str
         The name of the function being transformed.
-    _compute_primal_args : list
-        The argument names of the compute_primal function.
-    _compute_primal_returns : list
-        The names of the outputs from the new function.
     compute_primal : function
         The compute_primal function created from the original function.
     _orig_args : list
@@ -181,11 +180,6 @@ class CompJaxifyBase(ast.NodeTransformer):
 
         self._orig_args = list(inspect.signature(func).parameters)
 
-        # ensure that ordering of args and returns exactly matches the order of the inputs and
-        # outputs vectors.
-        self._compute_primal_args = self._get_compute_primal_args()
-        self._compute_primal_returns = self._get_compute_primal_returns()
-
         node = self.visit(ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec'))
         self._new_ast = ast.fix_missing_locations(node)
 
@@ -216,7 +210,19 @@ class CompJaxifyBase(ast.NodeTransformer):
         str
             The source code of the class containing the transformed function.
         """
-        return replace_method(self._comp().__class__, self._funcname, self.get_compute_primal_src())
+        try:
+            class_src = textwrap.dedent(inspect.getsource(self._comp().__class__))
+        except Exception:
+            raise RuntimeError(f"Couldn't obtain class source for {self._comp().__class__}.")
+
+        compute_primal_src = textwrap.indent(textwrap.dedent(self.get_compute_primal_src()),
+                                             ' ' * 4)
+
+        class_src = replace_src_block(class_src, self._funcname, compute_primal_src,
+                                      block_start_tok='def')
+        class_src = remove_src_blocks(class_src, self._get_del_methods(), block_start_tok='def')
+
+        return class_src.rstrip()
 
     def _get_self_statics_func(self, static_attrs, static_dcts):
         fsrc = ['def get_self_statics(self):']
@@ -263,13 +269,13 @@ class CompJaxifyBase(ast.NodeTransformer):
                                 attr='set_vals', ctx=ast.Load()), args=args, keywords=[]))]
 
     def _make_return(self):
-        val = ast.Tuple([ast.Name(id=n, ctx=ast.Load()) for n in self._compute_primal_returns],
-                        ctx=ast.Load())
+        val = ast.Tuple([ast.Name(id=n, ctx=ast.Load())
+                         for n in self._get_compute_primal_returns()], ctx=ast.Load())
         return ast.Return(val)
 
     def _get_new_args(self):
         new_args = [ast.arg('self', annotation=None)]
-        for arg_name in self._compute_primal_args:
+        for arg_name in self._get_compute_primal_args():
             new_args.append(ast.arg(arg=arg_name, annotation=None))
         return ast.arguments(args=new_args, posonlyargs=[], vararg=None, kwonlyargs=[],
                              kw_defaults=[], kwarg=None, defaults=[])
@@ -297,7 +303,10 @@ class CompJaxifyBase(ast.NodeTransformer):
             The transformed node.
         """
         newbody = self._get_pre_body()
-        newbody.extend([self.visit(statement) for statement in node.body])
+        for statement in node.body:
+            newnode = self.visit(statement)
+            if newnode is not None:
+                newbody.append(newnode)
         newbody.extend(self._get_post_body())
         # add a return statement for the outputs
         newbody.append(self._make_return())
@@ -349,6 +358,28 @@ class CompJaxifyBase(ast.NodeTransformer):
             if node.attr not in self._static_ops:
                 return ast.copy_location(ast.Attribute(value=ast.Name(id='jnp', ctx=ast.Load()),
                                                        attr=node.attr, ctx=node.ctx), node)
+        return self.generic_visit(node)
+
+    def visit_Assign(self, node):
+        """
+        Translate an Assign node into an Assign node with the subscript replaced with the name.
+
+        Parameters
+        ----------
+        node : ast.Assign
+            The Assign node being visited.
+
+        Returns
+        -------
+        ast.Any
+            The transformed node.
+        """
+        if len(node.targets) == 1:
+            nodeval = self.visit(node.value)
+            tgt = node.targets[0]
+            if isinstance(tgt, ast.Name) and isinstance(nodeval, ast.Name):
+                if tgt.id == nodeval.id:
+                    return None  # get rid of any 'x = x' assignments after conversion
 
         return self.generic_visit(node)
 
@@ -362,7 +393,7 @@ class ExplicitCompJaxify(CompJaxifyBase):
     of the output values in the order they are stored in outputs.
 
     If the component has discrete inputs, they will be passed individually into compute_primal
-    *before* the continuous inputs.  If the component has discrete outputs, they will be assigned
+    *after* the continuous inputs.  If the component has discrete outputs, they will be assigned
     to local variables of the same name within the function and set back into the discrete
     outputs dict just prior to the return from the function.
 
@@ -379,25 +410,16 @@ class ExplicitCompJaxify(CompJaxifyBase):
     def __init__(self, comp, verbose=False):  # noqa
         super().__init__(comp, 'compute', verbose)
 
-    def _get_arg_values(self):
-        discrete_inputs = self._comp()._discrete_inputs
-        yield from discrete_inputs.values()
-        if self._comp()._inputs is None:
-            for name, meta in self._comp()._var_rel2meta['input'].items():
-                if name not in discrete_inputs:
-                    yield meta['value']
-        else:
-            yield from self._comp()._inputs.values()
-
     def _get_compute_primal_args(self):
         # ensure that ordering of args and returns exactly matches the order of the inputs and
         # outputs vectors.
-        return [n for n in chain(self._comp()._var_rel_names['input'],
-                                 self._comp()._discrete_inputs)]
+        return chain(self._comp()._var_rel_names['input'], self._comp()._discrete_inputs)
 
     def _get_compute_primal_returns(self):
-        return [n for n in chain(self._comp()._var_rel_names['output'],
-                                 self._comp()._discrete_outputs)]
+        return chain(self._comp()._var_rel_names['output'], self._comp()._discrete_outputs)
+
+    def _get_del_methods(self):
+        return ['compute', 'compute_partials', 'compute_jacvec_product']
 
 
 class ImplicitCompJaxify(CompJaxifyBase):
@@ -411,7 +433,7 @@ class ImplicitCompJaxify(CompJaxifyBase):
     the residuals Vector.
 
     If the component has discrete inputs, they will be passed individually into compute_primal
-    *before* the continuous inputs.  If the component has discrete outputs, they will be assigned
+    *after* the continuous inputs.  If the component has discrete outputs, they will be assigned
     to local variables of the same name within the function and set back into the discrete
     outputs dict just prior to the return from the function.
 
@@ -428,36 +450,17 @@ class ImplicitCompJaxify(CompJaxifyBase):
     def __init__(self, comp, verbose=False):  # noqa
         super().__init__(comp, 'apply_nonlinear', verbose)
 
-    def _get_arg_values(self):
-        discrete_inputs = self._comp()._discrete_inputs
-
-        comp = self._comp()
-        if comp._inputs is None:
-            for name, meta in comp._var_rel2meta['input'].items():
-                if name not in discrete_inputs:
-                    yield meta['value']
-        else:
-            yield from comp._inputs.values()
-
-        if comp._outputs is None:
-            for name, meta in comp._var_rel2meta['output'].items():
-                if name not in comp._discrete_outputs:
-                    yield meta['value']
-        else:
-            yield from comp._outputs.values()
-
-        yield from discrete_inputs.values()
-
     def _get_compute_primal_args(self):
         # ensure that ordering of args and returns exactly matches the order of the inputs,
         # outputs, and residuals vectors.
-        return [n for n in chain(self._comp()._var_rel_names['input'],
-                                 self._comp()._var_rel_names['output'],
-                                 self._comp()._discrete_inputs)]
+        return chain(self._comp()._var_rel_names['input'], self._comp()._var_rel_names['output'],
+                     self._comp()._discrete_inputs)
 
     def _get_compute_primal_returns(self):
-        return [n for n in chain(self._comp()._var_rel_names['output'],
-                                 self._comp()._discrete_outputs)]
+        return chain(self._comp()._var_rel_names['output'], self._comp()._discrete_outputs)
+
+    def _get_del_methods(self):
+        return ['apply_nonlinear', 'linearize', 'apply_linear']
 
 
 class SelfAttrFinder(ast.NodeVisitor):
@@ -765,23 +768,6 @@ def jax_deriv_shape(derivs):
 
 
 if jax is None or bool(os.environ.get('JAX_DISABLE_JIT', '')):
-    def DelayedJit(func):
-        """
-        Do nothing.
-
-        Parameters
-        ----------
-        func : Callable
-            The function or method to be wrapped.
-
-        Returns
-        -------
-        Callable
-            The original function or method.
-
-        """
-        return func
-
     def _jax_update_class_attrs(cls):
         pass
 
@@ -832,70 +818,6 @@ else:
         _jax_update_class_attrs(cls)
         # register with jax so we can flatten/unflatten self
         tree_util.register_pytree_node(cls, cls._tree_flatten, cls._tree_unflatten)
-
-    class DelayedJit:
-        """
-        Wrap the method of a class, providing a delayed jit capability.
-
-        This decorator is used to delay the jit compilation of a method until the first time it is
-        called. This allows the method to be compiled with the correct static arguments, which can
-        be determined automatically on the first call. This is useful for methods of a class
-        that are jit compiled and that reference static attributes of the class.
-
-        Parameters
-        ----------
-        func : Callable
-            The function or method to be wrapped.
-
-        Attributes
-        ----------
-        _func : Callable
-            The function or method to be wrapped.
-        _jfunc : Callable
-            The jitted function.
-        """
-
-        def __init__(self, func):
-            """
-            Initialize the DelayedJit object.
-
-            Parameters
-            ----------
-            func : Callable
-                The function or method to be wrapped.
-            """
-            self._func = func
-            self._jfunc = None  # jitted function
-
-        def __call__(self, *args, **kwargs):
-            """
-            Jit the function on the first call after we know which args are static.
-
-            Parameters
-            ----------
-            args : list
-                Positional arguments.
-            kwargs : dict
-                Keyword arguments.
-
-            Returns
-            -------
-            object
-                The result of the function call.
-            """
-            if self._jfunc is None:
-                params = list(inspect.signature(self._func).parameters)
-                # we don't want to treat 'self' as static because we want _tree_(flatten/unflatten)
-                # to be called on it so 'get_self_statics' will be called.
-                offset = 1 if params and params[0] == 'self' else 0
-                # static args are those that are not jax or numpy arrays
-                static_argnums = [i for (i, arg) in enumerate(args)
-                                  if i >= offset and not isinstance(arg, (Array, ndarray))]
-                static_argnames = [n for (n, v) in kwargs.items()
-                                   if not isinstance(v, (Array, ndarray))]
-                self._jfunc = jit(self._func, static_argnums=static_argnums,
-                                  static_argnames=static_argnames)
-            return self._jfunc(*args, **kwargs)
 
 
 # we define compute_partials here instead of making this the base class version as we
@@ -994,7 +916,7 @@ def compute_jacvec_product(inst, inputs, d_inputs, d_outputs, mode, discrete_inp
             inst._vjp_hash = inhash
 
         if inst._compute_primal_returns_tuple:
-            deriv_vals = inst._vjp_fun(tuple(d_outputs.values()) + \
+            deriv_vals = inst._vjp_fun(tuple(d_outputs.values()) +
                                        tuple(inst._discrete_outputs.values()))
         else:
             deriv_vals = inst._vjp_fun(tuple(d_outputs.values())[0])
@@ -1128,6 +1050,151 @@ def apply_linear(inst, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
         d_outputs.set_vals(deriv_vals[ninputs:])
 
 
+def _to_compute_primal_setup_parser(parser):
+    """
+    Set up the command line options for the 'openmdao call_tree' command line tool.
+    """
+    parser.add_argument('file', nargs=1, help='Python file or module containing the class.')
+    parser.add_argument('-c', '--class', action='store', dest='klass',
+                        help='Component class to be converted.')
+    parser.add_argument('-i', '--import', action='store', dest='imported',
+                        help='Try to import the file as a module and convert the specified class.'
+                        ' This requires that the class be initializable with no arguments.')
+    parser.add_argument('-v', '--verbose', action='store_true', dest='verbose',
+                        help='Print status information.')
+    parser.add_argument('-o', '--outfile', action='store', dest='outfile',
+                        default='stdout', help='Output file.  Defaults to stdout.')
+
+
+def _to_compute_primal_exec(options, user_args):
+    """
+    Process command line args and call convert on the specified class.
+    """
+    from openmdao.core.component import Component
+    from openmdao.core.problem import Problem
+    import openmdao.utils.hooks as hooks
+
+    if not options.klass:
+        raise RuntimeError("Must specify a class to convert.")
+
+    if options.imported:
+        fname = options.file[0]
+        if fname.endswith('.py'):
+            fname = options.file[0]
+            if not os.path.exists(fname):
+                raise FileNotFoundError(f"File '{fname}' not found.")
+
+            modpath = get_module_path(fname)
+            if modpath is None:
+                modpath = fname
+                moddir = os.path.dirname(modpath)
+                sys.path = [moddir] + sys.path
+                modpath = os.path.basename(modpath)[:-3]
+        else:
+            modpath = options.file[0]
+
+        try:
+            mod = importlib.import_module(modpath)
+        except ImportError as err:
+            print(f"Can't import module '{modpath}': {err}")
+            return
+
+        for name, klass in inspect.getmembers(mod, inspect.isclass):
+            if name == options.klass:
+                if not issubclass(klass, Component):
+                    print(f"Class '{options.klass}' is not a subclass of Component.")
+                    return
+                # try to instantiate class with no args
+                try:
+                    inst = klass()
+                except Exception as err:
+                    print(f"Can't instantiate class '{options.klass}' with default args: {err}")
+                    print("Try using --instance instead and specify the path to an instance.")
+                    return
+
+                p = Problem()
+                p.model.add_subsystem('comp', inst)
+                p.setup()
+
+                to_compute_primal(inst, outfile=options.outfile)
+                break
+        else:
+            print(f"Class '{options.klass}' not found in module '{modpath}'")
+            return
+
+    else:
+        def _to_compute_primal(model):
+            found = False
+            classpath = options.klass.split('.')
+            cname = classpath[-1]
+            cmod = '.'.join(classpath[:-1])
+            npaths = len(classpath)
+            for s in model.system_iter(recurse=True, typ=Component):
+                for cls in inspect.getmro(type(s)):
+                    if cls.__name__ == cname:
+                        if npaths == 1 or cls.__module__ == cmod:
+                            if options.verbose:
+                                print(f"Converting class '{options.klass}' compute method to "
+                                        f"compute_primal method for instance '{s.pathname}'.")
+                                to_compute_primal(s, outfile=options.outfile,
+                                                    verbose=options.verbose)
+                                found = True
+                                break
+                if found:
+                    break
+            else:
+                print(f"Class '{options.klass}' not found in the model.")
+                return
+
+        def _set_dyn_hook(prob):
+            # set the _to_compute_primal hook to be called right after _setup_var_data on the model
+            prob.model.pathname = ''
+            hooks._register_hook('_setup_var_data', class_name='Group', inst_id='',
+                                 post=_to_compute_primal, exit=True)
+            hooks._setup_hooks(prob.model)
+
+        # register the hook to be called right after setup on the problem
+        hooks._register_hook('setup', 'Problem', pre=_set_dyn_hook, ncalls=1)
+
+        _load_and_exec(options.file[0], user_args)
+
+
+def to_compute_primal(inst, outfile='stdout', verbose=False):
+    """
+    Convert the given Component's compute method to a compute_primal method that works with jax.
+
+    Parameters
+    ----------
+    inst : Component
+        The Component to be converted.
+    outfile : str
+        The name of the file to write the converted class to. Defaults to 'stdout'.
+    verbose : bool
+        If True, print status information.
+    """
+    from openmdao.core.implicitcomponent import ImplicitComponent
+    from openmdao.core.explicitcomponent import ExplicitComponent
+
+    classname = type(inst).__name__
+    if verbose:
+        print(f"Converting class '{classname}' compute method to compute_primal method.")
+        print(f"Output will be written to '{outfile}'.")
+
+    if isinstance(inst, ImplicitComponent):
+        jaxer = ImplicitCompJaxify(inst)
+    elif isinstance(inst, ExplicitComponent):
+        jaxer = ExplicitCompJaxify(inst)
+    else:
+        print(f"'{classname}' is not an ImplicitComponent or ExplicitComponent.")
+        return
+
+    if outfile == 'stdout':
+        print(jaxer.get_class_src())
+    else:
+        with open(outfile, 'w') as f:
+            print(jaxer.get_class_src(), file=f)
+
+
 if __name__ == '__main__':
     import openmdao.api as om
 
@@ -1137,18 +1204,12 @@ if __name__ == '__main__':
         zz = q + x * 1.5
         return z, zz
 
-    print('partials are:\n',list(get_partials_deps(func, ('z', 'zz'))))
+    print('partials are:\n', list(get_partials_deps(func, ('z', 'zz'))))
 
     p = om.Problem()
     comp = p.model.add_subsystem('comp', om.ExecComp('y = 2.0*x', x=np.ones(3), y=np.ones(3)))
-    comp.derivs_method='jax'
+    comp.derivs_method = 'jax'
     p.setup()
     p.run_model()
 
     print(p.compute_totals(of=['comp.y'], wrt=['comp.x']))
-
-    # from openmdao.components.mux_comp import MuxComp
-
-    # c = MuxComp()
-
-    # sf = SelfAttrFinder(c.compute)

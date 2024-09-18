@@ -15,7 +15,7 @@ from openmdao.utils.general_utils import format_as_float_or_array, _subjac_meta2
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.jax_utils import jax, jit, ImplicitCompJaxify, DelayedJit, \
+from openmdao.utils.jax_utils import jax, jit, ImplicitCompJaxify, \
     linearize as _jax_linearize, apply_linear as _jax_apply_linear
 
 
@@ -962,29 +962,28 @@ class ImplicitComponent(Component):
                                    f"the expected args {compargs}.")
 
         if not from_group and self.options['use_jit']:
-            self.compute_primal = MethodType(DelayedJit(self.compute_primal.__func__), self)
-
-        statics = self.get_self_statics()
-        if not statics:
-            self._self_statics_hash = None  # set to None to avoid computing any more hashes
+            static_argnums = []
+            idx = len(self._var_rel_names['input']) + 1
+            static_argnums.extend(range(idx, idx + len(self._discrete_inputs)))
+            self.compute_primal = MethodType(jit(self.compute_primal.__func__,
+                                                 static_argnums=static_argnums), self)
 
     def _get_jac_func(self):
-        self._check_jac_func_changed()
-
         # TODO: modify this to use relevance and possibly compile multiple jac functions depending
         # on DV/response so that we don't compute any derivatives that are always zero.
         if self._jac_func_ is None:
             fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
-            nstatic = len(self._discrete_inputs)
-            wrt_idxs = list(range(nstatic, len(self._var_abs2meta['input']) +
-                                  len(self._var_abs2meta['output']) + nstatic))
-            static_argnums = tuple(range(nstatic))
+            wrt_idxs = list(range(1, len(self._var_abs2meta['input']) +
+                                  len(self._var_abs2meta['output']) + 1))
             primal_func = self.compute_primal.__func__
-            if isinstance(primal_func, DelayedJit):
-                primal_func = primal_func._func
-            primal_func = MethodType(primal_func, self)
-            self._jac_func_ = jit(fjax(primal_func, argnums=wrt_idxs),
-                                  static_argnums=static_argnums)
+            self._jac_func_ = MethodType(fjax(primal_func, argnums=wrt_idxs), self)
+
+            if self.options['use_jit']:
+                static_argnums = tuple(range(1 + len(wrt_idxs), 1 + len(wrt_idxs) +
+                                             len(self._discrete_inputs)))
+                self._jac_func_ = MethodType(jit(self._jac_func_.__func__,
+                                                 static_argnums=static_argnums),
+                                             self)
         return self._jac_func_
 
 

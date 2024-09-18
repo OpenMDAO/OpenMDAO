@@ -400,9 +400,6 @@ class System(object, metaclass=SystemMetaclass):
         Function that computes the primal for the given system.
     _jac_func_ : function or None
         Function that computes the jacobian using AD (jax).  Not used if jax is not active.
-    _self_statics_hash : int or None
-        Hash of the self static args used to compute the jacobian using AD (jax).  If this hash
-        changes, _jac_func will be re-jitted.  Not used if jax is not active.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -422,9 +419,6 @@ class System(object, metaclass=SystemMetaclass):
                                   'if using an assembled jacobian, will use this type.')
         self.options.declare('derivs_method', default=None, values=['jax', 'cs', 'fd', None],
                              desc='The method to use for computing derivatives')
-        self.options.declare('use_jit', types=bool, default=True,
-                             desc='If True, attempt to use jit on compute_primal, assuming jax or '
-                             'some other AD package is active.')
 
         # Case recording options
         self.recording_options = OptionsDictionary(parent_name=type(self).__name__)
@@ -556,7 +550,6 @@ class System(object, metaclass=SystemMetaclass):
             self.compute_primal = None
 
         self._jac_func_ = None  # for computing jacobian using AD (jax)
-        self._self_statics_hash = _UNDEFINED
 
     if _om_dump:
         @property
@@ -6666,15 +6659,6 @@ class System(object, metaclass=SystemMetaclass):
             Tuple containing all static values required by compute_primal.
         """
         return ()
-
-    def _check_jac_func_changed(self):
-        if self._self_statics_hash is None:
-            return  # don't need to compute hash
-
-        newhash = hash(self.get_self_statics())
-        if newhash != self._self_statics_hash:
-            self._self_statics_hash = newhash
-            self._jac_func_ = None
 
     def _setup_jax(self, from_group=False):
         pass

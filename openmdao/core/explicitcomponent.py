@@ -16,7 +16,7 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE, _UNDEFINED
-from openmdao.utils.jax_utils import jax, jit, ExplicitCompJaxify, DelayedJit, \
+from openmdao.utils.jax_utils import jax, jit, ExplicitCompJaxify, \
     compute_partials as _jax_compute_partials, \
     compute_jacvec_product as _jax_compute_jacvec_product, ReturnChecker
 from openmdao.utils.array_utils import submat_sparsity_iter
@@ -658,30 +658,26 @@ class ExplicitComponent(Component):
             self._compute_primal_returns_tuple = ReturnChecker(self.compute_primal).returns_tuple()
 
         if not from_group and self.options['use_jit']:
-            self.compute_primal = MethodType(DelayedJit(self.compute_primal.__func__), self)
-
-        statics = self.get_self_statics()
-        if not statics:
-            self._self_statics_hash = None  # set to None to avoid computing any more hashes
+            static_argnums = []
+            idx = len(self._var_rel_names['input']) + 1
+            static_argnums.extend(range(idx, idx + len(self._discrete_inputs)))
+            self.compute_primal = MethodType(jit(self.compute_primal.__func__,
+                                                 static_argnums=static_argnums), self)
 
     def _get_jac_func(self):
-        self._check_jac_func_changed()
-
         # TODO: modify this to use relevance and possibly compile multiple jac functions depending
         # on DV/response so that we don't compute any derivatives that are always zero.
         if self._jac_func_ is None:
             fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
             nstatic = len(self._discrete_inputs)
-            wrt_idxs = list(range(len(self._var_abs2meta['input'])))
-            primal_func = self.compute_primal.__func__
-            if isinstance(primal_func, DelayedJit):
-                primal_func = primal_func._func
-            primal_func = MethodType(primal_func, self)
-            self._jac_func_ = self._jac_func_ = fjax(primal_func, argnums=wrt_idxs)
+            wrt_idxs = list(range(1, len(self._var_abs2meta['input']) + 1))
+            self._jac_func_ = MethodType(fjax(self.compute_primal.__func__, argnums=wrt_idxs), self)
 
             if self.options['use_jit']:
-                static_argnums = tuple(range(len(wrt_idxs), len(wrt_idxs) + nstatic))
-                self._jac_func_ = jit(self._jac_func_, static_argnums=static_argnums)
+                static_argnums = tuple(range(1 + len(wrt_idxs), 1 + len(wrt_idxs) + nstatic))
+                self._jac_func_ = MethodType(jit(self._jac_func_.__func__,
+                                                 static_argnums=static_argnums),
+                                             self)
 
         return self._jac_func_
 
@@ -690,7 +686,7 @@ class ExplicitComponent(Component):
         Return sparsity pattern of the compute function.
 
         The compute function is executed once for each entry in the inputs array.  It's possible
-        that the returned sparsity pattern could be slightly more conservative than the actual
+        that the returned sparsity pattern could be more conservative than the actual
         jacobian sparsity pattern.
 
         Returns

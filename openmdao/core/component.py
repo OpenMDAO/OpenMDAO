@@ -138,6 +138,9 @@ class Component(System):
                              desc='If True, force nonlinear operations on this component to be '
                                   'included in the optimization loop even if this component is not '
                                   'relevant to the design variables and responses.')
+        self.options.declare('use_jit', types=bool, default=True,
+                             desc='If True, attempt to use jit on compute_primal, assuming jax or '
+                             'some other AD package is active.')
 
     def _check_matfree_deprecation(self):
         # check for mixed distributed variables
