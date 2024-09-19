@@ -15,7 +15,7 @@ except ImportError:
     from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 
-class MyCompJax1(om.ExplicitComponent):
+class DotProd(om.ExplicitComponent):
     def setup(self):
         self.add_input('x', shape_by_conn=True)
         self.add_input('y', shape_by_conn=True)
@@ -27,26 +27,7 @@ class MyCompJax1(om.ExplicitComponent):
         outputs['z'] = np.dot(inputs['x'], inputs['y'])
 
 
-
-class MyCompJax1Shaped(om.ExplicitComponent):
-    def __init__(self, xshape, yshape, **kwargs):
-        super().__init__(**kwargs)
-        self.xshape = xshape
-        self.yshape = yshape
-
-    def setup(self):
-        self.add_input('x', shape=self.xshape)
-        self.add_input('y', shape=self.yshape)
-        self.add_output('z', shape=(self.xshape[0], self.yshape[1]))
-
-        self.declare_partials(of='z', wrt=['x', 'y'])
-
-    def compute(self, inputs, outputs):
-        outputs['z'] = np.dot(inputs['x'], inputs['y'])
-
-
-
-class MyCompJax2(om.ExplicitComponent):
+class DotProdMult(om.ExplicitComponent):
     def setup(self):
         self.add_input('x', shape_by_conn=True)
         self.add_input('y', shape_by_conn=True)
@@ -60,28 +41,7 @@ class MyCompJax2(om.ExplicitComponent):
         outputs['zz'] = inputs['y'] * 2.5
 
 
-
-class MyCompJax2Shaped(om.ExplicitComponent):
-    def __init__(self, xshape, yshape, **kwargs):
-        super().__init__(**kwargs)
-        self.xshape = xshape
-        self.yshape = yshape
-
-    def setup(self):
-        self.add_input('x', shape=self.xshape)
-        self.add_input('y', shape=self.yshape)
-        self.add_output('z', shape=(self.xshape[0], self.yshape[1]))
-        self.add_output('zz', shape=self.yshape)
-
-        self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
-
-    def compute(self, inputs, outputs):
-        outputs['z'] = np.dot(inputs['x'], inputs['y'])
-        outputs['zz'] = inputs['y'] * 2.5
-
-
-
-class MyCompJax2Primal(om.JaxExplicitComponent):
+class DotProdMultPrimal(om.JaxExplicitComponent):
     def setup(self):
         self.add_input('x', shape_by_conn=True)
         self.add_input('y', shape_by_conn=True)
@@ -96,7 +56,7 @@ class MyCompJax2Primal(om.JaxExplicitComponent):
         return z, zz
 
 
-class MyCompJax2PrimalOption(om.JaxExplicitComponent):
+class DotProdMultPrimalOption(om.JaxExplicitComponent):
     def __init__(self, stat=2., **kwargs):
         super().__init__(**kwargs)
         self.stat = stat
@@ -122,7 +82,7 @@ class MyCompJax2PrimalOption(om.JaxExplicitComponent):
 
 
 
-class MyCompJaxWithOption(om.ExplicitComponent):
+class DotProdMultOption(om.ExplicitComponent):
     def initialize(self):
         self.options.declare('mult', default=2.5, desc='multiplier', types=(float,))
 
@@ -140,7 +100,7 @@ class MyCompJaxWithOption(om.ExplicitComponent):
 
 
 
-class MyCompJaxWithDiscrete(om.ExplicitComponent):
+class DotProductMultDiscrete(om.ExplicitComponent):
     def setup(self):
         self.add_input('x', shape_by_conn=True)
         self.add_input('y', shape_by_conn=True)
@@ -165,7 +125,7 @@ class MyCompJaxWithDiscrete(om.ExplicitComponent):
 
 
 
-class MyCompJaxWithDiscretePrimal(om.ExplicitComponent):
+class DotProductMultDiscretePrimal(om.ExplicitComponent):
     def setup(self):
         self.add_input('x', shape_by_conn=True)
         self.add_input('y', shape_by_conn=True)
@@ -179,7 +139,7 @@ class MyCompJaxWithDiscretePrimal(om.ExplicitComponent):
     def compute_primal(self, x, y, disc_in):
         def pos(x, y):
             return jnp.dot(x, y), y * 3.0
-        
+
         def neg(x, y):
             return -jnp.dot(x, y), y * 2.5
 
@@ -292,7 +252,7 @@ class TestJaxComp(unittest.TestCase):
         # itself.
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(xshape)))
         ivc.add_output('y', val=np.ones(yshape))
-        comp = p.model.add_subsystem('comp', MyCompJax1(derivs_method='jax'))
+        comp = p.model.add_subsystem('comp', DotProd(derivs_method='jax'))
         comp.matrix_free = matrix_free
         p.model.connect('ivc.x', 'comp.x')
         p.model.connect('ivc.y', 'comp.y')
@@ -315,7 +275,7 @@ class TestJaxComp(unittest.TestCase):
         p = om.Problem()
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
         ivc.add_output('y', val=np.ones(y_shape))
-        comp = p.model.add_subsystem('comp', MyCompJax2(derivs_method='jax'))
+        comp = p.model.add_subsystem('comp', DotProdMult(derivs_method='jax'))
         comp.matrix_free = matrix_free
         p.model.connect('ivc.x', 'comp.x')
         p.model.connect('ivc.y', 'comp.y')
@@ -342,7 +302,7 @@ class TestJaxComp(unittest.TestCase):
         p = om.Problem()
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
         ivc.add_output('y', val=np.ones(y_shape))
-        comp = p.model.add_subsystem('comp', MyCompJax2Primal(derivs_method='jax'))
+        comp = p.model.add_subsystem('comp', DotProdMultPrimal(derivs_method='jax'))
         comp.matrix_free = matrix_free
         p.model.connect('ivc.x', 'comp.x')
         p.model.connect('ivc.y', 'comp.y')
@@ -368,7 +328,7 @@ class TestJaxComp(unittest.TestCase):
         p = om.Problem()
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
         ivc.add_output('y', val=np.ones(y_shape))
-        comp = p.model.add_subsystem('comp', MyCompJax2PrimalOption(derivs_method='jax', mult=1.5))
+        comp = p.model.add_subsystem('comp', DotProdMultPrimalOption(derivs_method='jax', mult=1.5))
         comp.matrix_free = matrix_free
 
         # deriv shape: [[(2, 4, 2, 3), (2, 4, 3, 4)], [(3, 4, 2, 3), (3, 4, 3, 4)]]
@@ -417,7 +377,7 @@ class TestJaxComp(unittest.TestCase):
         p = om.Problem()
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
         ivc.add_output('y', val=np.ones(y_shape))
-        comp = p.model.add_subsystem('comp', MyCompJaxWithOption(mult=1.7, derivs_method='jax'))
+        comp = p.model.add_subsystem('comp', DotProdMultOption(mult=1.7, derivs_method='jax'))
         comp.matrix_free = matrix_free
 
         p.model.connect('ivc.x', 'comp.x')
@@ -454,7 +414,7 @@ class TestJaxComp(unittest.TestCase):
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
         ivc.add_output('y', val=np.ones(y_shape))
         ivc.add_discrete_output('disc_out', val=3)
-        comp = p.model.add_subsystem('comp', MyCompJaxWithDiscrete(derivs_method='jax'))
+        comp = p.model.add_subsystem('comp', DotProductMultDiscrete(derivs_method='jax'))
         comp.matrix_free = matrix_free
 
         p.model.connect('ivc.x', 'comp.x')
@@ -490,7 +450,7 @@ class TestJaxComp(unittest.TestCase):
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
         ivc.add_output('y', val=np.ones(y_shape))
         ivc.add_discrete_output('disc_out', val=3)
-        comp = p.model.add_subsystem('comp', MyCompJaxWithDiscretePrimal(derivs_method='jax'))
+        comp = p.model.add_subsystem('comp', DotProductMultDiscretePrimal(derivs_method='jax'))
         comp.matrix_free = matrix_free
 
         p.model.connect('ivc.x', 'comp.x')
