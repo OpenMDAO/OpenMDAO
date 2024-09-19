@@ -21,7 +21,7 @@ _plugins_loaded = False  # use this to ensure plugins only loaded once
 
 class Report(object):
     r"""
-    A class to manage the resistration of hooks associated with a particular named report.
+    A class to manage the registration of hooks associated with a particular named report.
 
     Parameters
     ----------

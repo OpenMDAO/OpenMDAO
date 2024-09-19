@@ -108,9 +108,6 @@ class ImplicitComponent(Component):
         if self.matrix_free is _UNDEFINED:
             self.matrix_free = overrides_method('apply_linear', self, ImplicitComponent)
 
-        if self.matrix_free:
-            self._check_matfree_deprecation()
-
     def _apply_nonlinear(self):
         """
         Compute residuals. The model is assumed to be in a scaled state.

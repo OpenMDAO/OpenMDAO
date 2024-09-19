@@ -60,6 +60,9 @@ def _test_func_name(func, num, param):
 
 cmd_tests = [
     # tuple of (command line, dict of dependencies that might not be installed)
+    ('openmdao -h', {}),
+    ('openmdao --help', {}),
+    ('openmdao --view_reports {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao call_tree openmdao.components.exec_comp.ExecComp.setup', {}),
     ('openmdao check {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao comm_info {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),

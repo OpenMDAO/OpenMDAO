@@ -105,7 +105,7 @@ class Circuit(om.Group):
 if __name__ == "__main__":
     import openmdao.api as om
 
-    p = om.Problem()
+    p = om.Problem(name='circuit_analysis')
     model = p.model
 
     # replacing the fixed current source with a BalanceComp to represent a fixed Voltage source
@@ -153,3 +153,4 @@ if __name__ == "__main__":
     p['circuit.n2.V'] = .7
 
     p.run_model()
+    p.run_driver()

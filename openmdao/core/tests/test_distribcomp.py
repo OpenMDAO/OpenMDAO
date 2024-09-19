@@ -816,6 +816,18 @@ class MPITests(unittest.TestCase):
         err_msg = str(context.exception).split(':')[-1]
         self.assertEqual(err_msg, 'Distributed component input "C.invec" is not connected.')
 
+    def test_auto_ivc_error_promoted(self):
+        size = 2
+
+        prob = om.Problem()
+        prob.model.add_subsystem("C", DistribCompSimple(arr_size=size), promotes=['*'])
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.setup()
+
+        err_msg = str(context.exception).split(':')[-1]
+        self.assertEqual(err_msg, 'Distributed component input "C.invec", promoted as "invec", is not connected.')
+
     def test_bad_distrib_connect(self):
         class Adder(om.ExplicitComponent):
             def setup(self):
