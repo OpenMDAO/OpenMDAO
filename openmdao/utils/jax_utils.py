@@ -1135,9 +1135,9 @@ def _to_compute_primal_exec(options, user_args):
                         if npaths == 1 or cls.__module__ == cmod:
                             if options.verbose:
                                 print(f"Converting class '{options.klass}' compute method to "
-                                        f"compute_primal method for instance '{s.pathname}'.")
+                                      f"compute_primal method for instance '{s.pathname}'.")
                                 to_compute_primal(s, outfile=options.outfile,
-                                                    verbose=options.verbose)
+                                                  verbose=options.verbose)
                                 found = True
                                 break
                 if found:

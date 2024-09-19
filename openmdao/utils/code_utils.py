@@ -651,6 +651,12 @@ def block_filter(tokiter, blocks_to_remove, block_start_tok):
         Set of block names to remove.
     block_start_tok : str
         The name of the block start token, e.g., 'def' or 'class'.
+
+    Yields
+    ------
+    tuple
+        The next token in the stream, unless it is part of a block that
+        should be removed.
     """
     indent = None
     save = []
@@ -711,6 +717,7 @@ def find_block_start(srccode, block_name, block_start_tok):
 
     return (None, None, None)
 
+
 def remove_src_blocks(srccode, names, block_start_tok):
     """
     Remove blocks from a piece of source code.
@@ -721,7 +728,7 @@ def remove_src_blocks(srccode, names, block_start_tok):
         The source code.
     names : list of str
         List of blocks to be removed.
-    block_start : str
+    block_start_tok : str
         The name of the block start token, e.g., 'def' or 'class'.
 
     Returns
