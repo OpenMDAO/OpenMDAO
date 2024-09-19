@@ -341,6 +341,9 @@ jobs:
           conda install graphviz
           python -m pip install pyparsing psutil objgraph pyxdsm pydot
 
+          echo "Pre-install playwright dependencies to avoid warning messages"
+          playwright install --with-deps || true
+
       - name: Display environment info
         id: env_info
         continue-on-error: true
