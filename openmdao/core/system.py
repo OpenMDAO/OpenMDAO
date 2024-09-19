@@ -1651,6 +1651,101 @@ class System(object, metaclass=SystemMetaclass):
 
         return True
 
+    def compute_sparsity(self):
+        """
+        Compute the sparsity of the partial jacobian.
+
+        Returns
+        -------
+        coo_matrix
+            The sparsity matrix.
+        dict
+            Metadata about the sparsity computation.
+        """
+        use_jax = self.options['derivs_method'] == 'jax'
+        if not use_jax:
+            approx_scheme = self._get_approx_scheme(self._coloring_info['method'])
+
+        save_first_call = self._first_call_to_linearize
+        self._first_call_to_linearize = False
+
+        # for groups, this does some setup of approximations
+        self._setup_approx_coloring()
+
+        # tell approx scheme to limit itself to only colored columns
+        if not use_jax:
+            approx_scheme._reset()
+            self._during_sparsity = True
+
+        self._coloring_info._update_wrt_matches(self)
+
+        save_jac = self._jacobian
+
+        # use special sparse jacobian to collect sparsity info
+        self._jacobian = _ColSparsityJac(self, self._coloring_info)
+
+        from openmdao.core.group import Group
+        is_total = isinstance(self, Group)
+        is_explicit = self.is_explicit()
+
+        # compute perturbations
+        starting_inputs = self._inputs.asarray(copy=True)
+        in_offsets = starting_inputs.copy()
+        in_offsets[in_offsets == 0.0] = 1.0
+        in_offsets *= self._coloring_info['perturb_size']
+
+        starting_outputs = self._outputs.asarray(copy=True)
+
+        if not is_explicit:
+            out_offsets = starting_outputs.copy()
+            out_offsets[out_offsets == 0.0] = 1.0
+            out_offsets *= self._coloring_info['perturb_size']
+
+        starting_resids = self._residuals.asarray(copy=True)
+
+        for i in range(self._coloring_info['num_full_jacs']):
+            # randomize inputs (and outputs if implicit)
+            if i > 0:
+                self._inputs.set_val(starting_inputs +
+                                     in_offsets * np.random.random(in_offsets.size))
+                if not is_explicit:
+                    self._outputs.set_val(starting_outputs +
+                                          out_offsets * np.random.random(out_offsets.size))
+                if is_total:
+                    with self._relevance.nonlinear_active('iter'):
+                        self._solve_nonlinear()
+                else:
+                    self._apply_nonlinear()
+
+                if not use_jax:
+                    for scheme in self._approx_schemes.values():
+                        scheme._reset()  # force a re-initialization of approx
+
+            if use_jax:
+                self._jax_linearize()
+            else:
+                self.run_linearize(sub_do_ln=False)
+
+        sparsity, sp_info = self._jacobian.get_sparsity(self)
+
+        self._jacobian = save_jac
+
+        if not use_jax:
+            self._during_sparsity = False
+
+            # revert uncolored approx back to normal
+            for scheme in self._approx_schemes.values():
+                scheme._reset()
+
+        # restore original inputs/outputs
+        self._inputs.set_val(starting_inputs)
+        self._outputs.set_val(starting_outputs)
+        self._residuals.set_val(starting_resids)
+
+        self._first_call_to_linearize = save_first_call
+
+        return sparsity, sp_info
+
     def _compute_coloring(self, recurse=False, **overrides):
         """
         Compute a coloring of the partial jacobian.
@@ -1743,101 +1838,19 @@ class System(object, metaclass=SystemMetaclass):
                     approx_scheme._reset()
             return [coloring]
 
-        save_first_call = self._first_call_to_linearize
-        self._first_call_to_linearize = False
         sparsity_start_time = time.perf_counter()
-
-        # for groups, this does some setup of approximations
-        self._setup_approx_coloring()
-
-        # tell approx scheme to limit itself to only colored columns
-        if not use_jax:
-            approx_scheme._reset()
-            self._during_sparsity = True
-
-        info._update_wrt_matches(self)
-
-        save_jac = self._jacobian
-
-        # use special sparse jacobian to collect sparsity info
-        self._jacobian = _ColSparsityJac(self, info)
-
-        from openmdao.core.group import Group
-        is_total = isinstance(self, Group)
-        is_explicit = self.is_explicit()
-
-        # compute perturbations
-        starting_inputs = self._inputs.asarray(copy=True)
-        in_offsets = starting_inputs.copy()
-        in_offsets[in_offsets == 0.0] = 1.0
-        in_offsets *= info['perturb_size']
-
-        starting_outputs = self._outputs.asarray(copy=True)
-
-        if not is_explicit:
-            out_offsets = starting_outputs.copy()
-            out_offsets[out_offsets == 0.0] = 1.0
-            out_offsets *= info['perturb_size']
-
-        starting_resids = self._residuals.asarray(copy=True)
-
-        for i in range(info['num_full_jacs']):
-            # randomize inputs (and outputs if implicit)
-            if i > 0:
-                self._inputs.set_val(starting_inputs +
-                                     in_offsets * np.random.random(in_offsets.size))
-                if not is_explicit:
-                    self._outputs.set_val(starting_outputs +
-                                          out_offsets * np.random.random(out_offsets.size))
-                if is_total:
-                    with self._relevance.nonlinear_active('iter'):
-                        self._solve_nonlinear()
-                else:
-                    self._apply_nonlinear()
-
-                if not use_jax:
-                    for scheme in self._approx_schemes.values():
-                        scheme._reset()  # force a re-initialization of approx
-
-            if use_jax:
-                self._jax_linearize()
-            else:
-                self.run_linearize(sub_do_ln=False)
-
-        sparsity, sp_info = self._jacobian.get_sparsity(self)
-
-        self._jacobian = save_jac
-
-        if not use_jax:
-            self._during_sparsity = False
-
-            # revert uncolored approx back to normal
-            for scheme in self._approx_schemes.values():
-                scheme._reset()
+        sparsity, sp_info = self.compute_sparsity()
+        sparsity_time = time.perf_counter() - sparsity_start_time
 
         if use_jax:
             direction = self._mode
         else:
             direction = 'fwd'
 
-        sparsity_time = time.perf_counter() - sparsity_start_time
-
         coloring = _compute_coloring(sparsity, direction)
-
-        # restore original inputs/outputs
-        self._inputs.set_val(starting_inputs)
-        self._outputs.set_val(starting_outputs)
-        self._residuals.set_val(starting_resids)
 
         if not self._finalize_coloring(coloring, info, sp_info, sparsity_time):
             return [None]
-
-        self._first_call_to_linearize = save_first_call
-
-        if not use_jax:
-            approx = self._get_approx_scheme(coloring._meta['method'])
-            # force regen of approx groups during next compute_approximations
-            approx._reset()
 
         return [coloring]
 

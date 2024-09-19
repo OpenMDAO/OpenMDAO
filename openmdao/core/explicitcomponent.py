@@ -4,11 +4,6 @@ import inspect
 import numpy as np
 from types import MethodType
 
-try:
-    from jax import tree_util
-except ImportError:
-    tree_util = None
-
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.core.component import Component

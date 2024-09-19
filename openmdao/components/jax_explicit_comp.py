@@ -5,6 +5,7 @@ An ExplicitComponent that uses JAX for derivatives.
 import sys
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.jax_utils import jax
+from openmdao.utils.om_warnings import issue_warning
 
 
 class JaxExplicitComponent(ExplicitComponent):
@@ -23,4 +24,9 @@ class JaxExplicitComponent(ExplicitComponent):
         if sys.version_info < (3, 9):
             raise RuntimeError("JaxExplicitComponent requires Python 3.9 or newer.")
         super().__init__(**kwargs)
-        self.options['derivs_method'] = 'jax' if jax else fallback_deriv_method
+        if jax:
+            self.options['derivs_method'] = 'jax'
+        else:
+            issue_warning(f"{self.msginfo}: JAX is not available, so '{fallback_deriv_method}' will"
+                          " be used for derivatives.")
+            self.options['derivs_method'] = fallback_deriv_method

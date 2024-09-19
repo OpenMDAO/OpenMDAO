@@ -3795,7 +3795,8 @@ class Group(System):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        if self._tot_jac is not None and self._owns_approx_jac:
+        if (self._tot_jac is not None and self._owns_approx_jac and
+                not isinstance(self._jacobian, coloring_mod._ColSparsityJac)):
             self._jacobian = self._tot_jac
         elif self._jacobian is None:
             self._jacobian = DictionaryJacobian(self)
