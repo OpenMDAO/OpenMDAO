@@ -915,19 +915,36 @@ class ImplicitComponent(Component):
         return self._list_states()
 
     def _get_compute_primal_invals(self, inputs, outputs, discrete_inputs):
-        if discrete_inputs:
-            yield from discrete_inputs.values()
+        """
+        Yield inputs and outputs in the order expected by the compute_primal method.
+
+        Parameters
+        ----------
+        inputs : Vector
+            Unscaled, dimensional input variables read via inputs[key].
+        outputs : Vector
+            Unscaled, dimensional output variables read via outputs[key].
+        discrete_inputs : dict or None
+            If not None, dict containing discrete input values.
+
+        Yields
+        ------
+        any
+            Inputs and outputs in the order expected by the compute_primal method.
+        """
         yield from inputs.values()
         yield from outputs.values()
+        if discrete_inputs:
+            yield from discrete_inputs.values()
 
     def _get_compute_primal_argnames(self):
         argnames = []
-        if self._discrete_inputs:
-            argnames.extend(self._discrete_inputs)
         argnames.extend(name for name in self._var_rel_names['input']
                         if name not in self._discrete_inputs)
         argnames.extend(name for name in self._var_rel_names['output']
                         if name not in self._discrete_outputs)
+        if self._discrete_inputs:
+            argnames.extend(self._discrete_inputs)
         return argnames
 
     def _setup_jax(self, from_group=False):
@@ -960,7 +977,7 @@ class ImplicitComponent(Component):
 
         if not from_group and self.options['use_jit']:
             static_argnums = []
-            idx = len(self._var_rel_names['input']) + 1
+            idx = len(self._var_rel_names['input']) + len(self._var_rel_names['output']) + 1
             static_argnums.extend(range(idx, idx + len(self._discrete_inputs)))
             self.compute_primal = MethodType(jit(self.compute_primal.__func__,
                                                  static_argnums=static_argnums), self)

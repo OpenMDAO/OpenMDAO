@@ -606,11 +606,34 @@ class ExplicitComponent(Component):
         return True
 
     def _get_compute_primal_invals(self, inputs, discrete_inputs):
+        """
+        Yield the inputs expected by the compute_primal method.
+
+        Parameters
+        ----------
+        inputs : Vector
+            Unscaled, dimensional input variables Vector.
+        discrete_inputs : dict or None
+            If not None, dict containing discrete input values.
+
+        Yields
+        ------
+        any
+            Inputs expected by the compute_primal method.
+        """
         yield from inputs.values()
         if discrete_inputs:
             yield from discrete_inputs.values()
 
     def _get_compute_primal_argnames(self):
+        """
+        Return the expected argnames for the compute_primal method.
+
+        Returns
+        -------
+        list
+            List of argnames expected by the compute_primal method.
+        """
         argnames = []
         argnames.extend(self._var_rel_names['input'])
         if self._discrete_inputs:
@@ -618,6 +641,14 @@ class ExplicitComponent(Component):
         return argnames
 
     def _setup_jax(self, from_group=False):
+        """
+        Set up the jax interface for this component.
+
+        Parameters
+        ----------
+        from_group : bool
+            If True, this is being called from a Group setup.
+        """
         if self.matrix_free is True:
             self.compute_jacvec_product = MethodType(_jax_compute_jacvec_product, self)
         else:
@@ -657,6 +688,17 @@ class ExplicitComponent(Component):
                                                  static_argnums=static_argnums), self)
 
     def _get_jac_func(self):
+        """
+        Return the jacobian function for this component.
+
+        In forward mode, jax.jacfwd is used, and in reverse mode, jax.jacrev is used.  The direction
+        is chosen automatically based on the sizes of the inputs and outputs.
+
+        Returns
+        -------
+        function
+            The jacobian function.
+        """
         # TODO: modify this to use relevance and possibly compile multiple jac functions depending
         # on DV/response so that we don't compute any derivatives that are always zero.
         if self._jac_func_ is None:
@@ -723,7 +765,9 @@ class ExplicitComponent(Component):
         """
         Check the declared sparsity of the sub-jacobians vs. the computed sparsity.
         """
-        full_nzrows, full_nzcols = self.get_compute_sparsity()
+        sparsity, _ = self.get_sparsity()
+        full_nzrows = sparsity.row
+        full_nzcols = sparsity.col
 
         def row_size_iter():
             for of, start, end, _, _ in self._jac_of_iter():
