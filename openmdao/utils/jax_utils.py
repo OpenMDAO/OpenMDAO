@@ -903,7 +903,6 @@ def compute_jacvec_product(inst, inputs, d_inputs, d_outputs, mode, discrete_inp
                                 primals=x, tangents=dx)
         d_outputs.set_vals(deriv_vals)
     else:
-        inhash = inputs.get_hash()
         inhash = ((inputs.get_hash(),) + tuple(inst._discrete_inputs.values()) +
                   inst.get_self_statics())
         if inhash != inst._vjp_hash:
@@ -1012,32 +1011,34 @@ def apply_linear(inst, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
         Either 'fwd' or 'rev'.
     """
     if mode == 'fwd':
-        invals = tuple(inst._get_compute_primal_invals(inputs, outputs, inst._discrete_inputs))
-        _, deriv_vals = jax.jvp(inst.compute_primal,
-                                primals=invals,
-                                tangents=tuple(chain(d_inputs.values(), d_outputs.values())))
+        dx = tuple(chain(d_inputs.values(), d_outputs.values()))
+        full_invals = tuple(inst._get_compute_primal_invals(inputs, outputs, inst._discrete_inputs))
+        x = full_invals[:len(dx)]
+        other = full_invals[len(dx):]
+        _, deriv_vals = jax.jvp(lambda *args: inst.compute_primal(*args, *other),
+                                primals=x, tangents=dx)
         if isinstance(deriv_vals, tuple):
             d_residuals.set_vals(deriv_vals)
         else:
             d_residuals.asarray()[:] = deriv_vals.flatten()
     else:
-        inhash = (inputs.get_hash(), inst._outputs.get_hash()) + \
-            tuple(inst._discrete_inputs.values())
+        inhash = (inputs.get_hash(), outputs.get_hash()) + tuple(inst._discrete_inputs.values())
         if inhash != inst._vjp_hash:
             # recompute vjp function only if inputs or outputs have changed
-            invals = tuple(inst._get_compute_primal_invals(inputs, outputs, inst._discrete_inputs))
-            _, inst._vjp_fun = jax.vjp(inst.compute_primal, *invals)
+            dx = tuple(chain(d_inputs.values(), d_outputs.values()))
+            full_invals = tuple(inst._get_compute_primal_invals(inputs, outputs, inst._discrete_inputs))
+            x = full_invals[:len(dx)]
+            other = full_invals[len(dx):]
+            _, inst._vjp_fun = jax.vjp(lambda *args: inst.compute_primal(*args, *other), *x)
             inst._vjp_hash = inhash
 
-        if inst._compute_primals_out_shape is None:
-            shape = jax.eval_shape(inst.compute_primal,
-                                   *tuple(inst._get_compute_primal_invals(inputs, outputs,
-                                                                          inst._discrete_inputs)))
-            if isinstance(shape, tuple):
-                shape = (tuple(s.shape for s in shape), True, len(inst._var_rel_names['input']))
-            else:
-                shape = (shape.shape, False, len(inst._var_rel_names['input']))
-            inst._compute_primals_out_shape = shape
+            if inst._compute_primals_out_shape is None:
+                shape = jax.eval_shape(lambda *args: inst.compute_primal(*args, *other), *x)
+                if isinstance(shape, tuple):
+                    shape = (tuple(s.shape for s in shape), True, len(inst._var_rel_names['input']))
+                else:
+                    shape = (shape.shape, False, len(inst._var_rel_names['input']))
+                inst._compute_primals_out_shape = shape
 
         shape, istup, ninputs = inst._compute_primals_out_shape
 
