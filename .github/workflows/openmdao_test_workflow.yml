@@ -211,6 +211,9 @@ jobs:
 
       - name: Install OpenMDAO
         run: |
+          echo "Make sure we are not using anaconda packages"
+          conda config --remove channels defaults
+
           conda install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
 
           python -m pip install --upgrade pip
