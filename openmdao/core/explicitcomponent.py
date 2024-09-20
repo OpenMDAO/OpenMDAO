@@ -715,52 +715,6 @@ class ExplicitComponent(Component):
 
         return self._jac_func_
 
-    def get_compute_sparsity(self):
-        """
-        Return sparsity pattern of the compute function.
-
-        The compute function is executed once for each entry in the inputs array.  It's possible
-        that the returned sparsity pattern could be more conservative than the actual
-        jacobian sparsity pattern.
-
-        Returns
-        -------
-        tuple
-            Tuple of (rows, cols) where rows and cols are index arrays indicating nonzero locations
-            in the jacobian.
-        """
-        inarr = self._inputs.asarray()
-        outarr = self._outputs.asarray()
-        outsave = outarr.copy()
-
-        rows = []
-        cols = []
-
-        for i in range(len(inarr)):
-            old = inarr[i]
-            inarr[i] = np.nan
-            if self._discrete_inputs or self._discrete_outputs:
-                self.compute(self._inputs, self._outputs, self._discrete_inputs,
-                             self._discrete_outputs)
-            else:
-                self.compute(self._inputs, self._outputs)
-            irows = np.where(np.isnan(outarr))[0]
-            rows.append(irows)
-            cols.append(np.full(irows.size, i))
-            inarr[i] = old
-
-        if rows:
-            rows = np.concatenate(rows)
-            cols = np.concatenate(cols)
-        else:
-            rows = np.zeros(0, dtype=INT_DTYPE)
-            cols = np.zeros(0, dtype=INT_DTYPE)
-
-        # restore old output values
-        self._outputs.set_val(outsave)
-
-        return rows, cols
-
     def _check_subjac_sparsity(self):
         """
         Check the declared sparsity of the sub-jacobians vs. the computed sparsity.
