@@ -1026,7 +1026,8 @@ def apply_linear(inst, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
         if inhash != inst._vjp_hash:
             # recompute vjp function only if inputs or outputs have changed
             dx = tuple(chain(d_inputs.values(), d_outputs.values()))
-            full_invals = tuple(inst._get_compute_primal_invals(inputs, outputs, inst._discrete_inputs))
+            full_invals = tuple(inst._get_compute_primal_invals(inputs, outputs,
+                                                                inst._discrete_inputs))
             x = full_invals[:len(dx)]
             other = full_invals[len(dx):]
             _, inst._vjp_fun = jax.vjp(lambda *args: inst.compute_primal(*args, *other), *x)

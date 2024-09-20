@@ -353,10 +353,10 @@ class _CheckingJacobian(DictionaryJacobian):
 
                     arr = scratch[start:end]
                     arr[:] = column[start:end]
-                    arr[row_inds] = 0.
-                    nzs = np.nonzero(arr)
-                    if nzs[0].size > 0:
+                    arr[row_inds] = 0.  # zero out the rows that are covered by sparsity
+                    nzs = np.nonzero(arr)[0]
+                    if nzs.size > 0:
                         self._errors.append(f"{system.msginfo}: User specified sparsity (rows/cols)"
                                             f" for subjac '{of}' wrt '{wrt}' is incorrect. There "
                                             f"are non-covered nonzeros in column {loc_idx} at "
-                                            f"row(s) {nzs[0]}.")
+                                            f"row(s) {nzs}.")

@@ -116,7 +116,7 @@ class TestSubmatSparsityIter(unittest.TestCase):
         nzcols = np.array([0])
         shape = (1, 1)
         result = list(submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, shape))
-        expected =  [('a', 'b', None, None, (1, 1))]
+        expected =  [('a', 'b', np.array([0]), np.array([0]), (1, 1))]
         self._check_results(expected, result)
 
     def test_multiple_elements_matrix(self):

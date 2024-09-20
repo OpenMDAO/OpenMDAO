@@ -14,8 +14,6 @@ from openmdao.core.constants import INT_DTYPE, _UNDEFINED
 from openmdao.utils.jax_utils import jax, jit, ExplicitCompJaxify, \
     compute_partials as _jax_compute_partials, \
     compute_jacvec_product as _jax_compute_jacvec_product, ReturnChecker
-from openmdao.utils.array_utils import submat_sparsity_iter
-from openmdao.utils.om_warnings import issue_warning
 
 
 _tuplist = (tuple, list)
@@ -714,42 +712,3 @@ class ExplicitComponent(Component):
                                              self)
 
         return self._jac_func_
-
-    def _check_subjac_sparsity(self):
-        """
-        Check the declared sparsity of the sub-jacobians vs. the computed sparsity.
-        """
-        sparsity, _ = self.get_sparsity()
-        full_nzrows = sparsity.row
-        full_nzcols = sparsity.col
-
-        def row_size_iter():
-            for of, start, end, _, _ in self._jac_of_iter():
-                yield of, end - start
-
-        def col_size_iter():
-            for wrt, start, end, _, _, _ in self._jac_wrt_iter():
-                yield wrt, end - start
-
-        prefix_len = len(self.pathname) + 1
-        for of, wrt, sjrows, sjcols, _ in submat_sparsity_iter(row_size_iter(), col_size_iter(),
-                                                               full_nzrows, full_nzcols,
-                                                               (len(self._outputs),
-                                                                len(self._inputs))):
-            if (of, wrt) in self._subjacs_info:
-                meta = self._subjacs_info[of, wrt]
-                if meta['rows'] is None and sjrows is not None:
-                    issue_warning(f"Sparsity pattern for {of} wrt {wrt} was declared with "
-                                  "rows=None, but a sparsity pattern has been computed.\n"
-                                  f"rows = {sjrows}\ncols = {sjcols}\n")
-                elif not np.all(np.asarray(meta['rows']) == sjrows):
-                    issue_warning(f"Sparsity pattern for {of} wrt {wrt} was declared with "
-                                  f"rows={meta['rows']} and col={meta['cols']}, but a different "
-                                  "sparsity pattern has been computed:\n"
-                                  f"rows = {sjrows}\ncols = {sjcols}\n"
-                                  f"Note: The sparsity pattern is computed based on the compute "
-                                  "function, and may be more conservative than the true pattern.\n")
-            else:
-                issue_warning(f"{self.msginfo}: Partial for {of[prefix_len:]} wrt "
-                              f"{wrt[prefix_len:]} was not declared but is nonzero.\n"
-                              f"rows = {sjrows}\ncols = {sjcols}\n")

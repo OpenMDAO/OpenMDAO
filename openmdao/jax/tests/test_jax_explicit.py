@@ -614,6 +614,8 @@ class TestJaxShapesAndReturns(unittest.TestCase):
         assert_check_partials(prob.check_partials(method='cs', out_stream=None), atol=1e-5)
         assert_check_totals(prob.check_totals(of=ofs, wrt=wrts, method='cs', out_stream=None), atol=1e-5)
 
+        #prob.model.comp.check_subjac_sparsity()
+
     # TODO: test with mixed np and jnp in compute
 
 if __name__ == '__main__':

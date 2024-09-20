@@ -7,7 +7,7 @@ import hashlib
 
 import numpy as np
 
-from scipy.sparse import coo_matrix, csr_matrix, csc_matrix
+from scipy.sparse import coo_matrix, csr_matrix
 
 from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.omnumba import numba
@@ -912,8 +912,7 @@ else:
         return True
 
 
-def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, shape,
-                         dense_pct=75.):
+def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, shape):
     """
     Yield the sparsity of each submatrix, based on variable names and sizes.
 
@@ -929,9 +928,6 @@ def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, s
         Column indices of nonzero entries in the full matrix.
     shape : tuple
         Shape of the full matrix.
-    dense_pct : float
-        Percentage of nonzero entries in a submatrix that will treat it as
-        dense, yielding None for rows and cols.
 
     Yields
     ------
@@ -939,7 +935,6 @@ def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, s
         (row_varname, col_varname, nonzero rows, nonzero cols, shape)
     """
     row_start = row_end = 0
-    dense_pct /= 100.
 
     data = np.ones(nzrows.size, dtype=np.int8)
     csr = csr_matrix((data, (nzrows, nzcols)), shape=shape)
@@ -958,8 +953,4 @@ def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, s
             col_start = col_end
 
             if submat.row.size > 0:  # only yield if nonzero
-                if submat.nnz / (submat.shape[0] * submat.shape[1]) >= dense_pct:
-                    # treat submatrix as dense and return None for rows and cols
-                    yield (of, wrt, None, None, submat.shape)
-                else:
-                    yield (of, wrt, submat.row, submat.col, submat.shape)
+                yield (of, wrt, submat.row, submat.col, submat.shape)
