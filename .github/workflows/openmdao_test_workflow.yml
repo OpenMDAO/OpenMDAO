@@ -139,13 +139,13 @@ jobs:
           # test oldest supported versions
           - NAME: Ubuntu Oldest
             OS: ubuntu-latest
-            PY: '3.8'
-            NUMPY: '1.22'
-            SCIPY: '1.7'
+            PY: '3.9'
+            NUMPY: '1.23'
+            SCIPY: '1.9'
             OPENMPI: '4.0'
             MPI4PY: '3.0'
             PETSc: '3.13'
-            PYOPTSPARSE: 'v1.2'
+            PYOPTSPARSE: 'v2.9.0'
             SNOPT: '7.2'
             OPTIONAL: '[all]'
             TESTS: true

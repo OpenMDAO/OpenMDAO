@@ -47,9 +47,8 @@ jobs:
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v3
         with:
-          python-version: 3.11
-          conda-version: "*"
-          channels: conda-forge
+          python-version: 3.12
+          miniforge-version: latest
 
       - name: Install lxml
         if: matrix.OS == 'windows-latest'
