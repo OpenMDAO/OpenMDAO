@@ -165,7 +165,6 @@ class AnalysisDriver(Driver):
             rank_cycler = itertools.cycle(range(comm.size))
             for i, case in enumerate(self.cases):
                 r = next(rank_cycler)
-                print(f'distributing case {i} to rank {r}')
                 comm.send((case, self.iter_count), dest=r)
                 self.iter_count += 1
             # Cases exhausted, terminate all workers
@@ -175,20 +174,18 @@ class AnalysisDriver(Driver):
     async def _case_worker(self):
         """
         Wait for cases from the root proc and run them as they are received.
-
-
         """
         comm = self._problem_comm
         while True:
-            print('waiting for case')
-            # Worker receives jobs from rank 0
+            # Worker receives case and iter count from rank 0
+            # The iter_count is necessary to print the correct
+            # iteration coordinate in the recorder.
             case, iter_count = comm.recv(source=0)
-            print(f'got case to run on rank {comm.rank}', case)
             if case is None:
+                # if rank0 has sent us None, we are finished.
                 break
             else:
                 self._run_case(case, iter_count)
-                # print('finished running the case')
 
     def _run_case(self, case, iter_count):
         """
@@ -231,8 +228,6 @@ class AnalysisDriver(Driver):
                                  wrt=self._indep_list,
                                  return_format=self._total_jac_format,
                                  driver_scaling=False)
-        
-        print(f'on rank {self._problem_comm.rank} the result is {self._problem().get_val("f_xy")}')
 
     # def _parallel_generator(self, design_vars, model=None):
     #     """

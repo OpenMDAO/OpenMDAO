@@ -1,6 +1,7 @@
 """
 Test DOE Driver and Generators.
 """
+import glob
 import unittest
 
 import numpy as np
@@ -70,7 +71,7 @@ class ParaboloidDiscreteArray(om.ExplicitComponent):
 @use_tempdirs
 class TestAnalysisDriverParallel(unittest.TestCase):
 
-    N_PROCS = 1
+    N_PROCS = 2
 
     def setUp(self):
         self.fullfact3 = [
@@ -116,25 +117,31 @@ class TestAnalysisDriverParallel(unittest.TestCase):
         # ]
 
     def test_simple(self):
+        cases = self.fullfact3
+
         prob = om.Problem()
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = AnalysisDriver(cases=self.fullfact3)
+        prob.driver = AnalysisDriver(cases=cases)
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
-# 
+
         prob.setup()
-        res = prob.run_driver()
+        prob.run_driver()
         prob.cleanup()
 
-        print(res)
-
-        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
-
         if prob.comm.rank == 0:
-            cases = cr.list_cases('driver')#, out_stream=None)
+            num_recorded_cases = 0
+            for file in glob.glob(str(prob.get_outputs_dir() / "cases.sql_*")):
+                if file.endswith('meta'):
+                    continue
+                cr = om.CaseReader(file)
+                num_recorded_cases += len(cr.list_cases(out_stream=None))
+            self.assertEqual(num_recorded_cases, 9)
 
-            self.assertEqual(len(cases), 9)
+        # if prob.comm.rank == 0:
+        #     cases = cr.list_cases()#, out_stream=None)
+        #     self.assertEqual(len(cases), 9)
 
 #     def test_list(self):
 #         prob = om.Problem()
