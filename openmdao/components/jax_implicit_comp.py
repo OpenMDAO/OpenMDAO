@@ -19,8 +19,6 @@ class JaxImplicitComponent(ImplicitComponent):
     **kwargs : dict
         Additional arguments to be passed to the base class.
     """
-    preferred_derivs_method = 'jax'
-
     def __init__(self, fallback_derivs_method='fd', **kwargs):  # noqa
         if sys.version_info < (3, 9):
             raise RuntimeError("JaxImplicitComponent requires Python 3.9 or newer.")
