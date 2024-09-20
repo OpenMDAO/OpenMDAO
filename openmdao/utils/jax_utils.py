@@ -768,36 +768,12 @@ def jax_deriv_shape(derivs):
 
 
 if jax is None or bool(os.environ.get('JAX_DISABLE_JIT', '')):
-    def _jax_update_class_attrs(cls):
-        pass
-
     def _jax_register_pytree_class(cls):
         pass
 
 else:
 
-    def _jax_update_class_attrs(cls):
-        """
-        Add _tree_flatten and _tree_unflatten methods if they're missing.
-
-        If a class has 'self static' attributes, it must define the 'get_self_statics' method,
-        which returns a tuple of static attributes of the class.
-
-        A 'self static' attribute is one that is accessed on 'self' within the jitted method
-        but is not passed in as an argument to the method.
-
-
-        Parameters
-        ----------
-        cls : class
-            The class being updated.
-        """
-        if not hasattr(cls, '_tree_flatten'):
-            cls._tree_flatten = lambda self: ((), {'_self_': self,
-                                                   '_statics_': self.get_self_statics()})
-        if not hasattr(cls, '_tree_unflatten'):
-            cls._tree_unflatten = \
-                staticmethod(lambda aux_data, children: aux_data['_self_'])
+    _registered_classes = set()
 
     def _jax_register_pytree_class(cls):
         """
@@ -814,10 +790,11 @@ else:
         attrs : dict
             The attributes of the class.
         """
-        # make sure we have _tree_flatten and _tree_unflatten methods
-        _jax_update_class_attrs(cls)
-        # register with jax so we can flatten/unflatten self
-        tree_util.register_pytree_node(cls, cls._tree_flatten, cls._tree_unflatten)
+        global _registered_classes
+        if cls not in _registered_classes:
+            # register with jax so we can flatten/unflatten self
+            tree_util.register_pytree_node(cls, cls._tree_flatten, cls._tree_unflatten)
+            _registered_classes.add(cls)
 
 
 # we define compute_partials here instead of making this the base class version as we

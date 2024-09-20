@@ -13,7 +13,7 @@ from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE, _UNDEFINED
 from openmdao.utils.jax_utils import jax, jit, ExplicitCompJaxify, \
     compute_partials as _jax_compute_partials, \
-    compute_jacvec_product as _jax_compute_jacvec_product, ReturnChecker
+    compute_jacvec_product as _jax_compute_jacvec_product, ReturnChecker, _jax_register_pytree_class
 
 
 _tuplist = (tuple, list)
@@ -684,6 +684,8 @@ class ExplicitComponent(Component):
             static_argnums.extend(range(idx, idx + len(self._discrete_inputs)))
             self.compute_primal = MethodType(jit(self.compute_primal.__func__,
                                                  static_argnums=static_argnums), self)
+
+        _jax_register_pytree_class(self.__class__)
 
     def _get_jac_func(self):
         """

@@ -16,7 +16,7 @@ from openmdao.utils.units import simplify_unit
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.jax_utils import jax, jit, ImplicitCompJaxify, \
-    linearize as _jax_linearize, apply_linear as _jax_apply_linear
+    linearize as _jax_linearize, apply_linear as _jax_apply_linear, _jax_register_pytree_class
 
 
 _tuplist = (tuple, list)
@@ -981,6 +981,8 @@ class ImplicitComponent(Component):
             static_argnums.extend(range(idx, idx + len(self._discrete_inputs)))
             self.compute_primal = MethodType(jit(self.compute_primal.__func__,
                                                  static_argnums=static_argnums), self)
+
+        _jax_register_pytree_class(self.__class__)
 
     def _get_jac_func(self):
         # TODO: modify this to use relevance and possibly compile multiple jac functions depending

@@ -26,7 +26,6 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
     DerivativesWarning, warn_deprecation
 from openmdao.utils.code_utils import is_lambda, LambdaPickleWrapper
-from openmdao.utils.jax_utils import _jax_register_pytree_class
 
 
 _forbidden_chars = {'.', '*', '?', '!', '[', ']'}
@@ -114,12 +113,26 @@ class Component(System):
         self._has_distrib_outputs = False
         self._compute_primals_out_shape = None
 
-    def __init_subclass__(cls, **kwargs):
+    def _tree_flatten(self):
         """
-        Register any class inheriting from this one as a jax pytree class.
+        Return a flattened pytree representation of this component.
+
+        We treat this component, when passed as 'self' into a function that is used by jax, as a
+        pytree with no continuous data.
+
+        Returns
+        -------
+        Tuple
+            A tuple containing continuous and static data.
         """
-        super().__init_subclass__(**kwargs)
-        _jax_register_pytree_class(cls)
+        return ((), {'_self_': self, '_statics_': self.get_self_statics()})
+
+    @staticmethod
+    def _tree_unflatten(aux_data, children):
+        """
+        Return the same instance of this component that was returned by the _tree_flatten method.
+        """
+        return aux_data['_self_']
 
     def _declare_options(self):
         """
