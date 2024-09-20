@@ -24,6 +24,10 @@ class JaxExplicitComponent(ExplicitComponent):
         if sys.version_info < (3, 9):
             raise RuntimeError("JaxExplicitComponent requires Python 3.9 or newer.")
         super().__init__(**kwargs)
+        # if derivs_method is explicitly passed in, just use it
+        if 'derivs_method' in kwargs:
+            return
+
         if jax:
             self.options['derivs_method'] = 'jax'
         else:

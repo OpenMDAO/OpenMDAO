@@ -41,19 +41,23 @@ class DotProdMult(om.ExplicitComponent):
         outputs['zz'] = inputs['y'] * 2.5
 
 
-class DotProdMultPrimal(om.JaxExplicitComponent):
+class DotProdMultPrimalNoDeclPartials(om.JaxExplicitComponent):
     def setup(self):
         self.add_input('x', shape_by_conn=True)
         self.add_input('y', shape_by_conn=True)
         self.add_output('z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
         self.add_output('zz', copy_shape='y')
 
-        self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
-
     def compute_primal(self, x, y):
         z = jnp.dot(x, y)
         zz = y * 2.5
         return z, zz
+
+
+class DotProdMultPrimal(DotProdMultPrimalNoDeclPartials):
+    def setup(self):
+        super().setup()
+        self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
 
 
 class DotProdMultPrimalOption(om.JaxExplicitComponent):
@@ -243,8 +247,9 @@ def compute_primal(self, in_scalar, in_array, in_array2, disc_in):
 @unittest.skipIf(jax is None or sys.version_info < (3, 9), 'jax is not available or python < 3.9.')
 class TestJaxComp(unittest.TestCase):
 
-    @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]), name_func=parameterized_name)
-    def test_jax_explicit_comp(self, mode, matrix_free):
+    @parameterized.expand(itertools.product(['fwd', 'rev'], [(True, 'jax'), (False, 'jax'), (False, 'fd')]), name_func=parameterized_name)
+    def test_jax_explicit_comp(self, mode, tup):
+        matrix_free, derivs_method = tup
         xshape = x_shape
         yshape = y_shape
         p = om.Problem()
@@ -252,7 +257,7 @@ class TestJaxComp(unittest.TestCase):
         # itself.
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(xshape)))
         ivc.add_output('y', val=np.ones(yshape))
-        comp = p.model.add_subsystem('comp', DotProd(derivs_method='jax'))
+        comp = p.model.add_subsystem('comp', DotProd(derivs_method=derivs_method))
         comp.matrix_free = matrix_free
         p.model.connect('ivc.x', 'comp.x')
         p.model.connect('ivc.y', 'comp.y')
@@ -268,7 +273,7 @@ class TestJaxComp(unittest.TestCase):
 
         assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
         p.check_totals(of=['comp.z'], wrt=['comp.x', 'comp.y'], method='cs', show_only_incorrect=True)
-        assert_check_partials(p.check_partials(show_only_incorrect=True))
+        assert_check_partials(p.check_partials(method='cs', show_only_incorrect=True))
 
     @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]), name_func=parameterized_name)
     def test_jax_explicit_comp2(self, mode, matrix_free):
@@ -321,6 +326,36 @@ class TestJaxComp(unittest.TestCase):
         assert_check_totals(p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'],
                                            method='fd', show_only_incorrect=True))
         assert_check_partials(p.check_partials(show_only_incorrect=True))
+
+    @parameterized.expand(itertools.product(['fwd', 'rev'], ['fd', 'cs']), name_func=parameterized_name)
+    def test_jax_explicit_comp2primal_nodecl(self, mode, derivs_method):
+        # this component defines its own compute_primal method
+        p = om.Problem()
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
+        ivc.add_output('y', val=np.ones(y_shape))
+        p.model.add_subsystem('comp', DotProdMultPrimalNoDeclPartials(derivs_method=derivs_method))
+        p.model.connect('ivc.x', 'comp.x')
+        p.model.connect('ivc.y', 'comp.y')
+
+        p.setup(mode=mode, force_alloc_complex=True)
+
+        x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
+        y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
+        p.set_val('ivc.x', x)
+        p.set_val('ivc.y', y)
+        p.final_setup()
+        p.run_model()
+
+        if derivs_method == 'fd':
+            method = 'cs'
+        else:
+            method = 'fd'
+
+        assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
+        assert_near_equal(p.get_val('comp.zz'), y * 2.5)
+        assert_check_totals(p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'],
+                                           method=method, show_only_incorrect=True))
+        assert_check_partials(p.check_partials(method=method, show_only_incorrect=True))
 
     @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]), name_func=parameterized_name)
     def test_jax_explicit_comp2primal_w_option(self, mode, matrix_free):
@@ -613,8 +648,6 @@ class TestJaxShapesAndReturns(unittest.TestCase):
 
         assert_check_partials(prob.check_partials(method='cs', out_stream=None), atol=1e-5)
         assert_check_totals(prob.check_totals(of=ofs, wrt=wrts, method='cs', out_stream=None), atol=1e-5)
-
-        #prob.model.comp.check_subjac_sparsity()
 
     # TODO: test with mixed np and jnp in compute
 

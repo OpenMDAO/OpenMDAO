@@ -19,14 +19,20 @@ class JaxImplicitComponent(ImplicitComponent):
     **kwargs : dict
         Additional arguments to be passed to the base class.
     """
+    preferred_derivs_method = 'jax'
 
-    def __init__(self, fallback_deriv_method='fd', **kwargs):  # noqa
+    def __init__(self, fallback_derivs_method='fd', **kwargs):  # noqa
         if sys.version_info < (3, 9):
             raise RuntimeError("JaxImplicitComponent requires Python 3.9 or newer.")
         super().__init__(**kwargs)
+        # if derivs_method is explicitly passed in, just use it
+        if 'derivs_method' in kwargs:
+            return
+
         if jax:
             self.options['derivs_method'] = 'jax'
         else:
-            issue_warning(f"{self.msginfo}: JAX is not available, so '{fallback_deriv_method}' will"
-                          " be used for derivatives.")
-            self.options['derivs_method'] = fallback_deriv_method
+            issue_warning(f"{self.msginfo}: JAX is not available, so "
+                          f"'{fallback_derivs_method}' will be used for derivatives.")
+            self.options['derivs_method'] = fallback_derivs_method
+

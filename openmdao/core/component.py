@@ -25,7 +25,7 @@ from openmdao.utils.indexer import Indexer, indexer
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
     DerivativesWarning, warn_deprecation
-from openmdao.utils.code_utils import is_lambda, LambdaPickleWrapper
+from openmdao.utils.code_utils import is_lambda, LambdaPickleWrapper, get_partials_deps
 
 
 _forbidden_chars = {'.', '*', '?', '!', '[', ']'}
@@ -384,6 +384,26 @@ class Component(System):
             self._jacobian = DictionaryJacobian(system=self)
 
         self.setup_partials()  # hook for component writers to specify sparsity patterns
+
+        if self.options['derivs_method'] in ('cs', 'fd'):
+            if self.matrix_free:
+                raise RuntimeError(f"{self.msginfo}: derivs_method of 'cs' or 'fd' is not "
+                                   "allowed for a matrix free component.")
+            self._has_approx = True
+            method = self.options['derivs_method']
+            self._get_approx_scheme(method)
+            if not self._declared_partials_patterns:
+                if self.compute_primal is None:
+                    raise RuntimeError(f"{self.msginfo}: compute_primal must be defined if using "
+                                       "a derivs_method option of 'cs' or 'fd'")
+                # declare all partials as 'cs' or 'fd'
+                for of, wrt in get_partials_deps(self.compute_primal,
+                                                 self._var_rel_names['output']):
+                    self.declare_partials(of, wrt, method=method)
+            else:
+                # declare only those partials that have been declared
+                for meta in self._declared_partials_patterns.values():
+                    meta['method'] = method
 
         # check to make sure that if num_par_fd > 1 that this system is actually doing FD.
         # Unfortunately we have to do this check after system setup has been called because that's
