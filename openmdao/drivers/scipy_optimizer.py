@@ -461,7 +461,11 @@ class ScipyOptimizeDriver(Driver):
 
         # Hessian calculation method for optimizers, which require it
         if opt in _hessian_optimizers:
-            if 'hess' in self.opt_settings:
+            if self.options['minimize_constraint_violation']:
+                # USe BFGS for constraint violation minimization
+                from scipy.optimize import BFGS
+                hess = BFGS()
+            elif 'hess' in self.opt_settings:
                 hess = self.opt_settings.pop('hess')
             else:
                 # Defaults to BFGS, if not in opt_settings
