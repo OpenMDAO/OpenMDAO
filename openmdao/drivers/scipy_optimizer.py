@@ -14,6 +14,7 @@ from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.core.group import Group
 from openmdao.utils.class_util import WeakMethodWrapper
 from openmdao.utils.mpi import MPI
+from openmdao.utils.om_warnings import issue_warning, DriverWarning
 
 
 # Optimizers in scipy.minimize
@@ -189,6 +190,9 @@ class ScipyOptimizeDriver(Driver):
                              "ignore - don't perform check.")
         self.options.declare('singular_jac_tol', default=1e-16,
                              desc='Tolerance for zero row/column check.')
+        self.options.declare('minimize_constraint_violation', default=False, types=bool,
+                            desc='Set to True to minimize the sum of constraint violations '
+                            'instead of the objective function.')
 
     def _get_name(self):
         """
@@ -261,6 +265,12 @@ class ScipyOptimizeDriver(Driver):
 
         self._check_for_missing_objective()
         self._check_for_invalid_desvar_values()
+
+        if self.options['minimize_constraint_violation']:
+            issue_warning('As `minimize_constraint_violation` is set to `True`, the '
+                          + 'objective function will be ignored and the sum of '
+                          + 'the constraint violation will instad be minimized.',
+                          category=DriverWarning)
 
         # Initial Run
         with RecordingDebugging(self._get_name(), self.iter_count, self):
@@ -463,6 +473,11 @@ class ScipyOptimizeDriver(Driver):
         # compute dynamic simul deriv coloring if option is set
         prob.get_total_coloring(self._coloring_info, run_model=False)
 
+        if self.options['minimize_constraint_violation']:
+            constraints_to_pass = []
+        else:
+            constraints_to_pass = constraints
+
         # optimize
         try:
             if opt in _optimizers:
@@ -476,7 +491,7 @@ class ScipyOptimizeDriver(Driver):
                                   hess=hess,
                                   # hessp=None,
                                   bounds=bounds,
-                                  constraints=constraints,
+                                  constraints=constraints_to_pass,
                                   tol=self.options['tol'],
                                   # callback=None,
                                   options=self.opt_settings)
@@ -631,12 +646,35 @@ class ScipyOptimizeDriver(Driver):
                 with model._relevance.nonlinear_active('iter'):
                     self._run_solve_nonlinear()
 
-            # Get the objective function evaluations
-            for obj in self.get_objective_values().values():
-                f_new = obj
-                break
-
             self._con_cache = self.get_constraint_values()
+
+            # Get the objective function evaluations
+            if self.options['minimize_constraint_violation']:
+                # Compute sum of constraint violations
+                f_new = 0.0
+                for name, meta in self._cons.items():
+                    con_val = self._con_cache[name]
+                    size = con_val.size
+
+                    equals = meta['equals']
+                    lower = meta['lower']
+                    upper = meta['upper']
+
+                    violation = np.zeros(size)
+                    if equals is not None:
+                        violation += np.abs(con_val - equals)
+                    else:
+                        if lower != -1e30:
+                            violation += np.maximum(0.0, lower - con_val)
+                        if upper != 1e30:
+                            violation += np.maximum(0.0, con_val - upper)
+
+                    f_new += np.sum(violation)
+            else:
+                # Gets the true objective function
+                for obj in self.get_objective_values().values():
+                    f_new = obj
+                    break
 
         except Exception:
             if self._exc_info is None:  # only record the first one
@@ -774,7 +812,42 @@ class ScipyOptimizeDriver(Driver):
         # print('   xnew', x_new)
         # print('   grad', grad[0, :])
 
-        return grad[0, :]
+        if self.options['minimize_constraint_violation']:
+            # Compute gradient of sum of constraint violations
+            violation_grad = np.zeros_like(grad[0, :])
+            row = 1  # start from the first constraint
+            for name, meta in self._cons.items():
+                con_val = self._con_cache[name]
+                size = con_val.size
+                con_grad = grad[row:row + size, :]
+                equals = meta['equals']
+                lower = meta['lower']
+                upper = meta['upper']
+
+                if equals is not None:
+                    violation = np.abs(con_val - equals)
+                    sign = np.sign(con_val - equals)
+                    for i in range(size):
+                        if violation[i] > 0:
+                            violation_grad += sign[i] * con_grad[i, :]
+                else:
+                    if lower is not None:
+                        lower_violation = lower - con_val
+                        for i in range(size):
+                            if lower_violation[i] > 0:
+                                violation_grad += -con_grad[i, :]
+                    if upper is not None:
+                        upper_violation = con_val - upper
+                        for i in range(size):
+                            if upper_violation[i] > 0:
+                                violation_grad += con_grad[i, :]
+                row += size
+
+            grad[0, :] = violation_grad
+            return grad[0, :]
+        else:
+            # Returns the gradient of the constraints
+            return grad[0, :]
 
     def _congradfunc(self, x_new, name, dbl, idx):
         """
