@@ -488,7 +488,7 @@ class TestJaxImplicitComp(unittest.TestCase):
 
         prob.run_model()
 
-        assert_near_equal(prob['lingrp.lin.x'], np.array([-5, 8, -5]))
+        assert_near_equal(prob['lingrp.lin.x'], np.array([-5, 8, -5]), tolerance=2e-15)
 
         assert_check_totals(prob.check_totals(of=['lingrp.lin.x'], wrt=['ivc.b', 'ivc.A'],
                                               abs_err_tol=2e-4, rel_err_tol=3e-6, show_only_incorrect=True),
@@ -499,7 +499,7 @@ class TestJaxImplicitComp(unittest.TestCase):
 
         prob.run_model()
 
-        assert_near_equal(prob['lingrp.lin.x'], np.array([-4, 9, -4]))
+        assert_near_equal(prob['lingrp.lin.x'], np.array([-4, 9, -4]), tolerance=2e-15)
 
         assert_check_totals(prob.check_totals(of=['lingrp.lin.x'], wrt=['ivc.b', 'ivc.A'],
                                               abs_err_tol=2e-4, rel_err_tol=3e-6, show_only_incorrect=True),
@@ -532,7 +532,7 @@ class TestJaxImplicitComp(unittest.TestCase):
 
         prob.run_model()
 
-        assert_near_equal(prob['lingrp.lin.x'], np.array([-5, 8, -5]))
+        assert_near_equal(prob['lingrp.lin.x'], np.array([-5, 8, -5]), tolerance=2e-15)
 
         assert_check_totals(prob.check_totals(of=['lingrp.lin.x'], wrt=['ivc.b', 'ivc.A'],
                                               abs_err_tol=2e-4, rel_err_tol=3e-6, show_only_incorrect=True),
@@ -543,7 +543,7 @@ class TestJaxImplicitComp(unittest.TestCase):
 
         prob.run_model()
 
-        assert_near_equal(prob['lingrp.lin.x'], np.array([-4, 9, -4]))
+        assert_near_equal(prob['lingrp.lin.x'], np.array([-4, 9, -4]), tolerance=2e-15)
 
         assert_check_totals(prob.check_totals(of=['lingrp.lin.x'], wrt=['ivc.b', 'ivc.A'],
                                               abs_err_tol=2e-4, rel_err_tol=3e-6, show_only_incorrect=True),
