@@ -342,7 +342,13 @@ def compute_primal(self, in_scalar, in_array, in_array2, out_scalar, out_array, 
     return (out_scalar, out_array, out_array2, disc_out)
 """.strip()
 
-        self.assertEqual(converter.get_compute_primal_src().strip(), expected)
+        # in certain python versions, it represents 'disc_out,' as '(disc_out,)', so we need to
+        # account for that here
+        src = converter.get_compute_primal_src()
+        if '(disc_out,)' in src:
+            src = src.replace('(disc_out,)', 'disc_out,')
+
+        self.assertEqual(src.strip(), expected)
 
 
 @unittest.skipIf(jax is None or sys.version_info < (3, 9), 'jax is not available or python < 3.9.')
