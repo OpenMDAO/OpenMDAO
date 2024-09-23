@@ -783,6 +783,27 @@ class Group(System):
         # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
 
+    def _check_required_connections(self):
+        conns = self._conn_global_abs_in2out
+        abs2prom = self._var_allprocs_abs2prom['input']
+        abs2meta_in = self._var_allprocs_abs2meta['input']
+        discrete_in = self._var_allprocs_discrete['input']
+        desvar = self.get_design_vars()
+
+        for abs_tgt, src in conns.items():
+            if src.startswith('_auto_ivc.'):
+                prom_tgt = abs2prom[abs_tgt]
+
+                # Ignore inputs that are declared as design vars.
+                if abs_tgt in discrete_in or (desvar and prom_tgt in desvar):
+                    continue
+
+                if abs2meta_in[abs_tgt]['require_connection']:
+                    promoted_as = f', promoted as "{prom_tgt}",' if prom_tgt != abs_tgt else ''
+                    self._collect_error(f'{self.msginfo}: Input "{abs_tgt}"{promoted_as} '
+                                        'requires a connection but is not connected.',
+                                        ident=(prom_tgt, abs_tgt))
+
     def _get_dataflow_graph(self):
         """
         Return a graph of all variables and components in the model.
@@ -4248,7 +4269,7 @@ class Group(System):
         graph = nx.DiGraph()
 
         if comps_only:
-            # add all compoenents as nodes in the graph so they'll be there even if unconnected.
+            # add all components as nodes in the graph so they'll be there even if unconnected.
             comps = set(v.rpartition('.')[0] for v in chain(self._var_allprocs_abs2prom['output'],
                                                             self._var_allprocs_abs2prom['input']))
             graph.add_nodes_from(comps)
