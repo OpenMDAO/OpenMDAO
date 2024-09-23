@@ -752,6 +752,7 @@ jobs:
     name: Finish coverage
     needs: [tests, windows_tests]
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
     - uses: coverallsapp/github-action@master
       with:
