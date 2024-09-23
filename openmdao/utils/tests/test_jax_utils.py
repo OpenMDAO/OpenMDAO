@@ -44,10 +44,6 @@ class TestJaxUtils(unittest.TestCase):
 
     def test_jax_component_option(self):
         """Test that the registration of jax-compatible components works."""
-        try:
-            import jax
-        except ImportError:
-            self.skipTest('jax is not available but required for this test.')
         import numpy as np
 
         if sys.version_info < (3, 9):

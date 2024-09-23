@@ -1,18 +1,9 @@
 import unittest
-import sys
-import itertools
-from collections.abc import Iterable
 
 import numpy as np
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
-import openmdao.api as om
+from openmdao.utils.assert_utils import assert_near_equal
 
-from openmdao.utils.jax_utils import jax, jnp, ExplicitCompJaxify
-
-try:
-    from parameterized import parameterized
-except ImportError:
-    from openmdao.utils.assert_utils import SkipParameterized as parameterized
+from openmdao.utils.jax_utils import jax
 
 if jax is not None:
     from openmdao.jax import act_tanh, smooth_abs, smooth_max, smooth_min, ks_max, ks_min
