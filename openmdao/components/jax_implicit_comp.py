@@ -14,11 +14,12 @@ class JaxImplicitComponent(ImplicitComponent):
 
     Parameters
     ----------
-    fallback_deriv_method : str
+    fallback_derivs_method : str
         The method to use if JAX is not available. Default is 'fd'.
     **kwargs : dict
         Additional arguments to be passed to the base class.
     """
+
     def __init__(self, fallback_derivs_method='fd', **kwargs):  # noqa
         if sys.version_info < (3, 9):
             raise RuntimeError("JaxImplicitComponent requires Python 3.9 or newer.")
@@ -33,4 +34,3 @@ class JaxImplicitComponent(ImplicitComponent):
             issue_warning(f"{self.msginfo}: JAX is not available, so "
                           f"'{fallback_derivs_method}' will be used for derivatives.")
             self.options['derivs_method'] = fallback_derivs_method
-
