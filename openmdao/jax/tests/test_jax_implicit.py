@@ -5,7 +5,7 @@ import itertools
 import numpy as np
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
-from openmdao.utils.jax_utils import jax, ImplicitCompJaxify
+from openmdao.utils.jax_utils import jax
 from openmdao.utils.testing_utils import parameterized_name
 
 
@@ -249,106 +249,6 @@ class JaxLinearSystemCompPrimalwDiscrete(om.JaxImplicitComponent):
 
     def compute_primal(self, A, b, x, c_discrete):
         return A.dot(x + int(c_discrete)) - b
-
-
-@unittest.skipIf(jax is None or sys.version_info < (3, 9), 'jax is not available or python < 3.9.')
-class TestJaxAST(unittest.TestCase):
-    def test_ast_continuous(self):
-        class ASTContinuousCompTester(om.ImplicitComponent):
-            def setup(self):
-                self.add_input('in_scalar', val=7.0)
-                self.add_input('in_array', val=np.ones((2, 3)))
-                self.add_input('in_array2', val=np.ones((3,4)))
-                self.add_output('out_scalar', val=5.0)
-                self.add_output('out_array', val=np.ones((2, 3)))
-                self.add_output('out_array2', val=np.ones((3, 4)))
-
-            def apply_nonlinear(self, inputs, outputs, residuals):
-                residuals['out_scalar'] = inputs['in_scalar'] * 2.0
-                residuals['out_array'] = inputs['in_array'] * 2.0
-                residuals['out_array2'] = np.dot(inputs['in_array'], inputs['in_array2'])
-
-        def check_prob(multi_setup=False):
-            p = om.Problem()
-            comp = p.model.add_subsystem('comp', ASTContinuousCompTester())
-            p.setup()
-            p.final_setup()
-
-            if multi_setup:
-                p.setup()  # make sure a second setup call doesn't break the conversion
-
-            converter = ImplicitCompJaxify(comp, verbose=True)
-
-            expected = """
-def compute_primal(self, in_scalar, in_array, in_array2, out_scalar, out_array, out_array2):
-    out_scalar = in_scalar * 2.0
-    out_array = in_array * 2.0
-    out_array2 = jnp.dot(in_array, in_array2)
-    return (out_scalar, out_array, out_array2)
-""".strip()
-
-            self.assertEqual(converter.get_compute_primal_src().strip(), expected)
-
-        check_prob(multi_setup=False)
-        check_prob(multi_setup=True)
-
-    def test_ast_discrete(self):
-        class ASTDiscreteCompTester(om.ImplicitComponent):
-            def setup(self):
-                self.add_input('in_scalar', val=7.0)
-                self.add_input('in_array', val=np.ones((2, 3)))
-                self.add_input('in_array2', val=np.ones((3,4)))
-                self.add_output('out_scalar', val=5.0)
-                self.add_output('out_array', val=np.ones((2, 3)))
-                self.add_output('out_array2', val=np.ones((3, 4)))
-                self.add_discrete_input('disc_in', val=2)
-                self.add_discrete_output('disc_out', val=3)
-
-            def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs, discrete_outputs):
-                outputs['out_scalar'] = inputs['in_scalar'] * 2.0
-                outputs['out_array'] = inputs['in_array'] * 2.0
-                outputs['out_array2'] = np.dot(inputs['in_array'], inputs['in_array2'])
-                if discrete_inputs['disc_in'] > 0:
-                    outputs['out_scalar'] *= 2.0
-                    outputs['out_array'] *= 2.0
-                    outputs['out_array2'] *= 2.0
-                else:
-                    outputs['out_scalar'] *= 3.0
-                    outputs['out_array'] *= 3.0
-                    outputs['out_array2'] *= 3.0
-
-        p = om.Problem()
-        comp = p.model.add_subsystem('comp', ASTDiscreteCompTester())
-        p.setup()
-        p.final_setup()
-
-        converter = ImplicitCompJaxify(comp)
-
-        expected = """
-def compute_primal(self, in_scalar, in_array, in_array2, out_scalar, out_array, out_array2, disc_in):
-    disc_out, = self._discrete_outputs.values()
-    out_scalar = in_scalar * 2.0
-    out_array = in_array * 2.0
-    out_array2 = jnp.dot(in_array, in_array2)
-    if disc_in > 0:
-        out_scalar *= 2.0
-        out_array *= 2.0
-        out_array2 *= 2.0
-    else:
-        out_scalar *= 3.0
-        out_array *= 3.0
-        out_array2 *= 3.0
-    self._discrete_outputs.set_vals((disc_out,))
-    return (out_scalar, out_array, out_array2, disc_out)
-""".strip()
-
-        # in certain python versions, it represents 'disc_out,' as '(disc_out,)', so we need to
-        # account for that here
-        src = converter.get_compute_primal_src()
-        if '(disc_out,)' in src:
-            src = src.replace('(disc_out,)', 'disc_out,')
-
-        self.assertEqual(src.strip(), expected)
 
 
 @unittest.skipIf(jax is None or sys.version_info < (3, 9), 'jax is not available or python < 3.9.')
