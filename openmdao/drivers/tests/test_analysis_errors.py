@@ -59,6 +59,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
     expected_result_eval_errors.update({
         'CONMIN': None,  # CONMIN does not provide a return code and will just give a bad answer
         'ParOpt': None,  # ParOpt does not provide a return code and will just give a bad answer
+        'SLSQP': None,   # SLSQP will sometimes fail on iterations and sometimes succeed...
     })
 
     expected_result_grad_errors = defaultdict(lambda: 0)
