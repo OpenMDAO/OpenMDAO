@@ -49,6 +49,10 @@ class TestJaxUtils(unittest.TestCase):
         if sys.version_info < (3, 9):
             self.skipTest('JaxExplicitComponent requires Python 3.9+')
 
+        from openmdao.utils.jax_utils import jax
+        if jax is None:
+            self.skipTest('jax is not available.')
+
         class PowComp(om.JaxExplicitComponent):
 
             def initialize(self):
