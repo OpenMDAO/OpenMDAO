@@ -769,6 +769,16 @@ jobs:
       with:
         workflow: Dymos Tests
         repo: ${{ github.repository_owner }}/dymos
+        inputs: >
+          {
+            "run_name": "Test Latest OpenMDAO Development Version",
+            "baseline": false,
+            "no_pyoptsparse": false,
+            "no_snopt": false,
+            "no_mpi": false,
+            "latest": true,
+            "oldest": false
+           }
         token: ${{ secrets.ACCESS_TOKEN }}
       if: github.event_name == 'push'
 
