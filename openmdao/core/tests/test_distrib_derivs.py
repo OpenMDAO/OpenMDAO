@@ -10,11 +10,10 @@ from openmdao.test_suite.components.distributed_components import DistribCompDer
 from openmdao.test_suite.components.paraboloid_distributed import DistParab, DistParabFeature, \
     DistParabDeprecated
 from openmdao.utils.mpi import MPI
-from openmdao.utils.om_warnings import OMDeprecationWarning
 from openmdao.utils.name_maps import rel_name2abs_name
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, \
-    assert_check_totals, assert_warning
+    assert_check_totals
 from openmdao.utils.testing_utils import use_tempdirs
 
 try:
@@ -1353,14 +1352,7 @@ class MPITests2(unittest.TestCase):
         model.add_constraint('D4.out_dist', lower=0.0)
         model.add_constraint('D4.out_nd', lower=0.0)
 
-        msg = "'D4' <class MixedDistrib2>: It appears this component mixes " \
-              "distributed/non-distributed inputs and outputs, so it may break starting with " \
-              "OpenMDAO 3.25, where the convention used when passing data between " \
-              "distributed and non-distributed inputs and outputs within a matrix free component " \
-              "will change. See https://github.com/OpenMDAO/POEMs/blob/master/POEM_075.md for " \
-              "details."
-        with assert_warning(OMDeprecationWarning, msg):
-            prob.setup(force_alloc_complex=True, mode='rev')
+        prob.setup(force_alloc_complex=True, mode='rev')
 
         # Set initial values of distributed variable.
         x_dist_init = 3.0 + np.arange(size)[offsets[rank]:offsets[rank] + sizes[rank]]

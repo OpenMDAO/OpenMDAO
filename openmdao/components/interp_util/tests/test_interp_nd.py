@@ -80,7 +80,7 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
         n = 50
         x = np.linspace(1.0, 12.0, n)
 
-        interp = InterpND(method='bsplines', num_cp=6, x_interp=x)
+        interp = InterpND(method='bsplines', num_cp=6, x_interp=x, x_cp_start=0.0)
 
         y = interp.evaluate_spline(ycp)
 
@@ -95,6 +95,31 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
                                      18.10589772, 18.49281052, 18.92046894, 19.39373414, 19.91746734,
                                      20.4965297 , 21.13578243, 21.8400867 , 22.61430372, 23.46329467,
                                      24.39192074, 25.40504312, 26.507523  , 27.70422156, 29.        ]),
+                          tolerance=1e-6)
+
+    def test_interp_spline_bsplines_cp_specify_ends(self):
+
+        # xcp runs from ==20 to 20.
+        ycp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
+        n = 50
+        x = np.linspace(-5.0, 5.0, n)
+
+        # This will put all the interp points betwen the 3rd and 4th cps.
+        interp = InterpND(method='bsplines', num_cp=6, x_interp=x, x_cp_start=-30.0, x_cp_end=30.0)
+
+        y = interp.evaluate_spline(ycp)
+
+        assert_near_equal(y,
+                          np.array([14.44401042, 14.46907599, 14.49421355, 14.51943   , 14.54473225,
+                                    14.5701272 , 14.59562175, 14.62122282, 14.64693731, 14.67277212,
+                                    14.69873417, 14.72483035, 14.75106758, 14.77745277, 14.8039928 ,
+                                    14.8306946 , 14.85756507, 14.88461112, 14.91183964, 14.93925756,
+                                    14.96687176, 14.99468917, 15.02271668, 15.05096121, 15.07942965,
+                                    15.10812892, 15.13706592, 15.16624755, 15.19568073, 15.22537235,
+                                    15.25532933, 15.28555858, 15.31606699, 15.34686147, 15.37794893,
+                                    15.40933628, 15.44103042, 15.47303826, 15.5053667 , 15.53802265,
+                                    15.57101302, 15.60434471, 15.63802463, 15.67205968, 15.70645678,
+                                    15.74122282, 15.77636472, 15.81188937, 15.84780369, 15.88411458]),
                           tolerance=1e-6)
 
     def test_table_interp(self):

@@ -69,9 +69,6 @@ class ExplicitComponent(Component):
         if self.matrix_free == _UNDEFINED:
             self.matrix_free = overrides_method('compute_jacvec_product', self, ExplicitComponent)
 
-        if self.matrix_free:
-            self._check_matfree_deprecation()
-
     def _jac_wrt_iter(self, wrt_matches=None):
         """
         Iterate over (name, start, end, vec, slice, dist_sizes) for each column var in the jacobian.

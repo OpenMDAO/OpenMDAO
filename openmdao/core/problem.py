@@ -10,6 +10,7 @@ import weakref
 import pathlib
 import textwrap
 import traceback
+import atexit
 
 from collections import defaultdict, namedtuple
 from itertools import product
@@ -339,6 +340,10 @@ class Problem(object, metaclass=ProblemMeta):
 
         # So Problem and driver can have hooks attached to their methods
         _setup_hooks(self)
+
+        # call cleanup at system exit, if requested
+        if 'cleanup' in os.environ.get('OPENMDAO_ATEXIT', '').split(','):
+            atexit.register(self.cleanup)
 
     def _set_name(self, name):
         if not MPI or self.comm.rank == 0:
@@ -1074,14 +1079,17 @@ class Problem(object, metaclass=ProblemMeta):
         started, and the rest of the framework is prepared for execution.
         """
         driver = self.driver
+        model = self.model
 
-        responses = self.model.get_responses(recurse=True, use_prom_ivc=True)
-        designvars = self.model.get_design_vars(recurse=True, use_prom_ivc=True)
+        responses = model.get_responses(recurse=True, use_prom_ivc=True)
+        designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
 
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-            self.model._final_setup()
+            model._final_setup()
 
-        response_size, desvar_size = driver._update_voi_meta(self.model, responses, designvars)
+        model._check_required_connections()
+
+        response_size, desvar_size = driver._update_voi_meta(model, responses, designvars)
 
         # update mode if it's been set to 'auto'
         if self._orig_mode == 'auto':
@@ -1095,7 +1103,7 @@ class Problem(object, metaclass=ProblemMeta):
         #  this part of _final_setup still needs to happen so that change takes effect
         #  in subsequent runs
         if self._metadata['setup_status'] >= _SetupStatus.POST_FINAL_SETUP:
-            self.model._setup_solver_print()
+            model._setup_solver_print()
 
         driver._setup_driver(self)
 

@@ -124,7 +124,7 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: ${{ matrix.PY }}
-          channels: conda-forge
+          miniforge-version: latest
 
       - name: Install MacOS-specific dependencies
         if: matrix.OS == 'macos-13'

@@ -56,6 +56,8 @@ python -m pip install --upgrade --pre websockets
 python -m pip install --upgrade --pre aiounittest
 python -m pip install --upgrade --pre playwright
 python -m pip install --upgrade --pre num2words
+echo "pre-install playwright dependencies to avoid warning messages"
+playwright install --with-deps || true
 
 echo "============================================================="
 echo "Install latest versions of other optional packages"
