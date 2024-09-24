@@ -1065,6 +1065,8 @@ class Group(System):
         # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
 
+        self._check_required_connections()
+
         # setup of residuals must occur before setup of vectors and partials
         self._setup_residuals()
 

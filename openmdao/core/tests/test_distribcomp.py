@@ -821,9 +821,10 @@ class MPITests(unittest.TestCase):
 
         prob = om.Problem()
         prob.model.add_subsystem("C", DistribCompSimple(arr_size=size), promotes=['*'])
+        prob.setup()
 
         with self.assertRaises(RuntimeError) as context:
-            prob.setup()
+            prob.final_setup()
 
         err_msg = str(context.exception).split(':')[-1]
         self.assertEqual(err_msg, 'Distributed component input "C.invec", promoted as "invec", is not connected.')
@@ -844,9 +845,9 @@ class MPITests(unittest.TestCase):
         prob.model.add_subsystem('adder', Adder())
 
         prob.model.connect('ivc.x0','adder.x')
-
+        prob.setup()
         try:
-            prob.setup()
+            prob.final_setup()
         except Exception as err:
             self.assertTrue(
                 "\nCollected errors for problem 'bad_distrib_problem':"
