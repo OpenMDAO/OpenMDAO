@@ -34,8 +34,31 @@ class UnknownType:
 
     Used to indicate the unpickler can't generate an instance of a class
     whose class definition is not available
+
+    Parameters
+    ----------
+    *args : list
+        Positional args.
+    **kwargs : dict
+        Keyword args.
     """
+
     def __init__(*args, **kwargs):
+        """
+        Construct an object.
+
+        Parameters
+        ----------
+        *args : list
+            Positional args.
+        **kwargs : dict
+            Keyword args.
+
+        Returns
+        -------
+        object
+            The returned object
+        """
         pass
 
 
@@ -54,12 +77,12 @@ class _RestrictedUnpicklerForCaseReader(pickle.Unpickler):
 
     def find_class(self, module, name):
         # Only allow safe classes from builtins and posix.
-        if (module == 'builtins' and name not in safe_builtins or
-            module == 'posix' and name == 'system'):
-                if self.error_strings:
-                    self.error_strings += ', '
-                self.error_strings += f"Error unpickling global, '{module}.{name}' is forbidden"
-                return UnknownType
+        if module == 'builtins' and name not in safe_builtins or \
+           module == 'posix' and name == 'system':
+            if self.error_strings:
+                self.error_strings += ', '
+            self.error_strings += f"Error unpickling global, '{module}.{name}' is forbidden"
+            return UnknownType
 
         try:
             return super().find_class(module, name)
