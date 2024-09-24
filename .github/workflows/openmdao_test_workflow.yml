@@ -773,12 +773,7 @@ jobs:
         inputs: >
           {
             "run_name": "Test Latest OpenMDAO Development Version",
-            "baseline": false,
-            "no_pyoptsparse": false,
-            "no_snopt": false,
-            "no_mpi": false,
-            "latest": true,
-            "oldest": false
+            "latest": true
            }
         token: ${{ secrets.ACCESS_TOKEN }}
       if: github.event_name == 'push'
