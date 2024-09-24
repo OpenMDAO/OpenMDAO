@@ -227,7 +227,7 @@ class TestSystemSetSolverOutputOptions(unittest.TestCase):
         prob.model.set_output_solver_options(name='comp.y1', ref=4)
         msg = "Problem .*: Before calling `run_model`, the `setup` method must be called if " \
               "set_output_solver_options has been called."
-        with self.assertRaisesRegex(RuntimeError, msg) as cm:
+        with self.assertRaisesRegex(RuntimeError, msg):
             prob.run_model()
 
         # also make sure it doesn't raise an error if done correctly with an additional call
@@ -246,7 +246,7 @@ class TestSystemSetSolverOutputOptions(unittest.TestCase):
         prob = Problem()
         model = prob.model
         # ScalingExample3 sets values for ref, res_ref, ref0, lower, and upper
-        comp = model.add_subsystem('comp', ScalingExample3())
+        model.add_subsystem('comp', ScalingExample3())
 
         # override all those values
         model.set_output_solver_options(name='comp.y1',
@@ -273,7 +273,7 @@ class TestSystemSetSolverOutputOptions(unittest.TestCase):
         prob.model.set_output_solver_options(name='lscomp.x', ref=5)
         msg = "Problem .*: Before calling `run_driver`, the `setup` method must be called if " \
               "set_output_solver_options has been called."
-        with self.assertRaisesRegex(RuntimeError, msg) as cm:
+        with self.assertRaisesRegex(RuntimeError, msg):
             prob.run_driver()
 
     def test_set_output_solver_options_vector_values(self):

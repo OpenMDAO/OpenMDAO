@@ -2,7 +2,7 @@ import numpy as np
 import unittest
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class MockSurrogate(om.MultiFiSurrogateModel):
@@ -236,9 +236,9 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         mm.options['train_y2_fi2'] = [4.0, 4.1, 4.3, 4.4, 4.5 ,4.6]
 
         prob.run_model()
-        expected_xtrain=[np.array([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]]),
-                         np.array([[1.1, 2.1], [2.1, 2.2], [3.1, 2.3],
-                                   [1.0, 1.0], [2.0, 2.0], [3.0, 3.0]])]
+        # expected_xtrain=[np.array([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]]),
+        #                 np.array([[1.1, 2.1], [2.1, 2.2], [3.1, 2.3],
+        #                           [1.0, 1.0], [2.0, 2.0], [3.0, 3.0]])]
         expected_y1train=[np.array([[0.0], [0.1], [0.2]]),
                           np.array([[3.0], [3.1], [3.3], [3.4], [3.5], [3.6]])]
         expected_y2train=[np.array([[4.0], [4.0], [4.0]]),

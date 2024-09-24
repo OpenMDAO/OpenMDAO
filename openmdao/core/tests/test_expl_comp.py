@@ -1,7 +1,5 @@
 """Simple example demonstrating how to implement an explicit component."""
 
-import sys
-
 from io import StringIO
 import unittest
 

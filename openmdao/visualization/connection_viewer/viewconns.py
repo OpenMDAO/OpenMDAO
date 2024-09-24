@@ -1,7 +1,6 @@
 
 """Define a function to view connections."""
 import os
-import pathlib
 import json
 from itertools import chain
 from collections import defaultdict
@@ -15,12 +14,9 @@ except ImportError:
 
 from openmdao.core.problem import Problem
 from openmdao.core.constants import _SetupStatus
-from openmdao.utils.units import convert_units
 from openmdao.utils.mpi import MPI
-from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.notebook_utils import notebook, colab
-from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.reports_system import register_report
 
 

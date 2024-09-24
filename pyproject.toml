@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "numpy>=2.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "OpenMDAO framework infrastructure"
 readme = "README.md"
 license = "Apache-2.0"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 authors = [
     { name = "OpenMDAO Team", email = "openmdao@openmdao.org" },
 ]
@@ -66,6 +66,7 @@ notebooks = [
     "idna>=3.7",
 ]
 test = [
+    "pre-commit",
     "aiounittest",
     "num2words",
     "numpydoc>=1.1",
@@ -176,3 +177,27 @@ path = "openmdao/__init__.py"
 include = [
     "/openmdao",
 ]
+
+[tool.ruff]
+line-length = 100
+indent-width = 4
+
+[tool.ruff.format]
+indent-style = "space"
+line-ending = "lf"
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+# Ignore `F401` (unused import) in api files.
+"api.py" = ["F401"]
+"parallel_api.py" = ["F401"]
+"__init__.py" = ["F401"]
+# Ignore files in the test suite.
+"**/test_suite/**" = ["E","F"]
+# Allow variable name I for current
+"**/extcode_resistor.py" = ["E741"]
+"**/circuit_analysis_examples.ipynb" = ["E741"]
+# Ignore some import related conventions in docs
+"**/openmdao_book/**" = ["E402","F811"]

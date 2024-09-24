@@ -31,7 +31,7 @@ class TestAdder(unittest.TestCase):
         prob = om.Problem()
         prob.model = om.Group()
 
-        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp('in', np.ones(10)), promotes=['*'])
+        prob.model.add_subsystem('indeps', om.IndepVarComp('in', np.ones(10)), promotes=['*'])
 
         prob.model.add_subsystem('L2norm', L2())
         prob.model.connect('in', ['L2norm.vec'])
@@ -548,7 +548,7 @@ class TestDynShapes(unittest.TestCase):
         # now put the DynShapeGroupSeries in a cycle (sink.y2 feeds back into Gdyn.C1.x2). Sizes are known
         # at both ends of the model (the IVC and at the sink)
         p = om.Problem()
-        indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
+        p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
         p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3,2, DynShapeComp))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
                                                   x1=np.ones((2,3)),
@@ -596,7 +596,7 @@ class TestDynShapes(unittest.TestCase):
         # now put the DynShapeGroupSeries in a cycle (sink.y2 feeds back into Gdyn.C1.x2), but here,
         # sink.y2 is unsized, so no var in the '2' loop can get resolved.
         p = om.Problem(name='cycle_unresolved')
-        indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
+        p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
         p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3,2, DynShapeComp))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
                                                   x1={'shape_by_conn': True, 'copy_shape': 'y1'},
@@ -620,7 +620,7 @@ class TestDynShapes(unittest.TestCase):
 
     def test_bad_copy_shape_name(self):
         p = om.Problem(name='bad_copy_shape_name')
-        indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
+        p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
         p.model.add_subsystem('sink', om.ExecComp('y1 = x1*2',
                                                   x1={'shape_by_conn': True, 'copy_shape': 'y1'},
                                                   y1={'shape_by_conn': True, 'copy_shape': 'x11'}))
@@ -636,7 +636,7 @@ class TestDynShapes(unittest.TestCase):
 
     def test_unconnected_var_dyn_shape(self):
         p = om.Problem(name='unconnected_var_dyn_shape')
-        indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
+        p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
         p.model.add_subsystem('sink', om.ExecComp('y1 = x1*2',
                                                   x1={'shape_by_conn': True, 'copy_shape': 'y1'},
                                                   y1={'shape_by_conn': True}))
@@ -662,8 +662,8 @@ class TestDistribDynShapes(unittest.TestCase):
         indep.add_output('x1', shape_by_conn=True)
 
         par = p.model.add_subsystem('par', om.ParallelGroup())
-        G1 = par.add_subsystem('G1', DynShapeGroupSeries(2,1, DistribDynShapeComp))
-        G2 = par.add_subsystem('G2', DynShapeGroupSeries(2,1, DistribDynShapeComp))
+        par.add_subsystem('G1', DynShapeGroupSeries(2,1, DistribDynShapeComp))
+        par.add_subsystem('G2', DynShapeGroupSeries(2,1, DistribDynShapeComp))
 
         # 'sink' has a defined shape and dyn shapes propagate in reverse from there.
         p.model.add_subsystem('sink', om.ExecComp(['y1=x1+x2'], shape=(8,)))
@@ -868,7 +868,7 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         p = om.Problem()
         indeps = p.model.add_subsystem('indeps', om.IndepVarComp())
         sizes = [3,0,5]
-        indeps.add_output('x', np.random.random(sizes[MPI.COMM_WORLD.rank]), distributed=True)
+        indeps.add_output('x', np.random.random(sizes[p.comm.rank]), distributed=True)
         p.model.add_subsystem('comp', DistCompUnknownInput())
         p.model.connect('indeps.x', 'comp.x')
         p.setup()
@@ -1014,10 +1014,10 @@ class TestDynShapesWithInputConns(unittest.TestCase):
     def test_shape_from_conn_input(self):
         prob = om.Problem()
         sub = prob.model.add_subsystem('sub', om.Group())
-        comp1 = sub.add_subsystem('comp1', om.ExecComp('y=3*x', x={'shape_by_conn': True}, y={'copy_shape': 'x'}),
-                                  promotes_inputs=['x'])
-        comp2 = sub.add_subsystem('comp2', om.ExecComp('y=3*x', x=np.ones(2), y=np.zeros(2)),
-                                  promotes_inputs=['x'])
+        sub.add_subsystem('comp1', om.ExecComp('y=3*x', x={'shape_by_conn': True}, y={'copy_shape': 'x'}),
+                          promotes_inputs=['x'])
+        sub.add_subsystem('comp2', om.ExecComp('y=3*x', x=np.ones(2), y=np.zeros(2)),
+                          promotes_inputs=['x'])
 
         prob.setup()
 
@@ -1030,12 +1030,12 @@ class TestDynShapesWithInputConns(unittest.TestCase):
     def test_shape_from_conn_input_mismatch(self):
         prob = om.Problem(name='shape_from_conn_input_mismatch')
         sub = prob.model.add_subsystem('sub', om.Group())
-        comp1 = sub.add_subsystem('comp1', om.ExecComp('y=3*x', x={'shape_by_conn': True}, y={'copy_shape': 'x'}),
-                                  promotes_inputs=['x'])
-        comp2 = sub.add_subsystem('comp2', om.ExecComp('y=3*x', x=np.ones(2), y=np.zeros(2)),
-                                  promotes_inputs=['x'])
-        comp3 = sub.add_subsystem('comp3', om.ExecComp('y=3*x', x=np.ones(3), y=np.zeros(3)),
-                                  promotes_inputs=['x'])
+        sub.add_subsystem('comp1', om.ExecComp('y=3*x', x={'shape_by_conn': True}, y={'copy_shape': 'x'}),
+                          promotes_inputs=['x'])
+        sub.add_subsystem('comp2', om.ExecComp('y=3*x', x=np.ones(2), y=np.zeros(2)),
+                          promotes_inputs=['x'])
+        sub.add_subsystem('comp3', om.ExecComp('y=3*x', x=np.ones(3), y=np.zeros(3)),
+                          promotes_inputs=['x'])
 
         with self.assertRaises(Exception) as cm:
             prob.setup()
@@ -1050,10 +1050,10 @@ class TestDynShapesWithInputConns(unittest.TestCase):
     def test_shape_from_conn_input_mismatch_group_inputs(self):
         prob = om.Problem(name='shape_from_conn_input_mismatch_group_inputs')
         sub = prob.model.add_subsystem('sub', om.Group())
-        comp1 = sub.add_subsystem('comp1', om.ExecComp('y=3*x', x={'shape_by_conn': True}, y={'copy_shape': 'x'}),
-                                  promotes_inputs=['x'])
-        comp2 = sub.add_subsystem('comp2', om.ExecComp('y=3*x', x=np.ones(2), y=np.zeros(2)),
-                                  promotes_inputs=['x'])
+        sub.add_subsystem('comp1', om.ExecComp('y=3*x', x={'shape_by_conn': True}, y={'copy_shape': 'x'}),
+                          promotes_inputs=['x'])
+        sub.add_subsystem('comp2', om.ExecComp('y=3*x', x=np.ones(2), y=np.zeros(2)),
+                          promotes_inputs=['x'])
 
         sub.set_input_defaults('x', src_shape=(3, ))
 

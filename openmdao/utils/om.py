@@ -49,6 +49,7 @@ from openmdao.devtools.iprof_mem import _mem_prof_exec, _mem_prof_setup_parser, 
     _mempost_exec, _mempost_setup_parser
 from openmdao.error_checking.check_config import _check_config_cmd, _check_config_setup_parser
 from openmdao.utils.mpi import MPI
+from openmdao.utils.file_utils import clean_outputs
 from openmdao.utils.find_cite import print_citations
 from openmdao.utils.code_utils import _calltree_setup_parser, _calltree_exec
 from openmdao.utils.coloring import _total_coloring_setup_parser, _total_coloring_cmd, \
@@ -271,6 +272,45 @@ def _tree_setup_parser(parser):
                         help="Display input and output sizes.")
     parser.add_argument('--approx', action='store_true', dest='show_approx',
                         help="Show which components compute approximations.")
+
+
+def _clean_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao clean' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('path', nargs='*', default='.',
+                        help='Path(s) from which OpenMDAO output directories should be removed.')
+    parser.add_argument('-f', '--noprompt', action='store_false', dest='prompt',
+                        help='Remove output directories without confirmation.')
+    parser.add_argument('-n', '--norecurse', action='store_true', dest='no_recurse',
+                        help='Do not recurse into subdirectories to find directories to remove.')
+    parser.add_argument('-d', '--dryrun', action='store_true', dest='dryrun',
+                        help='Highlight directories to be removed but do not actually remove them.')
+    parser.add_argument('-p', '--pattern', action='store', dest='pattern', default='*_out',
+                        help='Only directories whose name matches this glob pattern will be '
+                        'removed. This glob pattern applies to directory names found when '
+                        'recursing through the given paths. Surround this argument with quotation '
+                        'marks to prevent the OS from interpreting the glob pattern.')
+
+
+def _clean_cmd(options, user_args):
+    """
+    Return the post_setup hook function for 'openmdao summary'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+    user_args : list of str
+        Args to be passed to the user script.
+    """
+    clean_outputs(options.path, recurse=not options.no_recurse, prompt=options.prompt,
+                  pattern=options.pattern, dryrun=options.dryrun)
 
 
 def _get_tree_filter(attrs, vecvars):
@@ -524,6 +564,7 @@ _command_map = {
     'check': (_check_config_setup_parser, _check_config_cmd,
               'Perform a number of configuration checks on the problem.'),
     'cite': (_cite_setup_parser, _cite_cmd, 'Print citations referenced by the problem.'),
+    'clean': (_clean_setup_parser, _clean_cmd, 'Remove OpenMDAO output directories.'),
     'comm_info': (_comm_info_setup_parser, _comm_info_cmd,
                   'Print MPI communicator info for systems.'),
     'compute_entry_points': (_compute_entry_points_setup_parser, _compute_entry_points_exec,
@@ -539,6 +580,8 @@ _command_map = {
                      'Generate total timings of calls to particular object instances.'),
     'list_installed': (_list_installed_setup_parser, _list_installed_cmd,
                        'List installed types recognized by OpenMDAO.'),
+    'list_pre_post': (_list_pre_post_setup_parser, _list_pre_post_cmd,
+                      'Show pre and post setup systems.'),
     'list_reports': (_list_reports_setup_parser, _list_reports_cmd, 'List available reports.'),
     'mem': (_mem_prof_setup_parser, _mem_prof_exec,
             'Profile memory used by OpenMDAO related functions.'),
@@ -549,8 +592,6 @@ _command_map = {
     'scaffold': (_scaffold_setup_parser, _scaffold_exec,
                  'Generate a simple scaffold for a component.'),
     'scaling': (_scaling_setup_parser, _scaling_cmd, 'View driver scaling report.'),
-    'list_pre_post': (_list_pre_post_setup_parser, _list_pre_post_cmd,
-                      'Show pre and post setup systems.'),
     'summary': (_config_summary_setup_parser, _config_summary_cmd,
                 'Print a short top-level summary of the problem.'),
     'timing': (_timing_setup_parser, _timing_cmd, 'Collect timing information for all systems.'),
@@ -566,6 +607,24 @@ _command_map = {
     'view_mm': (_meta_model_parser, _meta_model_cmd, "View a metamodel."),
     'view_reports': (_view_reports_setup_parser, _view_reports_cmd, 'View existing reports.'),
 }
+
+
+def _register_view_reports():
+    """
+    Set hook to view reports after running an openmdao script.
+    """
+    hooks.use_hooks = True
+
+    # request cleanup at exit
+    om_atexit = os.environ.get('OPENMDAO_ATEXIT')
+    os.environ['OPENMDAO_ATEXIT'] = ','.join([om_atexit, 'cleanup']) if om_atexit else 'cleanup'
+
+    from openmdao.utils.reports_system import view_reports
+
+    def run_problem_reports(problem):
+        view_reports(problem._name)
+
+    hooks._register_hook('cleanup', 'Problem', post=run_problem_reports, exit=False)
 
 
 def openmdao_cmd():
@@ -589,10 +648,14 @@ def openmdao_cmd():
                                      'For example: '
                                      '"openmdao n2 -o foo.html myscript.py -- -x --myarg=bar"')
 
-    ver_group = parser.add_mutually_exclusive_group()
-    ver_group.add_argument('--version', action='version', version=version)
-    ver_group.add_argument('--dependency_versions', action='store_true', default=False,
+    opt_group = parser.add_mutually_exclusive_group()
+    opt_group.add_argument('--version', action='version', version=version)
+    opt_group.add_argument('--dependency_versions', action='store_true', default=False,
                            help="show versions of OpenMDAO and all dependencies, then exit")
+    opt_group.add_argument('--view_reports', action='store_true', default=False,
+                           help="after running an OpenMDAO script, display any generated reports")
+
+    opts = ('-h', '--help', '--version', '--dependency_versions', '--view_reports')
 
     # setting 'dest' here will populate the Namespace with the active subparser name
     subs = parser.add_subparsers(title='Tools', metavar='', dest="subparser_name")
@@ -626,10 +689,13 @@ def openmdao_cmd():
         subp.set_defaults(executor=executor)
 
     args = [a for a in sys.argv[1:] if not a.startswith('-')]
-    cmdargs = [a for a in sys.argv[1:] if a not in ('-h', '--version', '--dependency_versions')]
+    cmdopts = [a for a in sys.argv[1:] if a in opts]
+    cmdargs = [a for a in sys.argv[1:] if a not in opts]
 
     # handle case where someone just runs `openmdao <script> [dashed-args]`
     if not set(args).intersection(subs.choices) and len(args) == 1 and os.path.isfile(cmdargs[0]):
+        if '--view_reports' in cmdopts:
+            _register_view_reports()
         _load_and_exec(args[0], user_args)
     else:
         hooks.use_hooks = True

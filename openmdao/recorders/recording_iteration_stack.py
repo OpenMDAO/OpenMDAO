@@ -1,8 +1,6 @@
 """Management of iteration stack for recording."""
 import weakref
 
-from openmdao.utils.mpi import MPI
-
 _norec_funcs = frozenset(['_run_apply', '_compute_totals'])
 
 

@@ -12,16 +12,15 @@ import openmdao.api as om
 from openmdao.components.interp_util.interp import InterpND, SPLINE_METHODS, TABLE_METHODS
 from openmdao.components.interp_util.interp_semi import InterpNDSemi
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
-from openmdao.utils.assert_utils import assert_near_equal, assert_equal_arrays, assert_warning, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_equal_arrays, assert_check_partials
 from openmdao.utils.testing_utils import force_check_partials
-from openmdao.utils.om_warnings import OMDeprecationWarning
 
 def rel_error(actual, computed):
     return np.linalg.norm(actual - computed) / np.linalg.norm(actual)
 
 scipy_gte_019 = True
 try:
-    from scipy.interpolate._bsplines import make_interp_spline
+    from scipy.interpolate._bsplines import make_interp_spline  # noqa: F401
 except ImportError:
     scipy_gte_019 = False
 
@@ -76,12 +75,12 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
 
     def test_interp_spline_bsplines(self):
 
-        xcp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
+        # xcp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
         ycp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
         n = 50
         x = np.linspace(1.0, 12.0, n)
 
-        interp = InterpND(method='bsplines', num_cp=6, x_interp=x)
+        interp = InterpND(method='bsplines', num_cp=6, x_interp=x, x_cp_start=0.0)
 
         y = interp.evaluate_spline(ycp)
 
@@ -96,6 +95,31 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
                                      18.10589772, 18.49281052, 18.92046894, 19.39373414, 19.91746734,
                                      20.4965297 , 21.13578243, 21.8400867 , 22.61430372, 23.46329467,
                                      24.39192074, 25.40504312, 26.507523  , 27.70422156, 29.        ]),
+                          tolerance=1e-6)
+
+    def test_interp_spline_bsplines_cp_specify_ends(self):
+
+        # xcp runs from ==20 to 20.
+        ycp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
+        n = 50
+        x = np.linspace(-5.0, 5.0, n)
+
+        # This will put all the interp points betwen the 3rd and 4th cps.
+        interp = InterpND(method='bsplines', num_cp=6, x_interp=x, x_cp_start=-30.0, x_cp_end=30.0)
+
+        y = interp.evaluate_spline(ycp)
+
+        assert_near_equal(y,
+                          np.array([14.44401042, 14.46907599, 14.49421355, 14.51943   , 14.54473225,
+                                    14.5701272 , 14.59562175, 14.62122282, 14.64693731, 14.67277212,
+                                    14.69873417, 14.72483035, 14.75106758, 14.77745277, 14.8039928 ,
+                                    14.8306946 , 14.85756507, 14.88461112, 14.91183964, 14.93925756,
+                                    14.96687176, 14.99468917, 15.02271668, 15.05096121, 15.07942965,
+                                    15.10812892, 15.13706592, 15.16624755, 15.19568073, 15.22537235,
+                                    15.25532933, 15.28555858, 15.31606699, 15.34686147, 15.37794893,
+                                    15.40933628, 15.44103042, 15.47303826, 15.5053667 , 15.53802265,
+                                    15.57101302, 15.60434471, 15.63802463, 15.67205968, 15.70645678,
+                                    15.74122282, 15.77636472, 15.81188937, 15.84780369, 15.88411458]),
                           tolerance=1e-6)
 
     def test_table_interp(self):
@@ -260,7 +284,7 @@ class TestInterpNDSemiPython(unittest.TestCase):
             values = X + Y
             grid = np.array([X, Y]).T
             with self.assertRaises(ValueError) as cm:
-                interp = InterpNDSemi(grid, values, method=method)
+                InterpNDSemi(grid, values, method=method)
 
             msg = 'There are {} points in a data dimension, but method'.format(k)
             self.assertTrue(str(cm.exception).startswith(msg))
@@ -297,19 +321,19 @@ class TestInterpNDSemiPython(unittest.TestCase):
         values = values.ravel()
 
         with self.assertRaises(ValueError) as cm:
-            interp = InterpNDSemi(grid, values, method='junk')
+            InterpNDSemi(grid, values, method='junk')
 
         msg = ('Interpolation method "junk" is not defined. Valid methods are')
         self.assertTrue(cm.exception.args[0].startswith(msg))
 
         with self.assertRaises(ValueError) as cm:
-            interp = InterpNDSemi(grid, values, method=points)
+            InterpNDSemi(grid, values, method=points)
 
         msg = ("Argument 'method' should be a string.")
         self.assertTrue(cm.exception.args[0].startswith(msg))
 
         with self.assertRaises(ValueError) as cm:
-            interp = InterpNDSemi(grid, values[:-1], method='slinear')
+            InterpNDSemi(grid, values[:-1], method='slinear')
 
         msg = ('There are 2016 point arrays, but 2015 values.')
         self.assertEqual(cm.exception.args[0], msg)
@@ -317,13 +341,13 @@ class TestInterpNDSemiPython(unittest.TestCase):
         badgrid = deepcopy(grid)
         badgrid[0][0] = -6.0
         with self.assertRaises(ValueError) as cm:
-            interp = InterpNDSemi(badgrid, values, method='slinear')
+            InterpNDSemi(badgrid, values, method='slinear')
 
         msg = ('The points in dimension 0 must be strictly ascending.')
         self.assertEqual(cm.exception.args[0], msg)
 
         with self.assertRaises(KeyError) as cm:
-            interp = InterpNDSemi(grid, values, method='slinear', bad_arg=1)
+            InterpNDSemi(grid, values, method='slinear', bad_arg=1)
 
         msg = ("Option 'bad_arg' cannot be set because it has not been declared.")
         self.assertTrue(cm.exception.args[0].endswith(msg))
@@ -435,7 +459,7 @@ class TestInterpNDPython(unittest.TestCase):
             values = X + Y
             #self.assertRaises(ValueError, InterpND, points, values, method)
             with self.assertRaises(ValueError) as cm:
-                interp = InterpND(method=method, points=points, values=values)
+                InterpND(method=method, points=points, values=values)
 
             msg = 'There are {} points in a data dimension, but method'.format(k)
             self.assertTrue(str(cm.exception).startswith(msg))
@@ -471,7 +495,7 @@ class TestInterpNDPython(unittest.TestCase):
         gradient = np.array(df(*test_pt))
         tol = 1e-1
         for method in self.interp_methods:
-            k = self.interp_configs[method]
+            self.interp_configs[method]
             if method == 'slinear':
                 tol = 2
             interp = InterpND(method=method, points=points, values=values,
@@ -745,19 +769,19 @@ class TestInterpNDPython(unittest.TestCase):
         points, values = self._get_sample_4d_large()
 
         with self.assertRaises(ValueError) as cm:
-            interp = InterpND(method='junk', points=points, values=values.tolist())
+            InterpND(method='junk', points=points, values=values.tolist())
 
         msg = ('Interpolation method "junk" is not defined. Valid methods are')
         self.assertTrue(str(cm.exception).startswith(msg))
 
         with self.assertRaises(ValueError) as cm:
-            interp = InterpND(method=points, points=points, values=values.tolist())
+            InterpND(method=points, points=points, values=values.tolist())
 
         msg = ("Argument 'method' should be a string.")
         self.assertTrue(str(cm.exception).startswith(msg))
 
         with self.assertRaises(ValueError) as cm:
-            interp = InterpND(method='slinear', points=points, values=values.tolist()[1])
+            InterpND(method='slinear', points=points, values=values.tolist()[1])
 
         msg = ('There are 4 point arrays, but values has 3 dimensions')
         self.assertEqual(str(cm.exception), msg)
@@ -765,37 +789,36 @@ class TestInterpNDPython(unittest.TestCase):
         badpoints = deepcopy(points)
         badpoints[0][0] = 55.0
         with self.assertRaises(ValueError) as cm:
-            interp = InterpND(method='slinear', points=badpoints, values=values.tolist())
+            InterpND(method='slinear', points=badpoints, values=values.tolist())
 
         msg = ('The points in dimension 0 must be strictly ascending')
         self.assertEqual(str(cm.exception), msg)
 
         badpoints[0] = np.vstack((np.arange(6), np.arange(6)))
         with self.assertRaises(ValueError) as cm:
-            interp = InterpND(method='slinear', points=badpoints, values=values.tolist())
+            InterpND(method='slinear', points=badpoints, values=values.tolist())
 
         msg = ('The points in dimension 0 must be 1-dimensional')
         self.assertEqual(str(cm.exception), msg)
 
         badpoints[0] = (np.arange(4))
         with self.assertRaises(ValueError) as cm:
-            interp = InterpND(method='slinear', points=badpoints, values=values.tolist())
+            InterpND(method='slinear', points=badpoints, values=values.tolist())
 
         msg = ('There are 4 points and 6 values in dimension 0')
         self.assertEqual(str(cm.exception), msg)
 
         badvalues = np.array(values, dtype=complex)
         with self.assertRaises(ValueError) as cm:
-            interp = InterpND(method='scipy_slinear', points=badpoints, values=badvalues.tolist())
+            InterpND(method='scipy_slinear', points=badpoints, values=badvalues.tolist())
 
         msg = ("Interpolation method 'scipy_slinear' does not support complex points or values.")
         self.assertEqual(str(cm.exception), msg)
 
-        interp = InterpND(method='slinear', points=points, values=values.tolist())
-        x = [0.5, 0, 0.5, 0.9]
+        InterpND(method='slinear', points=points, values=values.tolist())
 
         with self.assertRaises(KeyError) as cm:
-            interp = InterpND(method='slinear', points=points, values=values.tolist(), bad_arg=1)
+            InterpND(method='slinear', points=points, values=values.tolist(), bad_arg=1)
 
         msg = ("\"InterpLinear: Option 'bad_arg' cannot be set because it has not been declared.")
         self.assertTrue(str(cm.exception).startswith(msg))
@@ -803,13 +826,13 @@ class TestInterpNDPython(unittest.TestCase):
         # Bspline not supported for tables.
         points, values, func, df = self. _get_sample_2d()
         with self.assertRaises(ValueError) as cm:
-            interp = InterpND(method='bsplines', points=points, values=values)
+            InterpND(method='bsplines', points=points, values=values)
 
         msg = "Method 'bsplines' is not supported for table interpolation."
         self.assertTrue(str(cm.exception).startswith(msg))
 
         with self.assertRaises(ValueError) as cm:
-            interp = InterpND(method='bsplines', points=points)
+            InterpND(method='bsplines', points=points)
 
         msg = "Either 'values' or 'x_interp' must be specified."
         self.assertTrue(str(cm.exception).startswith(msg))
@@ -861,7 +884,7 @@ class TestInterpNDPython(unittest.TestCase):
                 self.options.declare('interp', None)
 
             def setup(self):
-                method = self.options['interp']
+                self.options['interp']
 
                 self.add_input('p1', p1)
                 self.add_input('p2', p2)
@@ -915,13 +938,13 @@ class TestInterpNDFixedPython(unittest.TestCase):
         f = 2.0 * np.array([0, 1, 2])
 
         with self.assertRaises(ValueError) as cm:
-            interp = InterpND(method='1D-akima', points=p, values=f)
+            InterpND(method='1D-akima', points=p, values=f)
 
         msg = "There are 3 points in a data dimension, but method '1D-akima' requires at least 4 points per dimension."
         self.assertTrue(str(cm.exception).startswith(msg))
 
         with self.assertRaises(ValueError) as cm:
-            interp = InterpND(method='3D-slinear', points=p, values=f)
+            InterpND(method='3D-slinear', points=p, values=f)
 
         msg = "There are 1 dimensions, but method '3D-slinear' only works with a fixed table dimension of 3."
         self.assertTrue(str(cm.exception).startswith(msg))

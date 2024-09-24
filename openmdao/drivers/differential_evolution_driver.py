@@ -263,7 +263,6 @@ class DifferentialEvolutionDriver(Driver):
             Failure flag; True if failed to converge, False is successful.
         """
         self.result.reset()
-        model = self._problem().model
         ga = self._ga
 
         pop_size = self.options['pop_size']

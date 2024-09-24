@@ -312,6 +312,8 @@ class NodeConnectionInfo extends NodeInfo {
 
     /**
      * Load the NodeInfo window with connection information for an off-diagonal cell.
+     * Within a component, this NodeInfo window will have the title "Jacobian {input} --> {output}."
+     * For true connections between components, the window title is "Connections {source} --> {target}."
      * @param {Object} event Reference to the event that triggered the function.
      * @param {MatrixCell} cell Reference to the cell that was hovered.
      * @param {String} color The color of the title bar.
@@ -336,7 +338,8 @@ class NodeConnectionInfo extends NodeInfo {
             newRow.append('td').html(conn.tgt);
         }
 
-        let title = 'Connections';
+        let title = (color == OmStyle.color.declaredPartial) ? "Jacobian" : "Connections";
+
         if ( ! (cell.srcObj.isLeaf() || cell.tgtObj.isLeaf()) ) {
             title += ` from ${cell.srcObj.path} to ${cell.tgtObj.path}`;
         }

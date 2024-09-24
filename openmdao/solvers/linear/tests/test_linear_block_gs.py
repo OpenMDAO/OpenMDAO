@@ -16,7 +16,7 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.utils.mpi import MPI
 try:
     from openmdao.api import PETScVector
-except:
+except Exception:
     PETScVector = None
 
 
@@ -157,8 +157,8 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         # It takes 6 iterations without Aitken.
         aitken.options['maxiter'] = 4
 
-        sub = model.add_subsystem('sub', SellarDerivatives(nonlinear_solver=om.NonlinearRunOnce(),
-                                                           linear_solver=aitken))
+        model.add_subsystem('sub', SellarDerivatives(nonlinear_solver=om.NonlinearRunOnce(),
+                                                     linear_solver=aitken))
         model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
 
         prob.setup(mode='fwd')
@@ -178,8 +178,8 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         # It takes 6 iterations without Aitken.
         aitken.options['maxiter'] = 4
 
-        sub = model.add_subsystem('sub', SellarDerivatives(nonlinear_solver=om.NonlinearRunOnce(),
-                                                           linear_solver=aitken))
+        model.add_subsystem('sub', SellarDerivatives(nonlinear_solver=om.NonlinearRunOnce(),
+                                                     linear_solver=aitken))
         model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
 
         prob.setup(mode='rev')
@@ -475,25 +475,25 @@ class TestRecursiveApplyFix(unittest.TestCase):
     def test_matrix_free_explicit_fwd(self):
         prob, comp = execute_model1('fwd')
         comp._comp_jvp_count = 0
-        J = prob.compute_totals()
+        prob.compute_totals()
         self.assertEqual(comp._comp_jvp_count, 1)
 
     def test_matrix_free_explicit_rev(self):
         prob, comp = execute_model1('rev')
         comp._comp_jvp_count = 0
-        J = prob.compute_totals()
+        prob.compute_totals()
         self.assertEqual(comp._comp_jvp_count, 1)
 
     def test_matrix_free_explicit2_fwd(self):
         prob, comp = execute_model2('fwd')
         comp._comp_jvp_count = 0
-        J = prob.compute_totals()
+        prob.compute_totals()
         self.assertEqual(comp._comp_jvp_count, 1)
 
     def test_matrix_free_explicit2_rev(self):
         prob, comp = execute_model2('rev')
         comp._comp_jvp_count = 0
-        J = prob.compute_totals()
+        prob.compute_totals()
         self.assertEqual(comp._comp_jvp_count, 1)
 
 
@@ -679,7 +679,7 @@ class Coupled(om.Group):
 def create_model_with_post_not_in_a_group(maxiter):
     model = om.Group()
 
-    ivc = model.add_subsystem('ivc', om.IndepVarComp('x'))
+    model.add_subsystem('ivc', om.IndepVarComp('x'))
 
     coupling = model.add_subsystem('coupling', Coupled(), promotes=['*'])
     coupling.nonlinear_solver = om.NonlinearBlockGS(maxiter=maxiter)
@@ -697,7 +697,7 @@ def create_model_with_post_not_in_a_group(maxiter):
 def create_model_with_scenario(maxiter):
     model = om.Group()
 
-    ivc = model.add_subsystem('ivc', om.IndepVarComp('x'))
+    model.add_subsystem('ivc', om.IndepVarComp('x'))
 
     scenario = model.add_subsystem('scenario', om.Group(), promotes=['*'])
     coupling = scenario.add_subsystem('coupling', Coupled(), promotes=['*'])
@@ -719,29 +719,30 @@ class UserTestCase(unittest.TestCase):
         prob = om.Problem(create_model_with_scenario(1))
         prob.setup(mode='fwd')
         prob.run_model()
-        totals = prob.compute_totals('post.comp4.z','ivc.x')
+        prob.compute_totals('post.comp4.z','ivc.x')
         self.assertEqual(prob.model._get_subsystem('scenario.post.comp4').count, 1)
 
     def test_with_scenario_rev(self):
         prob = om.Problem(create_model_with_scenario(1))
         prob.setup(mode='rev')
         prob.run_model()
-        totals = prob.compute_totals('post.comp4.z','ivc.x')
+        prob.compute_totals('post.comp4.z','ivc.x')
         self.assertEqual(prob.model._get_subsystem('scenario.post.comp4').count, 1)
 
     def test_post_not_in_group_fwd(self):
         prob = om.Problem(create_model_with_post_not_in_a_group(10))
         prob.setup(mode='fwd')
         prob.run_model()
-        totals = prob.compute_totals('comp4.z','ivc.x')
+        prob.compute_totals('comp4.z','ivc.x')
         self.assertEqual(prob.model._get_subsystem('comp4').count, 1)
 
     def test_post_not_in_group_rev(self):
         prob = om.Problem(create_model_with_post_not_in_a_group(10))
         prob.setup(mode='rev')
         prob.run_model()
-        totals = prob.compute_totals('comp4.z','ivc.x')
+        prob.compute_totals('comp4.z','ivc.x')
         self.assertEqual(prob.model._get_subsystem('comp4').count, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

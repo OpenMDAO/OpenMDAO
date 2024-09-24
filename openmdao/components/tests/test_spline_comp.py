@@ -10,7 +10,6 @@ from openmdao.components.spline_comp import SPLINE_METHODS
 from openmdao.utils.assert_utils import assert_check_partials, assert_near_equal
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.spline_distributions import cell_centered, sine_distribution
-from openmdao.components.interp_util.interp import InterpND
 from openmdao.utils.testing_utils import force_check_partials
 
 
@@ -226,6 +225,52 @@ class SplineCompTestCase(unittest.TestCase):
         derivs = force_check_partials(prob, out_stream=None, method='cs')
         assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
 
+    def test_bspline_interp_specify_end_cp(self):
+        prob = om.Problem()
+        model = prob.model
+
+        n_cp = 12
+        n_point = 7
+
+        cp_start = -3.0
+        cp_end = 3.0
+
+        t = np.linspace(0, 0.5 * np.pi, n_cp)
+        x = np.sin(t)
+
+        tt = np.linspace(0, 0.5 * np.pi, n_point)
+        tt_mapped = 0.5 * np.pi * (tt - cp_start) / (cp_end - cp_start)
+        x_expected = np.sin(tt_mapped)
+
+        model.add_subsystem('px', om.IndepVarComp('x', val=x))
+
+        bspline_options = {'order': 2,
+                           'x_cp_start': cp_start,
+                           'x_cp_end': cp_end,
+                           }
+
+        comp = om.SplineComp(method='bsplines', x_interp_val=tt, num_cp=n_cp,
+                            interp_options=bspline_options)
+
+        prob.model.add_subsystem('interp', comp)
+
+        comp.add_spline(y_cp_name='h_cp', y_interp_name='h', y_cp_val=x, y_units='km')
+
+        model.connect('px.x', 'interp.h_cp')
+
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+
+        xx = prob['interp.h'].flatten()
+
+        delta = xx - x_expected
+
+        # Here we test that we don't have crazy interpolation error.
+        self.assertLess(max(delta), .01)
+
+        derivs = force_check_partials(prob, out_stream=None, method='cs')
+        assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
+
     def test_bsplines_vectorized(self):
         prob = om.Problem()
         model = prob.model
@@ -353,7 +398,6 @@ class SplineCompTestCase(unittest.TestCase):
         x = np.linspace(1.0, 12.0, n)
 
         prob = om.Problem()
-        model = prob.model
 
         # Set options specific to akima
         akima_option = {'delta_x': 0.1, 'eps': 1e-30}
@@ -430,7 +474,6 @@ class SplineCompFeatureTestCase(unittest.TestCase):
 
         x_cp = np.linspace(0., 1., 6)
         y_cp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
-        n = 20
         x = om.sine_distribution(20, start=0, end=1, phase=np.pi)
 
         prob = om.Problem()
@@ -459,7 +502,6 @@ class SplineCompFeatureTestCase(unittest.TestCase):
         x = np.linspace(1.0, 12.0, n)
 
         prob = om.Problem()
-        model = prob.model
 
         # Set options specific to akima
         akima_option = {'delta_x': 0.1, 'eps': 1e-30}
@@ -477,7 +519,6 @@ class SplineCompFeatureTestCase(unittest.TestCase):
     def test_bspline_options(self):
 
         prob = om.Problem()
-        model = prob.model
 
         n_cp = 80
         n_point = 160
@@ -527,7 +568,6 @@ class SplineCompFeatureTestCase(unittest.TestCase):
     def test_bsplines_2to3doc(self):
 
         prob = om.Problem()
-        model = prob.model
 
         n_cp = 5
         n_point = 10

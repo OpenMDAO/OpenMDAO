@@ -109,13 +109,11 @@ class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
     N_PROCS = 2
 
     def _do_compute_totals(self, mode):
-        comm = MPI.COMM_WORLD
-
         p = om.Problem()
         d_ivc = p.model.add_subsystem('distrib_ivc',
                                     om.IndepVarComp(distributed=True),
                                     promotes=['*'])
-        if comm.rank == 0:
+        if p.comm.rank == 0:
             ndvs = 3
         else:
             ndvs = 2
@@ -133,7 +131,7 @@ class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
         p.setup(mode=mode)
         p.run_model()
 
-        dv_vals = p.driver.get_design_var_values(get_remote=False)
+        p.driver.get_design_var_values(get_remote=False)
 
         # Compute totals and check the length of the gradient array on each proc
         J = p.compute_totals(get_remote=False)
@@ -150,13 +148,11 @@ class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
 
     def _do_compute_totals_2D(self, mode):
         # this test has some non-flat variables
-        comm = MPI.COMM_WORLD
-
         p = om.Problem()
         d_ivc = p.model.add_subsystem('distrib_ivc',
                                       om.IndepVarComp(distributed=True),
                                       promotes=['*'])
-        if comm.rank == 0:
+        if p.comm.rank == 0:
             ndvs = 6
             two_d = (3,2)
         else:
@@ -179,7 +175,7 @@ class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
         p.setup(mode=mode)
         p.run_model()
 
-        dv_vals = p.driver.get_design_var_values(get_remote=False)
+        p.driver.get_design_var_values(get_remote=False)
 
         # Compute totals and check the length of the gradient array on each proc
         J = p.compute_totals(get_remote=False)
@@ -431,8 +427,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         # Test compact_print output
         compact_stream = StringIO()
-        compact_totals = prob.check_totals(method='fd', out_stream=compact_stream,
-            compact_print=True)
+        prob.check_totals(method='fd', out_stream=compact_stream, compact_print=True)
 
         compact_lines = compact_stream.getvalue().splitlines()
 
@@ -465,7 +460,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         # check derivatives with complex step and a larger step size.
         stream = StringIO()
-        totals = prob.check_totals(method='fd', show_progress=True, out_stream=stream)
+        prob.check_totals(method='fd', show_progress=True, out_stream=stream)
 
         lines = stream.getvalue().splitlines()
         self.assertTrue("1/3: Checking derivatives with respect to: 'd1.x [2]' ..." in lines[0])
@@ -476,7 +471,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         # Check to make sure nothing is going to output
         stream = StringIO()
-        totals = prob.check_totals(method='fd', show_progress=False, out_stream=stream)
+        prob.check_totals(method='fd', show_progress=False, out_stream=stream)
 
         lines = stream.getvalue()
         self.assertFalse("Checking derivatives with respect to" in lines)
@@ -1284,8 +1279,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_near_equal(totals['a3', 'widths']['abs error'][0], 0.0, 1e-6)
         assert_near_equal(totals['a4', 'widths']['abs error'][0], 0.0, 1e-6)
 
-        l = prob.list_driver_vars(show_promoted_name=True, print_arrays=False,
-                                  cons_opts=['indices', 'alias'])
+        prob.list_driver_vars(show_promoted_name=True, print_arrays=False,
+                              cons_opts=['indices', 'alias'])
 
         # Rev mode
 
@@ -1309,7 +1304,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         prob.setup(mode='rev')
 
-        result = prob.run_driver()
+        prob.run_driver()
 
         totals = prob.check_totals(out_stream=None)
 
@@ -1926,7 +1921,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         for c in  [m.comp5, m.comp6, m.comp7, m.comp8]:
             c.nsolve_linear = 0
 
-        J = prob.compute_totals()
+        prob.compute_totals()
 
         nsolves = [c.nsolve_linear for c in [m.comp5, m.comp6, m.comp7, m.comp8]]
         # Coloring requires 2 linear solves, mixing all dependencies, so each comp gets
@@ -1951,7 +1946,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         for c in  [m.comp5, m.comp6, m.comp7, m.comp8]:
             c.nsolve_linear = 0
 
-        J = prob.compute_totals()
+        prob.compute_totals()
 
         nsolves = [c.nsolve_linear for c in [m.comp5, m.comp6, m.comp7, m.comp8]]
         # Coloring requires 2 linear solves, mixing all dependencies, so each comp gets
@@ -1992,7 +1987,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         for c in  [m.comp1, m.comp2, m.comp3, m.comp4]:
             c.nsolve_linear = 0
 
-        J = prob.compute_totals()
+        prob.compute_totals()
 
         nsolves = [c.nsolve_linear for c in [m.comp1, m.comp2, m.comp3, m.comp4]]
         # coloring requires 2 rev solves, which combine all dependencies, so each
@@ -2016,7 +2011,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         for c in  [m.comp1, m.comp2, m.comp3, m.comp4]:
             c.nsolve_linear = 0
 
-        J = prob.compute_totals()
+        prob.compute_totals()
 
         nsolves = [c.nsolve_linear for c in [m.comp1, m.comp2, m.comp3, m.comp4]]
         # coloring requires 2 rev solves, which combine all dependencies, so each
@@ -2054,7 +2049,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         p.setup(mode='fwd')
         p.run_model()
         stream = StringIO()
-        J = p.check_totals(step=[1e-6], out_stream=stream)
+        p.check_totals(step=[1e-6], out_stream=stream)
         contents = stream.getvalue()
         nsubjacs = 18
         self.assertEqual(contents.count("Full Model:"), nsubjacs)
@@ -2070,7 +2065,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         p.setup(mode='rev')
         p.run_model()
         stream = StringIO()
-        J = p.check_totals(step=[1e-6], out_stream=stream)
+        p.check_totals(step=[1e-6], out_stream=stream)
         contents = stream.getvalue()
         nsubjacs = 18
         self.assertEqual(contents.count("Full Model:"), nsubjacs)
@@ -2088,7 +2083,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 p.setup(mode=mode)
                 p.run_model()
                 stream = StringIO()
-                J = p.check_totals(step=[1e-6], compact_print=True, out_stream=stream)
+                p.check_totals(step=[1e-6], compact_print=True, out_stream=stream)
                 contents = stream.getvalue()
                 nsubjacs = 18
                 self.assertEqual(contents.count("step"), 0)
@@ -2102,7 +2097,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 p.setup(mode=mode, force_alloc_complex=True)
                 p.run_model()
                 stream = StringIO()
-                J = p.check_totals(method='cs', step=1e-30, compact_print=True, out_stream=stream)
+                p.check_totals(method='cs', step=1e-30, compact_print=True, out_stream=stream)
                 contents = stream.getvalue()
                 nsubjacs = 18
                 self.assertEqual(contents.count("step"), 0)
@@ -2114,7 +2109,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         p.setup(mode='fwd')
         p.run_model()
         stream = StringIO()
-        J = p.check_totals(step=[1e-6, 1e-7], out_stream=stream)
+        p.check_totals(step=[1e-6, 1e-7], out_stream=stream)
         contents = stream.getvalue()
         nsubjacs = 18
         self.assertEqual(contents.count("Full Model:"), nsubjacs)
@@ -2128,7 +2123,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         p.setup(mode='fwd')
         p.run_model()
         stream = StringIO()
-        J = p.check_totals(step=[1e-6, 1e-7], directional=True, out_stream=stream)
+        p.check_totals(step=[1e-6, 1e-7], directional=True, out_stream=stream)
         contents = stream.getvalue()
         self.assertEqual(contents.count("Full Model:"), 3)
         self.assertEqual(contents.count("Fd Magnitude:"), 6)
@@ -2141,7 +2136,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         p.setup(mode='rev')
         p.run_model()
         stream = StringIO()
-        J = p.check_totals(step=[1e-6, 1e-7], out_stream=stream)
+        p.check_totals(step=[1e-6, 1e-7], out_stream=stream)
         contents = stream.getvalue()
         nsubjacs = 18
         self.assertEqual(contents.count("Full Model:"), nsubjacs)
@@ -2155,7 +2150,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         p.setup(mode='rev')
         p.run_model()
         stream = StringIO()
-        J = p.check_totals(step=[1e-6, 1e-7], directional=True, out_stream=stream)
+        p.check_totals(step=[1e-6, 1e-7], directional=True, out_stream=stream)
         contents = stream.getvalue()
         self.assertEqual(contents.count("Full Model:"), 6)
         self.assertEqual(contents.count("Fd Magnitude:"), 12)
@@ -2170,7 +2165,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 p.setup(mode=mode)
                 p.run_model()
                 stream = StringIO()
-                J = p.check_totals(step=[1e-6, 1e-7], compact_print=True, out_stream=stream)
+                p.check_totals(step=[1e-6, 1e-7], compact_print=True, out_stream=stream)
                 contents = stream.getvalue()
                 nsubjacs = 18
                 self.assertEqual(contents.count("step"), 1)
@@ -2184,7 +2179,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 p.setup(mode=mode, force_alloc_complex=True)
                 p.run_model()
                 stream = StringIO()
-                J = p.check_totals(method='cs', step=[1e-20, 1e-30], compact_print=True, out_stream=stream)
+                p.check_totals(method='cs', step=[1e-20, 1e-30], compact_print=True, out_stream=stream)
                 contents = stream.getvalue()
                 nsubjacs = 18
                 self.assertEqual(contents.count("step"), 1)
@@ -2205,7 +2200,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                     p.setup(mode=mode)
                     p.run_model()
                     stream = StringIO()
-                    J = p.check_totals(step=[1e-6, 1e-7], compact_print=True, directional=True, out_stream=stream)
+                    p.check_totals(step=[1e-6, 1e-7], compact_print=True, directional=True, out_stream=stream)
                     contents = stream.getvalue()
                     self.assertEqual(contents.count("step"), 1)
                     # check number of rows/cols

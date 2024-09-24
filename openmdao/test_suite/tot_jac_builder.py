@@ -2,10 +2,8 @@
 A tool to make it easier to investigate coloring of jacobians with different sparsity structures.
 """
 
-import sys
 import numpy as np
 
-from openmdao.utils.general_utils import printoptions
 from openmdao.utils.coloring import _compute_coloring
 
 class TotJacBuilder(object):
@@ -15,9 +13,8 @@ class TotJacBuilder(object):
 
     def add_random_points(self, npoints):
         nrows, ncols = self.J.shape
-        count = 0
 
-        zro = self.J == False
+        zro = self.J is False
         flat = self.J[zro].flatten()
         flat[:npoints] = True
         np.random.shuffle(flat)
@@ -117,9 +114,6 @@ class TotJacBuilder(object):
         else:
             nrows, ncols = (100, 50)
             builder = TotJacBuilder(nrows, ncols)
-
-        J = builder.J
-        shape = J.shape
 
         # dense rows
         for row in range(n_dense_rows):

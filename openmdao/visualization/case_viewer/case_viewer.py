@@ -1,5 +1,6 @@
 """Widgets for accessing CaseReader in a Jupyter notebook."""
 
+import pathlib
 import re
 
 import numpy as np
@@ -306,13 +307,13 @@ class CaseViewer(object):
         if get_ipython() is None:
             raise RuntimeError('CaseViewer must be run from within a Jupyter notebook.')
         try:
-            import ipympl
+            import ipympl  # noqa: F401
         except ImportError:
             raise RuntimeError('CaseViewer requires ipympl')
 
         get_ipython().run_line_magic('matplotlib', 'widget')
 
-        self._case_reader = CaseReader(f) if isinstance(f, str) else f
+        self._case_reader = CaseReader(f) if isinstance(f, (str, pathlib.Path)) else f
 
         self._cmap = cm.viridis
 
@@ -481,7 +482,6 @@ class CaseViewer(object):
         if axis.lower() not in ('x', 'y'):
             raise ValueError(f'Unknown axis: {axis}')
 
-        src = self._widgets['source_select'].value
         cases = self._widgets['cases_list'].options
 
         if not cases:
@@ -522,7 +522,6 @@ class CaseViewer(object):
             if axis.lower() not in ('x', 'y'):
                 raise ValueError(f'Unknown axis: {axis}')
 
-            src = self._widgets['source_select'].value
             cases = self._widgets['cases_list'].options
 
             if not cases:
@@ -532,7 +531,6 @@ class CaseViewer(object):
 
             w_var_select = self._widgets[f'{axis}_select']
             var_filter = self._widgets[f'{axis}_filter'].value
-            var_select = w_var_select.value
             var_type = self._widgets[f'{axis}_var_type'].value
 
             if var_type == 'optimization':
@@ -943,7 +941,7 @@ class CaseViewer(object):
         """
         with self._widgets['debug_output']:
             cr = self._case_reader
-            src = self._widgets['source_select'].value
+            self._widgets['source_select'].value
             cases = self._widgets['cases_list'].options
             x_var = self._widgets['x_select'].value
             y_var = self._widgets['y_select'].value

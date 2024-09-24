@@ -10,8 +10,6 @@ from openmdao.core.parallel_group import ParallelGroup
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.indepvarcomp import IndepVarComp
 
-from openmdao.utils.mpi import MPI
-
 
 class DynComp(ExplicitComponent):
     """

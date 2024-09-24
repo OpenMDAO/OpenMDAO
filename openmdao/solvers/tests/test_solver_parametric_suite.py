@@ -3,7 +3,6 @@
 import numpy as np
 import unittest
 
-from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.assert_utils import assert_near_equal

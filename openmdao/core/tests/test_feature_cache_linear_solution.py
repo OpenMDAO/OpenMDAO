@@ -51,7 +51,6 @@ class CacheLinearTestCase(unittest.TestCase):
             def linearize(self, inputs, outputs, partials):
                 a = inputs['a'][0]
                 b = inputs['b'][0]
-                c = inputs['c'][0]
                 x = outputs['states'][0]
                 y = outputs['states'][1]
 

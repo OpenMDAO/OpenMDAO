@@ -25,7 +25,7 @@ class TestFindCite(unittest.TestCase):
         p.model.nonlinear_solver.cite = "foobar nonlinear_solver"
         p.model.linear_solver.cite = "foobar linear_solver"
 
-        indeps = p.model.add_subsystem('indeps', IndepVarComp('x', 10), promotes=['*'])
+        p.model.add_subsystem('indeps', IndepVarComp('x', 10), promotes=['*'])
 
         ec = p.model.add_subsystem('ec', MyImplComp(), promotes=['*'])
         ec.nonlinear_solver = NewtonSolver(solve_subsystems=False)
@@ -147,7 +147,7 @@ class TestFindCitePar(unittest.TestCase):
         p.model.nonlinear_solver.cite = "foobar nonlinear_solver"
         p.model.linear_solver.cite = "foobar linear_solver"
 
-        indeps = p.model.add_subsystem('indeps', IndepVarComp('x', 10), promotes=['*'])
+        p.model.add_subsystem('indeps', IndepVarComp('x', 10), promotes=['*'])
 
         par = p.model.add_subsystem('par', ParallelGroup(), promotes=['*'])
 

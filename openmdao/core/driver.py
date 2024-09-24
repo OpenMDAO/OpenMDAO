@@ -450,10 +450,10 @@ class Driver(object):
 
         self._split_dvs(model)
 
-        self._remote_dvs = remote_dv_dict = {}
-        self._remote_cons = remote_con_dict = {}
-        self._dist_driver_vars = dist_dict = {}
-        self._remote_objs = remote_obj_dict = {}
+        self._remote_dvs = {}
+        self._remote_cons = {}
+        self._dist_driver_vars = {}
+        self._remote_objs = {}
 
         # Only allow distributed design variables on drivers that support it.
         if self.supports['distributed_design_vars'] is False:
@@ -511,6 +511,8 @@ class Driver(object):
             rank = model.comm.rank
             nprocs = model.comm.size
 
+            dist_dict = self._dist_driver_vars
+
             # Loop over all VOIs.
             for vname, voimeta in chain(self._responses.items(), self._designvars.items()):
                 # vname may be a promoted name or an alias
@@ -552,11 +554,11 @@ class Driver(object):
                     sz = sizes[owner, i]
 
                     if vsrc in dv_set:
-                        remote_dv_dict[vname] = (owner, sz)
+                        self._remote_dvs[vname] = (owner, sz)
                     if vsrc in con_set:
-                        remote_con_dict[vname] = (owner, sz)
+                        self._remote_cons[vname] = (owner, sz)
                     if vsrc in obj_set:
-                        remote_obj_dict[vname] = (owner, sz)
+                        self._remote_objs[vname] = (owner, sz)
 
         self._remote_responses = self._remote_cons.copy()
         self._remote_responses.update(self._remote_objs)
@@ -609,6 +611,34 @@ class Driver(object):
         else:
             self._lin_dvs = {}
             self._nl_dvs = self._designvars
+
+    def _get_lin_dvs(self):
+        """
+        Get the design variables relevant to linear constraints.
+
+        If the driver does not support linear-only design variables, this will return all design
+        variables.
+
+        Returns
+        -------
+        dict
+            Dictionary containing design variables relevant to linear constraints.
+        """
+        return self._lin_dvs if self.supports['linear_only_designvars'] else self._designvars
+
+    def _get_nl_dvs(self):
+        """
+        Get the design variables relevant to nonlinear constraints.
+
+        If the driver does not support linear-only design variables, this will return all design
+        variables.
+
+        Returns
+        -------
+        dict
+            Dictionary containing design variables relevant to nonlinear constraints.
+        """
+        return self._nl_dvs if self.supports['linear_only_designvars'] else self._designvars
 
     def _check_for_missing_objective(self):
         """
@@ -1437,6 +1467,7 @@ class Driver(object):
         coloring = None
         info = self._coloring_info
         static = info.static
+        model = self._problem().model
 
         if isinstance(static, coloring_mod.Coloring):
             coloring = static
@@ -1447,13 +1478,18 @@ class Driver(object):
             if coloring is None and (static is coloring_mod._STD_COLORING_FNAME or
                                      isinstance(static, str)):
                 if static is coloring_mod._STD_COLORING_FNAME:
-                    fname = self._get_total_coloring_fname()
+                    fname = self._get_total_coloring_fname(mode='input')
                 else:
                     fname = static
 
-                print("loading total coloring from file %s" % fname)
+                print(f"loading total coloring from file {fname}")
                 coloring = info.coloring = coloring_mod.Coloring.load(fname)
                 info.update(coloring._meta)
+
+                ofname = self._get_total_coloring_fname(mode='output')
+                if ((model._full_comm is not None and model._full_comm.rank == 0) or
+                        (model._full_comm is None and model.comm.rank == 0)):
+                    coloring.save(ofname)
 
         if coloring is not None and info.static is not None:
             problem = self._problem()
@@ -1470,8 +1506,8 @@ class Driver(object):
 
         return coloring
 
-    def _get_total_coloring_fname(self):
-        return os.path.join(self._problem().options['coloring_dir'], 'total_coloring.pkl')
+    def _get_total_coloring_fname(self, mode='output'):
+        return self._problem().get_coloring_dir(mode='output') / 'total_coloring.pkl'
 
     def scaling_report(self, outfile='driver_scaling_report.html', title=None, show_browser=True,
                        jac=True):
@@ -1611,10 +1647,13 @@ class Driver(object):
             if run_model and self._coloring_info.coloring is not None:
                 issue_warning("The 'run_model' argument is ignored because the coloring has "
                               "already been computed.")
+
             if self._coloring_info.dynamic and self._coloring_info.do_compute_coloring():
+                ofname = self._get_total_coloring_fname(mode='output')
                 self._coloring_info.coloring = \
-                    coloring_mod.dynamic_total_coloring(self, run_model=run_model,
-                                                        fname=self._get_total_coloring_fname())
+                    coloring_mod.dynamic_total_coloring(self,
+                                                        run_model=run_model,
+                                                        fname=ofname)
 
             return self._coloring_info.coloring
 

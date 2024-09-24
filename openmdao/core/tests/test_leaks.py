@@ -1,19 +1,9 @@
 
 import unittest
-import gc
-from contextlib import contextmanager
-from types import FunctionType, MethodType, CoroutineType, GeneratorType, FrameType
-from collections import defaultdict
 from io import StringIO
 
 import openmdao.api as om
 from openmdao.core.tests.test_coloring import run_opt
-from openmdao.core.system import System
-from openmdao.vectors.vector import Vector
-from openmdao.solvers.solver import Solver
-from openmdao.core.driver import Driver
-from openmdao.jacobians.jacobian import Jacobian
-from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.devtools.memory import check_iter_leaks, list_iter_leaks
 from openmdao.utils.testing_utils import use_tempdirs

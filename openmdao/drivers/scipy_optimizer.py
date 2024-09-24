@@ -626,7 +626,7 @@ class ScipyOptimizeDriver(Driver):
 
             self._update_design_vars(x_new)
 
-            with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
+            with RecordingDebugging(self._get_name(), self.iter_count, self):
                 self.iter_count += 1
                 with model._relevance.nonlinear_active('iter'):
                     self._run_solve_nonlinear()
@@ -638,7 +638,7 @@ class ScipyOptimizeDriver(Driver):
 
             self._con_cache = self.get_constraint_values()
 
-        except Exception as msg:
+        except Exception:
             if self._exc_info is None:  # only record the first one
                 self._exc_info = sys.exc_info()
             return 0

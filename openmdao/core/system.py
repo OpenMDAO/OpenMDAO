@@ -2,6 +2,7 @@
 import sys
 import os
 import hashlib
+import pathlib
 import time
 import functools
 
@@ -16,8 +17,8 @@ from numbers import Integral
 
 import numpy as np
 
-from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE, INF_BOUND, \
-    _SetupStatus
+from openmdao.core.constants import _DEFAULT_COLORING_DIR, _DEFAULT_OUT_STREAM, \
+    _UNDEFINED, INT_DTYPE, INF_BOUND, _SetupStatus
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
@@ -37,7 +38,8 @@ from openmdao.utils.om_warnings import issue_warning, \
     DerivativesWarning, PromotionWarning, UnusedOptionWarning, UnitsWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, all_ancestors, match_prom_or_abs, \
-    ensure_compatible, env_truthy, make_traceback, _is_slicer_op
+    ensure_compatible, env_truthy, make_traceback, _is_slicer_op, _wrap_comm, _unwrap_comm, \
+    _om_mpi_debug, SystemMeta
 from openmdao.utils.file_utils import _get_outputs_dir
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -75,11 +77,11 @@ _recordable_funcs = frozenset(['_apply_linear', '_apply_nonlinear', '_solve_line
 
 # the following are local metadata that will also be accessible for vars on all procs
 global_meta_names = {
-    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc', 'shape_by_conn',
-              'compute_shape', 'copy_shape'),
+    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc',
+              'shape_by_conn', 'compute_shape', 'copy_shape', 'require_connection'),
     'output': ('units', 'shape', 'size', 'desc',
-               'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags', 'shape_by_conn',
-               'compute_shape', 'copy_shape'),
+               'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags',
+               'shape_by_conn', 'compute_shape', 'copy_shape'),
 }
 
 allowed_meta_names = {
@@ -171,7 +173,7 @@ def collect_errors(method):
     return wrapper
 
 
-class System(object):
+class System(object, metaclass=SystemMeta):
     """
     Base class for all systems in OpenMDAO.
 
@@ -195,7 +197,7 @@ class System(object):
         Name of the system, must be different from siblings.
     pathname : str
         Global name of the system, including the path.
-    comm : MPI.Comm or <FakeComm>
+    _comm : MPI.Comm or <FakeComm>
         MPI communicator object.
     options : OptionsDictionary
         options dictionary
@@ -402,7 +404,7 @@ class System(object):
         """
         self.name = ''
         self.pathname = None
-        self.comm = None
+        self._comm = None
         self._is_local = False
 
         # System options
@@ -537,6 +539,55 @@ class System(object):
         self._promotion_tree = None
 
         self._during_sparsity = False
+
+    if _om_mpi_debug:
+        @property
+        def comm(self):
+            """
+            Return the wrapped MPI communicator object for the system.
+
+            Returns
+            -------
+            DebugComm
+                Wrapped MPI communicator object.
+            """
+            return _wrap_comm(self._comm, self.msginfo)
+
+        @comm.setter
+        def comm(self, comm):
+            """
+            Set the MPI communicator object for the system.
+
+            Parameters
+            ----------
+            comm : MPI.Comm or DebugComm
+                Wrapped or unwrapped MPI communicator object.
+            """
+            self._comm = _unwrap_comm(comm)
+    else:
+        @property
+        def comm(self):
+            """
+            Return the MPI communicator object for the system.
+
+            Returns
+            -------
+            MPI.Comm
+                MPI communicator object.
+            """
+            return self._comm
+
+        @comm.setter
+        def comm(self, comm):
+            """
+            Set the MPI communicator object for the system.
+
+            Parameters
+            ----------
+            comm : MPI.Comm
+                MPI communicator object.
+            """
+            self._comm = comm
 
     @property
     def under_approx(self):
@@ -1551,7 +1602,8 @@ class System(object):
             if not info.per_instance:
                 # save the class coloring for so resources won't be wasted computing
                 # a bad coloring
-                coloring_mod._CLASS_COLORINGS[self.get_coloring_fname()] = None
+                fname = self.get_coloring_fname(mode='output')
+                coloring_mod._CLASS_COLORINGS[fname] = None
             return False
 
         sp_info['sparsity_time'] = sparsity_time
@@ -1583,7 +1635,8 @@ class System(object):
 
         if not info.per_instance:
             # save the class coloring for other instances of this class to use
-            coloring_mod._CLASS_COLORINGS[self.get_coloring_fname()] = coloring
+            ofname = self.get_coloring_fname(mode='output')
+            coloring_mod._CLASS_COLORINGS[ofname] = coloring
 
         return True
 
@@ -1666,7 +1719,7 @@ class System(object):
         if info.coloring is None and info.static is None:
             info.dynamic = True
 
-        coloring_fname = self.get_coloring_fname()
+        coloring_fname = self.get_coloring_fname(mode='output')
 
         # if we find a previously computed class coloring for our class, just use that
         # instead of regenerating a coloring.
@@ -1786,19 +1839,32 @@ class System(object):
     def _setup_approx_coloring(self):
         pass
 
-    def get_coloring_fname(self):
+    def get_coloring_fname(self, mode):
         """
         Return the full pathname to a coloring file.
 
+        Parameters
+        ----------
+        mode : str
+            The type of coloring file desired. Must be either 'input' or 'output'.
+
         Returns
         -------
-        str
+        pathlib.Path
             Full pathname of the coloring file.
         """
-        directory = self._problem_meta['coloring_dir']
+        prob_coloring_dir = self._problem_meta['coloring_dir']
+        if mode == 'output' or prob_coloring_dir is _DEFAULT_COLORING_DIR:
+            directory = self.get_outputs_dir('coloring_files', mkdir=True)
+        elif mode == 'input':
+            directory = pathlib.Path(prob_coloring_dir).absolute()
+        else:
+            raise ValueError(f"{self.msginfo}: get_coloring_fname requires mode"
+                             "to be one of 'input' or 'output'.")
+
         if not self.pathname:
             # total coloring
-            return os.path.join(directory, 'total_coloring.pkl')
+            return directory / 'total_coloring.pkl'
 
         if self._coloring_info.per_instance:
             # base the name on the instance pathname
@@ -1808,7 +1874,7 @@ class System(object):
             fname = 'coloring_' + '_'.join(
                 [self.__class__.__module__.replace('.', '_'), self.__class__.__name__]) + '.pkl'
 
-        return os.path.join(directory, fname)
+        return directory / fname
 
     def _save_coloring(self, coloring):
         """
@@ -1822,7 +1888,7 @@ class System(object):
         # under MPI, only save on proc 0
         if ((self._full_comm is not None and self._full_comm.rank == 0) or
                 (self._full_comm is None and self.comm.rank == 0)):
-            coloring.save(self.get_coloring_fname())
+            coloring.save(self.get_coloring_fname(mode='output'))
 
     def _get_static_coloring(self):
         """
@@ -1842,12 +1908,18 @@ class System(object):
 
         static = info.static
         if static is _STD_COLORING_FNAME or isinstance(static, str):
+            std_fname = self.get_coloring_fname(mode='input')
             if static is _STD_COLORING_FNAME:
-                fname = self.get_coloring_fname()
+                fname = std_fname
             else:
                 fname = static
-            print("%s: loading coloring from file %s" % (self.msginfo, fname))
+            print(f"{self.msginfo}: loading coloring from file {fname}")
             info.coloring = coloring = Coloring.load(fname)
+
+            if fname != std_fname:
+                # save it in the standard location
+                self._save_coloring(coloring)
+
             if info.wrt_patterns != coloring._meta['wrt_patterns']:
                 raise RuntimeError("%s: Loaded coloring has different wrt_patterns (%s) than "
                                    "declared ones (%s)." %
@@ -5433,9 +5505,9 @@ class System(object):
                         elif tunits is not None:
                             value = model.convert_from_units(src, value, tunits)
                         else:
-                            msg = f"A value with no units has been specified for input " + \
+                            msg = "A value with no units has been specified for input " + \
                                   f"'{name}', but the source ('{src}') has units '{sunits}'. " + \
-                                  f"No unit checking can be done."
+                                  "No unit checking can be done."
                             issue_warning(msg, prefix=self.msginfo, category=UnitsWarning)
                 else:
                     if gunits is None:
@@ -6549,3 +6621,63 @@ class System(object):
             Array of sizes of the variable on all procs.
         """
         return self._var_sizes[io][:, self._var_allprocs_abs2idx[name]]
+
+    def _sys_tree_visitor(self, func, predicate=None, recurse=True, include_self=True,
+                          yield_none=False, *args, **kwargs):
+        """
+        Yield the result of applying the given function to each System that satisfies the predicate.
+
+        The object yielded must be picklable if any System is running in a different process.
+
+        Parameters
+        ----------
+        func : callable
+            A callable that takes a System and args and kwargs and returns an object.
+        predicate : callable or None
+            A callable that takes a System as its only argument and returns -1, 0, or 1.
+            If it returns 1, apply the function to the system.
+            If it returns 0, don't apply the function, but continue on to the system's subsystems.
+            If it returns -1, don't apply the function and don't continue on to the system's
+            subsystems.
+            If predicate is None, the function is always applied.
+        recurse : bool
+            If True, function is applied to all subsystems of subsystems.
+        include_self : bool
+            If True, apply the function to the Group itself.
+        yield_none : bool
+            If False, don't yield None results.
+        args : tuple
+            Additional positional args to be passed to the function.
+        kwargs : dict
+            Additional keyword args to be passed to the function.
+
+        Yields
+        ------
+        object
+            The result of the function.
+        """
+        if include_self:
+            pred = 1 if predicate is None else predicate(self)
+            if pred == 1:
+                if yield_none:
+                    yield func(self, *args, **kwargs)
+                else:
+                    res = func(self, *args, **kwargs)
+                    if res is not None:
+                        yield res
+            elif pred == -1:
+                return
+
+        if recurse:
+            for s in self._subsystems_myproc:
+                yield from s._sys_tree_visitor(func, predicate, recurse=True, include_self=True,
+                                               *args, **kwargs)
+        else:
+            for s in self._subsystems_myproc:
+                if pred is None or predicate(s) == 1:
+                    if yield_none:
+                        yield func(s, *args, **kwargs)
+                    else:
+                        res = func(s, *args, **kwargs)
+                        if res is not None:
+                            yield res

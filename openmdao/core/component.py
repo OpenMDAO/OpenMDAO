@@ -2,7 +2,6 @@
 
 import sys
 import types
-from types import LambdaType
 from collections import defaultdict
 from collections.abc import Iterable
 from itertools import product
@@ -17,9 +16,8 @@ from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_M
 from openmdao.core.constants import INT_DTYPE
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.array_utils import shape_to_len
-from openmdao.utils.class_util import overrides_method
 from openmdao.utils.units import simplify_unit
-from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_name2abs_name
+from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     find_matches, make_set, inconsistent_across_procs
@@ -129,32 +127,6 @@ class Component(System):
                                   'included in the optimization loop even if this component is not '
                                   'relevant to the design variables and responses.')
 
-    def _check_matfree_deprecation(self):
-        # check for mixed distributed variables
-        has_dist_ins = has_nd_ins = has_dist_outs = has_nd_outs = False
-        for name in self._var_rel_names['input']:
-            meta = self._var_rel2meta[name]
-            if meta['distributed']:
-                has_dist_ins = True
-            else:
-                has_nd_ins = True
-
-        for name in self._var_rel_names['output']:
-            meta = self._var_rel2meta[name]
-            if meta['distributed']:
-                has_dist_outs = True
-            else:
-                has_nd_outs = True
-
-        if (has_nd_ins and has_dist_outs) or (has_dist_ins and has_nd_outs):
-            warn_deprecation(f"{self.msginfo}: It appears this component mixes "
-                             "distributed/non-distributed inputs and outputs, so it may break "
-                             "starting with OpenMDAO 3.25, where the convention "
-                             "used when passing data between distributed and non-distributed "
-                             "inputs and outputs within a matrix free component will change. "
-                             "See https://github.com/OpenMDAO/POEMs/blob/master/POEM_075.md for "
-                             "details.")
-
     def setup(self):
         """
         Declare inputs and outputs.
@@ -194,7 +166,6 @@ class Component(System):
                 self._num_par_fd = 1
 
         self.comm = comm
-        nprocs = comm.size
 
         # Clear out old variable information so that we can call setup on the component.
         self._var_rel_names = {'input': [], 'output': []}
@@ -519,7 +490,8 @@ class Component(System):
                     self._subjacs_info[abs_key]['sparsity'] = tup
 
     def add_input(self, name, val=1.0, shape=None, units=None, desc='', tags=None,
-                  shape_by_conn=False, copy_shape=None, compute_shape=None, distributed=None):
+                  shape_by_conn=False, copy_shape=None, compute_shape=None,
+                  require_connection=False, distributed=None):
         """
         Add an input variable to the component.
 
@@ -548,6 +520,8 @@ class Component(System):
         compute_shape : function
             A function taking a dict arg containing names and shapes of this component's outputs
             and returning the shape of this input.
+        require_connection : bool
+            If True and this input is not a design variable, it must be connected to an output.
         distributed : bool
             If True, this variable is a distributed variable, so it can have different sizes/values
             across MPI processes.
@@ -620,11 +594,12 @@ class Component(System):
             'flat_src_indices': None,
             'units': units,
             'desc': desc,
-            'distributed': distributed,
             'tags': make_set(tags),
             'shape_by_conn': shape_by_conn,
             'compute_shape': compute_shape,
             'copy_shape': copy_shape,
+            'require_connection': require_connection,
+            'distributed': distributed,
         }
 
         # this will get reset later if comm size is 1
