@@ -8,25 +8,25 @@ class AnalysisGenerator(Iterator):
 
     Parameter
     ---------
-    cases : dict
+    var_dict : dict
         A dictionary whose keys are promoted paths of variables to be set, and whose
         keys are the arguments to `set_val`.
     """
     
-    def __init__(self, cases=None):
+    def __init__(self, var_dict):
         super().__init__()
         self._run_count = 0
         self._vars = {}
         self._iter = None
 
-        if cases is not None:
-            self._setup(cases)
+        if var_dict is not None:
+            self._setup(var_dict)
 
-    def _setup(self, cases):
+    def _setup(self, var_dict):
         """
         
         """
-        self._vars = cases.copy()
+        self._vars = var_dict.copy()
         self._run_count = 0
 
     def __next__(self):
@@ -40,7 +40,7 @@ class AnalysisGenerator(Iterator):
         Raises
         ------
         StopIteration
-            When all analysis cases have been exhausted.
+            When all analysis var_dict have been exhausted.
 
         Returns
         -------
@@ -64,14 +64,14 @@ class ZipGenerator(AnalysisGenerator):
     """
     A generator which provides case data for AnalysisDriver by zipping values of each factor.
     """
-     
-    def _setup(self, cases):
+
+    def _setup(self, var_dict):
         """
         Setup the iterator which provides each case.
 
         Parameters
         ----------
-        cases : dict
+        var_dict : dict
             A dictionary which maps promoted path names of variables to be
             set in each itearation with their values to be assumed (required),
             units (optional), and indices (optional).
@@ -79,16 +79,16 @@ class ZipGenerator(AnalysisGenerator):
         Raises
         ------
         ValueError
-            Raised if the length of samples for each case are not all the same size.
+            Raised if the length of var_dict for each case are not all the same size.
         """
-        super()._setup(cases)
-        _case_vals = (c['val'] for c in cases.values())
-        _lens = (len(_c) for _c in _case_vals)
+        super()._setup(var_dict)
+        sampler = (c['val'] for c in var_dict.values())
+        _lens = (len(_c) for _c in sampler)
         if len(set(_lens)) != 1:
-            raise ValueError('zip sampler requires that val '
-                             f'for all cases have the same length\n{_lens}')
-        _case_vals = (c['val'] for c in cases.values())
-        self._iter = zip(*_case_vals)
+            raise ValueError('ZipGenerator requires that val '
+                             f'for all var_dict have the same length: {_lens}')
+        sampler = (c['val'] for c in var_dict.values())
+        self._iter = zip(*sampler)
 
 
 class ProductGenerator(AnalysisGenerator):
@@ -96,13 +96,13 @@ class ProductGenerator(AnalysisGenerator):
     A generator which provides full-factorial case data for AnalysisDriver.
     """
 
-    def _setup(self, cases):
+    def _setup(self, var_dict):
         """
         Setup the iterator which provides each case.
 
         Parameters
         ----------
-        cases : dict
+        var_dict : dict
             A dictionary which maps promoted path names of variables to be
             set in each itearation with their values to be assumed (required),
             units (optional), and indices (optional).
@@ -110,26 +110,8 @@ class ProductGenerator(AnalysisGenerator):
         Raises
         ------
         ValueError
-            Raised if the length of samples for each case are not all the same size.
+            Raised if the length of var_dict for each case are not all the same size.
         """
-        super()._setup(cases)
-        _case_vals = (c['val'] for c in cases.values())
-        self._iter = itertools.product(*_case_vals)
-
-
-if __name__ == '__main__':
-    cases = {'x': dict(val=[2, 3, 4], units='m'),
-             'y': dict(val=[0.0, 0.5, 1.0], units='km'),
-             'z': dict(val=3*['a'], units='kg')}
-
-    g = ProductGenerator(cases)
-    
-    for design_point in g:
-        print(design_point)
-
-    g = ZipGenerator(cases)
-    
-    for design_point in g:
-        print(design_point)
-
-    
+        super()._setup(var_dict)
+        sampler = (c['val'] for c in var_dict.values())
+        self._iter = itertools.product(*sampler)
