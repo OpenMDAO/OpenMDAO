@@ -3131,7 +3131,9 @@ class DummyClass(object):
         # for the instance is not available since the module containing it was removed
 
         # need to check for warning being issued about not being able to read it
-        with assert_warning(RuntimeWarning, "While reading system options from case recorder, the following errors occurred: No module named 'mymodule'"):
+        with assert_warning(RuntimeWarning,
+                            "While reading parab_with_dummy_metadata component options from case recorder, "
+                            "the following errors occurred: No module named 'mymodule'"):
             cr = om.CaseReader('test_reading_non_importable_objects_in_system_options_out/cases.sql')
 
         # Check to see that all the component options for the DummyClass are retrievable from the case recorder file
@@ -3181,6 +3183,54 @@ class DummyClass(object):
         objs = case.get_objectives()
         self.assertEqual(set(objs.keys()), {'z'})
 
+    def test_pickle_vulnerability(self):
+        # test handling of vulnerability https://github.com/advisories/GHSA-g4r7-86gm-pgqc
+        class Payload:
+            def __reduce__(self):
+                return os.system, ('touch pwned.txt',)
+
+        class PayloadComp(om.ExplicitComponent):
+            def initialize(self):
+                self.options.declare('payload', Payload())
+
+            def setup(self):
+                self.add_input('x')
+                self.add_output('y')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 2 * inputs['x']
+
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('comp1', PayloadComp(), promotes=['*'])
+        model.add_subsystem('comp2', om.ExecComp('z = y * 2'), promotes=['*'])
+
+        model.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.run_model()
+
+        self.maxDiff = None
+        with assert_warning(RuntimeWarning,
+                            "While reading comp1 component options from case recorder, "
+                            "the following errors occurred: "
+                            "Error unpickling global, 'posix.system' is forbidden"):
+            om.CaseReader(prob.get_outputs_dir() / self.filename)
+
+        # unpickling the case should not allow the payload to execute
+        files = os.listdir(os.getcwd())
+        # print(f"{os.getcwd()=}")
+        # from pprint import pprint
+        # pprint(files)
+
+        self.assertTrue('pwned.txt' not in files, "Payload was allowed to execute")
+
+        # from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
+        # d = _get_viewer_data(prob.get_outputs_dir() / self.filename)
+        # from pprint import pprint
+        # pprint(d['tree'])
+
+        # om.n2(prob.get_outputs_dir() / self.filename)
 
 @use_tempdirs
 class TestFeatureSqliteReader(unittest.TestCase):
