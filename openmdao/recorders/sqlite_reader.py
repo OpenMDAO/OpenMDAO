@@ -77,8 +77,8 @@ class _RestrictedUnpicklerForCaseReader(pickle.Unpickler):
 
     def find_class(self, module, name):
         # Only allow safe classes from builtins and posix.
-        if module == 'builtins' and name not in safe_builtins or \
-           module == 'posix' and name == 'system':
+        if (module == 'builtins' and name not in safe_builtins) or \
+           (module in ('posix', 'nt') and name == 'system'):
             if self.error_strings:
                 self.error_strings += ', '
             self.error_strings += f"Error unpickling global, '{module}.{name}' is forbidden"
