@@ -135,21 +135,6 @@ class ExplicitComponent(Component):
         """
         Call setup_partials in components.
         """
-        # if self.options['derivs_method'] in ('cs', 'fd'):
-        #     self._has_approx = True
-        #     method = self.options['derivs_method']
-        #     if not self._declared_partials_patterns:
-        #         # declare all partials as 'cs' or 'fd'
-        #         for of, wrt in get_partials_deps(self.compute_primal,
-        #                                          self._var_rel_names['output']):
-        #             self.declare_partials(of, wrt, method=method)
-        #         super()._setup_partials()
-        #     else:
-        #         super()._setup_partials()
-        #         # declare only those partials that have been declared
-        #         for of, wrt in self._declared_partials_patterns:
-        #             self._approx_partials(of, wrt, method=method)
-        # else:
         super()._setup_partials()
 
         if self.matrix_free:
