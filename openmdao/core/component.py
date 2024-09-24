@@ -1232,7 +1232,8 @@ class Component(System):
                          perturb_size=_DEFAULT_COLORING_META['perturb_size'],
                          min_improve_pct=_DEFAULT_COLORING_META['min_improve_pct'],
                          show_summary=_DEFAULT_COLORING_META['show_summary'],
-                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity']):
+                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity'],
+                         use_shape_correction=False):
         """
         Set options for deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -1268,11 +1269,13 @@ class Component(System):
             If True, display summary information after generating coloring.
         show_sparsity : bool
             If True, display sparsity with coloring info after generating coloring.
+        use_shape_correction : bool
+            If True, use shape correction if computing bidirectional coloring.
         """
         super().declare_coloring(wrt, method, form, step, per_instance,
                                  num_full_jacs,
                                  tol, orders, perturb_size, min_improve_pct,
-                                 show_summary, show_sparsity)
+                                 show_summary, show_sparsity, use_shape_correction)
 
         # create approx partials for all matches
         meta = self.declare_partials('*', wrt, method=method, step=step, form=form)
