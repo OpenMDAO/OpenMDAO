@@ -201,7 +201,7 @@ jobs:
           echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v3
@@ -344,8 +344,8 @@ jobs:
           conda install graphviz
           python -m pip install pyparsing psutil objgraph pyxdsm pydot
 
-          echo "Pre-install playwright dependencies to avoid warning messages"
-          playwright install --with-deps || true
+          echo "Pre-install playwright dependencies to avoid 'Playwright Host validation warning'"
+          playwright install --with-deps
 
       - name: Display environment info
         id: env_info
@@ -632,7 +632,7 @@ jobs:
           script: core.setFailed('The ${{ matrix.NAME }} job was excluded from the run, exiting...');
 
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v3
