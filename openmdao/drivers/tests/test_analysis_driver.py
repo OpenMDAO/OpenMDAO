@@ -11,6 +11,7 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
 from openmdao.drivers.analysis_driver import AnalysisDriver
+from openmdao.drivers.analysis_generators import ProductGenerator, ZipGenerator
 
 
 try:
@@ -116,15 +117,32 @@ class TestAnalysisDriverParallel(unittest.TestCase):
         #     {('f_xy', 'x'): np.array(-3.), ('f_xy', 'y'): np.array(11.)},
         # ]
 
-    def test_simple(self):
-        cases = self.fullfact3
+    def test_simple_fullfac3(self):
+        """
+        Test AnalysisDriver with an explicit list of samples to be run.
+        """
+        samples = [
+            {'x': {'val': 0.}, 'y': {'val': 0.}},
+            {'x': {'val': .5}, 'y': {'val': 0.}},
+            {'x': {'val': 1.}, 'y': {'val': 0.}},
+
+            {'x': {'val': 0.}, 'y': {'val': 0.5}},
+            {'x': {'val': .5}, 'y': {'val': 0.5}},
+            {'x': {'val': 1.}, 'y': {'val': 0.5}},
+
+            {'x': {'val': 0.}, 'y': {'val': 1.}},
+            {'x': {'val': .5}, 'y': {'val': 1.}},
+            {'x': {'val': 1.}, 'y': {'val': 1.}},
+        ]
 
         prob = om.Problem()
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = AnalysisDriver(cases=cases)
+        prob.driver = AnalysisDriver(samples=samples)
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.driver.add_response('f_xy', units=None, indices=[0])
 
         prob.setup()
         prob.run_driver()
@@ -132,12 +150,71 @@ class TestAnalysisDriverParallel(unittest.TestCase):
 
         if prob.comm.rank == 0:
             num_recorded_cases = 0
-            for file in glob.glob(str(prob.get_outputs_dir() / "cases.sql_*")):
+            for file in glob.glob(str(prob.get_outputs_dir() / "cases.sql*")):
                 if file.endswith('meta'):
                     continue
                 cr = om.CaseReader(file)
                 num_recorded_cases += len(cr.list_cases(out_stream=None))
             self.assertEqual(num_recorded_cases, 9)
+        
+    def test_product_generator(self):
+        """
+        Test AnalysisDriver with an explicit list of samples to be run.
+        """
+        samples = {'x': {'val': [0.0, 0.5, 1.0]},
+                   'y': {'val': [0.0, 0.5, 1.0]}}
+
+        prob = om.Problem()
+
+        prob.model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        prob.driver = AnalysisDriver(samples=ProductGenerator(samples))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.driver.add_response('f_xy', units=None, indices=[0])
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        if prob.comm.rank == 0:
+            num_recorded_cases = 0
+            for file in glob.glob(str(prob.get_outputs_dir() / "cases.sql*")):
+                if file.endswith('meta'):
+                    continue
+                cr = om.CaseReader(file)
+                num_recorded_cases += len(cr.list_cases(out_stream=None))
+            self.assertEqual(num_recorded_cases, 9)
+
+    def test_zip_generator(self):
+        """
+        Test AnalysisDriver with an explicit list of samples to be run.
+        """
+        samples = {'x': {'val': [0.0, 0.5, 1.0, 1.5, 2.0]},
+                   'y': {'val': [0.0, 0.5, 1.0, 1.5, 2.0]}}
+
+        prob = om.Problem()
+
+        prob.model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        prob.driver = AnalysisDriver(samples=ZipGenerator(samples))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.driver.add_response('f_xy', units=None, indices=[0])
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        if prob.comm.rank == 0:
+            num_recorded_cases = 0
+            for file in glob.glob(str(prob.get_outputs_dir() / "cases.sql*")):
+                if file.endswith('meta'):
+                    continue
+                cr = om.CaseReader(file)
+                num_recorded_cases += len(cr.list_cases(out_stream=None))
+            self.assertEqual(num_recorded_cases, 5)
+        
 
         # if prob.comm.rank == 0:
         #     cases = cr.list_cases()#, out_stream=None)
