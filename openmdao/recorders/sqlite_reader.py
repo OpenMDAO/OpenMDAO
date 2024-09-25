@@ -71,7 +71,7 @@ class _RestrictedUnpicklerForCaseReader(pickle.Unpickler):
         self.error_strings = ''  # Used to document which classes are not available
 
     def find_class(self, module, name):
-        # Only allow safe classes from builtins and posix.
+        # Disallow some unsafe function calls during unpickling.
         if (module == 'builtins' and name in ('eval', 'exec')) or \
            (name == 'system' and module in ('posix', 'nt')):
             if self.error_strings:
