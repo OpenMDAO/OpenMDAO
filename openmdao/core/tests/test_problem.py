@@ -812,7 +812,7 @@ class TestProblem(unittest.TestCase):
         _make_and_run()
 
         msg1 = "The problem name 'test_duplicate_prob_name' already exists"
-        
+
         msg2 = ("A report with the name 'scaling' for instance "
               "'test_duplicate_prob_name.driver' is already active.")
 
