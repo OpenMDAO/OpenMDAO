@@ -62,6 +62,15 @@ class UnknownType:
         pass
 
 
+# don't allow these functions when unpickling
+_unsafe = (
+    ('builtins', 'eval'),
+    ('builtins', 'exec'),
+    ('posix', 'system'),
+    ('nt', 'system'),
+)
+
+
 class _RestrictedUnpicklerForCaseReader(pickle.Unpickler):
 
     def __init__(self, file, *, fix_imports=True, encoding="ASCII",
@@ -72,8 +81,7 @@ class _RestrictedUnpicklerForCaseReader(pickle.Unpickler):
 
     def find_class(self, module, name):
         # Disallow some unsafe function calls during unpickling.
-        if (module == 'builtins' and name in ('eval', 'exec')) or \
-           (name == 'system' and module in ('posix', 'nt')):
+        if (module, name) in _unsafe:
             if self.error_strings:
                 self.error_strings += ', '
             self.error_strings += f"Error unpickling global, '{module}.{name}' is forbidden"
