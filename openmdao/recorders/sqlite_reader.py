@@ -34,9 +34,41 @@ class UnknownType:
 
     Used to indicate the unpickler can't generate an instance of a class
     whose class definition is not available
+
+    Parameters
+    ----------
+    *args : list
+        Positional args.
+    **kwargs : dict
+        Keyword args.
     """
 
-    pass
+    def __init__(*args, **kwargs):
+        """
+        Construct an object representing an unknown type.
+
+        Parameters
+        ----------
+        *args : list
+            Positional args.
+        **kwargs : dict
+            Keyword args.
+
+        Returns
+        -------
+        object
+            The returned UnknownType object
+        """
+        pass
+
+
+# don't allow these functions when unpickling
+_unsafe = (
+    ('builtins', 'eval'),
+    ('builtins', 'exec'),
+    ('posix', 'system'),
+    ('nt', 'system'),
+)
 
 
 class _RestrictedUnpicklerForCaseReader(pickle.Unpickler):
@@ -48,6 +80,13 @@ class _RestrictedUnpicklerForCaseReader(pickle.Unpickler):
         self.error_strings = ''  # Used to document which classes are not available
 
     def find_class(self, module, name):
+        # Disallow some unsafe function calls during unpickling.
+        if (module, name) in _unsafe:
+            if self.error_strings:
+                self.error_strings += ', '
+            self.error_strings += f"Error unpickling global, '{module}.{name}' is forbidden"
+            return UnknownType
+
         try:
             return super().find_class(module, name)
         except ModuleNotFoundError as e:
@@ -55,9 +94,8 @@ class _RestrictedUnpicklerForCaseReader(pickle.Unpickler):
                 self.error_strings += ', '
             self.error_strings += str(e)
 
-        # Returning this acts as a kind of flag to indicate that
-        # the unpickler can't generate instances of classes whose class definition
-        # is not available
+        # Returning this acts as a kind of flag to indicate that the unpickler can't
+        # generate instances of classes whose class definition is not available
         return UnknownType
 
     def loads_and_return_errors(self):
@@ -65,18 +103,24 @@ class _RestrictedUnpicklerForCaseReader(pickle.Unpickler):
         return unpickled_contents, self.error_strings
 
 
-def _loads_and_return_errors(s):
+def _safer_unpickle(s, desc, compressed=False):
     """
-    Unpickle input and also note errors. Analogous to pickle.loads().
-
-    But handles unpickling objects with no class definition available.
+    Unpickle input and issue a warning for any errors. Analogous to pickle.loads().
     """
-    i = io.BytesIO(s)
+    if compressed:
+        i = io.BytesIO(zlib.decompress(s))
+    else:
+        i = io.BytesIO(s)
 
     # returns a tuple of the value and also error strings
-    dictionary, error_string = _RestrictedUnpicklerForCaseReader(i).loads_and_return_errors()
+    data, errs = _RestrictedUnpicklerForCaseReader(i).loads_and_return_errors()
 
-    return dictionary, error_string
+    if errs:
+        issue_warning(f"While reading {desc} from case recorder, the "
+                      f"following errors occurred: {errs}",
+                      category=RuntimeWarning)
+
+    return data
 
 
 class SqliteCaseReader(BaseCaseReader):
@@ -306,14 +350,14 @@ class SqliteCaseReader(BaseCaseReader):
             abs2meta = row['abs2meta']
 
             try:
-                self._abs2prom = pickle.loads(abs2prom)
-                self._prom2abs = pickle.loads(prom2abs)
-                self._abs2meta = pickle.loads(abs2meta)
+                self._abs2prom = _safer_unpickle(abs2prom, 'abs2prom dictionary')
+                self._prom2abs = _safer_unpickle(prom2abs, 'prom2abs dictionary')
+                self._abs2meta = _safer_unpickle(abs2meta, 'abs2meta dictionary')
             except TypeError:
                 # Reading in a python 2 pickle recorded pre-OpenMDAO 2.4.
-                self._abs2prom = pickle.loads(abs2prom.encode())
-                self._prom2abs = pickle.loads(prom2abs.encode())
-                self._abs2meta = pickle.loads(abs2meta.encode())
+                self._abs2prom = _safer_unpickle(abs2prom.encode(), 'abs2prom dictionary')
+                self._prom2abs = _safer_unpickle(prom2abs.encode(), 'prom2abs dictionary')
+                self._abs2meta = _safer_unpickle(abs2meta.encode(), 'abs2meta dictionary')
 
         self.problem_metadata['abs2prom'] = self._abs2prom
 
@@ -335,7 +379,7 @@ class SqliteCaseReader(BaseCaseReader):
             if self._format_version >= 3:
                 driver_metadata = json_loads(row[0])
             elif self._format_version in (1, 2):
-                driver_metadata = pickle.loads(row[0])
+                driver_metadata = _safer_unpickle(row[0], 'driver metadata')
 
             self.problem_metadata.update(driver_metadata)
 
@@ -353,24 +397,12 @@ class SqliteCaseReader(BaseCaseReader):
         cur.execute("SELECT id, scaling_factors, component_metadata FROM system_metadata")
         for row in cur:
             id = row[0]
-            self._system_options[id] = {}
 
-            if self._format_version >= 14:
-                self._system_options[id]['scaling_factors'] = \
-                    pickle.loads(zlib.decompress(row[1]))
-                # First step is to decompress
-                pickled_component_options = zlib.decompress(row[2])
-                # Second, unpickle
-                unpickled_component_options, error_string = \
-                    _loads_and_return_errors(pickled_component_options)
-                if error_string:
-                    issue_warning(f"While reading system options from case recorder, the "
-                                  f"following errors occurred: {error_string}",
-                                  category=RuntimeWarning)
-                self._system_options[id]['component_options'] = unpickled_component_options
-            else:
-                self._system_options[id]['scaling_factors'] = pickle.loads(row[1])
-                self._system_options[id]['component_options'] = pickle.loads(row[2])
+            opt = self._system_options[id] = {}
+            cmp = self._format_version >= 14
+
+            opt['scaling_factors'] = _safer_unpickle(row[1], f'{id} scaling factors', cmp)
+            opt['component_options'] = _safer_unpickle(row[2], f'{id} component options', cmp)
 
     def _collect_solver_metadata(self, cur):
         """
@@ -386,14 +418,10 @@ class SqliteCaseReader(BaseCaseReader):
         cur.execute("SELECT id, solver_options, solver_class FROM solver_metadata")
         for row in cur:
             id = row[0]
-            if self._format_version >= 14:
-                solver_options = pickle.loads(zlib.decompress(row[1]))
-            else:
-                solver_options = pickle.loads(row[1])
-            solver_class = row[2]
+            cmp = self._format_version >= 14
             self.solver_metadata[id] = {
-                'solver_options': solver_options,
-                'solver_class': solver_class,
+                'solver_options': _safer_unpickle(row[1], f'{id} solver options', cmp),
+                'solver_class': row[2]
             }
 
     def _get_global_iterations(self, cur):
