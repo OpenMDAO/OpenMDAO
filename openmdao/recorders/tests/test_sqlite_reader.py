@@ -3,6 +3,7 @@
 import sys
 import os
 import unittest
+import platform
 
 from io import StringIO
 from tempfile import mkstemp
@@ -3186,12 +3187,24 @@ class DummyClass(object):
     def test_pickle_vulnerability(self):
         # test handling of vulnerability https://github.com/advisories/GHSA-g4r7-86gm-pgqc
         class Payload:
+            def __init__(self, func):
+                self.func = func
+
             def __reduce__(self):
-                return os.system, ('touch pwned.txt',)
+                if self.func == 'system':
+                    return os.system, ('touch pwned.txt',)
+                elif self.func == 'eval':
+                    return eval, ("__import__('os').system('touch pwned.txt')",)
+                elif self.func == 'exec':
+                    return exec, ("__import__('os').system('touch pwned.txt')",)
 
         class PayloadComp(om.ExplicitComponent):
+            def __init__(self, func, **kwargs):
+                self.func = func
+                super().__init__(**kwargs)
+
             def initialize(self):
-                self.options.declare('payload', Payload())
+                self.options.declare('payload', Payload(self.func))
 
             def setup(self):
                 self.add_input('x')
@@ -3200,37 +3213,42 @@ class DummyClass(object):
             def compute(self, inputs, outputs):
                 outputs['y'] = 2 * inputs['x']
 
-        prob = om.Problem()
-        model = prob.model
-        model.add_subsystem('comp1', PayloadComp(), promotes=['*'])
-        model.add_subsystem('comp2', om.ExecComp('z = y * 2'), promotes=['*'])
+        os_module = 'nt' if platform.system() == 'Windows' else 'posix'
+        test_matrix = (
+            ('system', f"'{os_module}.system' is forbidden"),
+            ('eval', "'builtins.eval' is forbidden"),
+            ('exec', "'builtins.exec' is forbidden"),
+        )
 
-        model.add_recorder(self.recorder)
+        for func, msg in test_matrix:
+            with self.subTest(func):
+                prob = om.Problem()
+                model = prob.model
+                model.add_subsystem('comp1', PayloadComp(func), promotes=['*'])
+                model.add_subsystem('comp2', om.ExecComp('z = y * 2'), promotes=['*'])
 
-        prob.setup()
-        prob.run_model()
+                filename = f"{func}.sql"
+                model.add_recorder(om.SqliteRecorder(filename))
 
-        self.maxDiff = None
-        with assert_warning(RuntimeWarning,
-                            "While reading comp1 component options from case recorder, "
-                            "the following errors occurred: "
-                            "Error unpickling global, 'posix.system' is forbidden"):
-            om.CaseReader(prob.get_outputs_dir() / self.filename)
+                prob.setup()
+                prob.run_model()
 
-        # unpickling the case should not allow the payload to execute
-        files = os.listdir(os.getcwd())
-        # print(f"{os.getcwd()=}")
-        # from pprint import pprint
-        # pprint(files)
+                self.maxDiff = None
+                with assert_warning(RuntimeWarning,
+                                    "While reading comp1 component options from case recorder, "
+                                    f"the following errors occurred: Error unpickling global, {msg}"):
+                    om.CaseReader(prob.get_outputs_dir() / filename)
 
-        self.assertTrue('pwned.txt' not in files, "Payload was allowed to execute")
+                # the payload should not have been allowed to execute
+                files = os.listdir(os.getcwd())
+                self.assertTrue('pwned.txt' not in files, "Payload was allowed to execute")
 
-        # from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
-        # d = _get_viewer_data(prob.get_outputs_dir() / self.filename)
-        # from pprint import pprint
-        # pprint(d['tree'])
+                # from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
+                # d = _get_viewer_data(prob.get_outputs_dir() / filename)
+                # from pprint import pprint
+                # pprint(d['tree'])
 
-        # om.n2(prob.get_outputs_dir() / self.filename)
+                # om.n2(prob.get_outputs_dir() / filename)
 
 @use_tempdirs
 class TestFeatureSqliteReader(unittest.TestCase):

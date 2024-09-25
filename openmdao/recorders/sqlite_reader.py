@@ -45,7 +45,7 @@ class UnknownType:
 
     def __init__(*args, **kwargs):
         """
-        Construct an object.
+        Construct an object representing an unknown type.
 
         Parameters
         ----------
@@ -57,14 +57,9 @@ class UnknownType:
         Returns
         -------
         object
-            The returned object
+            The returned UnknownType object
         """
         pass
-
-
-safe_builtins = __builtins__.copy()
-del safe_builtins['eval']
-del safe_builtins['exec']
 
 
 class _RestrictedUnpicklerForCaseReader(pickle.Unpickler):
@@ -77,8 +72,8 @@ class _RestrictedUnpicklerForCaseReader(pickle.Unpickler):
 
     def find_class(self, module, name):
         # Only allow safe classes from builtins and posix.
-        if (module == 'builtins' and name not in safe_builtins) or \
-           (module in ('posix', 'nt') and name == 'system'):
+        if (module == 'builtins' and name in ('eval', 'exec')) or \
+           (name == 'system' and module in ('posix', 'nt')):
             if self.error_strings:
                 self.error_strings += ', '
             self.error_strings += f"Error unpickling global, '{module}.{name}' is forbidden"
@@ -100,7 +95,7 @@ class _RestrictedUnpicklerForCaseReader(pickle.Unpickler):
         return unpickled_contents, self.error_strings
 
 
-def _safe_unpickle(s, desc, compressed=False):
+def _safer_unpickle(s, desc, compressed=False):
     """
     Unpickle input and issue a warning for any errors. Analogous to pickle.loads().
     """
@@ -347,14 +342,14 @@ class SqliteCaseReader(BaseCaseReader):
             abs2meta = row['abs2meta']
 
             try:
-                self._abs2prom = _safe_unpickle(abs2prom, 'abs2prom dictionary')
-                self._prom2abs = _safe_unpickle(prom2abs, 'prom2abs dictionary')
-                self._abs2meta = _safe_unpickle(abs2meta, 'abs2meta dictionary')
+                self._abs2prom = _safer_unpickle(abs2prom, 'abs2prom dictionary')
+                self._prom2abs = _safer_unpickle(prom2abs, 'prom2abs dictionary')
+                self._abs2meta = _safer_unpickle(abs2meta, 'abs2meta dictionary')
             except TypeError:
                 # Reading in a python 2 pickle recorded pre-OpenMDAO 2.4.
-                self._abs2prom = _safe_unpickle(abs2prom.encode(), 'abs2prom dictionary')
-                self._prom2abs = _safe_unpickle(prom2abs.encode(), 'prom2abs dictionary')
-                self._abs2meta = _safe_unpickle(abs2meta.encode(), 'abs2meta dictionary')
+                self._abs2prom = _safer_unpickle(abs2prom.encode(), 'abs2prom dictionary')
+                self._prom2abs = _safer_unpickle(prom2abs.encode(), 'prom2abs dictionary')
+                self._abs2meta = _safer_unpickle(abs2meta.encode(), 'abs2meta dictionary')
 
         self.problem_metadata['abs2prom'] = self._abs2prom
 
@@ -376,7 +371,7 @@ class SqliteCaseReader(BaseCaseReader):
             if self._format_version >= 3:
                 driver_metadata = json_loads(row[0])
             elif self._format_version in (1, 2):
-                driver_metadata = _safe_unpickle(row[0], 'driver metadata')
+                driver_metadata = _safer_unpickle(row[0], 'driver metadata')
 
             self.problem_metadata.update(driver_metadata)
 
@@ -398,8 +393,8 @@ class SqliteCaseReader(BaseCaseReader):
             opt = self._system_options[id] = {}
             cmp = self._format_version >= 14
 
-            opt['scaling_factors'] = _safe_unpickle(row[1], f'{id} scaling factors', cmp)
-            opt['component_options'] = _safe_unpickle(row[2], f'{id} component options', cmp)
+            opt['scaling_factors'] = _safer_unpickle(row[1], f'{id} scaling factors', cmp)
+            opt['component_options'] = _safer_unpickle(row[2], f'{id} component options', cmp)
 
     def _collect_solver_metadata(self, cur):
         """
@@ -417,7 +412,7 @@ class SqliteCaseReader(BaseCaseReader):
             id = row[0]
             cmp = self._format_version >= 14
             self.solver_metadata[id] = {
-                'solver_options': _safe_unpickle(row[1], f'{id} solver options', cmp),
+                'solver_options': _safer_unpickle(row[1], f'{id} solver options', cmp),
                 'solver_class': row[2]
             }
 
