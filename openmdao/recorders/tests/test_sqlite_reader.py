@@ -3243,12 +3243,6 @@ class DummyClass(object):
                 files = os.listdir(os.getcwd())
                 self.assertTrue('pwned.txt' not in files, "Payload was allowed to execute")
 
-                # from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
-                # d = _get_viewer_data(prob.get_outputs_dir() / filename)
-                # from pprint import pprint
-                # pprint(d['tree'])
-
-                # om.n2(prob.get_outputs_dir() / filename)
 
 @use_tempdirs
 class TestFeatureSqliteReader(unittest.TestCase):
