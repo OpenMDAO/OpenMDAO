@@ -2,7 +2,7 @@
 Design-of-Experiments Driver.
 """
 from collections.abc import Iterable
-import asyncio
+from collections import deque
 import itertools
 import traceback
 
@@ -65,6 +65,7 @@ class AnalysisDriver(Driver):
         self._name = 'AnalysisDriver'
         self._problem_comm = None
         self._color = None
+        self._num_colors = 1
 
         self._indep_list = []
         self._quantities = []
@@ -76,6 +77,9 @@ class AnalysisDriver(Driver):
         """
         self.options.declare('run_parallel', types=bool, default=True,
                              desc='Set to True to execute samples in parallel.')
+        self.options.declare('batch_size', types=int, default=1000,
+                             desc='Number of samples to distribute among the processors '
+                             'at a time when run_parallel is True.')
         self.options.declare('procs_per_model', types=int, default=1, lower=1,
                              desc='Number of processors to give each model under MPI.')
 
@@ -155,7 +159,7 @@ class AnalysisDriver(Driver):
             procs_per_model = self.options['procs_per_model']
 
             full_size = comm.size
-            size = full_size // procs_per_model
+            self._num_colors = size = full_size // procs_per_model
             if full_size != size * procs_per_model:
                 raise RuntimeError("The total number of processors is not evenly divisible by the "
                                    "specified number of processors per model.\n Provide a "
@@ -203,60 +207,60 @@ class AnalysisDriver(Driver):
         model_inputs =  {meta['prom_name'] for var, meta in model.list_inputs(is_indep_var=True, out_stream=None)}
         model_implicit_outputs = {meta['prom_name'] for var, meta in model.list_outputs(explicit=False, out_stream=None)}
         self._allowable_vars = model_inputs | model_implicit_outputs
+        self.iter_count = 0
 
-        # Run all tasks concurrently
-        if MPI and comm.size > 1:
-            loop = asyncio.get_event_loop()
-            if comm.rank == 0:
-                loop.run_until_complete(asyncio.gather(self._distribute_samples(), self._case_worker()))
-            else:
-                loop.run_until_complete(self._case_worker())
-        else:
-            for case in self._samples:
-                self._run_case(case, iter_count=self.iter_count)
-                self.iter_count += 1
+        n_procs = comm.size
+
+        if MPI and n_procs > 1:
+            batch_size = self.options['batch_size']
+            rank_cycler = itertools.cycle(range(n_procs))
+            samples_complete = False
+            job_queues = None
         
-        return False
-    
-    async def _distribute_samples(self):
-        """
-        Distribute samples to the workers, which includes rank 0.
-        """
-        comm = self._problem_comm
-        # rank_cycler = itertools.cycle(range(comm.size))
-        if comm.rank == 0:
-            rank_cycler = itertools.cycle(range(comm.size))
-            for i, case in enumerate(self._samples):
-                r = next(rank_cycler)
-                comm.send((case, self.iter_count), dest=r)
+            while not samples_complete:
+                if comm.rank == 0:
+                    job_queues = [deque() for _ in range(n_procs)]
+                    # Rank 0 pushes batch_size jobs to the ranks in job_queues
+                    for i, sample in enumerate(self._samples):
+                        rank_idx = next(rank_cycler)
+                        job_queues[rank_idx].appendleft((self.iter_count, sample))
+                        self.iter_count += 1
+                        if i >= batch_size - 1:
+                            # Break once batch_size samples obtained
+                            break
+                    else:
+                        samples_complete = True
+     
+                # Broadcast the samples_complete signal from root to all ranks
+                samples_complete = comm.bcast(samples_complete, root=0)
+                    
+                # Scatter the job list to each rank
+                q = comm.scatter(job_queues, root=0)
+                
+                # Now each proc does the jobs in its queue
+                while q:
+                    iter_count, sample = q.pop()
+                    self._run_sample(sample, iter_count)
+                
+                # Wait for all processors to run their jobs.
+                # Then repeat until samples are exhausted.
+                comm.barrier()
+
+        else:           
+            # Not under MPI
+            for sample in self._samples:
+                self._run_sample(sample, iter_count=self.iter_count)
                 self.iter_count += 1
-            # samples exhausted, terminate all workers
-            for i in range(comm.size):
-                comm.send((None, self.iter_count), dest=i)
 
-    async def _case_worker(self):
-        """
-        Wait for samples from the root proc and run them as they are received.
-        """
-        comm = self._problem_comm
-        while True:
-            # Worker receives case and iter count from rank 0
-            # The iter_count is necessary to print the correct
-            # iteration coordinate in the recorder.
-            case, iter_count = comm.recv(source=0)
-            if case is None:
-                # if rank0 has sent us None, we are finished.
-                break
-            else:
-                self._run_case(case, iter_count)
+        return False
 
-    def _run_case(self, case, iter_count):
+    def _run_sample(self, sample, iter_count):
         """
         Run case, save exception info and mark the metadata if the case fails.
 
         Parameters
         ----------
-        case : dict
+        sample : dict
             A dictionary keyed by variable name with each value being a dictionary with a 'val' key, and optionally
             keys for 'units' and 'indices'.
         iter_count : int
@@ -264,7 +268,7 @@ class AnalysisDriver(Driver):
         """
         metadata = {}
 
-        for var, meta in case.items():
+        for var, meta in sample.items():
             val = meta['val']
             units = meta.get('units', None)
             idxs = meta.get('indices', None)
@@ -291,12 +295,6 @@ class AnalysisDriver(Driver):
 
             # save reference to metadata for use in record_iteration
             self._metadata = metadata
-
-        if self.recording_options['record_derivatives']:
-            self._compute_totals(of=self._quantities,
-                                 wrt=self._indep_list,
-                                 return_format=self._total_jac_format,
-                                 driver_scaling=False)
 
     def _setup_recording(self):
         """

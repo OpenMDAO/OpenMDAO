@@ -72,7 +72,7 @@ class ParaboloidDiscreteArray(om.ExplicitComponent):
 @use_tempdirs
 class TestAnalysisDriverParallel(unittest.TestCase):
 
-    N_PROCS = 2
+    N_PROCS = 4
 
     def setUp(self):
         self.fullfact3 = [
@@ -185,6 +185,38 @@ class TestAnalysisDriverParallel(unittest.TestCase):
                 cr = om.CaseReader(file)
                 num_recorded_cases += len(cr.list_cases(out_stream=None))
             self.assertEqual(num_recorded_cases, 9)
+
+    def test_large_sample_set(self):
+        """
+        Test AnalysisDriver with an explicit list of samples to be run.
+        """
+        samples = {'x': {'val': np.linspace(-10, 10, 100)},
+                   'y': {'val': np.linspace(-10, 10, 100)}}
+
+        prob = om.Problem()
+
+        prob.model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        prob.driver = AnalysisDriver(samples=ProductGenerator(samples))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+        # from openmdao.recorders.stream_recorder import StreamRecorder
+        # prob.driver.add_recorder(StreamRecorder())
+        prob.driver.add_response('f_xy', units=None, indices=[0])
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        # prob.comm.barrier()
+
+        # if prob.comm.rank == 0:
+        #     num_recorded_cases = 0
+        #     for file in glob.glob(str(prob.get_outputs_dir() / "cases.sql*")):
+        #         if file.endswith('meta'):
+        #             continue
+        #         cr = om.CaseReader(file)
+        #         num_recorded_cases += len(cr.list_cases(out_stream=None))
+        #     self.assertEqual(num_recorded_cases, 10000)
 
     def test_zip_generator(self):
         """
