@@ -738,7 +738,7 @@ class _TotalJacInfo(object):
                 all_vois = set()
 
                 for i in ilist:
-                    cache_lin_sol, voiname, voisrc = idx_map[i]
+                    cache_lin_sol, _, voisrc = idx_map[i]
                     cache |= cache_lin_sol
                     all_vois.add(voisrc)
 

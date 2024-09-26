@@ -1,6 +1,7 @@
 """
 Class definitions for Relevance and related classes.
 """
+import os
 
 from contextlib import contextmanager
 from collections import defaultdict
@@ -11,6 +12,8 @@ from openmdao.utils.general_utils import all_ancestors, _contains_all, get_rev_c
 from openmdao.utils.graph_utils import get_sccs_topo
 from openmdao.utils.array_utils import array_hash
 from openmdao.utils.om_warnings import issue_warning
+
+_no_relevance = bool(os.environ.get('OPENMDAO_NO_RELEVANCE', ''))
 
 
 def get_relevance(model, of, wrt):
@@ -130,7 +133,7 @@ class Relevance(object):
         """
         assert model.pathname == '', "Relevance can only be initialized on the top level Group."
 
-        self._active = None  # allow relevance to be turned on later
+        self._active = False if _no_relevance else None  # allow relevance to be turned on later
         self._rel_array_cache = rel_array_cache
         self._graph = model._dataflow_graph
         self._rel_array_cache = {}

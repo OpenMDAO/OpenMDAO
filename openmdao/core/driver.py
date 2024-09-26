@@ -26,6 +26,9 @@ from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, \
     DriverWarning, OMDeprecationWarning, warn_deprecation
 
 
+def_use_shape_correction = bool(os.environ.get('OPENMDAO_JAC_SHAPE_CORRECTION', ''))
+
+
 class DriverResult():
     """
     A container that stores information pertaining to the result of a driver execution.
@@ -1379,7 +1382,7 @@ class Driver(object):
                          show_summary=coloring_mod._DEF_COMP_SPARSITY_ARGS['show_summary'],
                          show_sparsity=coloring_mod._DEF_COMP_SPARSITY_ARGS['show_sparsity'],
                          use_scaling=coloring_mod._DEF_COMP_SPARSITY_ARGS['use_scaling'],
-                         use_shape_correction=False):
+                         use_shape_correction=def_use_shape_correction):
         """
         Set options for total deriv coloring.
 

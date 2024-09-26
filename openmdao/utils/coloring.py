@@ -18,7 +18,7 @@ from packaging.version import Version
 
 
 import numpy as np
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
+from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, dok_matrix
 
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM
 from openmdao.utils.general_utils import _src_name_iter, _convert_auto_ivc_to_conn_name, \
@@ -451,6 +451,8 @@ class Partial_ColoringMeta(ColoringMeta):
         If None, do not attempt to use a static coloring.
     msginfo : str
         Prefix for warning/error messages.
+    use_shape_correction : bool
+        If True, use shape correction if computing bidirectional coloring.
 
     Attributes
     ----------
@@ -1700,12 +1702,16 @@ class Coloring(object):
                 tooltips = [('Response', '$snap_y{0}'),  # {0} triggers the formatter
                             ('Design Var', '$snap_x{0}'),
                             ('Forward solve', '@fwd_color_idx'),
-                            ('Reverse solve', '@rev_color_idx')]
+                            ('Reverse solve', '@rev_color_idx'),
+                            ('Row', '@row_idx'),
+                            ('Col', '@col_idx')]
                 formatters = {'$snap_y': response_var_js,
                               '$snap_x': design_var_js}
             else:
                 tooltips = [('Forward solve', '@fwd_color_idx'),
-                            ('Reverse solve', '@rev_color_idx')]
+                            ('Reverse solve', '@rev_color_idx'),
+                            ('Row', '@row_idx'),
+                            ('Col', '@col_idx')]
                 formatters = {}
 
             fig.add_tools(HoverTool(tooltips=tooltips, formatters=formatters))
@@ -2094,7 +2100,7 @@ def _2col_adj_rows_cols(J):
     return csc_matrix((np.ones(adjrows.size, dtype=bool), (adjrows, adjcols)), shape=(ncols, ncols))
 
 
-def _Jc2col_matrix_direct(Jrows, Jcols, shape):
+def _Jc2col_matrix_direct(J, Jrows, Jcols, shape):
     """
     Convert a partitioned jacobian sparsity matrix to a column adjacency matrix.
 
@@ -2105,6 +2111,8 @@ def _Jc2col_matrix_direct(Jrows, Jcols, shape):
 
     Parameters
     ----------
+    J : coo_matrix
+        Sparse full matrix, not a partition.
     Jrows : ndarray
         Nonzero rows of a partition of the matrix being colored.
     Jcols : ndarray
@@ -2117,48 +2125,31 @@ def _Jc2col_matrix_direct(Jrows, Jcols, shape):
     tuple
         (nzrows, nzcols, shape) of column adjacency matrix.
     """
-    nrows, ncols = shape
-
-    allnzr = []
-    allnzc = []
+    _, ncols = shape
 
     Jrow = np.zeros(ncols, dtype=bool)
     csr = csr_matrix((np.ones(Jrows.size, dtype=bool), (Jrows, Jcols)), shape=shape)
+    dok = dok_matrix((ncols, ncols), dtype=bool)
 
     # mark col_matrix[col1, col2] as True when Jpart[row, col1] is True OR Jpart[row, col2] is True
     for row in np.unique(Jrows):
-        nzr = []
-        nzc = []
-        row_nzcols = csr.getrow(row).indices
+        Jfullrow = J.getrow(row)
+        partrow = csr.getrow(row).indices
 
-        if row_nzcols.size == 1:
-            # if there's only 1 nonzero column in a row, include it
-            nzr.append(row_nzcols[0])
-            nzc.append(row_nzcols[0])
-        else:
+        for col in partrow:
+            dok[col, col] = True
+
+        if partrow.size > 1:
             Jrow[:] = False
-            Jrow[row_nzcols] = True
-            for col1, col2 in combinations(row_nzcols, 2):
+            Jrow[partrow] = True
+            for col1, col2 in combinations(Jfullrow.indices, 2):
                 if Jrow[col1] or Jrow[col2]:
-                    nzr.append(col1)
-                    nzc.append(col2)
-        if nzr:
-            allnzr.append(nzr)
-            allnzc.append(nzc)
+                    dok[col1, col2] = True
+                    dok[col2, col1] = True
 
     csr = Jrow = None  # free up memory
 
-    if allnzr:
-        # matrix is symmetric, so duplicate
-        rows = np.hstack(allnzr + allnzc)
-        cols = np.hstack(allnzc + allnzr)
-    else:
-        rows = np.zeros(0, dtype=INT_DTYPE)
-        cols = np.zeros(0, dtype=INT_DTYPE)
-
-    allnzr = allnzc = None
-
-    return csc_matrix((np.ones(rows.size, dtype=bool), (rows, cols)), shape=(ncols, ncols))
+    return dok.tocsc()
 
 
 def _get_full_disjoint_cols(J):
@@ -2212,7 +2203,7 @@ def _get_full_disjoint_col_matrix_cols(col_adj_matrix):
     return color_groups
 
 
-def _color_partition(Jprows, Jpcols, shape):
+def _color_partition(J, Jprows, Jpcols, shape):
     """
     Compute a single directional fwd coloring using partition Jpart.
 
@@ -2220,6 +2211,8 @@ def _color_partition(Jprows, Jpcols, shape):
 
     Parameters
     ----------
+    J : coo_matrix
+        Sparse full matrix, not a partition.
     Jprows : ndarray
         Nonzero rows of a partition of the matrix being colored.
     Jpcols : ndarray
@@ -2236,7 +2229,7 @@ def _color_partition(Jprows, Jpcols, shape):
     """
     _, ncols = shape
 
-    col_adj_matrix = _Jc2col_matrix_direct(Jprows, Jpcols, shape)
+    col_adj_matrix = _Jc2col_matrix_direct(J, Jprows, Jpcols, shape)
     col_groups = _get_full_disjoint_col_matrix_cols(col_adj_matrix)
 
     col_adj_matrix = None
@@ -2323,7 +2316,6 @@ def MNCO_bidir(J, use_shape_correction=False):
     else:
         ccols = crows = 0
 
-
     while M_rows.size > 0:
         # the algorithm is minimizing the total of the max number of nonzero
         # columns in Jf + the max number of nonzero rows in Jr, so it's basically minimizing
@@ -2378,7 +2370,7 @@ def MNCO_bidir(J, use_shape_correction=False):
         Jf_rows = None
         Jfr = np.hstack(Jfr)
         Jfc = np.hstack(Jfc)
-        coloring._fwd = _color_partition(Jfr, Jfc, J.shape)
+        coloring._fwd = _color_partition(J, Jfr, Jfc, J.shape)
         Jfr = Jfc = None
 
     if col_i > 0:
@@ -2394,7 +2386,7 @@ def MNCO_bidir(J, use_shape_correction=False):
         Jr_cols = None
         Jrr = np.hstack(Jrr)
         Jrc = np.hstack(Jrc)
-        coloring._rev = _color_partition(Jrc, Jrr, J.T.shape)
+        coloring._rev = _color_partition(J.T, Jrc, Jrr, J.T.shape)
 
     if nzrows.size != nnz_Jf + nnz_Jr:
         raise RuntimeError("Nonzero mismatch for J vs. Jf and Jr")
@@ -2767,7 +2759,11 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
                                                    orders=orders, setup=setup,
                                                    run_model=run_model, of=ofs, wrt=wrts,
                                                    driver=driver)
-        coloring = _compute_coloring(J, mode, driver._coloring_info.use_shape_correction)
+        if driver:
+            coloring = _compute_coloring(J, mode, driver._coloring_info.use_shape_correction)
+        else:
+            coloring = None
+
         if coloring is not None:
             coloring._row_vars = list(ofs)
             coloring._row_var_sizes = [m['size'] for m in ofs.values()]
