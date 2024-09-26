@@ -23,6 +23,7 @@ class OmNodeInfo extends NodeInfo {
             new InfoPropDefault('surrogate_name', 'Surrogate'),
             this.propList[2], // type
             new InfoPropDefault('dtype', 'DType'),
+            new InfoPropDefault('desc', 'Description'),
 
             new InfoPropDefault('units', 'Units'),
             new InfoPropDefault('shape', 'Shape'),
@@ -31,7 +32,10 @@ class OmNodeInfo extends NodeInfo {
                                 'Non-local values are not available under MPI, showing initial value.'),
             new InfoPropYesNo('distributed', 'Distributed'),
             this.propList[3], // val
-
+            new InfoPropNumber('val_min', 'Minimum'),
+            new InfoPropDefault('val_min_indices', 'Minimum Indices'),
+            new InfoPropNumber('val_max', 'Maximum'),
+            new InfoPropDefault('val_max_indices', 'Maximum Indices'),
             new InfoPropDefault('subsystem_type', 'Subsystem Type', true),
             new InfoPropDefault('component_type', 'Component Type', true),
             new InfoPropYesNo('implicit', 'Implicit'),

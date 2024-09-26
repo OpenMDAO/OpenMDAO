@@ -30,8 +30,8 @@ class DistributedAdder(om.ExplicitComponent):
     """
 
     def initialize(self):
-        self.options.declare('size', types=int, default=1,
-                             desc="Size of input and output vectors.")
+        self.options.declare('local_size', types=int, default=1,
+                             desc="Local size of input and output vectors.")
 
     def setup(self):
         """
@@ -39,19 +39,8 @@ class DistributedAdder(om.ExplicitComponent):
         distributed component will handle. Indices do NOT need to be sequential or
         contiguous!
         """
-        comm = self.comm
-        rank = comm.rank
-
-        # NOTE: evenly_distrib_idxs is a helper function to split the array
-        #       up as evenly as possible
-        sizes, offsets = evenly_distrib_idxs(comm.size,self.options['size'])
-        local_size, local_offset = sizes[rank], offsets[rank]
-
-        start = local_offset
-        end = local_offset + local_size
-
-        self.add_input('x', val=np.zeros(local_size, float), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
+        local_size = self.options['local_size']
+        self.add_input('x', val=np.zeros(local_size, float), distributed=True)
         self.add_output('y', val=np.zeros(local_size, float), distributed=True)
 
     def compute(self, inputs, outputs):
@@ -74,9 +63,22 @@ class DistributedListVarsTest(unittest.TestCase):
 
         prob = om.Problem()
 
+        comm = prob.comm
+        rank = comm.rank
+
+        # NOTE: evenly_distrib_idxs is a helper function to split the array
+        #       up as evenly as possible
+        sizes, offsets = evenly_distrib_idxs(comm.size, size)
+        local_size, local_offset = sizes[rank], offsets[rank]
+
+        start = local_offset
+        end = local_offset + local_size
+
         prob.model.add_subsystem('des_vars', om.IndepVarComp('x', np.ones(size)), promotes=['x'])
-        prob.model.add_subsystem('plus', DistributedAdder(size=size), promotes=['x', 'y'])
+        prob.model.add_subsystem('plus', DistributedAdder(local_size=int(local_size)), promotes_outputs=['y'])
         prob.model.add_subsystem('summer', Summer(size=size), promotes_outputs=['sum'])
+
+        prob.model.promotes('plus', inputs=['x'],  src_indices=np.arange(start, end, dtype=int))
         prob.model.promotes('summer', inputs=[('invec', 'y')], src_indices=om.slicer[:])
 
         prob.setup(force_alloc_complex=True)  # force complex array storage to detect mpi bug
@@ -87,7 +89,7 @@ class DistributedListVarsTest(unittest.TestCase):
 
         stream = StringIO()
         with multi_proc_exception_check(prob.comm):
-            inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream))
+            inputs = sorted(prob.model.list_inputs(val=True, prom_name=False, print_arrays=True, out_stream=stream))
             if prob.comm.rank:
                 self.assertEqual(inputs, [])
             else:
@@ -111,13 +113,14 @@ class DistributedListVarsTest(unittest.TestCase):
 
         stream = StringIO()
         with multi_proc_exception_check(prob.comm):
-            outputs = sorted(prob.model.list_outputs(values=True,
+            outputs = sorted(prob.model.list_outputs(val=True,
                                                      units=True,
                                                      shape=True,
                                                      bounds=True,
                                                      residuals=True,
                                                      scaling=True,
                                                      hierarchical=True,
+                                                     prom_name=False,
                                                      print_arrays=True,
                                                      out_stream=stream))
             if prob.comm.rank:
@@ -192,7 +195,7 @@ class DistributedListVarsTest(unittest.TestCase):
 
         stream = StringIO()
         with multi_proc_exception_check(prob.comm):
-            inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream))
+            inputs = sorted(prob.model.list_inputs(val=True, prom_name=False, print_arrays=True, out_stream=stream))
             if prob.comm.rank:
                 self.assertEqual(inputs, [])
             else:
@@ -218,13 +221,14 @@ class DistributedListVarsTest(unittest.TestCase):
 
         stream = StringIO()
         with multi_proc_exception_check(prob.comm):
-            outputs = sorted(prob.model.list_outputs(values=True,
+            outputs = sorted(prob.model.list_outputs(val=True,
                                                      units=True,
                                                      shape=True,
                                                      bounds=True,
                                                      residuals=True,
                                                      scaling=True,
                                                      hierarchical=True,
+                                                     prom_name=False,
                                                      print_arrays=True,
                                                      out_stream=stream))
             onames = [t[0] for t in outputs]
@@ -254,6 +258,44 @@ class DistributedListVarsTest(unittest.TestCase):
                 self.assertEqual(1, text.count('Obj'))
                 self.assertEqual(1, text.count('  obj'))
 
+
+        stream = StringIO()
+        with multi_proc_exception_check(prob.comm):
+            prob.model.list_vars(val=True,
+                                 units=True,
+                                 shape=True,
+                                 prom_name=False,
+                                 print_arrays=True,
+                                 all_procs=True,
+                                 out_stream=stream)
+
+            expected = [
+                "8 Variables(s) in 'model'",
+                "",
+                "varname             val     io      units  shape",
+                "------------------  ------  ------  -----  -----",
+                "par",
+                "  G1" if prob.comm.rank == 0 else "  G2",   # G1 on rank 0, G2 on rank 1
+                "    indep_var_comp",
+                "      x             [-5.]   output  None   (1,)",
+                "    Cy",
+                "      x             [-5.]   input   None   (1,)",
+                "      y             [-10.]  output  None   (1,)",
+                "    Cc",
+                "      x             [-5.]   input   None   (1,)",
+                "      c             [-3.]   output  None   (1,)",
+                "Obj",
+                "  y1                [-10.]  input   None   (1,)",
+                "  y2                [-10.]  input   None   (1,)",
+                "  obj               [-20.]  output  None   (1,)",
+                "",
+                ""
+            ]
+
+            text = stream.getvalue()
+            for i, line in enumerate(text.splitlines()):
+                self.assertEqual(line.rstrip(), expected[i].rstrip(), f"Actual output:\n{text}")
+
     def test_parallel_list_vars(self):
         print_opts = {'linewidth': 1024, 'precision': 1}
 
@@ -274,7 +316,7 @@ class DistributedListVarsTest(unittest.TestCase):
         #
         stream = StringIO()
         with printoptions(**print_opts):
-            prob.model.list_inputs(values=True, hierarchical=False, out_stream=stream)
+            prob.model.list_inputs(val=True, prom_name=False, hierarchical=False, out_stream=stream)
 
         with multi_proc_exception_check(prob.comm):
             if prob.comm.rank == 0:  # Only rank 0 prints
@@ -303,7 +345,7 @@ class DistributedListVarsTest(unittest.TestCase):
         #
         stream = StringIO()
         with printoptions(**print_opts):
-            prob.model.list_inputs(values=True, hierarchical=True, out_stream=stream)
+            prob.model.list_inputs(val=True, prom_name=False, hierarchical=True, out_stream=stream)
 
         with multi_proc_exception_check(prob.comm):
             if prob.comm.rank == 0:
@@ -339,7 +381,7 @@ class DistributedListVarsTest(unittest.TestCase):
         #
         stream = StringIO()
         with printoptions(**print_opts):
-            prob.model.list_outputs(values=True, residuals=True, hierarchical=False, out_stream=stream)
+            prob.model.list_outputs(val=True, prom_name=False, residuals=True, hierarchical=False, out_stream=stream)
 
         with multi_proc_exception_check(prob.comm):
             if prob.comm.rank == 0:
@@ -372,7 +414,7 @@ class DistributedListVarsTest(unittest.TestCase):
         #
         stream = StringIO()
         with printoptions(**print_opts):
-            prob.model.list_outputs(values=True, residuals=True, hierarchical=True, out_stream=stream)
+            prob.model.list_outputs(val=True, prom_name=False, residuals=True, hierarchical=True, out_stream=stream)
 
         with multi_proc_exception_check(prob.comm):
             if prob.comm.rank == 0:
@@ -432,7 +474,7 @@ class DistributedListVarsTest(unittest.TestCase):
         stream = StringIO()
         with printoptions(**print_opts):
             model.C2.list_inputs(hierarchical=False, shape=True, global_shape=True,
-                                 print_arrays=True, out_stream=stream)
+                                 print_arrays=True, prom_name=False, out_stream=stream)
 
         if prob.comm.rank == 0:
             text = stream.getvalue().split('\n')
@@ -455,7 +497,7 @@ class DistributedListVarsTest(unittest.TestCase):
         stream = StringIO()
         with printoptions(**print_opts):
             model.C2.list_outputs(hierarchical=False, shape=True, global_shape=True,
-                                  print_arrays=True, out_stream=stream)
+                                  print_arrays=True, prom_name=False, out_stream=stream)
 
         if prob.comm.rank == 0:
             text = stream.getvalue().split('\n')
@@ -484,7 +526,7 @@ class DistributedListVarsTest(unittest.TestCase):
         stream = StringIO()
         with printoptions(**print_opts):
             model.C2.list_inputs(hierarchical=False, shape=True, global_shape=True,
-                                 print_arrays=True, out_stream=stream)
+                                 print_arrays=True, prom_name=False, out_stream=stream)
 
         if prob.comm.rank == 0:
             text = stream.getvalue().split('\n')
@@ -506,7 +548,7 @@ class DistributedListVarsTest(unittest.TestCase):
         stream = StringIO()
         with printoptions(**print_opts):
             model.C2.list_outputs(hierarchical=False, shape=True, global_shape=True,
-                                  print_arrays=True, out_stream=stream)
+                                  print_arrays=True, prom_name=False, out_stream=stream)
 
         if prob.comm.rank == 0:
             text = stream.getvalue().split('\n')
@@ -528,7 +570,7 @@ class DistributedListVarsTest(unittest.TestCase):
         stream = StringIO()
         with printoptions(**print_opts):
             model.C3.list_inputs(hierarchical=False, shape=True, global_shape=True, all_procs=True,
-                                 print_arrays=True, out_stream=stream)
+                                 print_arrays=True, prom_name=False, out_stream=stream)
 
         text = stream.getvalue().split('\n')
 
@@ -575,7 +617,9 @@ class MPIFeatureTests(unittest.TestCase):
         model.connect('indep.x', 'C2.invec')
         model.connect('C2.outvec', 'C3.invec', src_indices=om.slicer[:])
 
-        prob = om.Problem(model)
+        model.add_design_var('indep.x')
+
+        prob = om.Problem(model, allow_post_setup_reorder=False)
         prob.setup()
 
         # prior to model execution, the global shape of a distributed variable is not available
@@ -594,6 +638,38 @@ class MPIFeatureTests(unittest.TestCase):
         # note that the shape of the input variable for the non-distributed Summer component
         # is different on each processor, use the all_procs argument to display on all processors
         model.C3.list_inputs(hierarchical=False, shape=True, global_shape=True, print_arrays=True, all_procs=True)
+
+        # list all model inputs
+        inputs = model.list_inputs(all_procs=True)
+        self.assertEqual(['C2.invec', 'C3.invec'], [name for name, _ in inputs])
+
+        # list all model outputs
+        outputs = model.list_outputs(all_procs=True)
+        self.assertEqual(['indep.x', 'C2.outvec', 'C3.sum'], [name for name, _ in outputs])
+
+        # list all model outputs that are an indep_var
+        outputs = model.list_outputs(is_indep_var=True, all_procs=True)
+        self.assertEqual(['indep.x'], [name for name, _ in outputs])
+
+        # list all model inputs that are connected to an indep_var
+        inputs = model.list_inputs(is_indep_var=True, all_procs=True)
+        self.assertEqual(['C2.invec'], [name for name, _ in inputs])
+
+        # list all model inputs that are not connected to an indep_var
+        inputs = model.list_inputs(is_indep_var=False, all_procs=True)
+        self.assertEqual(['C3.invec'], [name for name, _ in inputs])
+
+        # list all model outputs that are design vars
+        outputs = model.list_outputs(is_design_var=True, all_procs=True)
+        self.assertEqual(['indep.x'], [name for name, _ in outputs])
+
+        # list all model inputs that are connected to a design var
+        inputs = model.list_inputs(is_design_var=True, all_procs=True)
+        self.assertEqual(['C2.invec'], [name for name, _ in inputs])
+
+        # list all model inputs that are not connected to a design var
+        inputs = model.list_inputs(is_design_var=False, all_procs=True)
+        self.assertEqual(['C3.invec'], [name for name, _ in inputs])
 
         assert_near_equal(prob['C3.sum'], -5.)
 

@@ -21,19 +21,17 @@ except ImportError:
 
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.assert_utils import assert_near_equal
-from openmdao.core.tests.test_distrib_derivs import DistribExecComp
+
 
 def _test_func_name(func, num, param):
     args = []
     for p in param.args:
-        if isinstance(p, str):
-            p = {p}
-        elif not isinstance(p, Iterable):
-            p = {p}
+        if isinstance(p, str) or not isinstance(p, Iterable):
+            p = [p]
         for item in p:
             try:
                 arg = item.__name__
-            except:
+            except Exception:
                 arg = str(item)
             args.append(arg)
     return func.__name__ + '_' + '_'.join(args)
@@ -174,9 +172,9 @@ class TestParallelGroups(unittest.TestCase):
 
         J = prob.driver._compute_totals()
 
-        assert_near_equal(J['par.C1.y', 'indep.x'][0][0], 2.5, 1e-6)
+        assert_near_equal(J['par.C1.y', 'x'][0][0], 2.5, 1e-6)
         assert_near_equal(prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
-        assert_near_equal(J['par.C2.y', 'indep.x'][0][0], 7., 1e-6)
+        assert_near_equal(J['par.C2.y', 'x'][0][0], 7., 1e-6)
         assert_near_equal(prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
 
     @parameterized.expand(itertools.product(['fwd', 'rev'], [False]),
@@ -184,18 +182,38 @@ class TestParallelGroups(unittest.TestCase):
     def test_dup_dist(self, mode, auto):
         # Note: Auto-ivc not supported for distributed inputs.
 
+        class DistribComp(om.ExplicitComponent):
+            def __init__(self, arr_size=11, **kwargs):
+                super().__init__(**kwargs)
+                self.arr_size = arr_size
+                self.options['distributed'] = True
+
+            def setup(self):
+                comm = self.comm
+                rank = comm.rank
+
+                sizes, _ = evenly_distrib_idxs(comm.size, self.arr_size)
+
+                self.add_input('x', np.ones(sizes[rank]))
+                self.add_output('y', np.ones(sizes[rank]))
+
+                self.declare_partials(of='y', wrt='x', method='cs')
+
+            def compute(self, inputs, outputs):
+                if self.comm.rank == 0:
+                    outputs['y'] = 2.5 * inputs['x']
+                else:
+                    outputs['y'] = 3.5 * inputs['x']
+
         # non-distributed output, parallel input
         prob = om.Problem()
         model = prob.model
         size = 3
 
-        sizes = [2, 1]
-        rank = prob.comm.rank
-
         if not auto:
             model.add_subsystem('indep', om.IndepVarComp('x', np.ones(size)), promotes=['x'])
 
-        model.add_subsystem('C1', DistribExecComp(['y=2.5*x', 'y=3.5*x'], arr_size=size), promotes=['x'])
+        model.add_subsystem('C1', DistribComp(arr_size=size), promotes=['x'])
 
         of=['C1.y']
         wrt=['x']
@@ -215,7 +233,7 @@ class TestParallelGroups(unittest.TestCase):
 
         assert_near_equal(J['C1.y', 'x'], expected, 1e-6)
         assert_near_equal(prob.get_val('C1.y', get_remote=True),
-                         np.array([2.5,2.5,3.5], dtype=float), 1e-6)
+                          np.array([2.5,2.5,3.5], dtype=float), 1e-6)
 
     @parameterized.expand(itertools.product(['fwd', 'rev']),
                           name_func=_test_func_name)
@@ -251,16 +269,40 @@ class TestParallelGroups(unittest.TestCase):
     @parameterized.expand(itertools.product(['fwd', 'rev'], [False]),
                           name_func=_test_func_name)
     def test_dist_dup(self, mode, auto):
+
+        class DistribComp(om.ExplicitComponent):
+            def __init__(self, arr_size=11, **kwargs):
+                super().__init__(**kwargs)
+                self.arr_size = arr_size
+                self.options['distributed'] = True
+
+            def setup(self):
+                comm = self.comm
+                rank = comm.rank
+
+                sizes, _ = evenly_distrib_idxs(comm.size, self.arr_size)
+
+                self.add_input('x', np.ones(sizes[rank]))
+                self.add_output('y', np.ones(sizes[rank]))
+
+                self.declare_partials(of='y', wrt='x', method='cs')
+
+            def compute(self, inputs, outputs):
+                if self.comm.rank == 0:
+                    outputs['y'] = 2.5 * inputs['x']
+                else:
+                    outputs['y'] = 3.5 * inputs['x']
+
         # non-distributed output, parallel input
         # Note: Auto-ivc not supported for distributed inputs.
         prob = om.Problem()
         model = prob.model
         size = 3
 
-        rank = prob.comm.rank
         if not auto:
             model.add_subsystem('indep', om.IndepVarComp('x', np.ones(size)), promotes=['x'])
-        model.add_subsystem('C1', DistribExecComp(['y=2.5*x', 'y=3.5*x'], arr_size=size), promotes=['x'])
+
+        model.add_subsystem('C1', DistribComp(arr_size=size), promotes=['x'])
         model.add_subsystem('sink', om.ExecComp('y=-1.5 * x', x=np.zeros(size), y=np.zeros(size)))
 
         model.connect('C1.y', 'sink.x', src_indices=om.slicer[:])
@@ -288,18 +330,41 @@ class TestParallelGroups(unittest.TestCase):
     @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]),
                           name_func=_test_func_name)
     def test_par_dist(self, mode, auto):
+
+        class DistribComp(om.ExplicitComponent):
+            def __init__(self, arr_size=11, **kwargs):
+                super().__init__(**kwargs)
+                self.arr_size = arr_size
+                self.options['distributed'] = True
+
+            def setup(self):
+                comm = self.comm
+                rank = comm.rank
+
+                sizes, _ = evenly_distrib_idxs(comm.size, self.arr_size)
+
+                self.add_input('x1', np.ones(sizes[rank]))
+                self.add_input('x2', np.ones(sizes[rank]))
+                self.add_output('y', np.ones(sizes[rank]))
+
+                self.declare_partials(of='y', wrt='x*', method='cs')
+
+            def compute(self, inputs, outputs):
+                if self.comm.rank == 0:
+                    outputs['y'] = 1.5 * inputs['x1'] + 2.5 * inputs['x2']
+                else:
+                    outputs['y'] = 2.5 * inputs['x1'] - .5 * inputs['x2']
+
         # non-distributed output, parallel input
         prob = om.Problem()
         model = prob.model
         size = 3
 
-        sizes = [2, 1]
-        rank = prob.comm.rank
         model.add_subsystem('indep', om.IndepVarComp('x', np.ones(size)))
         par = model.add_subsystem('par', om.ParallelGroup())
         par.add_subsystem('C1', om.ExecComp('y = 3 * x', x=np.zeros(size), y=np.zeros(size)))
         par.add_subsystem('C2', om.ExecComp('y = 5 * x', x=np.zeros(size), y=np.zeros(size)))
-        model.add_subsystem('C3', DistribExecComp(['y=1.5*x1+2.5*x2', 'y=2.5*x1-.5*x2'], arr_size=size))
+        model.add_subsystem('C3', DistribComp(arr_size=size))
 
         model.connect('indep.x', 'par.C1.x')
         model.connect('indep.x', 'par.C2.x')

@@ -5,7 +5,7 @@ import numpy as np
 import openmdao.api as om
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.assert_utils import assert_near_equal
-from openmdao.utils.mpi import MPI
+from openmdao.utils.mpi import MPI, multi_proc_exception_check
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -104,8 +104,8 @@ class DistribQuadtric(om.ImplicitComponent):
         # Get the local slice of A that this processor will be working with
         self.A_local = A[start:end,:]
 
-        self.add_input('x', np.ones(size_local, float), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
+        # src_indices will be computed automatically
+        self.add_input('x', np.ones(size_local, float), distributed=True)
 
         self.add_output('y', np.ones(size_local, float), distributed=True)
 
@@ -234,25 +234,33 @@ class TestPETScVector3Proc(unittest.TestCase):
 
         model.linear_solver = om.LinearBlockGS()
 
-        prob.setup()
+        with multi_proc_exception_check(prob.comm):
+            prob.setup()
 
-        prob.run_model()
+        with multi_proc_exception_check(prob.comm):
+            prob.run_model()
 
-        vec = prob.model._vectors['output']['nonlinear']
-        norm_val = vec.get_norm()
-        assert_near_equal(norm_val, 89.61584681293817, 1e-10)
+        with multi_proc_exception_check(prob.comm):
+            vec = prob.model._vectors['output']['nonlinear']
+            norm_val = vec.get_norm()
+            assert_near_equal(norm_val, 89.61584681293817, 1e-10)
 
-        J = prob.compute_totals(of=['pp.calc1.y', 'pp.calc2.y', 'pp.calc3.y'], wrt=['des_vars.v1'])
+        with multi_proc_exception_check(prob.comm):
+            prob.compute_totals(of=['pp.calc1.y', 'pp.calc2.y', 'pp.calc3.y'], wrt=['des_vars.v1'])
 
-        vec = prob.model._vectors['output']['linear']
-        norm_val = vec.get_norm()
-        assert_near_equal(norm_val, 8.888194417315589, 1e-10)
+        with multi_proc_exception_check(prob.comm):
+            vec = prob.model._vectors['output']['linear']
+            norm_val = vec.get_norm()
+            assert_near_equal(norm_val, 8.888194417315589, 1e-10)
 
         # test petsc dot while we're at it
-        vec.set_val(3.)
+        with multi_proc_exception_check(prob.comm):
+            vec.set_val(3.)
         vec2 = prob.model._vectors['residual']['linear']
-        vec2.set_val(4.)
-        assert_near_equal(vec.dot(vec2), 12.*13, 1e-10)
+        with multi_proc_exception_check(prob.comm):
+            vec2.set_val(4.)
+        with multi_proc_exception_check(prob.comm):
+            assert_near_equal(vec.dot(vec2), 12.*13, 1e-10)
 
 
 if __name__ == '__main__':

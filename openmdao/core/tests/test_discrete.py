@@ -1,6 +1,5 @@
 """ Unit tests for discrete variables."""
 
-import sys
 import unittest
 import copy
 
@@ -246,28 +245,27 @@ class DiscreteTestCase(unittest.TestCase):
         #
         # list vars before model has been run (relative names)
         #
-        # expl_inputs = prob.model.expl.list_inputs(values=True, out_stream=None)
-        expl_inputs = prob.model.expl.list_inputs(out_stream=None)
+        expl_inputs = prob.model.expl.list_inputs(out_stream=None, prom_name=False)
         expected = {
             'a': {'val': [10.]},
             'x': {'val': 10}
         }
         self.assertEqual(dict(expl_inputs), expected)
 
-        impl_inputs = prob.model.impl.list_inputs(out_stream=None)
+        impl_inputs = prob.model.impl.list_inputs(out_stream=None, prom_name=False)
         expected = {
             'x': {'val': 10}
         }
         self.assertEqual(dict(impl_inputs), expected)
 
-        expl_outputs = prob.model.expl.list_outputs(out_stream=None)
+        expl_outputs = prob.model.expl.list_outputs(out_stream=None, prom_name=False)
         expected = {
             'b': {'val': [0.]},
             'y': {'val': 0}
         }
         self.assertEqual(dict(expl_outputs), expected)
 
-        impl_outputs = prob.model.impl.list_outputs(out_stream=None)
+        impl_outputs = prob.model.impl.list_outputs(out_stream=None, prom_name=False)
         expected = {
             'y': {'val': 0}
         }
@@ -282,7 +280,7 @@ class DiscreteTestCase(unittest.TestCase):
         # list inputs, not hierarchical
         #
         stream = StringIO()
-        prob.model.list_inputs(values=True, hierarchical=False, out_stream=stream)
+        prob.model.list_inputs(val=True, hierarchical=False, out_stream=stream)
         text = stream.getvalue()
 
         self.assertEqual(1, text.count("3 Input(s) in 'model'"))
@@ -294,7 +292,7 @@ class DiscreteTestCase(unittest.TestCase):
         # list inputs, hierarchical
         #
         stream = StringIO()
-        prob.model.list_inputs(values=True, hierarchical=True, out_stream=stream)
+        prob.model.list_inputs(val=True, hierarchical=True, out_stream=stream)
         text = stream.getvalue()
 
         self.assertEqual(1, text.count("3 Input(s) in 'model'"))
@@ -307,7 +305,7 @@ class DiscreteTestCase(unittest.TestCase):
         # list outputs, not hierarchical
         #
         stream = StringIO()
-        prob.model.list_outputs(values=True, residuals=True, hierarchical=False, out_stream=stream)
+        prob.model.list_outputs(val=True, residuals=True, hierarchical=False, out_stream=stream)
         text = stream.getvalue()
 
         self.assertEqual(text.count('3 Explicit Output'), 1)
@@ -321,7 +319,7 @@ class DiscreteTestCase(unittest.TestCase):
         # list outputs, hierarchical
         #
         stream = StringIO()
-        prob.model.list_outputs(values=True, residuals=True, hierarchical=True, out_stream=stream)
+        prob.model.list_outputs(val=True, residuals=True, hierarchical=True, out_stream=stream)
         text = stream.getvalue()
 
         self.assertEqual(text.count('\nindep'), 1)
@@ -417,7 +415,7 @@ class DiscreteTestCase(unittest.TestCase):
         prob.run_model()
 
         # list inputs, no tags
-        inputs = prob.model.list_inputs(values=False, out_stream=None)
+        inputs = prob.model.list_inputs(val=False, out_stream=None, prom_name=False)
         self.assertEqual(sorted(inputs), [
             ('expl.a', {}),
             ('expl.x', {}),
@@ -425,14 +423,14 @@ class DiscreteTestCase(unittest.TestCase):
         ])
 
         # list inputs, with tags
-        inputs = prob.model.list_inputs(values=False, out_stream=None, tags='tagx')
+        inputs = prob.model.list_inputs(val=False, out_stream=None, tags='tagx', prom_name=False)
         self.assertEqual(sorted(inputs), [
             ('expl.x', {}),
             ('impl.x', {}),
         ])
 
         # list outputs, no tags
-        outputs = prob.model.list_outputs(values=False, out_stream=None)
+        outputs = prob.model.list_outputs(val=False, out_stream=None, prom_name=False)
         self.assertEqual(sorted(outputs), [
             ('expl.b', {}),
             ('expl.y', {}),
@@ -441,14 +439,55 @@ class DiscreteTestCase(unittest.TestCase):
         ])
 
         # list outputs, with tags
-        outputs = prob.model.list_outputs(values=False, out_stream=None, tags='tagy')
+        outputs = prob.model.list_outputs(val=False, out_stream=None, tags='tagy', prom_name=False)
         self.assertEqual(sorted(outputs), [
             ('expl.y', {}),
             ('impl.y', {}),
         ])
 
-    def test_float_to_discrete_error(self):
+    def test_list_input_outputs_discrete_indep_desvar(self):
         prob = om.Problem()
+        model = prob.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_output('x', 1.0)
+        indep.add_discrete_output('a', 1)
+
+        model.add_subsystem('comp', CompDiscWDerivs())
+        model.connect('indep.x', 'comp.x')
+
+        model.add_design_var('indep.x')
+        model.add_objective('comp.y')
+
+        prob.setup()
+        prob.final_setup()
+
+        indeps = model.list_inputs(is_indep_var=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in indeps]), ['comp.N', 'comp.x'])
+
+        desvars = model.list_inputs(is_design_var=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in desvars]), ['comp.x'])
+
+        non_desvars = model.list_inputs(is_design_var=False, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in non_desvars]), ['comp.N'])
+
+        nonDV_indeps = model.list_inputs(is_indep_var=True, is_design_var=False, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in nonDV_indeps]), ['comp.N'])
+
+        indeps = model.list_outputs(is_indep_var=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in indeps]), ['indep.a', 'indep.x'])
+
+        desvars = model.list_outputs(is_design_var=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in desvars]), ['indep.x'])
+
+        non_desvars = model.list_outputs(is_design_var=False, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in non_desvars]), ['comp.Nout', 'comp.y', 'indep.a'])
+
+        nonDV_indeps = model.list_outputs(is_indep_var=True, is_design_var=False, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in nonDV_indeps]), ['indep.a'])
+
+    def test_float_to_discrete_error(self):
+        prob = om.Problem(name='float_to_discrete_error')
         model = prob.model
 
         indep = model.add_subsystem('indep', om.IndepVarComp())
@@ -460,10 +499,12 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.setup()
         self.assertEqual(str(ctx.exception),
-                         "<model> <class Group>: Can't connect continuous output 'indep.x' to discrete input 'comp.x'.")
+            "\nCollected errors for problem 'float_to_discrete_error':"
+            "\n   <model> <class Group>: Can't connect continuous output 'indep.x' to discrete "
+            "input 'comp.x'.")
 
     def test_discrete_to_float_error(self):
-        prob = om.Problem()
+        prob = om.Problem(name='discrete_to_float_error')
         model = prob.model
 
         indep = model.add_subsystem('indep', om.IndepVarComp())
@@ -475,10 +516,12 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.setup()
         self.assertEqual(str(ctx.exception),
-                         "<model> <class Group>: Can't connect discrete output 'indep.x' to continuous input 'comp.x'.")
+            "\nCollected errors for problem 'discrete_to_float_error':"
+            "\n   <model> <class Group>: Can't connect discrete output 'indep.x' to continuous "
+            "input 'comp.x'.")
 
     def test_discrete_mismatch_error(self):
-        prob = om.Problem()
+        prob = om.Problem(name='discrete_mismatch_error')
         model = prob.model
 
         indep = model.add_subsystem('indep', om.IndepVarComp())
@@ -490,7 +533,9 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.setup()
         self.assertEqual(str(ctx.exception),
-                         "<model> <class Group>: Type 'str' of output 'indep.x' is incompatible with type 'int' of input 'comp.x'.")
+            "\nCollected errors for problem 'discrete_mismatch_error':"
+            "\n   <model> <class Group>: Type 'str' of output 'indep.x' is incompatible with "
+            "type 'int' of input 'comp.x'.")
 
     def test_driver_discrete_enforce_int(self):
         # Drivers require discrete vars to be int or ndarrays of int.
@@ -542,7 +587,7 @@ class DiscreteTestCase(unittest.TestCase):
         indep = model.add_subsystem('indep', om.IndepVarComp())
         indep.add_output('x', 1.0)
 
-        comp = model.add_subsystem('comp', CompDiscWDerivs())
+        model.add_subsystem('comp', CompDiscWDerivs())
         model.connect('indep.x', 'comp.x')
 
         model.add_design_var('indep.x')
@@ -562,8 +607,8 @@ class DiscreteTestCase(unittest.TestCase):
         indep = model.add_subsystem('indep', om.IndepVarComp())
         indep.add_output('x', 1.0)
 
-        comp = model.add_subsystem('comp', CompDiscWDerivsImplicit(), promotes=['N'])
-        sink = model.add_subsystem('sink', MixedCompDiscIn(1.0))
+        model.add_subsystem('comp', CompDiscWDerivsImplicit(), promotes=['N'])
+        model.add_subsystem('sink', MixedCompDiscIn(1.0))
         model.connect('indep.x', 'comp.y2_actual')
         model.connect('comp.Nout', 'sink.x')
 
@@ -589,7 +634,7 @@ class DiscreteTestCase(unittest.TestCase):
 
         G = model.add_subsystem('G', om.Group(), promotes_inputs=['x'])
 
-        G1 = G.add_subsystem('G1', InternalDiscreteGroup(), promotes_inputs=['x'], promotes_outputs=['y'])
+        G.add_subsystem('G1', InternalDiscreteGroup(), promotes_inputs=['x'], promotes_outputs=['y'])
 
         G2 = G.add_subsystem('G2', om.Group(), promotes_inputs=['x'])
         G2.add_subsystem('C2_1', om.ExecComp('y=3*x'), promotes_inputs=['x'])
@@ -613,12 +658,12 @@ class DiscreteTestCase(unittest.TestCase):
         self.assertEqual(prob['C4.y'], 16.0)
 
         with self.assertRaises(Exception) as ctx:
-            J = prob.compute_totals()
+            prob.compute_totals()
         self.assertEqual(str(ctx.exception),
-                         "Total derivative with respect to 'indep.x' depends upon discrete output variables ['G.G1.C1.y'].")
+                         "Total derivative of 'C3.y' with respect to 'x' depends upon discrete output variables ['G.G1.C1.y'].")
 
     def test_connection_to_output(self):
-        prob = om.Problem()
+        prob = om.Problem(name='connection_to_output')
         model = prob.model
 
         model.add_subsystem('C1', ModCompEx(modval=2))
@@ -629,12 +674,13 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.setup()
 
-        msg = ("<model> <class Group>: Attempted to connect from 'C1.y' to 'C2.y', "
+        msg = ("\nCollected errors for problem 'connection_to_output':"
+               "\n   <model> <class Group>: Attempted to connect from 'C1.y' to 'C2.y', "
                "but 'C2.y' is an output. All connections must be from an output to an input.")
         self.assertEqual(str(cm.exception), msg)
 
     def test_connection_from_input(self):
-        prob = om.Problem()
+        prob = om.Problem(name='connection_from_input')
         model = prob.model
 
         model.add_subsystem('C1', ModCompEx(modval=2))
@@ -645,7 +691,8 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.setup()
 
-        msg = ("<model> <class Group>: Attempted to connect from 'C1.x' to 'C2.x', "
+        msg = ("\nCollected errors for problem 'connection_from_input':"
+               "\n   <model> <class Group>: Attempted to connect from 'C1.x' to 'C2.x', "
                "but 'C1.x' is an input. All connections must be from an output to an input.")
         self.assertEqual(str(cm.exception), msg)
 
@@ -712,6 +759,64 @@ class DiscreteTestCase(unittest.TestCase):
         prob.setup()
 
         self.assertEqual(prob['x'], 10)
+
+    def test_get_io_metadata_discrete(self):
+        prob = om.Problem()
+        model = prob.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_discrete_output('x', 11)
+        model.add_subsystem('comp', ModCompEx(3))
+
+        model.connect('indep.x', 'comp.x')
+
+        prob.setup()
+        prob.run_model()
+
+        assert_near_equal(prob.model.get_io_metadata(includes='comp.*'), {
+                          'comp.a': {'copy_shape': None,
+                                     'compute_shape': None,
+                                     'desc': '',
+                                     'discrete': False,
+                                     'distributed': False,
+                                     'global_shape': (1,),
+                                     'global_size': 1,
+                                     'has_src_indices': False,
+                                     'prom_name': 'comp.a',
+                                     'shape': (1,),
+                                     'shape_by_conn': False,
+                                     'size': 1,
+                                     'tags': set(),
+                                     'units': None},
+                          'comp.b': {'copy_shape': None,
+                                     'compute_shape': None,
+                                     'desc': '',
+                                     'discrete': False,
+                                     'distributed': False,
+                                     'global_shape': (1,),
+                                     'global_size': 1,
+                                     'lower': None,
+                                     'prom_name': 'comp.b',
+                                     'ref': 1.0,
+                                     'ref0': 0.0,
+                                     'res_ref': 1.0,
+                                     'shape': (1,),
+                                     'shape_by_conn': False,
+                                     'size': 1,
+                                     'tags': set(),
+                                     'units': None,
+                                     'upper': None},
+                          'comp.x': {'desc': '',
+                                     'discrete': True,
+                                     'prom_name': 'comp.x',
+                                     'tags': {'tagx'},
+                                     'type': int},
+                          'comp.y': {'desc': '',
+                                     'discrete': True,
+                                     'prom_name': 'comp.y',
+                                     'tags': {'tagy'},
+                                     'type': int}
+                          })
 
 
 class SolverDiscreteTestCase(unittest.TestCase):

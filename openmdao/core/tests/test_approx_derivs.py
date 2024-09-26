@@ -2,7 +2,10 @@
 import time
 import unittest
 
+from packaging.version import Version
+
 import numpy as np
+from scipy import __version__ as scipy_version
 
 import openmdao.api as om
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, TestImplCompArrayDense
@@ -14,10 +17,10 @@ from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.unit_conv import SrcComp, TgtCompC, TgtCompF, TgtCompK
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
 from openmdao.test_suite.parametric_suite import parametric_suite
-from openmdao.utils.assert_utils import assert_near_equal, assert_warnings, assert_check_partials, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, \
+    assert_check_totals, assert_warnings
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.mpi import MPI
-from openmdao.utils.om_warnings import OMDeprecationWarning
 from openmdao.utils.testing_utils import use_tempdirs
 
 try:
@@ -26,6 +29,8 @@ try:
 except ImportError:
     vector_class = om.DefaultVector
     PETScVector = None
+
+ScipyVersion = Version(scipy_version)
 
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
@@ -60,7 +65,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_near_equal(derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        self.assertEqual(np.sum(v.size for v in derivs.values()), 2)
+        self.assertEqual(np.sum(list(v.size for v in derivs.values())), 2)
 
     def test_fd_count(self):
         # Make sure we aren't doing extra FD steps.
@@ -103,8 +108,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         prob.setup()
         prob.run_model()
-        J = prob.compute_totals(of=['parab.f_xy'], wrt=['px.x', 'py.y'])
-        # print(J)
+        prob.compute_totals(of=['parab.f_xy'], wrt=['px.x', 'py.y'])
 
         # 1. run_model; 2. step x; 3. step y
         self.assertEqual(model.parab.count, 3)
@@ -152,7 +156,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        prob.driver._compute_totals(of=['parab.f_xy'], wrt=['px.x'], use_abs_names=True)
+        prob.driver._compute_totals(of=['parab.f_xy'], wrt=['px.x'])
 
         # 1. run_model; 2. step x
         self.assertEqual(model.parab.count, 2)
@@ -275,9 +279,14 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.linear_solver = om.ScipyKrylov()
         model.approx_totals()
 
+        model.add_design_var('p1.x1')
+        model.add_design_var('p2.x2')
+        model.add_constraint('comp.y1')
+        model.add_constraint('comp.y2')
+
         prob.setup()
         prob.run_model()
-        model.run_linearize()
+        model.run_linearize(driver=prob.driver)
 
         Jfd = model._jacobian
         assert_near_equal(Jfd['comp.y1', 'p1.x1'], comp.JJ[0:2, 0:2], 1e-6)
@@ -726,11 +735,11 @@ class TestGroupFiniteDifference(unittest.TestCase):
         p.run_model()
         # Formerly a KeyError
         derivs = p.check_totals(compact_print=True, out_stream=None)
-        assert_near_equal(0.0, derivs['indeps.y', 'indeps.x']['abs error'][0])
+        assert_near_equal(0.0, derivs['y', 'x']['abs error'][1])
 
         # Coverage
         derivs = p.driver._compute_totals(return_format='dict')
-        assert_near_equal(np.zeros((1, 10)), derivs['indeps.y']['indeps.x'])
+        assert_near_equal(np.zeros((1, 10)), derivs['y']['x'])
 
     def test_opt_with_linear_constraint(self):
         # Test for a bug where we weren't re-initializing things in-between computing totals on
@@ -986,7 +995,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        self.assertEqual(np.sum(v.size for v in derivs.values()), 2)
+        self.assertEqual(np.sum(list(v.size for v in derivs.values())), 2)
 
     def test_paraboloid_subbed(self):
 
@@ -1074,9 +1083,14 @@ class TestGroupComplexStep(unittest.TestCase):
         model.linear_solver = om.ScipyKrylov()
         model.approx_totals(method='cs')
 
+        model.add_design_var('p1.x1')
+        model.add_design_var('p2.x2')
+        model.add_constraint('comp.y1')
+        model.add_constraint('comp.y2')
+
         prob.setup()
         prob.run_model()
-        model.run_linearize()
+        model.run_linearize(driver=prob.driver)
 
         Jfd = model._jacobian
         assert_near_equal(Jfd['comp.y1', 'p1.x1'], comp.JJ[0:2, 0:2], 1e-6)
@@ -1426,7 +1440,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
         assert_near_equal(J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
 
-    def test_subbed_newton_gs(self):
+    def test_subbed_newton_assembled_csc(self):
 
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
         class SellarDerivatives(om.Group):
@@ -1442,24 +1456,26 @@ class TestGroupComplexStep(unittest.TestCase):
                 sub.linear_solver = om.DirectSolver(assemble_jac=True)
                 sub.options['assembled_jac_type'] = 'csc'
 
-                sub.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)', obj=0.0,
+                obj = sub.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)', obj=0.0,
                                                          x=0.0, z=np.array([0.0, 0.0]), y1=0.0, y2=0.0),
                                   promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-                sub.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1', con1=0.0, y1=0.0),
+                con1 = sub.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1', con1=0.0, y1=0.0),
                                   promotes=['con1', 'y1'])
-                sub.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0),
+                con2 = sub.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0),
                                   promotes=['con2', 'y2'])
 
+                obj.declare_partials(of='*', wrt='*', method='cs')
+                con1.declare_partials(of='*', wrt='*', method='cs')
+                con2.declare_partials(of='*', wrt='*', method='cs')
+
                 self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-                self.linear_solver = om.LinearBlockGS()
-                self.linear_solver.options['maxiter'] = 25
-                self.linear_solver.options['atol'] = 1e-16
+                self.linear_solver = om.DirectSolver(assemble_jac=False)
 
         prob = om.Problem()
         prob.model = SellarDerivatives()
 
-        prob.setup()
+        prob.setup(force_alloc_complex=True)
 
         prob.model.approx_totals(method='cs')
 
@@ -1469,64 +1485,14 @@ class TestGroupComplexStep(unittest.TestCase):
         of = ['obj', 'con1', 'con2']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_near_equal(J['obj', 'z'][0][0], 9.61001056, 1.0e-6)
-        assert_near_equal(J['obj', 'z'][0][1], 1.78448534, 1.0e-6)
-        assert_near_equal(J['obj', 'x'][0][0], 2.98061391, 1.0e-6)
-        assert_near_equal(J['con1', 'z'][0][0], -9.61002186, 1.0e-6)
-        assert_near_equal(J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
-        assert_near_equal(J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
+        assert_near_equal(J['obj', 'z'][0][0], 9.61001056, 1.0e-8)
+        assert_near_equal(J['obj', 'z'][0][1], 1.78448534, 1.0e-8)
+        assert_near_equal(J['obj', 'x'][0][0], 2.98061391, 1.0e-8)
+        assert_near_equal(J['con1', 'z'][0][0], -9.61002186, 1.0e-8)
+        assert_near_equal(J['con1', 'z'][0][1], -0.78449158, 1.0e-8)
+        assert_near_equal(J['con1', 'x'][0][0], -0.98061448, 1.0e-8)
 
-    def test_subbed_newton_gs_csc_external_mtx(self):
-
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
-        class SellarDerivatives(om.Group):
-
-            def setup(self):
-                self.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-                self.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-
-                self.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
-                self.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
-                sub = self.add_subsystem('sub', om.Group(), promotes=['*'])
-
-                sub.linear_solver = om.DirectSolver(assemble_jac=True)
-                sub.options['assembled_jac_type'] = 'csc'
-
-                sub.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)', obj=0.0,
-                                                         x=0.0, z=np.array([0.0, 0.0]), y1=0.0, y2=0.0),
-                                  promotes=['obj', 'x', 'z', 'y1', 'y2'])
-
-                sub.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1', con1=0.0, y1=0.0),
-                                  promotes=['con1', 'y1'])
-                sub.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0),
-                                  promotes=['con2', 'y2'])
-
-                self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-                self.linear_solver = om.LinearBlockGS()
-                self.linear_solver.options['maxiter'] = 25
-                self.linear_solver.options['atol'] = 1e-16
-
-        prob = om.Problem()
-        prob.model = SellarDerivatives()
-
-        prob.setup()
-
-        prob.model.approx_totals(method='cs')
-
-        prob.run_model()
-
-        wrt = ['z', 'x']
-        of = ['obj', 'con1', 'con2']
-
-        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_near_equal(J['obj', 'z'][0][0], 9.61001056, 1.0e-6)
-        assert_near_equal(J['obj', 'z'][0][1], 1.78448534, 1.0e-6)
-        assert_near_equal(J['obj', 'x'][0][0], 2.98061391, 1.0e-6)
-        assert_near_equal(J['con1', 'z'][0][0], -9.61002186, 1.0e-6)
-        assert_near_equal(J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
-        assert_near_equal(J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
-
-    def test_subbed_newton_gs_dense_external_mtx(self):
+    def test_subbed_newton_assembled_dense(self):
 
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
         class SellarDerivatives(om.Group):
@@ -1542,24 +1508,26 @@ class TestGroupComplexStep(unittest.TestCase):
                 sub.linear_solver = om.DirectSolver(assemble_jac=True)
                 sub.options['assembled_jac_type'] = 'dense'
 
-                sub.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)', obj=0.0,
+                obj = sub.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)', obj=0.0,
                                                          x=0.0, z=np.array([0.0, 0.0]), y1=0.0, y2=0.0),
                                   promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-                sub.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1', con1=0.0, y1=0.0),
+                con1 = sub.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1', con1=0.0, y1=0.0),
                                   promotes=['con1', 'y1'])
-                sub.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0),
+                con2 = sub.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0),
                                   promotes=['con2', 'y2'])
 
+                obj.declare_partials(of='*', wrt='*', method='cs')
+                con1.declare_partials(of='*', wrt='*', method='cs')
+                con2.declare_partials(of='*', wrt='*', method='cs')
+
                 self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-                self.linear_solver = om.LinearBlockGS()
-                self.linear_solver.options['maxiter'] = 25
-                self.linear_solver.options['atol'] = 1e-16
+                self.linear_solver = om.DirectSolver(assemble_jac=False)
 
         prob = om.Problem()
         prob.model = SellarDerivatives()
 
-        prob.setup()
+        prob.setup(force_alloc_complex=True)
 
         prob.model.approx_totals(method='cs')
 
@@ -1569,12 +1537,12 @@ class TestGroupComplexStep(unittest.TestCase):
         of = ['obj', 'con1', 'con2']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_near_equal(J['obj', 'z'][0][0], 9.61001056, 1.0e-6)
-        assert_near_equal(J['obj', 'z'][0][1], 1.78448534, 1.0e-6)
-        assert_near_equal(J['obj', 'x'][0][0], 2.98061391, 1.0e-6)
-        assert_near_equal(J['con1', 'z'][0][0], -9.61002186, 1.0e-6)
-        assert_near_equal(J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
-        assert_near_equal(J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
+        assert_near_equal(J['obj', 'z'][0][0], 9.61001056, 1.0e-8)
+        assert_near_equal(J['obj', 'z'][0][1], 1.78448534, 1.0e-8)
+        assert_near_equal(J['obj', 'x'][0][0], 2.98061391, 1.0e-8)
+        assert_near_equal(J['con1', 'z'][0][0], -9.61002186, 1.0e-8)
+        assert_near_equal(J['con1', 'z'][0][1], -0.78449158, 1.0e-8)
+        assert_near_equal(J['con1', 'x'][0][0], -0.98061448, 1.0e-8)
 
     def test_newton_with_krylov_solver(self):
         # Basic sellar test.
@@ -1647,7 +1615,7 @@ class TestGroupComplexStep(unittest.TestCase):
         sub.nonlinear_solver.options['atol'] = 1e-20
         sub.nonlinear_solver.options['rtol'] = 1e-20
 
-        model.approx_totals(method='cs', step=1e-12)
+        model.approx_totals(method='cs', step=1e-11)
 
         prob.setup()
         prob.set_solver_print(level=0)
@@ -1730,12 +1698,16 @@ class TestGroupComplexStep(unittest.TestCase):
         model.add_subsystem('d1', SellarDis1CS(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2CS(), promotes=['z', 'y1', 'y2'])
 
-        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+        obj = model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
                                                    z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
+        obj.declare_partials(of='*', wrt='*', method='cs')
 
-        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+        con1 = model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        con2 = model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        con1.declare_partials(of='*', wrt='*', method='cs')
+        con2.declare_partials(of='*', wrt='*', method='cs')
 
         prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         prob.model.linear_solver = om.DirectSolver(assemble_jac=False)
@@ -2004,7 +1976,7 @@ class TestComponentComplexStep(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        comp = model.add_subsystem('comp', BadSparsityComp())
+        model.add_subsystem('comp', BadSparsityComp())
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -2388,7 +2360,6 @@ class TestFDRelative(unittest.TestCase):
                 self.add_output('y', np.ones((nn, )))
 
             def setup_partials(self):
-                nn = self.options['vec_size']
                 self.set_check_partial_options('x_element', method='fd', step_calc='rel_element', directional=True)
 
             def compute(self, inputs, outputs):
@@ -2420,7 +2391,7 @@ class TestFDRelative(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             prob.check_partials()
 
-        msg = "<model> <class Group>: Option 'directional' is not supported when 'step_calc' is set to 'rel_element.'"
+        msg = "'comp' <class FDComp>: Option 'directional' is not supported when 'step_calc' is set to 'rel_element.'"
         self.assertEqual(cm.exception.args[0], msg)
 
     def test_check_settings_on_comp(self):
@@ -2519,23 +2490,6 @@ class TestFDRelative(unittest.TestCase):
         # This derivative requires rel_element to be accurate.
         self.assertTrue(np.abs(totals['comp.y', 'comp.x_element']['J_fd'][2, 2]) < 1e-9)
 
-    def test_deprecation(self):
-        prob = om.Problem()
-        model = prob.model
-        comp = model.add_subsystem('comp', Paraboloid())
-
-        prob.setup()
-        prob.run_model()
-
-        msg = "When using 'rel' as the step_calc, the fd stepsize is currently " + \
-            "scaled by the norm of the vector variable. This is not ideal for" + \
-            " larger vectors, and this behavior is being changed in " + \
-            "OpenMDAO 3.12.0. To preserve the older way of doing this " + \
-            "calculation, set step_calc to 'rel_legacy'."
-
-        with assert_warning(OMDeprecationWarning, msg):
-            prob.check_partials(out_stream=None, method='fd', step_calc='rel')
-
 
 class ParallelFDParametricTestCase(unittest.TestCase):
 
@@ -2630,13 +2584,12 @@ class CheckTotalsParallelGroup(unittest.TestCase):
         prob = om.Problem(model=model)
         prob.setup(force_alloc_complex=True)
         prob.run_model()
-        data  = prob.check_totals(method='cs', out_stream=None)
-        assert_near_equal(data[('pg.dc1.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc3.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
 
 class CheckTotalsIndices(unittest.TestCase):
 
     def test_w_indices(self):
+        # just checks for indexing error.  Doesn't raise exception if derivs are wrong.
         class TopComp(om.ExplicitComponent):
 
             def setup(self):
@@ -2656,7 +2609,7 @@ class CheckTotalsIndices(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        geom = model.add_subsystem('tcomp', TopComp())
+        model.add_subsystem('tcomp', TopComp())
 
         # setting indices here caused an indexing error later on
         model.add_design_var('tcomp.theta_c2_C', lower=-20., upper=20., indices=range(2, 9))
@@ -2665,7 +2618,441 @@ class CheckTotalsIndices(unittest.TestCase):
         prob.setup()
 
         prob.run_model()
-        check = prob.check_totals(compact_print=True)
+        prob.check_totals(compact_print=True)
+
+
+def _setup_1ivc_fdgroupwithpar_1sink(size=7):
+
+    prob = om.Problem()
+    model = prob.model
+
+    model.add_subsystem('p', om.IndepVarComp('x', np.ones((size, ))))
+
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+
+    sub.add_subsystem('C3', om.ExecComp('y = x1 + x2', shape=size))
+
+    model.connect('p.x', 'sub.par.C1.x')
+    model.connect('p.x', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.C3.x1')
+    model.connect('sub.par.C2.y', 'sub.C3.x2')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_objective('sub.C3.y', index=-1)
+
+    sub.approx_totals(method='fd')
+
+    return prob
+
+def _setup_2ivcs_fdgroupwithpar_1sink(size=7):
+    prob = om.Problem()
+    model = prob.model
+
+    model.add_subsystem('p', om.IndepVarComp('x', np.ones((size, ))))
+    model.add_subsystem('p2', om.IndepVarComp('x', np.ones((size, ))))
+
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+    sub.add_subsystem('C3', om.ExecComp('y = x1 + x2', shape=size))
+
+    model.connect('p.x', 'sub.par.C1.x')
+    model.connect('p2.x', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.C3.x1')
+    model.connect('sub.par.C2.y', 'sub.C3.x2')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_design_var('p2.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_objective('sub.C3.y', index=-1)
+
+    sub.approx_totals(method='fd')
+
+    return prob
+
+
+def _setup_1ivc_dum_fdgroupwithpar_1sink(size=7):
+    prob = om.Problem()
+    model = prob.model
+
+    model.add_subsystem('p', om.IndepVarComp('x', np.ones((size, ))))
+
+    model.add_subsystem('dum', om.ExecComp('y = x', shape=size))
+
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+
+    sub.add_subsystem('C3', om.ExecComp('y = x1 + x2', shape=size))
+
+    model.connect('p.x', 'dum.x')
+    model.connect('dum.y', 'sub.par.C1.x')
+    model.connect('dum.y', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.C3.x1')
+    model.connect('sub.par.C2.y', 'sub.C3.x2')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_objective('sub.C3.y', index=-1)
+
+    sub.approx_totals(method='fd')
+
+    return prob
+
+def _setup_1ivc_dum_fdgroupwithpar_1sink_c4(size=7):
+
+    prob = om.Problem()
+    model = prob.model
+
+    ivc = om.IndepVarComp()
+    ivc.add_output('x', np.ones((size, )))
+
+    model.add_subsystem('p', ivc)
+    model.add_subsystem('dum', om.ExecComp('y = x', shape=size))
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+    sub.add_subsystem('C3', om.ExecComp('y = x1 + x2', shape=size))
+    model.add_subsystem('C4', om.ExecComp('y = x', shape=size))
+
+    model.connect('p.x', 'dum.x')
+    model.connect('dum.y', 'sub.par.C1.x')
+    model.connect('dum.y', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.C3.x1')
+    model.connect('sub.par.C2.y', 'sub.C3.x2')
+    model.connect('sub.C3.y', 'C4.x')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_objective('C4.y', index=-1)
+
+    sub.approx_totals(method='fd')
+
+    return prob
+
+
+def _setup_2ivcs_fdgroupwithpar_2sinks(size=7):
+    prob = om.Problem()
+    model = prob.model
+
+    model.add_subsystem('p', om.IndepVarComp('x', np.ones((size, ))))
+    model.add_subsystem('p2', om.IndepVarComp('x', np.ones((size, ))))
+
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+
+    sub.add_subsystem('C3', om.ExecComp('y = x*.5', shape=size))
+    sub.add_subsystem('C4', om.ExecComp('y = x*3.', shape=size))
+
+    model.connect('p.x', 'sub.par.C1.x')
+    model.connect('p2.x', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.C3.x')
+    model.connect('sub.par.C2.y', 'sub.C4.x')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_design_var('p2.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_constraint('sub.C4.y', lower=0.0)
+    model.add_objective('sub.C3.y', index=-1)
+
+    sub.approx_totals(method='fd')
+
+    return prob
+
+
+def _setup_2ivcs_fdgroupwith2pars_2sinks(size=7):
+    prob = om.Problem()
+    model = prob.model
+
+    model.add_subsystem('p', om.IndepVarComp('x', np.ones((size, ))))
+    model.add_subsystem('p2', om.IndepVarComp('x', np.ones((size, ))))
+
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+
+    par2 = sub.add_subsystem('par2', om.ParallelGroup())
+    par2.add_subsystem('C1a', om.ExecComp('y = 2.*x', shape=size))
+    par2.add_subsystem('C2a', om.ExecComp('y = 3.*x', shape=size))
+
+    sub.add_subsystem('C3', om.ExecComp('y = x*.5', shape=size))
+    sub.add_subsystem('C4', om.ExecComp('y = x*3.', shape=size))
+
+    model.connect('p.x', 'sub.par.C1.x')
+    model.connect('p2.x', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.par2.C1a.x')
+    model.connect('sub.par.C2.y', 'sub.par2.C2a.x')
+    model.connect('sub.par2.C1a.y', 'sub.C3.x')
+    model.connect('sub.par2.C2a.y', 'sub.C4.x')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_design_var('p2.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_constraint('sub.par2.C1a.y', lower=0.0)
+    model.add_constraint('sub.par2.C2a.y', lower=0.0)
+    model.add_constraint('sub.C4.y', lower=0.0)
+    model.add_objective('sub.C3.y', index=-1)
+
+    sub.approx_totals(method='fd')
+
+    return prob
+
+
+def _setup_2ivcs_fdgroupwith2pars_1sink(size=7):
+    prob = om.Problem()
+    model = prob.model
+
+    model.add_subsystem('p', om.IndepVarComp('x', np.ones((size, ))))
+    model.add_subsystem('p2', om.IndepVarComp('x', np.ones((size, ))))
+
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+
+    par2 = sub.add_subsystem('par2', om.ParallelGroup())
+    par2.add_subsystem('C1a', om.ExecComp('y = 2.*x', shape=size))
+    par2.add_subsystem('C2a', om.ExecComp('y = 3.*x', shape=size))
+
+    sub.add_subsystem('C3', om.ExecComp('y = x1 + x2', shape=size))
+
+    model.connect('p.x', 'sub.par.C1.x')
+    model.connect('p2.x', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.par2.C1a.x')
+    model.connect('sub.par.C2.y', 'sub.par2.C2a.x')
+    model.connect('sub.par2.C1a.y', 'sub.C3.x1')
+    model.connect('sub.par2.C2a.y', 'sub.C3.x2')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_design_var('p2.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_constraint('sub.par2.C1a.y', lower=0.0)
+    model.add_constraint('sub.par2.C2a.y', lower=0.0)
+    model.add_objective('sub.C3.y', index=-1)
+
+    sub.approx_totals(method='fd')
+
+    return prob
+
+
+def _setup_2ivcs_fdgroupwithcrisscrosspars_2sinks(size=7):
+    prob = om.Problem()
+    model = prob.model
+
+    model.add_subsystem('p', om.IndepVarComp('x', np.ones((size, ))))
+    model.add_subsystem('p2', om.IndepVarComp('x', np.ones((size, ))))
+
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+
+    par2 = sub.add_subsystem('par2', om.ParallelGroup())
+    par2.add_subsystem('C1a', om.ExecComp('y = 2.*x', shape=size))
+    par2.add_subsystem('C2a', om.ExecComp('y = 3.*x', shape=size))
+
+    sub.add_subsystem('C3', om.ExecComp('y = x*.5', shape=size))
+    sub.add_subsystem('C4', om.ExecComp('y = x*3.', shape=size))
+
+    model.connect('p.x', 'sub.par.C1.x')
+    model.connect('p2.x', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.par2.C2a.x')
+    model.connect('sub.par.C2.y', 'sub.par2.C1a.x')
+    model.connect('sub.par2.C1a.y', 'sub.C3.x')
+    model.connect('sub.par2.C2a.y', 'sub.C4.x')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_design_var('p2.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_constraint('sub.par2.C1a.y', lower=0.0)
+    model.add_constraint('sub.par2.C2a.y', lower=0.0)
+    model.add_constraint('sub.C4.y', lower=0.0)
+    model.add_objective('sub.C3.y', index=-1)
+
+    sub.approx_totals(method='fd')
+
+    return prob
+
+def _setup_2ivcs_fdgroupwithcrisscrosspars_1sink(size=7):
+    prob = om.Problem()
+    model = prob.model
+
+    model.add_subsystem('p', om.IndepVarComp('x', np.ones((size, ))))
+    model.add_subsystem('p2', om.IndepVarComp('x', np.ones((size, ))))
+
+    sub = model.add_subsystem('sub', om.Group())
+    par = sub.add_subsystem('par', om.ParallelGroup())
+    par.add_subsystem('C1', om.ExecComp('y = 2.*x', shape=size))
+    par.add_subsystem('C2', om.ExecComp('y = 3.*x', shape=size))
+
+    par2 = sub.add_subsystem('par2', om.ParallelGroup())
+    par2.add_subsystem('C1a', om.ExecComp('y = 2.*x', shape=size))
+    par2.add_subsystem('C2a', om.ExecComp('y = 3.*x', shape=size))
+
+    sub.add_subsystem('C3', om.ExecComp('y = x1 + x2', shape=size))
+
+    model.connect('p.x', 'sub.par.C1.x')
+    model.connect('p2.x', 'sub.par.C2.x')
+    model.connect('sub.par.C1.y', 'sub.par2.C2a.x')
+    model.connect('sub.par.C2.y', 'sub.par2.C1a.x')
+    model.connect('sub.par2.C1a.y', 'sub.C3.x1')
+    model.connect('sub.par2.C2a.y', 'sub.C3.x2')
+
+    model.add_design_var('p.x', lower=-50.0, upper=50.0)
+    model.add_design_var('p2.x', lower=-50.0, upper=50.0)
+    model.add_constraint('sub.par.C1.y', lower=0.0)
+    model.add_constraint('sub.par.C2.y', lower=0.0)
+    model.add_constraint('sub.par2.C1a.y', lower=0.0)
+    model.add_constraint('sub.par2.C2a.y', lower=0.0)
+    model.add_objective('sub.C3.y', index=-1)
+
+    sub.approx_totals(method='fd')
+
+    return prob
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestFDWithParallelSubGroups(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_group_fd_inner_par_fwd(self):
+        prob = _setup_1ivc_fdgroupwithpar_1sink(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd'), atol=3e-6)
+
+    def test_group_fd_inner_par_rev(self):
+        prob = _setup_1ivc_fdgroupwithpar_1sink(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        # assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+        assert_check_totals(prob.check_totals(method='fd', show_only_incorrect=True), atol=3e-6)
+
+    def test_group_fd_inner_par2_fwd(self):
+        prob = _setup_2ivcs_fdgroupwithpar_2sinks(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_group_fd_inner_par2_rev(self):
+        prob = _setup_2ivcs_fdgroupwithpar_2sinks(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_2ivcs_fdgroupwithcrisscrosspars_2sinks_fwd(self):
+        prob = _setup_2ivcs_fdgroupwithcrisscrosspars_2sinks(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_2ivcs_fdgroupwithcrisscrosspars_2sinks_rev(self):
+        prob = _setup_2ivcs_fdgroupwithcrisscrosspars_2sinks(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_2ivcs_fdgroupwith2pars_2sinks_fwd(self):
+        prob = _setup_2ivcs_fdgroupwith2pars_2sinks(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_2ivcs_fdgroupwith2pars_2sinks_rev(self):
+        prob = _setup_2ivcs_fdgroupwith2pars_2sinks(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_2ivcs_fdgroupwithcrisscrosspars_1sink_fwd(self):
+        prob = _setup_2ivcs_fdgroupwithcrisscrosspars_1sink(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        prob.compute_totals()
+        import pprint
+        pprint.pprint({n: m['val'] for n,m in prob.model.sub._jacobian._subjacs_info.items()})
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_2ivcs_fdgroupwithcrisscrosspars_1sink_rev(self):
+        prob = _setup_2ivcs_fdgroupwithcrisscrosspars_1sink(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_2ivcs_fdgroupwith2pars_1sink_fwd(self):
+        prob = _setup_2ivcs_fdgroupwith2pars_1sink(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_2ivcs_fdgroupwith2pars_1sink_rev(self):
+        prob = _setup_2ivcs_fdgroupwith2pars_1sink(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_group_fd_inner_par2ivcs_fwd(self):
+        prob = _setup_2ivcs_fdgroupwithpar_1sink(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_group_fd_inner_par2ivcs_rev(self):
+        prob = _setup_2ivcs_fdgroupwithpar_1sink(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd'), atol=3e-6)
+
+    def test_group_fd_inner_par_indirect_fwd(self):
+        prob = _setup_1ivc_dum_fdgroupwithpar_1sink(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_group_fd_inner_par_indirect_rev(self):
+        prob = _setup_1ivc_dum_fdgroupwithpar_1sink(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        # assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+        assert_check_totals(prob.check_totals(method='fd', show_only_incorrect=True), atol=3e-6)
+
+    def test_group_fd_inner_par_indirect2_fwd(self):
+        prob = _setup_1ivc_dum_fdgroupwithpar_1sink_c4(size=7)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_model()
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+
+    def test_group_fd_inner_par_indirect2_rev(self):
+        prob = _setup_1ivc_dum_fdgroupwithpar_1sink_c4(size=7)
+        prob.setup(mode='rev', force_alloc_complex=True)
+        prob.run_model()
+        # assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
+        assert_check_totals(prob.check_totals(method='fd', show_only_incorrect=True), atol=3e-6)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestFDWithParallelSubGroups4(TestFDWithParallelSubGroups):
+
+    N_PROCS = 4
 
 
 if __name__ == "__main__":

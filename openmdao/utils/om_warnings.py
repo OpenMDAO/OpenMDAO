@@ -9,6 +9,8 @@ import sys
 import io
 import warnings
 
+from openmdao import __version__ as om_version
+
 
 __all__ = ['issue_warning', 'reset_warnings', 'reset_warning_registry', '_warn_simple_format',
            'OpenMDAOWarning', 'SetupWarning', 'DistributedComponentWarning', 'CaseRecorderWarning',
@@ -200,7 +202,7 @@ def issue_warning(msg, prefix='', stacklevel=2, category=OpenMDAOWarning):
     """
     old_format = warnings.formatwarning
     warnings.formatwarning = _warn_simple_format
-    _msg = f'{prefix}: {msg}' if prefix else f'{msg}'
+    _msg = f'{prefix}: {msg}' if prefix else msg
     try:
         warnings.warn(_msg, category=category, stacklevel=stacklevel)
     finally:
@@ -223,7 +225,7 @@ def _make_table(superclass=OpenMDAOWarning):
     name_header = "Warning Class"
     desc_header = "Description"
     print(f'| {name_header:<{max_name_len}} | {desc_header:<{max_desc_len}} |', file=s)
-    print(f'| {max_name_len*"-"} | {max_desc_len*"-"} |', file=s)
+    print(f'| {max_name_len * "-"} | {max_desc_len * "-"} |', file=s)
 
     for _class in _warnings:
         if isinstance(_class, superclass) or issubclass(_class, superclass):
@@ -232,7 +234,7 @@ def _make_table(superclass=OpenMDAOWarning):
     return s.getvalue()
 
 
-def warn_deprecation(msg):
+def warn_deprecation(msg, expires=None):
     """
     Raise a warning and prints a deprecation message to stdout.
 
@@ -240,8 +242,25 @@ def warn_deprecation(msg):
     ----------
     msg : str
         Message that will be printed to stdout.
+    expires : str
+        The version on OpenMDAO in which this deprecation expires, if any.
+        If this deprecation is encountered and the OpenMDAO version is at least the given
+        expires version, then an error is raised. This version should be in the form
+        'major.minor.path', without any development/release suffix.
+
+    Raises
+    ------
+    RuntimeError
+        Raised if expires is provided and the current OpenMDAO version is greater than
+        or equal to the expiration version.
     """
     # note, stack level 3 should take us back to original caller.
+    if expires is not None:
+        om_numeric = om_version.split('-')[0]
+        om_version_tuple = tuple([int(s) for s in om_numeric.split('.')])
+        expires_version_tuple = tuple([int(s) for s in expires.split('.')])
+        if om_version_tuple >= expires_version_tuple:
+            raise RuntimeError(f'Deprecation message expired in version {expires}')
     issue_warning(msg, stacklevel=3, category=OMDeprecationWarning)
 
 
@@ -278,6 +297,7 @@ class reset_warning_registry(object):
     Context manager which archives & clears warning registry for duration of context.
 
     From https://bugs.python.org/file40031/reset_warning_registry.py
+    (https://bugs.python.org/issue21724, https://github.com/python/cpython/issues/65923)
 
     Parameters
     ----------

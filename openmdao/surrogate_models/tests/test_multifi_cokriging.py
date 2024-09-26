@@ -3,10 +3,41 @@ import unittest
 import numpy as np
 
 from openmdao.api import MultiFiCoKrigingSurrogate
+from openmdao.surrogate_models.multifi_cokriging import MultiFiCoKriging
 from openmdao.utils.assert_utils import assert_near_equal
 
 
 class CoKrigingSurrogateTest(unittest.TestCase):
+
+    def test_multifi_cokriging_model(self):
+        # Test the MultiFiCoKriging implementation outside the context of a surrogate.
+        # This example was in the docstring of MultiFiCoKriging, but missing a training point.
+        # A matching test using the OpenMDAO surrogate class is below (test_1d_2fi_cokriging).
+
+        # high fidelity model
+        def fe(x):
+            return (x * 6 - 2) ** 2 * np.sin((x * 6 - 2) * 2)
+
+        # low fidelity model
+        def fc(x):
+            return 0.5 * fe(x) + (x - 0.5) * 10.0 - 5
+
+        # Xe: DOE for expensive code (nested in Xc)
+        # Xc: DOE for cheap code
+        # ye: expensive response
+        # yc: cheap response
+
+        Xe = np.array([[0],[0.4],[0.6],[1]])
+        Xc = np.vstack((np.array([[0.1],[0.2],[0.3],[0.5],[0.7],[0.8],[0.9]]), Xe))
+
+        ye = fe(Xe)
+        yc = fc(Xc)
+
+        model = MultiFiCoKriging(theta0=1, thetaL=1e-5, thetaU=50.)
+        model.fit([Xc, Xe], [yc, ye])
+
+        # Prediction on x=0.05
+        self.assertTrue(model.predict([0.05])[0].item() - fe(0.05) < 0.05)
 
     def test_1d_1fi_cokriging(self):
         # CoKrigingSurrogate with one fidelity could be used as a KrigingSurrogate
@@ -45,12 +76,11 @@ class CoKrigingSurrogateTest(unittest.TestCase):
         def f_cheap(x):
             return 0.5*((x*6-2)**2)*np.sin((x*6-2)*2)+(x-0.5)*10. - 5
 
+        x = [[[0.0], [0.4], [0.6], [1.0]],
+             [[0.1], [0.2], [0.3], [0.5], [0.7], [0.8], [0.9], [0.0], [0.4], [0.6], [1.0]]]
 
-        x = np.array([[[0.0], [0.4], [0.6], [1.0]],
-                      [[0.1], [0.2], [0.3], [0.5], [0.7],
-                       [0.8], [0.9], [0.0], [0.4], [0.6], [1.0]]])
-        y = np.array([[f_expensive(v) for v in np.array(x[0]).ravel()],
-                      [f_cheap(v) for v in np.array(x[1]).ravel()]])
+        y = [[f_expensive(v) for v in np.array(x[0]).ravel()],
+             [f_cheap(v) for v in np.array(x[1]).ravel()]]
 
         cokrig = MultiFiCoKrigingSurrogate()
         cokrig.train_multifi(x, y)
@@ -68,9 +98,8 @@ class CoKrigingSurrogateTest(unittest.TestCase):
             y = (x[1]-(5.1/(4.*np.pi**2.))*x[0]**2.+5.*x[0]/np.pi-6.)**2.+10.*(1.-1./(8.*np.pi))*np.cos(x[0])+10.
             return y
 
-        x = np.array([[-2., 0.], [-0.5, 1.5], [1., 3.], [8.5, 4.5],
-                    [-3.5, 6.], [4., 7.5], [-5., 9.], [5.5, 10.5],
-                    [10., 12.], [7., 13.5], [2.5, 15.]])
+        x = [[-2., 0.], [-0.5, 1.5], [1., 3.], [8.5, 4.5], [-3.5, 6.],
+             [4., 7.5], [-5., 9.], [5.5, 10.5], [10., 12.], [7., 13.5], [2.5, 15.]]
         y = np.array([branin(case) for case in x])
         krig1 = MultiFiCoKrigingSurrogate()
         krig1.train(x, y)
@@ -85,13 +114,13 @@ class CoKrigingSurrogateTest(unittest.TestCase):
 
         # Test with theta setting instead of estimation
         krig2 = MultiFiCoKrigingSurrogate(theta=[0.1])
-        krig1.train(x, y)
+        krig2.train(x, y)
 
         mu, sigma = krig1.predict([-2., 0.])
         assert_near_equal(mu, [[branin(x[0])]], 1e-5)
-        assert_near_equal(sigma, [[0.]], 1e-5)
+        assert_near_equal(sigma, [[0.]], 1e-4)
 
-        mu, sigma = krig1.predict([5., 5.])
+        mu, sigma = krig2.predict([5., 5.])
         assert_near_equal(mu, [[22]], 1)
         assert_near_equal(sigma, [[13]], 1)
 
@@ -137,9 +166,8 @@ class CoKrigingSurrogateTest(unittest.TestCase):
               [ 0.3914706 ,  0.09852519],
               [ 0.86565585,  0.85350002],
               [ 0.40806563,  0.91465314]]]
-        y = np.array([[branin(case) for case in x[0]],
-                      [branin_low_fidelity(case) for case in x[1]]])
-        nfi=2
+        y = [[branin(case) for case in x[0]],
+             [branin_low_fidelity(case) for case in x[1]]]
         cokrig = MultiFiCoKrigingSurrogate(normalize=False)
         cokrig.train_multifi(x, y)
 

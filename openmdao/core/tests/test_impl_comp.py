@@ -1,5 +1,4 @@
 """Simple example demonstrating how to implement an implicit component."""
-import sys
 import unittest
 
 from io import StringIO
@@ -52,7 +51,6 @@ class QuadraticLinearize(QuadraticComp):
     def linearize(self, inputs, outputs, partials):
         a = inputs['a']
         b = inputs['b']
-        c = inputs['c']
         x = outputs['x']
 
         partials['x', 'a'] = x ** 2
@@ -84,7 +82,6 @@ class QuadraticJacVec(QuadraticComp):
                      d_inputs, d_outputs, d_residuals, mode):
         a = inputs['a']
         b = inputs['b']
-        c = inputs['c']
         x = outputs['x']
         if mode == 'fwd':
             if 'x' in d_residuals:
@@ -201,7 +198,7 @@ class ImplicitCompTestCase(unittest.TestCase):
 
     def test_list_inputs_before_run(self):
         # cannot list_inputs on a Group before running
-        model_inputs = self.prob.model.list_inputs(desc=True, out_stream=None)
+        model_inputs = self.prob.model.list_inputs(desc=True, prom_name=False, out_stream=None)
         expected = {
             'comp1.a': {'val': [1.], 'desc': ''},
             'comp1.b': {'val': [1.], 'desc': ''},
@@ -213,7 +210,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(dict(model_inputs), expected)
 
         # list_inputs on a component before running is okay
-        c2_inputs = self.prob.model.comp2.list_inputs(desc=True, out_stream=None)
+        c2_inputs = self.prob.model.comp2.list_inputs(desc=True, prom_name=False, out_stream=None)
         expected = {
             'a': {'val': [1.], 'desc': ''},
             'b': {'val': [1.], 'desc': ''},
@@ -222,14 +219,14 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(dict(c2_inputs), expected)
 
         # listing component inputs based on tags should work
-        c2_inputs = self.prob.model.comp2.list_inputs(tags='tag_a', out_stream=None)
+        c2_inputs = self.prob.model.comp2.list_inputs(tags='tag_a', prom_name=False, out_stream=None)
         self.assertEqual(dict(c2_inputs), {'a': {'val': [1.]}})
 
         # includes and excludes based on relative names should work
-        c2_inputs = self.prob.model.comp2.list_inputs(includes='a', out_stream=None)
+        c2_inputs = self.prob.model.comp2.list_inputs(includes='a', prom_name=False, out_stream=None)
         self.assertEqual(dict(c2_inputs), {'a': {'val': [1.]}})
 
-        c2_inputs = self.prob.model.comp2.list_inputs(excludes='c', out_stream=None)
+        c2_inputs = self.prob.model.comp2.list_inputs(excludes='c', prom_name=False, out_stream=None)
         expected = {
             'a': {'val': [1.]},
             'b': {'val': [1.]},
@@ -246,7 +243,7 @@ class ImplicitCompTestCase(unittest.TestCase):
 
     def test_list_outputs_before_run(self):
         # cannot list_outputs on a Group before running
-        model_outputs = self.prob.model.list_outputs(out_stream=None)
+        model_outputs = self.prob.model.list_outputs(out_stream=None, prom_name=False)
         expected = {
             'comp1.x': {'val': [0.]},
             'comp2.x': {'val': [0.]},
@@ -254,26 +251,26 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(dict(model_outputs), expected)
 
         # list_outputs on a component before running is okay
-        c2_outputs = self.prob.model.comp2.list_outputs(out_stream=None)
+        c2_outputs = self.prob.model.comp2.list_outputs(out_stream=None, prom_name=False)
         expected = {
             'x': {'val': np.array([0.])}
         }
         self.assertEqual(dict(c2_outputs), expected)
 
         # listing component outputs based on tags should work
-        c2_outputs = self.prob.model.comp2.list_outputs(tags='tag_x', out_stream=None)
+        c2_outputs = self.prob.model.comp2.list_outputs(tags='tag_x', prom_name=False, out_stream=None)
         self.assertEqual(dict(c2_outputs), expected)
 
         # includes and excludes based on relative names should work
-        c2_outputs = self.prob.model.comp2.list_outputs(includes='x', out_stream=None)
+        c2_outputs = self.prob.model.comp2.list_outputs(includes='x', prom_name=False, out_stream=None)
         self.assertEqual(dict(c2_outputs), expected)
 
-        c2_outputs = self.prob.model.comp2.list_outputs(excludes='x', out_stream=None)
+        c2_outputs = self.prob.model.comp2.list_outputs(excludes='x', prom_name=False, out_stream=None)
         self.assertEqual(dict(c2_outputs), {})
 
         # specifying residuals_tol should not cause an error
         # there are no residuals yet, so nothing should be filtered
-        c2_outputs = self.prob.model.comp2.list_outputs(residuals_tol=.01, out_stream=None)
+        c2_outputs = self.prob.model.comp2.list_outputs(residuals_tol=.01, prom_name=False, out_stream=None)
         self.assertEqual(dict(c2_outputs), {
             'x': {'val': 0.}
         })
@@ -288,7 +285,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.prob.run_model()
 
         stream = StringIO()
-        inputs = self.prob.model.list_inputs(hierarchical=False, desc=True, out_stream=stream)
+        inputs = self.prob.model.list_inputs(hierarchical=False, desc=True, prom_name=False, out_stream=stream)
         self.assertEqual(sorted(inputs), [
             ('comp1.a', {'val':  [1.], 'desc': ''}),
             ('comp1.b', {'val': [-4.], 'desc': ''}),
@@ -306,7 +303,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.prob.run_model()
 
         # No tags
-        inputs = self.prob.model.list_inputs(values=False, hierarchical=False, out_stream=None)
+        inputs = self.prob.model.list_inputs(val=False, prom_name=False, hierarchical=False, out_stream=None)
         self.assertEqual(sorted(inputs), [
             ('comp1.a', {}),
             ('comp1.b', {}),
@@ -317,26 +314,23 @@ class ImplicitCompTestCase(unittest.TestCase):
         ])
 
         # With tag
-        inputs = self.prob.model.list_inputs(values=False, hierarchical=False, out_stream=None, tags='tag_a')
+        inputs = self.prob.model.list_inputs(val=False, prom_name=False, hierarchical=False, out_stream=None, tags='tag_a')
         self.assertEqual(sorted(inputs), [
             ('comp1.a', {}),
             ('comp2.a', {}),
         ])
 
         # Wrong tag
-        inputs = self.prob.model.list_inputs(values=False, hierarchical=False, out_stream=None, tags='tag_wrong')
+        inputs = self.prob.model.list_inputs(val=False, prom_name=False, hierarchical=False, out_stream=None, tags='tag_wrong')
         self.assertEqual(sorted(inputs), [])
 
     def test_list_inputs_prom_name(self):
         self.prob.run_model()
 
         stream = StringIO()
-        states = self.prob.model.list_inputs(prom_name=True, shape=True, hierarchical=True,
-                                             out_stream=stream)
+        self.prob.model.list_inputs(shape=True, hierarchical=True, out_stream=stream)
 
         text = stream.getvalue()
-        print(text)
-
         self.assertEqual(text.count('  a  '), 4)
         self.assertEqual(text.count('  b  '), 4)
         self.assertEqual(text.count('  c  '), 4)
@@ -357,14 +351,14 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.prob.run_model()
 
         # No tags
-        outputs = self.prob.model.list_outputs(explicit=False, hierarchical=False, out_stream=None)
+        outputs = self.prob.model.list_outputs(explicit=False, prom_name=False, hierarchical=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
             ('comp1.x', {'val': [3.]}),
             ('comp2.x', {'val': [3.]}),
         ])
 
         # With tag
-        outputs = self.prob.model.list_outputs(explicit=False, hierarchical=False, out_stream=None,
+        outputs = self.prob.model.list_outputs(explicit=False, prom_name=False, hierarchical=False, out_stream=None,
                                                tags="tag_x")
         self.assertEqual(sorted(outputs), [
             ('comp1.x', {'val': [3.]}),
@@ -372,7 +366,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         ])
 
         # Wrong tag
-        outputs = self.prob.model.list_outputs(explicit=False, hierarchical=False, out_stream=None,
+        outputs = self.prob.model.list_outputs(explicit=False, prom_name=False, hierarchical=False, out_stream=None,
                                                tags="tag_wrong")
         self.assertEqual(sorted(outputs), [])
 
@@ -380,7 +374,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.prob.run_model()
 
         stream = StringIO()
-        states = self.prob.model.list_outputs(explicit=False, residuals=True,
+        states = self.prob.model.list_outputs(explicit=False, prom_name=False, residuals=True,
                                               hierarchical=False, out_stream=stream)
         self.assertEqual([('comp1.x', {'val': [3.], 'resids': [0.]}),
                           ('comp2.x', {'val': [3.], 'resids': [0.]})], sorted(states))
@@ -394,9 +388,9 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.prob.run_model()
 
         stream = StringIO()
-        states = self.prob.model.list_outputs(explicit=False, residuals=True,
-                                              prom_name=True, hierarchical=True,
-                                              out_stream=stream)
+        self.prob.model.list_outputs(explicit=False, residuals=True,
+                                     prom_name=True, hierarchical=True,
+                                     out_stream=stream)
 
         text = stream.getvalue()
         self.assertEqual(text.count('comp1.x'), 1)
@@ -408,8 +402,8 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.prob.run_model()
 
         stream = StringIO()
-        resids = self.prob.model.list_outputs(values=False, residuals=True, hierarchical=False,
-                                              out_stream=stream)
+        resids = self.prob.model.list_outputs(val=False, residuals=True, hierarchical=False,
+                                              out_stream=stream, prom_name=False)
         self.assertEqual(sorted(resids), [
             ('comp1.x', {'resids': [0.]}),
             ('comp2.x', {'resids': [0.]})
@@ -443,13 +437,8 @@ class ImplicitCompTestCase(unittest.TestCase):
         prob.run_model()
 
         # list outputs with residuals, p1 and d1 should not appear
-        sysout = sys.stdout
-        try:
-            stdout = StringIO()
-            sys.stdout = stdout
-            outputs = model.list_outputs(residuals_tol=0.01, residuals=True, out_stream=stdout)
-        finally:
-            sys.stdout = sysout
+        stream = StringIO()
+        model.list_outputs(residuals_tol=0.01, residuals=True, prom_name=False, out_stream=stream)
 
         expected_text = [
             "0 Explicit Output(s) in 'model'",
@@ -463,10 +452,9 @@ class ImplicitCompTestCase(unittest.TestCase):
             "  y2",  # values removed from comparison
             "",
             "",
-            ""
         ]
-        captured_output = stdout.getvalue()
 
+        captured_output = stream.getvalue()
         for i, line in enumerate(captured_output.split('\n')):
             if line and not line.startswith('-'):
                 self.assertEqual(remove_whitespace(line.split('[')[0]),
@@ -511,7 +499,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         prob['pc.c'] = 3.
 
         # Making sure that guess_nonlinear is called early enough to eradicate this.
-        prob['comp2.x'] = np.NaN
+        prob['comp2.x'] = np.nan
 
         prob.run_model()
         assert_near_equal(prob['comp2.x'], 3.)
@@ -542,7 +530,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
             def linearize(self, inputs, outputs, partials):
                 a = inputs['a']
                 b = inputs['b']
-                c = inputs['c']
+
                 x = outputs['x']
 
                 partials['x', 'a'] = x ** 2
@@ -568,7 +556,8 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         indep.add_output('c', 3.0)
         model.add_subsystem('p', indep)
         model.add_subsystem('comp', ImpWithInitial())
-        model.add_subsystem('fn', om.ExecComp(['y = .03*a*x*x - .04*a*a*b*x - c']))
+        fn = model.add_subsystem('fn', om.ExecComp(['y = .03*a*x*x - .04*a*a*b*x - c']))
+        fn.declare_partials(of='*', wrt='*', method='cs')
 
         model.connect('p.a', 'comp.a')
         model.connect('p.a', 'fn.a')
@@ -618,7 +607,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
             def linearize(self, inputs, outputs, partials):
                 a = inputs['a']
                 b = inputs['b']
-                c = inputs['c']
+
                 x = outputs['x']
 
                 partials['x', 'a'] = x ** 2
@@ -671,7 +660,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
             def linearize(self, inputs, outputs, partials):
                 a = inputs['a']
                 b = inputs['b']
-                c = inputs['c']
+
                 x = outputs['x']
 
                 partials['x', 'a'] = x ** 2
@@ -853,7 +842,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
             def linearize(self, inputs, outputs, partials):
                 a = inputs['a']
                 b = inputs['b']
-                c = inputs['c']
+
                 x = outputs['x']
 
                 partials['x', 'a'] = x ** 2
@@ -967,7 +956,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
             def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs=None,
                 discrete_outputs=None):
                 pass
-            
+
         group = om.Group()
 
         group.add_subsystem('px', om.IndepVarComp('x', 77.0))
@@ -1371,27 +1360,9 @@ class ListFeatureTestCase(unittest.TestCase):
         prob.set_val('c', 3.)
         prob.run_model()
 
-    def test_list_inputs(self):
-        prob.model.list_inputs()
-
-    def test_list_outputs(self):
-        prob.model.list_outputs()
-
-    def test_list_explicit_outputs(self):
-        prob.model.list_outputs(implicit=False)
-
-    def test_list_implicit_outputs(self):
-        prob.model.list_outputs(explicit=False)
-
-    def test_list_residuals(self):
-        prob.model.list_outputs(residuals=True)
-
-    def test_list_prom_names(self):
-        prob.model.list_outputs(prom_name=True)
-
     def test_list_return_value(self):
         # list inputs
-        inputs = prob.model.list_inputs(out_stream=None)
+        inputs = prob.model.list_inputs(out_stream=None, prom_name=False, return_format='list')
         self.assertEqual(sorted(inputs), [
             ('sub.comp1.a', {'val': [1.]}),
             ('sub.comp1.b', {'val': [-4.]}),
@@ -1401,25 +1372,32 @@ class ListFeatureTestCase(unittest.TestCase):
             ('sub.comp2.c', {'val': [3.]})
         ])
 
-    def test_for_docs_list_no_values(self):
-        # list inputs
-        inputs = prob.model.list_inputs(values=False)
+        inputs = prob.model.list_inputs(out_stream=None, prom_name=False, return_format='dict')
+        self.assertEqual(inputs, {
+            'sub.comp1.a': {'val': [1.]},
+            'sub.comp1.b': {'val': [-4.]},
+            'sub.comp1.c': {'val': [3.]},
+            'sub.comp2.a': {'val': [1.]},
+            'sub.comp2.b': {'val': [-4.]},
+            'sub.comp2.c': {'val': [3.]}
+        })
 
-        # list only explicit outputs
-        outputs = prob.model.list_outputs(implicit=False, values=False)
+        # list outputs
+        outputs = prob.model.list_outputs(out_stream=None, prom_name=False, return_format='list')
+        self.assertEqual(sorted(outputs), [
+            ('sub.comp1.x', {'val': [3.]}),
+            ('sub.comp2.x', {'val': [3.]})
+        ])
 
-    def test_for_docs_list_includes_excludes(self):
-        # list inputs
-        inputs = prob.model.list_inputs(values=False, includes=['*comp2*',])
-        inputs = prob.model.list_inputs(values=False, excludes=['*comp2*',])
-
-        # list only explicit outputs
-        outputs = prob.model.list_outputs(implicit=False, values=False, includes=['*b',])
-        outputs = prob.model.list_outputs(implicit=False, values=False, excludes=['*b',])
+        outputs = prob.model.list_outputs(out_stream=None, prom_name=False, return_format='dict')
+        self.assertEqual(outputs, {
+            'sub.comp1.x': {'val': [3.]},
+            'sub.comp2.x': {'val': [3.]}
+        })
 
     def test_list_no_values(self):
         # list inputs
-        inputs = prob.model.list_inputs(values=False)
+        inputs = prob.model.list_inputs(val=False, prom_name=False, out_stream=None)
         self.assertEqual([n[0] for n in sorted(inputs)], [
             'sub.comp1.a',
             'sub.comp1.b',
@@ -1460,7 +1438,7 @@ class ListFeatureTestCase(unittest.TestCase):
 
         # list_inputs test
         stream = StringIO()
-        inputs = prob.model.list_inputs(values=False, out_stream=stream)
+        inputs = prob.model.list_inputs(val=False, prom_name=False, out_stream=stream)
         text = stream.getvalue()
         self.assertEqual(sorted(inputs), [
             ('sub.comp2.a', {}),
@@ -1479,7 +1457,7 @@ class ListFeatureTestCase(unittest.TestCase):
 
         # list_outputs tests
         # list implicit outputs
-        outputs = prob.model.list_outputs(explicit=False, out_stream=None)
+        outputs = prob.model.list_outputs(explicit=False, prom_name=False, out_stream=None)
         text = stream.getvalue()
         self.assertEqual(sorted(outputs), [
             ('sub.comp2.x', {'val': [3.]}),
@@ -1487,34 +1465,12 @@ class ListFeatureTestCase(unittest.TestCase):
         ])
         # list explicit outputs
         stream = StringIO()
-        outputs = prob.model.list_outputs(implicit=False, out_stream=None)
+        outputs = prob.model.list_outputs(implicit=False, prom_name=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
             ('comp1.a', {'val': [1.]}),
             ('comp1.b', {'val': [-4.]}),
             ('comp1.c', {'val': [3.]}),
         ])
-
-    def test_list_residuals_with_tol(self):
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('p1', om.IndepVarComp('x', 1.0))
-        model.add_subsystem('d1', SellarImplicitDis1())
-        model.add_subsystem('d2', SellarImplicitDis2())
-        model.connect('d1.y1', 'd2.y1')
-        model.connect('d2.y2', 'd1.y2')
-
-        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-        model.nonlinear_solver.options['maxiter'] = 5
-        model.linear_solver = om.ScipyKrylov()
-        model.linear_solver.precon = om.LinearBlockGS()
-
-        prob.setup()
-        prob.set_solver_print(level=-1)
-
-        prob.run_model()
-
-        outputs = model.list_outputs(residuals_tol=0.01, residuals=True)
 
 
 class CacheUsingComp(om.ImplicitComponent):

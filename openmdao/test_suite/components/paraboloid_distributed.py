@@ -27,17 +27,13 @@ class DistParab(om.ExplicitComponent):
         rank = comm.rank
 
         sizes, offsets = evenly_distrib_idxs(comm.size, arr_size)
-        start = offsets[rank]
         io_size = sizes[rank]
         self.offset = offsets[rank]
-        end = start + io_size
 
-        self.add_input('x', val=np.ones(io_size), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
-        self.add_input('y', val=np.ones(io_size), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
-        self.add_input('a', val=-3.0 * np.ones(io_size), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
+        # src_indices will be computed automatically
+        self.add_input('x', val=np.ones(io_size), distributed=True)
+        self.add_input('y', val=np.ones(io_size), distributed=True)
+        self.add_input('a', val=-3.0 * np.ones(io_size), distributed=True)
 
         self.add_output('f_xy', val=np.ones(io_size), distributed=True)
 
@@ -125,17 +121,13 @@ class DistParabDeprecated(om.ExplicitComponent):
         rank = comm.rank
 
         sizes, offsets = evenly_distrib_idxs(comm.size, arr_size)
-        start = offsets[rank]
         io_size = sizes[rank]
         self.offset = offsets[rank]
-        end = start + io_size
 
-        self.add_input('x', val=np.ones(io_size), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
-        self.add_input('y', val=np.ones(io_size), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
-        self.add_input('offset', val=-3.0 * np.ones(io_size), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
+        # src_indices will be computed automatically
+        self.add_input('x', val=np.ones(io_size), distributed=True)
+        self.add_input('y', val=np.ones(io_size), distributed=True)
+        self.add_input('offset', val=-3.0 * np.ones(io_size), distributed=True)
 
         self.add_output('f_xy', val=np.ones(io_size), distributed=True)
 

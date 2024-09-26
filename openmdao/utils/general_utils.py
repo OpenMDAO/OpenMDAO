@@ -2,24 +2,21 @@
 import os
 import re
 import sys
+from types import TracebackType
 import unittest
 from contextlib import contextmanager
 from fnmatch import fnmatchcase
 from io import StringIO
 from numbers import Integral
+from inspect import currentframe, getouterframes, stack, isfunction, ismethod
 
 from collections.abc import Iterable
 
 import numpy as np
 
 from openmdao.core.constants import INF_BOUND
-from openmdao.utils.om_warnings import issue_warning, warn_deprecation
 from openmdao.utils.array_utils import shape_to_len
 
-
-# Certain command line tools can make use of this to allow visualization of models when errors
-# are present that would normally cause setup to abort.
-_ignore_errors = False
 
 _float_inf = float('inf')
 
@@ -43,93 +40,6 @@ def _convert_auto_ivc_to_conn_name(conns_dict, name):
     for key, val in conns_dict.items():
         if val == name:
             return key
-
-
-def ignore_errors(flag=None):
-    """
-    Disable certain errors that will prevent setup from completing.
-
-    Parameters
-    ----------
-    flag : bool or None
-        If not None, set the value of _ignore_errors to this value.
-
-    Returns
-    -------
-    bool
-        The current value of _ignore_errors.
-    """
-    global _ignore_errors
-    if flag is not None:
-        _ignore_errors = flag
-    return _ignore_errors
-
-
-def conditional_error(msg, exc=RuntimeError, category=UserWarning, err=None):
-    """
-    Raise an exception or issue a warning, depending on the value of _ignore_errors.
-
-    Parameters
-    ----------
-    msg : str
-        The error/warning message.
-    exc : Exception class or exception info tuple (exception class, exception instance, traceback)
-        This exception class is used to create the exception to be raised, or an exception info
-        tuple from a previously raised exception that is to be re-raised, contingent on the value
-        of 'err'.
-    category : warning class
-        This category is the class of warning to be issued.
-    err : bool
-        If None, use ignore_errors(), otherwise use value of err to determine whether to
-        raise an exception (err=True) or issue a warning (err=False).
-    """
-    if (err is None and ignore_errors()) or err is False:
-        issue_warning(msg, category=category)
-    else:
-        if isinstance(exc, tuple):
-            raise exc[0](msg).with_traceback(exc[2])
-        else:
-            raise exc(msg)
-
-
-@contextmanager
-def ignore_errors_context(flag=True):
-    """
-    Set ignore_errors to the given flag in this context.
-
-    Parameters
-    ----------
-    flag : bool
-        If not None, set ignore_errors to this value.
-
-    Yields
-    ------
-    None
-    """
-    save = ignore_errors()
-    ignore_errors(flag)
-    try:
-        yield
-    finally:
-        ignore_errors(save)
-
-
-def simple_warning(msg, category=UserWarning, stacklevel=2):
-    """
-    Display a simple warning message without the annoying extra line showing the warning call.
-
-    Parameters
-    ----------
-    msg : str
-        The warning message.
-    category : class
-        The warning class.
-    stacklevel : int
-        Number of levels up the stack to identify as the warning location.
-    """
-    warn_deprecation('simple_warning is deprecated. '
-                     'Use openmdao.utils.om_warnings.issue_warning instead.')
-    issue_warning(msg, stacklevel=stacklevel, category=category)
 
 
 def ensure_compatible(name, value, shape=None, indices=None):
@@ -203,6 +113,43 @@ def ensure_compatible(name, value, shape=None, indices=None):
                                  f"{value.shape}.")
 
     return value, shape
+
+
+def _subjac_meta2value(meta):
+    """
+    Convert subjacobian metadata to value, rows, cols.
+
+    Parameters
+    ----------
+    meta : dict
+        Metadata dict.
+
+    Returns
+    -------
+    ndarray
+        Value of the subjacobian.
+    ndarray or None
+        Row indices of nonzero values in subjacobian.
+    ndarray or None
+        Column indices of nonzero values in subjacobian.
+    """
+    val = meta['val'] if 'val' in meta else None
+    rows = meta['rows'] if 'rows' in meta else None
+    cols = meta['cols'] if 'cols' in meta else None
+
+    if rows is not None:
+        if val is not None and np.isscalar(val):
+            val = np.full(len(rows), val)
+    elif np.isscalar(val):
+        shape = meta['shape'] if 'shape' in meta else None
+        if shape is not None:
+            val = np.full(shape, val)
+        else:
+            val = np.atleast_2d(val)
+    elif val is not None:
+        val = np.atleast_2d(val)
+
+    return val, rows, cols
 
 
 def determine_adder_scaler(ref0, ref, adder, scaler):
@@ -409,6 +356,9 @@ class ContainsAll(object):
         return True
 
 
+_contains_all = ContainsAll()
+
+
 def all_ancestors(pathname, delim='.'):
     """
     Return a generator of pathnames of the starting object and all of its parents.
@@ -426,9 +376,9 @@ def all_ancestors(pathname, delim='.'):
     ------
     str
     """
-    parts = pathname.split(delim)
-    for i in range(len(parts), 0, -1):
-        yield delim.join(parts[:i])
+    while pathname:
+        yield pathname
+        pathname, _, _ = pathname.rpartition(delim)
 
 
 def find_matches(pattern, var_list):
@@ -449,9 +399,44 @@ def find_matches(pattern, var_list):
     """
     if pattern == '*':
         return var_list
-    elif pattern in var_list:
-        return [pattern]
     return [name for name in var_list if fnmatchcase(name, pattern)]
+
+
+def pattern_filter(patterns, var_iter, name_index=None):
+    """
+    Yield variable names that match a given pattern.
+
+    Parameters
+    ----------
+    patterns : iter of str
+        Glob patterns or variable names.
+    var_iter : iter of str or iter of tuple/list
+        Iterator of variable names (or tuples containing variable names) to search for patterns.
+    name_index : int or None
+        If not None, the var_iter is assumed to yield tuples, and the
+        name_index is the index of the variable name in the tuple.
+
+    Yields
+    ------
+    str
+        Variable name that matches a pattern.
+    """
+    if '*' in patterns:
+        yield from var_iter
+    else:
+        if name_index is None:
+            for vname in var_iter:
+                for pattern in patterns:
+                    if fnmatchcase(vname, pattern):
+                        yield vname
+                        break
+        else:
+            for tup in var_iter:
+                vname = tup[name_index]
+                for pattern in patterns:
+                    if fnmatchcase(vname, pattern):
+                        yield tup
+                        break
 
 
 def _find_dict_meta(dct, key):
@@ -476,7 +461,7 @@ def _find_dict_meta(dct, key):
     return False
 
 
-def pad_name(name, pad_num=10, quotes=False):
+def pad_name(name, width=10, quotes=False):
     """
     Pad a string so that they all line up when stacked.
 
@@ -484,7 +469,7 @@ def pad_name(name, pad_num=10, quotes=False):
     ----------
     name : str
         The string to pad.
-    pad_num : int
+    width : int
         The number of total spaces the string should take up.
     quotes : bool
         If name should be quoted.
@@ -494,11 +479,11 @@ def pad_name(name, pad_num=10, quotes=False):
     str
         Padded string.
     """
-    name = f"'{name}'" if quotes else name
-    if pad_num > len(name):
-        return f"{name:<{pad_num}}"
+    name = f"'{name}'" if quotes else str(name)
+    if width > len(name):
+        return f"{name:<{width}}"
     else:
-        return f'{name}'
+        return f"{name}"
 
 
 def add_border(msg, borderstr='=', vpad=0):
@@ -524,7 +509,8 @@ def add_border(msg, borderstr='=', vpad=0):
     border = len(msg) * borderstr
     # handle borderstr of more than 1 char
     border = border[:len(msg)]
-    return f"{border}\n{msg}\n{border}"
+    padding = '\n' * (vpad + 1)
+    return f"{border}{padding}{msg}{padding}{border}"
 
 
 def run_model(prob, ignore_exception=False):
@@ -579,7 +565,7 @@ def run_driver(prob):
 
     sys.stdout = strout
     try:
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
     finally:
         sys.stdout = stdout
 
@@ -679,27 +665,6 @@ def remove_whitespace(s, right=False, left=False):
         return re.sub(r"\s+$", "", s, flags=re.UNICODE)
     else:  # left
         return re.sub(r"^\s+", "", s, flags=re.UNICODE)
-
-
-_badtab = r'`~@#$%^&*()[]{}-+=|\/?<>,.:;'
-_transtab = str.maketrans(_badtab, '_' * len(_badtab))
-
-
-def str2valid_python_name(s):
-    """
-    Translate a given string into a valid python variable name.
-
-    Parameters
-    ----------
-    s : str
-        The string to be translated.
-
-    Returns
-    -------
-    str
-        The valid python name string.
-    """
-    return s.translate(_transtab)
 
 
 _container_classes = (list, tuple, set)
@@ -853,7 +818,7 @@ def make_set(str_data, name=None):
 
 def match_includes_excludes(name, includes=None, excludes=None):
     """
-    Check to see if the variable names pass through the includes and excludes filter.
+    Check to see if the variable name passes through the includes and excludes filter.
 
     Parameters
     ----------
@@ -885,6 +850,24 @@ def match_includes_excludes(name, includes=None, excludes=None):
                 return True
 
     return False
+
+
+def meta2src_iter(meta_iter):
+    """
+    Yield the source name for each metadata dict in the given iterator.
+
+    Parameters
+    ----------
+    meta_iter : iter of dict
+        Iterator over metadata dicts.
+
+    Yields
+    ------
+    str
+        The source name for each metadata dict.
+    """
+    for meta in meta_iter:
+        yield meta['source']
 
 
 def match_prom_or_abs(name, prom_name, includes=None, excludes=None):
@@ -964,13 +947,30 @@ def env_truthy(env_var):
     return is_truthy(os.environ.get(env_var, ''))
 
 
+def env_none(env_var):
+    """
+    Return True if the given environment variable is None.
+
+    Parameters
+    ----------
+    env_var : str
+        The name of the environment variable.
+
+    Returns
+    -------
+    bool
+        True if the specified environment variable is None.
+    """
+    return os.environ.get(env_var) is None
+
+
 def common_subpath(pathnames):
     """
     Return the common dotted subpath found in all of the given dotted pathnames.
 
     Parameters
     ----------
-    pathnames : iter of str
+    pathnames : list or tuple of str
         Dotted pathnames of systems.
 
     Returns
@@ -984,8 +984,7 @@ def common_subpath(pathnames):
     if pathnames:
         npaths = len(pathnames)
         splits = [p.split('.') for p in pathnames]
-        minlen = np.min([len(s) for s in splits])
-        for common_loc in range(minlen):
+        for common_loc in range(np.min([len(s) for s in splits])):
             p0 = splits[0][common_loc]
             for i in range(1, npaths):
                 if p0 != splits[i][common_loc]:
@@ -1039,17 +1038,9 @@ def _src_name_iter(proms):
         yield meta['source']
 
 
-def _src_or_alias_name(meta):
-    if 'alias' in meta:
-        alias = meta['alias']
-        if alias:
-            return alias
-    return meta['source']
-
-
 def _src_or_alias_item_iter(proms):
     """
-    Yield items from proms with promoted input names converted to source or alias names.
+    Yield items from proms dict with promoted input names converted to source or alias names.
 
     Parameters
     ----------
@@ -1196,17 +1187,19 @@ def wing_dbg():
         new = sys.path[:] + [os.environ['WINGHOME']]
         sys.path = new
         try:
-            import wingdbstub
+            import wingdbstub  # noqa: F401
         finally:
             sys.path = save
 
 
 class LocalRangeIterable(object):
     """
-    Iterable object yielding local indices while iterating over local or distributed vars.
+    Iterable object yielding local indices while iterating over local, distributed, or remote vars.
 
     The number of iterations for a distributed variable will be the full distributed size of the
-    variable but None will be returned for any indices that are not local to the given rank.
+    variable.
+
+    None will be returned for any indices that are not local to the given rank.
 
     Parameters
     ----------
@@ -1215,15 +1208,17 @@ class LocalRangeIterable(object):
     vname : str
         Name of the variable.
     use_vec_offset : bool
-        If True, return indices for the given variable within its vector, else just return
+        If True, return indices for the given variable within its parent vector, else just return
         indices within the variable itself, i.e. range(var_size).
 
     Attributes
     ----------
+    _vname : str
+        Name of the variable.
     _inds : ndarray
         Variable indices (unused for distributed variables).
-    _dist_size : int
-        Full size of distributed variable.
+    _var_size : int
+        Full size of distributed or remote variable.
     _start : int
         Starting index of distributed variable on this rank.
     _end : int
@@ -1238,18 +1233,21 @@ class LocalRangeIterable(object):
         """
         Initialize the iterator.
         """
-        self._dist_size = 0
+        self._vname = vname
+        self._var_size = 0
 
-        abs2meta = system._var_allprocs_abs2meta['output']
-        if vname in abs2meta:
+        all_abs2meta = system._var_allprocs_abs2meta['output']
+        if vname in all_abs2meta:
             sizes = system._var_sizes['output']
             slices = system._outputs.get_slice_dict()
+            abs2meta = system._var_abs2meta['output']
         else:
-            abs2meta = system._var_allprocs_abs2meta['input']
+            all_abs2meta = system._var_allprocs_abs2meta['input']
             sizes = system._var_sizes['input']
             slices = system._inputs.get_slice_dict()
+            abs2meta = system._var_abs2meta['input']
 
-        if abs2meta[vname]['distributed']:
+        if all_abs2meta[vname]['distributed']:
             var_idx = system._var_allprocs_abs2idx[vname]
             rank = system.comm.rank
             self._offset = np.sum(sizes[rank, :var_idx]) if use_vec_offset else 0
@@ -1257,13 +1255,32 @@ class LocalRangeIterable(object):
             self._iter = self._dist_iter
             self._start = np.sum(sizes[:rank, var_idx])
             self._end = self._start + sizes[rank, var_idx]
-            self._dist_size = np.sum(sizes[:, var_idx])
+            self._var_size = np.sum(sizes[:, var_idx])
+        elif vname not in abs2meta:  # variable is remote
+            self._iter = self._remote_iter
+            self._var_size = all_abs2meta[vname]['global_size']
         else:
             self._iter = self._serial_iter
             if use_vec_offset:
                 self._inds = range(slices[vname].start, slices[vname].stop)
             else:
                 self._inds = range(slices[vname].stop - slices[vname].start)
+            self._var_size = all_abs2meta[vname]['global_size']
+
+    def __repr__(self):
+        """
+        Return a string representation of the iterator.
+
+        Returns
+        -------
+        str
+            String representation of the iterator.
+        """
+        if self._iter is self._dist_iter:
+            return f"LocalRangeIterable({self._vname}, dist: {self._start} to {self._end})"
+        elif self._iter is self._remote_iter:
+            return f"LocalRangeIterable({self._vname}, remote: size={self._var_size})"
+        return f"LocalRangeIterable({self._vname}, serial: size={self._var_size})"
 
     def _serial_iter(self):
         """
@@ -1288,11 +1305,23 @@ class LocalRangeIterable(object):
         start = self._start
         end = self._end
 
-        for i in range(self._dist_size):
+        for i in range(self._var_size):
             if i >= start and i < end:
                 yield i - start + self._offset
             else:
                 yield None
+
+    def _remote_iter(self):
+        """
+        Iterate over a remote variable.
+
+        Yields
+        ------
+        None
+            Always yields None.
+        """
+        for _ in range(self._var_size):
+            yield None
 
     def __iter__(self):
         """
@@ -1304,3 +1333,420 @@ class LocalRangeIterable(object):
             An iterator over our indices.
         """
         return self._iter()
+
+
+def make_traceback():
+    """
+    Create a traceback for use later with an exception.
+
+    The traceback will begin at the stack frame *above* the caller of make_traceback.
+
+    Returns
+    -------
+    traceback
+        The newly constructed traceback.
+    """
+    finfo = getouterframes(currentframe())[2]
+    return TracebackType(None, finfo.frame, finfo.frame.f_lasti, finfo.frame.f_lineno)
+
+
+if env_truthy('OM_DBG'):
+    def dprint(*args, **kwargs):
+        """
+        Print only if OM_DBG is truthy in the environment.
+
+        Parameters
+        ----------
+        args : list
+            Positional args.
+        kwargs : dict
+            Named args.
+        """
+        print(*args, **kwargs)
+else:
+    def dprint(*args, **kwargs):
+        """
+        Print only if OM_DBG is truthy in the environment.
+
+        Parameters
+        ----------
+        args : list
+            Positional args.
+        kwargs : dict
+            Named args.
+        """
+        pass
+
+
+def inconsistent_across_procs(comm, arr, tol=1e-15, return_array=True):
+    """
+    Check serial deriv values across ranks.
+
+    This should only be run after _apply_linear.
+
+    Parameters
+    ----------
+    comm : MPI communicator
+        Communicator belonging to the component that owns the derivs array.
+    arr : ndarray
+        The array being checked for consistency across processes.
+    tol : float
+        Tolerance to determine if diff is 0.
+    return_array : bool
+        If True, return a boolean array on rank 0 indicating which indices are inconsistent.
+
+    Returns
+    -------
+    ndarray on rank 0, boolean elsewhere, or bool everywhere if return_array is False
+        On rank 0, boolean array with True in entries that are not consistent across all processes
+        in the communicator.  On other ranks, True if there are inconsistent entries.
+    """
+    if comm.size < 2:
+        return np.zeros(0, dtype=bool) if return_array and comm.rank == 0 else False
+
+    if comm.rank == 0:
+        result = np.zeros(arr.size, dtype=bool) if return_array else False
+        for rank, val in enumerate(comm.gather(arr, root=0)):
+            if rank == 0:
+                baseval = val
+            elif return_array:
+                result |= (np.abs(baseval - val) > tol).flat
+            else:
+                result |= np.any(np.abs(baseval - val) > tol)
+
+        if return_array:
+            comm.bcast(np.any(result), root=0)
+        else:
+            comm.bcast(result, root=0)
+        return result
+
+    comm.gather(arr, root=0)
+    return comm.bcast(None, root=0)
+
+
+def get_rev_conns(conns):
+    """
+    Return a dict mapping each connected output to a list of its connected inputs.
+
+    Parameters
+    ----------
+    conns : dict
+        Dict mapping each input to its connected output.
+
+    Returns
+    -------
+    dict
+        Dict mapping each connected output to a list of its connected inputs.
+    """
+    rev = {}
+    for tgt, src in conns.items():
+        if src in rev:
+            rev[src].append(tgt)
+        else:
+            rev[src] = [tgt]
+    return rev
+
+
+def vprint(it, end='\n', getter=None, file=None):
+    """
+    Iterate over the given iterator and print each item separated by end.
+
+    Parameters
+    ----------
+    it : iter
+        Iterator to be printed.
+    end : str
+        String written after each item.
+    getter : function or None
+        If not None, only print the part of each item returned by getter(item).
+    file : file-like or None
+        File to write to.  If None, use sys.stdout.
+    """
+    if file is None:
+        file = sys.stdout
+
+    for val in it:
+        if getter is not None:
+            val = getter(val)
+        print(val, end=end, file=file)
+
+
+def _default_predicate(name, obj):
+    """
+    Determine if a given method should be traced.
+
+    Parameters
+    ----------
+    name : str
+        Name of the method.
+    obj : object
+        The object being checked.
+
+    Returns
+    -------
+    bool
+        True if the method should be traced.
+    """
+    if isfunction(obj) or ismethod(obj):
+        for n in ['solve', 'apply', 'compute', 'setup', 'coloring', 'linearize', 'get_outputs_dir',
+                  'approx', 'static']:
+            if n in name:
+                return True
+    return False
+
+
+_trace_predicate = _default_predicate
+
+
+def set_trace_predicate(funct):
+    """
+    Set the function that determines which methods will be traced.
+
+    Parameters
+    ----------
+    funct : function
+        Set of functions to be traced.
+    """
+    global _trace_predicate
+    _trace_predicate = funct
+
+
+def _decorate_functs(attrs, predicate, decorator):
+    """
+    Decorate the functions in the given attribute dict.
+
+    Parameters
+    ----------
+    attrs : dict
+        The attribute dict containing the functions to be decorated.
+    predicate : function
+        Function returning True if the function should be decorated.
+    decorator : function
+        The decorator function.
+    """
+    for name, obj in attrs.items():
+        if predicate(name, obj):
+            attrs[name] = decorator(obj)
+
+
+if env_truthy('OPENMDAO_DUMP'):
+    # OPENMDAO_DUMP can have values like 'stdout', 'stderr', 'rank', 'pid', 'mpi' or
+    # combos like 'rank,pid' or 'stdout,mpi'
+    # mpi means to wrap (most) comm calls with debug printouts
+    # rank means to include the rank in the dump file name, e.g., om_dump_0.out
+    # pid means to include the pid in the dump file name, e.g., om_dump_12345.out
+    # if rank and pid are both included, the file name will be, e.g., om_dump_0_12345.out
+    # stdout means to dump to stdout (so rank and pid are ignored)
+    # stderr means to dump to stderr (so rank and pid are ignored)
+    # if OPENMDAO_DUMP is just a plain truthy value, like '1', then we dump to a file
+    # named om_dump.out.
+    parts = [s.strip() for s in os.environ['OPENMDAO_DUMP'].split(',')]
+    _om_mpi_debug = 'mpi' in parts or 'rank' in parts
+    if 'stdout' in parts:
+        _dump_stream = sys.stdout
+    elif 'stderr' in parts:
+        _dump_stream = sys.stderr
+    else:
+        rankstr = pidstr = ''
+        if 'rank' in parts:
+            from openmdao.utils.mpi import MPI
+            rankstr = f"_{MPI.COMM_WORLD.rank if MPI else 0}"
+
+        if 'pid' in parts:
+            pidstr = f"_{os.getpid()}"
+
+        _dump_stream = open(f'om_dump{rankstr}{pidstr}.out', 'w')
+
+    def om_dump(*args, **kwargs):
+        """
+        Dump to a stream if OPENMDAO_DUMP is truthy in the environment.
+
+        Depending on the value of OPENMDAO_DUMP, output will go to file(s), stdout, or stderr.
+
+        Parameters
+        ----------
+        args : list
+            Positional args.
+        kwargs : dict
+            Named args.
+        """
+        kwargs['file'] = _dump_stream
+        kwargs['flush'] = True
+        print(*args, **kwargs)
+
+    def dbg(funct):
+        """
+        Print function entry and exit.
+
+        Parameters
+        ----------
+        funct : function
+            The function being decorated.
+
+        Returns
+        -------
+        function
+            The decorated function.
+        """
+        def wrapper(*args, **kwargs):
+            try:
+                path = args[0].msginfo + '.'
+            except Exception:
+                path = ''
+            indent = call_depth2indent()
+            om_dump(f"{indent}--> {path}{funct.__name__}")
+            ret = funct(*args, **kwargs)
+            om_dump(f"{indent}<-- {path}{funct.__name__}")
+            return ret
+
+        return wrapper
+
+    class DebugMeta(type):
+        """
+        A metaclass to add trace output to some methods of the class.
+
+        Parameters
+        ----------
+        name : str
+            The name of the class.
+        bases : tuple
+            The base classes of the class.
+        attrs : dict
+            The attributes of the class.
+
+        Returns
+        -------
+        class
+            The class with the metaclass applied.
+        """
+
+        def __new__(metaclass, name, bases, attrs):
+            """
+            Add trace output to some methods of the class.
+
+            Parameters
+            ----------
+            name : str
+                The name of the class.
+            bases : tuple
+                The base classes of the class.
+            attrs : dict
+                The attributes of the class.
+
+            Returns
+            -------
+            class
+                The class with trace output added to some methods
+            """
+            _decorate_functs(attrs, _trace_predicate, dbg)
+            return super().__new__(metaclass, name, bases, attrs)
+
+    SystemMeta = DebugMeta
+    ProblemMeta = DebugMeta
+    SolverMeta = DebugMeta
+
+else:
+    def om_dump(*args, **kwargs):
+        """
+        Dump to 'om_dump<rank>_<pid>.out' if OPENMDAO_DUMP is truthy in the environment.
+
+        Parameters
+        ----------
+        args : list
+            Positional args.
+        kwargs : dict
+            Named args.
+        """
+        pass
+
+    def dbg(funct):
+        """
+        Print function entry and exit.
+
+        Parameters
+        ----------
+        funct : function
+            The function being decorated.
+
+        Returns
+        -------
+        function
+            The decorated function.
+        """
+        return funct
+
+    SystemMeta = type
+    ProblemMeta = type
+    SolverMeta = type
+    DebugMeta = type
+
+    _om_mpi_debug = False
+
+
+def _comm_debug_decorator(fn, scope):  # pragma no cover
+    def _wrap(*args, **kwargs):
+        sc = '' if scope is None else f"{scope}."
+        indent = call_depth2indent()
+        om_dump(f"{indent}--> {sc}{fn.__name__}")
+        ret = fn(*args, **kwargs)
+        om_dump(f"{indent}<-- {sc}{fn.__name__}")
+        return ret
+    return _wrap
+
+
+class _DebugComm(object):  # pragma no cover
+    """
+    Debugging wrapper for an MPI communicator.
+    """
+
+    def __init__(self, comm, scope):
+        if isinstance(comm, _DebugComm):
+            self.__dict__['_comm'] = comm._comm
+        else:
+            self.__dict__['_comm'] = comm
+        self.__dict__['_scope'] = scope
+        for name in ['bcast', 'Bcast', 'gather', 'Gather', 'scatter', 'Scatter',
+                     'allgather', 'Allgather', 'allreduce', 'Allreduce',
+                     'send', 'Send', 'recv', 'Recv', 'sendrecv', 'Sendrecv']:
+            self.__dict__[name] = _comm_debug_decorator(getattr(self._comm, name), scope)
+
+    def __getattr__(self, name):
+        return getattr(self._comm, name)
+
+    def __setattr__(self, name, val):
+        setattr(self._comm, name, val)
+
+
+if _om_mpi_debug:
+    def _wrap_comm(comm, scope=None):  # pragma no cover
+        return _DebugComm(comm, scope)
+
+    def _unwrap_comm(comm):  # pragma no cover
+        if isinstance(comm, _DebugComm):
+            return comm._comm
+        return comm
+else:
+    def _wrap_comm(comm, scope=None):
+        return comm
+
+    def _unwrap_comm(comm):
+        return comm
+
+
+def call_depth2indent(tabsize=2, offset=-1):
+    """
+    Return a string of spaces corresponding to the current call depth.
+
+    Parameters
+    ----------
+    tabsize : int
+        Number of spaces per tab.
+    offset : int
+        Offset to add to the call depth.
+
+    Returns
+    -------
+    str
+        A string of spaces.
+    """
+    return ' ' * ((len(stack()) + offset) * tabsize)

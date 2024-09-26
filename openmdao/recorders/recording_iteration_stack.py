@@ -1,8 +1,6 @@
 """Management of iteration stack for recording."""
 import weakref
 
-from openmdao.utils.mpi import MPI
-
 _norec_funcs = frozenset(['_run_apply', '_compute_totals'])
 
 
@@ -128,8 +126,6 @@ class Recording(object):
         Current counter of iterations completed.
     recording_requester : weakref to object
         The object that wants to be recorded.
-    stack : list
-        Stack containing names and iteration counts.
     abs : float
         Absolute error.
     rel : float

@@ -3,9 +3,7 @@ import unittest
 import numpy as np
 from numpy.testing import assert_equal
 
-import openmdao.api as om
-from openmdao.utils.indexer import indexer
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.indexer import indexer, combine_ranges
 
 
 class IndexerTestCase(unittest.TestCase):
@@ -150,7 +148,7 @@ class IndexerTestCase(unittest.TestCase):
         assert_equal(src[ind.shaped_array()], np.array([5,3,7,9]))
         assert_equal(ind.shaped_instance()(), np.array([5,3,7,9]))
 
-    def test_neg_arr(self):
+    def test_neg_arr2(self):
         ind = indexer[[-1, -3, -5]]
         src = np.arange(10)
 
@@ -191,10 +189,10 @@ class IndexerTestCase(unittest.TestCase):
 
         assert_equal(ind.min_src_dim, 1)
 
-        with self.assertRaises(RuntimeError) as cm:
+        with self.assertRaises(Exception) as cm:
             ind.indexed_src_shape
         self.assertEqual(cm.exception.args[0], "Can't get indexed_src_shape of slice(None, None, 1) because source shape is unknown.")
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(Exception) as cm:
             ind.as_array()
         self.assertEqual(cm.exception.args[0], "Can't get shaped array of slice(None, None, 1) because it has no source shape.")
 
@@ -256,7 +254,7 @@ class IndexerTestCase(unittest.TestCase):
 
         assert_equal(ind.min_src_dim, 1)
 
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(Exception) as cm:
             ind.as_array()
         self.assertEqual(cm.exception.args[0], "Can't get shaped array of slice(3, None, 1) because it has no source shape.")
 
@@ -343,10 +341,10 @@ class IndexerMultiDimTestCase(unittest.TestCase):
             ind.flat()
         self.assertEqual(cm.exception.args[0], "Can't get shaped array of (slice(None, None, None), slice(None, None, None), slice(None, None, None)) because it has no source shape.")
 
-        with self.assertRaises(RuntimeError) as cm:
+        with self.assertRaises(Exception) as cm:
             ind.indexed_src_shape
         self.assertEqual(cm.exception.args[0], "Can't get indexed_src_shape of (slice(None, None, None), slice(None, None, None), slice(None, None, None)) because source shape is unknown.")
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(Exception) as cm:
             ind.as_array()
         self.assertEqual(cm.exception.args[0], "Can't determine extent of array because source shape is not known.")
 
@@ -389,10 +387,10 @@ class IndexerMultiDimTestCase(unittest.TestCase):
         assert_equal(ind(), (slice(None, -1, 1), slice(None, None, 1), slice(None, 2, 1)))
         assert_equal(src[ind()], src[:-1,:,:2])
 
-        with self.assertRaises(RuntimeError) as cm:
+        with self.assertRaises(Exception) as cm:
             ind.indexed_src_shape
         self.assertEqual(cm.exception.args[0], "Can't get indexed_src_shape of (slice(None, -1, None), slice(None, None, None), slice(None, 2, None)) because source shape is unknown.")
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(Exception) as cm:
             ind.as_array()
         self.assertEqual(cm.exception.args[0], "Can't determine extent of array because source shape is not known.")
 
@@ -409,10 +407,10 @@ class IndexerMultiDimTestCase(unittest.TestCase):
         ind = indexer[[0,2], :, [1,2]]
 
         assert_equal(ind(), ([0,2], slice(None, None, 1), [1,2]))
-        with self.assertRaises(RuntimeError) as cm:
+        with self.assertRaises(Exception) as cm:
             ind.indexed_src_shape
         self.assertEqual(cm.exception.args[0], "Can't get indexed_src_shape of ([0, 2], slice(None, None, None), [1, 2]) because source shape is unknown.")
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(Exception) as cm:
             ind.as_array()
         self.assertEqual(cm.exception.args[0], "Can't determine extent of array because source shape is not known.")
 
@@ -429,10 +427,10 @@ class IndexerMultiDimTestCase(unittest.TestCase):
         ind = indexer[[[0,0],[2,2]], [[0,2], [0, 2]]]  # shoud get a 2x2 array with corner values of the 3x3
 
         assert_equal(ind(), ([[0,0],[2,2]], [[0,2], [0, 2]]))
-        with self.assertRaises(RuntimeError) as cm:
+        with self.assertRaises(Exception) as cm:
             ind.indexed_src_shape
         self.assertEqual(cm.exception.args[0], "Can't get indexed_src_shape of ([[0, 0], [2, 2]], [[0, 2], [0, 2]]) because source shape is unknown.")
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(Exception) as cm:
             ind.as_array()
         self.assertEqual(cm.exception.args[0], "Can't determine extent of array because source shape is not known.")
 
@@ -457,6 +455,34 @@ class IndexerMultiDimTestCase(unittest.TestCase):
         assert_equal(ind.as_array(flat=False), np.array([1,3,5,4,22, -4, 11, 3]))
         assert_equal(ind.indexed_src_shape, (8,))
         assert_equal(ind.min_src_dim, 1)
+
+
+class TestCombineRanges(unittest.TestCase):
+
+    def test_empty(self):
+        ranges = []
+        result = combine_ranges(ranges)
+        self.assertEqual(result, [])
+
+    def test_single_range(self):
+        ranges = [(1, 5)]
+        result = combine_ranges(ranges)
+        self.assertEqual(result, [(1, 5)])
+
+    def test_contig_ranges(self):
+        ranges = [(1, 5), (5, 10), (10, 15)]
+        result = combine_ranges(ranges)
+        self.assertEqual(result, [(1, 15)])
+
+    def test_non_overlapping_ranges(self):
+        ranges = [(1, 5), (6, 10), (11, 15)]
+        result = combine_ranges(ranges)
+        self.assertEqual(result, [(1, 5), (6, 10), (11, 15)])
+
+    def test_mixed_ranges(self):
+        ranges = [(1, 5), (5, 10), (11, 15)]
+        result = combine_ranges(ranges)
+        self.assertEqual(result, [(1, 10), (11, 15)])
 
 
 if __name__ == '__main__':

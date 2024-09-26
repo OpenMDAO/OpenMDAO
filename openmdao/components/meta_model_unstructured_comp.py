@@ -73,7 +73,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         self._no_check_partials = True
 
-    def _setup_procs(self, pathname, comm, mode, prob_meta):
+    def _setup_procs(self, pathname, comm, prob_meta):
         """
         Execute first phase of the setup process.
 
@@ -85,9 +85,6 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
-        mode : str
-            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
-            reverse (adjoint).
         prob_meta : dict
             Problem level options.
         """
@@ -98,7 +95,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         self._surrogate_output_names.extend(self._static_surrogate_output_names)
         self._input_size = self._static_input_size
 
-        super()._setup_procs(pathname, comm, mode, prob_meta)
+        super()._setup_procs(pathname, comm, prob_meta)
 
     def initialize(self):
         """
@@ -259,21 +256,21 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                     rows = np.tile(rows, vec_size) + repeat * n_of
                     cols = np.tile(cols, vec_size) + repeat * n_wrt
 
-                    dct = {
+                    pattern_meta = {
                         'rows': rows,
                         'cols': cols,
                         'dependent': True,
                     }
-                    self._declare_partials(of=of, wrt=wrt, dct=dct)
+                    self._resolve_partials_patterns(of=of, wrt=wrt, pattern_meta=pattern_meta)
         else:
-            dct = {
+            pattern_meta = {
                 'val': None,
                 'dependent': True,
             }
             # Dense specification of partials for non-vectorized models.
-            self._declare_partials(of=tuple([name[0] for name in self._surrogate_output_names]),
-                                   wrt=tuple([name[0] for name in self._surrogate_input_names]),
-                                   dct=dct)
+            self._resolve_partials_patterns(of=tuple([n[0] for n in self._surrogate_output_names]),
+                                            wrt=tuple([n[0] for n in self._surrogate_input_names]),
+                                            pattern_meta=pattern_meta)
 
         # Support for user declaring fd partials in a child class and assigning new defaults.
         # We want a warning for all partials that were not explicitly declared.
@@ -384,7 +381,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                     output_shape = (vec_size, ) + shape
                 else:
                     output_shape = (vec_size, )
-                predicted = np.zeros(output_shape)
+                predicted = np.zeros(output_shape, dtype=flat_inputs.dtype)
                 rmse = self._metadata(name)['rmse'] = []
                 for i in range(vec_size):
                     pred_i = surrogate.predict(flat_inputs[i])
@@ -409,16 +406,11 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         ndarray
             flattened array of input data
         """
-        array_real = True
-
-        arr = np.zeros(self._input_size)
+        arr = np.zeros(self._input_size, dtype=vec.asarray().dtype)
 
         idx = 0
         for name, sz in self._surrogate_input_names:
             val = vec[name]
-            if array_real and np.issubdtype(val.dtype, np.complexfloating):
-                array_real = False
-                arr = arr.astype(np.complexfloating)
             arr[idx:idx + sz] = val.flat
             idx += sz
 
@@ -439,17 +431,12 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             2d array, self._vectorize rows of flattened input data.
         """
         vec_size = self.options['vec_size']
-        array_real = True
+        arr = np.zeros((vec_size, self._input_size), dtype=vec.asarray().dtype)
 
-        arr = np.zeros((vec_size, self._input_size))
-
+        vecvals = [(vec[n], sz) for n, sz in self._surrogate_input_names]
         for row in range(vec_size):
             idx = 0
-            for name, sz in self._surrogate_input_names:
-                val = vec[name]
-                if array_real and np.issubdtype(val.dtype, np.complexfloating):
-                    array_real = False
-                    arr = arr.astype(np.complexfloating)
+            for val, sz in vecvals:
                 arr[row][idx:idx + sz] = val[row].flat
                 idx += sz
 
@@ -500,9 +487,8 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             absolute, 'rel_avg' for a size relative to the absolute value of the vector input, or
             'rel_element' for a size relative to each value in the vector input. In addition, it
             can be 'rel_legacy' for a size relative to the norm of the vector.  For backwards
-            compatibilty, it can be 'rel', which currently defaults to 'rel_legacy', but in the
-            future will default to 'rel_avg'. Defaults to None, in which case the approximation
-            method provides its default value.
+            compatibilty, it can be 'rel', which is now equivalent to 'rel_avg'. Defaults to None,
+            in which case the approximation method provides its default value.
         """
         if method == 'cs':
             raise ValueError('Complex step has not been tested for MetaModelUnStructuredComp')
@@ -541,7 +527,6 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                             j2 = j1 + out_size * sz
                             partials[out_name, in_name][j1:j2] = derivs[:, idx:idx + sz].flat
                             idx += sz
-
             else:
                 if overrides_method('linearize', surrogate, SurrogateModel):
                     sjac = surrogate.linearize(flat_inputs)

@@ -1,8 +1,6 @@
 import unittest
 
-import types
 import os
-import sys
 import tempfile
 import shutil
 import subprocess
@@ -53,7 +51,7 @@ class TestProfileMemory(unittest.TestCase):
 class TestCmdlineMemory(unittest.TestCase):
     def setUp(self):
         try:
-            import psutil
+            import psutil  # noqa: F401
         except ImportError:
             raise unittest.SkipTest("psutil is not installed")
 
@@ -71,11 +69,10 @@ class TestCmdlineMemory(unittest.TestCase):
 
     def _run_command(self, cmd):
         try:
-            output = subprocess.check_output(cmd).decode('utf-8', 'ignore')
+            subprocess.check_output(cmd).decode('utf-8', 'ignore')
         except subprocess.CalledProcessError as err:
-            msg = "Running command '{}' failed. " + \
-                  "Output was: \n{}".format(cmd, err.output.decode('utf-8'))
-            self.fail(msg)
+            self.fail(f"Running command '{cmd}' failed. " + \
+                      f"Output was: \n{err.output.decode('utf-8')}")
 
     def test_mem(self):
         self._run_command(['openmdao', 'mem', self.tstfile])

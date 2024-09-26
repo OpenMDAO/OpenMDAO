@@ -4,7 +4,6 @@ from itertools import repeat
 import numpy as np
 import openmdao.api as om
 from openmdao.utils.general_utils import shape2tuple, env_truthy
-from openmdao.utils.mpi import MPI
 
 
 debug = env_truthy('OM_DEBUG')
@@ -42,7 +41,7 @@ class ExplicitSleepComp(om.ExplicitComponent):
                 elif isinstance(v, np.ndarray):
                     self.varshape = v.shape
                 else:
-                    raise TypeError(f"ExplicitSleepComp doesn't work with discrete variables.")
+                    raise TypeError("ExplicitSleepComp doesn't work with discrete variables.")
 
     def setup(self):
         self.inames = []
@@ -65,12 +64,9 @@ class ExplicitSleepComp(om.ExplicitComponent):
         outputs.set_val(inputs.asarray())
 
     def compute_partials(self, inputs, partials):
-        """
-        Jacobian for Sellar discipline 1.
-        """
         if debug: print(f"compute partials for {self.pathname}")
         self.sleep(self.compute_partials_delay)
-        val = np.eye(np.product(self.varshape, dtype=int))
+        val = np.eye(np.prod(self.varshape, dtype=int))
         for iname, oname in zip(self.inames, self.onames):
             partials[oname, iname] = val
 
@@ -177,7 +173,6 @@ def make_group(ncomps, nvars, delays, proc_groups, max_procs, nliters=2, liniter
 
 if __name__ == '__main__':
     import sys
-    from openmdao.utils.assert_utils import assert_check_totals
     from time import perf_counter
 
     start = perf_counter()

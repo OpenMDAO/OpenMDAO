@@ -10,8 +10,9 @@ from packaging.version import Version
 import numpy as np
 
 import openmdao.api as om
-from openmdao.test_suite.groups.parallel_groups import FanOutGrouped, FanInGrouped
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.test_suite.groups.parallel_groups import FanOutGrouped, FanInGrouped, FanInGrouped2
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
+from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
 
 
@@ -39,14 +40,25 @@ class ParDerivTestCase(unittest.TestCase):
         prob.model.add_objective('c3.y')
 
         prob.setup(check=False, mode='rev')
-        prob.run_driver()
+        prob.run_model()
 
-        indep_list = ['x1', 'x2']
-        unknown_list = ['c3.y']
+        data = prob.check_totals(of=['c3.y'], wrt=['x1', 'x2'])
+        assert_check_totals(data)
 
-        J = prob.compute_totals(unknown_list, indep_list, return_format='dict')
-        assert_near_equal(J['c3.y']['x1'][0][0], -6.0, 1e-6)
-        assert_near_equal(J['c3.y']['x2'][0][0], 35.0, 1e-6)
+    def test_fan_in_serial_sets_rev_ivc(self):
+
+        prob = om.Problem()
+        prob.model = FanInGrouped2()
+
+        prob.model.add_design_var('p1.x')
+        prob.model.add_design_var('p2.x')
+        prob.model.add_objective('c3.y')
+
+        prob.setup(check=False, mode='rev')
+        prob.run_model()
+
+        data = prob.check_totals(of=['c3.y'], wrt=['p1.x', 'p2.x'])
+        assert_check_totals(data)
 
     def test_fan_in_serial_sets_fwd(self):
 
@@ -150,7 +162,7 @@ class ParDerivTestCase(unittest.TestCase):
         if not prob.comm.rank:
             self.assertTrue('Solving color: par_dv (x1, x2)' in output)
             self.assertTrue('In mode: fwd.' in output)
-            self.assertTrue("('p.x3', [2])" in output)
+            self.assertTrue("('x3', [2])" in output)
 
     def test_fan_out_parallel_sets_rev(self):
 
@@ -180,6 +192,49 @@ class ParDerivTestCase(unittest.TestCase):
         # the seeds for the constraints are now back to -1 instead of -.5
         assert_near_equal(norm_val, 6.557438524302, 1e-6)
 
+    def test_ln_nl_complex_alloc_bug(self):
+        # This verifies a fix for an MPI hang when allocating the vectors. If one proc
+        # needs a complex vector, then they all do.
+
+        class ImpComp(om.ImplicitComponent):
+
+            def setup(self):
+                self.add_input('x', 3.0)
+                self.add_output('y', 4.0)
+
+                self. declare_partials('y', 'x', method='cs')
+                self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+                self.linear_solver = om.DirectSolver()
+
+            def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs=None,
+                                discrete_outputs=None):
+                pass
+
+        class Sub1(om.Group):
+
+            def setup(self):
+                self.add_subsystem('imp', ImpComp())
+
+        class Sub2(om.Group):
+
+            def setup(self):
+                self.add_subsystem('exp', om.ExecComp('y = x'))
+
+        class Par(om.ParallelGroup):
+
+            def setup(self):
+                self.add_subsystem('sub1', Sub1())
+                self.add_subsystem('sub2', Sub2())
+
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('par', Par())
+
+        prob.setup()
+
+        # Hangs on this step before bug fix.
+        prob.final_setup()
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class DecoupledTestCase(unittest.TestCase):
@@ -192,20 +247,21 @@ class DecoupledTestCase(unittest.TestCase):
         root = prob.model
         root.linear_solver = om.LinearBlockGS()
 
-        Indep1 = root.add_subsystem('Indep1', om.IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
-        Indep2 = root.add_subsystem('Indep2', om.IndepVarComp('x', np.arange(asize+2, dtype=float)+1.0))
+        root.add_subsystem('Indep1', om.IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
+        root.add_subsystem('Indep2', om.IndepVarComp('x', np.arange(asize+2, dtype=float)+1.0))
+
         G1 = root.add_subsystem('G1', om.ParallelGroup())
         G1.linear_solver = om.LinearBlockGS()
 
-        c1 = G1.add_subsystem('c1', om.ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
-                                                x=np.zeros(asize), y=np.zeros(asize)))
-        c2 = G1.add_subsystem('c2', om.ExecComp('y = x[:%d] * 2.0' % asize,
-                                                x=np.zeros(asize+2), y=np.zeros(asize)))
+        G1.add_subsystem('c1', om.ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
+                                           x=np.zeros(asize), y=np.zeros(asize)))
+        G1.add_subsystem('c2', om.ExecComp('y = x[:%d] * 2.0' % asize,
+                                           x=np.zeros(asize+2), y=np.zeros(asize)))
 
-        Con1 = root.add_subsystem('Con1', om.ExecComp('y = x * 5.0',
-                                                      x=np.zeros(asize), y=np.zeros(asize)))
-        Con2 = root.add_subsystem('Con2', om.ExecComp('y = x * 4.0',
-                                                      x=np.zeros(asize), y=np.zeros(asize)))
+        root.add_subsystem('Con1', om.ExecComp('y = x * 5.0',
+                                               x=np.zeros(asize), y=np.zeros(asize)))
+        root.add_subsystem('Con2', om.ExecComp('y = x * 4.0',
+                                               x=np.zeros(asize), y=np.zeros(asize)))
         root.connect('Indep1.x', 'G1.c1.x')
         root.connect('Indep2.x', 'G1.c2.x')
         root.connect('G1.c1.y', 'Con1.x')
@@ -306,18 +362,19 @@ class IndicesTestCase(unittest.TestCase):
         root = prob.model
         root.linear_solver = om.LinearBlockGS()
 
-        p = root.add_subsystem('p', om.IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
+        root.add_subsystem('p', om.IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
+
         G1 = root.add_subsystem('G1', om.ParallelGroup())
         G1.linear_solver = om.LinearBlockGS()
 
-        c2 = G1.add_subsystem('c2', om.ExecComp('y = x * 2.0',
-                                                x=np.zeros(asize), y=np.zeros(asize)))
-        c3 = G1.add_subsystem('c3', om.ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
-                                                x=np.zeros(asize), y=np.zeros(asize)))
-        c4 = root.add_subsystem('c4', om.ExecComp('y = x * 4.0',
-                                                  x=np.zeros(asize), y=np.zeros(asize)))
-        c5 = root.add_subsystem('c5', om.ExecComp('y = x * 5.0',
-                                                  x=np.zeros(asize), y=np.zeros(asize)))
+        G1.add_subsystem('c2', om.ExecComp('y = x * 2.0',
+                                           x=np.zeros(asize), y=np.zeros(asize)))
+        G1.add_subsystem('c3', om.ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
+                                           x=np.zeros(asize), y=np.zeros(asize)))
+        root.add_subsystem('c4', om.ExecComp('y = x * 4.0',
+                                             x=np.zeros(asize), y=np.zeros(asize)))
+        root.add_subsystem('c5', om.ExecComp('y = x * 5.0',
+                                             x=np.zeros(asize), y=np.zeros(asize)))
 
         prob.model.add_design_var('p.x', indices=[1, 2])
         prob.model.add_constraint('c4.y', upper=0.0, indices=[1], parallel_deriv_color='par_resp')
@@ -371,17 +428,17 @@ class IndicesTestCase2(unittest.TestCase):
         par2 = G1.add_subsystem('par2', om.Group())
         par2.linear_solver = om.LinearBlockGS()
 
-        p1 = par1.add_subsystem('p', om.IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
-        p2 = par2.add_subsystem('p', om.IndepVarComp('x', np.arange(asize, dtype=float)+10.0))
+        par1.add_subsystem('p', om.IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
+        par2.add_subsystem('p', om.IndepVarComp('x', np.arange(asize, dtype=float)+10.0))
 
-        c2 = par1.add_subsystem('c2', om.ExecComp('y = x * 2.0',
-                                                  x=np.zeros(asize), y=np.zeros(asize)))
-        c3 = par2.add_subsystem('c3', om.ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
-                                                  x=np.zeros(asize), y=np.zeros(asize)))
-        c4 = par1.add_subsystem('c4', om.ExecComp('y = x * 4.0',
-                                                  x=np.zeros(asize), y=np.zeros(asize)))
-        c5 = par2.add_subsystem('c5', om.ExecComp('y = x * 5.0',
-                                                  x=np.zeros(asize), y=np.zeros(asize)))
+        par1.add_subsystem('c2', om.ExecComp('y = x * 2.0',
+                                             x=np.zeros(asize), y=np.zeros(asize)))
+        par2.add_subsystem('c3', om.ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
+                                             x=np.zeros(asize), y=np.zeros(asize)))
+        par1.add_subsystem('c4', om.ExecComp('y = x * 4.0',
+                                             x=np.zeros(asize), y=np.zeros(asize)))
+        par2.add_subsystem('c5', om.ExecComp('y = x * 5.0',
+                                             x=np.zeros(asize), y=np.zeros(asize)))
 
         prob.model.add_design_var('G1.par1.p.x', indices=[1, 2])
         prob.model.add_design_var('G1.par2.p.x', indices=[1, 2])
@@ -422,6 +479,70 @@ class IndicesTestCase2(unittest.TestCase):
 
         assert_near_equal(J['G1.par2.c5.y', 'G1.par2.p.x'][0], np.array([20., 25.]), 1e-6)
         assert_near_equal(J['G1.par1.c4.y', 'G1.par1.p.x'][0], np.array([8., 0.]), 1e-6)
+
+    def test_src_indices_rev(self):
+        class DummyComp(om.ExplicitComponent):
+            def initialize(self):
+                self.options.declare('a',default=0.)
+                self.options.declare('b',default=0.)
+
+            def setup(self):
+                self.add_input('x')
+                self.add_output('y', 0.)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = self.options['a']*inputs['x'] + self.options['b']
+
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                if mode=='rev':
+                    if 'y' in d_outputs:
+                        if 'x' in d_inputs:
+                            d_inputs['x'] += self.options['a'] * d_outputs['y']
+                            # print(self.pathname, 'compute_jvp: dinputs[x]', d_inputs['x'])
+                else:
+                    raise RuntimeError("fwd mode not supported")
+
+        class DummyGroup(om.ParallelGroup):
+            def setup(self):
+                self.add_subsystem('C1',DummyComp(a=1,b=2.))
+                self.add_subsystem('C2',DummyComp(a=3.,b=4.))
+
+        class Top(om.Group):
+            def setup(self):
+                self.add_subsystem('dvs',om.IndepVarComp(), promotes=['*'])
+
+                # this only currently works if we make dvs.x a distributed output.
+                if self.comm.rank == 0:
+                    self.dvs.add_output('x', [1.], distributed=True)
+                else:
+                    self.dvs.add_output('x', [2.], distributed=True)
+
+                # making dvs.x a non-distributed variable as below results in
+                # one deriv being zero and the other being the sum of the two
+                # parallel derivs.
+                # self.dvs.add_output('x',[1.,2.])
+
+                self.add_subsystem('par',DummyGroup())
+                self.connect('x','par.C1.x',src_indices=[0])
+                self.connect('x','par.C2.x',src_indices=[1])
+
+        prob = om.Problem(model=Top())
+        prob.model.add_design_var('x',lower=0.,upper=1.)
+
+        # None or string
+        deriv_color = 'deriv_color'
+
+        # compute derivatives for made-up y constraints in parallel
+        prob.model.add_constraint('par.C1.y',
+                                lower=1.0,
+                                parallel_deriv_color=deriv_color)
+        prob.model.add_constraint('par.C2.y',
+                                lower=1.0,
+                                parallel_deriv_color=deriv_color)
+
+        prob.setup(mode='rev')
+        prob.run_model()
+        assert_check_totals(prob.check_totals())
 
 
 class SumComp(om.ExplicitComponent):
@@ -465,16 +586,16 @@ class SlowComp(om.ExplicitComponent):
     def compute_partials(self, inputs, partials):
         partials['y', 'x'] = self.mult
 
-    def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, jac, mode, scope_out=None, scope_in=None):
         time.sleep(self.delay)
-        super()._apply_linear(jac, rel_systems, mode, scope_out, scope_in)
+        super()._apply_linear(jac, mode, scope_out, scope_in)
 
 
 class PartialDependGroup(om.Group):
     def setup(self):
         size = 4
 
-        Comp1 = self.add_subsystem('Comp1', SumComp(size))
+        self.add_subsystem('Comp1', SumComp(size))
         pargroup = self.add_subsystem('ParallelGroup1', om.ParallelGroup())
 
         self.set_input_defaults('Comp1.x', val=np.arange(size, dtype=float)+1.0)
@@ -485,8 +606,8 @@ class PartialDependGroup(om.Group):
         pargroup.linear_solver.options['iprint'] = -1
 
         delay = .1
-        Con1 = pargroup.add_subsystem('Con1', SlowComp(delay=delay, size=2, mult=2.0))
-        Con2 = pargroup.add_subsystem('Con2', SlowComp(delay=delay, size=2, mult=-3.0))
+        pargroup.add_subsystem('Con1', SlowComp(delay=delay, size=2, mult=2.0))
+        pargroup.add_subsystem('Con2', SlowComp(delay=delay, size=2, mult=-3.0))
 
         self.connect('Comp1.y', 'ParallelGroup1.Con1.x')
         self.connect('Comp1.y', 'ParallelGroup1.Con2.x')
@@ -582,24 +703,25 @@ class CleanupTestCase(unittest.TestCase):
         root.linear_solver = om.LinearBlockGS()
         root.linear_solver.options['err_on_non_converge'] = True
 
-        inputs = root.add_subsystem("inputs", om.IndepVarComp("x", 1.0))
+        root.add_subsystem("inputs", om.IndepVarComp("x", 1.0))
+
         G1 = root.add_subsystem("G1", om.Group())
-        dparam = G1.add_subsystem("dparam", om.ExecComp("y = .5*x"))
-        G1_inputs = G1.add_subsystem("inputs", om.IndepVarComp("x", 1.5))
-        start = G1.add_subsystem("start", om.ExecComp("y = .7*x"))
-        timecomp = G1.add_subsystem("time", om.ExecComp("y = -.2*x"))
+        G1.add_subsystem("dparam", om.ExecComp("y = .5*x"))
+        G1.add_subsystem("inputs", om.IndepVarComp("x", 1.5))
+        G1.add_subsystem("start", om.ExecComp("y = .7*x"))
+        G1.add_subsystem("time", om.ExecComp("y = -.2*x"))
 
         G2 = G1.add_subsystem("G2", om.Group())
-        stage_step = G2.add_subsystem("stage_step",
-                                      om.ExecComp("y = -0.1*x + .5*x2 - .4*x3 + .9*x4"))
-        ode = G2.add_subsystem("ode", om.ExecComp("y = .8*x - .6*x2"))
-        dummy = G2.add_subsystem("dummy", om.IndepVarComp("x", 1.3))
+        G2.add_subsystem("stage_step",
+                         om.ExecComp("y = -0.1*x + .5*x2 - .4*x3 + .9*x4"))
+        G2.add_subsystem("ode", om.ExecComp("y = .8*x - .6*x2"))
+        G2.add_subsystem("dummy", om.IndepVarComp("x", 1.3))
 
-        step = G1.add_subsystem("step", om.ExecComp("y = -.2*x + .4*x2 - .4*x3"))
-        output = G1.add_subsystem("output", om.ExecComp("y = .6*x"))
+        G1.add_subsystem("step", om.ExecComp("y = -.2*x + .4*x2 - .4*x3"))
+        G1.add_subsystem("output", om.ExecComp("y = .6*x"))
 
-        con = root.add_subsystem("con", om.ExecComp("y = .2 * x"))
-        obj = root.add_subsystem("obj", om.ExecComp("y = .3 * x"))
+        root.add_subsystem("con", om.ExecComp("y = .2 * x"))
+        root.add_subsystem("obj", om.ExecComp("y = .3 * x"))
 
         root.connect("inputs.x", "G1.dparam.x")
 
@@ -625,13 +747,13 @@ class CleanupTestCase(unittest.TestCase):
         p.run_model()
 
         # test will fail if this fails to converge
-        J = p.compute_totals(['con.y', 'obj.y'],
-                             ['inputs.x'], return_format='dict')
+        p.compute_totals(['con.y', 'obj.y'],
+                         ['inputs.x'], return_format='dict')
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class CheckParallelDerivColoringEfficiency(unittest.TestCase):
-    # these tests check that redudant calls to compute_jacvec_product
+    # these tests check that redundant calls to compute_jacvec_product
     # are not performed when running parallel derivatives
     # ref issue 1405
 
@@ -652,7 +774,6 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
                 self.add_output('y2', shape=size)
 
             def compute(self, inputs, outputs):
-                waittime = self.options['time']
                 size = self.options['size']
                 outputs['y'] = np.linspace(3, 10, size) * inputs['x']
                 outputs['y2'] = np.linspace(2, 4, size) * inputs['x']
@@ -709,17 +830,17 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         prob.setup(mode='rev', force_alloc_complex=True)
         prob.run_model()
         data = prob.check_totals(method='cs', out_stream=None)
-        assert_near_equal(data[('pg.dc1.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc2.y2', 'iv.x')]['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc2.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc3.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(data[('dc1.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc2.y2', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc2.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc3.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
 
-        comm = MPI.COMM_WORLD
+        comm = model.comm
         # should only need one jacvec product per linear solve
         dc1count = dc2count = dc3count = 0.0
-        dc1count = comm.allreduce(prob.model.pg.dc1.counter, op=MPI.SUM)
-        dc2count = comm.allreduce(prob.model.pg.dc2.counter, op=MPI.SUM)
-        dc3count = comm.allreduce(prob.model.pg.dc3.counter, op=MPI.SUM)
+        dc1count = comm.allreduce(model.pg.dc1.counter, op=MPI.SUM)
+        dc2count = comm.allreduce(model.pg.dc2.counter, op=MPI.SUM)
+        dc3count = comm.allreduce(model.pg.dc3.counter, op=MPI.SUM)
         # one linear solve on proc 0
         self.assertEqual(dc1count, 1)
         # two solves on proc 1
@@ -739,17 +860,17 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         prob.setup(mode='rev', force_alloc_complex=True)
         prob.run_model()
         data = prob.check_totals(method='cs', out_stream=None)
-        assert_near_equal(data[('pg.dc1.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc2.y2', 'iv.x')]['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc2.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc3.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(data[('dc1.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc2.y2', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc2.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('dc3.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
 
         # should only need one jacvec product per linear solve
-        comm = MPI.COMM_WORLD
+        comm = model.comm
         dc1count = dc2count = dc3count = 0.0
-        dc1count = comm.allreduce(prob.model.pg.dc1.counter, op=MPI.SUM)
-        dc2count = comm.allreduce(prob.model.pg.dc2.counter, op=MPI.SUM)
-        dc3count = comm.allreduce(prob.model.pg.dc3.counter, op=MPI.SUM)
+        dc1count = comm.allreduce(model.pg.dc1.counter, op=MPI.SUM)
+        dc2count = comm.allreduce(model.pg.dc2.counter, op=MPI.SUM)
+        dc3count = comm.allreduce(model.pg.dc3.counter, op=MPI.SUM)
         # five linear solves on proc 0
         self.assertEqual(dc1count, 5)
         # ten solves on proc 1
@@ -765,10 +886,139 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         model.add_constraint('dc2.y', indices=[3], lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
         model.add_objective('dc3.y', index=2, parallel_deriv_color=pdc)
 
-        prob = om.Problem(model=model)
+        prob = om.Problem(model=model, name='parallel_deriv_coloring_overlap_err')
+        prob.setup(mode='rev')
         with self.assertRaises(Exception) as ctx:
-            prob.setup(mode='rev')
-        self.assertEqual(str(ctx.exception), "<model> <class Group>: response 'pg.dc2.y' has overlapping dependencies on the same rank with other responses in parallel_deriv_color 'a'.")
+            prob.final_setup()
+        self.assertEqual(str(ctx.exception),
+           "Parallel derivative color 'a' has responses ['pg.dc2.y', 'pg.dc2.y2'] with overlapping dependencies on the same rank.")
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestAutoIVCParDerivBug(unittest.TestCase):
+    N_PROCS = 4
+
+    def test_auto_ivc_par_deriv_bug(self):
+        class Simple(om.ExplicitComponent):
+            def __init__(self, mult1, mult2, mult3, mult4, **kwargs):
+                super().__init__(**kwargs)
+                self.mult1 = mult1
+                self.mult2 = mult2
+                self.mult3 = mult3
+                self.mult4 = mult4
+
+            def setup(self):
+                self.add_input('x1', 0.1)
+                self.add_input('x2', 0.01)
+
+                self.add_output('y1', 0.0)
+                self.add_output('y2', 0.0)
+
+                self.declare_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                outputs['y1'] = self.mult1 * inputs['x1'] + self.mult3 * inputs['x2']
+                outputs['y2'] = self.mult2 * inputs['x1'] ** 2 + self.mult4 * inputs['x2'] ** 2
+
+            def compute_partials(self, inputs, partials):
+                partials['y1', 'x1'] = self.mult1
+                partials['y1', 'x2'] = self.mult3
+                partials['y2', 'x1'] = 2 * self.mult2 * inputs['x1']
+                partials['y2', 'x2'] = 2 * self.mult4 * inputs['x2']
+
+        prob = om.Problem()
+        par = prob.model.add_subsystem('par', om.ParallelGroup())
+        par.add_subsystem("C1", Simple(mult1=0.5, mult2=0.15, mult3=0.25, mult4=0.35))
+        par.add_subsystem("C2", Simple(mult1=0.75, mult2=0.65, mult3=0.45, mult4=0.15))
+
+        prob.model.add_design_var('par.C1.x1', lower=-50, upper=50)
+        prob.model.add_design_var('par.C1.x2', lower=-50, upper=50)
+        prob.model.add_design_var('par.C2.x1', lower=-50, upper=50)
+        prob.model.add_design_var('par.C2.x2', lower=-50, upper=50)
+
+        # Use the parallel derivative option to solve constraint simultaneously
+        prob.model.add_constraint('par.C1.y1', equals=1.0, parallel_deriv_color="pd1")
+        prob.model.add_constraint('par.C2.y1', equals=2.5, parallel_deriv_color="pd1")
+        prob.model.add_objective('par.C1.y2')
+
+        prob.setup(mode='rev', force_alloc_complex=True)
+
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+
+
+class LinearComp(om.ExplicitComponent):
+    def initialize(self):
+        self.options.declare("a", desc="slope")
+        self.options.declare("b", desc="y-intercept")
+
+    def setup(self):
+        self.a = self.options["a"]
+        self.b = self.options["b"]
+        self.add_input("x", val=0.0)
+        self.add_output("y", val=1.0)
+        self.add_output("z", val=0.0)
+        self.declare_partials("*", "*", method="cs")
+
+    def compute(self, inputs, outputs):
+        outputs["y"] = self.a * inputs["x"] + self.b
+        outputs["z"] = self.a * inputs["x"] ** 2 + self.b * inputs["x"] + 1.0
+
+class LinearGroup(om.Group):
+    def initialize(self):
+        self.options.declare("a", desc="slope")
+        self.options.declare("b", desc="y-intercept")
+
+    def setup(self):
+        self.add_subsystem("ivc", om.IndepVarComp("x", val=0.0), promotes=["*"])
+        self.add_subsystem("eval", LinearComp(a=self.options["a"], b=self.options["b"]), promotes=["*"])
+        # Make x a dv for the linear equation
+        self.add_design_var("x", lower=-100.0, upper=100.0)
+        # Add constraint to find x intercept
+        self.add_constraint("y", equals=0.0, parallel_deriv_color="lift_con")
+
+
+@use_tempdirs
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestParDerivRelevance(unittest.TestCase):
+    N_PROCS = 3
+
+    def test_par_deriv_relevance(self):
+        from openmdao.utils.general_utils import set_pyoptsparse_opt
+
+        # check that pyoptsparse is installed. if it is, try to use SLSQP.
+        OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
+
+        if OPTIMIZER:
+            from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
+        else:
+            raise unittest.SkipTest("pyOptSparseDriver is required.")
+
+        prob = om.Problem()
+        model = prob.model
+
+        # Solve linear equation in parallel
+        parallel = model.add_subsystem('parallel', om.ParallelGroup())
+        parallel.add_subsystem('line1', LinearGroup(a=1.0, b=1.0))
+        parallel.add_subsystem('line2', LinearGroup(a=-1.0, b=1.0))
+        parallel.add_subsystem('line3', LinearGroup(a=5.0, b=3.14159))
+
+        # Add a dummy constraint because openmdao requires one
+        model.add_objective("parallel.line1.z")
+
+        # Setup to solve constrained problem
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = "SLSQP"
+
+        prob.setup()
+        prob.run_driver()
+
+        # Solution should be (-1.0, 1.0, -0.6283)
+        assert_near_equal(prob.get_val("parallel.line1.x", get_remote=True), -1.0)
+        assert_near_equal(prob.get_val("parallel.line2.x", get_remote=True), 1.0)
+        assert_near_equal(prob.get_val("parallel.line3.x", get_remote=True), -0.628318)
+
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests

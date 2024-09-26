@@ -60,9 +60,6 @@ class InterpNDSemi(object):
         Cache of computed gradients with respect to table values.
     _interp : class
         Class specified as interpolation algorithm, used to regenerate if needed.
-    _interp_config : dict
-        Configuration object that stores the number of points required for each interpolation
-        method.
     _interp_options : dict
         Dictionary of cached interpolator-specific options.
     _xi : ndarray
@@ -162,7 +159,7 @@ class InterpNDSemi(object):
             for i, p in enumerate(xi.T):
                 if np.isnan(p).any():
                     raise OutOfBoundsError("One of the requested xi contains a NaN",
-                                           i, np.NaN, self.grid[i][0], self.grid[i][-1])
+                                           i, np.nan, self.grid[i][0], self.grid[i][-1])
 
         if self._compute_d_dvalues:
             # If the table grid or values are component inputs, then we need to create a new table
@@ -183,7 +180,7 @@ class InterpNDSemi(object):
         # Loop over n_nodes because there isn't a way to vectorize.
         for j in range(n_nodes):
             val, d_x, d_values_tuple, extrapolate = table.interpolate(xi[j, :])
-            result[j] = val
+            result[j] = val.item()
             derivs_x[j, :] = d_x.ravel()
             if self._compute_d_dvalues:
                 d_values, idx = d_values_tuple

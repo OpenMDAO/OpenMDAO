@@ -10,6 +10,7 @@ from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
 from openmdao.utils.units import unit_conversion
+from openmdao.utils.iter_utils import size2range_iter, meta2item_iter
 
 _empty_dict = {}
 
@@ -81,13 +82,11 @@ class AssembledJacobian(Jacobian):
         dict
             Tuples of the form (start, end) keyed on variable name.
         """
-        ranges = {}
-        start = end = 0
-        for name, meta in system._var_abs2meta[vtype].items():
-            end += meta['size']
-            ranges[name] = (start, end)
-            start = end
-        return ranges
+        return {
+            name: rng
+            for name, rng in size2range_iter(meta2item_iter(system._var_abs2meta[vtype].items(),
+                                                            'size'))
+        }
 
     def _initialize(self, system):
         """
@@ -212,7 +211,6 @@ class AssembledJacobian(Jacobian):
         system : <System>
             The system being solved using a sub-view of the jacobian.
         """
-        abs2meta = system._var_abs2meta['output']
         ranges = self._view_ranges[system.pathname]
 
         ext_mtx = self._matrix_class(system.comm, False)
@@ -228,7 +226,7 @@ class AssembledJacobian(Jacobian):
 
         sizes = system._var_sizes['output']
         for s in system.system_iter(recurse=True, include_self=True, typ=Component):
-            for res_abs_name, res_meta in s._var_abs2meta['output'].items():
+            for res_abs_name in s._var_abs2meta['output']:
                 res_offset = np.sum(sizes[iproc, :abs2idx[res_abs_name]])
 
                 for in_abs_name in s._var_abs2meta['input']:
@@ -376,11 +374,11 @@ class AssembledJacobian(Jacobian):
         mode : str
             'fwd' or 'rev'.
         """
-        int_mtx = self._int_mtx
         ext_mtx = self._ext_mtx[system.pathname]
         if ext_mtx is None and not d_outputs._names:  # avoid unnecessary unscaling
             return
 
+        int_mtx = self._int_mtx
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             do_mask = ext_mtx is not None and d_inputs._names
             if do_mask:

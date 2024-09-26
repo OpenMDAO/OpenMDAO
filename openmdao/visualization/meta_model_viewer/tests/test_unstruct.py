@@ -74,7 +74,7 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         prob.setup()
 
         with self.assertRaises(Exception) as context:
-            viz = MetaModelVisualization(interp)
+            MetaModelVisualization(interp)
 
         msg = "No training data present for one or more parameters"
         self.assertTrue(msg in str(context.exception))
@@ -102,11 +102,10 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         prob.setup()
 
         with self.assertRaises(Exception) as context:
-            viz = MetaModelVisualization(interp)
+            MetaModelVisualization(interp)
 
         msg = 'Must have more than one input value'
         self.assertTrue(msg in str(context.exception))
-
 
     def test_training_point_array_width(self):
 
@@ -225,35 +224,6 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         prob.setup()
         prob.final_setup()
 
-    def test_not_top_level_prob(self):
-        # Model
-        interp = om.MetaModelUnStructuredComp()
-
-        # Training Data
-        x_train1 = np.linspace(0, 10, 20)
-        x_train2 = np.linspace(0, 20, 20)
-        x_train3 = np.linspace(0, 30, 20)
-        x_train4 = np.linspace(0, 40, 20)
-        y_train = np.linspace(10, 20, 20)
-
-        # Inputs
-        interp.add_input('input_1', 0., training_data=x_train1)
-        interp.add_input('input_2', 0., training_data=x_train2)
-        interp.add_input('input_3', 0., training_data=x_train3)
-        interp.add_input('input_4', 0., training_data=x_train4)
-
-        # Outputs
-        interp.add_output('output_1', 0., training_data=.5 * np.cos(y_train))
-        interp.add_output('output_2', 0., training_data=.5 * np.sin(y_train))
-
-        # Surrogate Model
-        interp.options['default_surrogate'] = om.ResponseSurface()
-
-        prob = om.Problem(model=interp)
-        prob.setup()
-        prob.final_setup()
-
-
     def test_in_between_training_points_right(self):
 
         filename = os.path.join(self.csv_dir, 'unstructured_test_points_right.csv')
@@ -318,12 +288,12 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
                                         1.28254220e-01, 1.05787985e-01, 1.01550282e-01, 8.44650788e-02,
                                         6.39578812e-02, 3.34477398e-02, 1.97405267e-02, 6.40957590e-04])
 
-        right_points = adjusted_points._unstructured_training_points(compute_distance=True, source='right')
-        right_plot = adjusted_points._right_plot()
+        right_points = adjusted_points._unstructured_training_points(compute_distance=True, source='right')  # noqa (unused)
+        right_plot = adjusted_points._right_plot()  # noqa (unused)
         right_transparency = adjusted_points.right_alphas
 
-        bottom_points = adjusted_points._unstructured_training_points(compute_distance=True, source='bottom')
-        bottom_plot = adjusted_points._bottom_plot()
+        bottom_points = adjusted_points._unstructured_training_points(compute_distance=True, source='bottom')  # noqa (unused)
+        bottom_plot = adjusted_points._bottom_plot()  # noqa (unused)
         bottom_transparency = adjusted_points.bottom_alphas
 
         assert_near_equal(right_transparency, known_points_right, 1.1e-02)

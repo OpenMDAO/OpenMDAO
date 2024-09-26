@@ -1,5 +1,5 @@
 """
-Integrates the Multi-Fidelity Co-Kriging method described in [LeGratiet2013].
+Implements the Multi-Fidelity Co-Kriging method described in [LeGratiet2013].
 
 (Author: Remi Vauclin vauclin.remi@gmail.com)
 
@@ -60,7 +60,7 @@ def constant_regression(x):
     array_like
         Constant regression output.
     """
-    x = np.asarray(x, dtype=np.float)
+    x = np.asarray(x, dtype=float)
     n_eval = x.shape[0]
     f = np.ones([n_eval, 1])
     return f
@@ -82,7 +82,7 @@ def linear_regression(x):
     array_like
         Linear regression output.
     """
-    x = np.asarray(x, dtype=np.float)
+    x = np.asarray(x, dtype=float)
     n_eval = x.shape[0]
     f = np.hstack([np.ones([n_eval, 1]), x])
     return f
@@ -114,8 +114,8 @@ def squared_exponential_correlation(theta, d):
         An array with shape (n_eval, ) containing the values of the
         autocorrelation model.
     """
-    theta = np.asarray(theta, dtype=np.float)
-    d = np.asarray(d, dtype=np.float)
+    theta = np.asarray(theta, dtype=float)
+    d = np.asarray(d, dtype=float)
 
     if d.ndim > 1:
         n_features = d.shape[1]
@@ -178,7 +178,7 @@ def l1_cross_distances(X, Y=None):
 
 class MultiFiCoKriging(object):
     """
-    Integrate the Multi-Fidelity Co-Kriging method described in [LeGratiet2013].
+    Implement the Multi-Fidelity Co-Kriging method described in [LeGratiet2013].
 
     Parameters
     ----------
@@ -324,24 +324,6 @@ class MultiFiCoKriging(object):
     .. [TBKH2011] Toal, D. J., Bressloff, N. W., Keane, A. J., & Holden, C. M. E. (2011).
        "The development of a hybridized particle swarm for kriging hyperparameter
        tuning." `Engineering optimization`, 43(6), 675-699.
-
-    Examples
-    --------
-    >>> from openmdao.surrogate_models.multifi_cokriging import MultiFiCoKriging
-    >>> import numpy as np
-    >>> # Xe: DOE for expensive code (nested in Xc)
-    >>> # Xc: DOE for cheap code
-    >>> # ye: expensive response
-    >>> # yc: cheap response
-    >>> Xe = np.array([[0],[0.4],[1]])
-    >>> Xc = np.vstack((np.array([[0.1],[0.2],[0.3],[0.5],[0.6],[0.7],[0.8],[0.9]]),Xe))
-    >>> ye = ((Xe*6-2)**2)*np.sin((Xe*6-2)*2)
-    >>> yc = 0.5*((Xc*6-2)**2)*np.sin((Xc*6-2)*2)+(Xc-0.5)*10. - 5
-    >>> model = MultiFiCoKriging(theta0=1, thetaL=1e-5, thetaU=50.)
-    >>> model.fit([Xc, Xe], [yc, ye])
-    >>> # Prediction on x=0.05
-    >>> np.abs(float(model.predict([0.05])[0])- ((0.05*6-2)**2)*np.sin((0.05*6-2)*2)) < 0.05
-    True
     """
 
     _regression_types = {

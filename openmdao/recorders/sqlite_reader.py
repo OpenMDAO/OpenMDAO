@@ -1,11 +1,13 @@
 """
 Definition of the SqliteCaseReader.
 """
+import pathlib
 import sqlite3
 from collections import OrderedDict
 
 import sys
 import numpy as np
+import io
 
 from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import Case
@@ -26,13 +28,64 @@ from json import loads as json_loads
 from io import TextIOBase
 
 
+class UnknownType:
+    """
+    A class used by _RestrictedUnpickler.
+
+    Used to indicate the unpickler can't generate an instance of a class
+    whose class definition is not available
+    """
+
+    pass
+
+
+class _RestrictedUnpicklerForCaseReader(pickle.Unpickler):
+
+    def __init__(self, file, *, fix_imports=True, encoding="ASCII",
+                 errors="strict", buffers=None):
+        super().__init__(file, fix_imports=fix_imports, encoding=encoding,
+                         errors=errors, buffers=buffers)
+        self.error_strings = ''  # Used to document which classes are not available
+
+    def find_class(self, module, name):
+        try:
+            return super().find_class(module, name)
+        except ModuleNotFoundError as e:
+            if self.error_strings:
+                self.error_strings += ', '
+            self.error_strings += str(e)
+
+        # Returning this acts as a kind of flag to indicate that
+        # the unpickler can't generate instances of classes whose class definition
+        # is not available
+        return UnknownType
+
+    def loads_and_return_errors(self):
+        unpickled_contents = self.load()
+        return unpickled_contents, self.error_strings
+
+
+def _loads_and_return_errors(s):
+    """
+    Unpickle input and also note errors. Analogous to pickle.loads().
+
+    But handles unpickling objects with no class definition available.
+    """
+    i = io.BytesIO(s)
+
+    # returns a tuple of the value and also error strings
+    dictionary, error_string = _RestrictedUnpicklerForCaseReader(i).loads_and_return_errors()
+
+    return dictionary, error_string
+
+
 class SqliteCaseReader(BaseCaseReader):
     """
     A CaseReader specific to files created with SqliteRecorder.
 
     Parameters
     ----------
-    filename : str
+    filename : str or pathlib.Path
         The path to the filename containing the recorded data.
     pre_load : bool
         If True, load all the data into memory during initialization.
@@ -49,8 +102,6 @@ class SqliteCaseReader(BaseCaseReader):
         Metadata about each system in the recorded model, including options and scaling factors.
     _format_version : int
         The version of the format assumed when loading the file.
-    _solver_metadata : dict
-        Metadata for all the solvers in the model, including their type and options
     _filename : str
         The path to the filename containing the recorded data.
     _abs2meta : dict
@@ -66,8 +117,6 @@ class SqliteCaseReader(BaseCaseReader):
         connections or a promoted input name for multiple connections. This is for output display.
     _driver_cases : DriverCases
         Helper object for accessing cases from the driver_iterations table.
-    _deriv_cases : DerivCases
-        Helper object for accessing cases from the driver_derivatives table.
     _system_cases : SystemCases
         Helper object for accessing cases from the system_iterations table.
     _solver_cases : SolverCases
@@ -88,13 +137,15 @@ class SqliteCaseReader(BaseCaseReader):
             check_valid_sqlite3_db(metadata_filename)
 
         # initialize private attributes
-        self._filename = filename
+        self._filename = pathlib.Path(filename)
         self._abs2prom = None
         self._prom2abs = None
         self._abs2meta = None
         self._conns = None
         self._auto_ivc_map = {}
         self._global_iterations = None
+
+        filename = str(filename)
 
         with sqlite3.connect(filename) as con:
             con.row_factory = sqlite3.Row
@@ -292,7 +343,7 @@ class SqliteCaseReader(BaseCaseReader):
         """
         Load data from the system table.
 
-        Populates the `system_options` attribute of this CaseReader.
+        Populates the `_system_options` attribute of this CaseReader.
 
         Parameters
         ----------
@@ -307,8 +358,16 @@ class SqliteCaseReader(BaseCaseReader):
             if self._format_version >= 14:
                 self._system_options[id]['scaling_factors'] = \
                     pickle.loads(zlib.decompress(row[1]))
-                self._system_options[id]['component_options'] = \
-                    pickle.loads(zlib.decompress(row[2]))
+                # First step is to decompress
+                pickled_component_options = zlib.decompress(row[2])
+                # Second, unpickle
+                unpickled_component_options, error_string = \
+                    _loads_and_return_errors(pickled_component_options)
+                if error_string:
+                    issue_warning(f"While reading system options from case recorder, the "
+                                  f"following errors occurred: {error_string}",
+                                  category=RuntimeWarning)
+                self._system_options[id]['component_options'] = unpickled_component_options
             else:
                 self._system_options[id]['scaling_factors'] = pickle.loads(row[1])
                 self._system_options[id]['component_options'] = pickle.loads(row[2])
@@ -1076,7 +1135,7 @@ class CaseTable(object):
             with sqlite3.connect(self._filename) as con:
                 cur = con.cursor()
                 cur.execute(f"SELECT {self._index_name} FROM {self._table_name}"
-                            " ORDER BY id ASC")
+                            " ORDER BY id ASC")  # nosec trusted input
                 rows = cur.fetchall()
 
             con.close()

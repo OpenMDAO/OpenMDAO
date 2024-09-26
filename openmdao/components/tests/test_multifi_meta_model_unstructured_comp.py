@@ -2,7 +2,7 @@ import numpy as np
 import unittest
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class MockSurrogate(om.MultiFiSurrogateModel):
@@ -236,9 +236,9 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         mm.options['train_y2_fi2'] = [4.0, 4.1, 4.3, 4.4, 4.5 ,4.6]
 
         prob.run_model()
-        expected_xtrain=[np.array([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]]),
-                         np.array([[1.1, 2.1], [2.1, 2.2], [3.1, 2.3],
-                                   [1.0, 1.0], [2.0, 2.0], [3.0, 3.0]])]
+        # expected_xtrain=[np.array([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]]),
+        #                 np.array([[1.1, 2.1], [2.1, 2.2], [3.1, 2.3],
+        #                           [1.0, 1.0], [2.0, 2.0], [3.0, 3.0]])]
         expected_y1train=[np.array([[0.0], [0.1], [0.2]]),
                           np.array([[3.0], [3.1], [3.3], [3.4], [3.5], [3.6]])]
         expected_y2train=[np.array([[4.0], [4.0], [4.0]]),
@@ -304,8 +304,8 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
               [ 0.3914706 ,  0.09852519],
               [ 0.86565585,  0.85350002],
               [ 0.40806563,  0.91465314]]]
-        y = np.array([[branin(case) for case in x[0]],
-                      [branin_low_fidelity(case) for case in x[1]]])
+        y = [[branin(case) for case in x[0]],
+             [branin_low_fidelity(case) for case in x[1]]]
 
         mm.options['train_x'] = x[0]
         mm.options['train_y'] = y[0]
@@ -378,7 +378,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
     def test_om_slice_in_add_input(self):
 
         mm = om.MultiFiMetaModelUnStructuredComp(nfi=2)
-        mm.add_input('x', np.ones(3), src_indices=om.slicer[:, 1])
+        mm.add_input('x', np.ones(3))
         mm.add_output('y', np.zeros((1, )))
 
         mm.options['default_surrogate'] = om.MultiFiCoKrigingSurrogate(normalize=False)
@@ -388,7 +388,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         prob = om.Problem()
         prob.model.add_subsystem('mm', mm)
         prob.model.add_subsystem('indep', om.IndepVarComp('x', arr))
-        prob.model.connect('indep.x', 'mm.x')
+        prob.model.connect('indep.x', 'mm.x', src_indices=om.slicer[:, 1])
         prob.setup()
 
         assert_near_equal(prob['mm.x'], np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]]))

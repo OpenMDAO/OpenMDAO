@@ -62,8 +62,7 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
                     json_data = json.load(f)
                     for i in json_data['cells']:
                         if 'execution_count' in i and i['execution_count'] is not None:
-                            msg = "Clear output with 'jupyter nbconvert  --clear-output " \
-                                  f"--inplace path_to_notebook.ipynb'"
+                            msg = "Clear output with 'reset_notebook path_to_notebook.ipynb'"
                             self.fail(f"Output found in {file}.\n{msg}")
 
     def test_header(self):
@@ -71,12 +70,12 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
         Check Jupyter Notebooks for code cell installing openmdao.
         """
         header = ["try:\n",
-                  "    from openmdao.utils.notebook_utils import notebook_mode\n",
+                  "    from openmdao.utils.notebook_utils import notebook_mode  # noqa: F401\n",
                   "except ImportError:\n",
                   "    !python -m pip install openmdao[notebooks]"]
 
         mpi_header = ['%matplotlib inline\n',
-                      'from ipyparallel import Client, error\n',
+                      'from ipyparallel import Client, error  # noqa: F401\n',
                       'cluster=Client(profile="mpi")\n',
                       'view=cluster[:]\n',
                       'view.block=True\n',
@@ -150,7 +149,12 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
 
                     for line in block['source']:
                         if 'assert' in line:
-                            self.fail(f"Assert found in a code block in {file}. ")
+                            sblock = ''.join(block['source'])
+                            stags = tags if tags else ''
+                            delim = '-' * 50
+                            self.fail(f"Assert found in a code block in {file}:\n"
+                                      f"Tags: {stags}\n"
+                                      f"Block source:\n{delim}\n{sblock}\n{delim}")
 
     def test_eval_rst(self):
         """

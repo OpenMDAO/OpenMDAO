@@ -61,7 +61,7 @@ _plot_value_linewidth = 0.5
 _equality_constraint_dot_size = 3
 
 # overall image parameters and layout
-_sparkline_figsize = (3, .5)
+_sparkline_figsize = (3, 0.8)
 _scalar_visual_figsize = (2.0, .2)
 _plot_dpi = 150
 _plot_pad_inches = 0
@@ -116,7 +116,7 @@ def opt_report(prob, outfile=None):
     driver = prob.driver
     if not driver.supports['optimization']:
         driver_class = type(driver).__name__
-        issue_warning(f"The optimizer report is not applicable for the {driver_class} Driver "
+        issue_warning(f"The optimizer report is not applicable for Driver type '{driver_class}', "
                       "which does not support optimization", category=DriverWarning)
         return
 
@@ -130,16 +130,7 @@ def opt_report(prob, outfile=None):
 
     driver_scaling = True
 
-    # Collect data from the problem
-    abs2prom = prob.model._var_abs2prom
-
-    def get_prom_name(abs_name):
-        if abs_name in abs2prom['input']:
-            return abs2prom['input'][abs_name]
-        elif abs_name in abs2prom['output']:
-            return abs2prom['output'][abs_name]
-        else:
-            return abs_name
+    get_prom_name = prob.model._get_prom_name
 
     # Collect the entire array of array valued desvars and constraints (ignore indices)
     objs_vals = {}
@@ -164,14 +155,11 @@ def opt_report(prob, outfile=None):
                 driver.get_design_var_values(driver_scaling=driver_scaling)[abs_name]
 
         for abs_name, meta in prob.driver._cons.items():
-            prom_name = get_prom_name(abs_name)
+            if meta.get('alias') is not None:
+                prom_name = abs_name
+            else:
+                prom_name = get_prom_name(abs_name)
             cons_meta[prom_name] = meta
-            if 'alias' in meta and meta['alias'] is not None:
-                # check to see if the abs_name is the alias
-                if abs_name == meta['alias']:
-                    prom_name = meta['name']
-                else:
-                    raise ValueError("Absolute name of var was expected to be the alias")  # TODO ??
             cons_vals[prom_name] = \
                 driver.get_constraint_values(driver_scaling=driver_scaling)[abs_name]
 
@@ -219,7 +207,7 @@ def _make_header_table(prob):
     """
     t = datetime.datetime.now()
     time_stamp = t.strftime("%Y-%m-%d %H:%M:%S %Z")
-    runtime = prob.driver.opt_result['runtime']
+    runtime = prob.driver.result.runtime
     runtime_ms = (runtime * 1000.0) % 1000.0
     runtime_formatted = \
         f"{time.strftime('%H hours %M minutes %S seconds', time.gmtime(runtime))} " \
@@ -229,12 +217,12 @@ def _make_header_table(prob):
     rows.append(['Problem:', prob._name])
     rows.append(['Script:', sys.argv[0]])
     rows.append(['Optimizer:', prob.driver._get_name()])
-    rows.append(['Number of driver iterations:', prob.driver.opt_result['iter_count']])
-    rows.append(['Number of objective calls:', prob.driver.opt_result['obj_calls']])
-    rows.append(['Number of derivative calls:', prob.driver.opt_result['deriv_calls']])
+    rows.append(['Number of driver iterations:', prob.driver.result.iter_count])
+    rows.append(['Number of model evals:', prob.driver.result.model_evals])
+    rows.append(['Number of deriv evals:', prob.driver.result.deriv_evals])
     rows.append(['Execution start time:', time_stamp])
     rows.append(['Wall clock run time:', runtime_formatted])
-    rows.append(['Exit status:', prob.driver.opt_result['exit_status']])
+    rows.append(['Exit status:', prob.driver.result.exit_status])
 
     return generate_table(rows, tablefmt='html')
 
@@ -355,8 +343,6 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
             meta['ref0'] = 0.0
 
         alias = meta.get('alias', '')
-        if alias:
-            name = meta['name']
 
         # the scipy optimizer, when using COBYLA, creates constraints under the hood.
         #  But the values are not given by the driver, so use this as a sign that this
@@ -376,8 +362,11 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
                 mean_val = np.mean(vals_dict[name])
                 row[col_name] = _indicate_value_is_derived_from_array(mean_val, vals_dict[name])
             elif col_name == 'min':
-                min_val = min(vals_dict[name])  # get min. Could be an array
-                min_val_as_str = _indicate_value_is_derived_from_array(min_val, vals_dict[name])
+                if isinstance(vals_dict[name], np.ndarray):
+                    min_val = min(vals_dict[name])  # get min. Could be an array
+                    min_val_as_str = _indicate_value_is_derived_from_array(min_val, vals_dict[name])
+                else:
+                    min_val_as_str = str(vals_dict[name])
                 comp = (vals_dict[name] - meta['lower']) < _bounds_tolerance
                 if np.any(comp):
                     row[col_name] = \
@@ -385,8 +374,11 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
                 else:
                     row[col_name] = min_val_as_str
             elif col_name == 'max':
-                max_val = max(vals_dict[name])
-                max_val_as_str = _indicate_value_is_derived_from_array(max_val, vals_dict[name])
+                if isinstance(vals_dict[name], np.ndarray):
+                    max_val = max(vals_dict[name])  # get max. Could be an array
+                    max_val_as_str = _indicate_value_is_derived_from_array(max_val, vals_dict[name])
+                else:
+                    max_val_as_str = str(vals_dict[name])
                 comp = (meta['upper'] - vals_dict[name]) < _bounds_tolerance
                 if np.any(comp):
                     row[col_name] = \
@@ -489,8 +481,8 @@ def _sparkline(kind, meta, val, width=300):
         else:
             _eq_constraint_sparkline(ax, meta, val)
     except (ValueError, IndexError):
-        mpl.use(_backend)  # set it back
         plt.close()
+        mpl.use(_backend)  # set it back
         return '<span class="plot-unavailable">Plot unavailable</span>'
 
     tmpfile = io.BytesIO()
@@ -499,8 +491,8 @@ def _sparkline(kind, meta, val, width=300):
     encoded = base64.b64encode(tmpfile.getvalue()).decode('utf-8')
     html = f'<img width={width} src=\'data:image/png;base64,{encoded}\'>'
 
-    mpl.use(_backend)  # set it back
     plt.close()
+    mpl.use(_backend)  # set it back
 
     return html
 
@@ -673,6 +665,15 @@ def _constraint_plot(kind, meta, val, width=300):
     if not (np.isscalar(val) or val.shape == (1,)):
         raise ValueError("Value for the _constraint_plot function must be a "
                          f"scalar. Variable {meta['name']} is not a scalar")
+    else:
+        try:
+            val = val.item()
+        except AttributeError:
+            pass  # handle other than ndarray, e.g. int
+
+    # If lower and upper bounds are None, return an HTML snippet indicating the issue
+    if kind == 'constraint' and meta['upper'] == INF_BOUND and meta['lower'] == -INF_BOUND:
+        return '<span class="bounds-unavailable">Both lower and upper bounds are None.</span>'
 
     if kind == 'desvar' and meta['upper'] == INF_BOUND and meta['lower'] == -INF_BOUND:
         return   # nothing to plot
@@ -713,8 +714,8 @@ def _constraint_plot(kind, meta, val, width=300):
 
     html = f'<img width={width} src=\'data:image/png;base64,{encoded}\'>'
 
-    mpl.use(_backend)
     plt.close()
+    mpl.use(_backend)
 
     return html
 
@@ -809,8 +810,6 @@ def var_bounds_plot(kind, ax, value, lower, upper):
     #  - value much greater than upper
 
     # also need to handle one-sided constraints where only one of lower and upper is given
-    if kind == 'constraint' and upper == INF_BOUND and lower == -INF_BOUND:
-        raise ValueError("Upper and lower bounds cannot all be None for a constraint")
 
     # Basic plot setup
     plt.rcParams['hatch.linewidth'] = _out_of_bounds_hatch_width  # can't seem to do this any other
@@ -968,4 +967,6 @@ def _val_to_plot_coord(value, lower, upper):
     # and where lower maps to 1./3 and upper to 2/3
     # Used with Python's functools to make a Python function out of this
     plot_coord = 1. / 3. + (value - lower) / (upper - lower) * 1. / 3.
+    if isinstance(plot_coord, np.ndarray):
+        return plot_coord[0]
     return plot_coord

@@ -2,10 +2,9 @@
 Class definition for SqliteRecorder, which provides dictionary backed by SQLite.
 """
 
-from copy import deepcopy
 from io import BytesIO
 
-import os
+import os.path
 import gc
 import sqlite3
 from itertools import chain
@@ -122,7 +121,7 @@ class SqliteRecorder(CaseRecorder):
 
     Parameters
     ----------
-    filepath : str
+    filepath : str or Path
         Path to the recorder file.
     append : bool, optional
         Optional. If True, append to an existing case recorder file.
@@ -156,6 +155,8 @@ class SqliteRecorder(CaseRecorder):
         Flag indicating whether or not the database has been initialized.
     _started : set
         set of recording requesters for which this recorder has been started.
+    _use_outputs_dir : bool
+        Flag indicating if the database is being saved in the problem outputs dir.
     """
 
     def __init__(self, filepath, append=False, pickle_version=PICKLE_VER, record_viewer_data=True):
@@ -174,7 +175,10 @@ class SqliteRecorder(CaseRecorder):
         self._prom2abs = {'input': {}, 'output': {}}
         self._abs2meta = {}
         self._pickle_version = pickle_version
-        self._filepath = filepath
+        self._filepath = str(filepath)
+
+        self._use_outputs_dir = not (os.path.sep in str(filepath) or '/' in str(filepath))
+
         self._database_initialized = False
         self._started = set()
 
@@ -208,7 +212,7 @@ class SqliteRecorder(CaseRecorder):
                         print("Note: Metadata is being recorded separately as "
                               f"{metadata_filepath}.")
                         try:
-                            rc = os.remove(metadata_filepath)
+                            os.remove(metadata_filepath)
                             issue_warning("The existing case recorder metadata file, "
                                           f"{metadata_filepath}, is being overwritten.",
                                           category=UserWarning)
@@ -263,20 +267,20 @@ class SqliteRecorder(CaseRecorder):
                           "solver_inputs TEXT, solver_output TEXT, solver_residuals TEXT)")
                 c.execute("CREATE INDEX solv_iter_ind on solver_iterations(iteration_coordinate)")
 
-            if self._record_metadata:
-                with self.metadata_connection as m:
-                    m.execute("CREATE TABLE metadata(format_version INT, openmdao_version TEXT, "
-                              "abs2prom BLOB, prom2abs BLOB, abs2meta BLOB, var_settings BLOB,"
-                              "conns BLOB)")
-                    m.execute("INSERT INTO metadata(format_version, openmdao_version, abs2prom,"
-                              " prom2abs) VALUES(?,?,?,?)", (format_version, openmdao_version,
-                                                             None, None))
-                    m.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
-                              "model_viewer_data TEXT)")
-                    m.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, "
-                              "scaling_factors BLOB, component_metadata BLOB)")
-                    m.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
-                              "solver_options BLOB, solver_class TEXT)")
+                if self._record_metadata:
+                    with self.metadata_connection as m:
+                        m.execute("CREATE TABLE metadata(format_version INT, openmdao_version "
+                                  "TEXT, abs2prom BLOB, prom2abs BLOB, abs2meta BLOB, "
+                                  "var_settings BLOB,conns BLOB)")
+                        m.execute("INSERT INTO metadata(format_version, openmdao_version, "
+                                  "abs2prom, prom2abs) VALUES(?,?,?,?)",
+                                  (format_version, openmdao_version, None, None))
+                        m.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
+                                  "model_viewer_data TEXT)")
+                        m.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, "
+                                  "scaling_factors BLOB, component_metadata BLOB)")
+                        m.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
+                                  "solver_options BLOB, solver_class TEXT)")
 
         self._database_initialized = True
         if MPI and comm and comm.size > 1:
@@ -290,7 +294,7 @@ class SqliteRecorder(CaseRecorder):
             for prop in self._abs2meta[name]:
                 self._abs2meta[name][prop] = make_serializable(self._abs2meta[name][prop])
 
-    def _cleanup_var_settings(self, var_settings):
+    def _make_var_setting_serializable(self, var_settings):
         """
         Convert all var_settings variable properties to a form that can be dumped as JSON.
 
@@ -304,11 +308,13 @@ class SqliteRecorder(CaseRecorder):
         var_settings : dict
             Dictionary mapping absolute variable names to var settings that are JSON compatible.
         """
-        # otherwise we trample on values that are used elsewhere
-        var_settings = deepcopy(var_settings)
-        for name in var_settings:
-            for prop in var_settings[name]:
-                var_settings[name][prop] = make_serializable(var_settings[name][prop])
+        # var_settings is already a copy at the outer level, so we just have to copy the
+        # inner dicts to prevent modifying the original designvars, objectives, and constraints.
+        for name, meta in var_settings.items():
+            meta = meta.copy()
+            for prop, val in meta.items():
+                meta[prop] = make_serializable(val)
+            var_settings[name] = meta
         return var_settings
 
     def startup(self, recording_requester, comm=None):
@@ -328,9 +334,6 @@ class SqliteRecorder(CaseRecorder):
 
         super().startup(recording_requester, comm)
 
-        if not self._database_initialized:
-            self._initialize_database(comm)
-
         # grab the system and driver
         if isinstance(recording_requester, Driver):
             system = recording_requester._problem().model
@@ -348,30 +351,37 @@ class SqliteRecorder(CaseRecorder):
             raise ValueError('Driver encountered a recording_requester it cannot handle'
                              ': {0}'.format(recording_requester))
 
+        if self._use_outputs_dir:
+            self._filepath = system.get_outputs_dir() / self._filepath
+
+        if not self._database_initialized:
+            self._initialize_database(comm)
+
         states = system._list_states_allprocs()
+
+        if driver is None:
+            desvars = system.get_design_vars(True, get_sizes=False, use_prom_ivc=False)
+            responses = system.get_responses(True, get_sizes=False, use_prom_ivc=False)
+            constraints = {}
+            objectives = {}
+            for name, data in responses.items():
+                if data['type'] == 'con':
+                    constraints[name] = data
+                else:
+                    objectives[name] = data
 
         if self.connection:
 
-            if driver is None:
-                desvars = system.get_design_vars(True, get_sizes=False, use_prom_ivc=False)
-                responses = system.get_responses(True, get_sizes=False)
-                constraints = {}
-                objectives = {}
-                for name, data in responses.items():
-                    if data['type'] == 'con':
-                        constraints[name] = data
-                    else:
-                        objectives[name] = data
-            else:
-                desvars = driver._designvars.copy()
-                responses = driver._responses.copy()
-                constraints = driver._cons.copy()
-                objectives = driver._objs.copy()
+            if driver is not None:
+                desvars = driver._designvars
+                responses = driver._responses
+                constraints = driver._cons
+                objectives = driver._objs
 
             inputs = list(system.abs_name_iter('input', local=False, discrete=True))
             outputs = list(system.abs_name_iter('output', local=False, discrete=True))
 
-            var_order = system._get_vars_exec_order(inputs=True, outputs=True)
+            var_order = system._get_vars_exec_order(inputs=True, outputs=True, local=True)
 
             # merge current abs2prom and prom2abs with this system's version
             self._abs2prom['input'].update(system._var_allprocs_abs2prom['input'])
@@ -394,18 +404,22 @@ class SqliteRecorder(CaseRecorder):
             disc_meta_in = system._var_allprocs_discrete['input']
             disc_meta_out = system._var_allprocs_discrete['output']
 
-            full_var_set = [(outputs, 'output'),
+            all_var_info = [(outputs, 'output'),
                             (desvars, 'desvar'), (responses, 'response'),
                             (objectives, 'objective'), (constraints, 'constraint')]
 
-            for var_set, var_type in full_var_set:
-                for name in var_set:
+            for varinfo, var_type in all_var_info:
+                if var_type != 'output':
+                    varinfo = varinfo.items()
+
+                for data in varinfo:
 
                     # Design variables, constraints and objectives can be requested by input name.
                     if var_type != 'output':
-                        srcname = var_set[name]['source']
+                        name, vmeta = data
+                        srcname = vmeta['source']
                     else:
-                        srcname = name
+                        srcname = name = data
 
                     if srcname not in self._abs2meta:
                         if srcname in real_meta_out:
@@ -448,11 +462,13 @@ class SqliteRecorder(CaseRecorder):
             conns = zlib.compress(json.dumps(
                 system._problem_meta['model_ref']()._conn_global_abs_in2out).encode('ascii'))
 
+            # TODO: seems like we could clobber the var_settings for a desvar in cases where a
+            # desvar is also a constraint... Make a test case and fix if needed.
             var_settings = {}
             var_settings.update(desvars)
             var_settings.update(objectives)
             var_settings.update(constraints)
-            var_settings = self._cleanup_var_settings(var_settings)
+            var_settings = self._make_var_setting_serializable(var_settings)
             var_settings['execution_order'] = var_order
             var_settings_json = zlib.compress(
                 json.dumps(var_settings, default=default_noraise).encode('ascii'))
@@ -557,8 +573,8 @@ class SqliteRecorder(CaseRecorder):
             inputs_text = json.dumps(inputs)
             residuals_text = json.dumps(residuals)
 
-            abs_err = data['abs']
-            rel_err = data['rel']
+            abs_err = data['abs'] if 'abs' in data else None
+            rel_err = data['rel'] if 'rel' in data else None
 
             with self.connection as c:
                 c = c.cursor()  # need a real cursor for lastrowid

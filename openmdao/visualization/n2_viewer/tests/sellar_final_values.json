@@ -1,0 +1,716 @@
+{
+    "name": "root",
+    "type": "root",
+    "class": "openmdao.test_suite.components.sellar:SellarStateConnection",
+    "expressions": null,
+    "nonlinear_solver": "NL: Newton",
+    "nonlinear_solver_options": {
+        "maxiter": 10,
+        "atol": 1e-10,
+        "rtol": 1e-10,
+        "iprint": 1,
+        "err_on_non_converge": false,
+        "debug_print": false,
+        "stall_limit": 0,
+        "stall_tol": 1e-12,
+        "stall_tol_type": "rel",
+        "restart_from_successful": false,
+        "solve_subsystems": false,
+        "max_sub_solves": 10,
+        "cs_reconverge": true,
+        "reraise_child_analysiserror": false
+    },
+    "linear_solver": "LN: SCIPY",
+    "linear_solver_options": {
+        "maxiter": 1000,
+        "atol": 1e-12,
+        "rtol": 1e-10,
+        "iprint": 1,
+        "err_on_non_converge": false,
+        "assemble_jac": false,
+        "solver": "gmres",
+        "restart": 20,
+        "rhs_checking": false
+    },
+    "component_type": null,
+    "subsystem_type": "group",
+    "is_parallel": false,
+    "solve_subsystems": false,
+    "children": [
+        {
+            "name": "_auto_ivc",
+            "type": "subsystem",
+            "class": "openmdao.core.indepvarcomp:_AutoIndepVarComp",
+            "expressions": null,
+            "nonlinear_solver": "",
+            "nonlinear_solver_options": null,
+            "linear_solver": "",
+            "linear_solver_options": null,
+            "subsystem_type": "component",
+            "is_parallel": false,
+            "component_type": "indep",
+            "children": [
+                {
+                    "name": "v0",
+                    "type": "output",
+                    "dtype": "ndarray",
+                    "is_discrete": false,
+                    "distributed": false,
+                    "shape": "(2,)",
+                    "desc": "",
+                    "implicit": false,
+                    "units": "None",
+                    "val": [
+                        5.0,
+                        2.0
+                    ],
+                    "val_min_indices": [
+                        1
+                    ],
+                    "val_min": 2.0,
+                    "val_max_indices": [
+                        0
+                    ],
+                    "val_max": 5.0
+                },
+                {
+                    "name": "v1",
+                    "type": "output",
+                    "dtype": "ndarray",
+                    "is_discrete": false,
+                    "distributed": false,
+                    "shape": "(1,)",
+                    "desc": "",
+                    "implicit": false,
+                    "units": "None",
+                    "val": [
+                        1.0
+                    ],
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_min": 1.0,
+                    "val_max_indices": [
+                        0
+                    ],
+                    "val_max": 1.0
+                }
+            ],
+            "options": {
+                "distributed": false,
+                "run_root_only": false,
+                "always_opt": false,
+                "name": "UNDEFINED",
+                "val": 1.0,
+                "shape": null,
+                "units": null,
+                "res_units": null,
+                "desc": null,
+                "lower": null,
+                "upper": null,
+                "ref": 1.0,
+                "ref0": 0.0,
+                "res_ref": null,
+                "tags": null
+            }
+        },
+        {
+            "name": "sub",
+            "type": "subsystem",
+            "class": "openmdao.core.group:Group",
+            "expressions": null,
+            "nonlinear_solver": "NL: RUNONCE",
+            "nonlinear_solver_options": {
+                "iprint": 1
+            },
+            "linear_solver": "LN: SCIPY",
+            "linear_solver_options": {
+                "maxiter": 1000,
+                "atol": 1e-12,
+                "rtol": 1e-10,
+                "iprint": 1,
+                "err_on_non_converge": false,
+                "assemble_jac": false,
+                "solver": "gmres",
+                "restart": 20,
+                "rhs_checking": false
+            },
+            "component_type": null,
+            "subsystem_type": "group",
+            "is_parallel": false,
+            "children": [
+                {
+                    "name": "state_eq_group",
+                    "type": "subsystem",
+                    "class": "openmdao.core.group:Group",
+                    "expressions": null,
+                    "nonlinear_solver": "NL: RUNONCE",
+                    "nonlinear_solver_options": {
+                        "iprint": 1
+                    },
+                    "linear_solver": "LN: SCIPY",
+                    "linear_solver_options": {
+                        "maxiter": 1000,
+                        "atol": 1e-12,
+                        "rtol": 1e-10,
+                        "iprint": 1,
+                        "err_on_non_converge": false,
+                        "assemble_jac": false,
+                        "solver": "gmres",
+                        "restart": 20,
+                        "rhs_checking": false
+                    },
+                    "component_type": null,
+                    "subsystem_type": "group",
+                    "is_parallel": false,
+                    "children": [
+                        {
+                            "name": "state_eq",
+                            "type": "subsystem",
+                            "class": "openmdao.test_suite.components.sellar:StateConnection",
+                            "expressions": null,
+                            "nonlinear_solver": "",
+                            "nonlinear_solver_options": null,
+                            "linear_solver": "",
+                            "linear_solver_options": null,
+                            "subsystem_type": "component",
+                            "is_parallel": false,
+                            "component_type": "implicit",
+                            "children": [
+                                {
+                                    "name": "y2_actual",
+                                    "type": "input",
+                                    "dtype": "ndarray",
+                                    "is_discrete": false,
+                                    "distributed": false,
+                                    "shape": "(1,)",
+                                    "desc": "",
+                                    "units": "None",
+                                    "val": [
+                                        12.058488150803932
+                                    ],
+                                    "val_min_indices": [
+                                        0
+                                    ],
+                                    "val_min": 12.058488150803932,
+                                    "val_max_indices": [
+                                        0
+                                    ],
+                                    "val_max": 12.058488150803932
+                                },
+                                {
+                                    "name": "y2_command",
+                                    "type": "output",
+                                    "dtype": "ndarray",
+                                    "is_discrete": false,
+                                    "distributed": false,
+                                    "shape": "(1,)",
+                                    "desc": "",
+                                    "implicit": true,
+                                    "units": "None",
+                                    "val": [
+                                        12.058488150803932
+                                    ],
+                                    "val_min_indices": [
+                                        0
+                                    ],
+                                    "val_min": 12.058488150803932,
+                                    "val_max_indices": [
+                                        0
+                                    ],
+                                    "val_max": 12.058488150803932
+                                }
+                            ],
+                            "options": {
+                                "assembled_jac_type": "csc",
+                                "distributed": false,
+                                "run_root_only": false,
+                                "always_opt": false
+                            }
+                        }
+                    ],
+                    "options": {
+                        "assembled_jac_type": "csc",
+                        "auto_order": false
+                    }
+                },
+                {
+                    "name": "d1",
+                    "type": "subsystem",
+                    "class": "openmdao.test_suite.components.sellar:SellarDis1withDerivatives",
+                    "expressions": null,
+                    "nonlinear_solver": "",
+                    "nonlinear_solver_options": null,
+                    "linear_solver": "",
+                    "linear_solver_options": null,
+                    "subsystem_type": "component",
+                    "is_parallel": false,
+                    "component_type": "explicit",
+                    "children": [
+                        {
+                            "name": "z",
+                            "type": "input",
+                            "dtype": "ndarray",
+                            "is_discrete": false,
+                            "distributed": false,
+                            "shape": "(2,)",
+                            "desc": "",
+                            "units": "None",
+                            "val": [
+                                5.0,
+                                2.0
+                            ],
+                            "val_min_indices": [
+                                1
+                            ],
+                            "val_min": 2.0,
+                            "val_max_indices": [
+                                0
+                            ],
+                            "val_max": 5.0
+                        },
+                        {
+                            "name": "x",
+                            "type": "input",
+                            "dtype": "ndarray",
+                            "is_discrete": false,
+                            "distributed": false,
+                            "shape": "(1,)",
+                            "desc": "",
+                            "units": "None",
+                            "val": [
+                                1.0
+                            ],
+                            "val_min_indices": [
+                                0
+                            ],
+                            "val_min": 1.0,
+                            "val_max_indices": [
+                                0
+                            ],
+                            "val_max": 1.0
+                        },
+                        {
+                            "name": "y2",
+                            "type": "input",
+                            "dtype": "ndarray",
+                            "is_discrete": false,
+                            "distributed": false,
+                            "shape": "(1,)",
+                            "desc": "",
+                            "units": "None",
+                            "val": [
+                                12.058488150803932
+                            ],
+                            "val_min_indices": [
+                                0
+                            ],
+                            "val_min": 12.058488150803932,
+                            "val_max_indices": [
+                                0
+                            ],
+                            "val_max": 12.058488150803932
+                        },
+                        {
+                            "name": "y1",
+                            "type": "output",
+                            "dtype": "ndarray",
+                            "is_discrete": false,
+                            "distributed": false,
+                            "shape": "(1,)",
+                            "desc": "",
+                            "implicit": false,
+                            "units": "None",
+                            "val": [
+                                25.588302369839212
+                            ],
+                            "val_min_indices": [
+                                0
+                            ],
+                            "val_min": 25.588302369839212,
+                            "val_max_indices": [
+                                0
+                            ],
+                            "val_max": 25.588302369839212
+                        }
+                    ],
+                    "options": {
+                        "distributed": false,
+                        "run_root_only": false,
+                        "always_opt": false
+                    }
+                },
+                {
+                    "name": "d2",
+                    "type": "subsystem",
+                    "class": "openmdao.test_suite.components.sellar:SellarDis2withDerivatives",
+                    "expressions": null,
+                    "nonlinear_solver": "",
+                    "nonlinear_solver_options": null,
+                    "linear_solver": "",
+                    "linear_solver_options": null,
+                    "subsystem_type": "component",
+                    "is_parallel": false,
+                    "component_type": "explicit",
+                    "children": [
+                        {
+                            "name": "z",
+                            "type": "input",
+                            "dtype": "ndarray",
+                            "is_discrete": false,
+                            "distributed": false,
+                            "shape": "(2,)",
+                            "desc": "",
+                            "units": "None",
+                            "val": [
+                                5.0,
+                                2.0
+                            ],
+                            "val_min_indices": [
+                                1
+                            ],
+                            "val_min": 2.0,
+                            "val_max_indices": [
+                                0
+                            ],
+                            "val_max": 5.0
+                        },
+                        {
+                            "name": "y1",
+                            "type": "input",
+                            "dtype": "ndarray",
+                            "is_discrete": false,
+                            "distributed": false,
+                            "shape": "(1,)",
+                            "desc": "",
+                            "units": "None",
+                            "val": [
+                                25.588302369839212
+                            ],
+                            "val_min_indices": [
+                                0
+                            ],
+                            "val_min": 25.588302369839212,
+                            "val_max_indices": [
+                                0
+                            ],
+                            "val_max": 25.588302369839212
+                        },
+                        {
+                            "name": "y2",
+                            "type": "output",
+                            "dtype": "ndarray",
+                            "is_discrete": false,
+                            "distributed": false,
+                            "shape": "(1,)",
+                            "desc": "",
+                            "implicit": false,
+                            "units": "None",
+                            "val": [
+                                12.058488150803932
+                            ],
+                            "val_min_indices": [
+                                0
+                            ],
+                            "val_min": 12.058488150803932,
+                            "val_max_indices": [
+                                0
+                            ],
+                            "val_max": 12.058488150803932
+                        }
+                    ],
+                    "options": {
+                        "distributed": false,
+                        "run_root_only": false,
+                        "always_opt": false
+                    }
+                }
+            ],
+            "options": {
+                "assembled_jac_type": "csc",
+                "auto_order": false
+            }
+        },
+        {
+            "name": "obj_cmp",
+            "type": "subsystem",
+            "class": "openmdao.components.exec_comp:ExecComp",
+            "expressions": [
+                "obj = x**2 + z[1] + y1 + exp(-y2)"
+            ],
+            "nonlinear_solver": "",
+            "nonlinear_solver_options": null,
+            "linear_solver": "",
+            "linear_solver_options": null,
+            "subsystem_type": "component",
+            "is_parallel": false,
+            "component_type": "exec",
+            "children": [
+                {
+                    "name": "x",
+                    "type": "input",
+                    "dtype": "ndarray",
+                    "is_discrete": false,
+                    "distributed": false,
+                    "shape": "(1,)",
+                    "desc": "",
+                    "units": "None",
+                    "val": [
+                        1.0
+                    ],
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_min": 1.0,
+                    "val_max_indices": [
+                        0
+                    ],
+                    "val_max": 1.0
+                },
+                {
+                    "name": "y1",
+                    "type": "input",
+                    "dtype": "ndarray",
+                    "is_discrete": false,
+                    "distributed": false,
+                    "shape": "(1,)",
+                    "desc": "",
+                    "units": "None",
+                    "val": [
+                        25.588302369839212
+                    ],
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_min": 25.588302369839212,
+                    "val_max_indices": [
+                        0
+                    ],
+                    "val_max": 25.588302369839212
+                },
+                {
+                    "name": "y2",
+                    "type": "input",
+                    "dtype": "ndarray",
+                    "is_discrete": false,
+                    "distributed": false,
+                    "shape": "(1,)",
+                    "desc": "",
+                    "units": "None",
+                    "val": [
+                        12.058488150803932
+                    ],
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_min": 12.058488150803932,
+                    "val_max_indices": [
+                        0
+                    ],
+                    "val_max": 12.058488150803932
+                },
+                {
+                    "name": "z",
+                    "type": "input",
+                    "dtype": "ndarray",
+                    "is_discrete": false,
+                    "distributed": false,
+                    "shape": "(2,)",
+                    "desc": "",
+                    "units": "None",
+                    "val": [
+                        5.0,
+                        2.0
+                    ],
+                    "val_min_indices": [
+                        1
+                    ],
+                    "val_min": 2.0,
+                    "val_max_indices": [
+                        0
+                    ],
+                    "val_max": 5.0
+                },
+                {
+                    "name": "obj",
+                    "type": "output",
+                    "dtype": "ndarray",
+                    "is_discrete": false,
+                    "distributed": false,
+                    "shape": "(1,)",
+                    "desc": "",
+                    "implicit": false,
+                    "units": "None",
+                    "val": [
+                        28.58830816498059
+                    ],
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_min": 28.58830816498059,
+                    "val_max_indices": [
+                        0
+                    ],
+                    "val_max": 28.58830816498059
+                }
+            ],
+            "options": {
+                "run_root_only": false,
+                "always_opt": false,
+                "has_diag_partials": false,
+                "units": null,
+                "shape": null,
+                "shape_by_conn": false,
+                "do_coloring": false
+            }
+        },
+        {
+            "name": "con_cmp1",
+            "type": "subsystem",
+            "class": "openmdao.components.exec_comp:ExecComp",
+            "expressions": [
+                "con1 = 3.16 - y1"
+            ],
+            "nonlinear_solver": "",
+            "nonlinear_solver_options": null,
+            "linear_solver": "",
+            "linear_solver_options": null,
+            "subsystem_type": "component",
+            "is_parallel": false,
+            "component_type": "exec",
+            "children": [
+                {
+                    "name": "y1",
+                    "type": "input",
+                    "dtype": "ndarray",
+                    "is_discrete": false,
+                    "distributed": false,
+                    "shape": "(1,)",
+                    "desc": "",
+                    "units": "None",
+                    "val": [
+                        25.588302369839212
+                    ],
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_min": 25.588302369839212,
+                    "val_max_indices": [
+                        0
+                    ],
+                    "val_max": 25.588302369839212
+                },
+                {
+                    "name": "con1",
+                    "type": "output",
+                    "dtype": "ndarray",
+                    "is_discrete": false,
+                    "distributed": false,
+                    "shape": "(1,)",
+                    "desc": "",
+                    "implicit": false,
+                    "units": "None",
+                    "val": [
+                        -22.428302369839212
+                    ],
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_min": -22.428302369839212,
+                    "val_max_indices": [
+                        0
+                    ],
+                    "val_max": -22.428302369839212
+                }
+            ],
+            "options": {
+                "run_root_only": false,
+                "always_opt": false,
+                "has_diag_partials": false,
+                "units": null,
+                "shape": null,
+                "shape_by_conn": false,
+                "do_coloring": false
+            }
+        },
+        {
+            "name": "con_cmp2",
+            "type": "subsystem",
+            "class": "openmdao.components.exec_comp:ExecComp",
+            "expressions": [
+                "con2 = y2 - 24.0"
+            ],
+            "nonlinear_solver": "",
+            "nonlinear_solver_options": null,
+            "linear_solver": "",
+            "linear_solver_options": null,
+            "subsystem_type": "component",
+            "is_parallel": false,
+            "component_type": "exec",
+            "children": [
+                {
+                    "name": "y2",
+                    "type": "input",
+                    "dtype": "ndarray",
+                    "is_discrete": false,
+                    "distributed": false,
+                    "shape": "(1,)",
+                    "desc": "",
+                    "units": "None",
+                    "val": [
+                        12.058488150803932
+                    ],
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_min": 12.058488150803932,
+                    "val_max_indices": [
+                        0
+                    ],
+                    "val_max": 12.058488150803932
+                },
+                {
+                    "name": "con2",
+                    "type": "output",
+                    "dtype": "ndarray",
+                    "is_discrete": false,
+                    "distributed": false,
+                    "shape": "(1,)",
+                    "desc": "",
+                    "implicit": false,
+                    "units": "None",
+                    "val": [
+                        -11.941511849196068
+                    ],
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_min": -11.941511849196068,
+                    "val_max_indices": [
+                        0
+                    ],
+                    "val_max": -11.941511849196068
+                }
+            ],
+            "options": {
+                "run_root_only": false,
+                "always_opt": false,
+                "has_diag_partials": false,
+                "units": null,
+                "shape": null,
+                "shape_by_conn": false,
+                "do_coloring": false
+            }
+        }
+    ],
+    "options": {
+        "assembled_jac_type": "csc",
+        "nonlinear_solver": "NL: Newton",
+        "nl_atol": null,
+        "nl_maxiter": null,
+        "linear_solver": "LN: SCIPY",
+        "ln_atol": null,
+        "ln_maxiter": null,
+        "auto_order": false
+    }
+}

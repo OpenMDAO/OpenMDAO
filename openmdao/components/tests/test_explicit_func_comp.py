@@ -1,21 +1,18 @@
 import unittest
-import math
 
 import numpy as np
 from numpy.testing import assert_almost_equal
 from io import StringIO
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals, \
-    assert_warning
-from openmdao.utils.cs_safe import abs, arctan2
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
+from openmdao.utils.cs_safe import abs
 import openmdao.func_api as omf
 from openmdao.utils.coloring import compute_total_coloring
 
 
 try:
     import jax
-    import jax.numpy as jnp
 except ImportError:
     jax = None
 
@@ -365,7 +362,7 @@ class TestFuncCompWrapped(unittest.TestCase):
 
         prob = om.Problem()
         prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
-        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(f))
+        prob.model.add_subsystem('C1', om.ExplicitFuncComp(f))
         prob.model.connect('indep.x', 'C1.x')
 
         with self.assertRaises(Exception) as cm:
@@ -385,7 +382,7 @@ class TestFuncCompWrapped(unittest.TestCase):
 
         prob = om.Problem()
         prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0))
-        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(f))
+        prob.model.add_subsystem('C1', om.ExplicitFuncComp(f))
         prob.model.connect('indep.x', 'C1.x')
 
         with self.assertRaises(Exception) as cm:
@@ -602,7 +599,6 @@ class TestFuncCompWrapped(unittest.TestCase):
         prob.run_model()
 
         J = prob.compute_totals(of=['comp.x', 'comp.y', 'comp.z'], wrt=['comp.a', 'comp.b', 'comp.c'], return_format='flat_dict')
-        Jcomp = prob.model.comp._jacobian._subjacs_info
 
         assert_near_equal(J['comp.x', 'comp.a'], np.diag(np.arange(1,4,dtype=float)*2.), 0.00001)
         assert_near_equal(J['comp.x', 'comp.b'], np.zeros((3,3)), 0.00001)
@@ -620,7 +616,6 @@ class TestFuncCompWrapped(unittest.TestCase):
         prob.run_model()
 
         J = prob.compute_totals(['comp.x', 'comp.y', 'comp.z'], wrt=['comp.a', 'comp.b', 'comp.c'], return_format='flat_dict')
-        Jcomp = prob.model.comp._jacobian._subjacs_info
 
         assert_near_equal(J['comp.x', 'comp.a'], np.diag(np.arange(1,4,dtype=float)*2.), 0.00001)
         assert_near_equal(J['comp.x', 'comp.b'], np.zeros((3,3)), 0.00001)
@@ -742,7 +737,7 @@ class TestFuncCompWrapped(unittest.TestCase):
         p.final_setup()
 
         # make sure only the partials that are needed are declared
-        declared_partials = comp._declared_partials
+        declared_partials = comp._declared_partials_patterns
         self.assertListEqual( sorted([('y1', 'x1'), ('y2', 'x2') ]),
                               sorted(declared_partials.keys()))
 
@@ -777,7 +772,7 @@ class TestFuncCompWrapped(unittest.TestCase):
         p.setup()
         p.final_setup()
 
-        declared_partials = comp._declared_partials
+        declared_partials = comp._declared_partials_patterns
         self.assertListEqual( sorted([('y1', 'x1'), ('y2', 'x2') ]),
                               sorted(declared_partials.keys()))
 
@@ -833,7 +828,7 @@ class TestFuncCompWrapped(unittest.TestCase):
         prob.run_model()
 
         stream = StringIO()
-        outputs = prob.model.list_outputs(residuals=True, residuals_tol=1e-5, out_stream=stream)
+        prob.model.list_outputs(residuals=True, residuals_tol=1e-5, out_stream=stream)
 
         text = stream.getvalue()
         self.assertTrue("balance" in text)
@@ -893,7 +888,7 @@ class TestFuncCompUserPartials(unittest.TestCase):
 
         assert_check_partials(p.check_partials(includes=['comp'], out_stream=None))
 
-        coloring = compute_total_coloring(p, mode='fwd', of=['comp.y1', 'comp.y2'], wrt=['comp.x1', 'comp.x2'], use_abs_names=True)
+        coloring = compute_total_coloring(p, mode='fwd', of=['comp.y1', 'comp.y2'], wrt=['comp.x1', 'comp.x2'])
 
         self.assertEqual(coloring.total_solves(), 1)  # verify that sparsity had an effect
 
@@ -904,8 +899,8 @@ def mat_factory(ninputs, noutputs):
     inshapes = list(zip(np.random.randint(1, 4, ninputs), np.random.randint(1, 4, ninputs)))
     outshapes = list(zip(np.random.randint(1, 4, noutputs), np.random.randint(1, 4, noutputs)))
 
-    nrows = np.sum([np.product(shp) for shp in outshapes])
-    ncols = np.sum([np.product(shp) for shp in inshapes])
+    nrows = np.sum([np.prod(shp) for shp in outshapes])
+    ncols = np.sum([np.prod(shp) for shp in inshapes])
 
     # create a sparse matrix
     mat = np.random.random((nrows, ncols)) < 0.2
@@ -1054,7 +1049,7 @@ class TestJax(unittest.TestCase):
         p.run_model()
         J = p.compute_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'])
 
-        I = np.eye(np.product(shape, dtype=int))
+        I = np.eye(np.prod(shape, dtype=int))  # noqa: E741
         assert_near_equal(J['comp.x', 'comp.a'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.b'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.c'], I * 3.)
@@ -1231,7 +1226,7 @@ class TestJaxNumpy(unittest.TestCase):
 
         J = p.compute_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'])
 
-        I = np.eye(np.product(shape)) if shape else np.eye(1)
+        I = np.eye(np.prod(shape)) if shape else np.eye(1)  # noqa: E741
         assert_near_equal(J['comp.x', 'comp.a'], I * p['comp.b'].ravel() * np.cos(p['comp.a']).ravel(), tolerance=1e-7)
         assert_near_equal(J['comp.x', 'comp.b'], I * np.sin(p['comp.a']).ravel(), tolerance=1e-7)
         assert_near_equal(J['comp.x', 'comp.c'], I * 3., tolerance=1e-7)
@@ -1276,7 +1271,7 @@ class TestJax2retvals(unittest.TestCase):
         p.run_model()
         J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
 
-        I = np.eye(np.product(shape)) if shape else np.eye(1)
+        I = np.eye(np.prod(shape)) if shape else np.eye(1)  # noqa: E741
         assert_near_equal(J['comp.x', 'comp.a'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.b'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.c'], I * 3.)
@@ -1333,7 +1328,7 @@ class TestJaxNonDifferentiableArgs(unittest.TestCase):
         p.run_model()
         J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
 
-        I = np.eye(3)
+        I = np.eye(3)  # noqa: E741
         assert_near_equal(J['comp.x', 'comp.a'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.b'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.c'], I * 3.)
@@ -1379,7 +1374,7 @@ class TestJax2retvalsColoring(unittest.TestCase):
         p.run_model()
         J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
 
-        I = np.eye(np.product(shape)) if shape else np.eye(1)
+        I = np.eye(np.prod(shape)) if shape else np.eye(1)  # noqa: E741
         assert_near_equal(J['comp.x', 'comp.a'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.b'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.c'], I * 3.)

@@ -14,12 +14,12 @@ from openmdao.core.analysis_error import AnalysisError
 from openmdao.components.add_subtract_comp import AddSubtractComp
 from openmdao.components.balance_comp import BalanceComp
 from openmdao.components.cross_product_comp import CrossProductComp
-from openmdao.components.demux_comp import DemuxComp
 from openmdao.components.dot_product_comp import DotProductComp
 from openmdao.components.eq_constraint_comp import EQConstraintComp
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.explicit_func_comp import ExplicitFuncComp
 from openmdao.components.implicit_func_comp import ImplicitFuncComp
+from openmdao.components.input_resids_comp import InputResidsComp
 from openmdao.components.external_code_comp import ExternalCodeComp
 from openmdao.components.external_code_comp import ExternalCodeImplicitComp
 from openmdao.components.ks_comp import KSComp
@@ -33,6 +33,7 @@ from openmdao.components.multifi_meta_model_unstructured_comp \
     import MultiFiMetaModelUnStructuredComp
 from openmdao.components.mux_comp import MuxComp
 from openmdao.components.vector_magnitude_comp import VectorMagnitudeComp
+from openmdao.components.submodel_comp import SubmodelComp
 
 
 # Solvers
@@ -59,7 +60,9 @@ from openmdao.surrogate_models.response_surface import ResponseSurface
 from openmdao.surrogate_models.surrogate_model import SurrogateModel, \
     MultiFiSurrogateModel
 
+from openmdao.utils.coloring import display_coloring, InvalidColoringError
 from openmdao.utils.indexer import slicer, indexer
+from openmdao.utils.file_utils import clean_outputs
 from openmdao.utils.find_cite import print_citations
 from openmdao.utils.spline_distributions import cell_centered
 from openmdao.utils.spline_distributions import sine_distribution
@@ -108,18 +111,19 @@ from openmdao.utils.units import convert_units, unit_conversion
 
 # Warning Options
 from openmdao.utils.om_warnings import issue_warning, reset_warnings, OpenMDAOWarning, \
-    SetupWarning, DistributedComponentWarning, CaseRecorderWarning,\
+    SetupWarning, DistributedComponentWarning, CaseRecorderWarning, \
     DriverWarning, CacheWarning, PromotionWarning, UnusedOptionWarning, DerivativesWarning, \
     MPIWarning, UnitsWarning, SolverWarning, OMDeprecationWarning, \
     OMInvalidCheckDerivativesOptionsWarning
 
 # Utils
-from openmdao.utils.general_utils import wing_dbg, env_truthy
+from openmdao.utils.general_utils import wing_dbg, env_truthy, om_dump
 from openmdao.utils.array_utils import shape_to_len
+from openmdao.utils.jax_utils import register_jax_component
 
 # Reports System
-from openmdao.utils.reports_system import register_report, get_reports_dir, list_reports, \
-    clear_reports
+from openmdao.utils.reports_system import register_report, unregister_report, get_reports_dir, \
+    list_reports, clear_reports, set_reports_dir
 
 import os
 

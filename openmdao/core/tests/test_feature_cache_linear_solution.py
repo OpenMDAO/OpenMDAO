@@ -32,9 +32,9 @@ class CacheLinearTestCase(unittest.TestCase):
                 self.declare_partials(of='*', wrt='*')
 
             def apply_nonlinear(self, inputs, outputs, residuals):
-                a = inputs['a']
-                b = inputs['b']
-                c = inputs['c']
+                a = inputs['a'].item()
+                b = inputs['b'].item()
+                c = inputs['c'].item()
                 x = outputs['states'][0]
                 y = outputs['states'][1]
 
@@ -42,16 +42,15 @@ class CacheLinearTestCase(unittest.TestCase):
                 residuals['states'][1] = a * y + b
 
             def solve_nonlinear(self, inputs, outputs):
-                a = inputs['a']
-                b = inputs['b']
-                c = inputs['c']
+                a = inputs['a'].item()
+                b = inputs['b'].item()
+                c = inputs['c'].item()
                 outputs['states'][0] = (-b + (b ** 2 - 4 * a * c) ** 0.5) / (2 * a)
                 outputs['states'][1] = -b/a
 
             def linearize(self, inputs, outputs, partials):
                 a = inputs['a'][0]
                 b = inputs['b'][0]
-                c = inputs['c'][0]
                 x = outputs['states'][0]
                 y = outputs['states'][1]
 
@@ -65,11 +64,10 @@ class CacheLinearTestCase(unittest.TestCase):
             def solve_linear(self, d_outputs, d_residuals, mode):
 
                 if mode == 'fwd':
-                    print("incoming initial guess", d_outputs['states'])
-                    d_outputs['states'] = gmres(self.state_jac, d_residuals['states'], x0=d_outputs['states'])[0]
+                    d_outputs['states'] = gmres(self.state_jac, d_residuals['states'], x0=d_outputs['states'], atol=0)[0]
 
                 elif mode == 'rev':
-                    d_residuals['states'] = gmres(self.state_jac, d_outputs['states'], x0=d_residuals['states'])[0]
+                    d_residuals['states'] = gmres(self.state_jac, d_outputs['states'], x0=d_residuals['states'], atol=0)[0]
 
         p = om.Problem()
         p.driver = om.ScipyOptimizeDriver()

@@ -1,10 +1,9 @@
 import unittest
 import numpy as np
 from openmdao.utils.mpi import MPI
-import traceback
 
 from openmdao.api import Problem
-from openmdao.api import ExplicitComponent, IndepVarComp
+from openmdao.api import ExplicitComponent
 from openmdao.api import NonlinearRunOnce, LinearRunOnce
 
 try:
@@ -15,22 +14,13 @@ except ImportError:
 
 class Comp(ExplicitComponent):
     def initialize(self):
-        self.options.declare('flat', False)
+        self.options.declare('node_size', 0)
 
     def setup(self):
-        irank = self.comm.Get_rank()
-        if irank ==1:
-            node_size = 0
-        else:
-            node_size = 3
+        node_size = self.options['node_size']
 
-        n_list = self.comm.allgather(node_size)
-        n1 = np.sum(n_list[:irank])
-        n2 = np.sum(n_list[:irank+1])
-
-        self.add_input( 'x',shape=node_size, src_indices=np.arange(n1, n2, dtype=int),
-                        flat_src_indices=self.options['flat'], distributed=True)
-        self.add_output('y',shape=node_size, distributed=True)
+        self.add_input( 'x', shape=node_size, distributed=True)
+        self.add_output('y', shape=node_size, distributed=True)
 
     def compute(self,inputs,outputs):
         outputs['y'] = inputs['x'] + 1.0
@@ -46,15 +36,26 @@ class TestSrcIndices(unittest.TestCase):
         model.nonlinear_solver = NonlinearRunOnce()
         model.linear_solver = LinearRunOnce()
 
-        model.add_subsystem('comp1',Comp())
-        model.add_subsystem('comp2',Comp())
-        model.connect('comp1.y','comp2.x')
+        irank = prob.comm.Get_rank()
+        if irank == 1:
+            node_size = 0
+        else:
+            node_size = 3
+
+        model.add_subsystem('comp1', Comp(node_size=node_size))
+        model.add_subsystem('comp2', Comp(node_size=node_size))
+
+        n_list = prob.comm.allgather(node_size)
+        n1 = np.sum(n_list[:irank])
+        n2 = np.sum(n_list[:irank+1])
+
+        model.connect('comp1.y','comp2.x', src_indices=np.arange(n1, n2, dtype=int))
         model.connect('comp2.y','comp1.x')
 
         prob.setup()
         prob.run_model()
 
-        if model.comm.rank == 1:
+        if prob.comm.rank == 1:
             np.testing.assert_almost_equal(model.comp1._outputs['y'], np.array([]))
             np.testing.assert_almost_equal(model.comp2._outputs['y'], np.array([]))
         else:
@@ -67,18 +68,28 @@ class TestSrcIndices(unittest.TestCase):
         model.nonlinear_solver = NonlinearRunOnce()
         model.linear_solver = LinearRunOnce()
 
-        model.add_subsystem('comp1',Comp(flat=True))
-        model.add_subsystem('comp2',Comp(flat=True))
-        model.connect('comp1.y','comp2.x')
+        irank = prob.comm.Get_rank()
+        if irank == 1:
+            node_size = 0
+        else:
+            node_size = 3
+
+        model.add_subsystem('comp1', Comp(node_size=node_size))
+        model.add_subsystem('comp2', Comp(node_size=node_size))
+
+        n_list = prob.comm.allgather(node_size)
+        n1 = np.sum(n_list[:irank])
+        n2 = np.sum(n_list[:irank+1])
+
+        model.connect('comp1.y','comp2.x', src_indices=np.arange(n1, n2, dtype=int), flat_src_indices=True)
         model.connect('comp2.y','comp1.x')
 
         prob.setup()
         prob.run_model()
 
-        if model.comm.rank == 1:
+        if prob.comm.rank == 1:
             np.testing.assert_almost_equal(model.comp1._outputs['y'], np.array([]))
             np.testing.assert_almost_equal(model.comp2._outputs['y'], np.array([]))
         else:
             np.testing.assert_almost_equal(model.comp1._outputs['y'], np.ones(3) * 2.)
             np.testing.assert_almost_equal(model.comp2._outputs['y'], np.ones(3) * 3.)
-

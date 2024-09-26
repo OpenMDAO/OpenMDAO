@@ -114,7 +114,7 @@ class TableTestCase(unittest.TestCase):
 | 0 | 1 | 2 |
 | 3 | 4 | 5 |
 | 6 | 7 | 8 |
-| - | - | - |"""
+| --------- |"""
         self.check_text('text', np.arange(9).reshape((3,3)), None, expected)
         self.check_text('text', [[0,1,2],[3,4,5],[6,7,8]], None, expected)
         self.check_text('text', iter(np.arange(9).reshape((3,3))), None, expected)
@@ -146,7 +146,7 @@ class TableTestCase(unittest.TestCase):
 |    0 |    1 |    2 |
 |    3 |    4 |    5 |
 |    6 |    7 |    8 |
-| ---- | ---- | ---- |"""
+| ------------------ |"""
         self.check_text('text', np.arange(9).reshape((3,3)), headers, expected)
         self.check_text('text', [[0,1,2],[3,4,5],[6,7,8]], headers, expected)
 
@@ -210,7 +210,7 @@ Col0  Col1  Col2
 | foobar blah           |    1.0 | N/A            |
 | asdfas dffff          |  3.142 | N/A            |
 | hello world blah blah |   9.87 | N/A            |
-| --------------------- | ------ | -------------- |
+| ----------------------------------------------- |
 """
         self.check_text('text', self.table_row_iter('str', 'float', None), headers, expected, missing_val='N/A')
 
@@ -226,9 +226,27 @@ Col0  Col1  Col2
 | dffff       |        |             |
 | hello world |   9.87 | N/A         |
 | blah blah   |        |             |
-| ----------- | ------ | ----------- |
+| ---------------------------------- |
 """
         self.check_text('text', self.table_row_iter('str', 'float', None), headers, expected, missing_val='N/A', max_width=38)
+
+    def test_word_wrap_box_grid(self):
+        headers = ['Strings', 'Floats', 'Something else']
+        expected = """
+╔═════════════╤════════╤═════════════╗
+║ Strings     ┊ Floats ┊ Something   ║
+║             ┊        ┊ else        ║
+╠═════════════╪════════╪═════════════╣
+║ foobar blah ┊    1.0 ┊ N/A         ║
+╟┈┈┈┈┈┈┈┈┈┈┈┈┈┿┈┈┈┈┈┈┈┈┿┈┈┈┈┈┈┈┈┈┈┈┈┈╢
+║ asdfas      ┊  3.142 ┊ N/A         ║
+║ dffff       ┊        ┊             ║
+╟┈┈┈┈┈┈┈┈┈┈┈┈┈┿┈┈┈┈┈┈┈┈┿┈┈┈┈┈┈┈┈┈┈┈┈┈╢
+║ hello world ┊   9.87 ┊ N/A         ║
+║ blah blah   ┊        ┊             ║
+╚═════════════╧════════╧═════════════╝
+"""
+        self.check_text('box_grid', self.table_row_iter('str', 'float', None), headers, expected, missing_val='N/A', max_width=38)
 
     def test_align(self):
         headers = ['Strings', 'Floats', 'Something else']
@@ -243,7 +261,7 @@ Col0  Col1  Col2
 | dffff       |        |             |
 | hello world |   9.87 |     N/A     |
 | blah blah   |        |             |
-| ----------- | ------ | ----------- |
+| ---------------------------------- |
 """
         self.check_text('text', self.table_row_iter('str', 'float', None), headers, expected,
                         column_meta=column_meta, missing_val='N/A', max_width=38)
@@ -251,6 +269,68 @@ Col0  Col1  Col2
     def test_basic_tabulator(self):
         # for now, just check that it doesn't crash
         headers = ['Strings', 'Floats', 'Something else']
-        table = generate_table(self.table_row_iter('str', 'float', None),
-                               tablefmt='tabulator', headers=headers)
-        tstr = str(table)
+        generate_table(self.table_row_iter('str', 'float', None),
+                       tablefmt='tabulator', headers=headers)
+
+    def test_embedded_newline(self):
+        cells = [
+            ["#", "title A", "title B"],
+            ["1", "lorem", "ipsum dolor sit amet"],
+            ["2", "lorem", "ipsum\ndolor sit amet"],
+            ["3", "lorem", "ipsum dolor sit amet"],
+        ]
+        expected = """
+╔═══╤═════════╤══════════════════════╗
+║ # ┊ title A ┊ title B              ║
+╠═══╪═════════╪══════════════════════╣
+║ 1 ┊ lorem   ┊ ipsum dolor sit amet ║
+╟┈┈┈┿┈┈┈┈┈┈┈┈┈┿┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈╢
+║ 2 ┊ lorem   ┊ ipsum                ║
+║   ┊         ┊ dolor sit amet       ║
+╟┈┈┈┿┈┈┈┈┈┈┈┈┈┿┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈╢
+║ 3 ┊ lorem   ┊ ipsum dolor sit amet ║
+╚═══╧═════════╧══════════════════════╝
+"""
+        self.check_text('box_grid', cells, 'firstrow', expected)
+
+    def test_embedded_newline2(self):
+        cells = [
+            ["#", "title A", "title B"],
+            ["1", "lorem", "ipsum dolor sit amet"],
+            ["2", "lorem", "ipsum\ndolor sit\namet"],
+            ["3", "lorem", "ipsum dolor sit amet"],
+        ]
+        expected = """
+╔═══╤═════════╤══════════════════════╗
+║ # ┊ title A ┊ title B              ║
+╠═══╪═════════╪══════════════════════╣
+║ 1 ┊ lorem   ┊ ipsum dolor sit amet ║
+╟┈┈┈┿┈┈┈┈┈┈┈┈┈┿┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈╢
+║ 2 ┊ lorem   ┊ ipsum                ║
+║   ┊         ┊ dolor sit            ║
+║   ┊         ┊ amet                 ║
+╟┈┈┈┿┈┈┈┈┈┈┈┈┈┿┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈╢
+║ 3 ┊ lorem   ┊ ipsum dolor sit amet ║
+╚═══╧═════════╧══════════════════════╝
+"""
+        self.check_text('box_grid', cells, 'firstrow', expected)
+
+    def test_non_string_header(self):
+        cells = [
+            ["#", "title A", "1.0"],
+            ["1", "lorem", "ipsum dolor sit amet"],
+            ["2", "lorem", "ipsum dolor sit amet"],
+            ["3", "lorem", "ipsum dolor sit amet"],
+        ]
+        expected = """
+╔═══╤═════════╤══════════════════════╗
+║ # ┊ title A ┊ 1.0                  ║
+╠═══╪═════════╪══════════════════════╣
+║ 1 ┊ lorem   ┊ ipsum dolor sit amet ║
+╟┈┈┈┿┈┈┈┈┈┈┈┈┈┿┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈╢
+║ 2 ┊ lorem   ┊ ipsum dolor sit amet ║
+╟┈┈┈┿┈┈┈┈┈┈┈┈┈┿┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈╢
+║ 3 ┊ lorem   ┊ ipsum dolor sit amet ║
+╚═══╧═════════╧══════════════════════╝
+"""
+        self.check_text('box_grid', cells, 'firstrow', expected)

@@ -1,6 +1,7 @@
 """Define the Component class."""
 
 import sys
+import types
 from collections import defaultdict
 from collections.abc import Iterable
 from itertools import product
@@ -11,19 +12,21 @@ from numpy import ndarray, isscalar, ndim, atleast_1d, atleast_2d, promote_types
 from scipy.sparse import issparse, coo_matrix
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
-    global_meta_names, _MetadataDict
+    global_meta_names, collect_errors
 from openmdao.core.constants import INT_DTYPE
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.units import simplify_unit
-from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_name2abs_name
+from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    find_matches, make_set, convert_src_inds, conditional_error
+    find_matches, make_set, inconsistent_across_procs
 from openmdao.utils.indexer import Indexer, indexer
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
-    DerivativesWarning, SetupWarning, warn_deprecation
+    DerivativesWarning, warn_deprecation
+from openmdao.utils.code_utils import is_lambda, LambdaPickleWrapper
+
 
 _forbidden_chars = {'.', '*', '?', '!', '[', ']'}
 _whitespace = {' ', '\t', '\r', '\n'}
@@ -66,8 +69,6 @@ class Component(System):
 
     Attributes
     ----------
-    _approx_schemes : OrderedDict
-        A mapping of approximation types to the associated ApproximationScheme.
     _var_rel2meta : dict
         Dictionary mapping relative names to metadata.
         This is only needed while adding inputs and outputs. During setup, these are used to
@@ -80,12 +81,15 @@ class Component(System):
         determine the list of absolute names.
     _static_var_rel_names : dict
         Static version of above - stores names of variables added outside of setup.
-    _declared_partials : dict
-        Cached storage of user-declared partials.
+    _declared_partials_patterns : dict
+        Dictionary of declared partials patterns.  Each key is a tuple of the form
+        (of, wrt) where of and wrt may be glob patterns.
     _declared_partial_checks : list
         Cached storage of user-declared check partial options.
     _no_check_partials : bool
         If True, the check_partials function will ignore this component.
+    _has_distrib_outputs : bool
+        If True, this component has at least one distributed output.
     """
 
     def __init__(self, **kwargs):
@@ -100,9 +104,10 @@ class Component(System):
         self._static_var_rel_names = {'input': [], 'output': []}
         self._static_var_rel2meta = {}
 
-        self._declared_partials = defaultdict(dict)
+        self._declared_partials_patterns = {}
         self._declared_partial_checks = []
         self._no_check_partials = False
+        self._has_distrib_outputs = False
 
     def _declare_options(self):
         """
@@ -117,6 +122,10 @@ class Component(System):
                              desc='If True, call compute, compute_partials, linearize, '
                                   'apply_linear, apply_nonlinear, and compute_jacvec_product '
                                   'only on rank 0 and broadcast the results to the other ranks.')
+        self.options.declare('always_opt', types=bool, default=False,
+                             desc='If True, force nonlinear operations on this component to be '
+                                  'included in the optimization loop even if this component is not '
+                                  'relevant to the design variables and responses.')
 
     def setup(self):
         """
@@ -130,7 +139,7 @@ class Component(System):
         """
         pass
 
-    def _setup_procs(self, pathname, comm, mode, prob_meta):
+    def _setup_procs(self, pathname, comm, prob_meta):
         """
         Execute first phase of the setup process.
 
@@ -142,15 +151,11 @@ class Component(System):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
-        mode : str
-            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
-            reverse (adjoint). Default is 'rev'.
         prob_meta : dict
             Problem level metadata.
         """
-        super()._setup_procs(pathname, comm, mode, prob_meta)
+        super()._setup_procs(pathname, comm, prob_meta)
 
-        orig_comm = comm
         if self._num_par_fd > 1:
             if comm.size > 1:
                 comm = self._setup_par_fd_procs(comm)
@@ -161,23 +166,18 @@ class Component(System):
                 self._num_par_fd = 1
 
         self.comm = comm
-        nprocs = comm.size
 
         # Clear out old variable information so that we can call setup on the component.
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2meta = {}
         if comm.size == 1:
-            self._has_distrib_vars = False
+            self._has_distrib_vars = self._has_distrib_outputs = False
 
         for meta in self._static_var_rel2meta.values():
-            # variable isn't distributed if we're only running on 1 proc
-            if nprocs == 1 and 'distributed' in meta and meta['distributed']:
-                meta['distributed'] = False
-
             # reset shape if any dynamic shape parameters are set in case this is a resetup
             # NOTE: this is necessary because we allow variables to be added in __init__.
             if 'shape_by_conn' in meta and (meta['shape_by_conn'] or
-                                            meta['copy_shape'] is not None):
+                                            meta['compute_shape'] is not None):
                 meta['shape'] = None
                 if not isscalar(meta['val']):
                     if meta['val'].size > 0:
@@ -216,12 +216,12 @@ class Component(System):
         # Check here if declare_coloring was called during setup but declare_partials wasn't.
         # If declare partials wasn't called, call it with of='*' and wrt='*' so we'll have
         # something to color.
-        if self._coloring_info['coloring'] is not None:
-            for key, meta in self._declared_partials.items():
+        if self._coloring_info.coloring is not None:
+            for meta in self._declared_partials_patterns.values():
                 if 'method' in meta and meta['method'] is not None:
                     break
             else:
-                method = self._coloring_info['method']
+                method = self._coloring_info.method
                 issue_warning("declare_coloring or use_fixed_coloring was called but no approx"
                               " partials were declared.  Declaring all partials as approximated "
                               f"using default metadata and method='{method}'.", prefix=self.msginfo,
@@ -239,10 +239,9 @@ class Component(System):
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
         abs2prom = self._var_allprocs_abs2prom = self._var_abs2prom
-        abs_in2prom_info = self._problem_meta['abs_in2prom_info']
 
         # Compute the prefix for turning rel/prom names into abs names
-        prefix = self.pathname + '.' if self.pathname else ''
+        prefix = self.pathname + '.'
 
         for io in ['input', 'output']:
             abs2meta = self._var_abs2meta[io]
@@ -264,10 +263,6 @@ class Component(System):
                 if is_input and 'src_indices' in metadata:
                     allprocs_abs2meta[abs_name]['has_src_indices'] = \
                         metadata['src_indices'] is not None
-                    if metadata['add_input_src_indices'] and abs_name not in abs_in2prom_info:
-                        # need a level for each system including '', so we don't
-                        # subtract 1 from abs_in.split('.') which includes the var name
-                        abs_in2prom_info[abs_name] = [None for s in abs_name.split('.')]
 
             for prom_name, val in self._var_discrete[io].items():
                 abs_name = prefix + prom_name
@@ -286,6 +281,50 @@ class Component(System):
         else:
             self._discrete_inputs = self._discrete_outputs = ()
 
+        if self.comm.size > 1:
+            # check that same variables are declared on all procs
+            vnames = (list(self._var_rel_names['output']), list(self._var_rel_names['input']))
+            allnames = self.comm.gather(vnames, root=0)
+            if self.comm.rank == 0:
+                outset, inset = vnames
+                msg = ''
+                for oset, iset in allnames:
+                    if iset != inset or oset != outset:
+                        msg = self._missing_vars_error(allnames)
+                        break
+                self.comm.bcast(msg, root=0)
+            else:
+                msg = self.comm.bcast(None, root=0)
+
+            if msg:
+                raise RuntimeError(msg)
+
+        self._serial_idxs = None
+        self._inconsistent_keys = set()
+
+    def _missing_vars_error(self, allnames):
+        msg = ''
+        outset, inset = allnames[0]
+        for rank, (olist, ilist) in enumerate(allnames):
+            if rank != 0 and (olist != outset or ilist != inset):
+                idiff = set(inset).symmetric_difference(ilist)
+                odiff = set(outset).symmetric_difference(olist)
+                if idiff or odiff:
+                    varnames = sorted(idiff | odiff)
+                    if len(varnames) == 1:
+                        varmsg = f"Variable '{varnames[0]}' exists on some ranks and not others."
+                    else:
+                        varmsg = f"Variables {varnames} exist on some ranks and not others."
+                else:
+                    varmsg = "Variables have not been declared in the same order on all ranks."
+
+                msg = (f"{self.msginfo}: {varmsg} A component must declare all variables in "
+                       "the same order on all ranks, even if the size of the variable is 0 on "
+                       "some ranks.")
+                break
+        return msg
+
+    @collect_errors
     def _setup_var_sizes(self):
         """
         Compute the arrays of variable sizes for all variables/procs on this system.
@@ -298,7 +337,8 @@ class Component(System):
                                                    dtype=INT_DTYPE)
 
             for i, (name, metadata) in enumerate(self._var_allprocs_abs2meta[io].items()):
-                sizes[iproc, i] = metadata['size']
+                sz = metadata['size']
+                sizes[iproc, i] = 0 if sz is None else sz
                 abs2idx[name] = i
 
             if self.comm.size > 1:
@@ -312,7 +352,8 @@ class Component(System):
         Process all partials and approximations that the user declared.
         """
         self._subjacs_info = {}
-        self._jacobian = DictionaryJacobian(system=self)
+        if not self.matrix_free:
+            self._jacobian = DictionaryJacobian(system=self)
 
         self.setup_partials()  # hook for component writers to specify sparsity patterns
 
@@ -326,15 +367,9 @@ class Component(System):
                                                                 self._approx_schemes):
             raise RuntimeError("%s: num_par_fd is > 1 but no FD is active." % self.msginfo)
 
-        for key, dct in self._declared_partials.items():
+        for key, pattern_meta in self._declared_partials_patterns.items():
             of, wrt = key
-            self._declare_partials(of, wrt, dct)
-
-        if self.matrix_free and self._subjacs_info:
-            issue_warning("matrix free component has declared the following "
-                          f"partials: {sorted(self._subjacs_info)}, which will allocate "
-                          "(possibly unnecessary) memory for each of those sub-jacobians.",
-                          prefix=self.msginfo, category=DerivativesWarning)
+            self._resolve_partials_patterns(of, wrt, pattern_meta)
 
     def setup_partials(self):
         """
@@ -345,6 +380,63 @@ class Component(System):
         all variables.
         """
         pass
+
+    def _setup_residuals(self):
+        """
+        Process hook to call user-defined setup_residuals method if provided.
+        """
+        pass
+
+    def _declared_partials_iter(self):
+        """
+        Iterate over all declared partials.
+
+        Yields
+        ------
+        key : tuple (of, wrt)
+            Subjacobian key.
+        """
+        yield from self._subjacs_info.keys()
+
+    def _get_missing_partials(self, missing):
+        """
+        Provide (of, wrt) tuples for which derivatives have not been declared in the component.
+
+        Parameters
+        ----------
+        missing : dict
+            Dictionary containing set of missing derivatives keyed by system pathname.
+        """
+        if ('*', '*') in self._declared_partials_patterns or \
+                (('*',), ('*',)) in self._declared_partials_patterns:
+            return
+
+        # keep old default behavior where matrix free components are assumed to have
+        # 'dense' whole variable to whole variable partials if no partials are declared.
+        if self.matrix_free and not self._declared_partials_patterns:
+            return
+
+        keyset = self._subjacs_info
+        mset = set()
+        for of in self._var_allprocs_abs2meta['output']:
+            for wrt in self._var_allprocs_abs2meta['input']:
+                if (of, wrt) not in keyset:
+                    mset.add((of, wrt))
+
+        if mset:
+            missing[self.pathname] = mset
+
+    @property
+    def checking(self):
+        """
+        Return True if check_partials or check_totals is executing.
+
+        Returns
+        -------
+        bool
+            True if we're running within check_partials or check_totals.
+        """
+        return self._problem_meta is not None and self._problem_meta['checking']
 
     def _run_root_only(self):
         """
@@ -363,39 +455,14 @@ class Component(System):
                 if self._num_par_fd > 1:
                     raise RuntimeError(f"{self.msginfo}: Can't set 'run_root_only' option when "
                                        "using parallel FD.")
-                if self._problem_meta['using_par_deriv_color']:
+                if self._problem_meta['has_par_deriv_color']:
                     raise RuntimeError(f"{self.msginfo}: Can't set 'run_root_only' option when "
                                        "using parallel_deriv_color.")
                 return True
         return False
 
-    def _update_wrt_matches(self, info):
-        """
-        Determine the list of wrt variables that match the wildcard(s) given in declare_coloring.
-
-        Parameters
-        ----------
-        info : dict
-            Coloring metadata dict.
-        """
-        ofs, allwrt = self._get_partials_varlists()
-        wrt_patterns = info['wrt_patterns']
-        if '*' in wrt_patterns or wrt_patterns is None:
-            info['wrt_matches_rel'] = None
-            info['wrt_matches'] = None
-            return
-
-        matches_rel = set()
-        for w in wrt_patterns:
-            matches_rel.update(find_matches(w, allwrt))
-
-        # error if nothing matched
-        if not matches_rel:
-            raise ValueError("{}: Invalid 'wrt' variable(s) specified for colored approx partial "
-                             "options: {}.".format(self.msginfo, wrt_patterns))
-
-        info['wrt_matches_rel'] = matches_rel
-        info['wrt_matches'] = [rel_name2abs_name(self, n) for n in matches_rel]
+    def _promoted_wrt_iter(self):
+        yield from self._get_partials_wrts()
 
     def _update_subjac_sparsity(self, sparsity):
         """
@@ -412,20 +479,18 @@ class Component(System):
             A nested dict of the form dct[of][wrt] = (rows, cols, shape)
         """
         # sparsity uses relative names, so we need to convert to absolute
-        pathname = self.pathname
+        prefix = self.pathname + '.'
         for of, sub in sparsity.items():
-            of_abs = '.'.join((pathname, of)) if pathname else of
+            of = prefix + of
             for wrt, tup in sub.items():
-                wrt_abs = '.'.join((pathname, wrt)) if pathname else wrt
-                abs_key = (of_abs, wrt_abs)
+                wrt = prefix + wrt
+                abs_key = (of, wrt)
                 if abs_key in self._subjacs_info:
-                    meta = self._subjacs_info[abs_key]
                     # add sparsity info to existing partial info
-                    meta['sparsity'] = tup
+                    self._subjacs_info[abs_key]['sparsity'] = tup
 
-    def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
-                  units=None, desc='', tags=None, shape_by_conn=False, copy_shape=None,
-                  distributed=None):
+    def add_input(self, name, val=1.0, shape=None, units=None, desc='', tags=None,
+                  shape_by_conn=False, copy_shape=None, compute_shape=None, distributed=None):
         """
         Add an input variable to the component.
 
@@ -437,16 +502,7 @@ class Component(System):
             The initial value of the variable being added in user-defined units.
             Default is 1.0.
         shape : int or tuple or list or None
-            Shape of this variable, only required if src_indices not provided and
-            val is not an array. Default is None.
-        src_indices : int or list or tuple or int ndarray or Iterable or None
-            The global indices of the source variable to transfer data from.
-            A value of None implies this input depends on all entries of the source array.
-            Default is None. The shapes of the target and src_indices must match,
-            and the form of the entries within is determined by the value of 'flat_src_indices'.
-        flat_src_indices : bool
-            If True and the source is non-flat, each entry of src_indices is assumed to be an index
-            into the flattened source.  Ignored if the source is flat.
+            Shape of this variable, only required if val is not an array. Default is None.
         units : str or None
             Units in which this input variable will be provided to the component
             during execution. Default is None, which means it is unitless.
@@ -460,6 +516,9 @@ class Component(System):
         copy_shape : str or None
             If a str, that str is the name of a variable. Shape this input to match that of
             the named variable.
+        compute_shape : function
+            A function taking a dict arg containing names and shapes of this component's outputs
+            and returning the shape of this input.
         distributed : bool
             If True, this variable is a distributed variable, so it can have different sizes/values
             across MPI processes.
@@ -481,39 +540,35 @@ class Component(System):
         if shape is not None and not isinstance(shape, (Integral, tuple, list)):
             raise TypeError("%s: The shape argument should be an int, tuple, or list but "
                             "a '%s' was given" % (self.msginfo, type(shape)))
-        if src_indices is not None:
-            try:
-                src_indices = indexer(src_indices, flat_src=flat_src_indices)
-            except Exception as err:
-                raise TypeError(f"{self.msginfo}: When specifying src_indices for input "
-                                f"'{name}': {err}")
         if units is not None:
             if not isinstance(units, str):
                 raise TypeError('%s: The units argument should be a str or None.' % self.msginfo)
             units = simplify_unit(units, msginfo=self.msginfo)
 
-        if tags is not None and not isinstance(tags, (str, list)):
-            raise TypeError('The tags argument should be a str or list')
+        if tags is not None and not isinstance(tags, (str, list, set)):
+            raise TypeError('The tags argument should be a str, set, or list')
 
-        if (shape_by_conn or copy_shape):
+        if copy_shape and compute_shape:
+            raise ValueError(f"{self.msginfo}: Only one of 'copy_shape' or 'compute_shape' can "
+                             "be specified.")
+
+        if copy_shape and not isinstance(copy_shape, str):
+            raise TypeError(f"{self.msginfo}: The copy_shape argument should be a str or None but "
+                            f"a '{type(copy_shape).__name__}' was given.")
+
+        if compute_shape and not isinstance(compute_shape, types.FunctionType):
+            raise TypeError(f"{self.msginfo}: The compute_shape argument should be a function but "
+                            f"a '{type(compute_shape).__name__}' was given.")
+
+        if (shape_by_conn or copy_shape or compute_shape):
             if shape is not None or ndim(val) > 0:
-                raise ValueError("%s: If shape is to be set dynamically using 'shape_by_conn' or "
-                                 "'copy_shape', 'shape' and 'val' should be a scalar, "
-                                 "but shape of '%s' and val of '%s' was given for variable '%s'."
-                                 % (self.msginfo, shape, val, name))
-            if src_indices is not None:
-                raise ValueError("%s: Setting of 'src_indices' along with 'shape_by_conn' or "
-                                 "'copy_shape' for variable '%s' is currently unsupported." %
-                                 (self.msginfo, name))
+                raise ValueError("%s: If shape is to be set dynamically using 'shape_by_conn', "
+                                 "'copy_shape', or 'compute_shape', 'shape' and 'val' should be a "
+                                 "scalar, but shape of '%s' and val of '%s' was given for variable"
+                                 " '%s'." % (self.msginfo, shape, val, name))
         else:
             # value, shape: based on args, making sure they are compatible
-            val, shape = ensure_compatible(name, val, shape, src_indices)
-
-        if src_indices is not None:
-            warn_deprecation(f"{self.msginfo}: Passing `src_indices` as an arg to "
-                             f"`add_input('{name}', ...` is deprecated and will become an error "
-                             "in a future release.  Add `src_indices` to a `promotes` or `connect` "
-                             "call instead.")
+            val, shape = ensure_compatible(name, val, shape)
 
         # until we get rid of component level distributed option, handle the case where
         # component distributed has been set to True but variable distributed has been set
@@ -522,24 +577,26 @@ class Component(System):
             if distributed is None:
                 distributed = False
             # using ._dict below to avoid tons of deprecation warnings
-            distributed = distributed or self.options._dict['distributed']['val']
+            distributed = distributed or ('distributed' in self.options and
+                                          self.options._dict['distributed']['val'])
 
-        metadata = _MetadataDict()
+        if compute_shape is not None and is_lambda(compute_shape):
+            compute_shape = LambdaPickleWrapper(compute_shape)
 
-        metadata.update({
+        metadata = {
             'val': val,
             'shape': shape,
             'size': shape_to_len(shape),
-            'src_indices': src_indices,
-            'flat_src_indices': flat_src_indices,
-            'add_input_src_indices': src_indices is not None,
+            'src_indices': None,
+            'flat_src_indices': None,
             'units': units,
             'desc': desc,
             'distributed': distributed,
             'tags': make_set(tags),
             'shape_by_conn': shape_by_conn,
+            'compute_shape': compute_shape,
             'copy_shape': copy_shape,
-        })
+        }
 
         # this will get reset later if comm size is 1
         self._has_distrib_vars |= metadata['distributed']
@@ -591,7 +648,7 @@ class Component(System):
         if tags is not None and not isinstance(tags, (str, list)):
             raise TypeError('%s: The tags argument should be a str or list' % self.msginfo)
 
-        metadata = _MetadataDict()
+        metadata = {}
 
         metadata.update({
             'val': val,
@@ -619,8 +676,8 @@ class Component(System):
         return metadata
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, tags=None,
-                   shape_by_conn=False, copy_shape=None, distributed=None):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,
+                   shape_by_conn=False, copy_shape=None, compute_shape=None, distributed=None):
         """
         Add an output variable to the component.
 
@@ -668,6 +725,9 @@ class Component(System):
         copy_shape : str or None
             If a str, that str is the name of a variable. Shape this output to match that of
             the named variable.
+        compute_shape : function
+            A function taking a dict arg containing names and shapes of this component's inputs
+            and returning the shape of this output.
         distributed : bool
             If True, this variable is a distributed variable, so it can have different sizes/values
             across MPI processes.
@@ -680,10 +740,10 @@ class Component(System):
         global _allowed_types
 
         # First, type check all arguments
-        if (shape_by_conn or copy_shape) and (shape is not None or ndim(val) > 0):
-            raise ValueError("%s: If shape is to be set dynamically using 'shape_by_conn' or "
-                             "'copy_shape', 'shape' and 'val' should be scalar, "
-                             "but shape of '%s' and val of '%s' was given for variable '%s'."
+        if (shape_by_conn or copy_shape or compute_shape) and (shape is not None or ndim(val) > 0):
+            raise ValueError("%s: If shape is to be set dynamically using 'shape_by_conn', "
+                             "'copy_shape', or 'compute_shape', 'shape' and 'val' should be scalar,"
+                             " but shape of '%s' and val of '%s' was given for variable '%s'."
                              % (self.msginfo, shape, val, name))
 
         if not isinstance(name, str):
@@ -708,7 +768,7 @@ class Component(System):
         if tags is not None and not isinstance(tags, (str, set, list)):
             raise TypeError('The tags argument should be a str, set, or list')
 
-        if not (copy_shape or shape_by_conn):
+        if not (copy_shape or shape_by_conn or compute_shape):
             if not isscalar(val) and not isinstance(val, _allowed_types):
                 msg = '%s: The val argument should be a float, list, tuple, ndarray or Iterable'
                 raise TypeError(msg % self.msginfo)
@@ -725,7 +785,7 @@ class Component(System):
 
             # All refs: check the shape if necessary
             for item, item_name in zip([ref, ref0, res_ref], ['ref', 'ref0', 'res_ref']):
-                if not isscalar(item):
+                if item is not None and not isscalar(item):
                     if not isinstance(item, _allowed_types):
                         raise TypeError(f'{self.msginfo}: The {item_name} argument should be a '
                                         'float, list, tuple, ndarray or Iterable')
@@ -760,11 +820,25 @@ class Component(System):
             if distributed is None:
                 distributed = False
             # using ._dict below to avoid tons of deprecation warnings
-            distributed = distributed or self.options._dict['distributed']['val']
+            distributed = distributed or ('distributed' in self.options and
+                                          self.options._dict['distributed']['val'])
 
-        metadata = _MetadataDict()
+        if copy_shape and compute_shape:
+            raise ValueError(f"{self.msginfo}: Only one of 'copy_shape' or 'compute_shape' can "
+                             "be specified.")
 
-        metadata.update({
+        if copy_shape and not isinstance(copy_shape, str):
+            raise TypeError(f"{self.msginfo}: The copy_shape argument should be a str or None but "
+                            f"a '{type(copy_shape).__name__}' was given.")
+
+        if compute_shape and not isinstance(compute_shape, types.FunctionType):
+            raise TypeError(f"{self.msginfo}: The compute_shape argument should be a function but "
+                            f"a '{type(compute_shape).__name__}' was given.")
+
+        if compute_shape is not None and is_lambda(compute_shape):
+            compute_shape = LambdaPickleWrapper(compute_shape)
+
+        metadata = {
             'val': val,
             'shape': shape,
             'size': shape_to_len(shape),
@@ -775,15 +849,17 @@ class Component(System):
             'tags': make_set(tags),
             'ref': format_as_float_or_array('ref', ref, flatten=True),
             'ref0': format_as_float_or_array('ref0', ref0, flatten=True),
-            'res_ref': format_as_float_or_array('res_ref', res_ref, flatten=True),
+            'res_ref': format_as_float_or_array('res_ref', res_ref, flatten=True, val_if_none=None),
             'lower': lower,
             'upper': upper,
             'shape_by_conn': shape_by_conn,
-            'copy_shape': copy_shape
-        })
+            'compute_shape': compute_shape,
+            'copy_shape': copy_shape,
+        }
 
         # this will get reset later if comm size is 1
         self._has_distrib_vars |= metadata['distributed']
+        self._has_distrib_outputs |= metadata['distributed']
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
@@ -832,7 +908,7 @@ class Component(System):
         if tags is not None and not isinstance(tags, (str, set, list)):
             raise TypeError('%s: The tags argument should be a str, set, or list' % self.msginfo)
 
-        metadata = _MetadataDict()
+        metadata = {}
 
         metadata.update({
             'val': val,
@@ -924,23 +1000,13 @@ class Component(System):
                         if dist_in:
                             offset = np.sum(sizes_in[:iproc, i])
                             end = offset + sizes_in[iproc, i]
-                        else:
-                            if src.startswith('_auto_ivc.'):
-                                nzs = np.nonzero(vout_sizes)[0]
-                                if nzs.size == 1:
-                                    # special case where we have a 'distributed' auto_ivc output
-                                    # that has a nonzero value in only one proc, so we can treat
-                                    # it like a non-distributed output. This happens in cases
-                                    # where an auto_ivc output connects to a variable that is
-                                    # remote on at least one proc.
-                                    offset = 0
-                                    end = vout_sizes[nzs[0]]
 
                     # total sizes differ and output is distributed, so can't determine mapping
                     if offset is None:
-                        raise RuntimeError(f"{self.msginfo}: Can't determine src_indices "
-                                           f"automatically for input '{iname}'. They must be "
-                                           "supplied manually.")
+                        self._collect_error(f"{self.msginfo}: Can't determine src_indices "
+                                            f"automatically for input '{iname}'. They must be "
+                                            "supplied manually.", ident=(self.pathname, iname))
+                        continue
 
                     if dist_in and not dist_out:
                         src_shape = self._get_full_dist_shape(src, all_abs2meta_out[src]['shape'])
@@ -976,25 +1042,14 @@ class Component(System):
         **kwargs : dict
             Keyword arguments for controlling the behavior of the approximation.
         """
-        pattern_matches = self._find_partial_matches(of, wrt)
         self._has_approx = True
+        info = self._subjacs_info
 
-        for of_bundle, wrt_bundle in product(*pattern_matches):
-            of_pattern, of_matches = of_bundle
-            wrt_pattern, wrt_matches = wrt_bundle
-            if not of_matches:
-                raise ValueError('{}: No matches were found for of="{}"'.format(self.msginfo,
-                                                                                of_pattern))
-            if not wrt_matches:
-                raise ValueError('{}: No matches were found for wrt="{}"'.format(self.msginfo,
-                                                                                 wrt_pattern))
-
-            info = self._subjacs_info
-            for abs_key in abs_key_iter(self, of_matches, wrt_matches):
-                meta = info[abs_key]
-                meta['method'] = method
-                meta.update(kwargs)
-                info[abs_key] = meta
+        for abs_key in self._matching_key_iter(of, wrt):
+            meta = info[abs_key]
+            meta['method'] = method
+            meta.update(kwargs)
+            info[abs_key] = meta
 
     def declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None,
                          method='exact', step=None, form=None, step_calc=None, minimum_step=None):
@@ -1003,10 +1058,10 @@ class Component(System):
 
         Parameters
         ----------
-        of : str or list of str
+        of : str or iter of str
             The name of the residual(s) that derivatives are being computed for.
             May also contain a glob pattern.
-        wrt : str or list of str
+        wrt : str or iter of str
             The name of the variables that derivatives are taken with respect to.
             This can contain the name of any input or output variable.
             May also contain a glob pattern.
@@ -1041,9 +1096,8 @@ class Component(System):
             absolute, 'rel_avg' for a size relative to the absolute value of the vector input, or
             'rel_element' for a size relative to each value in the vector input. In addition, it
             can be 'rel_legacy' for a size relative to the norm of the vector.  For backwards
-            compatibilty, it can be 'rel', which currently defaults to 'rel_legacy', but in the
-            future will default to 'rel_avg'. Defaults to None, in which case the approximation
-            method provides its default value.
+            compatibilty, it can be 'rel', which is now equivalent to 'rel_avg'. Defaults to None,
+            in which case the approximation method provides its default value.
         minimum_step : float
             Minimum step size allowed when using one of the relative step_calc options.
 
@@ -1058,13 +1112,20 @@ class Component(System):
             msg = '{}: d({})/d({}): method "{}" is not supported, method must be one of {}'
             raise ValueError(msg.format(self.msginfo, of, wrt, method, sorted(_supported_methods)))
 
-        # lists aren't hashable so convert to tuples
-        if isinstance(of, list):
-            of = tuple(of)
-        if isinstance(wrt, list):
-            wrt = tuple(wrt)
+        if not isinstance(of, (str, Iterable)):
+            raise ValueError(f"{self.msginfo}: in declare_partials, the 'of' arg must be a string "
+                             f"or an iter of strings, but got {of}.")
+        if not isinstance(wrt, (str, Iterable)):
+            raise ValueError(f"{self.msginfo}: in declare_partials, the 'wrt' arg must be a "
+                             f"string or an iter of strings, but got {wrt}.")
 
-        meta = self._declared_partials[of, wrt]
+        of = of if isinstance(of, str) else tuple(of)
+        wrt = wrt if isinstance(wrt, str) else tuple(wrt)
+
+        key = (of, wrt)
+        if key not in self._declared_partials_patterns:
+            self._declared_partials_patterns[key] = {}
+        meta = self._declared_partials_patterns[key]
         meta['dependent'] = dependent
 
         # If only one of rows/cols is specified
@@ -1074,9 +1135,17 @@ class Component(System):
 
         if dependent:
             meta['val'] = val
+
+            _val = val.data if issparse(val) else val
+            if np.all(_val == 0):
+                warn_deprecation(f'{self.msginfo}: d({of})/d({wrt}): Partial was declared to be '
+                                 f'exactly zero. This is inefficient and the declaration should '
+                                 f'be removed. In a future version of OpenMDAO this behavior '
+                                 f'will raise an error.')
+
             if rows is not None:
-                rows = np.array(rows, dtype=INT_DTYPE, copy=False)
-                cols = np.array(cols, dtype=INT_DTYPE, copy=False)
+                rows = np.asarray(rows, dtype=INT_DTYPE)
+                cols = np.asarray(cols, dtype=INT_DTYPE)
 
                 # Check the length of rows and cols to catch this easy mistake and give a
                 # clear message.
@@ -1233,9 +1302,8 @@ class Component(System):
             absolute, 'rel_avg' for a size relative to the absolute value of the vector input, or
             'rel_element' for a size relative to each value in the vector input. In addition, it
             can be 'rel_legacy' for a size relative to the norm of the vector.  For backwards
-            compatibilty, it can be 'rel', which currently defaults to 'rel_legacy', but in the
-            future will default to 'rel_avg'. Defaults to None, in which case the approximation
-            method provides its default value.
+            compatibilty, it can be 'rel', which is now equivalent to 'rel_avg'. Defaults to None,
+            in which case the approximation method provides its default value..
         minimum_step : float
             Minimum step size allowed when using one of the relative step_calc options.
         directional : bool
@@ -1285,7 +1353,7 @@ class Component(System):
         if not self._declared_partial_checks:
             return {}
         opts = {}
-        of, wrt = self._get_partials_varlists()
+        wrt = self._get_partials_wrts()
         invalid_wrt = []
         matrix_free = self.matrix_free
 
@@ -1338,9 +1406,9 @@ class Component(System):
 
         return opts
 
-    def _declare_partials(self, of, wrt, dct):
+    def _resolve_partials_patterns(self, of, wrt, pattern_meta):
         """
-        Store subjacobian metadata for later use.
+        Store subjacobian metadata for specific of, wrt pairs after resolving glob patterns.
 
         Parameters
         ----------
@@ -1351,17 +1419,19 @@ class Component(System):
             The names of the variables that derivatives are taken with respect to.
             This can contain the name of any input or output variable.
             May also contain glob patterns.
-        dct : dict
-            Metadata dict specifying shape, and/or approx properties.
+        pattern_meta : dict
+            Metadata dict specifying shape, and/or approx properties, keyed by (of, wrt) as
+            described above.
         """
-        val = dct['val'] if 'val' in dct else None
+        val = pattern_meta['val'] if 'val' in pattern_meta else None
         is_scalar = isscalar(val)
-        dependent = dct['dependent']
+        dependent = pattern_meta['dependent']
+        matfree = self.matrix_free
 
         if dependent:
-            if 'rows' in dct and dct['rows'] is not None:  # sparse list format
-                rows = dct['rows']
-                cols = dct['cols']
+            if 'rows' in pattern_meta and pattern_meta['rows'] is not None:  # sparse list format
+                rows = pattern_meta['rows']
+                cols = pattern_meta['cols']
 
                 if is_scalar:
                     val = np.full(rows.size, val, dtype=float)
@@ -1378,7 +1448,7 @@ class Component(System):
                                          'must be a scalar or have the same shape, val: {}, '
                                          'rows/cols: {}'.format(self.msginfo, of, wrt,
                                                                 val.shape, rows.shape))
-                else:
+                elif not matfree:
                     val = np.zeros_like(rows, dtype=float)
 
                 if rows.size > 0:
@@ -1394,15 +1464,141 @@ class Component(System):
                 rows = None
                 cols = None
 
-        pattern_matches = self._find_partial_matches(of, wrt)
         abs2meta_in = self._var_abs2meta['input']
         abs2meta_out = self._var_abs2meta['output']
 
         is_array = isinstance(val, ndarray)
-        patmeta = dict(dct)
-        patmeta_not_none = {k: v for k, v in dct.items() if v is not None}
+        patmeta = dict(pattern_meta)
+        patmeta_not_none = {k: v for k, v in pattern_meta.items() if v is not None}
 
-        for of_bundle, wrt_bundle in product(*pattern_matches):
+        for abs_key in self._matching_key_iter(of, '*' if wrt is None else wrt):
+            if not dependent:
+                if abs_key in self._subjacs_info:
+                    del self._subjacs_info[abs_key]
+                continue
+
+            if abs_key in self._subjacs_info:
+                meta = self._subjacs_info[abs_key]
+                meta.update(patmeta_not_none)
+            else:
+                meta = patmeta.copy()
+
+            of, wrt = abs_key
+            meta['rows'] = rows
+            meta['cols'] = cols
+            csz = abs2meta_in[wrt]['size'] if wrt in abs2meta_in else abs2meta_out[wrt]['size']
+            meta['shape'] = shape = (abs2meta_out[of]['size'], csz)
+            dist_out = abs2meta_out[of]['distributed']
+            if wrt in abs2meta_in:
+                dist_in = abs2meta_in[wrt]['distributed']
+            else:
+                dist_in = abs2meta_out[wrt]['distributed']
+
+            if dist_in and not dist_out and not self.matrix_free:
+                rel_key = abs_key2rel_key(self, abs_key)
+                raise RuntimeError(f"{self.msginfo}: component has defined partial {rel_key} "
+                                   "which is a non-distributed output wrt a distributed input."
+                                   " This is only supported using the matrix free API.")
+
+            if shape[0] == 0 or shape[1] == 0:
+                msg = "{}: '{}' is an array of size 0"
+                if shape[0] == 0:
+                    if dist_out:
+                        # distributed vars are allowed to have zero size inputs on some procs
+                        rows_max = -1
+                    else:
+                        # non-distributed vars are not allowed to have zero size inputs
+                        raise ValueError(msg.format(self.msginfo, of))
+                if shape[1] == 0:
+                    if not dist_in:
+                        # non-distributed vars are not allowed to have zero size outputs
+                        raise ValueError(msg.format(self.msginfo, wrt))
+                    else:
+                        # distributed vars are allowed to have zero size outputs on some procs
+                        cols_max = -1
+
+            if val is None and not matfree:
+                # we can only get here if rows is None  (we're not sparse list format)
+                meta['val'] = np.zeros(shape)
+            elif is_array:
+                if rows is None and val.shape != shape and val.size == shape[0] * shape[1]:
+                    meta['val'] = val = val.copy().reshape(shape)
+                else:
+                    meta['val'] = val.copy()
+            elif is_scalar:
+                meta['val'] = np.full(shape, val, dtype=float)
+            else:
+                meta['val'] = val
+
+            if rows_max >= shape[0] or cols_max >= shape[1]:
+                of, wrt = abs_key2rel_key(self, abs_key)
+                raise ValueError(f"{self.msginfo}: d({of})/d({wrt}): Expected {shape[0]}x"
+                                 f"{shape[1]} but declared at least {rows_max + 1}x"
+                                 f"{cols_max + 1}")
+
+            self._check_partials_meta(abs_key, meta['val'],
+                                      shape if rows is None else (rows.shape[0], 1))
+
+            self._subjacs_info[abs_key] = meta
+
+    def _get_partials_wrts(self):
+        """
+        Get list of 'wrt' variables that form the partial jacobian.
+
+        Returns
+        -------
+        list
+            List of 'wrt' relative variable names.
+        """
+        # filter out any discrete inputs or outputs
+        if self._discrete_inputs:
+            return [n for n in self._var_rel_names['input'] if n not in self._discrete_inputs]
+
+        return list(self._var_rel_names['input'])
+
+    def _get_partials_ofs(self, use_resname=False):
+        """
+        Get lists of 'of' variables that form the partial jacobian.
+
+        Parameters
+        ----------
+        use_resname : bool
+            Ignored.
+
+        Returns
+        -------
+        list
+            List of 'of' relative variable names.
+        """
+        # filter out any discrete inputs or outputs
+        if self._discrete_outputs:
+            return [n for n in self._var_rel_names['output'] if n not in self._discrete_outputs]
+
+        return list(self._var_rel_names['output'])
+
+    def _matching_key_iter(self, of_patterns, wrt_patterns, use_resname=False):
+        """
+        Iterate over all combinations of matching keys for the given patterns.
+
+        Parameters
+        ----------
+        of_patterns : list of str
+            List of variable names and/or glob patterns for the 'of' variables.
+        wrt_patterns : list of str
+            List of variable names and/or glob patterns for the 'wrt' variables.
+        use_resname : bool, optional
+            If True, match of_patterns against residuals instead of outputs.
+
+        Yields
+        ------
+        tuple
+            A tuple of matching keys, where the first element is the 'of' key and the second
+            element is the 'wrt' key.  Both are absolute names.
+        """
+        of_bundles = self._find_of_matches(of_patterns, use_resname=use_resname)
+        wrt_bundles = self._find_wrt_matches(wrt_patterns)
+
+        for of_bundle, wrt_bundle in product(of_bundles, wrt_bundles):
             of_pattern, of_matches = of_bundle
             wrt_pattern, wrt_matches = wrt_bundle
             if not of_matches:
@@ -1411,105 +1607,46 @@ class Component(System):
             if not wrt_matches:
                 raise ValueError('{}: No matches were found for wrt="{}"'.format(self.msginfo,
                                                                                  wrt_pattern))
+            yield from abs_key_iter(self, of_matches, wrt_matches)
 
-            for abs_key in abs_key_iter(self, of_matches, wrt_matches):
-                if not dependent:
-                    if abs_key in self._subjacs_info:
-                        del self._subjacs_info[abs_key]
-                    continue
-
-                if abs_key in self._subjacs_info:
-                    meta = self._subjacs_info[abs_key]
-                    meta.update(patmeta_not_none)
-                else:
-                    meta = patmeta.copy()
-
-                of, wrt = abs_key
-                meta['rows'] = rows
-                meta['cols'] = cols
-                csz = abs2meta_in[wrt]['size'] if wrt in abs2meta_in else abs2meta_out[wrt]['size']
-                meta['shape'] = shape = (abs2meta_out[of]['size'], csz)
-                dist_out = abs2meta_out[of]['distributed']
-                if wrt in abs2meta_in:
-                    dist_in = abs2meta_in[wrt]['distributed']
-                else:
-                    dist_in = abs2meta_out[wrt]['distributed']
-
-                if dist_in and not dist_out and not self.matrix_free:
-                    rel_key = abs_key2rel_key(self, abs_key)
-                    raise RuntimeError(f"{self.msginfo}: component has defined partial {rel_key} "
-                                       "which is a non-distributed output wrt a distributed input."
-                                       " This is only supported using the matrix free API.")
-
-                if shape[0] == 0 or shape[1] == 0:
-                    msg = "{}: '{}' is an array of size 0"
-                    if shape[0] == 0:
-                        if dist_out:
-                            # distributed vars are allowed to have zero size inputs on some procs
-                            rows_max = -1
-                        else:
-                            # non-distributed vars are not allowed to have zero size inputs
-                            raise ValueError(msg.format(self.msginfo, of))
-                    if shape[1] == 0:
-                        if not dist_in:
-                            # non-distributed vars are not allowed to have zero size outputs
-                            raise ValueError(msg.format(self.msginfo, wrt))
-                        else:
-                            # distributed vars are allowed to have zero size outputs on some procs
-                            cols_max = -1
-
-                if val is None:
-                    # we can only get here if rows is None  (we're not sparse list format)
-                    meta['val'] = np.zeros(shape)
-                elif is_array:
-                    if rows is None and val.shape != shape and val.size == shape[0] * shape[1]:
-                        meta['val'] = val = val.copy().reshape(shape)
-                    else:
-                        meta['val'] = val.copy()
-                elif is_scalar:
-                    meta['val'] = np.full(shape, val, dtype=float)
-                else:
-                    meta['val'] = val
-
-                if rows_max >= shape[0] or cols_max >= shape[1]:
-                    of, wrt = abs_key2rel_key(self, abs_key)
-                    raise ValueError(f"{self.msginfo}: d({of})/d({wrt}): Expected {shape[0]}x"
-                                     f"{shape[1]} but declared at least {rows_max + 1}x"
-                                     f"{cols_max + 1}")
-
-                self._check_partials_meta(abs_key, meta['val'],
-                                          shape if rows is None else (rows.shape[0], 1))
-
-                self._subjacs_info[abs_key] = meta
-
-    def _find_partial_matches(self, of_pattern, wrt_pattern):
+    def _find_of_matches(self, pattern, use_resname=False):
         """
-        Find all partial derivative matches from of and wrt.
+        Find all matches for the given 'of' pattern.
 
         Parameters
         ----------
-        of_pattern : str or list of str
-            The relative name of the residual(s) that derivatives are being computed for.
-            May also contain a glob pattern.
-        wrt_pattern : str or list of str
-            The relative name of the variables that derivatives are taken with respect to.
-            This can contain the name of any input or output variable.
-            May also contain a glob pattern.
+        pattern : str
+            Glob pattern or relative variable name.
+        use_resname : bool
+            If True, match residual names instead of output names.
 
         Returns
         -------
-        tuple(list, list)
-            Pair of lists containing pattern matches (if any). Returns (of_matches, wrt_matches)
-            where of_matches is a list of tuples (pattern, matches) and wrt_matches is a list of
-            tuples (pattern, output_matches, input_matches).
+        list
+            List of tuples of the form (abs_name, meta) where abs_name is the absolute name of the
+            matching variable and meta is the metadata for that variable.
         """
-        of_list = [of_pattern] if isinstance(of_pattern, str) else of_pattern
-        wrt_list = [wrt_pattern] if isinstance(wrt_pattern, str) else wrt_pattern
-        ofs, wrts = self._get_partials_varlists()
+        of_list = [pattern] if isinstance(pattern, str) else pattern
+        return [(pattern, find_matches(pattern, self._get_partials_ofs(use_resname=use_resname)))
+                for pattern in of_list]
 
-        of_pattern_matches = [(pattern, find_matches(pattern, ofs)) for pattern in of_list]
-        wrt_pattern_matches = [(pattern, find_matches(pattern, wrts)) for pattern in wrt_list]
-        return of_pattern_matches, wrt_pattern_matches
+    def _find_wrt_matches(self, pattern):
+        """
+        Find all matches for the given 'wrt' pattern.
+
+        Parameters
+        ----------
+        pattern : str
+            Glob pattern or relative variable name.
+
+        Returns
+        -------
+        list
+            List of tuples of the form (abs_name, meta) where abs_name is the absolute name of the
+            matching variable and meta is the metadata for that variable.
+        """
+        wrt_list = [pattern] if isinstance(pattern, str) else pattern
+        return [(pattern, find_matches(pattern, self._get_partials_wrts())) for pattern in wrt_list]
 
     def _check_partials_meta(self, abs_key, val, shape):
         """
@@ -1580,10 +1717,9 @@ class Component(System):
             if coloring_mod._use_partial_sparsity:
                 coloring = self._get_coloring()
                 if coloring is not None:
-                    if not self._coloring_info['dynamic']:
-                        coloring._check_config_partial(self)
                     self._update_subjac_sparsity(coloring.get_subjac_sparsity())
-                self._jacobian._restore_approx_sparsity()
+                if self._jacobian is not None:
+                    self._jacobian._restore_approx_sparsity()
 
     def _resolve_src_inds(self):
         abs2prom = self._var_abs2prom['input']
@@ -1598,23 +1734,14 @@ class Component(System):
                 pinfo = abs_in2prom_info[tgt][-1]  # component always last in the plist
                 if pinfo is not None:
                     inds, flat, shape = pinfo
-                    if inds is None:
-                        if meta['add_input_src_indices']:
-                            if shape is None:
-                                shape = all_abs2meta_out[conns[tgt]]['global_shape']
-                            meta['src_shape'] = shape
-                            inds = meta['src_indices']
-                    else:
+                    if inds is not None:
                         all_abs2meta_in[tgt]['has_src_indices'] = True
                         meta['src_shape'] = shape = all_abs2meta_out[conns[tgt]]['global_shape']
-                        if meta['add_input_src_indices']:
-                            inds = convert_src_inds(inds, shape, meta['src_indices'], shape)
-                        elif inds._flat_src:
+                        if inds._flat_src:
                             meta['flat_src_indices'] = True
                         elif meta['flat_src_indices'] is None:
                             meta['flat_src_indices'] = flat
 
-                    if inds is not None:
                         try:
                             if not isinstance(inds, Indexer):
                                 meta['src_indices'] = inds = indexer(inds, flat_src=flat,
@@ -1624,16 +1751,111 @@ class Component(System):
                                 inds.set_src_shape(shape)
                                 self._var_prom2inds[abs2prom[tgt]] = [shape, inds, flat]
                         except Exception:
-                            exc = sys.exc_info()
-                            conditional_error(f"When accessing '{conns[tgt]}' with src_shape "
-                                              f"{shape} from '{pinfo.prom_path()}' using "
-                                              f"src_indices {inds}: {exc[1]}",
-                                              exc=exc, category=SetupWarning,
-                                              err=self._raise_connection_errors)
+                            type_exc, exc, tb = sys.exc_info()
+                            self._collect_error(f"When accessing '{conns[tgt]}' with src_shape "
+                                                f"{shape} from '{pinfo.prom_path()}' using "
+                                                f"src_indices {inds}: {exc}", exc_type=type_exc,
+                                                tback=tb, ident=(conns[tgt], tgt))
 
-            elif meta['add_input_src_indices']:
-                self._var_prom2inds[abs2prom[tgt]] = [meta['shape'], meta['src_indices'],
-                                                      meta['src_indices']._flat_src]
+    def _check_consistent_serial_dinputs(self, nz_dist_outputs):
+        """
+        Check consistency across ranks for serial d_inputs variables.
+
+        This is used primarily to test that `compute_jacvec_product` and `apply_linear` methods
+        follow the OpenMDAO convention that in reverse mode, the component should perform
+        'allreduce' sorts of operations only for derivatives of distributed outputs with-respect-to
+        serial inputs.  This should result in serial input derivatives being consistent across all
+        ranks in the Component's communicator.
+
+        Parameters
+        ----------
+        nz_dist_outputs : set or list
+            Set of distributed outputs with nonzero values for the most recent _apply_linear call.
+        """
+        if not self.checking or not self._has_distrib_outputs or self.comm.size < 2:
+            return
+
+        if self._serial_idxs is None:
+            ranges = defaultdict(list)
+            output_len = 0 if self.is_explicit() else len(self._outputs)
+            for _, offset, end, vec, slc, dist_sizes in self._jac_wrt_iter():
+                if dist_sizes is None:  # not distributed
+                    if offset != end:
+                        if vec is self._outputs:
+                            ranges[vec].append(range(offset, end))
+                        else:
+                            ranges[vec].append(range(offset - output_len, end - output_len))
+
+            self._serial_idxs = []
+            for vec, rlist in ranges.items():
+                if rlist:
+                    self._serial_idxs.append((vec, np.hstack(rlist)))
+
+        for vec, inds in self._serial_idxs:
+            # _jac_wrt_iter gives us _input and possibly _output vecs (for implicit comps), but we
+            # want to check _dinputs and _doutputs
+            v = self._dinputs if vec is self._inputs else self._doutputs
+            result = inconsistent_across_procs(self.comm, v.asarray()[inds])
+            if self.comm.rank == 0 and np.any(result):
+                bad_inds = np.arange(len(v), dtype=INT_DTYPE)[inds][result]
+                bad_mask = np.zeros(len(v), dtype=bool)
+                bad_mask[bad_inds] = True
+                for inname, slc in v.get_slice_dict().items():
+                    if np.any(bad_mask[slc]):
+                        for outname in nz_dist_outputs:
+                            key = (outname, inname)
+                            self._inconsistent_keys.add(key)
+
+    def _get_dist_nz_dresids(self):
+        """
+        Get names of distributed resids that are non-zero prior to computing derivatives.
+
+        This should only be called when 'rev' mode is active.
+
+        Returns
+        -------
+        list of str
+            List of names of distributed resids that have nonzero entries.
+        """
+        nzresids = []
+        dresids = self._dresiduals.asarray()
+        for of, start, end, _, dist_sizes in self._jac_of_iter():
+            if dist_sizes is not None:
+                if np.any(dresids[start:end]):
+                    nzresids.append(of)
+
+        full_nzresids = set()
+        if self.comm.rank == 0:
+            for nzoutlist in self.comm.gather(nzresids, root=0):
+                full_nzresids.update(nzoutlist)
+            return full_nzresids
+
+        self.comm.gather(nzresids, root=0)
+        return nzresids
+
+    def _has_fast_rel_lookup(self):
+        """
+        Return True if this System should have fast relative variable name lookup in vectors.
+
+        Returns
+        -------
+        bool
+            True if this System should have fast relative variable name lookup in vectors.
+        """
+        return True
+
+    def _get_graph_node_meta(self):
+        """
+        Return metadata to add to this system's graph node.
+
+        Returns
+        -------
+        dict
+            Metadata for this system's graph node.
+        """
+        meta = super()._get_graph_node_meta()
+        meta['base'] = 'ExplicitComponent' if self.is_explicit() else 'ImplicitComponent'
+        return meta
 
 
 class _DictValues(object):

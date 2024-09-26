@@ -24,7 +24,11 @@ import os
 import copy
 
 import numpy as np
-from pyDOE2 import lhs
+
+try:
+    from pyDOE3 import lhs
+except ModuleNotFoundError:
+    lhs = None
 
 from openmdao.core.constants import INF_BOUND
 from openmdao.core.driver import Driver, RecordingDebugging
@@ -65,9 +69,16 @@ class SimpleGADriver(Driver):
         """
         Initialize the SimpleGADriver driver.
         """
+        if lhs is None:
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
+                               "which can be installed with one of the following commands:\n"
+                               "    pip install openmdao[doe]\n"
+                               "    pip install pyDOE3")
+
         super().__init__(**kwargs)
 
         # What we support
+        self.supports['optimization'] = True
         self.supports['integer_design_vars'] = True
         self.supports['inequality_constraints'] = True
         self.supports['equality_constraints'] = True
@@ -267,28 +278,6 @@ class SimpleGADriver(Driver):
         """
         return "SimpleGA"
 
-    def get_driver_objective_calls(self):
-        """
-        Return number of objective evaluations made during a driver run.
-
-        Returns
-        -------
-        int
-            Number of objective evaluations made during a driver run.
-        """
-        return self._nfit
-
-    def get_driver_derivative_calls(self):
-        """
-        Return number of derivative evaluations made during a driver run.
-
-        Returns
-        -------
-        int
-            Number of derivative evaluations made during a driver run.
-        """
-        return 0
-
     def run(self):
         """
         Execute the genetic algorithm.
@@ -298,6 +287,7 @@ class SimpleGADriver(Driver):
         bool
             Failure flag; True if failed to converge, False is successful.
         """
+        self.result.reset()
         model = self._problem().model
         ga = self._ga
 
@@ -313,6 +303,7 @@ class SimpleGADriver(Driver):
         Pc = self.options['Pc']
 
         self._check_for_missing_objective()
+        self._check_for_invalid_desvar_values()
 
         if compute_pareto:
             self._ga.nobj = len(self._objs)
@@ -400,7 +391,7 @@ class SimpleGADriver(Driver):
                 self.set_design_var(name, val)
 
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-                model.run_solve_nonlinear()
+                self._run_solve_nonlinear()
                 rec.abs = 0.0
                 rec.rel = 0.0
             self.iter_count += 1
@@ -510,7 +501,7 @@ class SimpleGADriver(Driver):
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             self.iter_count += 1
             try:
-                model.run_solve_nonlinear()
+                self._run_solve_nonlinear()
 
             # Tell the optimizer that this is a bad point.
             except AnalysisError:
@@ -620,6 +611,12 @@ class GeneticAlgorithm(object):
         """
         Initialize genetic algorithm object.
         """
+        if lhs is None:
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
+                               "which can be installed with one of the following commands:\n"
+                               "    pip install openmdao[doe]\n"
+                               "    pip install pyDOE3")
+
         self.objfun = objfun
         self.comm = comm
 
@@ -769,14 +766,14 @@ class GeneticAlgorithm(object):
                 # previous generation.
                 if elite and generation > 0:
                     max_index = np.argmax(fitness[:, 0])
-                    old_gen[max_index] = min_gen
-                    x_pop[max_index] = min_x
-                    fitness[max_index, 0] = min_fit
+                    old_gen[max_index] = min_gen        # noqa: F821, min_gen initialized below
+                    x_pop[max_index] = min_x            # noqa: F821, min_x initialized below
+                    fitness[max_index, 0] = min_fit     # noqa: F821, min_fit initialized below
 
                 # Find best performing point in this generation.
                 min_fit = np.min(fitness)
                 min_index = np.argmin(fitness)
-                min_gen = old_gen[min_index]
+                min_gen = old_gen[min_index]  # noqa: F841, used above
                 min_x = x_pop[min_index]
 
                 if min_fit < fopt:
@@ -980,7 +977,7 @@ class GeneticAlgorithm(object):
         -------
         ndarray
             New shuffled population.
-        ndarray(dtype=np.int)
+        ndarray(dtype=int)
             Index array that maps the shuffle from old to new.
         """
         temp = np.random.rand(self.npop)
@@ -999,7 +996,7 @@ class GeneticAlgorithm(object):
             Lower bound array.
         vub : ndarray
             Upper bound array.
-        bits : ndarray(dtype=np.int)
+        bits : ndarray(dtype=int)
             Number of bits for decoding.
 
         Returns
@@ -1038,7 +1035,7 @@ class GeneticAlgorithm(object):
             Lower bound array.
         vub : ndarray
             Upper bound array.
-        bits : ndarray(dtype=np.int)
+        bits : ndarray(dtype=int)
             Number of bits for decoding.
 
         Returns

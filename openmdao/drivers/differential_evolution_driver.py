@@ -17,7 +17,11 @@ import os
 import copy
 
 import numpy as np
-from pyDOE2 import lhs
+
+try:
+    from pyDOE3 import lhs
+except ModuleNotFoundError:
+    lhs = None
 
 from openmdao.core.constants import INF_BOUND
 from openmdao.core.driver import Driver, RecordingDebugging
@@ -60,9 +64,16 @@ class DifferentialEvolutionDriver(Driver):
         """
         Initialize the DifferentialEvolutionDriver driver.
         """
+        if lhs is None:
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
+                               "which can be installed with one of the following commands:\n"
+                               "    pip install openmdao[doe]\n"
+                               "    pip install pyDOE3")
+
         super().__init__(**kwargs)
 
         # What we support
+        self.supports['optimization'] = True
         self.supports['inequality_constraints'] = True
         self.supports['equality_constraints'] = True
         self.supports['multiple_objectives'] = True
@@ -242,28 +253,6 @@ class DifferentialEvolutionDriver(Driver):
         """
         return "DifferentialEvolution"
 
-    def get_driver_objective_calls(self):
-        """
-        Return number of objective evaluations made during a driver run.
-
-        Returns
-        -------
-        int
-            Number of objective evaluations made during a driver run.
-        """
-        return self._nfit
-
-    def get_driver_derivative_calls(self):
-        """
-        Return number of derivative evaluations made during a driver run.
-
-        Returns
-        -------
-        int
-            Number of derivative evaluations made during a driver run.
-        """
-        return 0
-
     def run(self):
         """
         Execute the genetic algorithm.
@@ -273,7 +262,7 @@ class DifferentialEvolutionDriver(Driver):
         bool
             Failure flag; True if failed to converge, False is successful.
         """
-        model = self._problem().model
+        self.result.reset()
         ga = self._ga
 
         pop_size = self.options['pop_size']
@@ -282,6 +271,7 @@ class DifferentialEvolutionDriver(Driver):
         Pc = self.options['Pc']
 
         self._check_for_missing_objective()
+        self._check_for_invalid_desvar_values()
 
         # Size design variables.
         desvars = self._designvars
@@ -320,7 +310,7 @@ class DifferentialEvolutionDriver(Driver):
             self.set_design_var(name, val)
 
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-            model.run_solve_nonlinear()
+            self._run_solve_nonlinear()
             rec.abs = 0.0
             rec.rel = 0.0
         self.iter_count += 1
@@ -430,7 +420,7 @@ class DifferentialEvolutionDriver(Driver):
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             self.iter_count += 1
             try:
-                model.run_solve_nonlinear()
+                self._run_solve_nonlinear()
 
             # Tell the optimizer that this is a bad point.
             except AnalysisError:
@@ -523,6 +513,12 @@ class DifferentialEvolution(object):
         """
         Initialize genetic algorithm object.
         """
+        if lhs is None:
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
+                               "which can be installed with one of the following commands:\n"
+                               "    pip install openmdao[doe]\n"
+                               "    pip install pyDOE3")
+
         self.objfun = objfun
         self.comm = comm
 

@@ -2,7 +2,6 @@
 
 import os
 from io import StringIO
-import re
 import sys
 import unittest
 
@@ -92,7 +91,7 @@ class TestSolverPrint(unittest.TestCase):
 
     def test_feature_iprint_1(self, stdout=None):
 
-        prob = om.Problem()
+        self.prob = prob = om.Problem()
         prob.model = SellarDerivatives()
 
         prob.setup()
@@ -118,9 +117,11 @@ class TestSolverPrint(unittest.TestCase):
         finally:
             sys.stdout = old_stdout
 
+        iters = self.prob.model.nonlinear_solver._iter_count
+
         # Verify output
         self.assertEqual(str_out.getvalue().strip(),
-                         "NL: Newton Converged in 2 iterations")
+                         f"NL: Newton Converged in {iters} iterations")
 
     def test_feature_iprint_2(self):
 

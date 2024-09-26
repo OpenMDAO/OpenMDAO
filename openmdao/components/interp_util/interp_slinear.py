@@ -183,7 +183,7 @@ class InterpLinearSemi(InterpAlgorithmSemi):
             # (Not much we can do for linear.)
             extrap = extrap or flag1 or flag0
 
-            slope = (val1 - val0) * h
+            slope = ((val1 - val0) * h).item()
 
             derivs = np.empty(len(dx0) + 1, dtype=x.dtype)
             derivs[0] = slope
@@ -212,8 +212,8 @@ class InterpLinearSemi(InterpAlgorithmSemi):
             d_value = None
             if self._compute_d_dvalues:
                 d_value = np.empty(2, dtype=x.dtype)
-                d_value[1] = h * (x - grid[idx])
-                d_value[0] = 1.0 - d_value[1]
+                d_value[1] = (h * (x - grid[idx])).item()
+                d_value[0] = (1.0 - d_value[1]).item()
 
                 d_value = (d_value, [self._idx[idx], self._idx[idx + 1]])
 
@@ -603,7 +603,7 @@ class Interp2DSlinear(InterpAlgorithmFixed):
 
         a[2] = (c01 - c00) * x1 + (c10 - c11) * x0
 
-        a[3] = c01 + c10 - c11 - c00
+        a[3] = c00 + c11 - c01 - c10
 
         rec_vol = 1.0 / ((x0 - x1) * (y0 - y1))
         return a * rec_vol
@@ -632,7 +632,6 @@ class Interp2DSlinear(InterpAlgorithmFixed):
         """
         x = x_vec[:, 0]
         y = x_vec[:, 1]
-        grid = self.grid
         vec_size = len(x)
         i_x, i_y = idx
 
@@ -715,7 +714,7 @@ class Interp2DSlinear(InterpAlgorithmFixed):
 
         a[:, 2] = (c01 - c00) * x1 + (c10 - c11) * x0
 
-        a[:, 3] = c01 + c10 - c11 - c00
+        a[:, 3] = c00 + c11 - c01 - c10
 
         rec_vol = 1.0 / ((x0 - x1) * (y0 - y1))
         return np.einsum('i,ij->ij', rec_vol, a)
@@ -971,7 +970,6 @@ class Interp3DSlinear(InterpAlgorithmFixed):
         x = x_vec[:, 0]
         y = x_vec[:, 1]
         z = x_vec[:, 2]
-        grid = self.grid
         vec_size = len(x)
         i_x, i_y, i_z = idx
 

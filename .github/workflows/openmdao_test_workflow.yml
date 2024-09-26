@@ -8,6 +8,70 @@ on:
   pull_request:
     branches: [ master ]
 
+  # Allow running the workflow manually from the Actions tab
+  # All jobs are excluded by default, desired jobs must be selected
+  workflow_dispatch:
+
+    inputs:
+
+      run_name:
+        type: string
+        description: 'Name of workflow run as it will appear under Actions tab:'
+        required: false
+        default: ""
+
+      Ubuntu_Baseline:
+        type: boolean
+        description: 'Include Ubuntu Baseline in test matrix'
+        required: false
+        default: false
+
+      MacOS_Baseline:
+        type: boolean
+        description: 'Include MacOS Baseline in test matrix'
+        required: false
+        default: false
+
+      MacOS_ARM:
+        type: boolean
+        description: 'Include MacOS ARM in test matrix'
+        required: false
+        default: false
+
+      Windows_Baseline:
+        type: boolean
+        description: 'Include Windows Baseline in test matrix'
+        required: false
+        default: false
+
+      Ubuntu_Minimal:
+        type: boolean
+        description: 'Include Ubuntu Minimal in test matrix'
+        required: false
+        default: false
+
+      Ubuntu_Oldest:
+        type: boolean
+        description: 'Include Ubuntu Oldest in test matrix'
+        required: false
+        default: false
+
+      Build_Docs:
+        type: boolean
+        description: 'Build docs'
+        required: false
+        default: false
+
+      debug_enabled:
+        type: boolean
+        description: 'Run the build with tmate debugging enabled (https://github.com/marketplace/actions/debugging-with-tmate)'
+        required: false
+        default: false
+
+run-name:  ${{ inputs.run_name }}
+
+permissions: {}
+
 jobs:
 
   tests:
@@ -21,82 +85,84 @@ jobs:
           # test baseline versions on Ubuntu
           - NAME: Ubuntu Baseline
             OS: ubuntu-latest
-            PY: '3.10'
-            NUMPY: 1.22
-            SCIPY: 1.7
-            PETSc: 3.16
-            PYOPTSPARSE: 'v2.8.3'
-            PAROPT: true
-            SNOPT: 7.7
+            PY: '3.12'
+            NUMPY: '1.26'
+            SCIPY: '1.14'
+            PETSc: '3.20'
+            PYOPTSPARSE: 'v2.11.0'
+            # PAROPT: true
+            SNOPT: '7.7'
             OPTIONAL: '[all]'
-            JAX: true
             BANDIT: true
+            PEP517: true
             TESTS: true
+            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Baseline }}
 
           # test baseline versions on MacOS
           - NAME: MacOS Baseline
-            OS: macos-latest
-            PY: '3.10'
-            NUMPY: 1.22
-            SCIPY: 1.7
-            PETSc: 3.16
-            # PYOPTSPARSE: 'v2.8.3'
+            OS: macos-13
+            PY: '3.12'
+            NUMPY: '1.26'
+            SCIPY: '1.13'
+            PETSc: '3.20'
+            PYOPTSPARSE: 'v2.11.0'
             # PAROPT: true
-            # SNOPT: 7.7
-            OPTIONAL: '[all]'
-            JAX: true
+            SNOPT: '7.7'
+            OPTIONAL: '[docs,doe,jax,notebooks,test]'
             TESTS: true
+            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.MacOS_Baseline }}
 
-          # test latest versions
-          - NAME: Ubuntu Latest
-            OS: ubuntu-latest
-            PY: 3
-            NUMPY: 1
-            SCIPY: 1
-            PETSc: 3
-            PYOPTSPARSE: 'latest'
-            PAROPT: true
-            SNOPT: 7.7
+          # test baseline versions on MacOS/ARM
+          - NAME: MacOS ARM
+            OS: macos-14
+            PY: '3.12'
+            NUMPY: '1.26'
+            SCIPY: '1.14'
+            PETSc: '3.20'
+            # PYOPTSPARSE: 'v2.11.0'
+            # PAROPT: true
+            # SNOPT: '7.7'
             OPTIONAL: '[all]'
-            JAX: true
             TESTS: true
+            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.MacOS_ARM }}
 
           # test minimal install
           - NAME: Ubuntu Minimal
             OS: ubuntu-latest
-            PY: 3
-            NUMPY: 1
-            SCIPY: 1
-            PYOPTSPARSE: 'conda-forge'
+            PY: '3.12'
+            NUMPY: '1.26'
+            SCIPY: '1.14'
             OPTIONAL: '[test]'
             TESTS: true
+            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Minimal }}
 
           # test oldest supported versions
           - NAME: Ubuntu Oldest
             OS: ubuntu-latest
-            PY: 3.7
-            NUMPY: 1.21
-            SCIPY: 1.7
+            PY: '3.9'
+            NUMPY: '1.23'
+            SCIPY: '1.9'
             OPENMPI: '4.0'
             MPI4PY: '3.0'
-            PETSc: 3.13
-            PYOPTSPARSE: 'v1.2'
-            SNOPT: 7.2
+            PETSc: '3.13'
+            PYOPTSPARSE: 'v2.9.0'
+            SNOPT: '7.2'
             OPTIONAL: '[all]'
             TESTS: true
+            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Oldest }}
 
           # build docs (baseline versions)
           - NAME: Build Docs
             OS: ubuntu-latest
-            PY: '3.10'
-            NUMPY: 1.22
-            SCIPY: 1.7
-            PETSc: 3.16
-            PYOPTSPARSE: 'v2.8.3'
-            SNOPT: 7.7
+            PY: '3.11'
+            NUMPY: '1.26'
+            SCIPY: '1.13'
+            PETSc: '3.19'
+            PYOPTSPARSE: 'v2.11.0'
+            SNOPT: '7.7'
             OPTIONAL: '[all]'
-            JAX: true
             BUILD_DOCS: true
+            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Build_Docs }}
 
     runs-on: ${{ matrix.OS }}
 
@@ -117,6 +183,12 @@ jobs:
           echo "Initiated by: ${GITHUB_ACTOR}"
           echo "============================================================="
 
+      - name: Exit if this job was excluded
+        if: matrix.EXCLUDE
+        uses: actions/github-script@v7
+        with:
+          script: core.setFailed('The ${{ matrix.NAME }} job was excluded from the run, exiting...');
+
       - name: Create SSH key
         if: (matrix.SNOPT || matrix.BUILD_DOCS)
         env:
@@ -129,67 +201,74 @@ jobs:
           echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
-      - name: Fetch tags
-        run: |
-          git fetch --prune --unshallow --tags
-
-      - name: Setup mamba
-        uses: conda-incubator/setup-miniconda@v2
+      - name: Setup conda
+        uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: ${{ matrix.PY }}
-          mamba-version: "*"
-          channels: conda-forge,defaults
-          channel-priority: true
+          channels: conda-forge
 
       - name: Install OpenMDAO
         run: |
-          mamba install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
+          echo "Make sure we are not using anaconda packages"
+          conda config --remove channels defaults
 
-          if [[ "${{ matrix.OPTIONAL }}" == "[all]" ]]; then
-            echo "============================================================="
-            echo "Install jupyter dependencies with mamba"
-            echo "============================================================="
-            mamba install jupyter jupyter-book 'lxml>=4.9.1'
-          fi
+          conda install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
 
           python -m pip install --upgrade pip
 
           echo "============================================================="
           echo "Install OpenMDAO"
           echo "============================================================="
-          python -m pip install .${{ matrix.OPTIONAL }}
+          if [[ "${{ matrix.PEP517 }}" == "true" ]]; then
+            pip wheel --no-deps --use-pep517 .
+            WHEEL=`find openmdao-*.whl`
+            echo "-----------------------------------------------------------"
+            echo "Installing from wheel: $WHEEL"
+            echo "-----------------------------------------------------------"
+            python -m pip install $WHEEL${{ matrix.OPTIONAL }}
+          else
+            python -m pip install .${{ matrix.OPTIONAL }}
+          fi
 
-      - name: Install jax
-        if: matrix.JAX
+      - name: Install MacOS-specific dependencies
+        if: matrix.OS == 'macos-13'
         run: |
-          echo "============================================================="
-          echo "Install jax"
-          echo "============================================================="
-          python -m pip install jax jaxlib
+          conda install swig
 
       - name: Install PETSc
         if: matrix.PETSc
         run: |
           echo "============================================================="
-          echo "Install PETSc"
+          echo "Install compilers for PETSc"
           echo "============================================================="
           if [[ "${{ matrix.OPENMPI }}" ]]; then
             COMPILERS="cython compilers openmpi-mpicc=${{ matrix.OPENMPI }}"
           else
             COMPILERS="cython compilers openmpi-mpicc"
           fi
+          conda install $COMPILERS -q -y
 
-          if [[ "${{ matrix.MPI4PY }}" ]]; then
-            MPI4PY="mpi4py=${{ matrix.MPI4PY }}"
+          echo "============================================================="
+          echo "Install PETSc"
+          echo "============================================================="
+          if [[ "${{ matrix.PETSc }}" == "3" ]]; then
+            python -m pip install git+https://github.com/mpi4py/mpi4py
+            python -m pip install petsc petsc4py
           else
-            MPI4PY="mpi4py"
+            if [[ "${{ matrix.MPI4PY }}" ]]; then
+              conda install mpi4py=${{ matrix.MPI4PY }} petsc4py=${{ matrix.PETSc }} -q -y
+            else
+              conda install mpi4py petsc4py=${{ matrix.PETSc }} -q -y
+            fi
           fi
 
-          mamba install $COMPILERS $MPI4PY petsc4py=${{ matrix.PETSc }} -q -y
-
+          echo "============================================================="
+          echo "Check MPI and PETSc installation"
+          echo "============================================================="
           export OMPI_MCA_rmaps_base_oversubscribe=1
+          export OMPI_MCA_btl=^openib
           echo "-----------------------"
           echo "Quick test of mpi4py:"
           mpirun -n 3 python -c "from mpi4py import MPI; print(f'Rank: {MPI.COMM_WORLD.rank}')"
@@ -202,6 +281,7 @@ jobs:
           echo "-----------------------"
 
           echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> $GITHUB_ENV
+          echo "OMPI_MCA_btl=^openib" >> $GITHUB_ENV
 
           echo "Workaround for intermittent failures with OMPI https://github.com/open-mpi/ompi/issues/7393"
           echo "TMPDIR=/tmp" >> $GITHUB_ENV
@@ -218,14 +298,18 @@ jobs:
               echo "SNOPT ${{ matrix.SNOPT }} was requested but is not available on conda-forge"
             fi
 
-            mamba install -c conda-forge pyoptsparse
+            conda install -c conda-forge pyoptsparse
           else
-            pip install git+https://github.com/OpenMDAO/build_pyoptsparse
+            python -m pip install git+https://github.com/OpenMDAO/build_pyoptsparse
 
             if [[ "${{ matrix.PYOPTSPARSE }}" == "latest" ]]; then
-              LATEST_URL=`curl -fsSLI -o /dev/null -w %{url_effective} https://github.com/mdolab/pyoptsparse/releases/latest`
-              LATEST_VER=`echo $LATEST_URL | awk '{split($0,a,"/tag/"); print a[2]}'`
-              BRANCH="-b $LATEST_VER"
+              function latest_version() {
+                local REPO_URL=$1/releases/latest
+                local LATEST_URL=`curl -fsSLI -o /dev/null -w %{url_effective} $REPO_URL`
+                local LATEST_VER=`echo $LATEST_URL | awk '{split($0,a,"/tag/"); print a[2]}'`
+                echo $LATEST_VER
+              }
+              BRANCH="-b $(latest_version https://github.com/mdolab/pyoptsparse)"
             else
               BRANCH="-b ${{ matrix.PYOPTSPARSE }}"
             fi
@@ -248,7 +332,7 @@ jobs:
               echo "SNOPT version ${{ matrix.SNOPT }} was requested but source is not available"
             fi
 
-            build_pyoptsparse $BRANCH $PAROPT $SNOPT
+            build_pyoptsparse -v $BRANCH $PAROPT $SNOPT
           fi
 
       - name: Install optional dependencies
@@ -257,36 +341,63 @@ jobs:
           echo "============================================================="
           echo "Install additional packages for testing/coverage"
           echo "============================================================="
-          python -m pip install psutil objgraph git+https://github.com/mdolab/pyxdsm
+          conda install graphviz
+          python -m pip install pyparsing psutil objgraph pyxdsm pydot
+
+          echo "Pre-install playwright dependencies to avoid warning messages"
+          playwright install --with-deps || true
 
       - name: Display environment info
+        id: env_info
+        continue-on-error: true
         run: |
-          mamba info
-          mamba list
+          conda info
+          conda list
 
           echo "============================================================="
           echo "Check installed versions of Python, Numpy and Scipy"
           echo "============================================================="
-          python -c "import sys; assert str(sys.version).startswith(str(${{ matrix.PY }})), \
-                    f'Python version {sys.version} is not the requested version (${{ matrix.PY }})'"
+          echo 'errors<<EOF' >> $GITHUB_OUTPUT
 
-          python -c "import numpy; assert str(numpy.__version__).startswith(str(${{ matrix.NUMPY }})), \
-                    f'Numpy version {numpy.__version__} is not the requested version (${{ matrix.NUMPY }})'"
+          FINAL_VER=`python -c "import platform; print(platform.python_version())"`
+          if [[ ! "$FINAL_VER" == "${{ matrix.PY }}"* ]]; then
+            echo "Python version was changed from ${{ matrix.PY }} to $FINAL_VER" >> $GITHUB_OUTPUT
+          fi
 
-          python -c "import scipy; assert str(scipy.__version__).startswith(str(${{ matrix.SCIPY }})), \
-                    f'Scipy version {scipy.__version__} is not the requested version (${{ matrix.SCIPY }})'"
+          FINAL_VER=`python -c "import numpy; print(numpy.__version__)"`
+          if [[ ! "$FINAL_VER" == "${{ matrix.NUMPY }}"* ]]; then
+            echo "NumPy version was changed from ${{ matrix.NUMPY }} to $FINAL_VER" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Audit dependencies
-        run: |
-          python -m pip install pip-audit
-          echo "============================================================="
-          echo "Scan environment for packages with known vulnerabilities"
-          echo "(Temporarily ignoring PYSEC-2022-237, required by nbconvert)"
-          echo "============================================================="
-          python -m pip_audit --ignore-vuln PYSEC-2022-237 --ignore-vuln GHSA-fpfv-jqm9-f5jm
+          FINAL_VER=`python -c "import scipy; print(scipy.__version__)"`
+          if [[ ! "$FINAL_VER" == "${{ matrix.SCIPY }}"* ]]; then
+            echo "SciPy version was changed from ${{ matrix.SCIPY }} to $FINAL_VER" >> $GITHUB_OUTPUT
+          fi
+
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+          grep changed $GITHUB_OUTPUT || echo ""
+
+      # Enable tmate debugging of manually-triggered workflows if the input option was provided
+      #
+      # To access the terminal through the web-interface:
+      #    1. Click on the web-browser link printed out in this action from the github
+      #       workflow terminal
+      #    2. Press cntrl + c in the new tab that opens up to reveal the terminal
+      #    3. To activate the conda environment run:
+      #        $ source $CONDA/etc/profile.d/conda.sh
+      #        $ conda activate test
+      - name: Setup tmate session
+        if: ${{ inputs.debug_enabled }}
+        uses: mxschmitt/action-tmate@v3
+        with:
+          limit-access-to-actor: true
 
       - name: Run tests
+        id: run_tests
         if: matrix.TESTS
+        env:
+          OPENMDAO_CHECK_ALL_PARTIALS: true
         run: |
           echo "============================================================="
           echo "Run tests with coverage (from directory other than repo root)"
@@ -296,10 +407,12 @@ jobs:
           echo "###################################################"
           cp .coveragerc $HOME
           cd $HOME
-          testflo -n 2 openmdao --timeout=120 --show_skipped --coverage --coverpkg openmdao --durations=20
+          testflo -n 2 openmdao --timeout=240 --show_skipped --coverage --coverpkg openmdao --durations=20
 
       - name: Submit coverage
+        id: coveralls
         if: matrix.TESTS
+        continue-on-error: true
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COVERALLS_SERVICE_NAME: "github"
@@ -313,11 +426,22 @@ jobs:
           SITE_DIR=`python -c 'import site; print(site.getsitepackages()[-1])'`
           coveralls --basedir $SITE_DIR
 
+      - name: Slack failure to upload to coveralls.io
+        if: steps.coveralls.outcome == 'failure'
+        uses: act10ns/slack@v2.0.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: 'warning'
+          message: |
+            Uploading of coverage data to coveralls.io failed.
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
       - name: Build docs
         if: matrix.BUILD_DOCS
         id: build_docs
         run: |
           export OPENMDAO_REPORTS=0
+          export PYDEVD_DISABLE_FILE_VALIDATION=1
 
           cd openmdao/docs
           if [[ "${{ secrets.SNOPT_LOCATION_72 }}" || "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
@@ -345,7 +469,7 @@ jobs:
       - name: Display doc build reports
         if: failure() && matrix.BUILD_DOCS && steps.build_docs.outcome == 'failure'
         run: |
-          for f in /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports/*; do
+          for f in $(find /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports -name '*.log'); do
             echo "============================================================="
             echo $f
             echo "============================================================="
@@ -353,11 +477,21 @@ jobs:
           done
 
       - name: Publish docs
-        if: ${{ github.event_name == 'push' && matrix.BUILD_DOCS }}
+        if: ${{ github.event_name != 'pull_request' && matrix.BUILD_DOCS }}
         env:
           DOCS_LOCATION: ${{ secrets.DOCS_LOCATION }}
         run: |
           if [[ "${#DOCS_LOCATION}" ]]; then
+            echo "============================================================="
+            echo "Install version of openssl compatible with hosting service"
+            echo "============================================================="
+            conda install -c conda-forge 'openssl=3.0'
+
+            echo "============================================================="
+            echo "Fetch tags to get docs version"
+            echo "============================================================="
+            git fetch --prune --unshallow --tags
+
             echo "============================================================="
             echo "Publish docs"
             echo "============================================================="
@@ -370,6 +504,7 @@ jobs:
       - name: Scan for security issues
         if: matrix.BANDIT
         id: bandit
+        continue-on-error: true
         run: |
           python -m pip install bandit
           echo "============================================================="
@@ -378,13 +513,82 @@ jobs:
           cd $GITHUB_WORKSPACE
           python -m bandit -c bandit.yml -ll -r openmdao
 
-      - name: Notify slack
-        uses: act10ns/slack@v1
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      - name: Check NumPy 2.0 Compatibility
+        run: |
+          echo "============================================================="
+          echo "Check OpenMDAO code for NumPy 2.0 compatibility"
+          echo "See: https://numpy.org/devdocs/numpy_2_0_migration_guide.html"
+          echo "============================================================="
+          python -m pip install ruff
+          ruff check . --select NPY201
+
+      - name: Perform linting with Ruff
+        if: ${{ matrix.NAME == 'Ubuntu Baseline' }}
+        run: |
+          echo "============================================================="
+          echo "Lint OpenMDAO code per settings in pyproject.toml"
+          echo "============================================================="
+          python -m pip install ruff
+          ruff check . --config pyproject.toml
+
+      - name: Slack env change
+        if: steps.env_info.outputs.errors != ''
+        uses: act10ns/slack@v2.0.0
         with:
-          status: ${{ job.status }}
-        if: always()
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: 'warning'
+          message: |
+            Environment change detected on `${{ matrix.NAME }}` build.
+            Python, NumPy or SciPy was not the requested version:
+            ```${{steps.env_info.outputs.errors}}```
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Slack unit test failure
+        if: failure() && steps.run_tests.outcome == 'failure'
+        uses: act10ns/slack@v2.0.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: ${{ steps.run_tests.outcome }}
+          message:
+            Unit testing failed on `${{ matrix.NAME }}` build.
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Slack doc build failure
+        if: failure() && steps.build_docs.outcome == 'failure'
+        uses: act10ns/slack@v2.0.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: ${{ steps.build_docs.outcome }}
+          message: |
+            Doc build failed on `${{ matrix.NAME }}` build.
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Slack security issue
+        if: steps.bandit.outcome == 'failure'
+        uses: act10ns/slack@v2.0.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: ${{ steps.bandit.outcome }}
+          message:
+            Security issue found on `${{ matrix.NAME }}` build.
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Fail the workflow if tests or doc build failed
+        if: steps.run_tests.outcome == 'failure' || steps.build_docs.outcome == 'failure'
+        uses: actions/github-script@v3
+        with:
+          script: |
+              let test_fail = ${{ steps.run_tests.outcome == 'failure' }};
+              let docs_fail = ${{ steps.build_docs.outcome == 'failure' }};
+              if (test_fail && docs_fail) {
+                  core.setFailed('Tests and doc build failed.');
+              }
+              else if (test_fail) {
+                  core.setFailed('Tests failed.');
+              }
+              else if (docs_fail) {
+                  core.setFailed('Doc build failed.');
+              }
 
   windows_tests:
     runs-on: windows-latest
@@ -397,9 +601,12 @@ jobs:
         include:
           # baseline versions
           - NAME: Windows Baseline
-            PY: 3
-            NUMPY: 1
-            SCIPY: 1
+            PY: '3.12'
+            NUMPY: '1.26'
+            SCIPY: '1.13'
+            PYOPTSPARSE: '2.11.0'
+            BANDIT: true
+            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Windows_Baseline }}
 
     name: ${{ matrix.NAME }}
 
@@ -418,36 +625,44 @@ jobs:
           echo "Initiated by: $env:GITHUB_ACTOR"
           echo "============================================================="
 
+      - name: Exit if this job was excluded
+        if: matrix.EXCLUDE
+        uses: actions/github-script@v7
+        with:
+          script: core.setFailed('The ${{ matrix.NAME }} job was excluded from the run, exiting...');
+
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
-      - name: Fetch tags
-        run: |
-          git fetch --prune --unshallow --tags
-
-      - name: Setup mamba
-        uses: conda-incubator/setup-miniconda@v2
+      - name: Setup conda
+        uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: ${{ matrix.PY }}
-          mamba-version: "*"
-          channels: conda-forge,defaults
-          channel-priority: true
+          channels: conda-forge
 
       - name: Install OpenDMAO
         run: |
-          mamba install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
-
-          echo "============================================================="
-          echo "Install jupyter dependencies with mamba"
-          echo "============================================================="
-          mamba install jupyter jupyter-book 'lxml>=4.9.1'
+          conda install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
 
           python -m pip install --upgrade pip
+
+          echo "============================================================="
+          echo "Install lxml for Windows (No Python 3.11 version on pypi)"
+          echo "============================================================="
+          conda install lxml
 
           echo "============================================================="
           echo "Install OpenMDAO"
           echo "============================================================="
           python -m pip install .[all]
+
+      - name: Install pyOptSparse
+        if: matrix.PYOPTSPARSE
+        run: |
+          echo "============================================================="
+          echo "Install pyoptsparse from conda-forge"
+          echo "============================================================="
+          conda install -c conda-forge pyoptsparse=${{ matrix.PYOPTSPARSE }} -q -y
 
       - name: Install optional dependencies
         run: |
@@ -458,8 +673,8 @@ jobs:
 
       - name: Display environment info
         run: |
-          mamba info
-          mamba list
+          conda info
+          conda list
 
           echo "============================================================="
           echo "Check installed versions of Python, Numpy and Scipy"
@@ -473,25 +688,31 @@ jobs:
           python -c "import scipy; assert str(scipy.__version__).startswith(str(${{ matrix.SCIPY }})), \
                     f'Scipy version {scipy.__version__} is not the requested version (${{ matrix.SCIPY }})'"
 
-      - name: Audit dependencies
-        run: |
-          python -m pip install pip-audit
-          echo "============================================================="
-          echo "Scan environment for packages with known vulnerabilities"
-          echo "(Temporarily ignoring PYSEC-2022-237, required by nbconvert)"
-          echo "============================================================="
-          python -m pip_audit --ignore-vuln PYSEC-2022-237
-
       - name: Run tests
+        env:
+          OPENMDAO_CHECK_ALL_PARTIALS: true
         run: |
           echo "============================================================="
           echo "Run tests with coverage (from directory other than repo root)"
           echo "============================================================="
           copy .coveragerc $HOME
           cd $HOME
-          testflo -n 2 openmdao --timeout=120 --show_skipped --coverage  --coverpkg openmdao --durations=20
+          Set-DisplayResolution -Width 1920 -Height 1080 -Force
+          testflo -n 2 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20
+
+      - name: Slack unit test failure
+        if: failure() && steps.run_tests.outcome == 'failure'
+        uses: act10ns/slack@v2.0.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: ${{ steps.run_tests.outcome }}
+          message:
+            Unit testing failed on `${{ matrix.NAME }}` build.
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Submit coverage
+        id: coveralls
+        continue-on-error: true
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COVERALLS_SERVICE_NAME: "github"
@@ -505,13 +726,27 @@ jobs:
           $SITE_DIR=python -c "import site; print(site.getsitepackages()[-1].replace('lib\\site-', 'Lib\\site-'))"
           coveralls --basedir $SITE_DIR
 
-      - name: Notify slack
-        uses: act10ns/slack@v1
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      - name: Slack failure to upload to coveralls.io
+        if: steps.coveralls.outcome == 'failure'
+        uses: act10ns/slack@v2.0.0
         with:
-          status: ${{ job.status }}
-        if: always()
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: 'warning'
+          message: |
+            Uploading of coverage data to coveralls.io failed.
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Scan for security issues
+        if: matrix.BANDIT
+        id: bandit
+        run: |
+          python -m pip install bandit
+          echo "============================================================="
+          echo "Run bandit scan for high/medium severity issues"
+          echo "============================================================="
+          cd ${{ github.workspace }}
+          python -m bandit -c bandit.yml -ll -r openmdao
+
 
   coveralls:
     name: Finish coverage
@@ -523,14 +758,31 @@ jobs:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         parallel-finished: true
 
-  dymos_tests:
-    name: Run Dymos Tests
+
+  related_tests:
+    name: Run Dymos & pyCycle Tests
     needs: [tests, windows_tests]
     runs-on: ubuntu-latest
+
     steps:
     - uses: benc-uk/workflow-dispatch@v1
       with:
         workflow: Dymos Tests
         repo: ${{ github.repository_owner }}/dymos
+        token: ${{ secrets.ACCESS_TOKEN }}
+      if: github.event_name == 'push'
+
+    - uses: benc-uk/workflow-dispatch@v1
+      with:
+        workflow: pyCycle Tests
+        repo: ${{ github.repository_owner }}/pycycle
+        inputs: >
+          {
+            "run_name": "Test Latest OpenMDAO Development Version",
+            "Ubuntu_Baseline": false,
+            "MacOS_Baseline": false,
+            "Windows_Baseline": false,
+            "OpenMDAO_Dev": true
+           }
         token: ${{ secrets.ACCESS_TOKEN }}
       if: github.event_name == 'push'

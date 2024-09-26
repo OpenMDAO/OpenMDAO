@@ -1,12 +1,9 @@
 """Functions for plotting the dynamic shapes dependency graph."""
 
-import os
-import sys
 import networkx as nx
 
 from openmdao.core.problem import Problem
 from openmdao.utils.mpi import MPI
-from openmdao.utils.general_utils import ignore_errors
 from openmdao.utils.file_utils import _load_and_exec
 import openmdao.utils.hooks as hooks
 from openmdao.utils.general_utils import common_subpath
@@ -56,8 +53,6 @@ def _view_dyn_shapes_cmd(options, user_args):
 
     # register the hooks
     hooks._register_hook('setup', 'Problem', pre=_set_dyn_hook, ncalls=1)
-
-    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 
@@ -99,7 +94,6 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
         raise RuntimeError("The view_dyn_shapes command requires matplotlib.")
 
     graph = system._shapes_graph
-    knowns = system._shape_knowns
 
     if graph is None:
         raise RuntimeError("Can't plot dynamic shape dependency graph because it hasn't been "
@@ -122,6 +116,8 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
 
     abs2meta = system._var_allprocs_abs2meta
 
+    dyn_names = ['shape_by_conn', 'compute_shape', 'copy_shape']
+
     # label variables with known shape at the start of the algorithm in green, unknowns in red.
     # prepend the shape onto the variable name
     node_colors = []
@@ -133,8 +129,10 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
             shape = '?'
             node_colors.append('red')
         else:
-            if meta.get('shape_by_conn', False) or meta.get('copy_shape', False):
-                node_colors.append('blue')
+            for shname in dyn_names:
+                if meta.get(shname, False):
+                    node_colors.append('blue')
+                    break
             else:
                 node_colors.append('green')
         node_labels[n] = f"{shape}: {n[common_idx:]}"

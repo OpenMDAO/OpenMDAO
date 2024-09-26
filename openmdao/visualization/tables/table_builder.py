@@ -8,8 +8,10 @@ import json
 import textwrap
 from itertools import zip_longest, chain
 from html import escape
+from dataclasses import dataclass
 from numbers import Number, Integral
 from openmdao.utils.notebook_utils import notebook, display, HTML, IFrame, colab
+from openmdao.utils.om_warnings import issue_warning
 
 
 _align2symbol = {
@@ -97,8 +99,10 @@ class TableBuilder(object):
         """
         Initialize all attributes.
         """
-        if headers == 'keys':
-            rows, headers = self._to_rows(rows)
+        if headers in ('keys', 'firstrow'):
+            rows, headers = self._to_rows(rows, headers)
+        elif isinstance(headers, str):
+            raise RuntimeError("If 'headers' is a string, it must be one of ['keys', 'firstrow'].")
 
         self._raw_rows = []
         for row in rows:
@@ -130,6 +134,8 @@ class TableBuilder(object):
                                    f"{hlen} != {self._ncols}.")
 
             for i, h in enumerate(headers):
+                if not isinstance(h, str):
+                    h = str(h)
                 self.update_column_meta(i, header=h)
 
         if column_meta is not None:
@@ -158,7 +164,7 @@ class TableBuilder(object):
         raise NotImplementedError("The display method is not defined for class "
                                   f"'{type(self).__name__}'.")
 
-    def _to_rows(self, rows):
+    def _to_rows(self, rows, headers):
         """
         Convert dict or iter of dicts into expected row and header data format.
 
@@ -166,6 +172,8 @@ class TableBuilder(object):
         ----------
         rows : dict or iter of dicts
             Table cell and header data.
+        headers : str
+            Either 'keys' or 'firstrow'.
 
         Returns
         -------
@@ -174,8 +182,19 @@ class TableBuilder(object):
         list of str
             Table headers.
         """
-        headers = []
         new_rows = []
+
+        if headers == 'firstrow':
+
+            for i, row in enumerate(rows):
+                if i == 0:
+                    headers = list(row)
+                else:
+                    new_rows.append(list(row))
+
+            return new_rows, headers
+
+        headers = []
 
         if isinstance(rows, dict):
             # each value is a column, so re-arrange to be row major, and allow columns of
@@ -325,9 +344,6 @@ class TableBuilder(object):
 
         meta = self._column_meta[col_idx]
         for name, val in options.items():
-            # if name not in self.allowed_col_meta:
-            #     raise KeyError(f"'{name}' is not a valid column metadata key. Allowed keys are "
-            #                    f"{sorted(self.allowed_col_meta)}.")
             meta[name] = val
 
     def _set_widths(self, force_set_max=False):
@@ -380,7 +396,7 @@ class TableBuilder(object):
         try:
             return meta['format'].format(cell)
         except Exception:
-            return '{}'.format(cell)
+            return f'{cell}'
 
     def _update_col_meta_from_rows(self):
         """
@@ -492,12 +508,85 @@ class TableBuilder(object):
         ----------
         outfile : str or None
             The output file.  If None, assume table should be sent to stdout.
+
+        Returns
+        -------
+        str or None
+            The output file name or None if written to stdout.
         """
         if outfile is None:
             sys.stdout.write(str(self))
         else:
             with open(outfile, 'w') as f:
                 f.write(str(self))
+            return outfile
+
+
+@dataclass(frozen=True)
+class Line:
+    """
+    Information about a line in the table.
+
+    Parameters
+    ----------
+    left : str
+        Left border string.
+    sep : str
+        Column separator.
+    right : str
+        Right border string.
+    hline : str
+        Horizontal line string.
+
+    Attributes
+    ----------
+    left : str
+        Left border string.
+    sep : str
+        Column separator.
+    right : str
+        Right border string.
+    hline : str
+        Horizontal line string.
+    """
+
+    left: str = ''
+    sep: str = ''
+    right: str = ''
+    hline: str = ''
+
+    def get_border_line(self, widths):
+        """
+        Return a border line given the column widths.
+
+        Parameters
+        ----------
+        widths : list of int
+            Column widths.
+
+        Returns
+        -------
+        str
+            The border line.
+        """
+        line = self.sep.join([(self.hline * w)[:w] for w in widths])
+        return ''.join((self.left, line, self.right))
+
+    def get_data_line(self, cells):
+        """
+        Return a table line containing the given cells.
+
+        Parameters
+        ----------
+        cells : list of str
+            Contents of table columns for the current row.
+
+        Returns
+        -------
+        str
+            The table line containing the cells, with separators and left and right borders.
+        """
+        return ''.join((self.left, self.sep.join(cells), self.right))
 
 
 class TextTableBuilder(TableBuilder):
@@ -508,57 +597,65 @@ class TextTableBuilder(TableBuilder):
     ----------
     rows : iter of iters
         Data used to fill table cells.
-    column_sep : str
-        Column separator string.
-    top_border : str
-        Top border character(s).
-    bottom_border : str
-        Bottom border character(s).
-    header_bottom_border : str
-        Header bottom border character(s).
-    left_border : str
-        Left border character(s).
-    right_border : str
-        Right border character(s).
+    top_border : Line
+        Top border info.
+    header_bottom_border : Line
+        Header bottom border info.
+    bottom_border : Line
+        Bottom border info.
+    header_line : Line
+        Header line info.
+    data_row_line : Line
+        Data row line info.
+    row_separator : Line or None
+        If not None, info for lines between data rows.
     **kwargs : dict
         Keyword args for the base class.
 
     Attributes
     ----------
-    column_sep : str
-        Column separator string.
-    top_border : str
-        Top border character(s).
-    bottom_border : str
-        Bottom border character(s).
-    header_bottom_border : str
-        Header bottom border character(s).
-    left_border : str
-        Left border character(s).
-    right_border : str
-        Right border character(s).
+    top_border : Line
+        Top border info.
+    header_bottom_border : Line
+        Header bottom border info.
+    bottom_border : Line
+        Bottom border info.
+    header_line : Line
+        Header line info.
+    data_row_line : Line
+        Data row line info.
+    row_separator : Line or None
+        If not None, info for lines between data rows.
     """
 
-    def __init__(self, rows, column_sep=' | ', top_border='-', bottom_border='-',
-                 header_bottom_border='-', left_border='| ', right_border=' |', **kwargs):
+    def __init__(self, rows,
+                 top_border=Line('| ', '---', ' |', '-'),
+                 header_bottom_border=Line('| ', ' | ', ' |', '-'),
+                 bottom_border=Line('| ', '---', ' |', '-'),
+                 header_line=Line('| ', ' | ', ' |'),
+                 data_row_line=Line('| ', ' | ', ' |'),
+                 row_separator=None,
+                 **kwargs):
         """
         Initialize all attributes.
         """
         super().__init__(rows, **kwargs)
 
-        self.column_sep = column_sep
         self.top_border = top_border
+        self.header_line = header_line
         self.header_bottom_border = header_bottom_border
         self.bottom_border = bottom_border
-        self.left_border = left_border
-        self.right_border = right_border
+        self.data_row_line = data_row_line
+        self.row_separator = row_separator
 
     def _get_total_width(self):
         """
         Return the total table width in characters.
         """
-        return sum(self._get_column_widths()) + len(self.column_sep) * (len(self._column_meta) - 1)\
-            + len(self.left_border) + len(self.right_border)
+        tot = sum(self._get_column_widths())
+        tot += (len(self._column_meta) - 1) * len(self.top_border.sep)
+        tot += len(self.top_border.left) + len(self.top_border.right)
+        return tot
 
     def _get_fixed_width_cell(self, col_meta, cell, width, align_name):
         """
@@ -589,7 +686,7 @@ class TextTableBuilder(TableBuilder):
                            f"metadata, but got '{align}'.")
         return f"{cell:{sym}{width}}"
 
-    def get_lengthened_columns(self, sorted_cols, header_cells):
+    def get_lengthened_columns(self, sorted_cols, header_cells, widths):
         """
         Yield as many rows of cells as needed to allow for multi-line cells due to word wrapping.
 
@@ -599,6 +696,8 @@ class TextTableBuilder(TableBuilder):
             List of sorted column metadata.
         header_cells : list of str
             List of header strings.
+        widths : list of int
+            Column widths.
 
         Yields
         ------
@@ -606,17 +705,22 @@ class TextTableBuilder(TableBuilder):
             Each row after expanding due to word wrapping.
         """
         cell_lists = []
-        for meta, cell in zip(sorted_cols, header_cells):
+        for meta, cell, wid in zip(sorted_cols, header_cells, widths):
             maxwid = meta['max_width']
             if maxwid is not None and maxwid < len(cell):
                 lines = textwrap.wrap(cell, maxwid)
-                sym = _align2symbol[meta['header_align']]
-                if sym == '^':  # center
-                    lines = [line.strip() for line in lines]
-                # ensure all cells have same width in this column
-                cell_lists.append([f"{line:{sym}{maxwid}}" for line in lines])
+                wid = maxwid
+            elif '\n' in cell:
+                lines = cell.split('\n')
             else:
                 cell_lists.append([cell])
+                continue
+
+            sym = _align2symbol[meta['header_align']]
+            if sym == '^':  # center
+                lines = [line.strip() for line in lines]
+            # ensure all cells have same width in this column
+            cell_lists.append([f"{line:{sym}{wid}}" for line in lines])
 
         # now find longest column
         maxlen = max([len(lst) for lst in cell_lists])
@@ -651,10 +755,7 @@ class TextTableBuilder(TableBuilder):
                 header_cells[i] = self._get_fixed_width_cell(meta, header, widths[i],
                                                              'header_align')
 
-        if self.needs_wrap():
-            yield from self.get_lengthened_columns(sorted_cols, header_cells)
-        else:
-            yield header_cells
+        yield from self.get_lengthened_columns(sorted_cols, header_cells, widths)
 
     def _stringified_row_iter(self):
         """
@@ -671,110 +772,94 @@ class TextTableBuilder(TableBuilder):
         widths = self._get_column_widths()
         row_cells = [None] * len(self._column_meta)
 
-        needs_wrap = self.needs_wrap()
         sorted_cols = self.sorted_meta()
 
         for row in self._get_formatted_rows():
             for i, meta in enumerate(sorted_cols):
                 row_cells[i] = self._get_fixed_width_cell(meta, row[i], widths[i], 'align')
 
-            if needs_wrap:
-                cell_lists = []
-                for meta, cell in zip(sorted_cols, row_cells):
-                    maxwid = meta['max_width']
-                    if maxwid is not None and maxwid < len(cell):
-                        lines = textwrap.wrap(cell, maxwid)
-                        sym = _align2symbol[meta['align']]
-                        if sym == '^':  # center
-                            lines = [line.strip() for line in lines]
-                        # ensure all cells have same width in this column
-                        cell_lists.append([f"{line:{sym}{maxwid}}" for line in lines])
+            cell_lists = []
+            for meta, cell, wid in zip(sorted_cols, row_cells, widths):
+                maxwid = meta['max_width']
+                if maxwid is not None and maxwid < len(cell):
+                    lines = textwrap.wrap(cell, maxwid)
+                    if not lines:  # empty cell or whitespace
+                        lines = ['']
+                    wid = maxwid
+                elif '\n' in cell:
+                    lines = cell.split('\n')
+                else:
+                    cell_lists.append([cell])
+                    continue
+
+                sym = _align2symbol[meta['align']]
+                if sym == '^':  # center
+                    lines = [line.strip() for line in lines]
+                # ensure all cells have same width in this column
+                cell_lists.append([f"{line:{sym}{wid}}" for line in lines])
+
+            # now find longest column
+            maxlen = max([len(lst) for lst in cell_lists])
+            cell_list_group = []
+            for r in range(maxlen):
+                cells = []
+                for clist in cell_lists:
+                    if len(clist) > r:
+                        cells.append(clist[r])
                     else:
-                        cell_lists.append([cell])
+                        w = len(clist[0]) if clist else 0
+                        cells.append(' ' * w)
+                cell_list_group.append(cells)
 
-                # now find longest column
-                maxlen = max([len(lst) for lst in cell_lists])
-                for r in range(maxlen):
-                    cells = []
-                    for clist in cell_lists:
-                        if len(clist) > r:
-                            cells.append(clist[r])
-                        else:
-                            w = len(clist[0]) if clist else 0
-                            cells.append(' ' * w)
-                    yield cells
-            else:
-                yield row_cells
+            yield cell_list_group
 
-    def add_side_borders(self, line):
-        """
-        Add side borders to the given line.
-
-        Parameters
-        ----------
-        line : str
-            The border will be added to this line.
-
-        Returns
-        -------
-        str
-            The line with side borders added.
-        """
-        if self.left_border or self.right_border:
-            parts = [p for p in (self.left_border, line, self.right_border) if p]
-            return ''.join(parts)
-        return line
-
-    def get_top_border(self, header_cells):
+    def get_top_border(self, widths):
         """
         Return the top border string for this table.
 
         Parameters
         ----------
-        header_cells : list of str
-            The list of header cells.
+        widths : list of int
+            Column widths.
 
         Returns
         -------
         str
             The top border string.
         """
-        width = sum(len(h) for h in header_cells) + len(self.column_sep) * (len(header_cells) - 1)
-        return (self.top_border * width)[:width]
+        return self.top_border.get_border_line(widths)
 
-    def get_header_bottom_border(self, header_cells):
+    def get_header_bottom_border(self, widths):
         """
         Return the header bottom border string for this table.
 
         Parameters
         ----------
-        header_cells : list of str
-            The list of header cells.
+        widths : list of int
+            Column widths.
 
         Returns
         -------
         str
             The header bottom border string.
         """
-        parts = [(self.header_bottom_border * len(h))[:len(h)] for h in header_cells]
-        return self.column_sep.join(parts)
+        return self.header_bottom_border.get_border_line(widths)
 
-    def get_bottom_border(self, header_cells):
+    def get_bottom_border(self, widths):
         """
         Return the bottom border string for this table.
 
         Parameters
         ----------
-        header_cells : list of str
-            The list of header cells.
+        widths : list of int
+            List of column widths.
 
         Returns
         -------
         str
             The bottom border string.
         """
-        parts = [(self.bottom_border * len(h))[:len(h)] for h in header_cells]
-        return self.column_sep.join(parts)
+        return self.bottom_border.get_border_line(widths)
 
     def __str__(self):
         """
@@ -788,22 +873,30 @@ class TextTableBuilder(TableBuilder):
         header_lines = []
         data_lines = []
         row_cells = None
-        for row_cells in self._stringified_row_iter():
-            data_lines.append(self.add_side_borders(self.column_sep.join(row_cells)))
+        row_list = list(self._stringified_row_iter())
+        if row_list:
+            widths = [len(c) for c in row_list[0][0]]
+        else:
+            widths = []
+
+        for i, cell_list_group in enumerate(row_list):
+            if i > 0 and self.row_separator:
+                data_lines.append(self.row_separator.get_border_line(widths))
+            for row_cells in cell_list_group:
+                data_lines.append(self.data_row_line.get_data_line(row_cells))
 
         if self.bottom_border:
-            data_lines.append(self.add_side_borders(self.get_bottom_border(row_cells)))
+            data_lines.append(self.get_bottom_border(widths))
 
         if row_cells is not None and self.top_border:
-            header_lines.append(self.add_side_borders(self.get_top_border(row_cells)))
+            header_lines.append(self.get_top_border(widths))
 
         if sum(self._header_widths) > 0:
-            for i, header_cells in enumerate(self._stringified_header_iter()):
-                header_lines.append(self.add_side_borders(self.column_sep.join(header_cells)))
+            for header_cells in self._stringified_header_iter():
+                header_lines.append(self.header_line.get_data_line(header_cells))
 
             if self.header_bottom_border:
-                bottom = self.add_side_borders(self.get_header_bottom_border(header_cells))
-                header_lines.append(bottom)
+                header_lines.append(self.get_header_bottom_border(widths))
 
         return '\n'.join(chain(header_lines, data_lines))
 
@@ -815,51 +908,22 @@ class TextTableBuilder(TableBuilder):
         ----------
         outfile : str or None
             If None, print this table to stdout, else write it to the named file.
+
+        Returns
+        -------
+        str or None
+            The name of the file where the table was written, or None if it was written to stdout.
         """
         if outfile is None:
             sys.stdout.write(str(self))
             sys.stdout.write('\n')
-        else:
-            with open(outfile, 'w') as f:
-                f.write(str(self))
-                f.write('\n')
+            return
 
+        with open(outfile, 'w') as f:
+            f.write(str(self))
+            f.write('\n')
 
-class RSTTableBuilder(TextTableBuilder):
-    r"""
-    Class that generates an RST table.
-
-    Parameters
-    ----------
-    rows : iter of iters
-        Data used to fill table cells.
-    **kwargs : dict
-        Keyword args for the base class.
-    """
-
-    def __init__(self, rows, **kwargs):
-        """
-        Initialize all attributes.
-        """
-        super().__init__(rows, column_sep='  ', top_border='=', header_bottom_border='=',
-                         bottom_border='=', left_border='', right_border='', **kwargs)
-
-    def get_top_border(self, header_cells):
-        """
-        Return the top border string.
-
-        Parameters
-        ----------
-        header_cells : list of str
-            List of header cells.
-
-        Returns
-        -------
-        str
-            The top border string.
-        """
-        parts = [(self.top_border * len(h))[:len(h)] for h in header_cells]
-        return self.column_sep.join(parts)
+        return outfile
 
 
 class GithubTableBuilder(TextTableBuilder):
@@ -878,20 +942,24 @@ class GithubTableBuilder(TextTableBuilder):
         """
         Initialize all attributes.
         """
-        super().__init__(rows, column_sep=' | ', top_border='', header_bottom_border='-',
-                         bottom_border='', left_border='| ', right_border=' |', **kwargs)
+        super().__init__(rows,
+                         top_border=None,
+                         header_bottom_border=Line('| ', ' | ', ' |', '-'),
+                         bottom_border=None,
+                         header_line=Line('| ', ' | ', ' |'),
+                         data_row_line=Line('| ', ' | ', ' |'), **kwargs)
 
     def _repr_markdown_(self):
         return str(self)
 
-    def get_header_bottom_border(self, header_cells):
+    def get_header_bottom_border(self, widths):
         """
         Return the header bottom border string.
 
         Parameters
         ----------
-        header_cells : list of str
-            List of header cells.
+        widths : list of int
+            Column widths.
 
         Returns
         -------
@@ -899,11 +967,11 @@ class GithubTableBuilder(TextTableBuilder):
             The header bottom border string.
         """
         parts = []
-        for i, cell in enumerate(header_cells):
+        for i, width in enumerate(widths):
             meta = self._column_meta[i]
             align = meta['align']
             left = right = ''
-            size = len(cell)
+            size = width
             if align == 'left':
                 left = ':'
                 size -= 1
@@ -913,9 +981,10 @@ class GithubTableBuilder(TextTableBuilder):
             else:  # center
                 left = right = ':'
                 size -= 2
-            parts.append(left + (self.header_bottom_border * size) + right)
+            parts.append(left + (self.header_bottom_border.hline * size) + right)
 
-        return self.column_sep.join(parts)
+        return ''.join((self.header_bottom_border.left, self.header_bottom_border.sep.join(parts),
+                        self.header_bottom_border.right))
 
     def needs_wrap(self):
         """
@@ -1127,11 +1196,17 @@ class HTMLTableBuilder(TableBuilder):
         ----------
         outfile : str
             The output file where the HTML will be written.
+
+        Returns
+        -------
+        str
+            The name of the file where the table was written.
         """
         with open(outfile, 'w', encoding='utf-8') as f:
             f.write(str(self))
+        return outfile
 
-    def display(self, outfile=_default_html_table):
+    def display(self, outfile=None):
         """
         Display this table, either in a notebook or a browser.
 
@@ -1140,9 +1215,18 @@ class HTMLTableBuilder(TableBuilder):
 
         Parameters
         ----------
-        outfile : str
+        outfile : str or None
             Table will be written to this file.
+            If None, write this table to '{_default_html_table}'.
+
+        Returns
+        -------
+        str
+            The name of the file where the table was written.
         """
+        if outfile is None:
+            outfile = _default_html_table
+
         self.write(outfile)
 
         if notebook:
@@ -1155,6 +1239,8 @@ class HTMLTableBuilder(TableBuilder):
             # open it up in the browser
             from openmdao.utils.webview import webview
             webview(outfile)
+
+        return outfile
 
 
 _tabulator_typemeta = {
@@ -1238,7 +1324,10 @@ class TabulatorJSBuilder(TableBuilder):
         'filter',
         'header_align',
         'sorter',
-        'formatter'
+        'formatter',
+        'formatterParams',
+        'labelField',
+        'target',
     })
 
     def __init__(self, rows, html_id='tabul-table', title='', filter=True, sort=True, center=False,
@@ -1423,6 +1512,12 @@ class TabulatorJSBuilder(TableBuilder):
     def _setup_fit_columns_layout(self):
         smeta = self.sorted_meta()
         maxws = [m['max_width'] for m in smeta]
+        if None in maxws:
+            issue_warning("Can't use 'layout' of 'fitColumns' with columns that have no "
+                          "max_width set. Switching to layout of 'fitDataTable'.")
+            self._table_meta['layout'] = 'fitDataTable'
+            return
+
         mx = sum(maxws)
         pcts = [int(w / mx * 100) for w in maxws]
         rempcts = 100 - sum(pcts)
@@ -1448,11 +1543,18 @@ class TabulatorJSBuilder(TableBuilder):
         ----------
         outfile : str or None
             If not None, the output file where the HTML will be written.
+
+        Returns
+        -------
+        str
+            The output file name.
         """
         outfile = os.path.relpath(outfile)
 
         with open(outfile, 'w', encoding='utf-8') as f:
             f.write(str(self))
+
+        return outfile
 
     def __str__(self):
         """
@@ -1479,12 +1581,12 @@ class TabulatorJSBuilder(TableBuilder):
                   encoding='utf-8') as f:
             template = f.read()
 
-        with open(os.path.join(libs_dir, 'tabulator.min.js'), "r", encoding='utf-8') as f:
+        with open(os.path.join(libs_dir, 'tabulator.5.4.4.min.js'), "r", encoding='utf-8') as f:
             tabulator_src = f.read()
 
         format_dct['tabulator_src'] = tabulator_src
 
-        with open(os.path.join(style_dir, 'tabulator.min.css'), "r", encoding='utf-8') as f:
+        with open(os.path.join(style_dir, 'tabulator.5.4.4.min.css'), "r", encoding='utf-8') as f:
             tabulator_style = f.read()
 
         format_dct['tabulator_style'] = tabulator_style
@@ -1505,6 +1607,11 @@ class TabulatorJSBuilder(TableBuilder):
         ----------
         outfile : str or None
             If None, write this table to '{_default_tabulator_file}'.
+
+        Returns
+        -------
+        str
+            The name of the file where the table was written.
         """
         if outfile is None:
             outfile = _default_tabulator_file
@@ -1521,21 +1628,7 @@ class TabulatorJSBuilder(TableBuilder):
             from openmdao.utils.webview import webview
             webview(outfile)
 
-
-def _fmt2class(tablefmt):
-    _table_types = {
-        'text': TextTableBuilder,
-        'github': GithubTableBuilder,
-        'rst': RSTTableBuilder,
-        'tabulator': TabulatorJSBuilder,
-        'html': HTMLTableBuilder,
-    }
-
-    try:
-        return _table_types[tablefmt]
-    except Exception:
-        raise KeyError(f"'{tablefmt}' is not a valid type choice for generate_table. Valid "
-                       f"choices are: {sorted(_table_types)}.")
+        return outfile
 
 
 def generate_table(rows, tablefmt='text', **options):
@@ -1556,4 +1649,79 @@ def generate_table(rows, tablefmt='text', **options):
     TableBuilder
         A table builder object.
     """
-    return _fmt2class(tablefmt)(rows, **options)
+    _text_formats = {
+        'rst': {
+            'top_border': Line('', '  ', '', '='),
+            'header_line': Line('', '  ', ''),
+            'header_bottom_border': Line('', '  ', '', '='),
+            'bottom_border': Line('', '  ', '', '='),
+            'data_row_line': Line('', '  ', '')
+        },
+        'grid': {
+            'top_border': Line('+-', '-+-', '-+', '-'),
+            'header_line': Line('| ', ' | ', ' |'),
+            'header_bottom_border': Line('+=', '=+=', '=+', '='),
+            'bottom_border': Line('+-', '-+-', '-+', '-'),
+            'data_row_line': Line('| ', ' | ', ' |'),
+            'row_separator': Line('+-', '-+-', '-+', '-')
+        },
+        'simple_grid': {
+            'top_border': Line("┌─", "─┬─", "─┐", "─"),
+            'header_line': Line("│ ", " │ ", " │"),
+            'header_bottom_border': Line("├─", "─┼─", "─┤", "─"),
+            'row_separator': Line("├─", "─┼─", "─┤", "─"),
+            'bottom_border': Line("└─", "─┴─", "─┘", "─"),
+            'data_row_line': Line("│ ", " │ ", " │"),
+        },
+        'heavy_grid': {
+            'top_border': Line("┏━", "━┳━", "━┓", "━"),
+            'header_line': Line("┃ ", " ┃ ", " ┃"),
+            'header_bottom_border': Line("┣━", "━╋━", "━┫", "━"),
+            'row_separator': Line("┣━", "━╋━", "━┫", "━"),
+            'bottom_border': Line("┗━", "━┻━", "━┛", "━"),
+            'data_row_line': Line("┃ ", " ┃ ", " ┃"),
+        },
+        'double_grid': {
+            'top_border': Line("╔═", "═╦═", "═╗", "═"),
+            'header_line': Line("║ ", " ║ ", " ║"),
+            'header_bottom_border': Line("╠═", "═╬═", "═╣", "═"),
+            'row_separator': Line("╠═", "═╬═", "═╣", "═"),
+            'bottom_border': Line("╚═", "═╩═", "═╝", "═"),
+            'data_row_line': Line("║ ", " ║ ", " ║"),
+        },
+        'box_grid': {
+            'top_border': Line("╔═", "═╤═", "═╗", "═"),
+            'header_line': Line("║ ", " ┊ ", " ║"),
+            'header_bottom_border': Line("╠═", "═╪═", "═╣", "═"),
+            'row_separator': Line("╟┈", "┈┿┈", "┈╢", "┈"),
+            'bottom_border': Line("╚═", "═╧═", "═╝", "═"),
+            'data_row_line': Line("║ ", " ┊ ", " ║"),
+        },
+    }
+
+    for fmt in list(_text_formats):
+        if 'grid' in fmt:
+            dct = _text_formats[fmt].copy()
+            dct['row_separator'] = None
+            _text_formats[fmt.replace('grid', 'outline')] = dct
+
+    _table_types = {
+        'text': TextTableBuilder,
+        'github': GithubTableBuilder,
+        'tabulator': TabulatorJSBuilder,
+        'html': HTMLTableBuilder,
+    }
+
+    if tablefmt in _text_formats:
+        kwargs = _text_formats[tablefmt].copy()
+        kwargs['rows'] = rows
+        kwargs.update(**options)
+        return TextTableBuilder(**kwargs)
+
+    try:
+        builder = _table_types[tablefmt]
+    except Exception:
+        raise KeyError(f"'{tablefmt}' is not a valid type choice for generate_table. Valid "
+                       f"choices are: {sorted(_table_types)}.")
+
+    return builder(rows, **options)

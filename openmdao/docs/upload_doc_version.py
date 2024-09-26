@@ -1,7 +1,7 @@
 import sys
 import subprocess
-import pipes
-import os
+from packaging.version import Version
+from warnings import warn
 
 
 def get_tag_info():
@@ -11,24 +11,25 @@ def get_tag_info():
     # using a pattern to only grab tags that are in version format "X.Y.Z"
     git_versions = subprocess.Popen(['git', 'tag', '-l', '*.*.*'],  # nosec: trusted input
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    cmd_out, cmd_err = git_versions.communicate()
+    cmd_out, _ = git_versions.communicate()
 
     cmd_out = cmd_out.decode('utf8')
     # take the output of git tag -l *.*.*, and split it from one string into a list.
     version_tags = cmd_out.split()
 
     if not version_tags:
-        raise Exception('No tags found in repository')
+        warn('No tags found in repository')
+        return None, None
 
     # use sort to put the versions list in order from lowest to highest
-    version_tags.sort(key=lambda s: [int(u) for u in s.split('.')])
+    version_tags.sort(key=Version)
 
     # grab the highest tag that this repo knows about
     latest_tag = version_tags[-1]
 
     cmd = subprocess.Popen(['git', 'rev-list', '-1', latest_tag, '-s'],  # nosec: trusted input
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    cmd_out, cmd_err = cmd.communicate()
+    cmd_out, _ = cmd.communicate()
 
     cmd_out = cmd_out.decode('utf8')
     commit_id = cmd_out.strip()
@@ -42,7 +43,7 @@ def get_commit_info():
     """
     git_commit = subprocess.Popen(['git', 'show', '--pretty=oneline', '-s'],  # nosec: trusted input
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    cmd_out, cmd_err = git_commit.communicate()
+    cmd_out, _ = git_commit.communicate()
 
     cmd_out = cmd_out.decode('utf8')
     commit_id = cmd_out.split()[0]
@@ -59,7 +60,7 @@ def get_doc_version():
 
     current_commit = get_commit_info()
 
-    if current_commit == release_commit:
+    if release_tag is not None and current_commit == release_commit:
         return release_tag, 1
     else:
         return current_commit, 0
@@ -103,7 +104,7 @@ def upload_doc_version(source_dir, destination, *args):
 
     try:
         subprocess.run(cmd, shell=True, check=True)  # nosec: trusted input
-    except:
+    except Exception:
         raise Exception('Doc transfer failed.')
     else:
         print("Uploaded documentation for", name if rel else "latest")

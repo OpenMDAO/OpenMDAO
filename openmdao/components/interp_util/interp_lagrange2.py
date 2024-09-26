@@ -233,13 +233,13 @@ class InterpLagrange2Semi(InterpAlgorithmSemi):
                 # All other cases, we are in an extrapolation sub-region.
                 extrap = True
 
-        xx1 = x[0] - grid[idx]
-        xx2 = x[0] - grid[idx + 1]
-        xx3 = x[0] - grid[idx + 2]
+        xx1 = (x[0] - grid[idx]).item()
+        xx2 = (x[0] - grid[idx + 1]).item()
+        xx3 = (x[0] - grid[idx + 2]).item()
 
-        c12 = grid[idx] - grid[idx + 1]
-        c13 = grid[idx] - grid[idx + 2]
-        c23 = grid[idx + 1] - grid[idx + 2]
+        c12 = (grid[idx] - grid[idx + 1]).item()
+        c13 = (grid[idx] - grid[idx + 2]).item()
+        c23 = (grid[idx + 1] - grid[idx + 2]).item()
 
         if subtables is not None:
 

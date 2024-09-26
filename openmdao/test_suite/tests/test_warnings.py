@@ -95,9 +95,9 @@ class TestWarnings(unittest.TestCase):
         p.model.connect('a_comp.z', 'exec_comp.z')
         p.driver.declare_coloring()
 
-        warnings.filterwarnings('ignore', category=om.UnitsWarning)
-
         with warnings.catch_warnings(record=True) as w:
+            warnings.filterwarnings('ignore', category=om.UnitsWarning)
+
             p.setup()
             unit_warnings = [wm for wm in w if wm.category is om.UnitsWarning]
             assert (len(unit_warnings) == 0)
@@ -128,7 +128,7 @@ class TestWarnings(unittest.TestCase):
                 outputs['y'] = inputs['a'] * inputs['x'] + inputs['b']
                 outputs['z'] = inputs['b'] * inputs['x']
 
-        p = om.Problem()
+        p = om.Problem(name='error_on_openmdao_warning')
 
         p.model.add_subsystem('a_comp', AComp())
         p.model.add_subsystem('exec_comp',
@@ -141,14 +141,14 @@ class TestWarnings(unittest.TestCase):
         p.model.connect('a_comp.z', 'exec_comp.z')
         p.driver.declare_coloring()
 
-        warnings.filterwarnings('error', category=om.OpenMDAOWarning)
+        with warnings.catch_warnings():
+            warnings.filterwarnings('error', category=om.OpenMDAOWarning)
 
-        with self.assertRaises(om.UnitsWarning) as e:
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", r'.*OpenMDAO support for Python version .* will end soon.*')
+            with self.assertRaises(Exception) as e:
                 p.setup()
 
-        expected = "<model> <class Group>: Output 'a_comp.y' with units of 'm' is connected to " \
+        expected = "\nCollected errors for problem 'error_on_openmdao_warning':" \
+                   "\n   <model> <class Group>: Output 'a_comp.y' with units of 'm' is connected to " \
                    "input 'exec_comp.y' which has no units."
 
         self.assertEqual(expected, str(e.exception), )

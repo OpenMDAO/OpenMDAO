@@ -1,4 +1,4 @@
-""" Unit tests for the SimpleGADriver Driver."""
+""" Unit tests for SimpleGADriver."""
 
 import unittest
 import os
@@ -19,7 +19,7 @@ from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
 
 from openmdao.utils.general_utils import run_driver
 from openmdao.utils.testing_utils import use_tempdirs
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 try:
     from parameterized import parameterized
 except ImportError:
@@ -31,6 +31,11 @@ try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
     PETScVector = None
+
+try:
+    import pyDOE3
+except ImportError:
+    pyDOE3 = None
 
 extra_prints = False  # enable printing results
 
@@ -47,6 +52,30 @@ def _test_func_name(func, num, param):
     return func.__name__ + '_' + '_'.join(args)
 
 
+class TestErrors(unittest.TestCase):
+
+    @unittest.skipIf(pyDOE3, "only runs if 'pyDOE3' is not installed")
+    def test_no_pyDOE3(self):
+        with self.assertRaises(RuntimeError) as err:
+            GeneticAlgorithm(lambda: 0)
+
+        self.assertEqual(str(err.exception),
+                         "GeneticAlgorithm requires the 'pyDOE3' package, "
+                         "which can be installed with one of the following commands:\n"
+                         "    pip install openmdao[doe]\n"
+                         "    pip install pyDOE3")
+
+        with self.assertRaises(RuntimeError) as err:
+            om.SimpleGADriver()
+
+        self.assertEqual(str(err.exception),
+                         "SimpleGADriver requires the 'pyDOE3' package, "
+                         "which can be installed with one of the following commands:\n"
+                         "    pip install openmdao[doe]\n"
+                         "    pip install pyDOE3")
+
+
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
 class TestSimpleGA(unittest.TestCase):
 
     def setUp(self):
@@ -135,10 +164,10 @@ class TestSimpleGA(unittest.TestCase):
 
         # Optimal solution
         assert_near_equal(prob['comp.f'], 0.49399549, 1e-4)
-        self.assertTrue(int(prob['xI']) in [3, -3])
+        self.assertTrue(int(prob['xI'].item()) in [3, -3])
 
     def test_mixed_integer_branin_discrete(self):
-        prob = om.Problem()
+        prob = om.Problem(reports=('optimizer',))
         model = prob.model
 
         indep = om.IndepVarComp()
@@ -389,7 +418,7 @@ class TestSimpleGA(unittest.TestCase):
 
         indeps = prob.model.add_subsystem('indeps', om.IndepVarComp())
         indeps.add_output('x', 3)
-        indeps.add_output('y', [4.0, -4])
+        indeps.add_output('y', [4.0, 1.0])
 
         prob.model.add_subsystem('paraboloid1',
                                  om.ExecComp('f = (x+5)**2- 3'))
@@ -436,6 +465,55 @@ class TestSimpleGA(unittest.TestCase):
 
         self.assertEqual(exception.args[0], msg)
 
+    def test_scipy_invalid_desvar_values(self):
+
+        expected_err = ("The following design variable initial conditions are out of their specified "
+                        "bounds:"
+                        "\n  xI"
+                        "\n    val: [-6.]"
+                        "\n    lower: -5.0"
+                        "\n    upper: 10.0"
+                        "\n  xC"
+                        "\n    val: [15.1]"
+                        "\n    lower: 0.0"
+                        "\n    upper: 15.0"
+                        "\nSet the initial value of the design variable to a valid value or set "
+                        "the driver option['invalid_desvar_behavior'] to 'ignore'.")
+
+        for option in ['warn', 'raise', 'ignore']:
+            with self.subTest(f'invalid_desvar_behavior = {option}'):
+
+                # build the model
+                prob = om.Problem()
+                model = prob.model
+
+                model.add_subsystem('comp', Branin(),
+                                    promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
+
+                model.add_design_var('xI', lower=-5.0, upper=10.0)
+                model.add_design_var('xC', lower=0.0, upper=15.0)
+                model.add_objective('comp.f')
+
+                prob.driver = om.SimpleGADriver(invalid_desvar_behavior=option)
+                prob.driver.options['bits'] = {'xC': 8}
+                prob.driver.options['pop_size'] = 10
+
+                prob.setup()
+
+                prob.set_val('xC', 15.1)
+                prob.set_val('xI', -6)
+
+                # run the optimization
+                if option == 'ignore':
+                    prob.run_driver()
+                elif option == 'raise':
+                    with self.assertRaises(ValueError) as ctx:
+                        prob.run_driver()
+                    self.assertEqual(str(ctx.exception), expected_err)
+                else:
+                    with assert_warning(om.DriverWarning, expected_err):
+                        prob.run_driver()
+
     @parameterized.expand([
         (None, None),
         (INF_BOUND, INF_BOUND),
@@ -463,12 +541,12 @@ class TestSimpleGA(unittest.TestCase):
             prob.final_setup()
 
         # A value of None for lower and upper is changed to +/- INF_BOUND in add_design_var()
-        if lower == None:
+        if lower is None:
             lower = -INF_BOUND
-        if upper == None:
+        if upper is None:
             upper = INF_BOUND
 
-        msg = ("Invalid bounds for design variable 'x.x'. When using "
+        msg = ("Invalid bounds for design variable 'x'. When using "
                "SimpleGADriver, values for both 'lower' and 'upper' "
                f"must be specified between +/-INF_BOUND ({INF_BOUND}), "
                f"but they are: lower={lower}, upper={upper}.")
@@ -502,6 +580,7 @@ class TestSimpleGA(unittest.TestCase):
             self.assertLessEqual(1.0, prob["x"][i])
 
 
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
 class TestDriverOptionsSimpleGA(unittest.TestCase):
 
     def setUp(self):
@@ -551,6 +630,7 @@ class Box(om.ExplicitComponent):
         outputs['volume'] = length*height*width
 
 
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
 class TestMultiObjectiveSimpleGA(unittest.TestCase):
 
     def setUp(self):
@@ -573,8 +653,8 @@ class TestMultiObjectiveSimpleGA(unittest.TestCase):
         prob.driver.options['bits'] = {'length': 8, 'width': 8, 'height': 8}
         prob.driver.options['multi_obj_exponent'] = 1.
         prob.driver.options['penalty_parameter'] = 10.
-        prob.driver.options['multi_obj_weights'] = {'box.front_area': 0.1,
-                                                    'box.top_area': 0.9}
+        prob.driver.options['multi_obj_weights'] = {'front_area': 0.1,
+                                                    'top_area': 0.9}
         prob.driver.options['multi_obj_exponent'] = 1
 
         prob.model.add_design_var('length', lower=0.1, upper=2.)
@@ -614,8 +694,8 @@ class TestMultiObjectiveSimpleGA(unittest.TestCase):
         prob2.driver.options['bits'] = {'length': 8, 'width': 8, 'height': 8}
         prob2.driver.options['multi_obj_exponent'] = 1.
         prob2.driver.options['penalty_parameter'] = 10.
-        prob2.driver.options['multi_obj_weights'] = {'box.front_area': 0.9,
-                                                     'box.top_area': 0.1}
+        prob2.driver.options['multi_obj_weights'] = {'front_area': 0.9,
+                                                     'top_area': 0.1}
         prob2.driver.options['multi_obj_exponent'] = 1
 
         prob2.model.add_design_var('length', lower=0.1, upper=2.)
@@ -682,6 +762,7 @@ class TestMultiObjectiveSimpleGA(unittest.TestCase):
         self.assertTrue(np.all(sorted_obj[:-1, 1] >= sorted_obj[1:, 1]))
 
 
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
 class TestConstrainedSimpleGA(unittest.TestCase):
 
     def setUp(self):
@@ -747,10 +828,10 @@ class TestConstrainedSimpleGA(unittest.TestCase):
 
         prob = om.Problem()
 
-        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
 
         # setup the optimization
-        driver = prob.driver = om.SimpleGADriver()
+        prob.driver = om.SimpleGADriver()
 
         with self.assertRaises(KeyError) as raises_msg:
             prob.driver.supports['equality_constraints'] = False
@@ -957,9 +1038,9 @@ class TestConstrainedSimpleGA(unittest.TestCase):
             prob.final_setup()
 
         # A value of None for lower and upper is changed to +/- INF_BOUND in add_constraint()
-        if lower == None:
+        if lower is None:
             lower = -INF_BOUND
-        if upper == None:
+        if upper is None:
             upper = INF_BOUND
 
         msg = ("Invalid bounds for constraint 'const.g'. "
@@ -973,6 +1054,7 @@ class TestConstrainedSimpleGA(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
 class MPITestSimpleGA(unittest.TestCase):
 
     N_PROCS = 2
@@ -1152,18 +1234,7 @@ class MPITestSimpleGA(unittest.TestCase):
 
 class D1(om.ExplicitComponent):
     def setup(self):
-        comm = self.comm
-        rank = comm.rank
-
-        if rank == 1:
-            start = 1
-            end = 2
-        else:
-            start = 0
-            end = 1
-
-        self.add_input('y2', np.ones((1, ), float), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
+        self.add_input('y2', np.ones((1, ), float), distributed=True)
         self.add_input('x', np.ones((1, ), float), distributed=True)
 
         self.add_output('y1', np.ones((1, ), float), distributed=True)
@@ -1180,9 +1251,6 @@ class D1(om.ExplicitComponent):
             outputs['y1'] = 28.0 - 0.2*y2 + x
 
     def compute_partials(self, inputs, partials, discrete_inputs=None):
-        y2 = inputs['y2']
-        x = inputs['x']
-
         partials['y1', 'y2'] = -0.2
         if self.comm.rank == 1:
             partials['y1', 'x'] = 2.0
@@ -1192,18 +1260,7 @@ class D1(om.ExplicitComponent):
 
 class D2(om.ExplicitComponent):
     def setup(self):
-        comm = self.comm
-        rank = comm.rank
-
-        if rank == 1:
-            start = 1
-            end = 2
-        else:
-            start = 0
-            end = 1
-
-        self.add_input('y1', np.ones((1, ), float), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
+        self.add_input('y1', np.ones((1, ), float), distributed=True)
 
         self.add_output('y2', np.ones((1, ), float), distributed=True)
 
@@ -1213,7 +1270,7 @@ class D2(om.ExplicitComponent):
         y1 = inputs['y1']
 
         if self.comm.rank == 1:
-            outputs['y2'] = y2 = y1**.5 - 3
+            outputs['y2'] = y1**.5 - 3
         else:
             outputs['y2'] = y1**.5 + 7
 
@@ -1236,6 +1293,7 @@ class Summer(om.ExplicitComponent):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
 @use_tempdirs
 class MPITestSimpleGA4Procs(unittest.TestCase):
 
@@ -1322,6 +1380,10 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
 
                 self.add_subsystem('comp', om.ExecComp(['f = x + y + z']))
 
+                self.connect('p1.x', 'comp.x')
+                self.connect('p2.y', 'comp.y')
+                self.connect('p3.z', 'comp.z')
+
                 self.add_design_var('p1.x', lower=-100, upper=100)
                 self.add_design_var('p2.y', lower=-100, upper=100)
                 self.add_design_var('p3.z', lower=-100, upper=100)
@@ -1347,8 +1409,22 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
 
         model.add_subsystem('p', om.IndepVarComp('x', 3.0), promotes=['x'])
 
-        model.add_subsystem('d1', D1(), promotes=['*'])
-        model.add_subsystem('d2', D2(), promotes=['*'])
+        comm = prob.comm
+        rank = comm.rank
+
+        if rank == 1:
+            start = 1
+            end = 2
+        else:
+            start = 0
+            end = 1
+
+        model.add_subsystem('d1', D1(), promotes_outputs=['*'])
+        model.promotes('d1', inputs=['x'])
+        model.promotes('d1', inputs=['y2'], src_indices=np.arange(start, end, dtype=int))
+
+        model.add_subsystem('d2', D2(), promotes_outputs=['*'])
+        model.promotes('d2', inputs=['y1'], src_indices=np.arange(start, end, dtype=int))
 
         model.add_subsystem('obj_comp', Summer(), promotes_outputs=['*'])
         model.promotes('obj_comp', inputs=['*'], src_indices=om.slicer[:])
@@ -1381,10 +1457,10 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
         # a separate case file should have been written by rank 0 of each parallel model
         # (the top two global ranks)
         rank = prob.comm.rank
-        filename = "cases.sql_%d" % rank
+        filename = prob.get_outputs_dir() / f"cases.sql_{rank}"
 
         if rank < num_models:
-            expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
+            expect_msg = f"Cases from rank {rank} are being written to {filename}."
             self.assertTrue(expect_msg in output)
 
             cr = om.CaseReader(filename)
@@ -1441,6 +1517,7 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
         assert_near_equal(np.sum(prob.get_val('f_xy', get_remote=True))/3, -23.1333, 0.15)
 
 
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
 class TestFeatureSimpleGA(unittest.TestCase):
 
     def setUp(self):
@@ -1674,6 +1751,7 @@ class TestFeatureSimpleGA(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
 class MPIFeatureTests(unittest.TestCase):
     N_PROCS = 2
 

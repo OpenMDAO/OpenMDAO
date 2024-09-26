@@ -1,6 +1,7 @@
 import unittest
 import tracemalloc
 import gc
+import os
 import os.path
 
 import openmdao.api as om
@@ -15,6 +16,8 @@ ITERS = [ 10, 100 ]
 # 0.2 KiB.
 MAX_MEM_DIFF_KB = 200
 
+
+@unittest.skipIf(os.environ.get('COVERAGE_RUN') == 'true', "Invalid when running with coverage.")
 class TestSetupMemLeak(unittest.TestCase):
     """ Test for memory leaks when calling setup() multiple times """
 
@@ -29,7 +32,6 @@ class TestSetupMemLeak(unittest.TestCase):
 
         for memtest in ITERS:
             prob.model = SellarMDA()
-            snapshots = []
 
             for i in range(memtest):
                 prob.setup(check=False) # called here causes memory leak
@@ -41,9 +43,11 @@ class TestSetupMemLeak(unittest.TestCase):
                 # Force garbage collection now instead of waiting for an
                 # optimal/arbitrary point since we're tracking memory usage
                 gc.collect()
-                snapshots.append(tracemalloc.take_snapshot())
+                if i == 0:
+                    snapshot0 = tracemalloc.take_snapshot()
 
-            top_stats = snapshots[memtest - 1].compare_to(snapshots[0], 'lineno')
+            snapshot = tracemalloc.take_snapshot()
+            top_stats = snapshot.compare_to(snapshot0, 'lineno')
 
             total_mem = 0
             for stat in top_stats:

@@ -4,7 +4,8 @@ import unittest
 import numpy as np
 from openmdao.api import Problem, Group, ExecComp, IndepVarComp, DirectSolver, ParallelGroup
 from openmdao.utils.mpi import MPI
-
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.om_warnings import OpenMDAOWarning
 try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
@@ -124,7 +125,6 @@ class TestGetSetVariables(unittest.TestCase):
         with self.assertRaises(KeyError) as ctx:
             p['x'] = 5.0
         self.assertEqual(str(ctx.exception), msg.format('x'))
-        p._initial_condition_cache = {}
 
         with self.assertRaises(KeyError) as ctx:
             p['x']
@@ -134,7 +134,6 @@ class TestGetSetVariables(unittest.TestCase):
         with self.assertRaises(KeyError) as ctx:
             p['y'] = 5.0
         self.assertEqual(str(ctx.exception), msg.format('y'))
-        p._initial_condition_cache = {}
 
         with self.assertRaises(KeyError) as ctx:
             p['y']
@@ -339,7 +338,7 @@ class TestGetSetVariables(unittest.TestCase):
         np.testing.assert_allclose(p['C2.y'], np.ones(3) * 9.)
 
     def test_serial_multi_src_inds_units_promoted_no_src(self):
-        p = Problem()
+        p = Problem(name='serial_multi_src_inds_units_promoted_no_src')
         p.model.add_subsystem('C1', ExecComp('y=x*2.',
                                              x={'val': np.zeros(7),
                                                 'units': 'ft'},
@@ -359,7 +358,11 @@ class TestGetSetVariables(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
 
-        self.assertEqual(str(cm.exception), "<model> <class Group>: The following inputs, ['C1.x', 'C2.x', 'C3.x'], promoted to 'x', are connected but their metadata entries ['units'] differ. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
+        self.assertEqual(str(cm.exception),
+           "\nCollected errors for problem 'serial_multi_src_inds_units_promoted_no_src':"
+           "\n   <model> <class Group>: The following inputs, ['C1.x', 'C2.x', 'C3.x'], promoted "
+           "to 'x', are connected but their metadata entries ['units'] differ. Call "
+           "<group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
 
     def test_serial_multi_src_inds_units_setval_promoted(self):
         p = Problem()
@@ -441,6 +444,104 @@ class ParTestCase(unittest.TestCase):
         np.testing.assert_allclose(p['par.C2.x'], (np.arange(7,10) + 1.) * 3.)
         np.testing.assert_allclose(p['par.C1.y'], (np.arange(7) + 1.) * 4.)
         np.testing.assert_allclose(p['par.C2.y'], (np.arange(7,10) + 1.) * 9.)
+
+    def test_load_case_remote_input_src_indices(self):
+        import numpy as np
+        import openmdao.api as om
+        from openmdao.utils.assert_utils import assert_near_equal
+
+        p = om.Problem()
+
+        class CompA(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', shape=(5,))
+                self.add_output('y', shape=(5,))
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = inputs['x']
+
+        class CompB(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('y', shape=(1,))
+                self.add_output('z', shape=(1,))
+
+            def compute(self, inputs, outputs):
+                outputs['z'] = inputs['y']
+
+        p.add_recorder(om.SqliteRecorder('load_case_issue.sql'))
+        p.recording_options['record_inputs'] = True
+        p.recording_options['record_outputs'] = True
+
+        G = p.model.add_subsystem('G', om.ParallelGroup())
+
+        a = G.add_subsystem('a', CompA())
+        G.add_subsystem('b', CompB())
+
+        G.connect('a.y', 'b.y', src_indices=[-1])
+
+        G.nonlinear_solver = om.NonlinearBlockJac(iprint=2)
+        G.linear_solver = om.PETScKrylov(iprint=2)
+
+        p.setup()
+
+        if a in G._subsystems_myproc:
+            p.set_val('G.a.x', np.linspace(0, np.pi, 5))
+
+        p.run_model()
+
+        p.record(case_name='case_1')
+        p.cleanup()
+
+        case_1 = om.CaseReader(p.get_outputs_dir() / 'load_case_issue.sql').get_case('case_1')
+        assert_near_equal(case_1.get_val('G.a.y')[-1], case_1.get_val('G.b.y'))
+
+        # Populate the x input with zeros just to make sure we're changing it.
+        p.set_val('G.a.x', 0.0)
+        p.run_model()
+
+        # Try to load the case into the model. This should trigger the following warning.
+        expected_warning = "<model> <class Group>: Cannot set the value of 'G.b.y': " \
+                           "Setting the value of a remote connected input with src_indices " \
+                           "is currently not supported, you must call `run_model()` to have " \
+                           "the outputs populate their corresponding inputs."
+        with assert_warning(OpenMDAOWarning, expected_warning, ranks=0):
+            p.load_case(case_1)
+
+
+class SystemSetValTestCase(unittest.TestCase):
+    def setup_model(self):
+        p = Problem()
+        model = p.model
+        G1 = model.add_subsystem('G1', Group())
+        G2 = G1.add_subsystem('G2', Group())
+        C1 = G2.add_subsystem('C1', ExecComp('y=2*x'))
+
+        p.setup()
+        return p, G1, G2, C1
+
+    def test_set_val(self):
+        p, G1, G2, C1 = self.setup_model()
+        C1.set_val('x', 42.)
+        G2.set_val('C1.x', 99.)
+
+        assert_near_equal(p['G1.G2.C1.x'], 99.)
+
+        p.final_setup()
+
+        assert_near_equal(p['G1.G2.C1.x'], 99.)
+
+    def test_set_val2(self):
+        p, G1, G2, C1 = self.setup_model()
+        G2.set_val('C1.x', 99.)
+        C1.set_val('x', 42.)
+
+        assert_near_equal(p['G1.G2.C1.x'], 42.)
+
+        p.final_setup()
+
+        assert_near_equal(p['G1.G2.C1.x'], 42.)
 
 
 if __name__ == '__main__':

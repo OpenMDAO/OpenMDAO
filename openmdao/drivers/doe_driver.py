@@ -13,8 +13,6 @@ from openmdao.drivers.doe_generators import DOEGenerator, ListGenerator
 
 from openmdao.utils.mpi import MPI
 
-from openmdao.recorders.sqlite_recorder import SqliteRecorder
-
 
 class DOEDriver(Driver):
     """
@@ -36,9 +34,9 @@ class DOEDriver(Driver):
     _color : int or None
         In MPI, the cached color is used to determine which cases to run on this proc.
     _indep_list : list
-        List of design variables.
+        List of design variables, used to compute derivatives.
     _quantities : list
-        Contains the objectives plus nonlinear constraints.
+        Contains the objectives plus nonlinear constraints, used to compute derivatives.
     """
 
     def __init__(self, generator=None, **kwargs):
@@ -163,6 +161,7 @@ class DOEDriver(Driver):
         bool
             Failure flag; True if failed to converge, False is successful.
         """
+        self.result.reset()
         self.iter_count = 0
         self._quantities = []
 
@@ -179,8 +178,7 @@ class DOEDriver(Driver):
             self._quantities.append(name)
 
         # Add all constraints
-        con_meta = self._cons
-        for name, _ in con_meta.items():
+        for name, _ in self._cons.items():
             self._quantities.append(name)
 
         if MPI and self.options['run_parallel']:
@@ -218,9 +216,9 @@ class DOEDriver(Driver):
                 if msg:
                     raise ValueError(msg)
 
-        with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
+        with RecordingDebugging(self._get_name(), self.iter_count, self):
             try:
-                self._problem().model.run_solve_nonlinear()
+                self._run_solve_nonlinear()
                 metadata['success'] = 1
                 metadata['msg'] = ''
             except AnalysisError:
@@ -234,11 +232,11 @@ class DOEDriver(Driver):
             # save reference to metadata for use in record_iteration
             self._metadata = metadata
 
-        opts = self.recording_options
-        if opts['record_derivatives']:
+        if self.recording_options['record_derivatives']:
             self._compute_totals(of=self._quantities,
                                  wrt=self._indep_list,
-                                 return_format=self._total_jac_format)
+                                 return_format=self._total_jac_format,
+                                 driver_scaling=False)
 
     def _parallel_generator(self, design_vars, model=None):
         """

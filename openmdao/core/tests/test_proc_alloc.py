@@ -1,15 +1,15 @@
 
 import unittest
 
-from openmdao.api import Problem, Group, ExecComp
-from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, LinearBlockGS, \
-    ExecComp, ExplicitComponent, PETScVector, ScipyKrylov, NonlinearBlockGS
+from openmdao.api import ParallelGroup, Problem, IndepVarComp, ExecComp, PETScVector
+from openmdao.devtools.debug import comm_info
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.testing_utils import use_tempdirs
 
 try:
     from openmdao.api import PETScVector
-except:
+except Exception:
     PETScVector = None
 
 
@@ -49,7 +49,7 @@ def _build_model(nsubs, min_procs=None, max_procs=None, weights=None, top=None, 
 def _get_which_procs(group):
     sub_inds = [i for s, i in group._subsystems_allprocs.values()
                 if s in group._subsystems_myproc]
-    return MPI.COMM_WORLD.allgather(sub_inds)
+    return group.comm.allgather(sub_inds)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -110,7 +110,7 @@ class ProcTestCase3(unittest.TestCase):
 
     def test_4_subs_with_mins(self):
         try:
-            p = _build_model(nsubs=4, min_procs=[1,2,2,1])
+            _build_model(nsubs=4, min_procs=[1,2,2,1])
         except Exception as err:
             self.assertEqual(str(err), "'par' <class ParallelGroup>: MPI process allocation failed: can't meet min_procs required because the sum of the min procs required exceeds the procs allocated and the min procs required is > 1 for the following subsystems: ['C1', 'C2']")
         else:
@@ -181,11 +181,40 @@ class ProcTestCase6(unittest.TestCase):
 
     def test_3_subs_over_max(self):
         try:
-            p = _build_model(nsubs=3, max_procs=[1, 2, 2])
+            _build_model(nsubs=3, max_procs=[1, 2, 2])
         except Exception as err:
             self.assertEqual(str(err), "'par' <class ParallelGroup>: too many MPI procs allocated. Comm is size 6 but can only use 5.")
         else:
             self.fail("Exception expected.")
+
+
+@use_tempdirs
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class ProcTestCase6comm_info(unittest.TestCase):
+
+    N_PROCS = 6
+    def test_comm_info_cmd(self):
+        p = _build_model(nsubs=3, weights=[1.0, 2.0, 1.0])
+        comm_info(p.model, outfile='comm_info.txt', table_format='grid')
+
+        p.model.comm.barrier()
+        with open('comm_info.txt', 'r') as f:
+            output = f.read()
+
+        expected = """+-------+-----------------+-----------------+
+| Comm  |   COMM_WORLD    | System Pathname |
+| Size  |    Range(s)     |                 |
++=======+=================+=================+
+|   6   |      0 - 5      |                 |
++-------+-----------------+-----------------+
+|   3   |      2 - 4      | par.C1          |
++-------+-----------------+-----------------+
+|   2   |      0 - 1      | par.C0          |
++-------+-----------------+-----------------+
+|   1   |        5        | par.C2          |
++-------+-----------------+-----------------+
+"""
+        self.assertEqual(output, expected)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

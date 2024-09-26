@@ -1,13 +1,10 @@
 import unittest
-import time
 from collections.abc import Iterable
 
 import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.mpi import MPI
-from openmdao.utils.array_utils import evenly_distrib_idxs, take_nth
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 
 try:
     from parameterized import parameterized
@@ -30,7 +27,7 @@ def _test_func_name(func, num, param):
         for item in p:
             try:
                 arg = item.__name__
-            except:
+            except Exception:
                 arg = str(item)
             args.append(arg)
     return func.__name__ + '_' + '_'.join(args)
@@ -197,7 +194,7 @@ class SerialTests(unittest.TestCase):
         self.assertEqual(p.get_val('par.C2.y', get_remote=True), 'par.C2/')
 
     def test_discrete_fan_out2(self):
-        p = om.Problem()
+        p = om.Problem(name='discrete_fan_out2')
         model = p.model
         par = model.add_subsystem('par', om.ParallelGroup(), promotes=['x'])
         par.add_subsystem('C1', PathCompEx('foo'), promotes=['x'])
@@ -206,7 +203,12 @@ class SerialTests(unittest.TestCase):
         try:
             p.setup()
         except Exception as err:
-            self.assertEqual(str(err), "<model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['val'] differ. Call <group>.set_input_defaults('x', val=?), where <group> is the Group named 'par' to remove the ambiguity.")
+            self.assertTrue(
+              "\nCollected errors for problem 'discrete_fan_out2':"
+              "\n   <model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted "
+              "to 'x', are connected but their metadata entries ['val'] differ. Call "
+              "<group>.set_input_defaults('x', val=?), where <group> is the Group named 'par' to "
+              "remove the ambiguity." in str(err))
         else:
             self.fail("Exception expected.")
 

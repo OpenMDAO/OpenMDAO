@@ -1,7 +1,5 @@
 """Simple example demonstrating how to implement an explicit component."""
 
-import sys
-
 from io import StringIO
 import unittest
 
@@ -13,82 +11,18 @@ from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple, 
     TestExplCompSimpleDense
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
      SellarDis2withDerivatives
-from openmdao.utils.assert_utils import assert_warning, assert_near_equal
+from openmdao.test_suite.components.rectangle import RectangleGroup, \
+    RectangleComp, RectangleCompWithTags, RectangleJacVec
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import printoptions, remove_whitespace
 from openmdao.utils.mpi import MPI
-
-# Note: The following class definitions are used in feature docs
-
-
-class RectangleComp(om.ExplicitComponent):
-    """
-    A simple Explicit Component that computes the area of a rectangle.
-    """
-
-    def setup(self):
-        self.add_input('length', val=1.)
-        self.add_input('width', val=1.)
-        self.add_output('area', val=1.)
-
-    def setup_partials(self):
-        self.declare_partials('*', '*')
-
-    def compute(self, inputs, outputs):
-        outputs['area'] = inputs['length'] * inputs['width']
-
-
-class RectangleCompWithTags(om.ExplicitComponent):
-    """
-    A simple Explicit Component that also has input and output with tags.
-    """
-
-    def setup(self):
-        self.add_input('length', val=1., tags=["tag1"])
-        self.add_input('width', val=1., tags=["tag2"])
-        self.add_output('area', val=1., tags=["tag1"])
-
-    def setup_partials(self):
-        self.declare_partials('*', '*')
-
-    def compute(self, inputs, outputs):
-        outputs['area'] = inputs['length'] * inputs['width']
-
-
-class RectanglePartial(RectangleComp):
-
-    def compute_partials(self, inputs, partials):
-        partials['area', 'length'] = inputs['width']
-        partials['area', 'width'] = inputs['length']
-
-
-class RectangleJacVec(RectangleComp):
-
-    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        if mode == 'fwd':
-            if 'area' in d_outputs:
-                if 'length' in d_inputs:
-                    d_outputs['area'] += inputs['width'] * d_inputs['length']
-                if 'width' in d_inputs:
-                    d_outputs['area'] += inputs['length'] * d_inputs['width']
-        elif mode == 'rev':
-            if 'area' in d_outputs:
-                if 'length' in d_inputs:
-                    d_inputs['length'] += inputs['width'] * d_outputs['area']
-                if 'width' in d_inputs:
-                    d_inputs['width'] += inputs['length'] * d_outputs['area']
-
-
-class RectangleGroup(om.Group):
-
-    def setup(self):
-        self.add_subsystem('comp1', RectanglePartial(), promotes_inputs=['width', 'length'])
-        self.add_subsystem('comp2', RectangleJacVec(), promotes_inputs=['width', 'length'])
 
 
 class ExplCompTestCase(unittest.TestCase):
 
     def test_simple(self):
-        prob = om.Problem(RectangleComp())
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', RectangleComp(), promotes=['*'])
         prob.setup()
         prob.run_model()
 
@@ -136,7 +70,7 @@ class ExplCompTestCase(unittest.TestCase):
         prob.setup()
 
         # list explicit outputs
-        outputs = prob.model.list_outputs(implicit=False, out_stream=None)
+        outputs = prob.model.list_outputs(implicit=False, prom_name=False, out_stream=None)
         expected = {
             'comp1.area': {'val': np.array([1.])},
             'comp2.area': {'val': np.array([1.])}
@@ -144,16 +78,44 @@ class ExplCompTestCase(unittest.TestCase):
         self.assertEqual(dict(outputs), expected)
 
         # list states
-        states = prob.model.list_outputs(explicit=False, out_stream=None)
+        states = prob.model.list_outputs(explicit=False, prom_name=False, out_stream=None)
         self.assertEqual(states, [])
 
         prob.set_val('length', 3.)
         prob.set_val('width', 2.)
-        with assert_warning(UserWarning, "'comp2' <class RectangleJacVec>: matrix free component has declared the following partials: [('comp2.area', 'comp2.length'), ('comp2.area', 'comp2.width')], which will allocate (possibly unnecessary) memory for each of those sub-jacobians."):
-            prob.run_model()
+        prob.run_model()
 
         assert_near_equal(prob['comp1.area'], 6.)
         assert_near_equal(prob['comp2.area'], 6.)
+
+        expected = {'comp1.area': {'io': 'output',
+                                   'prom_name': 'comp1.area',
+                                   'units': None,
+                                   'val': np.array([6.])},
+                    'comp1.length': {'io': 'input',
+                                     'prom_name': 'length',
+                                     'units': None,
+                                     'val': np.array([3.])},
+                    'comp1.width': {'io': 'input',
+                                    'prom_name': 'width',
+                                    'units': None,
+                                    'val': np.array([2.])},
+                    'comp2.area': {'io': 'output',
+                                   'prom_name': 'comp2.area',
+                                   'units': None,
+                                   'val': np.array([6.])},
+                    'comp2.length': {'io': 'input',
+                                     'prom_name': 'length',
+                                     'units': None,
+                                     'val': np.array([3.])},
+                    'comp2.width': {'io': 'input',
+                                    'prom_name': 'width',
+                                    'units': None,
+                                    'val': np.array([2.])}}
+
+        # Unit test for list_vars basic functionality.
+        io_vars = prob.model.list_vars(units=True, out_stream=None)
+        self.assertEqual(dict(io_vars), expected)
 
         # total derivs
         total_derivs = prob.compute_totals(
@@ -166,7 +128,7 @@ class ExplCompTestCase(unittest.TestCase):
         assert_near_equal(total_derivs['comp2.area', 'width'], [[3.]])
 
         # list inputs
-        inputs = prob.model.list_inputs(out_stream=None)
+        inputs = prob.model.list_inputs(out_stream=None, prom_name=False)
         self.assertEqual(sorted(inputs), [
             ('comp1.length', {'val': [3.]}),
             ('comp1.width',  {'val': [2.]}),
@@ -175,7 +137,7 @@ class ExplCompTestCase(unittest.TestCase):
         ])
 
         # list explicit outputs
-        outputs = prob.model.list_outputs(implicit=False, out_stream=None)
+        outputs = prob.model.list_outputs(implicit=False, prom_name=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
             ('comp1.area',   {'val': [6.]}),
             ('comp2.area',   {'val': [6.]}),
@@ -216,7 +178,7 @@ class ExplCompTestCase(unittest.TestCase):
         prob.setup()
 
         # list outputs before model has been run will raise an exception
-        outputs = dict(prob.model.list_outputs(out_stream=None))
+        outputs = dict(prob.model.list_outputs(prom_name=False, out_stream=None))
         expected = {
             'p1.x': {'val': 12.},
             'p2.y': {'val': 1.},
@@ -225,17 +187,17 @@ class ExplCompTestCase(unittest.TestCase):
         self.assertEqual(outputs, expected)
 
         # list_inputs on a component before run is okay, using relative names
-        expl_inputs = prob.model.comp.list_inputs(out_stream=None)
+        expl_inputs = prob.model.comp.list_inputs(prom_name=False, out_stream=None)
         expected = {
             'x': {'val': 0.},
             'y': {'val': 0.}
         }
         self.assertEqual(dict(expl_inputs), expected)
 
-        expl_inputs = prob.model.comp.list_inputs(includes='x', out_stream=None)
+        expl_inputs = prob.model.comp.list_inputs(includes='x', prom_name=False, out_stream=None)
         self.assertEqual(dict(expl_inputs), {'x': {'val': 0.}})
 
-        expl_inputs = prob.model.comp.list_inputs(excludes='x', out_stream=None)
+        expl_inputs = prob.model.comp.list_inputs(excludes='x', prom_name=False, out_stream=None)
         self.assertEqual(dict(expl_inputs), {'y': {'val': 0.}})
 
         # specifying prom_name should not cause an error
@@ -247,7 +209,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         # list_outputs on a component before run is okay, using relative names
         stream = StringIO()
-        expl_outputs = prob.model.p1.list_outputs(out_stream=stream)
+        expl_outputs = prob.model.p1.list_outputs(prom_name=False, out_stream=stream)
         expected = {
             'x': {'val': 12.}
         }
@@ -268,14 +230,14 @@ class ExplCompTestCase(unittest.TestCase):
             if line and not line.startswith('-'):
                 self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
 
-        expl_outputs = prob.model.p1.list_outputs(includes='x', out_stream=None)
+        expl_outputs = prob.model.p1.list_outputs(includes='x', prom_name=False, out_stream=None)
         self.assertEqual(dict(expl_outputs), expected)
 
-        expl_outputs = prob.model.p1.list_outputs(excludes='x', out_stream=None)
+        expl_outputs = prob.model.p1.list_outputs(excludes='x', prom_name=False, out_stream=None)
         self.assertEqual(dict(expl_outputs), {})
 
         # specifying residuals_tol should not cause an error
-        expl_outputs = prob.model.p1.list_outputs(residuals_tol=.01, out_stream=None)
+        expl_outputs = prob.model.p1.list_outputs(residuals_tol=.01, prom_name=False, out_stream=None)
         self.assertEqual(dict(expl_outputs), expected)
 
         # specifying prom_name should not cause an error
@@ -291,7 +253,7 @@ class ExplCompTestCase(unittest.TestCase):
         # list_inputs tests
         # Can't do exact equality here because units cause comp.y to be slightly different than 12.0
         stream = StringIO()
-        inputs = prob.model.list_inputs(units=True, shape=True, out_stream=stream)
+        inputs = prob.model.list_inputs(units=True, shape=True, prom_name=False, out_stream=stream)
         tol = 1e-7
         for actual, expected in zip(sorted(inputs), [
             ('comp.x', {'val': [12.], 'shape': (1,), 'units': 'inch'}),
@@ -319,16 +281,17 @@ class ExplCompTestCase(unittest.TestCase):
         # list_outputs tests
 
         # list outputs for implicit comps - should get none
-        outputs = prob.model.list_outputs(implicit=True, explicit=False, out_stream=None)
+        outputs = prob.model.list_outputs(implicit=True, explicit=False, prom_name=False, out_stream=None)
         self.assertEqual(outputs, [])
 
         # list outputs with out_stream and all the optional display values True
         stream = StringIO()
-        outputs = prob.model.list_outputs(values=True,
+        outputs = prob.model.list_outputs(val=True,
                                           units=True,
                                           shape=True,
                                           bounds=True,
                                           desc=True,
+                                          prom_name=False,
                                           residuals=True,
                                           scaling=True,
                                           print_arrays=False,
@@ -393,12 +356,13 @@ class ExplCompTestCase(unittest.TestCase):
         print(inputs)
 
         outputs = prob.model.list_outputs(implicit=False,
-                                          values=True,
+                                          val=True,
                                           units=True,
                                           shape=True,
                                           bounds=True,
                                           residuals=True,
                                           scaling=True,
+                                          prom_name=False,
                                           hierarchical=False,
                                           print_arrays=False)
 
@@ -412,12 +376,13 @@ class ExplCompTestCase(unittest.TestCase):
         ])
 
         outputs = prob.model.list_outputs(implicit=False,
-                                          values=True,
+                                          val=True,
                                           units=True,
                                           shape=True,
                                           bounds=True,
                                           residuals=True,
                                           scaling=True,
+                                          prom_name=False,
                                           hierarchical=True,
                                           print_arrays=False)
 
@@ -457,7 +422,7 @@ class ExplCompTestCase(unittest.TestCase):
         # logging inputs
         # out_stream - not hierarchical - extras - no print_arrays
         stream = StringIO()
-        prob.model.list_inputs(values=True,
+        prob.model.list_inputs(val=True,
                                units=True,
                                hierarchical=False,
                                print_arrays=False,
@@ -480,7 +445,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         # out_stream - hierarchical - extras - no print_arrays
         stream = StringIO()
-        prob.model.list_inputs(values=True,
+        prob.model.list_inputs(val=True,
                                units=True,
                                hierarchical=True,
                                print_arrays=False,
@@ -498,7 +463,7 @@ class ExplCompTestCase(unittest.TestCase):
         # logging outputs
         # out_stream - not hierarchical - extras - no print_arrays
         stream = StringIO()
-        prob.model.list_outputs(values=True,
+        prob.model.list_outputs(val=True,
                                 units=True,
                                 shape=True,
                                 bounds=True,
@@ -518,7 +483,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         # Hierarchical
         stream = StringIO()
-        prob.model.list_outputs(values=True,
+        prob.model.list_outputs(val=True,
                                 units=True,
                                 shape=True,
                                 bounds=True,
@@ -568,7 +533,7 @@ class ExplCompTestCase(unittest.TestCase):
         # logging inputs
         # out_stream - not hierarchical - extras - no print_arrays
         stream = StringIO()
-        prob.model.list_inputs(values=True,
+        prob.model.list_inputs(val=True,
                                units=True,
                                hierarchical=False,
                                print_arrays=False,
@@ -581,7 +546,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         # out_stream - hierarchical - extras - no print_arrays
         stream = StringIO()
-        prob.model.list_inputs(values=True,
+        prob.model.list_inputs(val=True,
                                units=True,
                                hierarchical=True,
                                print_arrays=False,
@@ -596,7 +561,7 @@ class ExplCompTestCase(unittest.TestCase):
         # logging outputs
         # out_stream - not hierarchical - extras - no print_arrays
         stream = StringIO()
-        prob.model.list_outputs(values=True,
+        prob.model.list_outputs(val=True,
                                 units=True,
                                 shape=True,
                                 bounds=True,
@@ -614,7 +579,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         # Promoted names - no print arrays
         stream = StringIO()
-        prob.model.list_outputs(values=True,
+        prob.model.list_outputs(val=True,
                                 prom_name=True,
                                 print_arrays=False,
                                 out_stream=stream)
@@ -626,7 +591,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         # Hierarchical - no print arrays
         stream = StringIO()
-        prob.model.list_outputs(values=True,
+        prob.model.list_outputs(val=True,
                                 units=True,
                                 shape=True,
                                 bounds=True,
@@ -665,7 +630,7 @@ class ExplCompTestCase(unittest.TestCase):
             # logging outputs
             # out_stream - not hierarchical - extras - print_arrays
             stream = StringIO()
-            prob.model.list_outputs(values=True,
+            prob.model.list_outputs(val=True,
                                     units=True,
                                     shape=True,
                                     bounds=True,
@@ -686,7 +651,7 @@ class ExplCompTestCase(unittest.TestCase):
 
             # Hierarchical
             stream = StringIO()
-            prob.model.list_outputs(values=True,
+            prob.model.list_outputs(val=True,
                                     units=True,
                                     shape=True,
                                     bounds=True,
@@ -736,7 +701,7 @@ class ExplCompTestCase(unittest.TestCase):
         prob['x'] = np.arange(size)
         prob.run_driver()
 
-        prob.model.list_inputs(values=True,
+        prob.model.list_inputs(val=True,
                                units=True,
                                hierarchical=True,
                                print_arrays=True)
@@ -745,7 +710,7 @@ class ExplCompTestCase(unittest.TestCase):
                           linewidth=75, nanstr='nan', precision=8,
                           suppress=False, threshold=1000, formatter=None):
 
-            prob.model.list_outputs(values=True,
+            prob.model.list_outputs(val=True,
                                     implicit=False,
                                     units=True,
                                     shape=True,
@@ -755,7 +720,7 @@ class ExplCompTestCase(unittest.TestCase):
                                     hierarchical=False,
                                     print_arrays=True)
 
-            prob.model.list_outputs(values=True,
+            prob.model.list_outputs(val=True,
                                     implicit=False,
                                     units=True,
                                     shape=True,
@@ -804,13 +769,8 @@ class ExplCompTestCase(unittest.TestCase):
         p.model.run_apply_nonlinear()
 
         # list outputs with residuals
-        sysout = sys.stdout
-        try:
-            capture_stdout = StringIO()
-            sys.stdout = capture_stdout
-            p.model.list_outputs(residuals=True)
-        finally:
-            sys.stdout = sysout
+        stream = StringIO()
+        p.model.list_outputs(residuals=True, prom_name=False, out_stream=stream)
 
         expected_text = [
             "1 Explicit Output(s) in 'model'",
@@ -833,18 +793,14 @@ class ExplCompTestCase(unittest.TestCase):
             "",
             "",
         ]
-        captured_output = capture_stdout.getvalue()
+
+        captured_output = stream.getvalue()
         for i, line in enumerate(captured_output.split('\n')):
             self.assertEqual(line.strip(), expected_text[i].strip())
 
         # list outputs filtered by residuals_tol
-        sysout = sys.stdout
-        try:
-            capture_stdout = StringIO()
-            sys.stdout = capture_stdout
-            p.model.list_outputs(residuals=True, residuals_tol=1e-2)
-        finally:
-            sys.stdout = sysout
+        stream = StringIO()
+        p.model.list_outputs(residuals=True, residuals_tol=1e-2, prom_name=False, out_stream=stream)
 
         # Note: Explicit output has 0 residual, so it should not be included.
         # Note: Implicit outputs Z2 and Z3 should both be shown, because the
@@ -864,63 +820,65 @@ class ExplCompTestCase(unittest.TestCase):
             "",
             "",
         ]
-        captured_output = capture_stdout.getvalue()
+
+        captured_output = stream.getvalue()
         for i, line in enumerate(captured_output.split('\n')):
             self.assertEqual(line.strip(), expected_text[i].strip())
 
     def test_simple_var_tags(self):
-        prob = om.Problem(RectangleCompWithTags())
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', RectangleCompWithTags())
         prob.setup(check=False)
         prob.run_model()
 
         # Inputs no tags
-        inputs = prob.model.list_inputs(out_stream=None)
+        inputs = prob.model.list_inputs(out_stream=None, prom_name=False)
         self.assertEqual(sorted(inputs), [
-            ('length', {'val': [1.]}),
-            ('width', {'val': [1.]}),
+            ('comp.length', {'val': [1.]}),
+            ('comp.width', {'val': [1.]}),
         ])
 
         # Inputs with tags
-        inputs = prob.model.list_inputs(out_stream=None, tags="tag1")
+        inputs = prob.model.list_inputs(out_stream=None, prom_name=False, tags="tag1")
         self.assertEqual(sorted(inputs), [
-            ('length', {'val': [1.]}),
+            ('comp.length', {'val': [1.]}),
         ])
 
         # Inputs with multiple tags
-        inputs = prob.model.list_inputs(out_stream=None, tags=["tag1", "tag3"])
+        inputs = prob.model.list_inputs(out_stream=None, prom_name=False, tags=["tag1", "tag3"])
         self.assertEqual(sorted(inputs), [
-            ('length', {'val': [1.]}),
+            ('comp.length', {'val': [1.]}),
         ])
-        inputs = prob.model.list_inputs(out_stream=None, tags=["tag1", "tag2"])
+        inputs = prob.model.list_inputs(out_stream=None, prom_name=False, tags=["tag1", "tag2"])
         self.assertEqual(sorted(inputs), [
-            ('length', {'val': [1.]}),
-            ('width', {'val': [1.]}),
+            ('comp.length', {'val': [1.]}),
+            ('comp.width', {'val': [1.]}),
         ])
 
         # Inputs with tag that does not match
-        inputs = prob.model.list_inputs(out_stream=None, tags="tag3")
+        inputs = prob.model.list_inputs(out_stream=None, prom_name=False, tags="tag3")
         self.assertEqual(sorted(inputs), [])
 
         # Outputs no tags
-        outputs = prob.model.list_outputs(out_stream=None)
+        outputs = prob.model.list_outputs(out_stream=None, prom_name=False)
         self.assertEqual(sorted(outputs), [
-            ('area', {'val': [1.]}),
+            ('comp.area', {'val': [1.]}),
         ])
 
         # Outputs with tags
-        outputs = prob.model.list_outputs(out_stream=None, tags="tag1")
+        outputs = prob.model.list_outputs(out_stream=None, prom_name=False, tags="tag1")
         self.assertEqual(sorted(outputs), [
-            ('area', {'val': [1.]}),
+            ('comp.area', {'val': [1.]}),
         ])
 
         # Outputs with multiple tags
-        outputs = prob.model.list_outputs(out_stream=None, tags=["tag1", "tag3"])
+        outputs = prob.model.list_outputs(out_stream=None, prom_name=False, tags=["tag1", "tag3"])
         self.assertEqual(sorted(outputs), [
-            ('area', {'val': [1.]}),
+            ('comp.area', {'val': [1.]}),
         ])
 
         # Outputs with tag that does not match
-        outputs = prob.model.list_outputs(out_stream=None, tags="tag3")
+        outputs = prob.model.list_outputs(out_stream=None, prom_name=False, tags="tag3")
         self.assertEqual(sorted(outputs), [])
 
     def test_tags_error_messages(self):
@@ -948,77 +906,8 @@ class ExplCompTestCase(unittest.TestCase):
         with self.assertRaises(TypeError) as cm:
             prob.setup(self)
 
-        msg = "The tags argument should be a str or list"
+        msg = "The tags argument should be a str, set, or list"
         self.assertEqual(str(cm.exception), msg)
-
-    def test_feature_simple_var_tags(self):
-        from openmdao.api import Problem, ExplicitComponent
-
-        class RectangleCompWithTags(ExplicitComponent):
-            """
-            A simple Explicit Component that also has input and output with tags.
-            """
-
-            def setup(self):
-                self.add_input('length', val=1., tags=["tag1", "tag2"])
-                self.add_input('width', val=1., tags=["tag2"])
-                self.add_output('area', val=1., tags="tag1")
-
-            def setup_partials(self):
-                self.declare_partials('*', '*')
-
-            def compute(self, inputs, outputs):
-                outputs['area'] = inputs['length'] * inputs['width']
-
-        prob = Problem(RectangleCompWithTags())
-        prob.setup(check=False)
-        prob.run_model()
-
-        # Inputs no tags
-        inputs = prob.model.list_inputs(values=False, out_stream=None)
-        self.assertEqual(sorted(inputs), [
-            ('length', {}),
-            ('width', {}),
-        ])
-
-        # Inputs with tags
-        inputs = prob.model.list_inputs(values=False, out_stream=None, tags="tag1")
-        self.assertEqual(sorted(inputs), [
-            ('length', {}),
-        ])
-
-        # Inputs with multiple tags
-        inputs = prob.model.list_inputs(values=False, out_stream=None, tags=["tag1", "tag2"])
-        self.assertEqual(sorted(inputs), [
-            ('length', {}),
-            ('width', {}),
-        ])
-
-        # Inputs with tag that does not match
-        inputs = prob.model.list_inputs(values=False, out_stream=None, tags="tag3")
-        self.assertEqual(sorted(inputs), [])
-
-        # Outputs no tags
-        outputs = prob.model.list_outputs(values=False, out_stream=None)
-        self.assertEqual(sorted(outputs), [
-            ('area', {}),
-        ])
-
-        # Outputs with tags
-        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag1")
-        self.assertEqual(sorted(outputs), [
-            ('area', {}),
-        ])
-
-        # Outputs with multiple tags
-        outputs = prob.model.list_outputs(values=False, out_stream=None, tags=["tag1", "tag3"])
-        self.assertEqual(sorted(outputs), [
-            ('area', {}),
-        ])
-
-        # Outputs with tag that does not match
-        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag3")
-        self.assertEqual(sorted(outputs), [])
 
     def test_compute_inputs_read_only(self):
         class BadComp(TestExplCompSimple):
@@ -1026,14 +915,15 @@ class ExplCompTestCase(unittest.TestCase):
                 super().compute(inputs, outputs)
                 inputs['length'] = 0.  # should not be allowed
 
-        prob = om.Problem(BadComp())
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', BadComp(), promotes=['*'])
         prob.setup()
 
         with self.assertRaises(ValueError) as cm:
             prob.run_model()
 
         self.assertEqual(str(cm.exception),
-                         "<model> <class BadComp>: Attempt to set value of 'length' in input vector when it is read only.")
+                         "'comp' <class BadComp>: Attempt to set value of 'length' in input vector when it is read only.")
 
     def test_compute_inputs_read_only_reset(self):
         class BadComp(TestExplCompSimple):
@@ -1041,8 +931,10 @@ class ExplCompTestCase(unittest.TestCase):
                 super().compute(inputs, outputs)
                 raise om.AnalysisError("It's just a scratch.")
 
-        prob = om.Problem(BadComp())
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', BadComp(), promotes=['*'])
         prob.setup()
+
         with self.assertRaises(om.AnalysisError):
             prob.run_model()
 
@@ -1055,15 +947,17 @@ class ExplCompTestCase(unittest.TestCase):
                 super().compute_partials(inputs, partials)
                 inputs['length'] = 0.  # should not be allowed
 
-        prob = om.Problem(BadComp())
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', BadComp(), promotes=['*'])
         prob.setup()
+
         prob.run_model()
 
         with self.assertRaises(ValueError) as cm:
             prob.check_partials()
 
         self.assertEqual(str(cm.exception),
-                         "<model> <class BadComp>: Attempt to set value of 'length' in input vector "
+                         "'comp' <class BadComp>: Attempt to set value of 'length' in input vector "
                          "when it is read only.")
 
     def test_compute_partials_inputs_read_only_reset(self):
@@ -1072,8 +966,10 @@ class ExplCompTestCase(unittest.TestCase):
                 super().compute_partials(inputs, partials)
                 raise om.AnalysisError("It's just a scratch.")
 
-        prob = om.Problem(BadComp())
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', BadComp(), promotes=['*'])
         prob.setup()
+
         prob.run_model()
 
         with self.assertRaises(om.AnalysisError):
@@ -1088,15 +984,17 @@ class ExplCompTestCase(unittest.TestCase):
                 super().compute_jacvec_product(inputs, d_inputs, d_outputs, mode)
                 inputs['length'] = 0.  # should not be allowed
 
-        prob = om.Problem(BadComp())
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', BadComp(), promotes=['*'])
         prob.setup()
+
         prob.run_model()
 
         with self.assertRaises(ValueError) as cm:
             prob.check_partials()
 
         self.assertEqual(str(cm.exception),
-                         "<model> <class BadComp>: Attempt to set value of 'length' in input vector "
+                         "'comp' <class BadComp>: Attempt to set value of 'length' in input vector "
                          "when it is read only.")
 
     def test_compute_jacvec_product_inputs_read_only_reset(self):
@@ -1105,8 +1003,10 @@ class ExplCompTestCase(unittest.TestCase):
                 super().compute_jacvec_product(inputs, d_inputs, d_outputs, mode)
                 raise om.AnalysisError("It's just a scratch.")
 
-        prob = om.Problem(BadComp())
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', BadComp(), promotes=['*'])
         prob.setup()
+
         prob.run_model()
 
         with self.assertRaises(om.AnalysisError):
@@ -1200,7 +1100,7 @@ class TestMPIExplComp(unittest.TestCase):
         prob.run_model()
 
         stream = StringIO()
-        prob.model.list_outputs(all_procs=True, out_stream=stream)
+        prob.model.list_outputs(all_procs=True, prom_name=False, out_stream=stream)
 
         if self.comm.rank == 0:
 
@@ -1230,7 +1130,7 @@ class TestMPIExplComp(unittest.TestCase):
                     self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
 
         stream = StringIO()
-        prob.model.list_inputs(all_procs=True, out_stream=stream)
+        prob.model.list_inputs(all_procs=True, prom_name=False, out_stream=stream)
 
         if self.comm.rank == 0:
 

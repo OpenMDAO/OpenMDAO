@@ -7,8 +7,6 @@ import openmdao.api as om
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.proc_allocators.default_allocator import DefaultAllocator
-from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.utils.assert_utils import assert_near_equal
 
 
@@ -21,8 +19,6 @@ if MPI:
 
 # check that pyoptsparse is installed. if it is, try to use SLSQP.
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
-if OPTIMIZER:
-    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -81,21 +77,29 @@ class ProbRemoteTestCase(unittest.TestCase):
         par.add_subsystem('C2', om.ExecComp('y=3*x'))
         p.model.connect('indep.x', ['par.C1.x', 'par.C2.x'])
 
-        with self.assertRaisesRegex(RuntimeError,
-            "Problem .*: is_local\('indep\.x'\) was called before setup\(\) completed\."):
-            loc = p.is_local('indep.x')
+        with self.assertRaises(RuntimeError) as err:
+            p.is_local('indep.x')
+        self.assertEqual(str(err.exception),
+                         f"Problem {p._get_inst_id()}: is_local('indep.x') "
+                         "was called before setup() completed.")
 
-        with self.assertRaisesRegex(RuntimeError,
-            "Problem .*: is_local\('par\.C1'\) was called before setup\(\) completed\."):
-            loc = p.is_local('par.C1')
+        with self.assertRaises(RuntimeError) as err:
+            p.is_local('par.C1')
+        self.assertEqual(str(err.exception),
+                         f"Problem {p._get_inst_id()}: is_local('par.C1') "
+                         "was called before setup() completed.")
 
-        with self.assertRaisesRegex(RuntimeError,
-            "Problem .*: is_local\('par\.C1\.y'\) was called before setup\(\) completed\."):
-            loc = p.is_local('par.C1.y')
+        with self.assertRaises(RuntimeError) as err:
+            p.is_local('par.C1.y')
+        self.assertEqual(str(err.exception),
+                         f"Problem {p._get_inst_id()}: is_local('par.C1.y') "
+                         "was called before setup() completed.")
 
-        with self.assertRaisesRegex(RuntimeError,
-            "Problem .*: is_local\('par\.C1\.x'\) was called before setup\(\) completed\."):
-            loc = p.is_local('par.C1.x')
+        with self.assertRaises(RuntimeError) as err:
+            p.is_local('par.C1.x')
+        self.assertEqual(str(err.exception),
+                         f"Problem {p._get_inst_id()}: is_local('par.C1.x') "
+                         "was called before setup() completed.")
 
         p.setup()
         p.final_setup()
@@ -130,7 +134,7 @@ class ProbRemoteTestCase(unittest.TestCase):
                 rank = self.comm.rank
                 sizes, offsets = evenly_distrib_idxs(self.comm.size, N)
 
-                self.add_input('x', shape=1, src_indices=[0], distributed=True)
+                self.add_input('x', shape=1, distributed=True)
                 self.add_output('y', shape=sizes[rank], distributed=True)
 
             def compute(self, inputs, outputs):
@@ -144,23 +148,27 @@ class ProbRemoteTestCase(unittest.TestCase):
         class MyModel(om.Group):
 
             def setup(self):
-                self.add_subsystem('ivc', om.IndepVarComp('x', 0.), promotes_outputs=['*'])
-                self.add_subsystem('dst', DistribComp(), promotes_inputs=['*'])
+                self.add_subsystem('ivc', om.IndepVarComp('x', 0.))
+                self.add_subsystem('dst', DistribComp())
                 self.add_subsystem('sum', om.ExecComp('z = sum(y)', y=np.zeros((N,)), z=0.0))
+
+                self.connect('ivc.x', 'dst.x', src_indices=[0])
                 self.connect('dst.y', 'sum.y', src_indices=om.slicer[:])
 
-                self.add_subsystem('par', om.ParallelGroup(), promotes_inputs=['*'])
+                self.add_subsystem('par', om.ParallelGroup())
                 self.par.add_subsystem('c1', om.ExecComp(['y=2.0*x']), promotes_inputs=['*'])
                 self.par.add_subsystem('c2', om.ExecComp(['y=5.0*x']), promotes_inputs=['*'])
+
+                self.connect('ivc.x', 'par.x')
 
         prob = om.Problem(model=MyModel())
         prob.setup(mode='fwd')
 
-        prob['x'] = 7.0
+        prob['ivc.x'] = 7.0
         prob.run_model()
 
         # get_remote=True
-        assert_near_equal(prob.get_val('x', get_remote=True), [7.])
+        assert_near_equal(prob.get_val('ivc.x', get_remote=True), [7.])
         assert_near_equal(prob.get_val('dst.x', get_remote=True), [7., 7.])  # ???????
         assert_near_equal(prob.get_val('dst.y', get_remote=True), [2., 7., 7.])
         assert_near_equal(prob.get_val('par.c1.x', get_remote=True), [7.])
@@ -316,8 +324,8 @@ class ProbRemote4TestCase(unittest.TestCase):
         p1.add_design_var('x', lower=-50.0, upper=50.0)
 
         par = model.add_subsystem('par', om.ParallelGroup())
-        c1 = par.add_subsystem('C1', om.ExecComp('y = x*x'))
-        c2 = par.add_subsystem('C2', om.ExecComp('y = x*x'))
+        par.add_subsystem('C1', om.ExecComp('y = x*x'))
+        par.add_subsystem('C2', om.ExecComp('y = x*x'))
 
         model.add_subsystem('obj', om.ExecComp('o = a + b + 2.'))
 
@@ -336,16 +344,28 @@ class ProbRemote4TestCase(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         all_failed = comm.allgather(failed)
         if any(all_failed):
-            all_msgs = comm.allgather(str(prob.driver.pyopt_solution.optInform))
+            msg = 'No solution found' if prob.driver.pyopt_solution is None \
+                else str(prob.driver.pyopt_solution.optInform)
+            all_msgs = comm.allgather(msg)
             for i, tup in enumerate(zip(all_failed, all_msgs)):
                 failed, msg = tup
                 if failed:
-                    self.fail("Optimization failed on rank %d: %s" % (i, msg))
+                    self.fail(f"Optimization failed on rank {i}: {msg}")
 
-        objs = comm.allgather(prob['obj.o'])
-        for i, obj in enumerate(objs):
+        try:
+            obj = prob['obj.o']
+            failed = False
+        except Exception as err:
+            obj = str(err)
+            failed = True
+
+        all_status = comm.allgather((obj, failed))
+        for i, tup in enumerate(all_status):
+            obj, failed = tup
+            if failed:
+                self.fail(f"Failed to retrieve objective on rank {i}: {obj}")
             assert_near_equal(obj, 2.0, 1e-6)

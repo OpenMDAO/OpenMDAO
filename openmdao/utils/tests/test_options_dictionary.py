@@ -37,8 +37,8 @@ class TestOptionsDict(unittest.TestCase):
 =========  ============  =================  =====================  ======================
 Option     Default       Acceptable Values  Acceptable Types       Description           
 =========  ============  =================  =====================  ======================
-comp       MyComp        N/A                ['ExplicitComponent']  
-flag       False         [True, False]      ['bool']               
+comp       MyComp        N/A                ['ExplicitComponent']                        
+flag       False         [True, False]      ['bool']                                     
 long_desc  **Required**  N/A                ['str']                This description is   
                                                                    long and verbose, so  
                                                                    it takes up multiple  
@@ -342,7 +342,7 @@ test       **Required**  ['a', 'b']         N/A                    Test integer 
             self.dict['test2'] = None
         # Should only generate warning first time
         with assert_no_warning(OMDeprecationWarning, msg):
-            option = self.dict['test2']
+            self.dict['test2']
 
     def test_deprecated_tuple_option(self):
         msg = 'Option "test1" is deprecated. Use "foo" instead.'
@@ -392,6 +392,42 @@ test       **Required**  ['a', 'b']         N/A                    Test integer 
 
         with assert_warning(OMDeprecationWarning, msg):
             opt.declare('foo:bar', 1.0)
+
+    def test_context_manager(self):
+        options = OptionsDictionary()
+        options.declare('foo', values=['a', 'b', 'c'], default=None, allow_none=True)
+        options.declare('bar', types=(float, int))
+
+        options['foo'] = 'b'
+        options['bar'] = 3.14
+
+        self.assertEqual(options['foo'], 'b')
+        self.assertAlmostEqual(options['bar'], 3.14)
+
+        with options.temporary(foo='c', bar=5):
+            self.assertEqual(options['foo'], 'c')
+            self.assertEqual(options['bar'], 5)
+            with options.temporary(foo='a'):
+                self.assertEqual(options['foo'], 'a')
+            self.assertEqual(options['foo'], 'c')
+            self.assertEqual(options['bar'], 5)
+
+        self.assertEqual(options['foo'], 'b')
+        self.assertAlmostEqual(options['bar'], 3.14)
+
+    def test_call(self):
+        options = OptionsDictionary()
+        options.declare('foo', values=['a', 'b', 'c'], default=None, allow_none=True)
+        options.declare('bar', types=(float, int))
+
+        options['foo'] = 'b'
+        options['bar'] = 3.14
+
+        self.assertEqual(options['foo'], 'b')
+        self.assertAlmostEqual(options['bar'], 3.14)
+        options.set(foo='c', bar=5)
+        self.assertEqual(options['foo'], 'c')
+        self.assertEqual(options['bar'], 5)
 
 
 if __name__ == "__main__":

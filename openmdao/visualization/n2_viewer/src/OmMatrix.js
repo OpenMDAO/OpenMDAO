@@ -28,6 +28,8 @@ class OmMatrix extends Matrix {
     constructor(model, layout, diagGroups, arrowMgr, lastClickWasLeft, findRootOfChangeFunction,
         prevNodeSize = { 'width': 0, 'height': 0 }) {
         super(model, layout, diagGroups, arrowMgr, lastClickWasLeft, findRootOfChangeFunction, prevNodeSize);
+
+        this._nodeIdxCache = {};
     }
 
     /**
@@ -133,57 +135,86 @@ class OmMatrix extends Matrix {
     }
 
     /**
-     * Draw the cycle arrows in the lower-left corner of the matrix.
-     * @param {OmMatrixCell} cell The focused cell.
+     * Determine whether a connection has already been drawn. If not,
+     * record that it has now.
+     * @param {Number} startIndex The index of the first diagonal node.
+     * @param {Number} endIndex The index of the last diagonal node.
+     * @returns {Boolean} True if the connection is already drawn, otherwise false.
+     */
+    _checkDrawnList(startIndex, endIndex) {
+        if (this._drawnList[startIndex] && this._drawnList[startIndex][endIndex]) return true;
+        if (this._drawnList[endIndex] && this._drawnList[endIndex][startIndex]) return true;
+
+        if (!this._drawnList[startIndex]) this._drawnList[startIndex] = {};
+        this._drawnList[startIndex][endIndex] = true;
+        return false;
+    }
+
+    /**
+     * Determine which cycle arrows to draw in the lower-left corner of the matrix.
      * @param {Number} startIndex The index of the first diagonal node.
      * @param {Number} endIndex The index of the last diagonal node.
      */
-    _drawArrowsInputView(cell, startIndex, endIndex) {
+    _addArrowsInputView(startIndex, endIndex) {
+        if (this._checkDrawnList(startIndex, endIndex)) return;
+
         const boxInfo = this._boxInfo()
         const boxStart = boxInfo[startIndex],
             boxEnd = boxInfo[endIndex];
 
         // Draw multiple horizontal lines, but no more than one vertical line
         // for box-to-box connections
-        const arrows = [];
         for (let startsI = boxStart.startI; startsI <= boxStart.stopI; ++startsI) {
             for (let endsI = boxEnd.startI; endsI <= boxEnd.stopI; ++endsI) {
-                if (this.exists(startsI, endsI)) {
-                    arrows.push({
-                        'start': startsI,
-                        'end': endsI
-                    });
+                if (startsI != endsI && this.exists(startsI, endsI)) {
+                    if (!this._arrows[startsI]) this._arrows[startsI] = {};
+                    this._arrows[startsI][endsI] = true;
                 }
             }
         }
+    }
 
-        for (const arrow of arrows) {
-            this.arrowMgr.addFullArrow(cell.id, {
-                'start': {
-                    'col': arrow.start,
-                    'row': arrow.start,
-                    'id': this.grid[arrow.start][arrow.start].srcObj.id
-                },
-                'end': {
-                    'col': arrow.end,
-                    'row': arrow.end,
-                    'id': this.grid[arrow.end][arrow.end].tgtObj.id
-                },
-                'color': (startIndex < endIndex) ?
-                    OmStyle.color.outputArrow : OmStyle.color.inputArrow,
-            });
+    /**
+     * Draw the accumulated set of arrows in the matrix.
+     * @param {OmMatrixCell} cell Reference to the cell where the mouseover was triggered.
+     */
+    _drawArrowsInputView(cell) {
+        for (const start in this._arrows) {
+            for (const end in this._arrows[start]) {
+                this.arrowMgr.addFullArrow(cell.id, {
+                    'start': {
+                        'col': start,
+                        'row': start,
+                        'id': this.grid[start][start].srcObj.id
+                    },
+                    'end': {
+                        'col': end,
+                        'row': end,
+                        'id': this.grid[end][end].tgtObj.id
+                    },
+                    'color': (start < end) ?
+                        OmStyle.color.outputArrow : OmStyle.color.inputArrow,
+                });
+            }
         }
     }
 
     /**
      * Find the index of the first node in this.diagNodes that "has" the supplied node.
-     * For some reason Array.findIndex() did not work correctly for this.
+     * For some reason Array.findIndex() did not work correctly for this. Found nodes
+     * are cached with their index so the search doesn't have to be performed more
+     * than once per node.
      * @param {OmTreeNode} node Reference to the node to search for.
      * @returns {Number} The index of the node if found, otherwise -1.
      */
     _findDiagNodeIndex(node) {
+        if (this._nodeIdxCache[node.path]) {
+            return this._nodeIdxCache[node.path];
+        }
+
         for (const idx in this.diagNodes) {
             if (this.diagNodes[idx].hasNode(node)) {
+                this._nodeIdxCache[node.path] = idx;
                 return idx;
             }
         }
@@ -202,6 +233,11 @@ class OmMatrix extends Matrix {
         if (cell.row > cell.col) {
             const src = this.diagNodes[cell.row],
                 tgt = this.diagNodes[cell.col];
+
+            // Accumulate what's been discovered/drawn in these to prevent duplicates
+            this._drawnList = {};
+            this._arrows = {};
+
             // Get an array of all the parents and children of the target with cycle arrows
             const relativesWithCycleArrows = tgt.getNodesWithCycleArrows();
 
@@ -218,12 +254,14 @@ class OmMatrix extends Matrix {
                                 throw ("OmMatrix.drawOffDiagonalArrows() error: first end index not found");
 
                             if (firstBeginIndex != firstEndIndex) {
-                                this._drawArrowsInputView(cell, firstBeginIndex, firstEndIndex);
+                                this._addArrowsInputView(firstBeginIndex, firstEndIndex);
                             }
                         }
                     }
                 }
             }
+
+            this._drawArrowsInputView(cell)
         }
     }
 }

@@ -6,9 +6,8 @@ import warnings
 
 import openmdao.api as om
 from openmdao.utils.units import NumberDict, PhysicalUnit, _find_unit, import_library, \
-    add_unit, add_offset_unit, unit_conversion, get_conversion, simplify_unit
-from openmdao.utils.assert_utils import assert_warning, assert_near_equal
-from openmdao.utils.om_warnings import OMDeprecationWarning
+    add_unit, add_offset_unit, unit_conversion, simplify_unit
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestNumberDict(unittest.TestCase):
@@ -258,20 +257,6 @@ class TestPhysicalUnit(unittest.TestCase):
         else:
             self.fail("Expecting RuntimeError")
 
-    def test_get_conversion(self):
-        msg = "'get_conversion' has been deprecated. Use 'unit_conversion' instead."
-        with assert_warning(OMDeprecationWarning, msg):
-            get_conversion('km', 'm'), (1000., 0.)
-
-        self.assertEqual(get_conversion('km', 'm'), (1000., 0.))
-
-        try:
-            get_conversion('km', 1.0)
-        except ValueError as err:
-            self.assertEqual(str(err), "The units '1.0' are invalid.")
-        else:
-            self.fail("Expecting ValueError")
-
     def test_unit_simplification(self):
         test_strings = ['ft/s*s',
                         'm/s*s',
@@ -338,7 +323,6 @@ class TestModuleFunctions(unittest.TestCase):
 
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            warnings.filterwarnings("ignore", r'.*OpenMDAO support for Python version .* will end soon.*')
             p.setup()
 
         p.run_model()
@@ -355,7 +339,6 @@ class TestModuleFunctions(unittest.TestCase):
 
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            warnings.filterwarnings("ignore", r'.*OpenMDAO support for Python version .* will end soon.*')
             p.setup()
 
         p.run_model()
@@ -373,14 +356,13 @@ class TestModuleFunctions(unittest.TestCase):
 
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            warnings.filterwarnings("ignore", r'.*OpenMDAO support for Python version .* will end soon.*')
             p.setup()
 
         p.run_model()
         assert_near_equal(p.get_val('exec_comp.z'), 15.0)
 
     def test_incompatible(self):
-        p = om.Problem()
+        p = om.Problem(name='incompatible_units')
         ivc = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['x', 'y'])
         ivc.add_output('x', val=5.0, units='1/s*s')
         ivc.add_output('y', val=10.0, units='Hz*s')
@@ -388,7 +370,8 @@ class TestModuleFunctions(unittest.TestCase):
                                                        x={'units': None}, y={'units': 'ft'}),
                               promotes_inputs=['x', 'y'])
 
-        msg = ("<model> <class Group>: Output units of 'Hz*s' for 'indeps.y' are incompatible with input "
+        msg = ("\nCollected errors for problem 'incompatible_units':"
+               "\n   <model> <class Group>: Output units of 'Hz*s' for 'indeps.y' are incompatible with input "
                "units of 'ft' for 'exec_comp.y'.")
 
         with self.assertRaises(RuntimeError) as cm:
@@ -405,14 +388,15 @@ class TestUnitless(unittest.TestCase):
         assert_near_equal(margin_percent, 5)
 
     def test_unitless_connection_error(self):
-        p = om.Problem()
+        p = om.Problem(name='unitless_connection_error')
         ivc = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
         ivc.add_output('x', val=5.0, units='unitless')
         p.model.add_subsystem(
             'exec_comp',om.ExecComp('z = x', z={'units': 'm'}, x={'units': 'm'}),
             promotes_inputs=['x'])
 
-        msg = ("<model> <class Group>: Output units of 'unitless' for 'indeps.x' are incompatible with input "
+        msg = ("\nCollected errors for problem 'unitless_connection_error':"
+               "\n   <model> <class Group>: Output units of 'unitless' for 'indeps.x' are incompatible with input "
                "units of 'm' for 'exec_comp.x'.")
 
         with self.assertRaises(RuntimeError) as cm:

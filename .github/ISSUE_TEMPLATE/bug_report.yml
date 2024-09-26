@@ -16,7 +16,6 @@ body:
     attributes:
       label: Example
       description: Please provide an example of the code that triggers the unexpected behavior. If possible, we would appreciate a minimal test case that reproduces the issue. Alternatively, link to a file in another repository where the issue is demonstrated.
-      render: python
     validations:
       required: true
   - type: input
@@ -24,7 +23,7 @@ body:
     attributes:
       label: OpenMDAO Version
       description: What version of OpenMDAO is being used.
-      placeholder: "3.21.1-dev"
+      placeholder: "3.34.3-dev"
     validations:
       required: true
   - type: textarea

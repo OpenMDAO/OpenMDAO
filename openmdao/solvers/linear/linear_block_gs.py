@@ -1,9 +1,7 @@
 """Define the LinearBlockGS class."""
 
-import sys
 import numpy as np
 
-from openmdao.core.constants import _UNDEFINED
 from openmdao.solvers.solver import BlockLinearSolver
 
 
@@ -97,12 +95,12 @@ class LinearBlockGS(BlockLinearSolver):
             d_n = d_out_vec.asarray(copy=True)
             delta_d_n = d_out_vec.asarray(copy=True)
 
+        relevance = system._relevance
+
         if mode == 'fwd':
             parent_offset = system._dresiduals._root_offset
 
-            for subsys, _ in system._subsystems_allprocs.values():
-                if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
-                    continue
+            for subsys in relevance.filter(system._all_subsystem_iter()):
                 # must always do the transfer on all procs even if subsys not local
                 system._transfer('linear', mode, subsys.name)
 
@@ -124,26 +122,20 @@ class LinearBlockGS(BlockLinearSolver):
                 off = b_vec._root_offset - parent_offset
 
                 if subsys._iter_call_apply_linear():
-                    subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+                    subsys._apply_linear(None, mode, scope_out, scope_in)
                     b_vec *= -1.0
                     b_vec += self._rhs_vec[off:off + len(b_vec)]
                 else:
                     b_vec.set_val(self._rhs_vec[off:off + len(b_vec)])
 
-                subsys._solve_linear(mode, self._rel_systems, scope_out, scope_in)
+                subsys._solve_linear(mode, scope_out, scope_in)
 
         else:  # rev
-            if sys.version_info >= (3, 8):
-                subsystems = reversed(system._subsystems_allprocs.values())
-            else:
-                subsystems = list(system._subsystems_allprocs.values())
-                subsystems.reverse()
+            subsystems = list(relevance.filter(system._all_subsystem_iter()))
+            subsystems.reverse()
             parent_offset = system._doutputs._root_offset
 
-            for subsys, _ in subsystems:
-                if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
-                    continue
-
+            for subsys in subsystems:
                 if subsys._is_local:
                     b_vec = subsys._doutputs
                     b_vec.set_val(0.0)
@@ -158,10 +150,10 @@ class LinearBlockGS(BlockLinearSolver):
                     scope_out = self._vars_union(self._scope_out, scope_out)
                     scope_in = self._vars_union(self._scope_in, scope_in)
 
-                    subsys._solve_linear(mode, self._rel_systems, scope_out, scope_in)
+                    subsys._solve_linear(mode, scope_out, scope_in)
 
                     if subsys._iter_call_apply_linear():
-                        subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+                        subsys._apply_linear(None, mode, scope_out, scope_in)
                     else:
                         b_vec.set_val(0.0)
                 else:   # subsys not local

@@ -3,6 +3,9 @@
 import unittest
 
 import numpy as np
+import scipy
+
+from packaging.version import Version
 
 import openmdao.api as om
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
@@ -11,7 +14,7 @@ from openmdao.test_suite.components.misc_components import Comp4LinearCacheTest
 from openmdao.test_suite.components.quad_implicit import QuadraticComp
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
 
 
 # use this to fake out the TestImplicitGroup so it'll use the solver we want.
@@ -130,7 +133,8 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         output = d_residuals.asarray()
         assert_near_equal(output, g1.expected_solution, 3e-15)
 
-    def test_linear_solution_cache(self):
+    @unittest.skipIf(Version(scipy.__version__) == Version('1.12.0'), "Bug in scipy 1.12.0, see Issue #19948")
+    def test_linear_solution_cache_fwd(self):
         # Test derivatives across a converged Sellar model. When caching
         # is performed, the second solve takes less iterations than the
         # first one.
@@ -153,13 +157,20 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        J = prob.driver._compute_totals(of=['y'], wrt=['x'], use_abs_names=False, return_format='flat_dict')
+        prob.driver._compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
         icount1 = prob.model.linear_solver._iter_count
-        J = prob.driver._compute_totals(of=['y'], wrt=['x'], use_abs_names=False, return_format='flat_dict')
+        prob.driver._compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
         icount2 = prob.model.linear_solver._iter_count
 
         # Should take less iterations when starting from previous solution.
-        self.assertTrue(icount2 < icount1)
+        self.assertTrue(icount2 < icount1,
+                        f"Second solve ran for {icount2} iterations, which should have been less than "
+                        f"the first solve, which ran for {icount1} iterations.")
+
+    def test_linear_solution_cache_rev(self):
+        # Test derivatives across a converged Sellar model. When caching
+        # is performed, the second solve takes less iterations than the
+        # first one.
 
         # Reverse mode
 
@@ -179,13 +190,15 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        J = prob.driver._compute_totals(of=['y'], wrt=['x'], use_abs_names=False, return_format='flat_dict')
+        prob.driver._compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
         icount1 = prob.model.linear_solver._iter_count
-        J = prob.driver._compute_totals(of=['y'], wrt=['x'], use_abs_names=False, return_format='flat_dict')
+        prob.driver._compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
         icount2 = prob.model.linear_solver._iter_count
 
         # Should take less iterations when starting from previous solution.
-        self.assertTrue(icount2 < icount1)
+        self.assertTrue(icount2 < icount1,
+                        f"Second solve ran for {icount2} iterations, which should have been less than "
+                        f"the first solve, which ran for {icount1} iterations.")
 
 
 class TestScipyKrylovFeature(unittest.TestCase):
@@ -267,6 +280,7 @@ class TestScipyKrylovFeature(unittest.TestCase):
 
         model.linear_solver = om.ScipyKrylov()
         model.linear_solver.options['maxiter'] = 3
+        model.linear_solver.options['err_on_non_converge'] = True
 
         prob.setup()
 
@@ -278,9 +292,11 @@ class TestScipyKrylovFeature(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_near_equal(J['obj', 'z'][0][0], 0.0, .00001)
-        assert_near_equal(J['obj', 'z'][0][1], 0.0, .00001)
+        with self.assertRaises(om.AnalysisError) as cm:
+            prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
+
+        msg = "Solver 'LN: SCIPY' on system '' failed to converge in 3 iterations."
+        self.assertEqual(str(cm.exception), msg)
 
     def test_feature_atol(self):
 
@@ -349,6 +365,40 @@ class TestScipyKrylovFeature(unittest.TestCase):
         assert_near_equal(prob.get_val('sub1.q1.x'), 1.996, .0001)
         assert_near_equal(prob.get_val('sub2.q2.x'), 1.996, .0001)
 
+
+class TestCaching(unittest.TestCase):
+
+    def test_caching(self):
+        prob = om.Problem()
+        prob.driver = om.ScipyOptimizeDriver()
+        model = prob.model
+
+        model.add_subsystem('ivc', om.IndepVarComp('x', 1.0))
+        G = model.add_subsystem('G', om.Group())
+        G.add_subsystem('comp', om.ExecComp('y = 2.*x'))
+        G.linear_solver = om.ScipyKrylov(iprint=2, assemble_jac=True,
+                                         rhs_checking={'verbose': True, 'collect_stats': True})
+        G.linear_solver.precon = om.LinearBlockGS(iprint=-1)
+        model.add_subsystem('comp2', om.ExecComp('y = 3.*x'))
+        model.add_subsystem('comp3', om.ExecComp('y = 4.*x'))
+
+        model.connect('ivc.x', 'G.comp.x')
+        model.connect('G.comp.y', ['comp2.x', 'comp3.x'])
+
+        model.add_design_var('ivc.x')
+        model.add_objective('comp2.y')
+        model.add_constraint('G.comp.y', upper=10.0)
+
+        prob.setup(mode='rev')
+
+        prob.set_val('ivc.x', .3)
+        prob.run_model()
+
+        prob.compute_totals()
+
+        self.assertEqual(G.linear_solver._lin_rhs_checker._stats['parhits'], 1)
+
+        assert_check_totals(prob.check_totals(out_stream=None))
 
 if __name__ == "__main__":
     unittest.main()

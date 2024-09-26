@@ -10,6 +10,7 @@ from scipy.sparse import csc_matrix
 from openmdao.solvers.solver import LinearSolver
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.utils.array_utils import identity_column_iter
+from openmdao.solvers.linear.linear_rhs_checker import LinearRHSChecker
 
 
 def index_to_varname(system, loc):
@@ -102,9 +103,9 @@ def format_singular_error(system, matrix):
             try:
                 u, _, _ = np.linalg.svd(matrix)
 
-            except Exception as err:
+            except Exception:
                 msg = f"Jacobian in '{system.pathname}' is not full rank, but OpenMDAO was " + \
-                    "not able to determine which rows or columns."
+                      "not able to determine which rows or columns."
                 return msg
 
             # Nonzero elements in the left singular vector show the rows that contribute strongly to
@@ -178,9 +179,21 @@ class DirectSolver(LinearSolver):
     ----------
     **kwargs : dict
         Options dictionary.
+
+    Attributes
+    ----------
+    _lin_rhs_checker : LinearRHSChecker or None
+        Object for checking the right-hand side of the linear solve.
     """
 
     SOLVER = 'LN: Direct'
+
+    def __init__(self, **kwargs):
+        """
+        Declare the solver options.
+        """
+        super().__init__(**kwargs)
+        self._lin_rhs_checker = None
 
     def _declare_options(self):
         """
@@ -191,6 +204,13 @@ class DirectSolver(LinearSolver):
         self.options.declare('err_on_singular', types=bool, default=True,
                              desc="Raise an error if LU decomposition is singular.")
 
+        self.options.declare('rhs_checking', types=(bool, dict),
+                             default=False,
+                             desc="If True, check RHS vs. cache and/or zero to avoid some solves."
+                             "Can also be set to a dict of options for the LinearRHSChecker to "
+                             "allow finer control over it. Allowed options are: "
+                             f"{LinearRHSChecker.options}")
+
         # this solver does not iterate
         self.options.undeclare("maxiter")
         self.options.undeclare("err_on_non_converge")
@@ -200,6 +220,8 @@ class DirectSolver(LinearSolver):
 
         # Use an assembled jacobian by default.
         self.options['assemble_jac'] = True
+
+        self.supports['implicit_components'] = True
 
     def _setup_solvers(self, system, depth):
         """
@@ -214,6 +236,8 @@ class DirectSolver(LinearSolver):
         """
         super()._setup_solvers(system, depth)
         self._disallow_distrib_solve()
+        self._lin_rhs_checker = LinearRHSChecker.create(self._system(),
+                                                        self.options['rhs_checking'])
 
     def _linearize_children(self):
         """
@@ -223,6 +247,28 @@ class DirectSolver(LinearSolver):
         -------
         boolean
             Flag for indicating child linearization.
+        """
+        return False
+
+    def can_solve_cycle(self):
+        """
+        Return True if this solver can solve groups with cycles.
+
+        Returns
+        -------
+        bool
+            True if this solver can solve groups with cycles.
+        """
+        return True
+
+    def use_relevance(self):
+        """
+        Return True if relevance should be active.
+
+        Returns
+        -------
+        bool
+            True if relevance should be active.
         """
         return False
 
@@ -248,17 +294,18 @@ class DirectSolver(LinearSolver):
         mtx = np.empty((nmtx, nmtx), dtype=b_data.dtype)
         scope_out, scope_in = system._get_matvec_scope()
 
-        # Assemble the Jacobian by running the identity matrix through apply_linear
-        for i, seed in enumerate(identity_column_iter(seed)):
-            # set value of x vector to provided value
-            xvec.set_val(seed)
+        # temporarily disable relevance to avoid creating a singular matrix
+        with system._relevance.active(False):
+            # Assemble the Jacobian by running the identity matrix through apply_linear
+            for i, seed in enumerate(identity_column_iter(seed)):
+                # set value of x vector to provided value
+                xvec.set_val(seed)
 
-            # apply linear
-            system._apply_linear(self._assembled_jac, self._rel_systems, 'fwd',
-                                 scope_out, scope_in)
+                # apply linear
+                system._apply_linear(self._assembled_jac, 'fwd', scope_out, scope_in)
 
-            # put new value in out_vec
-            mtx[:, i] = bvec.asarray()
+                # put new value in out_vec
+                mtx[:, i] = bvec.asarray()
 
         # Restore the backed-up vectors
         bvec.set_val(b_data)
@@ -284,7 +331,7 @@ class DirectSolver(LinearSolver):
             elif isinstance(matrix, csc_matrix):
                 try:
                     self._lu = scipy.sparse.linalg.splu(matrix)
-                except RuntimeError as err:
+                except RuntimeError:
                     raise RuntimeError(format_singular_error(system, matrix))
 
             elif isinstance(matrix, np.ndarray):  # dense
@@ -294,11 +341,11 @@ class DirectSolver(LinearSolver):
                         warnings.simplefilter('error', RuntimeWarning)
                     try:
                         self._lup = scipy.linalg.lu_factor(matrix)
-                    except RuntimeWarning as err:
+                    except RuntimeWarning:
                         raise RuntimeError(format_singular_error(system, matrix))
 
                     # NaN in matrix.
-                    except ValueError as err:
+                    except ValueError:
                         raise RuntimeError(format_nan_error(system, matrix))
 
             # Note: calling scipy.sparse.linalg.splu on a COO actually transposes
@@ -323,12 +370,15 @@ class DirectSolver(LinearSolver):
                 try:
                     self._lup = scipy.linalg.lu_factor(mtx)
 
-                except RuntimeWarning as err:
+                except RuntimeWarning:
                     raise RuntimeError(format_singular_error(system, mtx))
 
                 # NaN in matrix.
-                except ValueError as err:
+                except ValueError:
                     raise RuntimeError(format_nan_error(system, mtx))
+
+        if self._lin_rhs_checker is not None:
+            self._lin_rhs_checker.clear()
 
     def _inverse(self):
         """
@@ -343,7 +393,6 @@ class DirectSolver(LinearSolver):
             Inverse Jacobian.
         """
         system = self._system()
-        iproc = system.comm.rank
         nproc = system.comm.size
 
         if self._assembled_jac is not None:
@@ -363,17 +412,17 @@ class DirectSolver(LinearSolver):
                         warnings.simplefilter('error', RuntimeWarning)
                     try:
                         inv_jac = scipy.linalg.inv(matrix)
-                    except RuntimeWarning as err:
+                    except RuntimeWarning:
                         raise RuntimeError(format_singular_error(system, matrix))
 
                     # NaN in matrix.
-                    except ValueError as err:
+                    except ValueError:
                         raise RuntimeError(format_nan_error(system, matrix))
 
             elif isinstance(matrix, csc_matrix):
                 try:
                     inv_jac = scipy.sparse.linalg.inv(matrix)
-                except RuntimeError as err:
+                except RuntimeError:
                     raise RuntimeError(format_singular_error(system, matrix))
 
                 # to prevent broadcasting errors later, make sure inv_jac is 2D
@@ -399,11 +448,11 @@ class DirectSolver(LinearSolver):
                 try:
                     inv_jac = scipy.linalg.inv(mtx)
 
-                except RuntimeWarning as err:
+                except RuntimeWarning:
                     raise RuntimeError(format_singular_error(system, mtx))
 
                 # NaN in matrix.
-                except ValueError as err:
+                except ValueError:
                     raise RuntimeError(format_nan_error(system, mtx))
 
         return inv_jac
@@ -417,7 +466,7 @@ class DirectSolver(LinearSolver):
         mode : str
             'fwd' or 'rev'.
         rel_systems : set of str
-            Names of systems relevant to the current solve.
+            Names of systems relevant to the current solve.  Deprecated.
         """
         system = self._system()
 
@@ -436,18 +485,30 @@ class DirectSolver(LinearSolver):
             trans_lu = 1
             trans_splu = 'T'
 
+            if self._lin_rhs_checker is not None:
+                sol_array, is_zero = self._lin_rhs_checker.get_solution(b_vec, system)
+                if is_zero:
+                    x_vec[:] = 0.0
+                    return
+                if sol_array is not None:
+                    x_vec[:] = sol_array
+                    return
+
         # AssembledJacobians are unscaled.
         if self._assembled_jac is not None:
-            full_b = tmp = b_vec
+            full_b = b_vec
 
             with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
                 if isinstance(self._assembled_jac._int_mtx, DenseMatrix):
-                    arr = scipy.linalg.lu_solve(self._lup, full_b, trans=trans_lu)
+                    sol_array = scipy.linalg.lu_solve(self._lup, full_b, trans=trans_lu)
                 else:
-                    arr = self._lu.solve(full_b, trans_splu)
+                    sol_array = self._lu.solve(full_b, trans_splu)
 
-                x_vec[:] = arr
+                x_vec[:] = sol_array
 
         # matrix-vector-product generated jacobians are scaled.
         else:
-            x_vec[:] = scipy.linalg.lu_solve(self._lup, b_vec, trans=trans_lu)
+            x_vec[:] = sol_array = scipy.linalg.lu_solve(self._lup, b_vec, trans=trans_lu)
+
+        if not system.under_complex_step and self._lin_rhs_checker is not None and mode == 'rev':
+            self._lin_rhs_checker.add_solution(b_vec, sol_array, copy=True)

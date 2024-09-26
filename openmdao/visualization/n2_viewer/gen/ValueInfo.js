@@ -14,10 +14,10 @@ class ValueInfo extends WindowResizable {
      * @param {PersistentNodeInfo} pnInfo The PersistentNodeInfo window to get data from.
      * @returns {ValueInfo} The newly constructed window.
      */
-    static add(name, val, pnInfo) {
+    static add(name, val, min, max, pnInfo) {
         if (!ValueInfo.existingValueWindows[name]) {
             ValueInfo.existingValueWindows[name] = true;
-            return new ValueInfo(name, val, pnInfo);
+            return new ValueInfo(name, val, min, max, pnInfo);
         }
     }
 
@@ -33,12 +33,18 @@ class ValueInfo extends WindowResizable {
      * references to the HTML elements.
      * @param {String} name Variable name.
      * @param {Number} val Variable value.
+     * @param {Number} min Min variable value.
+     * @param {Number} val Max variable value.
      * @param {PersistentNodeInfo} pnInfo The PersistentNodeInfo window to get data from.
      */
-    constructor(name, val, pnInfo) {
+    constructor(name, val, min, max, pnInfo) {
         super('valueInfo-' + uuidv4());
         this.name = name;
         this.val = val;
+        this.val_min = min;
+        this.val_max = max;
+        this.val_range = max - min;
+        this.val_mid = this.val_range / 2;
 
         this.table = this.body.append('table');
         this.tbody = this.table.append('tbody');
@@ -93,24 +99,50 @@ class ValueInfo extends WindowResizable {
             .text(function (d) { return d; });
 
         // Construct the table displaying the variable value
-        const evenOdd = ['even', 'odd'];
         const rows = this.tbody
             .selectAll('tr.array-row')
             .data(val)
             .enter()
             .append('tr')
-            // Style alternating rows differently:
-            .attr('class', function (d, i) { return `array-row ${evenOdd[i % 2]}`; });
+            .attr('class', 'array-row');
 
         // Insert the array index into the first column:
         rows.append('th').text(function (d, i) { return i; });
 
         // Add the contents of the array:
+        const self = this;
         rows.selectAll('td')
             .data(function (row) { return row; })
             .enter()
             .append('td')
-            .text(function (d) { return InfoPropArray.floatFormatter(d); });
+            .attr('style', d => {
+                // Since several CSS elements need to be computed at once,
+                // use the style attr instead of setting a single style.
+                let style = 'border: '
+                if ( d == self.val_min) style += '3px dashed #ff00ff; font-weight: bold';
+                else if ( d == self.val_max) style += '3px dashed yellow; font-weight: bold';
+                else style += 'none'
+
+                style += '; background-color: rgb(';
+                let percent = (d - self.val_min) / self.val_range;
+                let color = 'black';
+                if ( percent < 0.5 ) {
+                    const whiteness = 255 * percent * 2;
+                    style += `${whiteness},${whiteness},255`;
+                    if ( percent < 0.25 ) color = 'white';
+                }
+                else {
+                    if ( percent > 0.75 ) color = 'white';
+                    percent = (percent - 0.5) * 2;
+                    const whiteness = 255 * (1 - percent);
+                    style += `255,${whiteness},${whiteness}`;
+                }
+
+                style += `); color: ${color};`;
+
+                return style;
+            })
+            .text(function (d) { return InfoPropDefault.floatFormatter(d); });
 
         const pnInfoPos = pnInfo._getPos();
         this.sizeToContent(17, 17) // TODO: Properly find size of scrollbar + 2

@@ -1,8 +1,5 @@
-import errno
-import os
 import unittest
-from tempfile import mkdtemp, TemporaryFile
-from shutil import rmtree
+from tempfile import TemporaryFile
 
 import numpy as np
 
@@ -11,6 +8,7 @@ from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
 from openmdao.error_checking.check_config import get_sccs_topo
 from openmdao.utils.assert_utils import assert_warning, assert_no_warning
 from openmdao.utils.logger_utils import TestLogger
+from openmdao.utils.testing_utils import use_tempdirs
 
 
 class MyComp(om.ExecComp):
@@ -49,18 +47,11 @@ class TestCheckConfig(unittest.TestCase):
         p.setup(check=['cycles', 'out_of_order'], logger=testlogger)
         p.final_setup()
 
-        expected_info = (
-            "The following groups contain cycles:\n"
-            "   Group '' has the following cycles: [['C1', 'C2', 'C4']]\n"
-        )
-
-        expected_warning = (
-            "The following systems are executed out-of-order:\n"
-            "   System 'C3' executes out-of-order with respect to its source systems ['C4']\n"
-        )
-
-        testlogger.find_in('info', expected_info)
-        testlogger.find_in('warning', expected_warning)
+        testlogger.find_in('info', "The following groups contain cycles:")
+        testlogger.find_in('info', "   Group '' has the following cycles:")
+        testlogger.find_in('info', "      ['C1', 'C2', 'C4']")
+        testlogger.find_in('warning', "The following systems are executed out-of-order:\n"
+            "   System 'C3' executes out-of-order with respect to its source systems ['C4']\n")
 
     def test_parallel_group_order(self):
         prob = om.Problem()
@@ -70,13 +61,13 @@ class TestCheckConfig(unittest.TestCase):
         model.add_subsystem('p2', om.IndepVarComp('x', 1.0))
 
         parallel = model.add_subsystem('parallel', om.ParallelGroup())
-        parallel.add_subsystem('c1', om.ExecComp(['y=-2.0*x']))
         parallel.add_subsystem('c2', om.ExecComp(['y=5.0*x']))
+        parallel.add_subsystem('c1', om.ExecComp(['y=-2.0*x']))
         parallel.connect('c1.y', 'c2.x')
 
         parallel = model.add_subsystem('parallel_copy', om.ParallelGroup())
-        parallel.add_subsystem('comp1', om.ExecComp(['y=-2.0*x']))
         parallel.add_subsystem('comp2', om.ExecComp(['y=5.0*x']))
+        parallel.add_subsystem('comp1', om.ExecComp(['y=-2.0*x']))
         parallel.connect('comp1.y', 'comp2.x')
 
         model.add_subsystem('c3', om.ExecComp(['y=3.0*x1+7.0*x2']))
@@ -99,11 +90,8 @@ class TestCheckConfig(unittest.TestCase):
         with assert_warning(UserWarning, msg):
             prob.run_model()
 
-        expected_warning = ("The following systems are executed out-of-order:\n"
-                            "   System 'parallel.c2' executes out-of-order with respect to its source systems ['parallel.c1']\n"
-                            "   System 'parallel_copy.comp2' executes out-of-order with respect to its source systems ['parallel_copy.comp1']\n")
-
-        testlogger.find_in('warning', expected_warning)
+        for w in testlogger.get('warning'):
+            self.assertTrue('out-of-order' not in w)
 
     def test_serial_in_parallel(self):
         prob = om.Problem()
@@ -139,8 +127,8 @@ class TestCheckConfig(unittest.TestCase):
         model.add_subsystem('p2', om.IndepVarComp('x', 1.0))
 
         parallel = model.add_subsystem('parallel', om.ParallelGroup())
-        parallel.add_subsystem('c1', om.ExecComp(['y=-2.0*x']))
         parallel.add_subsystem('c2', om.ExecComp(['y=5.0*x']))
+        parallel.add_subsystem('c1', om.ExecComp(['y=-2.0*x']))
         parallel.connect('c1.y', 'c2.x')
 
         model.add_subsystem('c3', om.ExecComp(['y=3.0*x1+7.0*x2']))
@@ -159,10 +147,8 @@ class TestCheckConfig(unittest.TestCase):
         with assert_warning(UserWarning, msg):
             prob.run_model()
 
-        expected_warning = ("The following systems are executed out-of-order:\n"
-                            "   System 'parallel.c2' executes out-of-order with respect to its source systems ['parallel.c1']\n")
-
-        testlogger.find_in('warning', expected_warning)
+        for w in testlogger.get('warning'):
+            self.assertTrue('out-of-order' not in w)
 
     def test_no_connect_parallel_group(self):
         prob = om.Problem()
@@ -223,17 +209,19 @@ class TestCheckConfig(unittest.TestCase):
         p.final_setup()
 
         expected_info = (
-            "The following groups contain cycles:\n"
-            "   Group '' has the following cycles: [['G1', 'C4']]\n"
+            "The following groups contain cycles:",
+            "   Group '' has the following cycles:",
+            "      ['G1', 'C4']"
         )
 
         expected_warning = (
             "The following systems are executed out-of-order:\n"
+            "   In System 'G1', subsystem 'C1' executes out-of-order with respect to its source systems ['C2']\n"
             "   System 'C3' executes out-of-order with respect to its source systems ['C4']\n"
-            "   System 'G1.C1' executes out-of-order with respect to its source systems ['G1.C2']\n"
         )
 
-        testlogger.find_in('info', expected_info)
+        for msg in expected_info:
+            testlogger.find_in('info', msg)
         testlogger.find_in('warning', expected_warning)
 
         # test comps_only cycle check
@@ -319,8 +307,8 @@ class TestCheckConfig(unittest.TestCase):
 
         expected_warning_1 = (
             "The following systems are executed out-of-order:\n"
-            "   System 'G1.C2' executes out-of-order with respect to its source systems ['G1.N3']\n"
-            "   System 'G1.C3' executes out-of-order with respect to its source systems ['G1.C11']\n"
+            "   In System 'G1', subsystem 'C2' executes out-of-order with respect to its source systems ['N3']\n"
+            "   In System 'G1', subsystem 'C3' executes out-of-order with respect to its source systems ['C11']\n"
         )
 
         testlogger.find_in('warning', expected_warning_1)
@@ -371,18 +359,21 @@ class TestCheckConfig(unittest.TestCase):
         p.final_setup()
 
         expected_info = (
-            "The following groups contain cycles:\n"
-            "   Group 'G1' has the following cycles: "
-            "[['C13', 'C12', 'C11'], ['C23', 'C22', 'C21'], ['C3', 'C2', 'C1']]\n"
+            "The following groups contain cycles:",
+            "   Group 'G1' has the following cycles:",
+            "      ['C13', 'C12', 'C11']",
+            "      ['C23', 'C22', 'C21']",
+            "      ['C3', 'C2', 'C1']"
         )
 
         expected_warning_1 = (
             "The following systems are executed out-of-order:\n"
-            "   System 'G1.C2' executes out-of-order with respect to its source systems ['G1.N3']\n"
-            "   System 'G1.C3' executes out-of-order with respect to its source systems ['G1.C11']\n"
+            "   In System 'G1', subsystem 'C2' executes out-of-order with respect to its source systems ['N3']\n"
+            "   In System 'G1', subsystem 'C3' executes out-of-order with respect to its source systems ['C11']\n"
         )
 
-        testlogger.find_in('info', expected_info)
+        for msg in expected_info:
+            testlogger.find_in('info', msg)
         testlogger.find_in('warning', expected_warning_1)
 
     def test_unconnected_auto_ivc(self):
@@ -557,25 +548,11 @@ class TestCheckConfig(unittest.TestCase):
         testlogger.find_in('warning', msg4)
         testlogger.find_in('warning', msg5)
 
-
+@use_tempdirs
 class TestRecorderCheckConfig(unittest.TestCase):
 
     def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.temp_dir = mkdtemp()
-        os.chdir(self.temp_dir)
-
-        self.filename = os.path.join(self.temp_dir, "sqlite_test")
-        self.recorder = om.SqliteRecorder(self.filename)
-
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        try:
-            rmtree(self.temp_dir)
-        except OSError as e:
-            # If directory already deleted, keep going
-            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
-                raise e
+        self.recorder = om.SqliteRecorder("sqlite_test")
 
     def test_check_no_recorder_set(self):
         p = om.Problem()

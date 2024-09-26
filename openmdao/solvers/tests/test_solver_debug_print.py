@@ -1,10 +1,6 @@
 """Tests the `debug_print` option for Nonlinear solvers."""
 
-import os
-import re
 import sys
-import shutil
-import tempfile
 
 import unittest
 from packaging.version import Version
@@ -15,8 +11,8 @@ import numpy as np
 import openmdao.api as om
 from openmdao.test_suite.scripts.circuit_analysis import Circuit
 
-from openmdao.utils.general_utils import run_model
-from openmdao.utils.general_utils import printoptions
+from openmdao.utils.general_utils import run_model, printoptions
+from openmdao.utils.testing_utils import use_tempdirs
 
 try:
     from parameterized import parameterized
@@ -30,18 +26,9 @@ nonlinear_solvers = [
     om.BroydenSolver
 ]
 
-
+@use_tempdirs
 class TestNonlinearSolvers(unittest.TestCase):
     def setUp(self):
-        import re
-        import os
-        from tempfile import mkdtemp
-
-        # perform test in temporary directory
-        self.startdir = os.getcwd()
-        self.tempdir = mkdtemp(prefix='test_solver')
-        os.chdir(self.tempdir)
-
         # iteration coordinate, file name and variable data are common for all tests
         coord = 'rank0:root._solve_nonlinear|0|NLRunOnce|0|circuit._solve_nonlinear|0'
         self.filename = 'solver_errors.0.out'
@@ -51,37 +38,26 @@ class TestNonlinearSolvers(unittest.TestCase):
             "# Inputs and outputs at start of iteration '%s':" % coord,
             "",
             "# nonlinear inputs",
-            "{'circuit.D1.V_in': array([ 1.]),",
-            " 'circuit.D1.V_out': array([ 0.]),",
-            " 'circuit.R1.V_in': array([ 1.]),",
-            " 'circuit.R1.V_out': array([ 0.]),",
-            " 'circuit.R2.V_in': array([ 1.]),",
-            " 'circuit.R2.V_out': array([ 1.]),",
-            " 'circuit.n1.I_in:0': array([ 0.1]),",
-            " 'circuit.n1.I_out:0': array([ 1.]),",
-            " 'circuit.n1.I_out:1': array([ 1.]),",
-            " 'circuit.n2.I_in:0': array([ 1.]),",
-            " 'circuit.n2.I_out:0': array([ 1.])}",
+            "{'circuit.D1.V_in': array([ 1.+0.j]),",
+            " 'circuit.D1.V_out': array([ 0.+0.j]),",
+            " 'circuit.R1.V_in': array([ 1.+0.j]),",
+            " 'circuit.R1.V_out': array([ 0.+0.j]),",
+            " 'circuit.R2.V_in': array([ 1.+0.j]),",
+            " 'circuit.R2.V_out': array([ 1.+0.j]),",
+            " 'circuit.n1.I_in:0': array([ 0.1+0.j]),",
+            " 'circuit.n1.I_out:0': array([ 1.+0.j]),",
+            " 'circuit.n1.I_out:1': array([ 1.+0.j]),",
+            " 'circuit.n2.I_in:0': array([ 1.+0.j]),",
+            " 'circuit.n2.I_out:0': array([ 1.+0.j])}",
             "",
             "# nonlinear outputs",
-            "{'circuit.D1.I': array([ 1.]),",
-            " 'circuit.R1.I': array([ 1.]),",
-            " 'circuit.R2.I': array([ 1.]),",
-            " 'circuit.n1.V': array([ 10.]),",
-            " 'circuit.n2.V': array([ 0.001])}",
+            "{'circuit.D1.I': array([ 1.+0.j]),",
+            " 'circuit.R1.I': array([ 1.+0.j]),",
+            " 'circuit.R2.I': array([ 1.+0.j]),",
+            " 'circuit.n1.V': array([ 10.+0.j]),",
+            " 'circuit.n2.V': array([ 0.001+0.j])}",
             ""
         ])
-
-    def tearDown(self):
-        import os
-        from shutil import rmtree
-
-        # clean up the temporary directory
-        os.chdir(self.startdir)
-        try:
-            rmtree(self.tempdir)
-        except OSError:
-            pass
 
     @parameterized.expand([
         [solver.__name__, solver] for solver in nonlinear_solvers
@@ -183,27 +159,41 @@ class TestNonlinearSolvers(unittest.TestCase):
         with open(self.filename, 'r') as f:
             self.assertEqual(f.read(), self.expected_data)
 
+    def test_solver_debug_print_multi_run_scenario(self):
 
+        p = om.Problem()
+        model = p.model
+
+        model.add_subsystem('circuit', Circuit())
+
+        p.setup()
+
+        nl = model.circuit.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+
+        nl.options['iprint'] = 2
+        nl.options['debug_print'] = True
+        nl.options['err_on_non_converge'] = False
+
+        # set some poor initial guesses so that we don't converge
+        p.set_val('circuit.I_in', 0.1, units='A')
+        p.set_val('circuit.Vg', 0.0, units='V')
+        p.set_val('circuit.n1.V', 10.)
+        p.set_val('circuit.n2.V', 1e-3)
+
+        p.run_model()
+        p.set_solver_print(level=-1)
+        output = run_model(p)
+
+        # Should be empty since solver debugging printing was turned off
+        self.assertEqual(output, '')
+
+@use_tempdirs
 class TestNonlinearSolversIsolated(unittest.TestCase):
     """
     This test needs to run isolated to preclude interactions in the underlying
     `warnings` module that is used to raise the singular entry error.
     """
     ISOLATED = True
-
-    def setUp(self):
-        # perform test in temporary directory
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix='test_solver')
-        os.chdir(self.tempdir)
-
-    def tearDown(self):
-        # clean up the temporary directory
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
 
     def test_debug_after_raised_error(self):
         prob = om.Problem()

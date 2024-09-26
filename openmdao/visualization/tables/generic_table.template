@@ -49,14 +49,13 @@ for (let i = 0; i < columns.length; i++) {{
     }}
 }}
 
-function setup_tabulator(table_data) {{
-    let tab = new Tabulator(table_data.id, table_data.meta);
-    // full redraw is necessary, else word wrapping in columns is hosed until user manually
-    // resizes a column.
-    tab.redraw(true);
-}}
+// let the_table = setup_tabulator(my_table_data);
+let the_table = new Tabulator(my_table_data.id, my_table_data.meta);
 
-let the_table = setup_tabulator(my_table_data);
+
+the_table.on("tableBuilt", () => {{
+  the_table.redraw();  // otherwise columns are messed up
+}});
 
 
 </script>

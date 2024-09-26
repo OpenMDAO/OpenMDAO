@@ -5,10 +5,12 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
-from openmdao.utils.om_warnings import OMDeprecationWarning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_warnings
+from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.utils.file_utils import get_work_dir
 
 
+@use_tempdirs
 class TestSystem(unittest.TestCase):
 
     def test_vector_context_managers(self):
@@ -199,6 +201,28 @@ class TestSystem(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, msg):
             residuals['C2.y'] = bad_val.tolist()
 
+    def test_list_inputs_outputs_invalid_return_format(self):
+        from openmdao.test_suite.components.paraboloid_problem import ParaboloidProblem
+        prob = ParaboloidProblem()
+        prob.setup()
+        prob.final_setup()
+
+        with self.assertRaises(ValueError) as cm:
+            prob.model.list_inputs(return_format=dict)
+
+        msg = "Invalid value (<class 'dict'>) for return_format, " \
+              "must be a string value of 'list' or 'dict'"
+
+        self.assertEqual(str(cm.exception), msg)
+
+        with self.assertRaises(ValueError) as cm:
+            prob.model.list_outputs(return_format='dct')
+
+        msg = "Invalid value ('dct') for return_format, " \
+              "must be a string value of 'list' or 'dict'"
+
+        self.assertEqual(str(cm.exception), msg)
+
     def test_list_inputs_output_with_includes_excludes(self):
         from openmdao.test_suite.scripts.circuit_analysis import Circuit
 
@@ -213,6 +237,7 @@ class TestSystem(unittest.TestCase):
         model.connect('ground.V', 'circuit.Vg')
 
         p.setup()
+        p.set_solver_print(-1)
         p.run_model()
 
         # Inputs with no includes or excludes
@@ -251,54 +276,57 @@ class TestSystem(unittest.TestCase):
         outputs = model.list_outputs(excludes=['circuit*'], implicit=False, out_stream=None)
         self.assertEqual(len(outputs), 2)
 
-    def test_list_inputs_outputs_val_deprecation(self):
-        p = Problem()
-        p.model.add_subsystem('comp', ExecComp('b=2*a'), promotes=['a', 'b'])
-        p.setup()
-        p.run_model()
+    def test_list_inputs_outputs_is_indep_is_des_var(self):
+        from openmdao.test_suite.components.sellar_feature import SellarMDA
 
-        msg = "<model> <class Group>: The 'values' argument to 'list_inputs()' " \
-              "is deprecated and will be removed in 4.0. Please use 'val' instead."
+        model = SellarMDA()
 
-        with assert_warning(OMDeprecationWarning, msg):
-            inputs = p.model.list_inputs(values=False, out_stream=None)
-        self.assertEqual(inputs, [('comp.a', {})])
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        # model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
 
-        with assert_warning(OMDeprecationWarning, msg):
-            inputs = p.model.list_inputs(values=True, out_stream=None)
-        self.assertEqual(inputs, [('comp.a', {'val': 1})])
+        prob = Problem(model)
 
-        msg = "The metadata key 'value' will be deprecated in 4.0. Please use 'val'."
-        with assert_warning(OMDeprecationWarning, msg):
-            self.assertEqual(inputs[0][1]['value'], 1)
+        prob.setup()
+        prob.final_setup()
 
-        msg = "<model> <class Group>: The 'values' argument to 'list_outputs()' " \
-              "is deprecated and will be removed in 4.0. Please use 'val' instead."
+        indeps = model.list_inputs(is_indep_var=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in indeps]),
+                         ['cycle.d1.x', 'cycle.d1.z', 'cycle.d2.z',
+                          'obj_cmp.x', 'obj_cmp.z'])
 
-        with assert_warning(OMDeprecationWarning, msg):
-            outputs = p.model.list_outputs(values=False, out_stream=None)
-        self.assertEqual(outputs, [('comp.b', {})])
+        desvars = model.list_inputs(is_design_var=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in desvars]),
+                         ['cycle.d1.z', 'cycle.d2.z', 'obj_cmp.z'])
 
-        with assert_warning(OMDeprecationWarning, msg):
-            outputs = p.model.list_outputs(values=True, out_stream=None)
-        self.assertEqual(outputs, [('comp.b', {'val': 2})])
+        non_desvars = model.list_inputs(is_design_var=False, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in non_desvars]),
+                         ['con_cmp1.y1', 'con_cmp2.y2',
+                          'cycle.d1.x', 'cycle.d1.y2', 'cycle.d2.y1',
+                          'obj_cmp.x', 'obj_cmp.y1', 'obj_cmp.y2'])
 
-        msg = "The metadata key 'value' will be deprecated in 4.0. Please use 'val'."
-        with assert_warning(OMDeprecationWarning, msg):
-            self.assertEqual(outputs[0][1]['value'], 2)
+        nonDV_indeps = model.list_inputs(is_indep_var=True, is_design_var=False, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in nonDV_indeps]),
+                         ['cycle.d1.x', 'obj_cmp.x'])
 
-        meta = p.model.get_io_metadata(metadata_keys=('val',))
-        with assert_warning(OMDeprecationWarning, msg):
-            self.assertEqual(meta['comp.a']['value'], 1)
+        indeps = model.list_outputs(is_indep_var=True, list_autoivcs=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in indeps]),
+                         ['_auto_ivc.v0', '_auto_ivc.v1'])
 
-        with assert_warning(OMDeprecationWarning, msg):
-            meta = p.model.get_io_metadata(metadata_keys=('value',))
-        self.assertEqual(meta['comp.a']['val'], 1)
+        desvars = model.list_outputs(is_design_var=True, list_autoivcs=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in desvars]),
+                         ['_auto_ivc.v0'])
 
-        with assert_warning(OMDeprecationWarning, msg):
-            meta = p.model.get_io_metadata(metadata_keys=('value',))
-        with assert_warning(OMDeprecationWarning, msg):
-            self.assertEqual(meta['comp.a']['value'], 1)
+        non_desvars = model.list_outputs(is_design_var=False, list_autoivcs=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in non_desvars]),
+                         ['_auto_ivc.v1', 'con_cmp1.con1', 'con_cmp2.con2',
+                          'cycle.d1.y1', 'cycle.d2.y2', 'obj_cmp.obj'])
+
+        nonDV_indeps = model.list_outputs(is_indep_var=True, is_design_var=False, list_autoivcs=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in nonDV_indeps]),
+                         ['_auto_ivc.v1'])
 
     def test_setup_check_group(self):
 
@@ -384,7 +412,287 @@ class TestSystem(unittest.TestCase):
               "any `set_val` calls.")
 
         with assert_warning(UserWarning, msg):
-            prob.model.list_inputs(units=True, prom_name=True)
+            prob.model.list_inputs(units=True, prom_name=True, out_stream=None)
+
+    def test_get_io_metadata(self):
+        from openmdao.test_suite.components.sellar_feature import SellarMDA
+
+        prob = Problem()
+        prob.model = SellarMDA()
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+
+        prob.run_model()
+
+        assert_near_equal(prob.model.get_io_metadata(includes='x'), {
+                          'cycle.d1.x': {'copy_shape': None,
+                                         'compute_shape': None,
+                                         'desc': '',
+                                         'discrete': False,
+                                         'distributed': False,
+                                         'global_shape': (1,),
+                                         'global_size': 1,
+                                         'has_src_indices': False,
+                                         'prom_name': 'x',
+                                         'shape': (1,),
+                                         'shape_by_conn': False,
+                                         'size': 1,
+                                         'tags': set(),
+                                         'units': None},
+                          'obj_cmp.x':  {'copy_shape': None,
+                                         'compute_shape': None,
+                                         'desc': '',
+                                         'discrete': False,
+                                         'distributed': False,
+                                         'global_shape': (1,),
+                                         'global_size': 1,
+                                         'has_src_indices': False,
+                                         'prom_name': 'x',
+                                         'shape': (1,),
+                                         'shape_by_conn': False,
+                                         'size': 1,
+                                         'tags': set(),
+                                         'units': None}
+                            })
+
+    def test_model_options_set_all(self):
+        import openmdao.api as om
+
+        def declare_options(system):
+            system.options.declare('foo', types=(int,))
+            system.options.declare('bar', types=(float,))
+            system.options.declare('baz', types=(str,))
+
+        p = om.Problem()
+
+        G0 = p.model.add_subsystem('G0', om.Group())
+        G1 = G0.add_subsystem('G1', om.Group())
+        C1 = G0.add_subsystem('C1', om.ExecComp('y1 = a * x + b'))
+        G2 = G1.add_subsystem('G2', om.Group())
+        C2 = G1.add_subsystem('C2', om.ExecComp('y2 = y1**2'))
+        G3 = G2.add_subsystem('G3', om.Group())
+        C3 = G2.add_subsystem('C3', om.ExecComp('y3 = y2**3'))
+
+        for system in (G0, G1, C1, G2, C2, G3, C3):
+            declare_options(system)
+
+        G0.connect('C1.y1', 'G1.C2.y1')
+        G0.connect('G1.C2.y2', 'G1.G2.C3.y2')
+
+        p.model_options['*'] = {'foo': -1, 'bar': np.pi, 'baz': 'fizz'}
+
+        p.setup()
+
+        for system in (G0, G1, C1, G2, C2, G3, C3):
+            self.assertEqual(system.options['foo'], -1)
+            assert_near_equal(system.options['bar'], np.pi, tolerance=1.0E-9)
+            self.assertEqual(system.options['baz'], 'fizz')
+
+    def test_model_options_with_filter(self):
+        import openmdao.api as om
+
+        def declare_options(system):
+            system.options.declare('foo', types=(int,))
+            system.options.declare('bar', types=(float,))
+            system.options.declare('baz', types=(str,))
+
+        p = om.Problem()
+
+        G0 = p.model.add_subsystem('G0', om.Group())
+        G1 = G0.add_subsystem('G1', om.Group())
+        C1 = G0.add_subsystem('C1', om.ExecComp('y1 = a * x + b'))
+        G2 = G1.add_subsystem('G2', om.Group())
+        C2 = G1.add_subsystem('C2', om.ExecComp('y2 = y1**2'))
+        G3 = G2.add_subsystem('G3', om.Group())
+        C3 = G2.add_subsystem('C3', om.ExecComp('y3 = y2**3'))
+
+        for system in (G0, G1, C1, G2, C2, G3, C3):
+            declare_options(system)
+
+        G0.connect('C1.y1', 'G1.C2.y1')
+        G0.connect('G1.C2.y2', 'G1.G2.C3.y2')
+
+        p.model_options['*G[0123]'] = {'foo': -1, 'bar': np.pi, 'baz': 'im_a_group'}
+        p.model_options['*.C[123]'] = {'foo': 1, 'bar': -np.pi, 'baz': 'im_a_component'}
+
+        p.setup()
+
+        for system in (G0, G1, C1, G2, C2, G3, C3):
+            if isinstance(system, om.Group):
+                self.assertEqual(system.options['foo'], -1)
+                assert_near_equal(system.options['bar'], np.pi, tolerance=1.0E-9)
+                self.assertEqual(system.options['baz'], 'im_a_group')
+            elif isinstance(system, om.ExplicitComponent):
+                self.assertEqual(system.options['foo'], 1)
+                assert_near_equal(system.options['bar'], -np.pi, tolerance=1.0E-9)
+                self.assertEqual(system.options['baz'], 'im_a_component')
+
+    def test_model_options_override(self):
+        import openmdao.api as om
+
+        def declare_options(system):
+            system.options.declare('foo', types=(int,), default=0)
+            system.options.declare('bar', types=(float,), default=0.0)
+            system.options.declare('baz', types=(str,), default='')
+
+        p = om.Problem()
+
+        G0 = p.model.add_subsystem('G0', om.Group())
+        G1 = G0.add_subsystem('G1', om.Group())
+        C1 = G0.add_subsystem('C1', om.ExecComp('y1 = a * x + b'))
+        G2 = G1.add_subsystem('G2', om.Group())
+        C2 = G1.add_subsystem('C2', om.ExecComp('y2 = y1**2'))
+        G3 = G2.add_subsystem('G3', om.Group())
+        C3 = G2.add_subsystem('C3', om.ExecComp('y3 = y2**3'))
+
+        for system in (G0, G1, C1, G2, C2, G3, C3):
+            declare_options(system)
+
+        G0.connect('C1.y1', 'G1.C2.y1')
+        G0.connect('G1.C2.y2', 'G1.G2.C3.y2')
+
+        # Match all groups
+        p.model_options['*G?'] = {'foo': -1, 'bar': np.pi, 'baz': 'im_a_group'}
+        # Match all components except for C3
+        p.model_options['*.C[!3]'] = {'foo': 1, 'bar': -np.pi, 'baz': 'im_C1_or_C2'}
+
+        p.setup()
+
+        for system in (G0, G1, C1, G2, C2, G3, C3):
+            if isinstance(system, om.Group):
+                self.assertEqual(system.options['foo'], -1)
+                assert_near_equal(system.options['bar'], np.pi, tolerance=1.0E-9)
+                self.assertEqual(system.options['baz'], 'im_a_group')
+            elif isinstance(system, om.ExplicitComponent):
+                if system.pathname.endswith('C3'):
+                    # Check that the default values stuck for C3.
+                    self.assertEqual(0, system.options['foo'])
+                    assert_near_equal(system.options['bar'], 0.0, tolerance=1.0E-9)
+                    self.assertEqual('', system.options['baz'])
+                else:
+                    self.assertEqual(system.options['foo'], 1)
+                    assert_near_equal(system.options['bar'], -np.pi, tolerance=1.0E-9)
+                    self.assertEqual(system.options['baz'], 'im_C1_or_C2')
+
+    def test_group_modifies_model_options(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.options_feature_lincomb import LinearCombinationComp
+
+        class MyGroup(om.Group):
+
+            def setup(self):
+                g1 = self.add_subsystem('g1', om.Group())
+                g1.add_subsystem('c1', LinearCombinationComp())
+                g1.add_subsystem('c2', LinearCombinationComp())
+                g1.add_subsystem('c3', LinearCombinationComp())
+
+                # Send options a and b to all children of this model.
+                self.model_options[f'{self.pathname}.*'] = {'a': 3., 'b': 5.}
+
+                g1.connect('c1.y', 'c2.x')
+                g1.connect('c2.y', 'c3.x')
+
+        p = om.Problem()
+        p.model.add_subsystem('my_group', MyGroup())
+        p.setup()
+
+        p.set_val('my_group.g1.c1.x', 4)
+
+        p.run_model()
+
+        c3y = p.get_val('my_group.g1.c3.y')
+        expected = ((4 * 3 + 5) * 3 + 5) * 3 + 5.
+        assert_near_equal(expected, c3y)
+
+    @use_tempdirs
+    def test_recording_options_includes_excludes(self):
+        import openmdao.api as om
+
+        prob = om.Problem()
+
+        mag = prob.model.add_subsystem('mag', om.ExecComp('y=x**2'),
+                                       promotes_inputs=['*'], promotes_outputs=['*'])
+
+        sum = prob.model.add_subsystem('sum', om.ExecComp('z=sum(y)'),
+                                       promotes_inputs=['*'], promotes_outputs=['*'])
+
+        recorder = om.SqliteRecorder("rec_options.sql")
+        mag.add_recorder(recorder)
+        sum.add_recorder(recorder)
+
+        mag.recording_options['record_inputs'] = True
+        mag.recording_options['excludes'] = ['*x*', '*aa*']
+        mag.recording_options['includes'] = ['*y*', '*bb*']
+
+        sum.recording_options['record_inputs'] = True
+        sum.recording_options['excludes'] = ['*y*', '*cc*']
+        sum.recording_options['includes'] = ['*z*', '*dd*']
+
+        prob.setup()
+
+        expected_warnings = (
+            (om.OpenMDAOWarning, "'mag' <class ExecComp>: No matches for pattern '*aa*' in recording_options['excludes']."),
+            (om.OpenMDAOWarning, "'mag' <class ExecComp>: No matches for pattern '*bb*' in recording_options['includes']."),
+            (om.OpenMDAOWarning, "'sum' <class ExecComp>: No matches for pattern '*cc*' in recording_options['excludes']."),
+            (om.OpenMDAOWarning, "'sum' <class ExecComp>: No matches for pattern '*dd*' in recording_options['includes'].")
+        )
+
+        with assert_warnings(expected_warnings):
+            prob.final_setup()
+
+    @use_tempdirs
+    def test_record_residuals_includes_excludes(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.sellar import SellarProblem
+
+        prob = SellarProblem()
+
+        model = prob.model
+
+        recorder = om.SqliteRecorder("rec_resids.sql")
+        model.add_recorder(recorder)
+
+        # just want record residuals
+        model.recording_options['record_inputs'] = False
+        model.recording_options['record_outputs'] = False
+        model.recording_options['record_residuals'] = True
+        model.recording_options['excludes'] = ['*y1*', '*x']   # x is an input, which we are not recording
+        model.recording_options['includes'] = ['*con*', '*z']  # z is an input, which we are not recording
+
+        prob.setup()
+
+        expected_warnings = (
+            (om.OpenMDAOWarning, "<model> <class SellarDerivatives>: No matches for pattern '*x' in recording_options['excludes']."),
+            (om.OpenMDAOWarning, "<model> <class SellarDerivatives>: No matches for pattern '*z' in recording_options['includes']."),
+        )
+
+        with assert_warnings(expected_warnings):
+            prob.final_setup()
+
+    def test_get_outputs_dir(self):
+        import pathlib
+        import openmdao.api as om
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = om.Problem(name='test_prob_name')
+        model = prob.model
+
+        model.add_subsystem('comp', Paraboloid())
+
+        model.set_input_defaults('comp.x', 3.0)
+        model.set_input_defaults('comp.y', -4.0)
+
+        with self.assertRaises(RuntimeError) as e:
+            model.get_outputs_dir()
+
+        self.assertEqual('The output directory cannot be accessed before setup.',
+                         str(e.exception))
+
+        prob.setup()
+
+        d = prob.get_outputs_dir('subdir')
+        self.assertEqual(str(pathlib.Path(get_work_dir(), 'test_prob_name_out', 'subdir')), str(d))
 
 
 if __name__ == "__main__":

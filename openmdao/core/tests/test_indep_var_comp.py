@@ -3,8 +3,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_warnings
-from openmdao.utils.om_warnings import OMDeprecationWarning
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestIndepVarComp(unittest.TestCase):
@@ -43,29 +42,38 @@ class TestIndepVarComp(unittest.TestCase):
     def test_simple(self):
         """Define one independent variable and set its value."""
 
-        comp = om.IndepVarComp('openmdao:indep_var')
-        prob = om.Problem(comp).setup()
+        comp = om.IndepVarComp('indep_var')
 
-        assert_near_equal(prob.get_val('openmdao:indep_var'), 1.0)
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', comp, promotes=['*'])
+        prob.setup(check=False)
 
-        prob.set_val('openmdao:indep_var', 2.0)
-        assert_near_equal(prob.get_val('openmdao:indep_var'), 2.0)
+        assert_near_equal(prob.get_val('indep_var'), 1.0)
+
+        prob.set_val('indep_var', 2.0)
+        assert_near_equal(prob.get_val('indep_var'), 2.0)
 
     def test_simple_default(self):
         """Define one independent variable with a default value."""
 
-        comp = om.IndepVarComp('openmdao:indep_var', val=2.0)
-        prob = om.Problem(comp).setup()
+        comp = om.IndepVarComp('indep_var', val=2.0)
 
-        assert_near_equal(prob.get_val('openmdao:indep_var'), 2.0)
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', comp, promotes=['*'])
+        prob.setup(check=False)
+
+        assert_near_equal(prob.get_val('indep_var'), 2.0)
 
     def test_simple_kwargs(self):
         """Define one independent variable with a default value and additional options."""
 
-        comp = om.IndepVarComp('openmdao:indep_var', val=2.0, units='m', lower=0, upper=10)
-        prob = om.Problem(comp).setup()
+        comp = om.IndepVarComp('indep_var', val=2.0, units='m', lower=0, upper=10)
 
-        assert_near_equal(prob.get_val('openmdao:indep_var'), 2.0)
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', comp, promotes=['*'])
+        prob.setup(check=False)
+
+        assert_near_equal(prob.get_val('indep_var'), 2.0)
 
     def test_simple_array(self):
         """Define one independent array variable."""
@@ -75,10 +83,13 @@ class TestIndepVarComp(unittest.TestCase):
             [3., 4.],
         ])
 
-        comp = om.IndepVarComp('openmdao:indep_var', val=array)
-        prob = om.Problem(comp).setup()
+        comp = om.IndepVarComp('indep_var', val=array)
 
-        assert_near_equal(prob.get_val('openmdao:indep_var'), array)
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', comp, promotes=['*'])
+        prob.setup()
+
+        assert_near_equal(prob.get_val('indep_var'), array)
 
     def test_add_output(self):
         """Define two independent variables using the add_output method."""
@@ -87,10 +98,58 @@ class TestIndepVarComp(unittest.TestCase):
         comp.add_output('indep_var_1', val=1.0)
         comp.add_output('indep_var_2', val=2.0)
 
-        prob = om.Problem(comp).setup()
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', comp, promotes=['*'])
+        prob.setup(check=False)
 
         assert_near_equal(prob.get_val('indep_var_1'), 1.0)
         assert_near_equal(prob.get_val('indep_var_2'), 2.0)
+
+    def test_tuple_ivc(self):
+        """Define one independent variable using a tuple."""
+
+        ivcs = [
+            ('indep_var', 1.0),
+            ('indep_var2', 2.0),
+        ]
+
+        comp = om.IndepVarComp(ivcs)
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', comp, promotes=['*'])
+        prob.setup(check=False)
+
+        assert_near_equal(prob.get_val('indep_var'), 1.0)
+        assert_near_equal(prob.get_val('indep_var2'), 2.0)
+
+    def test_tuple_ivc_kwargs(self):
+        """Define one independent variable using a tuple with additional options."""
+
+        ivcs = [
+            ('indep_var', 1.0, {'units': 'm'}),
+            ('indep_var2', 2.0, {'units': 'm'}),
+        ]
+
+        comp = om.IndepVarComp(ivcs)
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', comp, promotes=['*'])
+        prob.setup(check=False)
+
+        assert_near_equal(prob.get_val('indep_var', units='m'), 1.0)
+        assert_near_equal(prob.get_val('indep_var2', units='m'), 2.0)
+
+    def test_tuple_error(self):
+        """Test to see if the objects in the list are actually tuples."""
+            
+        ivcs = ['indep_var', 'indep_var2']
+
+        try:
+            om.IndepVarComp(ivcs)
+        except TypeError as err:
+            self.assertEqual(str(err), "Each entry in the list of tuples must be of type tuple.")
+        else:
+            self.fail('Exception expected.')
 
     def test_promote_glob_no_inputs(self):
         p = om.Problem()
@@ -98,14 +157,17 @@ class TestIndepVarComp(unittest.TestCase):
                               om.IndepVarComp('x', 2.0),
                               promotes_inputs=['*'],
                               promotes_outputs=['x'])
-        p.model.add_subsystem('C1', om.ExecComp('y=x'), promotes_inputs=['x'], promotes_outputs=['y'])
+
+        p.model.add_subsystem('C1', om.ExecComp('y=x'),
+                              promotes_inputs=['x'],
+                              promotes_outputs=['y'])
         p.setup()
         p.run_model()
         self.assertEqual(p.get_val('x'), p.get_val('y'))
 
     def test_invalid_tags(self):
         with self.assertRaises(TypeError) as cm:
-            comp = om.IndepVarComp('openmdao:indep_var', tags=99)
+            om.IndepVarComp('indep_var', tags=99)
 
         self.assertEqual(str(cm.exception),
             "IndepVarComp: Value (99) of option 'tags' has type 'int', "
@@ -114,30 +176,34 @@ class TestIndepVarComp(unittest.TestCase):
     def test_simple_with_tags(self):
         """Define one independent variable and set its value. Try filtering with tag"""
 
-        comp = om.IndepVarComp('openmdao:indep_var', tags='tag1')
-        prob = om.Problem(comp).setup(check=False)
+        comp = om.IndepVarComp('indep_var', tags='tag1')
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', comp, promotes=['*'])
+        prob.setup(check=False)
+
         prob.run_model()
 
         # Outputs no tags
-        outputs = prob.model.list_outputs(values=False, out_stream=None)
+        outputs = prob.model.list_outputs(val=False, prom_name=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('openmdao:indep_var', {}),
+            ('comp.indep_var', {}),
         ])
 
         # Outputs with automatically added indep_var_comp tag
-        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="openmdao:indep_var")
+        outputs = prob.model.list_outputs(val=False, prom_name=False, out_stream=None, tags="openmdao:indep_var")
         self.assertEqual(sorted(outputs), [
-            ('openmdao:indep_var', {}),
+            ('comp.indep_var', {}),
         ])
 
         # Outputs with tag
-        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag1")
+        outputs = prob.model.list_outputs(val=False, prom_name=False, out_stream=None, tags="tag1")
         self.assertEqual(sorted(outputs), [
-            ('openmdao:indep_var', {}),
+            ('comp.indep_var', {}),
         ])
 
         # Outputs with wrong tag
-        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag_wrong")
+        outputs = prob.model.list_outputs(val=False, prom_name=False, out_stream=None, tags="tag_wrong")
         self.assertEqual(sorted(outputs), [])
 
     def test_add_output_with_tags(self):
@@ -145,49 +211,54 @@ class TestIndepVarComp(unittest.TestCase):
         Add tags to them and see if we can filter them with list_outputs"""
 
         comp = om.IndepVarComp()
-        comp.add_output('indep_var_1', val=1.0, tags="tag1")
-        comp.add_output('indep_var_2', val=2.0, tags="tag2")
+        comp.add_output('var_1', val=1.0, tags="tag1")
+        comp.add_output('var_2', val=2.0, tags="tag2")
 
-        prob = om.Problem(comp).setup(check=False)
+        prob = om.Problem()
+        prob.model.add_subsystem('indep', comp, promotes=['*'])
+        prob.setup(check=False)
         prob.run_model()
 
         # Outputs no tags
-        outputs = prob.model.list_outputs(out_stream=None)
+        outputs = prob.model.list_outputs(out_stream=None, prom_name=False)
         self.assertEqual(sorted(outputs), [
-            ('indep_var_1', {'val': [1.]}),
-            ('indep_var_2', {'val': [2.]}),
+            ('indep.var_1', {'val': [1.]}),
+            ('indep.var_2', {'val': [2.]}),
         ])
 
         # Outputs with tags
-        outputs = prob.model.list_outputs(out_stream=None, tags="tag1")
+        outputs = prob.model.list_outputs(out_stream=None, prom_name=False, tags="tag1")
         self.assertEqual(sorted(outputs), [
-            ('indep_var_1', {'val': [1.]}),
+            ('indep.var_1', {'val': [1.]}),
         ])
 
         # Outputs with the indep_var tags
-        outputs = prob.model.list_outputs(out_stream=None, tags="openmdao:indep_var")
+        outputs = prob.model.list_outputs(out_stream=None, prom_name=False, tags="openmdao:indep_var")
         self.assertEqual(sorted(outputs), [
-            ('indep_var_1', {'val': [1.]}),
-            ('indep_var_2', {'val': [2.]}),
+            ('indep.var_1', {'val': [1.]}),
+            ('indep.var_2', {'val': [2.]}),
         ])
 
         # Outputs with multiple tags
-        outputs = prob.model.list_outputs(out_stream=None, tags=["tag1", "tag2"])
+        outputs = prob.model.list_outputs(out_stream=None, prom_name=False, tags=["tag1", "tag2"])
         self.assertEqual(sorted(outputs), [
-            ('indep_var_1', {'val': [1.]}),
-            ('indep_var_2', {'val': [2.]}),
+            ('indep.var_1', {'val': [1.]}),
+            ('indep.var_2', {'val': [2.]}),
         ])
 
         # Outputs with tag that does not match
-        outputs = prob.model.list_outputs(out_stream=None, tags="tag3")
+        outputs = prob.model.list_outputs(out_stream=None, prom_name=False, tags="tag3")
         self.assertEqual(sorted(outputs), [])
 
     def test_error_novars(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', om.IndepVarComp())
+
         try:
-            prob = om.Problem(om.IndepVarComp()).setup()
+            prob.setup()
         except Exception as err:
             self.assertEqual(str(err),
-                "<model> <class IndepVarComp>: No outputs (independent variables) have been declared. They must either be declared during "
+                "'comp' <class IndepVarComp>: No outputs (independent variables) have been declared. They must either be declared during "
                 "instantiation or by calling add_output or add_discrete_output afterwards.")
         else:
             self.fail('Exception expected.')
@@ -195,7 +266,9 @@ class TestIndepVarComp(unittest.TestCase):
     def test_error_bad_arg(self):
         try:
             comp = om.IndepVarComp(1.0)
-            prob = om.Problem(comp).setup()
+            prob = om.Problem()
+            prob.model.add_subsystem('comp', comp, promotes=['*'])
+            prob.setup()
         except Exception as err:
             self.assertEqual(str(err),
                 "first argument to IndepVarComp init must be either of type "
@@ -230,12 +303,29 @@ class TestIndepVarComp(unittest.TestCase):
                 self.add_discrete_output('num_x', val = np.zeros(self.options['num_x']))
                 self.add_output('val_y',val = self.options['val_y'])
 
-        prob = om.Problem(model=Parameters(num_x=4, val_y=2.5))
-        prob.setup()
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', Parameters(num_x=4, val_y=2.5), promotes=['*'])
+        prob.setup(check=False)
+
         prob.run_model()
 
         self.assertEqual(len(prob.get_val('num_x')), 4)
         self.assertEqual(prob.get_val('val_y'), 2.5)
+
+    def test_add_input(self):
+        try:
+            prob = om.Problem()
+            ivc = prob.model.add_subsystem('ivc', om.IndepVarComp(), promotes=['*'])
+            ivc.add_input('x', 1.0)
+        except Exception as err:
+            self.assertEqual(str(err), "Can't add input 'x' to IndepVarComp 'ivc'. IndepVarComps are "
+                             "not allowed to have inputs. If you want IndepVarComp-like behavior for "
+                             "some outputs of a component that has inputs, you can tag those outputs "
+                             "with 'openmdao:indep_var' and 'openmdao:allow_desvar' and they will be "
+                             "treated as independent variables.")
+        else:
+            self.fail('Exception expected.')
 
 
 if __name__ == '__main__':

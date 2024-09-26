@@ -1,6 +1,7 @@
 """
 Test DOE Driver and Generators.
 """
+from io import StringIO
 import unittest
 
 import os
@@ -10,6 +11,8 @@ import csv
 
 import numpy as np
 
+from packaging.version import Version
+
 import openmdao.api as om
 
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -17,7 +20,7 @@ from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.groups.parallel_groups import FanInGrouped
 
 from openmdao.utils.assert_utils import assert_near_equal
-from openmdao.utils.general_utils import run_driver, printoptions
+from openmdao.utils.general_utils import run_driver
 from openmdao.utils.testing_utils import use_tempdirs
 
 from openmdao.utils.mpi import MPI
@@ -26,6 +29,11 @@ try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
     PETScVector = None
+
+try:
+    import pyDOE3
+except ImportError:
+    pyDOE3 = None
 
 
 class ParaboloidArray(om.ExplicitComponent):
@@ -73,7 +81,7 @@ class ParaboloidDiscreteArray(om.ExplicitComponent):
         x = discrete_inputs['x']
         y = discrete_inputs['y']
         f_xy = (x - 3.0)**2 + x * y + (y + 4.0)**2 - 3.0
-        discrete_outputs['f_xy'] = f_xy.astype(np.int)
+        discrete_outputs['f_xy'] = f_xy.astype(int)
 
 
 class TestErrors(unittest.TestCase):
@@ -95,6 +103,27 @@ class TestErrors(unittest.TestCase):
                          "DOEDriver requires an instance of DOEGenerator, "
                          "but an instance of Problem was found.")
 
+    @unittest.skipIf(pyDOE3, "only runs if 'pyDOE3' is not installed")
+    def test_no_pyDOE3(self):
+        with self.assertRaises(RuntimeError) as err:
+            om.FullFactorialGenerator(levels=3)
+
+        self.assertEqual(str(err.exception),
+                         "FullFactorialGenerator requires the 'pyDOE3' package, "
+                         "which can be installed with one of the following commands:\n"
+                         "    pip install openmdao[doe]\n"
+                         "    pip install pyDOE3")
+
+        with self.assertRaises(RuntimeError) as err:
+            om.DOEDriver(generator=om.FullFactorialGenerator(levels=3))
+
+        self.assertEqual(str(err.exception),
+                         "FullFactorialGenerator requires the 'pyDOE3' package, "
+                         "which can be installed with one of the following commands:\n"
+                         "    pip install openmdao[doe]\n"
+                         "    pip install pyDOE3")
+
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_lhc_criterion(self):
         with self.assertRaises(ValueError) as err:
             om.LatinHypercubeGenerator(criterion='foo')
@@ -109,6 +138,20 @@ class TestErrors(unittest.TestCase):
 class TestDOEDriver(unittest.TestCase):
 
     def setUp(self):
+        self.fullfact3 = [
+            [('x', 0.), ('y', 0.)],
+            [('x', .5), ('y', 0.)],
+            [('x', 1.), ('y', 0.)],
+
+            [('x', 0.), ('y', .5)],
+            [('x', .5), ('y', .5)],
+            [('x', 1.), ('y', .5)],
+
+            [('x', 0.), ('y', 1.)],
+            [('x', .5), ('y', 1.)],
+            [('x', 1.), ('y', 1.)],
+        ]
+
         self.expected_fullfact3 = [
             {'x': np.array([0.]), 'y': np.array([0.]), 'f_xy': np.array([22.00])},
             {'x': np.array([.5]), 'y': np.array([0.]), 'f_xy': np.array([19.25])},
@@ -123,7 +166,7 @@ class TestDOEDriver(unittest.TestCase):
             {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         ]
 
-        self.expected_fullfact_derivs3 = [
+        self.expected_fullfact3_derivs = [
             {('f_xy', 'x'): np.array(-6.), ('f_xy', 'y'): np.array(8.)},
             {('f_xy', 'x'): np.array(-5.), ('f_xy', 'y'): np.array(8.5)},
             {('f_xy', 'x'): np.array(-4.), ('f_xy', 'y'): np.array(9.)},
@@ -156,7 +199,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 0)
@@ -175,12 +218,8 @@ class TestDOEDriver(unittest.TestCase):
 
         prob.setup()
 
-        # create a list of DOE cases
-        case_gen = om.FullFactorialGenerator(levels=3)
-        cases = list(case_gen(model.get_design_vars(recurse=True)))
-
         # create DOEDriver using provided list of cases
-        prob.driver = om.DOEDriver(cases)
+        prob.driver = om.DOEDriver(self.fullfact3)
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.run_driver()
@@ -188,7 +227,7 @@ class TestDOEDriver(unittest.TestCase):
 
         expected = self.expected_fullfact3
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 9)
@@ -231,8 +270,8 @@ class TestDOEDriver(unittest.TestCase):
 
         # data contains a list of list, but one has the wrong length
         cases = [
-            [['p1.x', 0.], ['p2.y', 0.]],
-            [['p1.x', 1.], ['p2.y', 1., 'foo']]
+            [['x', 0.], ['y', 0.]],
+            [['x', 1.], ['y', 1., 'foo']]
         ]
 
         prob.driver = om.DOEDriver(generator=om.ListGenerator(cases))
@@ -241,12 +280,12 @@ class TestDOEDriver(unittest.TestCase):
             prob.run_driver()
         self.assertEqual(str(err.exception), "Invalid DOE case found, "
                          "expecting a list of name/value pairs:\n"
-                         "[['p1.x', 1.0], ['p2.y', 1.0, 'foo']]")
+                         "[['x', 1.0], ['y', 1.0, 'foo']]")
 
         # data contains a list of list, but one case has an invalid design var
         cases = [
-            [['p1.x', 0.], ['p2.y', 0.]],
-            [['p1.x', 1.], ['p2.z', 1.]]
+            [['x', 0.], ['y', 0.]],
+            [['x', 1.], ['z', 1.]]
         ]
 
         prob.driver = om.DOEDriver(generator=om.ListGenerator(cases))
@@ -254,12 +293,12 @@ class TestDOEDriver(unittest.TestCase):
         with self.assertRaises(RuntimeError) as err:
             prob.run_driver()
         self.assertEqual(str(err.exception), "Invalid DOE case found, "
-                         "'p2.z' is not a valid design variable:\n"
-                         "[['p1.x', 1.0], ['p2.z', 1.0]]")
+                         "'z' is not a valid design variable:\n"
+                         "[['x', 1.0], ['z', 1.0]]")
 
         # data contains a list of list, but one case has multiple invalid design vars
         cases = [
-            [['p1.x', 0.], ['p2.y', 0.]],
+            [['x', 0.], ['y', 0.]],
             [['p1.y', 1.], ['p2.z', 1.]]
         ]
 
@@ -284,11 +323,8 @@ class TestDOEDriver(unittest.TestCase):
 
         prob.setup()
 
-        # create a list of DOE cases
-        case_gen = om.FullFactorialGenerator(levels=3)
-        cases = list(case_gen(model.get_design_vars(recurse=True)))
-
         # generate CSV file with cases
+        cases = self.fullfact3
         header = [var for (var, val) in cases[0]]
         with open('cases.csv', 'w') as f:
             writer = csv.writer(f)
@@ -305,7 +341,7 @@ class TestDOEDriver(unittest.TestCase):
 
         expected = self.expected_fullfact3
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 9)
@@ -315,6 +351,7 @@ class TestDOEDriver(unittest.TestCase):
             for name in ('x', 'y', 'f_xy'):
                 self.assertEqual(outputs[name], expected_case[name])
 
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_csv_array(self):
         prob = om.Problem()
         model = prob.model
@@ -373,7 +410,7 @@ class TestDOEDriver(unittest.TestCase):
             {'p1.x': np.array([1., 1.]), 'p2.y': np.array([1., 1.])},
         ]
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 16)
@@ -412,10 +449,8 @@ class TestDOEDriver(unittest.TestCase):
 
         prob.setup()
 
-        case_gen = om.FullFactorialGenerator(levels=2)
-        cases = list(case_gen(model.get_design_vars(recurse=True)))
-
         # test CSV file with an invalid design var
+        cases = self.fullfact3
         header = [var for var, _ in cases[0]]
         header[-1] = 'foobar'
         with open('cases.csv', 'w') as f:
@@ -452,18 +487,11 @@ class TestDOEDriver(unittest.TestCase):
             for case in cases:
                 writer.writerow([np.ones((2, 2)) * val for _, val in case])
 
-        from packaging.version import Version
-        if Version(np.__version__) >= Version("1.14"):
-            opts = {'legacy': '1.13'}
-        else:
-            opts = {}
-
-        with printoptions(**opts):
-            # have to use regex to handle differences in numpy print formats for shape
-            msg = f"Error assigning p1.x = \[ 0.  0.  0.  0.\]: could not broadcast " \
-                  f"input array from shape \(4.*\) into shape \(1.*\)"
-            with self.assertRaisesRegex(ValueError, msg):
-                prob.run_driver()
+        with self.assertRaises(ValueError) as err:
+            prob.run_driver()
+        self.assertEqual(str(err.exception),
+                         "Error assigning x = [0. 0. 0. 0.]: could not broadcast "
+                         "input array from shape (4,) into shape (1,)")
 
     def test_uniform(self):
         prob = om.Problem()
@@ -493,7 +521,7 @@ class TestDOEDriver(unittest.TestCase):
             {'x': np.array([9.27325521]), 'y': np.array([-2.33116962])},
         ]
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 5)
@@ -503,6 +531,7 @@ class TestDOEDriver(unittest.TestCase):
             for name in ('x', 'y'):
                 assert_near_equal(outputs[name], expected_case[name], 1e-4)
 
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_full_factorial(self):
         prob = om.Problem()
         model = prob.model
@@ -523,7 +552,7 @@ class TestDOEDriver(unittest.TestCase):
 
         expected = self.expected_fullfact3
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 9)
@@ -533,6 +562,7 @@ class TestDOEDriver(unittest.TestCase):
             for name in ('x', 'y', 'f_xy'):
                 self.assertEqual(outputs[name], expected_case[name])
 
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_full_factorial_factoring(self):
 
         class Digits2Num(om.ExplicitComponent):
@@ -569,16 +599,17 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
-        objs = [int(cr.get_case(case).outputs['f']) for case in cases]
+        objs = [cr.get_case(case).outputs['f'].item() for case in cases]
 
         self.assertEqual(len(objs), 16)
         # Testing uniqueness. If all elements are unique, it should be the same length as the
         # number of cases
         self.assertEqual(len(set(objs)), 16)
 
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_full_factorial_array(self):
         prob = om.Problem()
         model = prob.model
@@ -610,7 +641,7 @@ class TestDOEDriver(unittest.TestCase):
             {'xy': np.array([10.,  50.])},
         ]
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 9)
@@ -620,6 +651,7 @@ class TestDOEDriver(unittest.TestCase):
             self.assertEqual(outputs['xy'][0], expected_case['xy'][0])
             self.assertEqual(outputs['xy'][1], expected_case['xy'][1])
 
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_full_fact_dict_levels(self):
         # Specifying levels only for one DV, the other is defaulted
         prob = om.Problem()
@@ -636,9 +668,6 @@ class TestDOEDriver(unittest.TestCase):
             {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         ]
 
-        # size = prob.comm.size
-        # rank = prob.comm.rank
-
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
         model.set_input_defaults('x', 0.0)
         model.set_input_defaults('y', 0.0)
@@ -653,7 +682,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 6)
@@ -664,6 +693,7 @@ class TestDOEDriver(unittest.TestCase):
             self.assertEqual(outputs['y'], expected_case['y'])
             self.assertEqual(outputs['f_xy'], expected_case['f_xy'])
 
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_generalized_subset(self):
         # All DVs have the same number of levels
         prob = om.Problem()
@@ -689,7 +719,7 @@ class TestDOEDriver(unittest.TestCase):
             {'x': np.array([1.0]), 'y': np.array([1.0]), 'f_xy': np.array([27.0])},
         ]
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver')
 
         self.assertEqual(len(cases), 2)
@@ -699,6 +729,7 @@ class TestDOEDriver(unittest.TestCase):
             for name in ('x', 'y', 'f_xy'):
                 self.assertEqual(outputs[name], expected_case[name])
 
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_generalized_subset_dict_levels(self):
         # Number of variables specified individually for all DVs (scalars).
         prob = om.Problem()
@@ -731,7 +762,7 @@ class TestDOEDriver(unittest.TestCase):
             {'x': np.array([0.5]), 'y': np.array([1.]), 'f_xy': np.array([28.75])},
         ]
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver')
 
         self.assertEqual(len(cases), 9)
@@ -741,6 +772,7 @@ class TestDOEDriver(unittest.TestCase):
             for name in ('x', 'y', 'f_xy'):
                 self.assertAlmostEqual(outputs[name][0], expected_case[name][0])
 
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_generalized_subset_array(self):
         # Number of levels specified individually for all DVs (arrays).
 
@@ -778,15 +810,16 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
-        objs = [int(cr.get_case(case).outputs['f']) for case in cases]
+        objs = [cr.get_case(case).outputs['f'].item() for case in cases]
 
-        self.assertEqual(len(objs), 104)  # The number can be verified with standalone pyDOE2
+        self.assertEqual(len(objs), 104)  # The number can be verified with standalone pyDOE3
         # Testing uniqueness. If all elements are unique, it should be the same length as the number of cases
         self.assertEqual(len(set(objs)), 104)
 
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_plackett_burman(self):
         prob = om.Problem()
         model = prob.model
@@ -813,7 +846,7 @@ class TestDOEDriver(unittest.TestCase):
             {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         ]
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 4)
@@ -823,6 +856,7 @@ class TestDOEDriver(unittest.TestCase):
             for name in ('x', 'y', 'f_xy'):
                 self.assertEqual(outputs[name], expected_case[name])
 
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_box_behnken(self):
         upper = 10.
         center = 1
@@ -850,7 +884,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         # The Box-Behnken design for 3 factors involves three blocks, in each of
@@ -859,30 +893,52 @@ class TestDOEDriver(unittest.TestCase):
         # ref: https://en.wikipedia.org/wiki/Box-Behnken_design
         self.assertEqual(len(cases), (3*4)+center)
 
-        expected = [
-            {'x': np.array([0.]), 'y': np.array([0.]), 'z': np.array([5.])},
-            {'x': np.array([10.]), 'y': np.array([0.]), 'z': np.array([5.])},
-            {'x': np.array([0.]), 'y': np.array([10.]), 'z': np.array([5.])},
-            {'x': np.array([10.]), 'y': np.array([10.]), 'z': np.array([5.])},
+        # slight change in order from refactor in pyDOE3 v1.0.4 (PR #15)
+        if Version(pyDOE3.__version__) >= Version("1.0.4"):
+            expected = [
+                {'x': np.array([0.]), 'y': np.array([0.]), 'z': np.array([5.])},
+                {'x': np.array([0.]), 'y': np.array([10.]), 'z': np.array([5.])},
+                {'x': np.array([10.]), 'y': np.array([0.]), 'z': np.array([5.])},
+                {'x': np.array([10.]), 'y': np.array([10.]), 'z': np.array([5.])},
 
-            {'x': np.array([0.]), 'y': np.array([5.]), 'z': np.array([0.])},
-            {'x': np.array([10.]), 'y': np.array([5.]), 'z': np.array([0.])},
-            {'x': np.array([0.]), 'y': np.array([5.]), 'z': np.array([10.])},
-            {'x': np.array([10.]), 'y': np.array([5.]), 'z': np.array([10.])},
+                {'x': np.array([0.]), 'y': np.array([5.]), 'z': np.array([0.])},
+                {'x': np.array([0.]), 'y': np.array([5.]), 'z': np.array([10.])},
+                {'x': np.array([10.]), 'y': np.array([5.]), 'z': np.array([0.])},
+                {'x': np.array([10.]), 'y': np.array([5.]), 'z': np.array([10.])},
 
-            {'x': np.array([5.]), 'y': np.array([0.]), 'z': np.array([0.])},
-            {'x': np.array([5.]), 'y': np.array([10.]), 'z': np.array([0.])},
-            {'x': np.array([5.]), 'y': np.array([0.]), 'z': np.array([10.])},
-            {'x': np.array([5.]), 'y': np.array([10.]), 'z': np.array([10.])},
+                {'x': np.array([5.]), 'y': np.array([0.]), 'z': np.array([0.])},
+                {'x': np.array([5.]), 'y': np.array([0.]), 'z': np.array([10.])},
+                {'x': np.array([5.]), 'y': np.array([10.]), 'z': np.array([0.])},
+                {'x': np.array([5.]), 'y': np.array([10.]), 'z': np.array([10.])},
 
-            {'x': np.array([5.]), 'y': np.array([5.]), 'z': np.array([5.])},
-        ]
+                {'x': np.array([5.]), 'y': np.array([5.]), 'z': np.array([5.])}
+            ]
+        else:
+            expected = [
+                {'x': np.array([0.]), 'y': np.array([0.]), 'z': np.array([5.])},
+                {'x': np.array([10.]), 'y': np.array([0.]), 'z': np.array([5.])},
+                {'x': np.array([0.]), 'y': np.array([10.]), 'z': np.array([5.])},
+                {'x': np.array([10.]), 'y': np.array([10.]), 'z': np.array([5.])},
+
+                {'x': np.array([0.]), 'y': np.array([5.]), 'z': np.array([0.])},
+                {'x': np.array([10.]), 'y': np.array([5.]), 'z': np.array([0.])},
+                {'x': np.array([0.]), 'y': np.array([5.]), 'z': np.array([10.])},
+                {'x': np.array([10.]), 'y': np.array([5.]), 'z': np.array([10.])},
+
+                {'x': np.array([5.]), 'y': np.array([0.]), 'z': np.array([0.])},
+                {'x': np.array([5.]), 'y': np.array([10.]), 'z': np.array([0.])},
+                {'x': np.array([5.]), 'y': np.array([0.]), 'z': np.array([10.])},
+                {'x': np.array([5.]), 'y': np.array([10.]), 'z': np.array([10.])},
+
+                {'x': np.array([5.]), 'y': np.array([5.]), 'z': np.array([5.])},
+            ]
 
         for case, expected_case in zip(cases, expected):
             outputs = cr.get_case(case).outputs
             for name in ('x', 'y', 'z'):
                 self.assertEqual(outputs[name], expected_case[name])
 
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_latin_hypercube(self):
         samples = 4
 
@@ -933,15 +989,15 @@ class TestDOEDriver(unittest.TestCase):
             {'x': np.array([-0.72559325]), 'y': np.array([-2.27558409])},
         ]
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 4)
 
         for case, expected_case in zip(cases, expected):
             outputs = cr.get_case(case).outputs
-            x = outputs['x']
-            y = outputs['y']
+            x = outputs['x'].item()
+            y = outputs['y'].item()
 
             bucket = int((x + x_offset) / (x_bucket_size / samples))
             x_buckets_filled.add(bucket)
@@ -955,6 +1011,7 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(x_buckets_filled, all_buckets)
         self.assertEqual(y_buckets_filled, all_buckets)
 
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_latin_hypercube_array(self):
         samples = 4
 
@@ -1001,7 +1058,7 @@ class TestDOEDriver(unittest.TestCase):
             {'xy': np.array([-7.25593248, -11.37792043])},
         ]
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 4)
@@ -1023,6 +1080,7 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(x_buckets_filled, all_buckets)
         self.assertEqual(y_buckets_filled, all_buckets)
 
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_latin_hypercube_center(self):
         samples = 4
         upper = 10.
@@ -1051,7 +1109,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), samples)
@@ -1069,8 +1127,8 @@ class TestDOEDriver(unittest.TestCase):
 
         for case in cases:
             outputs = cr.get_case(case).outputs
-            x = float(outputs['indep.x'])
-            y = float(outputs['indep.y'])
+            x = outputs['indep.x'].item()
+            y = outputs['indep.y'].item()
 
             x_buckets_filled.add(int(x/bucket_size))
             y_buckets_filled.add(int(y/bucket_size))
@@ -1081,6 +1139,7 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(x_buckets_filled, all_buckets)
         self.assertEqual(y_buckets_filled, all_buckets)
 
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_record_bug(self):
         # There was a bug that caused values to be recorded in driver_scaled form.
 
@@ -1106,7 +1165,7 @@ class TestDOEDriver(unittest.TestCase):
 
         prob.run_driver()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         final_case = cr.list_cases('driver', out_stream=None)[-1]
         outputs = cr.get_case(final_case).outputs
 
@@ -1144,7 +1203,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         expected = [{'x': 5, 'y': 1, 'f_xy': 31},
@@ -1195,7 +1254,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         expected = ['abc', None]
@@ -1213,8 +1272,8 @@ class TestDOEDriver(unittest.TestCase):
 
         # Add independent variables
         indeps = model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
-        indeps.add_discrete_output('x', np.ones((2, ), dtype=np.int))
-        indeps.add_discrete_output('y', np.ones((2, ), dtype=np.int))
+        indeps.add_discrete_output('x', np.ones((2, ), dtype=int))
+        indeps.add_discrete_output('y', np.ones((2, ), dtype=int))
 
         # Add components
         model.add_subsystem('parab', ParaboloidDiscreteArray(), promotes=['*'])
@@ -1234,9 +1293,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.record("end")
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('problem', out_stream=None)
-
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         case = cr.get_case('end')
         inputs = case.inputs
         outputs = case.outputs
@@ -1269,13 +1326,13 @@ class TestDOEDriver(unittest.TestCase):
 
         prob.setup()
 
-        prob.set_val('x', np.ones((2, ), dtype=np.int))
-        prob.set_val('y', np.ones((2, ), dtype=np.int))
+        prob.set_val('x', np.ones((2, ), dtype=int))
+        prob.set_val('y', np.ones((2, ), dtype=int))
 
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         expected = [{'x': np.array([5, 1]), 'y': np.array([1, 4]), 'f_xy': np.array([31, 69])},
@@ -1325,7 +1382,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         expected = [{'x': 5, 'y': 1, 'f_xy': 31},
@@ -1340,11 +1397,13 @@ class TestDOEDriver(unittest.TestCase):
                 self.assertEqual(outputs[name], expected_case[name])
                 self.assertTrue(isinstance(outputs[name], int))
 
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_desvar_indices(self):
         prob = om.Problem()
         prob.model.add_subsystem('comp', om.ExecComp('y=x**2',
-                                                x=np.array([1., 2., 3.]),
-                                                y=np.zeros(3)), promotes=['*'])
+                                                     x=np.array([1., 2., 3.]),
+                                                     y=np.zeros(3)),
+                                 promotes=['*'])
         prob.model.add_design_var('x', lower=7.0, upper=11.0, indices=[0])
         prob.model.add_objective('y', index=0)
         prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
@@ -1388,12 +1447,13 @@ class TestDOEDriver(unittest.TestCase):
         prob2.run_driver()
         prob2.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob2.get_outputs_dir() / "cases.sql")
         outputs = cr.get_case(0).outputs
 
         for name in ('x', 'y', 'z'):
             assert_near_equal(outputs[name], prob[name])
 
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_multi_constraint_doe(self):
         prob = om.Problem()
         prob.model.add_subsystem('comp', om.ExecComp('y=x**2 + b',
@@ -1412,7 +1472,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver')
 
         for case in cases:
@@ -1430,7 +1490,7 @@ class TestDOEDriver(unittest.TestCase):
         model.add_design_var('y', lower=0.0, upper=1.0)
         model.add_objective('f_xy')
 
-        prob.driver = om.DOEDriver(generator=om.FullFactorialGenerator(levels=3))
+        prob.driver = om.DOEDriver(self.fullfact3)
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
         prob.driver.recording_options['record_derivatives'] = True
 
@@ -1439,9 +1499,9 @@ class TestDOEDriver(unittest.TestCase):
         prob.cleanup()
 
         expected_vals = self.expected_fullfact3
-        expected_derivs = self.expected_fullfact_derivs3
+        expected_derivs = self.expected_fullfact3_derivs
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 9)
@@ -1450,11 +1510,54 @@ class TestDOEDriver(unittest.TestCase):
             outputs = cr.get_case(case).outputs
             for name in ('x', 'y', 'f_xy'):
                 self.assertEqual(outputs[name], expected_val[name])
-            
+
             derivs = cr.get_case(case).derivatives
             for dv in ('x', 'y'):
                 self.assertEqual(derivs['f_xy', dv], expected_deriv['f_xy', dv])
-                # print(f"derivs: 'f_xy', {dv} = {derivs['f_xy', dv]}")
+
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
+    def test_derivative_scaled_recording(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+        model.set_input_defaults('x', 0.0)
+        model.set_input_defaults('y', 0.0)
+        model.add_design_var('x', lower=0.0, upper=1.0, ref=5.0)
+        model.add_design_var('y', lower=0.0, upper=1.0, ref=10.0)
+        model.add_objective('f_xy', ref=2.0)
+
+        prob.driver = om.DOEDriver(generator=om.FullFactorialGenerator(levels=3))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+        prob.driver.recording_options['record_derivatives'] = True
+
+        prob.setup()
+        result = prob.run_driver()
+        prob.cleanup()
+
+        expected_vals = self.expected_fullfact3
+        expected_derivs = self.expected_fullfact3_derivs
+
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
+        cases = cr.list_cases('driver', out_stream=None)
+
+        self.assertEqual(len(cases), 9)
+
+        for case, expected_val, expected_deriv in zip(cases, expected_vals, expected_derivs):
+            outputs = cr.get_case(case).outputs
+            for name in ('x', 'y', 'f_xy'):
+                self.assertEqual(outputs[name], expected_val[name])
+
+            derivs = cr.get_case(case).derivatives
+            for dv in ('x', 'y'):
+                self.assertEqual(derivs['f_xy', dv], expected_deriv['f_xy', dv])
+
+        self.assertGreater(result.runtime, 1.0E-16)
+        self.assertEqual(result.iter_count, 9)
+        self.assertEqual(result.model_evals, 9)
+        self.assertEqual(result.deriv_evals, 9)
+        self.assertEqual(result.success, True)
+        self.assertEqual(result.exit_status, 'SUCCESS')
 
     def test_derivative_no_recording(self):
         prob = om.Problem()
@@ -1467,7 +1570,7 @@ class TestDOEDriver(unittest.TestCase):
         model.add_design_var('y', lower=0.0, upper=1.0)
         model.add_objective('f_xy')
 
-        prob.driver = om.DOEDriver(generator=om.FullFactorialGenerator(levels=3))
+        prob.driver = om.DOEDriver(self.fullfact3)
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
         prob.driver.recording_options['record_derivatives'] = False
 
@@ -1475,18 +1578,20 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(len(cases), 9)
 
-        for case in cases:            
+        for case in cases:
             derivs = cr.get_case(case).derivatives
             self.assertIsNone(derivs)
 
+
 @use_tempdirs
 class TestDOEDriverListVars(unittest.TestCase):
-    def test_list_problem_vars(self):
+
+    def test_list_driver_vars(self):
         # this passes if no exception is raised
 
         prob = om.Problem()
@@ -1506,8 +1611,8 @@ class TestDOEDriverListVars(unittest.TestCase):
         model.add_objective('f_xy')
 
         samples = [[('x', 5), ('y', 1)],
-                    [('x', 3), ('y', 6)],
-                    [('x', -1), ('y', 3)],
+                   [('x', 3), ('y', 6)],
+                   [('x', -1), ('y', 3)],
         ]
 
         # Setup driver for 3 cases at a time
@@ -1517,43 +1622,13 @@ class TestDOEDriverListVars(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        prob.list_problem_vars()
+        f = StringIO()
+        prob.list_driver_vars(out_stream=f)
+        output = f.getvalue()
 
-
-@use_tempdirs
-class TestDOEDriverListVars(unittest.TestCase):
-    def test_list_problem_vars(self):
-        # this passes if no exception is raised
-
-        prob = om.Problem()
-        model = prob.model
-
-        # Add independent variables
-        indeps = model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
-        indeps.add_discrete_output('x', 4)
-        indeps.add_discrete_output('y', 3)
-
-        # Add components
-        model.add_subsystem('parab', ParaboloidDiscrete(), promotes=['*'])
-
-        # Specify design variable range and objective
-        model.add_design_var('x')
-        model.add_design_var('y')
-        model.add_objective('f_xy')
-
-        samples = [[('x', 5), ('y', 1)],
-                    [('x', 3), ('y', 6)],
-                    [('x', -1), ('y', 3)],
-        ]
-
-        # Setup driver for 3 cases at a time
-        prob.driver = om.DOEDriver(om.ListGenerator(samples))
-
-        prob.setup(derivatives=False)
-        prob.run_driver()
-        prob.cleanup()
-
-        prob.list_problem_vars()
+        self.assertIn('x     -1   0', output)
+        self.assertIn('y     3    0', output)
+        self.assertIn('f_xy  59   0', output)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -1563,6 +1638,20 @@ class TestParallelDOE4Proc(unittest.TestCase):
     N_PROCS = 4
 
     def setUp(self):
+        self.fullfact3 = [
+            [('x', 0.), ('y', 0.)],
+            [('x', .5), ('y', 0.)],
+            [('x', 1.), ('y', 0.)],
+
+            [('x', 0.), ('y', .5)],
+            [('x', .5), ('y', .5)],
+            [('x', 1.), ('y', .5)],
+
+            [('x', 0.), ('y', 1.)],
+            [('x', .5), ('y', 1.)],
+            [('x', 1.), ('y', 1.)],
+        ]
+
         self.expected_fullfact3 = [
             {'x': np.array([0.]), 'y': np.array([0.]), 'f_xy': np.array([22.00])},
             {'x': np.array([.5]), 'y': np.array([0.]), 'f_xy': np.array([19.25])},
@@ -1577,10 +1666,24 @@ class TestParallelDOE4Proc(unittest.TestCase):
             {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         ]
 
+        self.fullfact3_fan_in_grouped = [
+            [('x1', 0.), ('x2', 0.)],
+            [('x1', .5), ('x2', 0.)],
+            [('x1', 1.), ('x2', 0.)],
+
+            [('x1', 0.), ('x2', .5)],
+            [('x1', .5), ('x2', .5)],
+            [('x1', 1.), ('x2', .5)],
+
+            [('x1', 0.), ('x2', 1.)],
+            [('x1', .5), ('x2', 1.)],
+            [('x1', 1.), ('x2', 1.)],
+        ]
+
     def test_indivisible_error(self):
         prob = om.Problem()
 
-        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
+        prob.driver = om.DOEDriver(self.fullfact3)
         prob.driver.options['run_parallel'] = True
         prob.driver.options['procs_per_model'] = 3
 
@@ -1600,7 +1703,7 @@ class TestParallelDOE4Proc(unittest.TestCase):
         prob.model._proc_info['sub'] = (2, None, 1.0, None)
 
         # run cases on all procs
-        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
+        prob.driver = om.DOEDriver(self.fullfact3_fan_in_grouped)
         prob.driver.options['run_parallel'] = True
         prob.driver.options['procs_per_model'] = 1
 
@@ -1623,7 +1726,7 @@ class TestParallelDOE4Proc(unittest.TestCase):
         model.add_design_var('y', lower=0.0, upper=1.0)
         model.add_objective('f_xy')
 
-        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3), procs_per_model=1,
+        prob.driver = om.DOEDriver(self.fullfact3, procs_per_model=1,
                                    run_parallel=True)
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
@@ -1640,9 +1743,9 @@ class TestParallelDOE4Proc(unittest.TestCase):
         rank = prob.comm.rank
 
         # cases will be split across files for each proc
-        filename = "cases.sql_%d" % rank
+        filename = prob.get_outputs_dir() / f"cases.sql_{rank}"
 
-        expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
+        expect_msg = f"Cases from rank {rank} are being written to {filename}."
         self.assertTrue(expect_msg in output)
 
         cr = om.CaseReader(filename)
@@ -1678,7 +1781,7 @@ class TestParallelDOE4Proc(unittest.TestCase):
 
         model.add_objective('c3.y')
 
-        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
+        prob.driver = om.DOEDriver(self.fullfact3_fan_in_grouped)
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.driver.options['run_parallel'] = run_parallel
@@ -1717,11 +1820,11 @@ class TestParallelDOE4Proc(unittest.TestCase):
             # a separate case file will be written by rank 0 of each parallel model
             # (the top two global ranks)
             rank = prob.comm.rank
-            filename = "cases.sql_%d" % rank
+            filename = prob.get_outputs_dir() / f"cases.sql_{rank}"
 
             if rank < num_models:
-                expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
-                self.assertTrue(expect_msg in output)
+                expect_msg = f"Cases from rank {rank} are being written to {filename}."
+                self.assertIn(expect_msg, output)
 
                 cr = om.CaseReader(filename)
                 cases = cr.list_cases('driver')
@@ -1759,7 +1862,7 @@ class TestParallelDOE4Proc(unittest.TestCase):
 
         model.add_objective('c3.y')
 
-        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
+        prob.driver = om.DOEDriver(self.fullfact3_fan_in_grouped)
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.driver.options['run_parallel'] = run_parallel
@@ -1790,9 +1893,9 @@ class TestParallelDOE4Proc(unittest.TestCase):
 
         # there will be a separate case file for each proc, containing the cases
         # run by the instance of the model that runs in serial mode on that proc
-        filename = "cases.sql_%d" % rank
+        filename = prob.get_outputs_dir() / f"cases.sql_{rank}"
 
-        expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
+        expect_msg = f"Cases from rank {rank} are being written to {filename}."
         self.assertTrue(expect_msg in output)
 
         # we are running 4 models in parallel, each using 1 proc
@@ -1831,7 +1934,7 @@ class TestParallelDOE4Proc(unittest.TestCase):
         model.add_design_var('x2', lower=0.0, upper=1.0)
         model.add_objective('c3.y')
 
-        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
+        prob.driver = om.DOEDriver(self.fullfact3_fan_in_grouped)
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.driver.options['run_parallel'] = run_parallel
@@ -1867,7 +1970,7 @@ class TestParallelDOE4Proc(unittest.TestCase):
             # redundant recordings will not be made on any other procs
             filename = "cases.sql"
 
-            cr = om.CaseReader(filename)
+            cr = om.CaseReader(prob.get_outputs_dir() / filename)
             cases = cr.list_cases('driver', out_stream=None)
 
             # cases recorded on proc 0
@@ -1899,7 +2002,7 @@ class TestParallelDOE4Proc(unittest.TestCase):
         model.add_design_var('x2', lower=0.0, upper=1.0)
         model.add_objective('c3.y')
 
-        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
+        prob.driver = om.DOEDriver(self.fullfact3_fan_in_grouped)
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.driver.options['run_parallel'] = run_parallel
@@ -1933,7 +2036,7 @@ class TestParallelDOE4Proc(unittest.TestCase):
             # redundant recordings will not be made on any other procs
             filename = "cases.sql"
 
-            cr = om.CaseReader(filename)
+            cr = om.CaseReader(prob.get_outputs_dir() / filename)
             cases = cr.list_cases('driver', out_stream=None)
 
             # cases recorded on proc 0
@@ -1960,7 +2063,7 @@ class TestParallelDOE4Proc(unittest.TestCase):
         prob.model.add_design_var('y', lower=0.0, upper=1.0)
         prob.model.add_objective('f_xy')
 
-        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
+        prob.driver = om.DOEDriver(self.fullfact3)
         prob.driver.add_recorder(om.SqliteRecorder('cases_sequential.sql'))
 
         # do not run in parallel, only proc 0 should generate a recording file
@@ -1971,10 +2074,10 @@ class TestParallelDOE4Proc(unittest.TestCase):
         prob.cleanup()
 
         # verify we have the single case recording file
-        self.assertTrue(os.path.exists("cases_sequential.sql"))
+        self.assertTrue(os.path.exists(prob.get_outputs_dir() / "cases_sequential.sql"))
 
         # verify we do not have multiple/parallel case recording files
-        filenames = glob.glob('./cases_sequential.sql_*')
+        filenames = glob.glob(f'{prob.get_outputs_dir()}/cases_sequential.sql_*')
         self.assertEqual(len(filenames), 0, f'Found multiple recording files: {filenames}')
 
 
@@ -1987,6 +2090,20 @@ class TestParallelDOE2proc(unittest.TestCase):
     def setUp(self):
         from mpi4py import MPI
         rank = MPI.COMM_WORLD.rank
+
+        self.fullfact3 = [
+            [('x', 0.), ('y', 0.)],
+            [('x', .5), ('y', 0.)],
+            [('x', 1.), ('y', 0.)],
+
+            [('x', 0.), ('y', .5)],
+            [('x', .5), ('y', .5)],
+            [('x', 1.), ('y', .5)],
+
+            [('x', 0.), ('y', 1.)],
+            [('x', .5), ('y', 1.)],
+            [('x', 1.), ('y', 1.)],
+        ]
 
         expected = [
             {'x': np.array([0.]), 'y': np.array([0.]), 'f_xy': np.array([22.00])},
@@ -2013,8 +2130,6 @@ class TestParallelDOE2proc(unittest.TestCase):
         ])
 
     def test_full_factorial(self):
-        from mpi4py import MPI
-
         prob = om.Problem()
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
@@ -2022,7 +2137,7 @@ class TestParallelDOE2proc(unittest.TestCase):
         prob.model.add_design_var('y', lower=0.0, upper=1.0)
         prob.model.add_objective('f_xy')
 
-        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
+        prob.driver = om.DOEDriver(self.fullfact3)
         prob.driver.options['run_parallel'] = True
         prob.driver.options['procs_per_model'] = 1
 
@@ -2032,16 +2147,17 @@ class TestParallelDOE2proc(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        self.assertEqual(MPI.COMM_WORLD.size, 2)
+        self.assertEqual(prob.comm.size, 2)
 
         # check recorded cases from each case file
-        rank = MPI.COMM_WORLD.rank
+        rank = prob.comm.rank
         filename = "cases.sql_%d" % rank
 
         # SqliteCaseReader will automatically look for cases.sql_meta if
         # metadata_filename is not specified, but test by explicitly
         # using it here.
-        cr = om.CaseReader(filename, metadata_filename='cases.sql_meta')
+        cr = om.CaseReader(prob.get_outputs_dir() / filename,
+                           metadata_filename=prob.get_outputs_dir() / 'cases.sql_meta')
         cases = cr.list_cases('driver')
         self.assertEqual(len(cases), 5 if rank == 0 else 4)
 
@@ -2057,7 +2173,7 @@ class TestParallelDOE2proc(unittest.TestCase):
 
         # Test for missing metadata db file error
         try:
-            cr_test = om.CaseReader(filename, metadata_filename='nonexistant_filename')
+            om.CaseReader(prob.get_outputs_dir() / filename, metadata_filename='nonexistant_filename')
             found_metadata = True
         except IOError:
             found_metadata = False
@@ -2066,6 +2182,7 @@ class TestParallelDOE2proc(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
 @use_tempdirs
 class TestParallelDistribDOE(unittest.TestCase):
 
@@ -2108,7 +2225,7 @@ class TestParallelDistribDOE(unittest.TestCase):
         # check recorded cases from each case file
         rank = prob.comm.rank
         if rank == 0:
-            filename0 = "cases.sql_0"
+            filename0 = prob.get_outputs_dir() / "cases.sql_0"
             values = []
 
             cr = om.CaseReader(filename0)
@@ -2126,7 +2243,7 @@ class TestParallelDistribDOE(unittest.TestCase):
                         self.assertEqual(x_inputs.count([n1, n2, n3]), 8)
 
         elif rank == 1:
-            filename0 = "cases.sql_1"
+            filename0 = prob.get_outputs_dir() / "cases.sql_1"
             values = []
 
             cr = om.CaseReader(filename0)

@@ -1,6 +1,7 @@
 """Define the Problem class and a FakeComm class for non-MPI users."""
 
 import __main__
+import shutil
 
 import sys
 import pprint
@@ -8,28 +9,30 @@ import os
 import weakref
 import pathlib
 import textwrap
+import traceback
+import atexit
 
 from collections import defaultdict, namedtuple
-from fnmatch import fnmatchcase
 from itertools import product
 
-from io import StringIO
+from io import StringIO, TextIOBase
 
 import numpy as np
 import scipy.sparse as sparse
 
 from openmdao.core.constants import _SetupStatus
 from openmdao.core.component import Component
-from openmdao.core.driver import Driver, record_iteration, SaveOptResult
+from openmdao.core.driver import Driver, record_iteration
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.core.group import Group, System
+from openmdao.core.system import System
+from openmdao.core.group import Group
 from openmdao.core.total_jac import _TotalJacInfo
-from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
+from openmdao.core.constants import _DEFAULT_COLORING_DIR, _DEFAULT_OUT_STREAM, \
+    _UNDEFINED
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.solvers.solver import SolverInfo
-from openmdao.vectors.vector import _full_slice
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.error_checking.check_config import _default_checks, _all_checks, \
     _all_non_redundant_checks
@@ -43,16 +46,19 @@ from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import abs_key2rel_key
 from openmdao.utils.logger_utils import get_logger, TestLogger
 from openmdao.utils.hooks import _setup_hooks, _reset_all_hooks
-from openmdao.utils.indexer import indexer
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.array_utils import scatter_dist_to_local
+from openmdao.utils.class_util import overrides_method
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
-    clear_reports, get_reports_dir, _load_report_plugins
-from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable, \
-    _find_dict_meta, env_truthy, add_border
+    clear_reports, _load_report_plugins
+from openmdao.utils.general_utils import pad_name, LocalRangeIterable, \
+    _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs, \
+    ProblemMeta
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.file_utils import _get_outputs_dir, text2html, get_work_dir
+from openmdao.visualization.tables.table_builder import generate_table
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -61,7 +67,6 @@ except ImportError:
 
 from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
-_contains_all = ContainsAll()
 
 CITATION = """@article{openmdao_2019,
     Author={Justin S. Gray and John T. Hwang and Joaquim R. R. A.
@@ -79,6 +84,9 @@ CITATION = """@article{openmdao_2019,
 # Used for naming Problems when no explicit name is given
 # Also handles sub problems
 _problem_names = []
+
+# Used to keep track of the current Problem tree if there are any subproblems
+_prob_setup_stack = []
 
 
 def _clear_problem_names():
@@ -113,6 +121,10 @@ def _default_prob_name():
     str
         The default problem name.
     """
+    def_prob_name = os.environ.get('OPENMDAO_DEFAULT_PROBLEM', '')
+    if def_prob_name:
+        return def_prob_name
+
     name = _get_top_script()
     if name is None or env_truthy('TESTFLO_RUNNING'):
         return 'problem'
@@ -120,7 +132,7 @@ def _default_prob_name():
     return name.stem
 
 
-class Problem(object):
+class Problem(object, metaclass=ProblemMeta):
     """
     Top-level container for the systems and drivers.
 
@@ -131,7 +143,8 @@ class Problem(object):
     driver : <Driver> or None
         The driver for the problem. If not specified, a simple "Run Once" driver will be used.
     comm : MPI.Comm or <FakeComm> or None
-        The global communicator.
+        The MPI communicator for this Problem. If not specified, comm will be MPI.COMM_WORLD if
+        MPI is active, else it will be None.
     name : str
         Problem name. Can be used to specify a Problem instance when multiple Problems
         exist.
@@ -160,14 +173,18 @@ class Problem(object):
         Derivatives calculation mode assigned by the user.  If set to 'auto', _mode will be
         automatically assigned to 'fwd' or 'rev' based on relative sizes of design variables vs.
         responses.
-    _initial_condition_cache : dict
-        Any initial conditions that are set at the problem level via setitem are cached here
-        until they can be processed.
     cite : str
         Listing of relevant citations that should be referenced when
         publishing work that uses this class.
     options : <OptionsDictionary>
         Dictionary with general options for the problem.
+    model_options : dict
+        A  dictionary of options to be passed to subsystems in the problem's model during
+        the setup process.
+        This dictionary is keyed by a path pattern string, and the associated value for each path
+        pattern is a dictionary of {option_name: option_val}. Those subsystems within the
+        hierarchy which match the path pattern and that have an option of the given name, will
+        have the value of that option overridden by value given in the dictionary.
     recording_options : <OptionsDictionary>
         Dictionary with problem recording options.
     _rec_mgr : <RecordingManager>
@@ -184,14 +201,14 @@ class Problem(object):
         Problem name. If no name given, a default name of the form 'problemN', where N is an
         integer, will be given to the problem so it can be referenced in command line tools
         that have an optional problem name argument
-    _system_options_recorded : bool
-        A flag to indicate whether the system options for all the systems have been recorded
     _metadata : dict
         Problem level metadata.
     _run_counter : int
         The number of times run_driver or run_model has been called.
     _warned : bool
         Bool to check if `value` deprecation warning has occured yet
+    _computing_coloring : bool
+        When True, we are computing coloring.
     """
 
     def __init__(self, model=None, driver=None, comm=None, name=None, reports=_UNDEFINED,
@@ -209,28 +226,7 @@ class Problem(object):
 
         self.cite = CITATION
         self._warned = False
-
-        # Set the Problem name so that it can be referenced from command line tools (e.g. check)
-        # that accept a Problem argument, and to name the corresponding reports subdirectory.
-
-        if name:  # if name hasn't been used yet, use it. Otherwise, error
-            if name not in _problem_names:
-                self._name = name
-            else:
-                raise ValueError(f"The problem name '{name}' already exists")
-        else:  # No name given: look for a name, of the form, 'problemN', that hasn't been used
-            problem_counter = len(_problem_names) + 1 if _problem_names else ''
-            base = _default_prob_name()
-            _name = f"{base}{problem_counter}"
-            if _name in _problem_names:  # need to make it unique so append string of form '.N'
-                i = 1
-                while True:
-                    _name = f"{base}{problem_counter}.{i}"
-                    if _name not in _problem_names:
-                        break
-                    i += 1
-            self._name = _name
-        _problem_names.append(self._name)
+        self._computing_coloring = False
 
         if comm is None:
             use_mpi = check_mpi_env()
@@ -243,13 +239,21 @@ class Problem(object):
                 except ImportError:
                     comm = FakeComm()
 
+        self.comm = comm
+
+        self._set_name(name)
+
         if model is None:
             self.model = Group()
-        elif isinstance(model, System):
+        elif isinstance(model, Group):
+            from openmdao.core.parallel_group import ParallelGroup
+            if isinstance(model, ParallelGroup):
+                raise TypeError(f"{self.msginfo}: The value provided for 'model' "
+                                "cannot be a ParallelGroup.")
             self.model = model
         else:
             raise TypeError(self.msginfo +
-                            ": The value provided for 'model' is not a valid System.")
+                            ": The value provided for 'model' is not a Group.")
 
         if driver is None:
             driver = Driver()
@@ -262,23 +266,35 @@ class Problem(object):
         # can't use driver property here without causing a lint error, so just do it manually
         self._driver = driver
 
-        self.comm = comm
-
-        self._mode = None  # mode is assigned in setup()
-
-        self._initial_condition_cache = {}
-
-        self._metadata = None
+        self._metadata = {'setup_status': _SetupStatus.PRE_SETUP}
         self._run_counter = -1
-        self._system_options_recorded = False
         self._rec_mgr = RecordingManager()
 
         # General options
         self.options = OptionsDictionary(parent_name=type(self).__name__)
         self.options.declare('coloring_dir', types=str,
-                             default=os.path.join(os.getcwd(), 'coloring_files'),
+                             default=os.path.join(get_work_dir(), 'coloring_files'),
                              desc='Directory containing coloring files (if any) for this Problem.')
+        self.options.declare('group_by_pre_opt_post', types=bool,
+                             default=False,
+                             desc="If True, group subsystems of the top level model into "
+                             "pre-optimization, optimization, and post-optimization, and only "
+                             "iterate over the optimization subsystems during optimization.  This "
+                             "applies only when the top level nonlinear solver is of type"
+                             "NonlinearRunOnce.")
+        self.options.declare('allow_post_setup_reorder', types=bool,
+                             default=True,
+                             desc="If True, the execution order of direct subsystems of any group "
+                             "that sets its 'auto_order' option to True will be automatically "
+                             "ordered according to data dependencies. If this option is False, the "
+                             "'auto_order' option will be ignored and a warning will be issued for "
+                             "each group that has set it to True. Note that subsystems of a Group "
+                             "that form a cycle will never be reordered, regardless of the value of"
+                             " the 'auto_order' option.")
         self.options.update(options)
+
+        # Options passed to models
+        self.model_options = {}
 
         # Case recording options
         self.recording_options = OptionsDictionary(parent_name=type(self).__name__)
@@ -324,6 +340,37 @@ class Problem(object):
 
         # So Problem and driver can have hooks attached to their methods
         _setup_hooks(self)
+
+        # call cleanup at system exit, if requested
+        if 'cleanup' in os.environ.get('OPENMDAO_ATEXIT', '').split(','):
+            atexit.register(self.cleanup)
+
+    def _set_name(self, name):
+        if not MPI or self.comm.rank == 0:
+            # Set the Problem name so that it can be referenced from command line tools (e.g. check)
+            # that accept a Problem argument, and to name the corresponding outputs subdirectory.
+            if name:  # if name hasn't been used yet, use it. Otherwise, error
+                if name in _problem_names:
+                    issue_warning(f"The problem name '{name}' already exists")
+                self._name = name
+            else:  # No name given: look for a name, of the form, 'problemN', that hasn't been used
+                problem_counter = len(_problem_names) + 1 if _problem_names else ''
+                base = _default_prob_name()
+                _name = f"{base}{problem_counter}"
+                if _name in _problem_names:  # need to make it unique so append string of form '.N'
+                    i = 1
+                    while True:
+                        _name = f"{base}{problem_counter}.{i}"
+                        if _name not in _problem_names:
+                            break
+                        i += 1
+                self._name = _name
+            if self.comm.size > 1:
+                self._name = self.comm.bcast(self._name, root=0)
+        else:
+            self._name = self.comm.bcast(None, root=0)
+
+        _problem_names.append(self._name)
 
     def _has_active_report(self, name):
         """
@@ -399,6 +446,20 @@ class Problem(object):
             return type(self).__name__
         return f'{type(self).__name__} {self._name}'
 
+    @property
+    def _mode(self):
+        """
+        Return the derivative mode.
+
+        Returns
+        -------
+        str
+            Derivative mode, 'fwd' or 'rev'.
+        """
+        if self._metadata is None:
+            return None
+        return self._metadata['mode']
+
     def _get_inst_id(self):
         return self._name
 
@@ -416,7 +477,7 @@ class Problem(object):
         bool
             True if the named system or variable is local to this process.
         """
-        if self._metadata is None:
+        if self._metadata['setup_status'] < _SetupStatus.POST_SETUP:
             raise RuntimeError(f"{self.msginfo}: is_local('{name}') was called before setup() "
                                "completed.")
 
@@ -429,55 +490,6 @@ class Problem(object):
         # variable exists, but may be remote
         return abs_name in self.model._var_abs2meta['input'] or \
             abs_name in self.model._var_abs2meta['output']
-
-    def _get_cached_val(self, name, get_remote=False):
-        # We have set and cached already
-        if name in self._initial_condition_cache:
-            return self._initial_condition_cache[name]
-
-        # Vector not setup, so we need to pull values from saved metadata request.
-        else:
-            try:
-                conns = self.model._conn_abs_in2out
-            except AttributeError:
-                conns = {}
-
-            abs_names = name2abs_names(self.model, name)
-            if not abs_names:
-                raise KeyError(f'{self.model.msginfo}: Variable "{name}" not found.')
-
-            abs_name = abs_names[0]
-            vars_to_gather = self._metadata['vars_to_gather']
-
-            meta = self.model._var_abs2meta
-            io = 'output' if abs_name in meta['output'] else 'input'
-            if abs_name in meta[io]:
-                if abs_name in conns:
-                    val = meta['output'][conns[abs_name]]['val']
-                else:
-                    val = meta[io][abs_name]['val']
-            else:
-                # not found in real outputs or inputs, try discretes
-                meta = self.model._var_discrete
-                io = 'output' if abs_name in meta['output'] else 'input'
-                if abs_name in meta[io]:
-                    if abs_name in conns:
-                        val = meta['output'][conns[abs_name]]['val']
-                    else:
-                        val = meta[io][abs_name]['val']
-
-            if get_remote and abs_name in vars_to_gather:
-                owner = vars_to_gather[abs_name]
-                if self.model.comm.rank == owner:
-                    self.model.comm.bcast(val, root=owner)
-                else:
-                    val = self.model.comm.bcast(None, root=owner)
-
-            if val is not _UNDEFINED:
-                # Need to cache the "get" in case the user calls in-place numpy operations.
-                self._initial_condition_cache[name] = val
-
-            return val
 
     @property
     def _recording_iter(self):
@@ -527,12 +539,16 @@ class Problem(object):
             The value of the requested output/input variable.
         """
         if self._metadata['setup_status'] == _SetupStatus.POST_SETUP:
-            val = self._get_cached_val(name, get_remote=get_remote)
-            if val is not _UNDEFINED:
-                if indices is not None:
-                    val = val[indices]
-                if units is not None:
-                    val = self.model.convert2units(name, val, simplify_unit(units))
+            abs_names = name2abs_names(self.model, name)
+            if abs_names:
+                val = self.model._get_cached_val(name, abs_names, get_remote=get_remote)
+                if val is not _UNDEFINED:
+                    if indices is not None:
+                        val = val[indices]
+                    if units is not None:
+                        val = self.model.convert2units(name, val, simplify_unit(units))
+            else:
+                raise KeyError(f'{self.model.msginfo}: Variable "{name}" not found.')
         else:
             val = self.model.get_val(name, units=units, indices=indices, get_remote=get_remote,
                                      from_src=True)
@@ -560,7 +576,7 @@ class Problem(object):
         """
         self.set_val(name, value)
 
-    def set_val(self, name, val=None, units=None, indices=None, value=None):
+    def set_val(self, name, val=None, units=None, indices=None):
         """
         Set an output/input variable.
 
@@ -576,203 +592,55 @@ class Problem(object):
             Units that value is defined in.
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to set to specified value.
-        value : object
-            Deprecated `value` arg.
         """
-        if value is not None and not self._warned:
-            self._warned = True
-            warn_deprecation(f"{self.msginfo} 'value' will be deprecated in 4.0. Please use 'val' "
-                             "in the future.")
-        if val is not None:
-            value = val
-
-        model = self.model
-        if self._metadata is not None:
-            conns = model._conn_global_abs_in2out
-        else:
+        if self._metadata is None:
             raise RuntimeError(f"{self.msginfo}: '{name}' Cannot call set_val before setup.")
 
-        all_meta = model._var_allprocs_abs2meta
-        loc_meta = model._var_abs2meta
-        n_proms = 0  # if nonzero, name given was promoted input name w/o a matching prom output
-
-        try:
-            ginputs = model._group_inputs
-        except AttributeError:
-            ginputs = {}  # could happen if top level system is not a Group
-
-        abs_names = name2abs_names(model, name)
-        if abs_names:
-            n_proms = len(abs_names)  # for output this will never be > 1
-            if n_proms > 1 and name in ginputs:
-                abs_name = ginputs[name][0].get('use_tgt', abs_names[0])
-            else:
-                abs_name = abs_names[0]
-        else:
-            raise KeyError(f'{model.msginfo}: Variable "{name}" not found.')
-
-        if abs_name in conns:
-            src = conns[abs_name]
-            if abs_name not in model._var_allprocs_discrete['input']:
-                value = np.asarray(value)
-                tmeta = all_meta['input'][abs_name]
-                tunits = tmeta['units']
-                sunits = all_meta['output'][src]['units']
-                if abs_name in loc_meta['input']:
-                    tlocmeta = loc_meta['input'][abs_name]
-                else:
-                    tlocmeta = None
-
-                gunits = ginputs[name][0].get('units') if name in ginputs else None
-                if n_proms > 1:  # promoted input name was used
-                    if gunits is None:
-                        tunit_list = [all_meta['input'][n]['units'] for n in abs_names]
-                        tu0 = tunit_list[0]
-                        for tu in tunit_list:
-                            if tu != tu0:
-                                model._show_ambiguity_msg(name, ('units',), abs_names)
-
-                if units is None:
-                    # avoids double unit conversion
-                    if self._metadata['setup_status'] > _SetupStatus.POST_SETUP:
-                        ivalue = value
-                        if sunits is not None:
-                            if gunits is not None and gunits != tunits:
-                                value = model.convert_from_units(src, value, gunits)
-                            else:
-                                value = model.convert_from_units(src, value, tunits)
-                else:
-                    if gunits is None:
-                        ivalue = model.convert_from_units(abs_name, value, units)
-                    else:
-                        ivalue = model.convert_units(name, value, units, gunits)
-                    if self._metadata['setup_status'] == _SetupStatus.POST_SETUP:
-                        value = ivalue
-                    else:
-                        value = model.convert_from_units(src, value, units)
-        else:
-            src = abs_name
-            if units is not None:
-                value = model.convert_from_units(abs_name, value, units)
-
-        # Caching only needed if vectors aren't allocated yet.
-        if self._metadata['setup_status'] == _SetupStatus.POST_SETUP:
-            if indices is not None:
-                self._get_cached_val(name)
-                try:
-                    if _is_slicer_op(indices):
-                        self._initial_condition_cache[name] = value[indices]
-                    else:
-                        self._initial_condition_cache[name][indices] = value
-                except IndexError:
-                    self._initial_condition_cache[name][indices] = value
-                except Exception as err:
-                    raise RuntimeError(f"Failed to set value of '{name}': {str(err)}.")
-            else:
-                self._initial_condition_cache[name] = value
-        else:
-            myrank = model.comm.rank
-
-            if indices is None:
-                indices = _full_slice
-
-            if model._outputs._contains_abs(abs_name):
-                distrib = all_meta['output'][abs_name]['distributed']
-                if (distrib and indices is _full_slice and
-                        value.size == all_meta['output'][abs_name]['global_size']):
-                    # assume user is setting using full distributed value
-                    sizes = model._var_sizes['output'][:, model._var_allprocs_abs2idx[abs_name]]
-                    start = np.sum(sizes[:myrank])
-                    end = start + sizes[myrank]
-                    model._outputs.set_var(abs_name, value[start:end], indices)
-                else:
-                    model._outputs.set_var(abs_name, value, indices)
-            elif abs_name in conns:  # input name given. Set value into output
-                src_is_auto_ivc = src.startswith('_auto_ivc.')
-                # when setting auto_ivc output, error messages should refer
-                # to the promoted name used in the set_val call
-                var_name = name if src_is_auto_ivc else src
-                if model._outputs._contains_abs(src):  # src is local
-                    if (model._outputs._abs_get_val(src).size == 0 and
-                            src_is_auto_ivc and
-                            all_meta['output'][src]['distributed']):
-                        pass  # special case, auto_ivc dist var with 0 local size
-                    elif tmeta['has_src_indices']:
-                        if tlocmeta:  # target is local
-                            flat = False
-                            if name in model._var_prom2inds:
-                                sshape, inds, flat = model._var_prom2inds[name]
-                                src_indices = inds
-                            elif (tlocmeta.get('manual_connection') or
-                                  model._inputs._contains_abs(name)):
-                                src_indices = tlocmeta['src_indices']
-                            else:
-                                src_indices = None
-
-                            if src_indices is None:
-                                model._outputs.set_var(src, value, _full_slice, flat,
-                                                       var_name=var_name)
-                            else:
-                                if tmeta['distributed']:
-                                    src_indices = src_indices.shaped_array()
-                                    ssizes = model._var_sizes['output']
-                                    sidx = model._var_allprocs_abs2idx[src]
-                                    ssize = ssizes[myrank, sidx]
-                                    start = np.sum(ssizes[:myrank, sidx])
-                                    end = start + ssize
-                                    if np.any(src_indices < start) or np.any(src_indices >= end):
-                                        raise RuntimeError(f"{model.msginfo}: Can't set {name}: "
-                                                           "src_indices refer "
-                                                           "to out-of-process array entries.")
-                                    if start > 0:
-                                        src_indices = src_indices - start
-                                    src_indices = indexer(src_indices)
-                                if indices is _full_slice:
-                                    model._outputs.set_var(src, value, src_indices, flat,
-                                                           var_name=var_name)
-                                else:
-                                    model._outputs.set_var(src, value, src_indices.apply(indices),
-                                                           True, var_name=var_name)
-                        else:
-                            raise RuntimeError(f"{model.msginfo}: Can't set {abs_name}: remote"
-                                               " connected inputs with src_indices currently not"
-                                               " supported.")
-                    else:
-                        value = np.asarray(value)
-                        if indices is not _full_slice:
-                            indices = indexer(indices)
-                        model._outputs.set_var(src, value, indices, var_name=var_name)
-                elif src in model._discrete_outputs:
-                    model._discrete_outputs[src] = value
-                # also set the input
-                # TODO: maybe remove this if inputs are removed from case recording
-                if n_proms < 2:
-                    if model._inputs._contains_abs(abs_name):
-                        model._inputs.set_var(abs_name, ivalue, indices)
-                    elif abs_name in model._discrete_inputs:
-                        model._discrete_inputs[abs_name] = value
-                    else:
-                        # must be a remote var. so, just do nothing on this proc. We can't get here
-                        # unless abs_name is found in connections, so the variable must exist.
-                        if abs_name in model._var_allprocs_abs2meta:
-                            print(f"Variable '{name}' is remote on rank {self.comm.rank}.  "
-                                  "Local assignment ignored.")
-            elif abs_name in model._discrete_outputs:
-                model._discrete_outputs[abs_name] = value
-            elif model._inputs._contains_abs(abs_name):   # could happen if model is a component
-                model._inputs.set_var(abs_name, value, indices)
-            elif abs_name in model._discrete_inputs:   # could happen if model is a component
-                model._discrete_inputs[abs_name] = value
+        self.model.set_val(name, val, units=units, indices=indices)
 
     def _set_initial_conditions(self):
         """
         Set all initial conditions that have been saved in cache after setup.
         """
-        for name, value in self._initial_condition_cache.items():
-            self.set_val(name, value)
+        for value, set_units, pathname, name in self.model._initial_condition_cache.values():
+            if pathname:
+                system = self.model._get_subsystem(pathname)
+                if system is None:
+                    self.model.set_val(pathname + '.' + name, value, units=set_units)
+                else:
+                    system.set_val(name, value, units=set_units)
+            else:
+                self.model.set_val(name, value, units=set_units)
 
         # Clean up cache
-        self._initial_condition_cache = {}
+        self.model._initial_condition_cache = {}
+
+    def _check_collected_errors(self):
+        """
+        If any collected errors are found, raise an exception containing all of them.
+        """
+        if self._metadata['saved_errors'] is None:
+            return
+
+        unique_errors = self._get_unique_saved_errors()
+
+        # set the errors to None so that all future calls will immediately raise an exception.
+        self._metadata['saved_errors'] = None
+
+        if unique_errors:
+            final_msg = [f"\nCollected errors for problem '{self._name}':"]
+            for _, msg, exc_type, tback in unique_errors:
+                final_msg.append(f"   {msg}")
+
+                # if there's only one error, include its traceback if it exists.
+                if len(unique_errors) == 1:
+                    if isinstance(tback, str):
+                        final_msg.append('Traceback (most recent call last):')
+                        final_msg.append(tback)
+                    else:
+                        raise exc_type('\n'.join(final_msg)).with_traceback(tback)
+
+            raise RuntimeError('\n'.join(final_msg))
 
     def run_model(self, case_prefix=None, reset_iter_counts=True):
         """
@@ -787,9 +655,18 @@ class Problem(object):
         reset_iter_counts : bool
             If True and model has been run previously, reset all iteration counters.
         """
-        if self._mode is None:
+        if not self.model._have_output_solver_options_been_applied():
             raise RuntimeError(self.msginfo +
-                               ": The `setup` method must be called before `run_model`.")
+                               ": Before calling `run_model`, the `setup` method must be called "
+                               "if set_output_solver_options has been called.")
+
+        if self._metadata['setup_status'] < _SetupStatus.POST_SETUP:
+            if self.model._order_set:
+                raise RuntimeError(f"{self.msginfo}: Cannot call set_order without calling setup "
+                                   "after")
+            else:
+                raise RuntimeError(self.msginfo +
+                                   ": The `setup` method must be called before `run_model`.")
 
         old_prefix = self._recording_iter.prefix
 
@@ -831,9 +708,20 @@ class Problem(object):
         bool
             Failure flag; True if failed to converge, False is successful.
         """
-        if self._mode is None:
+        model = self.model
+        driver = self.driver
+
+        if self._metadata['setup_status'] < _SetupStatus.POST_SETUP:
             raise RuntimeError(self.msginfo +
                                ": The `setup` method must be called before `run_driver`.")
+
+        if not model._have_output_solver_options_been_applied():
+            raise RuntimeError(self.msginfo +
+                               ": Before calling `run_driver`, the `setup` method must be called "
+                               "if set_output_solver_options has been called.")
+
+        if 'singular_jac_behavior' in driver.options:
+            self._metadata['singular_jac_behavior'] = driver.options['singular_jac_behavior']
 
         old_prefix = self._recording_iter.prefix
 
@@ -843,19 +731,22 @@ class Problem(object):
             self._recording_iter.prefix = case_prefix
 
         try:
-            if self.model.iter_count > 0 and reset_iter_counts:
-                self.driver.iter_count = 0
-                self.model._reset_iter_counts()
+            if model.iter_count > 0 and reset_iter_counts:
+                driver.iter_count = 0
+                model._reset_iter_counts()
 
             self.final_setup()
+
+            # for optimizing drivers, check that constraints are affected by design vars
+            if driver.supports['optimization'] and self._metadata['use_derivatives']:
+                driver.check_relevance()
 
             self._run_counter += 1
             record_model_options(self, self._run_counter)
 
-            self.model._clear_iprint()
+            model._clear_iprint()
 
-            with SaveOptResult(self.driver):
-                return self.driver.run()
+            return driver._run()
         finally:
             self._recording_iter.prefix = old_prefix
 
@@ -935,8 +826,9 @@ class Problem(object):
         """
         Set up case recording.
         """
-        self._filtered_vars_to_record = self.driver._get_vars_to_record(self.recording_options)
-        self._rec_mgr.startup(self, self.comm)
+        if self._rec_mgr.has_recorders():
+            self._filtered_vars_to_record = self.driver._get_vars_to_record(self)
+            self._rec_mgr.startup(self, self.comm)
 
     def add_recorder(self, recorder):
         """
@@ -997,9 +889,9 @@ class Problem(object):
         """
         return create_local_meta(case_name)
 
-    def setup(self, check=False, logger=None, mode='auto', force_alloc_complex=False,
+    def setup(self, check=None, logger=None, mode='auto', force_alloc_complex=False,
               distributed_vector_class=PETScVector, local_vector_class=DefaultVector,
-              derivatives=True):
+              derivatives=True, parent=None):
         """
         Set up the model hierarchy.
 
@@ -1012,7 +904,9 @@ class Problem(object):
         ----------
         check : None, bool, list of str, or the strs ‘all’
             Determines what config checks, if any, are run after setup is complete.
-            If None or False, no checks are run
+            If None: no checks are run unless the 'checks' report is active, in which case the
+            default reports will be run.
+            If False, no checks are run
             If True, the default checks ('out_of_order', 'system', 'solvers', 'dup_inputs',
             'missing_recorders', 'unserializable_options', 'comp_has_no_outputs',
             'auto_ivc_warnings') are run
@@ -1038,6 +932,8 @@ class Problem(object):
             and associated transfers involved in intraprocess communication.
         derivatives : bool
             If True, perform any memory allocations necessary for derivative computation.
+        parent : Problem, System, Solver, or None
+            The "parent" object of this problem instance in a tree of potentially nested problems.
 
         Returns
         -------
@@ -1047,18 +943,10 @@ class Problem(object):
         model = self.model
         comm = self.comm
 
-        if sys.version_info.minor < 8:
-            sv = sys.version_info
-            msg = f'OpenMDAO support for Python version {sv.major}.{sv.minor} will end soon.'
-            try:
-                from IPython import get_ipython
-                ip = get_ipython()
-                if ip is None or ip.config is None or 'IPKernelApp' not in ip.config:
-                    warn_deprecation(msg)
-            except ImportError:
-                warn_deprecation(msg)
-            except AttributeError:
-                warn_deprecation(msg)
+        if not isinstance(self.model, Group):
+            raise TypeError("The model for this Problem is of type "
+                            f"'{self.model.__class__.__name__}'. "
+                            "The model must be a Group or a sub-class of Group.")
 
         # A distributed vector type is required for MPI
         if comm.size > 1:
@@ -1075,15 +963,16 @@ class Problem(object):
             msg = f"{self.msginfo}: Unsupported mode: '{mode}'. Use either 'fwd' or 'rev'."
             raise ValueError(msg)
 
-        self._mode = self._orig_mode = mode
+        self._orig_mode = mode
 
         model_comm = self.driver._setup_comm(comm)
 
         # this metadata will be shared by all Systems/Solvers in the system tree
         self._metadata = {
             'name': self._name,  # the name of this Problem
+            'pathname': None,  # the pathname of this Problem in the current tree of Problems
             'comm': comm,
-            'coloring_dir': self.options['coloring_dir'],  # directory for coloring files
+            'coloring_dir': _DEFAULT_COLORING_DIR,  # directory for input coloring files
             'recording_iter': _RecIteration(comm.rank),  # manager of recorder iterations
             'local_vector_class': local_vector_class,
             'distributed_vector_class': distributed_vector_class,
@@ -1103,8 +992,9 @@ class Problem(object):
             'setup_status': _SetupStatus.PRE_SETUP,
             'model_ref': weakref.ref(model),  # ref to the model (needed to get out-of-scope
                                               # src data for inputs)
-            'using_par_deriv_color': False,  # True if parallel derivative coloring is being used
+            'has_par_deriv_color': False,  # True if any dvs/responses have parallel deriv colors
             'mode': mode,  # mode (derivative direction) set by the user.  'auto' by default
+            'orig_mode': mode,  # mode (derivative direction) set by the user.  'auto' by default
             'abs_in2prom_info': {},  # map of abs input name to list of length = sys tree height
                                      # down to var location, to allow quick resolution of local
                                      # src_shape/src_indices due to promotes.  For example,
@@ -1113,20 +1003,68 @@ class Problem(object):
                                      # a, a.b, and a.b.c, with one of the Nones replaced
                                      # by promotes info.  Dict entries are only created if
                                      # src_indices are applied to the variable somewhere.
-            'raise_connection_errors': True,  # If False, connection related errors in setup will
-                                              # be converted to warnings.
-            'reports_dir': self.get_reports_dir(),  # directory where reports will be written
+            'reports_dir': None,  # directory where reports will be written
+            'saved_errors': [],  # store setup errors here until after final_setup
+            'checking': False,  # True if check_totals or check_partials is running
+            'model_options': self.model_options,  # A dict of options passed to all systems in tree
+            'allow_post_setup_reorder': self.options['allow_post_setup_reorder'],  # see option
+            'singular_jac_behavior': 'warn',  # How to handle singular jac conditions
+            'parallel_deriv_color': None,  # None unless derivatives involving a parallel deriv
+                                           # colored dv/response are currently being computed.
+            'seed_vars': None,  # set of names of seed variables. Seed variables are those that
+                                # have their derivative value set to 1.0 at the beginning of the
+                                # current derivative solve.
+            'coloring_randgen': None,  # If total coloring is being computed, will contain a random
+                                       # number generator, else None.
+            'group_by_pre_opt_post': self.options['group_by_pre_opt_post'],  # see option
+            'relevance_cache': {},  # cache of relevance objects
+            'rel_array_cache': {},  # cache of relevance arrays
+            'ncompute_totals': 0,  # number of times compute_totals has been called
         }
-        model._setup(model_comm, mode, self._metadata)
 
-        # set static mode back to True in all systems in this Problem
-        self._metadata['static_mode'] = True
+        if parent:
+            if isinstance(parent, Problem):
+                parent_prob_meta = parent._metadata
+            elif isinstance(parent, System):
+                parent_prob_meta = parent._problem_meta
+            else:
+                raise ValueError('Problem parent must be another Problem or System instance.')
+        else:
+            parent_prob_meta = None
+
+        if parent_prob_meta and parent_prob_meta['pathname']:
+            self._metadata['pathname'] = parent_prob_meta['pathname'] + f'/{self._name}'
+        else:
+            self._metadata['pathname'] = self._name
+
+        # We don't want to delete the outputs directory because we may be using the coloring files
+        # from a previous run.
+        # Start setup by deleting any existing reports so that the files
+        # that are in that directory are all from this run and not a previous run
+        reports_dirpath = self.get_reports_dir(force=False)
+        if not MPI or (self.comm is not None and self.comm.rank == 0):
+            if os.path.isdir(reports_dirpath):
+                try:
+                    shutil.rmtree(reports_dirpath)
+                except FileNotFoundError:
+                    # Folder already removed by another proccess
+                    pass
+        self._metadata['reports_dir'] = self.get_reports_dir(force=False)
+
+        try:
+            model._setup(model_comm, self._metadata)
+        finally:
+            # whenever we're outside of model._setup, static mode should be True so that anything
+            # added outside of _setup will persist.
+            self._metadata['static_mode'] = True
 
         # Cache all args for final setup.
         self._check = check
         self._logger = logger
 
         self._metadata['setup_status'] = _SetupStatus.POST_SETUP
+
+        self._check_collected_errors()
 
         return self
 
@@ -1142,34 +1080,41 @@ class Problem(object):
         """
         driver = self.driver
 
-        response_size, desvar_size = driver._update_voi_meta(self.model)
+        responses = self.model.get_responses(recurse=True, use_prom_ivc=True)
+        designvars = self.model.get_design_vars(recurse=True, use_prom_ivc=True)
+
+        if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
+            self.model._final_setup()
+
+        response_size, desvar_size = driver._update_voi_meta(self.model, responses, designvars)
 
         # update mode if it's been set to 'auto'
         if self._orig_mode == 'auto':
             mode = 'rev' if response_size < desvar_size else 'fwd'
-            self._mode = mode
         else:
             mode = self._orig_mode
 
-        if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-            self.model._final_setup(self.comm)
+        self._metadata['mode'] = mode
+
+        # If set_solver_print is called after an initial run, in a multi-run scenario,
+        #  this part of _final_setup still needs to happen so that change takes effect
+        #  in subsequent runs
+        if self._metadata['setup_status'] >= _SetupStatus.POST_FINAL_SETUP:
+            self.model._setup_solver_print()
 
         driver._setup_driver(self)
 
-        info = driver._coloring_info
-        coloring = info['coloring']
-        if coloring is None and info['static'] is not None:
-            coloring = driver._get_static_coloring()
-
-        if coloring and coloring_mod._use_total_sparsity:
-            # if we're using simultaneous total derivatives then our effective size is less
-            # than the full size
-            if coloring._fwd and coloring._rev:
-                pass  # we're doing both!
-            elif mode == 'fwd' and coloring._fwd:
-                desvar_size = coloring.total_solves()
-            elif mode == 'rev' and coloring._rev:
-                response_size = coloring.total_solves()
+        if coloring_mod._use_total_sparsity:
+            coloring = driver._coloring_info.coloring
+            if coloring is not None:
+                # if we're using simultaneous total derivatives then our effective size is less
+                # than the full size
+                if coloring._fwd and coloring._rev:
+                    pass  # we're doing both!
+                elif mode == 'fwd' and coloring._fwd:
+                    desvar_size = coloring.total_solves()
+                elif mode == 'rev' and coloring._rev:
+                    response_size = coloring.total_solves()
 
         if ((mode == 'fwd' and desvar_size > response_size) or
                 (mode == 'rev' and response_size > desvar_size)):
@@ -1178,8 +1123,8 @@ class Problem(object):
                           "response variables (objectives and nonlinear constraints).",
                           category=DerivativesWarning)
 
-        if self._metadata['setup_status'] == _SetupStatus.PRE_SETUP and \
-                hasattr(self.model, '_order_set') and self.model._order_set:
+        if (not self._metadata['allow_post_setup_reorder'] and
+                self._metadata['setup_status'] == _SetupStatus.PRE_SETUP and self.model._order_set):
             raise RuntimeError(f"{self.msginfo}: Cannot call set_order without calling setup after")
 
         # set up recording, including any new recorders since last setup
@@ -1232,8 +1177,8 @@ class Problem(object):
             significant relative error due to a minor absolute error.  Default is 1.0E-6.
         method : str
             Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'.
-        step : float
-            Step size for approximation. Default is None, which means 1e-6 for 'fd' and 1e-40 for
+        step : None, float, or list/tuple of float
+            Step size(s) for approximation. Default is None, which means 1e-6 for 'fd' and 1e-40 for
             'cs'.
         form : str
             Form for finite difference, can be 'forward', 'backward', or 'central'. Default
@@ -1243,9 +1188,8 @@ class Problem(object):
             absolute, 'rel_avg' for a size relative to the absolute value of the vector input, or
             'rel_element' for a size relative to each value in the vector input. In addition, it
             can be 'rel_legacy' for a size relative to the norm of the vector.  For backwards
-            compatibilty, it can be 'rel', which currently defaults to 'rel_legacy', but in the
-            future will default to 'rel_avg'. Defaults to None, in which case the approximation
-            method provides its default value.
+            compatibilty, it can be 'rel', which is now equivalent to 'rel_avg'. Defaults to None,
+            in which case the approximation method provides its default value.
         minimum_step : float
             Minimum step size allowed when using one of the relative step_calc options.
         force_dense : bool
@@ -1256,17 +1200,16 @@ class Problem(object):
         Returns
         -------
         dict of dicts of dicts
-            First key:
-                is the component name;
-            Second key:
-                is the (output, input) tuple of strings;
-            Third key:
-                is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev'];
-
-            For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
-                forward - fd, adjoint - fd, forward - adjoint.
-            For 'J_fd', 'J_fwd', 'J_rev' the value is: A numpy array representing the computed
-                Jacobian for the three different methods of computation.
+            First key is the component name.
+            Second key is the (output, input) tuple of strings.
+            Third key is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev',
+            'rank_inconsistent'].
+            For 'rel error', 'abs error', and 'magnitude' the value is a tuple containing norms for
+            forward - fd, adjoint - fd, forward - adjoint.
+            For 'J_fd', 'J_fwd', 'J_rev' the value is a numpy array representing the computed
+            Jacobian for the three different methods of computation.
+            The boolean 'rank_inconsistent' indicates if the derivative wrt a serial variable is
+            inconsistent across MPI ranks.
         """
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             self.final_setup()
@@ -1283,11 +1226,12 @@ class Problem(object):
         excludes = [excludes] if isinstance(excludes, str) else excludes
 
         comps = []
-        under_CI = env_truthy('CI')
+
+        # OPENMDAO_CHECK_ALL_PARTIALS overrides _no_check_partials (used for testing)
+        force_check_partials = env_truthy('OPENMDAO_CHECK_ALL_PARTIALS')
 
         for comp in model.system_iter(typ=Component, include_self=True):
-            # if we're under CI, do all of the partials, ignoring _no_check_partials
-            if comp._no_check_partials and not under_CI:
+            if comp._no_check_partials and not force_check_partials:
                 continue
 
             # skip any Component with no outputs
@@ -1299,25 +1243,8 @@ class Problem(object):
                     isinstance(comp, ExplicitComponent)):
                 continue
 
-            name = comp.pathname
-
-            # Process includes
-            if includes is not None:
-                for pattern in includes:
-                    if fnmatchcase(name, pattern):
-                        break
-                else:
-                    continue
-
-            # Process excludes
-            if excludes is not None:
-                match = False
-                for pattern in excludes:
-                    if fnmatchcase(name, pattern):
-                        match = True
-                        break
-                if match:
-                    continue
+            if not match_includes_excludes(comp.pathname, includes, excludes):
+                continue
 
             comps.append(comp)
 
@@ -1328,11 +1255,13 @@ class Problem(object):
         #   program errs out
         requested_method = method
         alloc_complex = model._outputs._alloc_complex
+        abs2meta_in = model._var_allprocs_abs2meta['input']
+        abs2meta_out = model._var_allprocs_abs2meta['output']
 
         for comp in comps:
             local_opts = comp._get_check_partial_options()
 
-            for key, meta in comp._declared_partials.items():
+            for keypats, meta in comp._declared_partials_patterns.items():
 
                 # Get the complete set of options, including defaults
                 #    for the computing of the derivs for this component
@@ -1343,17 +1272,14 @@ class Problem(object):
                     meta_with_defaults = ComplexStep.DEFAULT_OPTIONS.copy()
                 else:
                     meta_with_defaults = FiniteDifference.DEFAULT_OPTIONS.copy()
-                for name in meta:
-                    meta_with_defaults[name] = meta[name]
+                meta_with_defaults.update(meta)
 
+                _, wrtpats = keypats
                 # For each of the partials, check to see if the
                 #   check partials options are different than the options used to compute
                 #   the partials
-                pattern_matches = comp._find_partial_matches(*key)
-                wrt_vars = pattern_matches[1]
-                for wrt_var in wrt_vars:
-                    _, vars = wrt_var
-                    for var in vars:
+                for _, wrtvars in comp._find_wrt_matches(wrtpats):
+                    for var in wrtvars:
                         # we now have individual vars like 'x'
                         # get the options for checking partials
                         fd_options, _ = _get_fd_options(var, requested_method, local_opts, step,
@@ -1405,9 +1331,6 @@ class Problem(object):
         # Directional derivative directions for matrix free comps.
         mfree_directions = {}
 
-        meta_in = model._var_allprocs_abs2meta['input']
-        meta_out = model._var_allprocs_abs2meta['output']
-
         # Analytic Jacobians
         print_reverse = False
         for mode in ('fwd', 'rev'):
@@ -1431,7 +1354,8 @@ class Problem(object):
 
                 with comp._unscaled_context():
 
-                    of_list, wrt_list = comp._get_partials_varlists()
+                    of_list = comp._get_partials_ofs()
+                    wrt_list = comp._get_partials_wrts()
 
                     # Matrix-free components need to calculate their Jacobian by matrix-vector
                     # product.
@@ -1464,11 +1388,6 @@ class Problem(object):
                                 # Implicit state
                                 flat_view = dstate._abs_get_val(inp_abs)
 
-                            if inp_abs in meta_in:
-                                in_dist = meta_in[inp_abs]['distributed']
-                            else:
-                                in_dist = meta_out[inp_abs]['distributed']
-
                             if directional:
                                 n_in = 1
                                 idxs = range(1)
@@ -1486,15 +1405,6 @@ class Problem(object):
                                 idxs = LocalRangeIterable(comp, inp_abs, use_vec_offset=False)
                                 perturb = 1.0
 
-                            if not in_dist and mode == 'rev':
-                                # in rev mode, if in_dist is False that means that the 'of' var
-                                # is serial.  In cases where 'of' is serial and 'wrt' is
-                                # distributed, the component must do an internal Allreduce in
-                                # order for the total derivatives to be correct, so here we compute
-                                # a correction to undo this so we get the correct answer when
-                                # checking partials.
-                                mult = 1.0 / comp.comm.size
-
                             for idx in idxs:
 
                                 dinputs.set_val(0.0)
@@ -1506,7 +1416,11 @@ class Problem(object):
                                     flat_view[idx] = perturb
 
                                 # Matrix Vector Product
-                                comp._apply_linear(None, _contains_all, mode)
+                                self._metadata['checking'] = True
+                                try:
+                                    comp.run_apply_linear(mode)
+                                finally:
+                                    self._metadata['checking'] = False
 
                                 for out in out_list:
                                     out_abs = rel_name2abs_name(comp, out)
@@ -1530,14 +1444,6 @@ class Problem(object):
                                             deriv[jac_key][:, idx] = derivs
 
                                     else:  # rev
-                                        if not in_dist:
-                                            if out_abs in meta_out:
-                                                out_dist = meta_out[out_abs]['distributed']
-                                            else:
-                                                out_dist = meta_in[out_abs]['distributed']
-                                            if out_dist:
-                                                derivs *= mult
-
                                         key = inp, out
                                         deriv = partials_data[c_name][key]
 
@@ -1546,9 +1452,16 @@ class Problem(object):
                                             m = mfree_directions[c_name][out]
                                             d = mfree_directions[c_name][inp]
                                             mhat = derivs
-                                            dhat = partials_data[c_name][inp, out]['J_fwd'][:, idx]
+                                            dhat = deriv['J_fwd'][:, idx]
 
                                             deriv['directional_fwd_rev'] = mhat.dot(m) - dhat.dot(d)
+                                        else:
+                                            meta = abs2meta_in[out_abs] if out_abs in abs2meta_in \
+                                                else abs2meta_out[out_abs]
+                                            if not meta['distributed']:  # serial input or state
+                                                if inconsistent_across_procs(comp.comm, derivs,
+                                                                             return_array=False):
+                                                    deriv['rank_inconsistent'] = True
 
                                         # Allocate first time
                                         if jac_key not in deriv:
@@ -1625,6 +1538,13 @@ class Problem(object):
         model.run_apply_nonlinear()
 
         # Finite Difference to calculate Jacobian
+        if step is None or isinstance(step, (float, int)):
+            steps = [step]
+        else:
+            steps = step
+
+        do_steps = len(steps) > 1
+
         alloc_complex = model._outputs._alloc_complex
         all_fd_options = {}
         comps_could_not_cs = set()
@@ -1634,74 +1554,92 @@ class Problem(object):
             c_name = comp.pathname
             all_fd_options[c_name] = {}
 
-            approximations = {'fd': FiniteDifference(),
-                              'cs': ComplexStep()}
-            added_wrts = set()
+            of = comp._get_partials_ofs()
+            wrt = comp._get_partials_wrts()
 
-            of, wrt = comp._get_partials_varlists()
+            actual_steps = defaultdict(list)
 
-            # Load up approximation objects with the requested settings.
+            for i, step in enumerate(steps):
+                approximations = {'fd': FiniteDifference(),
+                                  'cs': ComplexStep()}
 
-            local_opts = comp._get_check_partial_options()
-            for rel_key in product(of, wrt):
-                abs_key = rel_key2abs_key(comp, rel_key)
-                local_wrt = rel_key[1]
+                added_wrts = set()
 
-                fd_options, could_not_cs = _get_fd_options(local_wrt, requested_method, local_opts,
-                                                           step, form, step_calc, alloc_complex,
-                                                           minimum_step)
+                # Load up approximation objects with the requested settings.
 
-                if could_not_cs:
-                    comps_could_not_cs.add(c_name)
+                local_opts = comp._get_check_partial_options()
+                for rel_key in product(of, wrt):
+                    abs_key = rel_key2abs_key(comp, rel_key)
+                    local_wrt = rel_key[1]
 
-                # Determine if fd or cs.
-                method = requested_method
+                    fd_options, could_not_cs = _get_fd_options(local_wrt, requested_method,
+                                                               local_opts, step, form, step_calc,
+                                                               alloc_complex, minimum_step)
 
-                all_fd_options[c_name][local_wrt] = fd_options
-                if c_name in mfree_directions:
-                    vector = mfree_directions[c_name].get(local_wrt)
-                else:
-                    vector = None
+                    actual_steps[rel_key].append(fd_options['step'])
 
-                # prevent adding multiple approxs with same wrt (and confusing users with warnings)
-                if abs_key[1] not in added_wrts:
-                    approximations[fd_options['method']].add_approximation(abs_key, self.model,
-                                                                           fd_options,
-                                                                           vector=vector)
-                    added_wrts.add(abs_key[1])
+                    if could_not_cs:
+                        comps_could_not_cs.add(c_name)
 
-            approx_jac = _CheckingJacobian(comp)
-            for approximation in approximations.values():
-                # Perform the FD here.
-                approximation.compute_approximations(comp, jac=approx_jac)
+                    # Determine if fd or cs.
+                    method = requested_method
 
-            with multi_proc_exception_check(comp.comm):
-                if approx_jac._errors:
-                    raise RuntimeError('\n'.join(approx_jac._errors))
+                    all_fd_options[c_name][local_wrt] = fd_options
+                    if c_name in mfree_directions:
+                        vector = mfree_directions[c_name].get(local_wrt)
+                    else:
+                        vector = None
 
-            for abs_key, partial in approx_jac.items():
-                rel_key = abs_key2rel_key(comp, abs_key)
-                partials_data[c_name][rel_key]['J_fd'] = partial
+                    # prevent adding multiple approxs with same wrt (and confusing users with
+                    # warnings)
+                    if abs_key[1] not in added_wrts:
+                        approximations[fd_options['method']].add_approximation(abs_key, comp,
+                                                                               fd_options,
+                                                                               vector=vector)
+                        added_wrts.add(abs_key[1])
 
-                # If this is a directional derivative, convert the analytic to a directional one.
-                wrt = rel_key[1]
-                if wrt in local_opts and local_opts[wrt]['directional']:
+                approx_jac = _CheckingJacobian(comp)
+                for approximation in approximations.values():
+                    # Perform the FD here.
+                    approximation.compute_approximations(comp, jac=approx_jac)
+
+                with multi_proc_exception_check(comp.comm):
+                    if approx_jac._errors:
+                        raise RuntimeError('\n'.join(approx_jac._errors))
+
+                for abs_key, partial in approx_jac.items():
+                    rel_key = abs_key2rel_key(comp, abs_key)
                     deriv = partials_data[c_name][rel_key]
-                    deriv['J_fwd'] = np.atleast_2d(np.sum(deriv['J_fwd'], axis=1)).T
+                    _of, _wrt = rel_key
 
-                    if comp.matrix_free:
-                        deriv['J_rev'] = np.atleast_2d(np.sum(deriv['J_rev'], axis=0)).T
+                    if 'J_fd' not in deriv:
+                        deriv['J_fd'] = []
+                        deriv['steps'] = []
+                    deriv['J_fd'].append(partial)
+                    deriv['steps'] = actual_steps[rel_key]
 
-                        # Dot product test for adjoint validity.
-                        m = mfree_directions[c_name][rel_key[0]].flatten()
-                        d = mfree_directions[c_name][wrt].flatten()
-                        mhat = partial.flatten()
-                        dhat = deriv['J_rev'].flatten()
+                    # If this is a directional derivative, convert the analytic to a directional
+                    # one.
+                    if _wrt in local_opts and local_opts[_wrt]['directional']:
+                        if i == 0:  # only do this on the first iteration
+                            deriv['J_fwd'] = np.atleast_2d(np.sum(deriv['J_fwd'], axis=1)).T
 
-                        deriv['directional_fd_rev'] = dhat.dot(d) - mhat.dot(m)
+                        if comp.matrix_free:
+                            if i == 0:  # only do this on the first iteration
+                                deriv['J_rev'] = np.atleast_2d(np.sum(deriv['J_rev'], axis=0)).T
+
+                            # Dot product test for adjoint validity.
+                            m = mfree_directions[c_name][_of].flatten()
+                            d = mfree_directions[c_name][_wrt].flatten()
+                            mhat = partial.flatten()
+                            dhat = deriv['J_rev'].flatten()
+
+                            if 'directional_fd_rev' not in deriv:
+                                deriv['directional_fd_rev'] = []
+                            deriv['directional_fd_rev'].append(dhat.dot(d) - mhat.dot(m))
 
         # Conversion of defaultdict to dicts
-        partials_data = {comp_name: dict(outer) for comp_name, outer in partials_data.items()}
+        partials_data = {comp_name: dict(data) for comp_name, data in partials_data.items()}
 
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
@@ -1715,16 +1653,19 @@ class Problem(object):
             issue_warning(msg, category=DerivativesWarning)
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
-                                  compact_print, comps, all_fd_options, indep_key=indep_key,
-                                  print_reverse=print_reverse,
+                                  compact_print, comps, all_fd_options, self.comm,
+                                  indep_key=indep_key, print_reverse=print_reverse,
                                   show_only_incorrect=show_only_incorrect)
+
+        if not do_steps:
+            _fix_check_data(partials_data)
 
         return partials_data
 
     def check_totals(self, of=None, wrt=None, out_stream=_DEFAULT_OUT_STREAM, compact_print=False,
                      driver_scaling=False, abs_err_tol=1e-6, rel_err_tol=1e-6, method='fd',
                      step=None, form=None, step_calc='abs', show_progress=False,
-                     show_only_incorrect=False):
+                     show_only_incorrect=False, directional=False, sort=False):
         """
         Check total derivatives for the model vs. finite difference.
 
@@ -1754,7 +1695,7 @@ class Problem(object):
             significant relative error due to a minor absolute error.  Default is 1.0E-6.
         method : str
             Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'.
-        step : float
+        step : None, float, or list/tuple of float
             Step size for approximation. Default is None, which means 1e-6 for 'fd' and 1e-40 for
             'cs'.
         form : str
@@ -1765,13 +1706,17 @@ class Problem(object):
             absolute, 'rel_avg' for a size relative to the absolute value of the vector input, or
             'rel_element' for a size relative to each value in the vector input. In addition, it
             can be 'rel_legacy' for a size relative to the norm of the vector.  For backwards
-            compatibilty, it can be 'rel', which currently defaults to 'rel_legacy', but in the
-            future will default to 'rel_avg'. Defaults to None, in which case the approximation
-            method provides its default value.
+            compatibilty, it can be 'rel', which is now equivalent to 'rel_avg'. Defaults to None,
+            in which case the approximation method provides its default value..
         show_progress : bool
             True to show progress of check_totals.
         show_only_incorrect : bool, optional
             Set to True if output should print only the subjacs found to be incorrect.
+        directional : bool
+            If True, compute a single directional derivative for each 'of' in rev mode or each
+            'wrt' in fwd mode.
+        sort : bool
+            If True, sort the subjacobian keys alphabetically.
 
         Returns
         -------
@@ -1789,7 +1734,7 @@ class Problem(object):
             out_stream = sys.stdout
 
         # Check to see if approximation options are the same as that used to compute totals
-        # If yes, issue an warning
+        # If yes, issue a warning
         if self.model._owns_approx_jac and method in self.model._approx_schemes:
             scheme = self.model._get_approx_scheme(method)
 
@@ -1845,60 +1790,89 @@ class Problem(object):
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
         if wrt is None:
-            wrt = list(self.driver._designvars)
-            if not wrt:
+            if not self.driver._designvars:
                 raise RuntimeError("Driver is not providing any design variables "
                                    "for compute_totals.")
 
         lcons = []
         if of is None:
-            of = list(self.driver._objs)
-            of.extend(self.driver._cons)
-            if not of:
+            if not self.driver._responses:
                 raise RuntimeError("Driver is not providing any response variables "
                                    "for compute_totals.")
-            lcons = [n for n, meta in self.driver._cons.items()
-                     if ('linear' in meta and meta['linear'])]
+            lcons = [n for n, meta in self.driver._cons.items() if meta['linear']]
+            if lcons:
+                # if driver has linear constraints, construct a full list of driver responses
+                # in order to avoid using any driver coloring that won't include the linear
+                # constraints. (The driver coloring would only be used if the supplied of and
+                # wrt lists were None or identical to the driver's lists.)
+                of = list(self.driver._responses)
 
         # Calculate Total Derivatives
-        if model._owns_approx_jac:
-            # Support this, even though it is a bit silly (though you could compare fd with cs.)
-            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
-                                       approx=True, driver_scaling=driver_scaling)
-            Jcalc = total_info.compute_totals_approx(initialize=True)
-
-        else:
-            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
-                                       driver_scaling=driver_scaling)
+        total_info = _TotalJacInfo(self, of, wrt, return_format='flat_dict',
+                                   approx=model._owns_approx_jac,
+                                   driver_scaling=driver_scaling, directional=directional)
+        self._metadata['checking'] = True
+        try:
             Jcalc = total_info.compute_totals()
+        finally:
+            self._metadata['checking'] = False
+        Jcalc_name = f"J_{total_info.mode}"
 
         if step is None:
             if method == 'cs':
-                step = ComplexStep.DEFAULT_OPTIONS['step']
+                steps = [ComplexStep.DEFAULT_OPTIONS['step']]
             else:
-                step = FiniteDifference.DEFAULT_OPTIONS['step']
+                steps = [FiniteDifference.DEFAULT_OPTIONS['step']]
+        elif isinstance(step, (float, int)):
+            steps = [step]
+        else:
+            steps = step
 
-        # Approximate FD
-        fd_args = {
-            'step': step,
-            'form': form,
-            'step_calc': step_calc,
-            'method': method,
-        }
         approx = model._owns_approx_jac
         approx_of = model._owns_approx_of
         approx_wrt = model._owns_approx_wrt
+        approx_jac_meta = model._owns_approx_jac_meta
         old_jac = model._jacobian
         old_subjacs = model._subjacs_info.copy()
+        old_schemes = model._approx_schemes
 
-        model.approx_totals(method=method, step=step, form=form,
-                            step_calc=step_calc if method == 'fd' else None)
-        total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True,
-                                   driver_scaling=driver_scaling)
-        if show_progress:
-            Jfd = total_info.compute_totals_approx(initialize=True, progress_out_stream=out_stream)
-        else:
-            Jfd = total_info.compute_totals_approx(initialize=True)
+        Jfds = []
+        # prevent form from showing as None in check_totals output
+        if form is None and method == 'fd':
+            form = FiniteDifference.DEFAULT_OPTIONS['form']
+
+        for step in steps:
+            # Approximate FD
+            fd_args = {
+                'step': step,
+                'form': form,
+                'step_calc': step_calc,
+                'method': method,
+                'directional': directional,
+            }
+
+            model._approx_schemes = {}
+
+            model.approx_totals(method=method, step=step, form=form,
+                                step_calc=step_calc if method == 'fd' else None)
+            fd_tot_info = _TotalJacInfo(self, of, wrt, return_format='flat_dict',
+                                        approx=True, driver_scaling=driver_scaling,
+                                        directional=directional)
+            if directional:
+                # for fd, use the same fwd mode seeds as the analytical derives used
+                fd_tot_info.seeds = total_info.seeds
+                Jcalc, Jcalc_slices = total_info._get_as_directional()
+
+            if show_progress:
+                Jfd = fd_tot_info.compute_totals(progress_out_stream=out_stream)
+            else:
+                Jfd = fd_tot_info.compute_totals()
+
+            if directional:
+                Jfd, Jfd_slices = fd_tot_info._get_as_directional(total_info.mode)
+                Jfds.append((fd_tot_info.J, step))
+            else:
+                Jfds.append((Jfd, step))
 
         # reset the _owns_approx_jac flag after approximation is complete.
         if not approx:
@@ -1906,30 +1880,77 @@ class Problem(object):
             model._owns_approx_jac = False
             model._owns_approx_of = approx_of
             model._owns_approx_wrt = approx_wrt
+            model._owns_approx_jac_meta = approx_jac_meta
             model._subjacs_info = old_subjacs
+            model._approx_schemes = old_schemes
 
         # Assemble and Return all metrics.
         data = {'': {}}
         resp = self.driver._responses
-        # TODO key should not be fwd when exact computed in rev mode or auto
-        for key, val in Jcalc.items():
-            data[''][key] = {'J_fwd': val, 'J_fd': Jfd[key]}
+        do_steps = len(Jfds) > 1
 
-            # Display whether indices were declared when response was added.
-            of = key[0]
-            if of in resp and resp[of]['indices'] is not None:
-                data[''][key]['indices'] = resp[of]['indices'].indexed_src_size
+        Jcalc_items = Jcalc.items()
+        if sort:
+            Jcalc_items = sorted(Jcalc_items, key=lambda x: x[0])
 
-        if out_stream == _DEFAULT_OUT_STREAM:
-            out_stream = sys.stdout
+        for Jfd, step in Jfds:
+            for key, val in Jcalc_items:
+                if key not in data['']:
+                    data[''][key] = {}
+                meta = data[''][key]
+                if 'J_fd' not in meta:
+                    meta['J_fd'] = []
+                    meta['steps'] = []
+                meta['steps'].append(step)
+                if directional:
+                    if self._mode == 'fwd':
+                        if 'directional_fd_fwd' not in meta:
+                            meta['directional_fd_fwd'] = []
+                        _, wrt = key
+                        # check directional fwd against fd (one must have negative seed)
+                        directional_fd_fwd = total_info.J[:, Jcalc_slices['wrt'][wrt].start] - \
+                            Jfd[:, Jcalc_slices['wrt'][wrt].start]
+                        meta['directional_fd_fwd'].append(directional_fd_fwd)
+                        meta['J_fwd'] = total_info.J[:, Jcalc_slices['wrt'][wrt].start]
+                        meta['J_fd'].append(Jfd[:, Jcalc_slices['wrt'][wrt].start])
+                    else:  # rev
+                        if 'directional_fd_rev' not in meta:
+                            meta['directional_fd_rev'] = []
+                        of, _ = key
+                        # check directional rev against fd (different seeds)
+                        dhat = total_info.J[Jcalc_slices['of'][of].start, :]  # first row of 'of'
+                        d = total_info.seeds['fwd']  # used as direction for fd
+                        mhat = Jfd[Jfd_slices['of'][of], 0]
+                        m = total_info.seeds['rev'][Jcalc_slices['of'][of]]
+
+                        dhat_dot_d = dhat.dot(d)
+                        mhat_dot_m = mhat.dot(m)
+
+                        # Dot product test for adjoint validity.
+                        meta['directional_fd_rev'].append(dhat_dot_d - mhat_dot_m)
+                        meta['J_rev'] = dhat_dot_d
+                        meta['J_fd'].append(mhat_dot_m)
+                else:
+                    meta[Jcalc_name] = val
+                    meta['J_fd'].append(Jfd[key])
+
+                # Display whether indices were declared when response was added.
+                of = key[0]
+                if of in resp and resp[of]['indices'] is not None:
+                    data[''][key]['indices'] = resp[of]['indices'].indexed_src_size
 
         _assemble_derivative_data(data, rel_err_tol, abs_err_tol, out_stream, compact_print,
-                                  [model], {'': fd_args}, totals=True, lcons=lcons,
-                                  show_only_incorrect=show_only_incorrect)
+                                  [model], {'': fd_args}, self.comm, totals=total_info, lcons=lcons,
+                                  show_only_incorrect=show_only_incorrect, sort=sort)
+
+        if not do_steps:
+            _fix_check_data(data)
+
         return data['']
 
     def compute_totals(self, of=None, wrt=None, return_format='flat_dict', debug_print=False,
-                       driver_scaling=False, use_abs_names=False, get_remote=True):
+                       driver_scaling=False, use_abs_names=False, get_remote=True,
+                       coloring_info=None):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1952,40 +1973,30 @@ class Problem(object):
             or the ref and ref0 values that were specified when add_design_var, add_objective, and
             add_constraint were called on the model. Default is False, which is unscaled.
         use_abs_names : bool
-            Set to True when passing in absolute names to skip some translation steps.
+            This is deprecated and has no effect.
         get_remote : bool
             If True, the default, the full distributed total jacobian will be retrieved.
+        coloring_info : ColoringMeta, None, or False
+            If False, do no coloring.  If None, use driver coloring info to compute the coloring.
+            Otherwise use the given coloring info object to provide the coloring, if it exists.
 
         Returns
         -------
         object
             Derivatives in form requested by 'return_format'.
         """
+        if use_abs_names:
+            warn_deprecation("The use_abs_names argument to compute_totals is deprecated and has "
+                             "no effect.")
+
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-            self.final_setup()
+            with multi_proc_exception_check(self.comm):
+                self.final_setup()
 
-        if wrt is None:
-            wrt = list(self.driver._designvars)
-            if not wrt:
-                raise RuntimeError("Driver is not providing any design variables "
-                                   "for compute_totals.")
-
-        if of is None:
-            of = list(self.driver._objs)
-            of.extend(self.driver._cons)
-            if not of:
-                raise RuntimeError("Driver is not providing any response variables "
-                                   "for compute_totals.")
-
-        if self.model._owns_approx_jac:
-            total_info = _TotalJacInfo(self, of, wrt, use_abs_names, return_format,
-                                       approx=True, driver_scaling=driver_scaling)
-            return total_info.compute_totals_approx(initialize=True)
-        else:
-            total_info = _TotalJacInfo(self, of, wrt, use_abs_names, return_format,
-                                       debug_print=debug_print, driver_scaling=driver_scaling,
-                                       get_remote=get_remote)
-            return total_info.compute_totals()
+        total_info = _TotalJacInfo(self, of, wrt, return_format, approx=self.model._owns_approx_jac,
+                                   driver_scaling=driver_scaling, get_remote=get_remote,
+                                   debug_print=debug_print, coloring_info=coloring_info)
+        return total_info.compute_totals()
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
@@ -2013,6 +2024,7 @@ class Problem(object):
                           desvar_opts=[],
                           cons_opts=[],
                           objs_opts=[],
+                          out_stream=_DEFAULT_OUT_STREAM
                           ):
         """
         Print all design variables and responses (objectives and constraints).
@@ -2046,9 +2058,79 @@ class Problem(object):
             Allowed values are:
             ['ref', 'ref0', 'indices', 'adder', 'scaler', 'units',
             'parallel_deriv_color', 'cache_linear_solution'].
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+
+        Returns
+        -------
+        dict
+            Name, size, val, and other requested parameters of design variables, constraints,
+            and objectives.
+        """
+        warn_deprecation(msg='Method `list_problem_vars` has been renamed `list_driver_vars`.\n'
+                         'Please update your code to use list_driver_vars to avoid this warning.')
+        return self.list_driver_vars(show_promoted_name=show_promoted_name,
+                                     print_arrays=print_arrays,
+                                     driver_scaling=driver_scaling,
+                                     desvar_opts=desvar_opts,
+                                     cons_opts=cons_opts,
+                                     objs_opts=objs_opts,
+                                     out_stream=out_stream)
+
+    def list_driver_vars(self,
+                         show_promoted_name=True,
+                         print_arrays=False,
+                         driver_scaling=True,
+                         desvar_opts=[],
+                         cons_opts=[],
+                         objs_opts=[],
+                         out_stream=_DEFAULT_OUT_STREAM
+                         ):
+        """
+        Print all design variables and responses (objectives and constraints).
+
+        Parameters
+        ----------
+        show_promoted_name : bool
+            If True, then show the promoted names of the variables.
+        print_arrays : bool, optional
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format is affected
+            by the values set with numpy.set_printoptions.
+            Default is False.
+        driver_scaling : bool, optional
+            When True, return values that are scaled according to either the adder and scaler or
+            the ref and ref0 values that were specified when add_design_var, add_objective, and
+            add_constraint were called on the model. Default is True.
+        desvar_opts : list of str
+            List of optional columns to be displayed in the desvars table.
+            Allowed values are:
+            ['lower', 'upper', 'ref', 'ref0', 'indices', 'adder', 'scaler', 'parallel_deriv_color',
+            'cache_linear_solution', 'units', 'min', 'max'].
+        cons_opts : list of str
+            List of optional columns to be displayed in the cons table.
+            Allowed values are:
+            ['lower', 'upper', 'equals', 'ref', 'ref0', 'indices', 'adder', 'scaler',
+            'linear', 'parallel_deriv_color', 'cache_linear_solution', 'units', 'min', 'max'].
+        objs_opts : list of str
+            List of optional columns to be displayed in the objs table.
+            Allowed values are:
+            ['ref', 'ref0', 'indices', 'adder', 'scaler', 'units',
+            'parallel_deriv_color', 'cache_linear_solution'].
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+
+        Returns
+        -------
+        dict
+            Name, size, val, and other requested parameters of design variables, constraints,
+            and objectives.
         """
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-            raise RuntimeError(f"{self.msginfo}: Problem.list_problem_vars() cannot be called "
+            raise RuntimeError(f"{self.msginfo}: Problem.list_driver_vars() cannot be called "
                                "before `Problem.run_model()`, `Problem.run_driver()`, or "
                                "`Problem.final_setup()`.")
 
@@ -2061,10 +2143,17 @@ class Problem(object):
         def_desvar_opts = [opt for opt in ('indices',) if opt not in desvar_opts and
                            _find_dict_meta(desvars, opt)]
         col_names = default_col_names + def_desvar_opts + desvar_opts
-        self._write_var_info_table(header, col_names, desvars, vals,
-                                   show_promoted_name=show_promoted_name,
-                                   print_arrays=print_arrays,
-                                   col_spacing=2)
+        if out_stream:
+            self._write_var_info_table(header, col_names, desvars, vals,
+                                       show_promoted_name=show_promoted_name,
+                                       print_arrays=print_arrays,
+                                       col_spacing=2, out_stream=out_stream)
+
+        des_vars = [[i, j] for i, j in desvars.items()]
+        for d in des_vars:
+            d[1] = {i: j for i, j in d[1].items() if i in col_names}
+            d[1]['val'] = vals[d[0]]
+        des_vars = [tuple(d) for d in des_vars]
 
         # Constraints
         cons = self.driver._cons
@@ -2074,10 +2163,17 @@ class Problem(object):
         def_cons_opts = [opt for opt in ('indices', 'alias') if opt not in cons_opts and
                          _find_dict_meta(cons, opt)]
         col_names = default_col_names + def_cons_opts + cons_opts
-        self._write_var_info_table(header, col_names, cons, vals,
-                                   show_promoted_name=show_promoted_name,
-                                   print_arrays=print_arrays,
-                                   col_spacing=2)
+        if out_stream:
+            self._write_var_info_table(header, col_names, cons, vals,
+                                       show_promoted_name=show_promoted_name,
+                                       print_arrays=print_arrays,
+                                       col_spacing=2, out_stream=out_stream)
+
+        cons_vars = [[i, j] for i, j in cons.items()]
+        for c in cons_vars:
+            c[1] = {i: j for i, j in c[1].items() if i in col_names}
+            c[1]['val'] = vals[c[0]]
+        cons_vars = [tuple(c) for c in cons_vars]
 
         objs = self.driver._objs
         vals = self.driver.get_objective_values(driver_scaling=driver_scaling)
@@ -2085,13 +2181,27 @@ class Problem(object):
         def_obj_opts = [opt for opt in ('indices',) if opt not in objs_opts and
                         _find_dict_meta(objs, opt)]
         col_names = default_col_names + def_obj_opts + objs_opts
-        self._write_var_info_table(header, col_names, objs, vals,
-                                   show_promoted_name=show_promoted_name,
-                                   print_arrays=print_arrays,
-                                   col_spacing=2)
+        if out_stream:
+            self._write_var_info_table(header, col_names, objs, vals,
+                                       show_promoted_name=show_promoted_name,
+                                       print_arrays=print_arrays,
+                                       col_spacing=2, out_stream=out_stream)
+
+        obj_vars = [[i, j] for i, j in objs.items()]
+        for o in obj_vars:
+            o[1] = {i: j for i, j in o[1].items() if i in col_names}
+            o[1]['val'] = vals[o[0]]
+        obj_vars = [tuple(o) for o in obj_vars]
+
+        prob_vars = {'design_vars': des_vars,
+                     'constraints': cons_vars,
+                     'objectives': obj_vars}
+
+        return prob_vars
 
     def _write_var_info_table(self, header, col_names, meta, vals, print_arrays=False,
-                              show_promoted_name=True, col_spacing=1):
+                              show_promoted_name=True, col_spacing=1,
+                              out_stream=_DEFAULT_OUT_STREAM):
         """
         Write a table of information for the problem variable in meta and vals.
 
@@ -2101,9 +2211,9 @@ class Problem(object):
             The header line for the table.
         col_names : list of str
             List of column labels.
-        meta : OrderedDict
+        meta : dict
             Dictionary of metadata for each problem variable.
-        vals : OrderedDict
+        vals : dict
             Dictionary of values for each problem variable.
         print_arrays : bool, optional
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
@@ -2115,7 +2225,17 @@ class Problem(object):
             If True, then show the promoted names of the variables.
         col_spacing : int
             Number of spaces between columns in the table.
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
         """
+        if out_stream is None:
+            return
+        elif out_stream is _DEFAULT_OUT_STREAM:
+            out_stream = sys.stdout
+        elif not isinstance(out_stream, TextIOBase):
+            raise TypeError("Invalid output stream specified for 'out_stream'")
+
         abs2prom = self.model._var_abs2prom
 
         # Gets the current numpy print options for consistent decimal place
@@ -2158,7 +2278,7 @@ class Problem(object):
             rows.append(row)
 
         col_space = ' ' * col_spacing
-        print(add_border(header, '-'))
+        print(add_border(header, '-'), file=out_stream)
 
         # loop through the rows finding the max widths
         max_width = {}
@@ -2180,8 +2300,8 @@ class Problem(object):
         for col_name in col_names:
             header_div += '-' * max_width[col_name] + col_space
             header_col_names += pad_name(col_name, max_width[col_name], quotes=False) + col_space
-        print(header_col_names)
-        print(header_div[:-1])
+        print(header_col_names, file=out_stream)
+        print(header_div[:-1], file=out_stream)
 
         # print rows with var info
         for row in rows:
@@ -2196,16 +2316,16 @@ class Problem(object):
                 else:
                     out = str(cell)
                 row_string += pad_name(out, max_width[col_name], quotes=False) + col_space
-            print(row_string)
+            print(row_string, file=out_stream)
 
             if print_arrays:
                 spaces = (max_width['name'] + col_spacing) * ' '
                 for col_name in have_array_values:
-                    print(f"{spaces}{col_name}:")
-                    print(textwrap.indent(pprint.pformat(row[col_name]), spaces))
-                    print()
+                    print(f"{spaces}{col_name}:", file=out_stream)
+                    print(textwrap.indent(pprint.pformat(row[col_name]), spaces), file=out_stream)
+                    print(file=out_stream)
 
-        print()
+        print(file=out_stream)
 
     def load_case(self, case):
         """
@@ -2213,39 +2333,136 @@ class Problem(object):
 
         Parameters
         ----------
-        case : Case object
-            A Case from a CaseRecorder file.
+        case : Case or dict
+            A Case from a CaseReader, or a dictionary with key 'inputs' mapped to the
+            output of problem.model.list_inputs and key 'outputs' mapped to the output
+            of prob.model.list_outputs. Both list_inputs and list_outputs should be called
+            with `prom_name=True` and `return_format='dict'`.
         """
-        inputs = case.inputs if case.inputs is not None else None
-        abs2idx = self.model._var_allprocs_abs2idx
-        if inputs:
-            meta = self.model._var_allprocs_abs2meta['input']
-            abs2prom = self.model._var_allprocs_abs2prom['input']
-            for name in inputs.absolute_names():
-                if name not in abs2prom:
-                    raise KeyError(f"{self.msginfo}: Input variable, '{name}', recorded in the "
-                                   "case is not found in the model")
-                varmeta = meta[name]
-                if varmeta['distributed'] and self.model.comm.size > 1:
-                    sizes = self.model._var_sizes['input'][:, abs2idx[name]]
-                    self[name] = scatter_dist_to_local(inputs[name], self.model.comm, sizes)
-                else:
-                    self[name] = inputs[name]
+        model = self.model
 
-        outputs = case.outputs if case.outputs is not None else None
-        if outputs:
-            meta = self.model._var_allprocs_abs2meta['output']
-            abs2prom = self.model._var_allprocs_abs2prom['output']
-            for name in outputs.absolute_names():
-                if name not in abs2prom:
-                    raise KeyError(f"{self.msginfo}: Output variable, '{name}', recorded in the "
-                                   "case is not found in the model")
-                varmeta = meta[name]
-                if varmeta['distributed'] and self.model.comm.size > 1:
-                    sizes = self.model._var_sizes['output'][:, abs2idx[name]]
-                    self[name] = scatter_dist_to_local(outputs[name], self.model.comm, sizes)
+        # if model overrides load_case, then call the overloaded method
+        if overrides_method('load_case', model, System):
+            model.load_case(case)
+            return
+
+        # find all subsystems that override the load_case method
+        system_overrides = {}
+        for subsys in model.system_iter(include_self=False, recurse=True):
+            if overrides_method('load_case', subsys, System):
+                system_overrides[subsys.pathname] = subsys
+
+        def set_later(var_name):
+            # determine if variable should be set later via an overridden load_case method
+            for pathname in system_overrides:
+                if var_name.startswith(pathname + '.'):
+                    return True
+            return False
+
+        if isinstance(case, dict):
+            # case data comes from list_inputs/list_outputs, keyed on absolute pathname
+            # we need it to be keyed on promoted name
+            if 'inputs' in case:
+                inputs = {meta['prom_name']: meta for meta in case['inputs'].values()}
+            else:
+                inputs = None
+            if 'outputs' in case:
+                outputs = {meta['prom_name']: meta for meta in case['outputs'].values()}
+            else:
+                outputs = None
+        else:
+            inputs = case.inputs
+            outputs = case.outputs
+
+        abs2idx = model._var_allprocs_abs2idx
+        prom2abs_in = model._var_allprocs_prom2abs_list['input']
+        prom2abs_out = model._var_allprocs_prom2abs_list['output']
+        abs2meta_in = model._var_allprocs_abs2meta['input']
+        abs2meta_out = model._var_allprocs_abs2meta['output']
+        abs2meta_disc_in = model._var_allprocs_discrete['input']
+        abs2meta_disc_out = model._var_allprocs_discrete['output']
+
+        if inputs:
+            for name in inputs:
+                if set_later(name):
+                    continue
+
+                if name in prom2abs_in:
+                    for abs_name in prom2abs_in[name]:
+                        if set_later(abs_name):
+                            continue
+
+                        if isinstance(case, dict):
+                            val = inputs[name]['val']
+                        else:
+                            # need a unique abs_name to get value from a case
+                            # if there is a matching abs_name in the case, use that value
+                            # otherwise use the value of the first matching abs_name
+                            case_abs_names = case._prom2abs['input'][name]
+                            if abs_name in case_abs_names:
+                                val = case.inputs[abs_name]
+                            else:
+                                val = case.inputs[case_abs_names[0]]
+                        try:
+                            varmeta = abs2meta_in[abs_name]
+                        except KeyError:
+                            # Var may be discrete
+                            varmeta = abs2meta_disc_in[abs_name]
+                        if varmeta.get('distributed') and model.comm.size > 1:
+                            sizes = model._var_sizes['input'][:, abs2idx[abs_name]]
+                            model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
+                        else:
+                            model.set_val(abs_name, val)
                 else:
-                    self[name] = outputs[name]
+                    issue_warning(f"{model.msginfo}: Input variable, '{name}', recorded "
+                                  "in the case is not found in the model.")
+
+        if outputs:
+            for name in outputs:
+                if set_later(name):
+                    continue
+
+                # auto_ivc output may point to a promoted input name
+                if name in prom2abs_out:
+                    prom2abs = prom2abs_out
+                    is_output = True
+                else:
+                    prom2abs = prom2abs_in
+                    is_output = False
+
+                if name in prom2abs:
+                    if isinstance(case, dict):
+                        val = outputs[name]['val']
+                    else:
+                        val = outputs[name]
+
+                    for abs_name in prom2abs[name]:
+                        if set_later(abs_name):
+                            continue
+
+                        if is_output:
+                            try:
+                                varmeta = abs2meta_out[abs_name]
+                            except KeyError:
+                                varmeta = abs2meta_disc_out[abs_name]
+                        else:
+                            try:
+                                varmeta = abs2meta_in[abs_name]
+                            except KeyError:
+                                varmeta = abs2meta_disc_in[abs_name]
+                        if varmeta.get('distributed') and model.comm.size > 1:
+                            sizes = model._var_sizes['output'][:, abs2idx[abs_name]]
+                            model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
+                        else:
+                            model.set_val(abs_name, val)
+
+                else:
+                    issue_warning(f"{model.msginfo}: Output variable, '{name}', recorded "
+                                  "in the case is not found in the model.")
+
+        # call the overridden load_case method on applicable subsystems (in top-down order)
+        for sys_name in sorted(system_overrides.keys()):
+            system_overrides[sys_name].load_case(case)
 
     def check_config(self, logger=None, checks=_default_checks, out_file='openmdao_checks.out'):
         """
@@ -2268,19 +2485,40 @@ class Problem(object):
         if checks is None:
             return
 
+        reports_dir_exists = os.path.isdir(self.get_reports_dir())
+        check_file_path = None
         if logger is None:
-            logger = get_logger('check_config', out_file=out_file, use_format=True)
+            if out_file is not None:
+                if reports_dir_exists:
+                    check_file_path = str(self.get_reports_dir() / out_file)
+                else:
+                    check_file_path = out_file
+            logger = get_logger('check_config', out_file=check_file_path, use_format=True)
 
         if checks == 'all':
             checks = sorted(_all_non_redundant_checks)
 
+        if logger is None and checks:
+            check_file_path = None if out_file is None else str(self.get_outputs_dir() / out_file)
+            logger = get_logger('check_config', out_file=check_file_path, use_format=True)
+
         for c in checks:
             if c not in _all_checks:
                 print(f"WARNING: '{c}' is not a recognized check.  Available checks are: "
-                      f"{ sorted(_all_checks)}")
+                      f"{sorted(_all_checks)}")
                 continue
             logger.info(f'checking {c}')
             _all_checks[c](self, logger)
+
+        if checks and check_file_path is not None and reports_dir_exists:
+            # turn text file written to reports dir into an html file to be viewable from the
+            # 'openmdao view_reports' command
+            with open(check_file_path, 'r') as f:
+                txt = f.read()
+
+            path = self.get_reports_dir() / 'checks.html'
+            with open(path, 'w') as f:
+                f.write(text2html(txt))
 
     def set_complex_step_mode(self, active):
         """
@@ -2318,15 +2556,318 @@ class Problem(object):
 
         Returns
         -------
-        str
+        pathlib.Path
             The path to the directory where reports should be written.
         """
-        reports_dirpath = pathlib.Path(get_reports_dir()).joinpath(f'{self._name}')
+        return self.get_outputs_dir('reports', mkdir=force or len(self._reports) > 0)
 
-        if self.comm.rank == 0 and (force or self._reports):
-            pathlib.Path(reports_dirpath).mkdir(parents=True, exist_ok=True)
+    def get_outputs_dir(self, *subdirs, mkdir=True):
+        """
+        Get the path under which all output files of this problem are to be placed.
 
-        return reports_dirpath
+        Parameters
+        ----------
+        *subdirs : str
+            Subdirectories nested under the relevant problem output directory.
+            To create {prob_output_dir}/a/b one would pass `prob.get_outputs_dir('a', 'b')`.
+        mkdir : bool
+            If True, attempt to create this directory if it does not exist.
+
+        Returns
+        -------
+        pathlib.Path
+           The path of the outputs directory for the problem.
+        """
+        return _get_outputs_dir(self, *subdirs, mkdir=mkdir)
+
+    def get_coloring_dir(self, mode, mkdir=False):
+        """
+        Get the path to the directory for the coloring files.
+
+        Parameters
+        ----------
+        mode : str
+            Must be one of 'input' or 'output'. A problem will always write its coloring files to
+            its standard output directory in `{prob_name}_out/coloring_files`, but input coloring
+            files to be loaded may be read from a different directory specifed by the problem's
+            `coloring_dir` option.
+        mkdir : bool
+            If True, attempt to create this directory if it does not exist.
+
+        Returns
+        -------
+        pathlib.Path
+            The path to the directory where reports should be written.
+        """
+        if mode == 'input':
+            return pathlib.Path(self.options['coloring_dir'])
+        elif mode == 'output':
+            return self.get_outputs_dir('coloring_files', mkdir=mkdir)
+        else:
+            raise ValueError(f"{self.msginfo}: get_coloring_dir requires mode"
+                             "to be one of 'input' or 'output'.")
+
+    def list_indep_vars(self, include_design_vars=True, options=None,
+                        print_arrays=False, out_stream=_DEFAULT_OUT_STREAM):
+        """
+        Retrieve the independent variables in the Problem.
+
+        Returns a dictionary mapping the promoted names of indep_vars which the user is
+        expected to provide to the metadata for the associated independent variable.
+
+        A output is designated as an independent variable if it is tagged with
+        'openmdao:indep_var'. This includes IndepVarComp by default, and users are
+        able to apply this tag to their own component outputs if they wish
+        to provide components with IndepVarComp-like capability.
+
+        Parameters
+        ----------
+        include_design_vars : bool
+            If True, include design variables in the list of problem inputs.
+            The user may provide values for these but ultimately they will
+            be overwritten by the Driver.
+            Default is False.
+        options : list of str or None
+            List of optional columns to be displayed in the independent variable table.
+            Allowed values are:
+            ['name', 'units', 'shape', 'size', 'desc', 'ref', 'ref0', 'res_ref',
+            'distributed', 'lower', 'upper', 'tags', 'shape_by_conn', 'copy_shape', 'compute_shape',
+            'global_size', 'global_shape', 'value'].
+        print_arrays : bool, optional
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format is affected
+            by the values set with numpy.set_printoptions.
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+
+        Returns
+        -------
+        dict
+            A dictionary mapping the promoted names of all independent variables
+            in the model to their metadata.
+        """
+        model = self.model
+        if model._outputs is None:
+            raise RuntimeError("list_indep_vars requires that final_setup has been "
+                               "run for the Problem.")
+
+        design_vars = model.get_design_vars(recurse=True,
+                                            use_prom_ivc=True,
+                                            get_sizes=False)
+
+        problem_indep_vars = []
+        indep_var_names = set()
+
+        col_names = ['name', 'units', 'val']
+        if options is not None:
+            col_names.extend(options)
+
+        abs2meta = model._var_allprocs_abs2meta['output']
+
+        prom2src = {}
+        for prom in self.model._var_allprocs_prom2abs_list['input']:
+            src = model.get_source(prom)
+            if 'openmdao:indep_var' in abs2meta[src]['tags']:
+                prom2src[prom] = src
+
+        for prom, src in prom2src.items():
+            name = prom if src.startswith('_auto_ivc.') else src
+
+            if (include_design_vars or name not in design_vars) \
+                    and name not in indep_var_names:
+                meta = abs2meta[src]
+                meta = {key: meta[key] for key in col_names if key in meta}
+                meta['val'] = self.get_val(prom)
+                problem_indep_vars.append((name, meta))
+                indep_var_names.add(name)
+
+        if out_stream is not None:
+            header = f'Problem {self._name} Independent Variables'
+            if problem_indep_vars:
+                meta = {key: meta for key, meta in problem_indep_vars}
+                vals = {key: self.get_val(key) for key in meta}
+                self._write_var_info_table(header, col_names, meta, vals, print_arrays=print_arrays,
+                                           show_promoted_name=True, col_spacing=1,
+                                           out_stream=out_stream)
+            else:
+                if out_stream is _DEFAULT_OUT_STREAM:
+                    out_stream = sys.stdout
+                hr = '-' * len(header)
+                print(f'{hr}\n{header}\n{hr}', file=out_stream)
+                print('None found', file=out_stream)
+
+        return problem_indep_vars
+
+    def iter_count_iter(self, include_driver=True, include_solvers=True, include_systems=False):
+        """
+        Yield iteration counts for driver, solvers and/or systems.
+
+        Parameters
+        ----------
+        include_driver : bool
+            If True, include the driver in the iteration counts.
+        include_solvers : bool
+            If True, include solvers in the iteration counts.
+        include_systems : bool
+            If True, include systems in the iteration counts.
+
+        Yields
+        ------
+        str
+            Name of the object.
+        str
+            Name of the counter.
+        int
+            Value of the counter.
+        """
+        if include_driver:
+            yield ('Driver', 'iter_count', self.driver.iter_count)
+        if include_solvers or include_systems:
+            for s in self.model.system_iter(include_self=True, recurse=True):
+                if include_systems:
+                    for it in ('iter_count', 'iter_count_apply'):
+                        val = getattr(s, it)
+                        if val > 0:
+                            yield (s.pathname, it, val)
+
+                if include_solvers:
+                    prefix = s.pathname + '.' if s.pathname else ''
+                    if s.nonlinear_solver is not None and s.nonlinear_solver._iter_count > 0:
+                        yield (prefix + 'nonlinear_solver', '_iter_count',
+                               s.nonlinear_solver._iter_count)
+                    if s.linear_solver is not None and s.linear_solver._iter_count > 0:
+                        yield (prefix + 'linear_solver', '_iter_count',
+                               s.linear_solver._iter_count)
+
+    def list_pre_post(self, outfile=None):
+        """
+        Display the pre and post optimization components.
+
+        Parameters
+        ----------
+        outfile : file-like or str or None
+            Where to send human readable output. Default is None, which sends output to stdout.
+        """
+        if self._metadata is None or self._metadata['setup_status'] < _SetupStatus.POST_SETUP:
+            raise RuntimeError(f"{self.msginfo}: list_pre_post can't be called before setup.")
+
+        if outfile is None:
+            out = sys.stdout
+        else:
+            out = open(outfile, 'w')
+
+        model = self.model
+        if model._pre_components:
+            print("\nPre-optimization components:", file=out)
+            for name in sorted(model._pre_components):
+                print(f"    {name}", file=out)
+        else:
+            print("\nPre-optimization components: []", file=out)
+
+        if model._post_components:
+            print("\nPost-optimization components:", file=out)
+            for name in sorted(model._post_components):
+                print(f"    {name}", file=out)
+        else:
+            print("\nPost-optimization components: []", file=out)
+
+    def _any_rank_has_saved_errors(self):
+        """
+        Return True if any rank has saved errors.
+
+        Returns
+        -------
+        bool
+            True if any rank has errors.
+        """
+        if self._metadata is None:
+            return False
+        else:
+            if MPI and self.comm is not None and self.comm.size > 1:
+                if self._metadata['saved_errors'] is None:
+                    nerrs = 0
+                else:
+                    nerrs = len(self._metadata['saved_errors'])
+                return self.comm.allreduce(nerrs, op=MPI.SUM) > 0
+            else:
+                return bool(self._metadata['saved_errors'])
+
+    def _get_unique_saved_errors(self):
+        """
+        Get a list of unique saved errors.
+
+        Returns
+        -------
+        list
+            List of unique saved errors.
+        """
+        unique_errors = []
+        if self._metadata is not None:
+            if self._any_rank_has_saved_errors():
+                # traceback won't pickle, so convert to string
+                if self.comm.size > 1:
+                    saved = [(ident, msg, exc_type, ''.join(traceback.format_tb(tback)))
+                             for ident, msg, exc_type, tback in self._metadata['saved_errors']]
+                    all_errors = self.comm.allgather(saved)
+                else:
+                    all_errors = [self._metadata['saved_errors']]
+
+                seen = set()
+                for errors in all_errors:
+                    for ident, msg, exc_type, tback in errors:
+                        if (ident is None and msg not in seen) or ident not in seen:
+                            unique_errors.append((ident, msg, exc_type, tback))
+                            seen.add(ident)
+                            seen.add(msg)
+
+        return unique_errors
+
+    def get_total_coloring(self, coloring_info=None, of=None, wrt=None, run_model=None):
+        """
+        Get the total coloring.
+
+        If necessary, dynamically generate it.
+
+        Parameters
+        ----------
+        coloring_info : dict
+            Coloring metadata dict.
+        of : list of str or None
+            List of response names.
+        wrt : list of str or None
+            List of design variable names.
+        run_model : bool or None
+            If False, don't run model.  If None, use problem._run_counter to determine if model
+            should be run.
+
+        Returns
+        -------
+        Coloring or None
+            Coloring object, possibly dynamically generated, or None.
+        """
+        if coloring_mod._use_total_sparsity:
+            coloring = None
+            # if no coloring_info is supplied, copy the coloring_info from the driver but
+            # remove any existing coloring, and force dynamic coloring
+            if coloring_info is None:
+                coloring_info = self.driver._coloring_info.copy()
+                coloring_info.coloring = None
+                coloring_info.dynamic = True
+
+            if coloring_info.do_compute_coloring():
+                if coloring_info.dynamic:
+                    do_run = run_model if run_model is not None else self._run_counter < 0
+                    coloring = \
+                        coloring_mod.dynamic_total_coloring(
+                            self.driver, run_model=do_run,
+                            fname=self.driver._get_total_coloring_fname(mode='output'),
+                            of=of, wrt=wrt)
+            else:
+                return coloring_info.coloring
+
+            return coloring
 
 
 _ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
@@ -2347,8 +2888,8 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
         True if the current dirivatives are computed in a matrix free manner.
     directional : bool
         True if the current dirivtives are directional.
-    totals : bool
-        True if the current derivatives are total derivatives.
+    totals : bool or _TotalJacInfo
+        _TotalJacInfo if the current derivatives are total derivatives.
 
     Returns
     -------
@@ -2360,55 +2901,86 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
     def safe_norm(arr):
         return 0. if arr is None or arr.size == 0 else np.linalg.norm(arr)
 
-    # TODO total derivs may have been computed in rev mode, not fwd
-    forward = derivative_info['J_fwd']
-    fwd_norm = safe_norm(forward)
+    Jforward = derivative_info.get('J_fwd')
+    Jreverse = derivative_info.get('J_rev')
+    forward = Jforward is not None
+    reverse = Jreverse is not None
+
+    rev_norm = fwd_norm = fwd_rev_error = None
+    calc_norm = 0.
+    if reverse:
+        rev_norm = calc_norm = safe_norm(Jreverse)
+    if forward:
+        fwd_norm = calc_norm = safe_norm(Jforward)
+
     try:
-        fd = derivative_info['J_fd']
-        fd_norm = safe_norm(fd)
+        fdinfo = derivative_info['J_fd']
+        steps = derivative_info['steps']
     except KeyError:
         # this can happen when a partial is not declared, which means it should be zero
-        fd = fd_norm = 0.
+        fdinfo = (np.zeros(1),)
+        steps = (None,)
 
-    fwd_error = safe_norm(forward - fd)
-    rev_norm = None
-    if not totals and matrix_free:
+    if matrix_free:
         if directional:
-            fwd_rev_error = derivative_info['directional_fwd_rev']
-            rev_error = derivative_info['directional_fd_rev']
-        else:
-            reverse = derivative_info.get('J_rev')
-            rev_error = safe_norm(reverse - fd)
-            fwd_rev_error = safe_norm(forward - reverse)
-            rev_norm = safe_norm(reverse)
-    else:
-        rev_error = fwd_rev_error = None
-
-    derivative_info['abs error'] = _ErrorTuple(fwd_error, rev_error, fwd_rev_error)
-    derivative_info['magnitude'] = _MagnitudeTuple(fwd_norm, rev_norm, fd_norm)
-
-    if fd_norm == 0.:
-        if fwd_norm == 0.:
-            derivative_info['rel error'] = rel_err = _ErrorTuple(nan, nan, nan)
-
-        else:
-            # If fd_norm is zero, let's use fwd_norm as the divisor for relative
-            # check. That way we don't accidentally squelch a legitimate problem.
-            if not totals and matrix_free:
-                rel_err = _ErrorTuple(fwd_error / fwd_norm, rev_error / fwd_norm,
-                                      fwd_rev_error / fwd_norm)
-                derivative_info['rel error'] = rel_err
+            if forward and reverse:
+                fwd_rev_error = safe_norm(derivative_info['directional_fwd_rev'])
             else:
-                derivative_info['rel error'] = _ErrorTuple(fwd_error / fwd_norm, None, None)
+                fwd_rev_error = None
+        elif not totals:
+            fwd_rev_error = safe_norm(Jforward - Jreverse)
 
-    else:
-        if not totals and matrix_free:
-            derivative_info['rel error'] = _ErrorTuple(fwd_error / fd_norm, rev_error / fd_norm,
-                                                       fwd_rev_error / fd_norm)
+    derivative_info['abs error'] = []
+    derivative_info['rel error'] = []
+    derivative_info['magnitude'] = []
+    derivative_info['steps'] = []
+    fdnorms = []
+
+    for i, fd in enumerate(fdinfo):
+        step = steps[i]
+        fd_norm = safe_norm(fd)
+        fdnorms.append(fd_norm)
+
+        fwd_error = rev_error = None
+
+        if reverse and not directional:
+            rev_error = safe_norm(Jreverse - fd)
+
+        if forward:
+            fwd_error = safe_norm(Jforward - fd)
+
+        if directional:
+            if reverse:
+                rev_error = safe_norm(derivative_info['directional_fd_rev'][i])
+                if not totals:
+                    rev_norm = None
+            if forward and totals:
+                fwd_error = safe_norm(derivative_info['directional_fd_fwd'][i])
+
+        derivative_info['abs error'].append(_ErrorTuple(fwd_error, rev_error, fwd_rev_error))
+        derivative_info['magnitude'].append(_MagnitudeTuple(fwd_norm, rev_norm, fd_norm))
+        derivative_info['steps'].append(step)
+
+        # If fd_norm is zero, let's use calc_norm as the divisor for the relative
+        # error check. That way we don't accidentally squelch a legitimate problem.
+        div_norm = fd_norm if fd_norm != 0. else calc_norm
+
+        if div_norm == 0.:
+            derivative_info['rel error'].append(_ErrorTuple(None if fwd_error is None else nan,
+                                                            None if rev_error is None else nan,
+                                                            None if fwd_rev_error is None else nan))
         else:
-            derivative_info['rel error'] = _ErrorTuple(fwd_error / fd_norm, None, None)
+            if matrix_free and not totals:
+                derivative_info['rel error'].append(_ErrorTuple(fwd_error / div_norm,
+                                                                rev_error / div_norm,
+                                                                fwd_rev_error / div_norm))
+            else:
+                derivative_info['rel error'].append(_ErrorTuple(
+                    None if fwd_error is None else fwd_error / div_norm,
+                    None if rev_error is None else rev_error / div_norm,
+                    None if fwd_rev_error is None else fwd_rev_error / div_norm))
 
-    return fd_norm
+    return np.max(fdnorms)
 
 
 def _errors_above_tol(deriv_info, abs_error_tol, rel_error_tol):
@@ -2431,31 +3003,38 @@ def _errors_above_tol(deriv_info, abs_error_tol, rel_error_tol):
     bool
         True if relative tolerance is violated.
     """
-    abs_err = deriv_info['abs error']
-    rel_err = deriv_info['rel error']
+    abs_errs = deriv_info['abs error']
+    rel_errs = deriv_info['rel error']
 
     above_abs = above_rel = False
 
-    for error in abs_err:
-        if error is not None and not np.isnan(error) and error >= abs_error_tol:
-            above_abs = True
+    for abs_err in abs_errs:
+        for error in abs_err:
+            if error is not None and not np.isnan(error) and error >= abs_error_tol:
+                above_abs = True
+                break
+        if above_abs:
             break
 
-    for error in rel_err:
-        if error is not None and not np.isnan(error) and error >= rel_error_tol:
-            above_rel = True
+    for rel_err in rel_errs:
+        for error in rel_err:
+            if error is not None and not np.isnan(error) and error >= rel_error_tol:
+                above_rel = True
+                break
+        if above_rel:
             break
 
     return above_abs, above_rel
 
 
 def _iter_derivs(derivatives, sys_name, show_only_incorrect, global_options, totals,
-                 matrix_free, abs_error_tol, rel_error_tol):
+                 matrix_free, abs_error_tol=1e-6, rel_error_tol=1e-6, incon_keys=()):
     """
     Iterate over all of the derivatives.
 
     If show_only_incorrect is True, only the derivatives with abs or rel errors outside of
-    tolerance will be returned.
+    tolerance or derivatives wrt serial variables that are inconsistent across ranks will be
+    returned.
 
     Parameters
     ----------
@@ -2467,14 +3046,16 @@ def _iter_derivs(derivatives, sys_name, show_only_incorrect, global_options, tot
         If True, yield only derivatives with errors outside of tolerance.
     global_options : dict
         Dictionary containing the options for the approximation.
-    totals : bool
-        Set to True if we are doing check_totals to skip a bunch of stuff.
+    totals : bool or _TotalJacInfo
+        Set to _TotalJacInfo if we are doing check_totals to skip a bunch of stuff.
     matrix_free : bool
         True if the system computes matrix free derivatives.
     abs_error_tol : float
         Absolute error tolerance.
     rel_error_tol : float
         Relative error tolerance.
+    incon_keys : set or tuple
+        Keys where there are serial d_inputs variables that are inconsistent across processes.
 
     Yields
     ------
@@ -2490,34 +3071,63 @@ def _iter_derivs(derivatives, sys_name, show_only_incorrect, global_options, tot
         True if the differences for the current derivatives are above the absolute error tolerance.
     bool
         True if the differences for the current derivatives are above the relative error tolerance.
+    bool
+        True if the current derivative was computed where some serial d_inputs variables were not
+        consistent across processes.
     """
     # Sorted keys ensures deterministic ordering
     sorted_keys = sorted(derivatives)
 
     for key in sorted_keys:
-        of, wrt = key
+        _, wrt = key
+
+        inconsistent = False
         derivative_info = derivatives[key]
 
         if totals:
             fd_opts = global_options['']
         else:
             fd_opts = global_options[sys_name][wrt]
-        directional = fd_opts.get('directional')
+            if key in incon_keys:
+                inconsistent = True
+
+        directional = bool(fd_opts) and fd_opts.get('directional')
 
         fd_norm = _compute_deriv_errors(derivative_info, matrix_free, directional, totals)
 
         above_abs, above_rel = _errors_above_tol(derivative_info, abs_error_tol, rel_error_tol)
 
-        if show_only_incorrect and not (above_abs or above_rel):
+        if show_only_incorrect and not (above_abs or above_rel or inconsistent):
             continue
 
-        yield key, fd_norm, fd_opts, directional, above_abs, above_rel
+        yield key, fd_norm, fd_opts, directional, above_abs, above_rel, inconsistent
+
+
+def _fix_check_data(data):
+    """
+    Modify the data dict to match the old format if there is only one fd step size.
+
+    Parameters
+    ----------
+    data : dict
+        Dictionary containing derivative information keyed by system name.
+    """
+    names = ['J_fd', 'abs error', 'rel error', 'magnitude', 'directional_fd_fwd',
+             'directional_fd_rev']
+
+    for sdata in data.values():
+        for dct in sdata.values():
+            for name in names:
+                if name in dct:
+                    dct[name] = dct[name][0]
+            if 'steps' in dct:
+                del dct['steps']
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
-                              compact_print, system_list, global_options, totals=False,
+                              compact_print, system_list, global_options, comm, totals=False,
                               indep_key=None, print_reverse=False,
-                              show_only_incorrect=False, lcons=None):
+                              show_only_incorrect=False, lcons=None, sort=False):
     """
     Compute the relative and absolute errors in the given derivatives and print to the out_stream.
 
@@ -2538,8 +3148,10 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         The systems (in the proper order) that were checked.
     global_options : dict
         Dictionary containing the options for the approximation.
-    totals : bool
-        Set to True if we are doing check_totals to skip a bunch of stuff.
+    comm : MPI.Comm or FakeComm
+        The MPI communicator.
+    totals : bool or _TotalJacInfo
+        Set to _TotalJacInfo if we are doing check_totals to skip a bunch of stuff.
     indep_key : dict of sets, optional
         Keyed by component name, contains the of/wrt keys that are declared not dependent.
     print_reverse : bool, optional
@@ -2548,15 +3160,10 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         Set to True if output should print only the subjacs found to be incorrect.
     lcons : list or None
         For total derivatives only, list of outputs that are actually linear constraints.
+    sort : bool
+        If True, sort subjacobian keys alphabetically.
     """
     suppress_output = out_stream is None
-
-    if compact_print:
-        if print_reverse:
-            deriv_line = "{0} wrt {1} | {2:.4e} | {3} | {4:.4e} | {5:.4e} | {6} | {7}" \
-                         " | {8} | {9} | {10}"
-        else:
-            deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}"
 
     # Keep track of the worst subjac in terms of relative error for fwd and rev
     if not suppress_output and show_only_incorrect:
@@ -2567,11 +3174,10 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             out_stream.write('\n** Only writing information about components with '
                              'incorrect Jacobians **\n\n')
 
-    worst_subjac_rel_err = 0.0
     worst_subjac = None
+    incon_keys = ()
 
     for system in system_list:
-
         # Match header to appropriate type.
         if isinstance(system, Component):
             sys_type = 'Component'
@@ -2594,74 +3200,32 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         if totals:
             sys_name = 'Full Model'
 
+        incon_keys = system._get_inconsistent_keys()
+
         num_bad_jacs = 0  # Keep track of number of bad derivative values for each component
 
+        # Need to capture the output of a component's derivative
+        # info so that it can be used if that component is the
+        # worst subjac. That info is printed at the bottom of all the output
+        out_buffer = StringIO()
+
         if not suppress_output:
-            # Need to capture the output of a component's derivative
-            # info so that it can be used if that component is the
-            # worst subjac. That info is printed at the bottom of all the output
-            out_buffer = StringIO()
+            num_format = '{: 1.4e}'
+            num_col_meta = {'format': num_format}
 
             if totals:
-                header = f"Total Derivatives"
+                title = "Total Derivatives"
             else:
-                header = f"{sys_type}: {sys_class_name} '{sys_name}'"
+                title = f"{sys_type}: {sys_class_name} '{sys_name}'"
 
-            print(f"{add_border(header, '-')}\n", file=out_buffer)
+            print(f"{add_border(title, '-')}\n", file=out_buffer)
 
-            if compact_print:
-                # Error Header
-                if totals:
-                    header = "{0} wrt {1} | {2} | {3} | {4} | {5}"\
-                        .format(
-                            pad_name('<output>', 30, quotes=True),
-                            pad_name('<variable>', 30, quotes=True),
-                            pad_name('calc mag.'),
-                            pad_name('check mag.'),
-                            pad_name('a(cal-chk)'),
-                            pad_name('r(cal-chk)'),
-                        )
-                else:
-                    max_width_of = len("'<output>'")
-                    max_width_wrt = len("'<variable>'")
-                    for of, wrt in derivatives:
-                        max_width_of = max(max_width_of, len(of) + 2)  # 2 to include quotes
-                        max_width_wrt = max(max_width_wrt, len(wrt) + 2)
+            table_data = []
 
-                    if print_reverse:
-                        header = \
-                            "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}" \
-                            .format(
-                                pad_name('<output>', max_width_of, quotes=True),
-                                pad_name('<variable>', max_width_wrt, quotes=True),
-                                pad_name('fwd mag.'),
-                                pad_name('rev mag.'),
-                                pad_name('check mag.'),
-                                pad_name('a(fwd-chk)'),
-                                pad_name('a(rev-chk)'),
-                                pad_name('a(fwd-rev)'),
-                                pad_name('r(fwd-chk)'),
-                                pad_name('r(rev-chk)'),
-                                pad_name('r(fwd-rev)')
-                            )
-                    else:
-                        header = "{0} wrt {1} | {2} | {3} | {4} | {5}"\
-                            .format(
-                                pad_name('<output>', max_width_of, quotes=True),
-                                pad_name('<variable>', max_width_wrt, quotes=True),
-                                pad_name('calc mag.'),
-                                pad_name('check mag.'),
-                                pad_name('a(cal-chk)'),
-                                pad_name('r(cal-chk)'),
-                            )
-
-                out_buffer.write(header + '\n')
-                out_buffer.write('-' * len(header) + '\n\n')
-
-        for key, fd_norm, fd_opts, directional, above_abs, above_rel in \
+        for key, fd_norm, fd_opts, directional, above_abs, above_rel, inconsistent in \
                 _iter_derivs(derivatives, sys_name, show_only_incorrect,
                              global_options, totals, matrix_free,
-                             abs_error_tol, rel_error_tol):
+                             abs_error_tol, rel_error_tol, incon_keys):
 
             # Skip printing the non-dependent keys if the derivatives are fine.
             if not compact_print:
@@ -2672,233 +3236,340 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             of, wrt = key
             derivative_info = derivatives[key]
 
-            do_rev = not totals and matrix_free and not directional
-            do_rev_dp = not totals and matrix_free and directional
-
-            if above_abs or above_rel:
+            if above_abs or above_rel or inconsistent:
                 num_bad_jacs += 1
+
+            if suppress_output:
+                continue
 
             # Informative output for responses that were declared with an index.
             indices = derivative_info.get('indices')
             if indices is not None:
                 of = f'{of} (index size: {indices})'
 
-            if not suppress_output:
+            abs_errs = derivative_info['abs error']
+            rel_errs = derivative_info['rel error']
+            magnitudes = derivative_info['magnitude']
+            steps = derivative_info['steps']
 
-                abs_err = derivative_info['abs error']
-                rel_err = derivative_info['rel error']
-                magnitude = derivative_info['magnitude']
+            if len(steps) > 1:
+                stepstrs = [f", step={step}" for step in steps]
+            else:
+                stepstrs = [""]
 
-                if compact_print:
+            if magnitudes[0].reverse is not None:
+                Jrev = derivative_info['J_rev']
+
+            # use forward even if both fwd and rev are defined
+            if magnitudes[0].forward is not None:
+                Jfor = derivative_info['J_fwd']
+
+            if isinstance(wrt, str):
+                wrt = f"'{wrt}'"
+            if isinstance(of, str):
+                of = f"'{of}'"
+
+            if directional:
+                wrt = f"(d){wrt}"
+
+            if compact_print:
+                err_desc = []
+                if above_abs:
+                    err_desc.append(' >ABS_TOL')
+                if above_rel:
+                    err_desc.append(' >REL_TOL')
+                if inconsistent:
+                    err_desc.append(' <RANK INCONSISTENT>')
+                err_desc = ''.join(err_desc)
+
+                for i in range(len(magnitudes)):
+                    if magnitudes[0].reverse is not None:
+                        calc_mag = magnitudes[i].reverse
+                        calc_abs = abs_errs[i].reverse
+                        calc_rel = rel_errs[i].reverse
+
+                    # use forward even if both fwd and rev are defined
+                    if magnitudes[0].forward is not None:
+                        calc_mag = magnitudes[i].forward
+                        calc_abs = abs_errs[i].forward
+                        calc_rel = rel_errs[i].forward
+
                     if totals:
-                        out_buffer.write(deriv_line.format(
-                            pad_name(of, 30, quotes=True),
-                            pad_name(wrt, 30, quotes=True),
-                            magnitude.forward,
-                            magnitude.fd,
-                            abs_err.forward,
-                            rel_err.forward))
+                        if len(steps) > 1:
+                            table_data.append([of, wrt, steps[i], calc_mag, magnitudes[i].fd,
+                                               calc_abs, calc_rel, err_desc])
+                        else:
+                            table_data.append([of, wrt, calc_mag, magnitudes[i].fd,
+                                               calc_abs, calc_rel, err_desc])
                     else:
-                        if directional:
-                            wrt_padded = pad_name(f"(d)'{wrt}'", max_width_wrt)
-                        else:
-                            wrt_padded = pad_name(wrt, max_width_wrt, quotes=True)
                         if print_reverse:
-                            if np.isnan(rel_err.forward):
-                                rel_fwd_str = pad_name('nan')
+                            if len(steps) > 1:
+                                table_data.append([of, wrt, steps[i], magnitudes[i].forward,
+                                                   magnitudes[i].reverse, magnitudes[i].fd,
+                                                   abs_errs[i].forward, abs_errs[i].reverse,
+                                                   abs_errs[i].forward_reverse, rel_errs[i].forward,
+                                                   rel_errs[i].reverse, rel_errs[i].forward_reverse,
+                                                   err_desc])
                             else:
-                                rel_fwd_str = f"{rel_err.forward:.4e}"
-
-                            deriv_info_line = \
-                                deriv_line.format(
-                                    pad_name(of, max_width_of, quotes=True),
-                                    wrt_padded,
-                                    magnitude.forward,
-                                    _format_if_not_matrix_free(matrix_free and not directional,
-                                                               magnitude.reverse),
-                                    magnitude.fd,
-                                    abs_err.forward,
-                                    _format_if_not_matrix_free(matrix_free, abs_err.reverse),
-                                    _format_if_not_matrix_free(matrix_free,
-                                                               abs_err.forward_reverse),
-                                    rel_fwd_str,
-                                    _format_if_not_matrix_free(matrix_free, rel_err.reverse),
-                                    _format_if_not_matrix_free(matrix_free,
-                                                               rel_err.forward_reverse),
-                                )
+                                table_data.append([of, wrt, magnitudes[i].forward,
+                                                   magnitudes[i].reverse, magnitudes[i].fd,
+                                                   abs_errs[i].forward, abs_errs[i].reverse,
+                                                   abs_errs[i].forward_reverse, rel_errs[i].forward,
+                                                   rel_errs[i].reverse, rel_errs[i].forward_reverse,
+                                                   err_desc])
                         else:
-                            deriv_info_line = \
-                                deriv_line.format(
-                                    pad_name(of, max_width_of, quotes=True),
-                                    wrt_padded,
-                                    magnitude.forward,
-                                    magnitude.fd,
-                                    abs_err.forward,
-                                    rel_err.forward,
-                                )
-
-                        out_buffer.write(deriv_info_line)
+                            if len(steps) > 1:
+                                table_data.append([of, wrt, steps[i], magnitudes[i].forward,
+                                                   magnitudes[i].fd, abs_errs[i].forward,
+                                                   rel_errs[i].forward, err_desc])
+                            else:
+                                table_data.append([of, wrt, magnitudes[i].forward, magnitudes[i].fd,
+                                                   abs_errs[i].forward, rel_errs[i].forward,
+                                                   err_desc])
+                            assert abs_errs[i].forward_reverse is None
+                            assert rel_errs[i].forward_reverse is None
+                            assert abs_errs[i].reverse is None
+                            assert rel_errs[i].reverse is None
 
                         # See if this component has the greater error in the derivative computation
                         # compared to the other components so far
-                        for err in rel_err[:2]:
-                            if err is not None and not np.isnan(err) and err > worst_subjac_rel_err:
-                                worst_subjac_rel_err = err
-                                worst_subjac = (sys_type, sys_class_name, sys_name)
-                                worst_subjac_line = deriv_info_line
+                        for err in rel_errs[i][:2]:
+                            if err is None or np.isnan(err):
+                                continue
 
-                    if above_abs:
-                        out_buffer.write(' >ABS_TOL')
-                    if above_rel:
-                        out_buffer.write(' >REL_TOL')
-                    out_buffer.write('\n')
+                            if worst_subjac is None or err > worst_subjac[2]:
+                                worst_subjac = (sys_class_name, sys_name, err, table_data[-1])
 
-                else:  # not compact print
-
-                    forward = derivative_info['J_fwd']
-
-                    fd_desc = f"{fd_opts['method']}:{fd_opts['form']}"
-
-                    # Magnitudes
-                    if directional:
-                        out_buffer.write(f"  {sys_name}: '{of}' wrt (d)'{wrt}'")
+            else:  # not compact print
+                if fd_norm == 0.:
+                    if magnitudes[0].forward is None:
+                        divname = 'Jrev'
                     else:
-                        out_buffer.write(f"  {sys_name}: '{of}' wrt '{wrt}'")
-                    if lcons and of in lcons:
+                        divname = 'Jfor'
+                else:
+                    divname = 'Jfd'
+
+                if out_stream:
+                    # Magnitudes
+                    out_buffer.write(f"  {sys_name}: {of} wrt {wrt}")
+                    if not isinstance(of, tuple) and lcons and of.strip("'") in lcons:
                         out_buffer.write(" (Linear constraint)")
 
                     out_buffer.write('\n')
-                    if do_rev or do_rev_dp:
-                        out_buffer.write('     Forward')
-                    else:
-                        out_buffer.write('    Analytic')
-                    out_buffer.write(f' Magnitude: {magnitude.forward:.6e}\n')
+                    if magnitudes[0].forward is not None:
+                        out_buffer.write(f'     Forward Magnitude: {magnitudes[0].forward:.6e}\n')
 
-                    if do_rev:
-                        out_buffer.write(f'     Reverse Magnitude: {magnitude.reverse:.6e}\n')
+                    if magnitudes[0].reverse is not None:
+                        out_buffer.write(f'     Reverse Magnitude: {magnitudes[0].reverse:.6e}\n')
 
-                    out_buffer.write(f'          Fd Magnitude: {magnitude.fd:.6e} ({fd_desc})\n')
-
-                    # Absolute Errors
-                    if do_rev:
-                        error_descs = ('(Jfor - Jfd) ', '(Jrev - Jfd) ', '(Jfor - Jrev)')
-                    elif do_rev_dp:
-                        error_descs = ('(Jfor - Jfd) ', '(Jrev - Jfd  Dot Product Test) ',
-                                       '(Jrev - Jfor Dot Product Test) ')
-                    else:
-                        error_descs = ('(Jan - Jfd) ', )
-
-                    for error, desc in zip(abs_err, error_descs):
-                        error_str = _format_error(error, abs_error_tol)
-                        if out_stream:
-                            out_buffer.write(f'    Absolute Error {desc}: {error_str}\n')
-
+                    fd_desc = f"{fd_opts['method']}:{fd_opts['form']}"
+                    for i in range(len(magnitudes)):
+                        out_buffer.write(f'          Fd Magnitude: '
+                                         f'{magnitudes[i].fd:.6e} ({fd_desc}{stepstrs[i]})\n')
                     out_buffer.write('\n')
 
-                    # Relative Errors
-                    if do_rev:
-                        if fd_norm == 0.:
-                            error_descs = ('(Jfor - Jfd) / Jfor ', '(Jrev - Jfd) / Jfor ',
-                                           '(Jfor - Jrev) / Jfor')
+                    for i in range(len(magnitudes)):
+                        # Absolute Errors
+                        if directional:
+                            if totals and abs_errs[i].forward is not None:
+                                err = _format_error(abs_errs[i].forward, abs_error_tol)
+                                out_buffer.write(f'    Absolute Error (Jfor - Jfd){stepstrs[i]} : '
+                                                 f'{err}\n')
+
+                            if abs_errs[i].reverse is not None:
+                                err = _format_error(abs_errs[i].reverse, abs_error_tol)
+                                out_buffer.write(f'    Absolute Error ([rev, fd] Dot Product Test)'
+                                                 f'{stepstrs[i]} : {err}\n')
                         else:
-                            error_descs = ('(Jfor - Jfd) / Jfd ', '(Jrev - Jfd) / Jfd ',
-                                           '(Jfor - Jrev) / Jfd')
-                    elif do_rev_dp:
-                        if fd_norm == 0.:
-                            error_descs = ('(Jfor - Jfd) / Jfor ',
-                                           '(Jrev - Jfd  Dot Product Test) / Jfor ',
-                                           '(Jrev - Jfor Dot Product Test) / Jfor ')
-                        else:
-                            error_descs = ('(Jfor - Jfd) / Jfd ',
-                                           '(Jrev - Jfd  Dot Product Test) / Jfd ',
-                                           '(Jrev - Jfor Dot Product Test) / Jfd ')
-                    else:
-                        if fd_norm == 0.:
-                            error_descs = ('(Jan - Jfd) / Jan ', )
-                        else:
-                            error_descs = ('(Jan - Jfd) / Jfd ', )
+                            if abs_errs[i].forward is not None:
+                                err = _format_error(abs_errs[i].forward, abs_error_tol)
+                                out_buffer.write(f'    Absolute Error (Jfor - Jfd){stepstrs[i]} : '
+                                                 f'{err}\n')
 
-                    for error, desc in zip(rel_err, error_descs):
-                        error_str = _format_error(error, rel_error_tol)
-
-                        out_buffer.write(f'    Relative Error {desc}: {error_str}\n')
-
-                    if MPI and MPI.COMM_WORLD.size > 1:
-                        out_buffer.write(f'    MPI Rank {MPI.COMM_WORLD.rank}\n')
-                    out_buffer.write('\n')
-
-                    # Raw Derivatives
-                    if do_rev_dp:
-                        out_buffer.write('    Directional Forward Derivative (Jfor)\n')
-                    else:
-                        if not totals and matrix_free:
-                            out_buffer.write('    Raw Forward')
-                        else:
-                            out_buffer.write('    Raw Analytic')
-                        out_buffer.write(' Derivative (Jfor)\n')
-                    out_buffer.write(str(forward) + '\n')
-                    out_buffer.write('\n')
-
-                    if not totals and matrix_free and not directional:
-                        reverse = derivative_info.get('J_rev')
-                        out_buffer.write('    Raw Reverse Derivative (Jrev)\n')
-                        out_buffer.write(str(reverse) + '\n')
-                        out_buffer.write('\n')
-
-                    try:
-                        fd = derivative_info['J_fd']
-                    except KeyError:
-                        fd = 0.
+                            if abs_errs[i].reverse is not None:
+                                err = _format_error(abs_errs[i].reverse, abs_error_tol)
+                                out_buffer.write(f'    Absolute Error (Jrev - Jfd){stepstrs[i]} : '
+                                                 f'{err}\n')
 
                     if directional:
-                        out_buffer.write(f'    Directional FD Derivative (Jfd)\n{fd}\n')
+                        if abs_errs[0].forward_reverse is not None:
+                            err = _format_error(abs_errs[0].forward_reverse, abs_error_tol)
+                            out_buffer.write('    Absolute Error ([rev, for] Dot Product Test) : '
+                                             f'{err}\n')
                     else:
-                        out_buffer.write(f'    Raw FD Derivative (Jfd)\n{fd}\n')
+                        if abs_errs[0].forward_reverse is not None:
+                            err = _format_error(abs_errs[0].forward_reverse, abs_error_tol)
+                            out_buffer.write(f'    Absolute Error (Jrev - Jfor) : {err}\n')
 
-                    out_buffer.write(' -' * 30 + '\n')
+                out_buffer.write('\n')
 
-                # End of if compact print if/else
-            # End of if not suppress_output
+                for i in range(len(magnitudes)):
+                    # Relative Errors
+                    if out_stream:
+                        if directional:
+                            if totals and rel_errs[i].forward is not None:
+                                err = _format_error(rel_errs[i].forward, rel_error_tol)
+                                out_buffer.write(f'    Relative Error (Jfor - Jfd) / {divname}'
+                                                 f'{stepstrs[i]} : {err}\n')
+
+                            if rel_errs[i].reverse is not None:
+                                err = _format_error(rel_errs[i].reverse, rel_error_tol)
+                                out_buffer.write(f'    Relative Error ([rev, fd] Dot Product Test) '
+                                                 f'/ {divname}{stepstrs[i]} : {err}\n')
+                        else:
+                            if rel_errs[i].forward is not None:
+                                err = _format_error(rel_errs[i].forward, rel_error_tol)
+                                out_buffer.write(f'    Relative Error (Jfor - Jfd) / {divname}'
+                                                 f'{stepstrs[i]} : {err}\n')
+
+                            if rel_errs[i].reverse is not None:
+                                err = _format_error(rel_errs[i].reverse, rel_error_tol)
+                                out_buffer.write(f'    Relative Error (Jrev - Jfd) / {divname}'
+                                                 f'{stepstrs[i]} : {err}\n')
+
+                if out_stream:
+                    if directional:
+                        if rel_errs[0].forward_reverse is not None:
+                            err = _format_error(rel_errs[0].forward_reverse, rel_error_tol)
+                            out_buffer.write(f'    Relative Error ([rev, for] Dot Product Test) / '
+                                             f'{divname} : {err}\n')
+                    else:
+                        if rel_errs[0].forward_reverse is not None:
+                            err = _format_error(rel_errs[0].forward_reverse, rel_error_tol)
+                            out_buffer.write(f'    Relative Error (Jrev - Jfor) / {divname} : '
+                                             f'{err}\n')
+
+                if inconsistent:
+                    out_buffer.write('\n    * Inconsistent value across ranks *\n')
+
+                if MPI and comm.size > 1:
+                    out_buffer.write(f'\n    MPI Rank {comm.rank}\n')
+                out_buffer.write('\n')
+
+                with np.printoptions(linewidth=240):
+                    # Raw Derivatives
+                    if magnitudes[0].forward is not None:
+                        if directional:
+                            out_buffer.write('    Directional Derivative (Jfor)')
+                        else:
+                            out_buffer.write('    Raw Forward Derivative (Jfor)')
+                        Jstr = textwrap.indent(str(Jfor), '    ')
+                        out_buffer.write(f"\n{Jstr}\n\n")
+
+                    fdtype = fd_opts['method'].upper()
+
+                    if magnitudes[0].reverse is not None:
+                        if directional:
+                            if totals:
+                                out_buffer.write('    Directional Derivative (Jrev) Dot Product')
+                            else:
+                                out_buffer.write('    Directional Derivative (Jrev)')
+                        else:
+                            out_buffer.write('    Raw Reverse Derivative (Jrev)')
+                        Jstr = textwrap.indent(str(Jrev), '    ')
+                        out_buffer.write(f"\n{Jstr}\n\n")
+
+                    try:
+                        fds = derivative_info['J_fd']
+                    except KeyError:
+                        fds = [0.]
+
+                    for i in range(len(magnitudes)):
+                        fd = fds[i]
+
+                        if directional:
+                            if totals and magnitudes[i].reverse is not None:
+                                out_buffer.write(f'    Directional {fdtype} Derivative (Jfd) '
+                                                 f'Dot Product{stepstrs[i]}\n    {fd}\n\n')
+                            else:
+                                out_buffer.write(f"    Directional {fdtype} Derivative (Jfd)"
+                                                 f"{stepstrs[i]}\n    {fd}\n\n")
+                        else:
+                            Jstr = textwrap.indent(str(fd), '    ')
+                            out_buffer.write(f"    Raw {fdtype} Derivative (Jfd){stepstrs[i]}"
+                                             f"\n{Jstr}\n\n")
+
+                out_buffer.write(' -' * 30 + '\n')
+
+            # End of if compact print if/else
         # End of for of, wrt in sorted_keys
 
         if not suppress_output:
+            if compact_print and table_data:
+                headers = ["of '<variable>'", "wrt '<variable>'"]
+                if len(steps) > 1:
+                    headers.append('step')
+                column_meta = [{}, {}]
+
+                if print_reverse:
+                    headers.extend(['fwd mag.', 'rev mag.', 'check mag.', 'a(fwd-chk)',
+                                    'a(rev-chk)', 'a(fwd-rev)', 'r(fwd-chk)', 'r(rev-chk)',
+                                    'r(fwd-rev)', 'error desc'])
+                else:
+                    headers.extend(['calc mag.', 'check mag.', 'a(cal-chk)', 'r(cal-chk)',
+                                    'error desc'])
+
+                column_meta.extend([num_col_meta.copy() for _ in range(len(headers) - 3)])
+                column_meta.append({})
+                print(generate_table(table_data, headers=headers, tablefmt='grid',
+                                     column_meta=column_meta, missing_val='n/a'), file=out_buffer)
+
             if totals or not show_only_incorrect or num_bad_jacs > 0:
                 out_stream.write(out_buffer.getvalue())
 
     # End of for system in system_list
 
-    if not suppress_output and compact_print and not totals:
-        if worst_subjac:
-            _, class_name, name = worst_subjac
+    if not suppress_output:
+        if compact_print and not totals and worst_subjac:
+            class_name, name, _, worst_row = worst_subjac
+
             worst_header = f"Sub Jacobian with Largest Relative Error: {class_name} '{name}'"
-            print(f"\n{add_border(worst_header, '#')}\n", file=out_stream)
-            print(header, file=out_stream)
-            print('-' * len(header), file=out_stream)
-            print(worst_subjac_line, file=out_stream)
+            worst_table = generate_table([worst_row[:-1]], headers=headers[:-1],
+                                         tablefmt='grid', column_meta=column_meta[:-1],
+                                         missing_val='n/a')
+            print(f"\n{add_border(worst_header, '#')}\n{worst_table}", file=out_stream)
+
+    if incon_keys:
+        # stick incon_keys into the first key's dict in order to avoid breaking existing code
+        for key, dct in derivative_data['' if totals else sys_name].items():
+            dct['inconsistent_keys'] = incon_keys
+            break
+        if not suppress_output:
+            if totals:
+                msgstart = "During computation of totals, the "
+            else:
+                msgstart = "The "
+            ders = [f"{sof} wrt {swrt}" for sof, swrt in sorted(incon_keys)]
+            print(f"\n{msgstart}following partial derivatives resulted in\n"
+                  "inconsistent values across processes for certain serial inputs:\n"
+                  f"{ders}.\nThis can happen if a component 'compute_jacvec_product' "
+                  "or 'apply_linear'\nmethod does not properly reduce the value of a distributed "
+                  "output when computing the\nderivative of that output with respect to a serial "
+                  "input.\nOpenMDAO 3.25 changed the convention used "
+                  "when transferring data between distributed and non-distributed \nvariables "
+                  "within a matrix free component. See POEM 75 for details.")
 
 
-def _format_if_not_matrix_free(matrix_free, val):
+def _format_cell(val):
     """
     Return string to represent deriv check value in compact display.
 
     Parameters
     ----------
-    matrix_free : bool
-        If True, then the associated Component is matrix-free.
-    val : float
+    val : float or None
         The deriv check value.
 
     Returns
     -------
     str
-        String which is the actual value if matrix-free, otherwise 'n/a'
+        String which is the actual value or 'n/a' if val is None.
     """
-    if matrix_free:
-        if np.isnan(val):
-            return pad_name('nan')
-        return f'{val:.4e}'
-    else:
+    if val is None:
         return pad_name('n/a')
+
+    if np.isnan(val):
+        return pad_name('nan')
+    return f'{val:.4e}'
 
 
 def _format_error(error, tol):
@@ -2944,14 +3615,16 @@ def _get_fd_options(var, global_method, local_opts, global_step, global_form, gl
                   'method': method}
 
     if method == 'cs':
-        defaults = ComplexStep.DEFAULT_OPTIONS
+        fd_options = ComplexStep.DEFAULT_OPTIONS.copy()
+        fd_options['method'] = 'cs'
 
         fd_options['form'] = None
         fd_options['step_calc'] = None
         fd_options['minimum_step'] = None
 
     elif method == 'fd':
-        defaults = FiniteDifference.DEFAULT_OPTIONS
+        fd_options = FiniteDifference.DEFAULT_OPTIONS.copy()
+        fd_options['method'] = 'fd'
 
         fd_options['form'] = global_form
         fd_options['step_calc'] = global_step_calc
@@ -2959,10 +3632,8 @@ def _get_fd_options(var, global_method, local_opts, global_step, global_form, gl
 
     if global_step and global_method == method:
         fd_options['step'] = global_step
-    else:
-        fd_options['step'] = defaults['step']
 
-    fd_options['directional'] = defaults['directional']
+    fd_options['directional'] = False
 
     # Precedence: component options > global options > defaults
     if local_wrt in local_opts:

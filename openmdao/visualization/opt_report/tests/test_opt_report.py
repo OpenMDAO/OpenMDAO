@@ -1,5 +1,4 @@
 import os
-import pathlib
 import unittest
 
 import numpy as np
@@ -21,6 +20,11 @@ from openmdao.utils.tests.test_hooks import hooks_active
 
 from openmdao.visualization.opt_report.opt_report import opt_report, \
     _default_optimizer_report_filename
+
+try:
+    import pyDOE3
+except ImportError:
+    pyDOE3 = None
 
 
 @use_tempdirs
@@ -83,14 +87,14 @@ class TestOptimizationReport(unittest.TestCase):
         Check that the data in the opt_result dict is valid for the run.
         """
         if opt_result is None:
-            opt_result = self.prob.driver.opt_result
+            opt_result = self.prob.driver.result
         if expected is None:
             expected = {}
 
         self.assertTrue(opt_result['runtime'] > 0.0,
                         f"Unexpected value for runtime: {opt_result['runtime']} (should be > 0.0)")
 
-        for key in ['iter_count', 'obj_calls', 'deriv_calls']:
+        for key in ['iter_count', 'model_evals', 'deriv_evals']:
             if key in expected:
                 self.assertTrue( opt_result[key] == expected[key] ,
                     f"Unexpected value for {key}: {opt_result[key]}. Expected {expected[key]}")
@@ -108,13 +112,13 @@ class TestOptimizationReport(unittest.TestCase):
         """
         if prob is None:
             prob = self.prob
-        report_file_path = str(pathlib.Path(prob.get_reports_dir()).joinpath(_default_optimizer_report_filename))
+        report_file_path = prob.get_reports_dir() / _default_optimizer_report_filename
 
         check_rows = {
             # 'runtime': 'Wall clock run time:',
-            'iter_count':  'Number of driver iterations:',
-            'obj_calls':   'Number of objective calls:',
-            'deriv_calls': 'Number of derivative calls:',
+            'iter_count': 'Number of driver iterations:',
+            'model_evals': 'Number of model evals:',
+            'deriv_evals': 'Number of deriv evals:',
             'exit_status': 'Exit status:'
         }
 
@@ -129,7 +133,7 @@ class TestOptimizationReport(unittest.TestCase):
             else:
                 try:
                     value = int(value)
-                except ValueError as err:
+                except ValueError:
                     pass
             return value
 
@@ -156,10 +160,17 @@ class TestOptimizationReport(unittest.TestCase):
                                           vars_lower=-50, vars_upper=50.,
                                           cons_lower=-1,
                                           )
-        expect = {'obj_calls': 0, 'deriv_calls': 0}
+        expect = {'model_evals': 1, 'deriv_evals': 0}
+
         self.check_opt_result(expected=expect)
-        opt_report(self.prob)
-        self.check_opt_report(expected=expect)
+
+        expected_warning_msg = "The optimizer report is not applicable for Driver type 'Driver', " \
+                               "which does not support optimization"
+        with assert_warning(DriverWarning, expected_warning_msg):
+            opt_report(self.prob)
+
+        outfilepath = self.prob.get_reports_dir() / _default_optimizer_report_filename
+        self.assertFalse(os.path.exists(outfilepath))
 
     def test_opt_report_scipyopt_SLSQP(self):
         self.setup_problem_and_run_driver(om.ScipyOptimizeDriver,
@@ -177,7 +188,18 @@ class TestOptimizationReport(unittest.TestCase):
                                           cons_lower=0, cons_upper=10.,
                                           optimizer='COBYLA',
                                           )
-        expect = {'deriv_calls': None}
+        expect = {'deriv_evals': 0}
+        self.check_opt_result(expected=expect)
+        opt_report(self.prob)
+        self.check_opt_report(expected=expect)
+
+    def test_opt_report_scipyopt_COBYLA_nobounds(self):
+        self.setup_problem_and_run_driver(om.ScipyOptimizeDriver,
+                                          # no bounds on design vars
+                                          cons_lower=0, cons_upper=10.,
+                                          optimizer='COBYLA',
+                                          )
+        expect = {'deriv_evals': 0}
         self.check_opt_result(expected=expect)
         opt_report(self.prob)
         self.check_opt_report(expected=expect)
@@ -227,25 +249,27 @@ class TestOptimizationReport(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        self.check_opt_result(prob.driver.opt_result, expected={'obj_calls': 0, 'deriv_calls': 0})
+        self.check_opt_result(prob.driver.result, expected={'model_evals': 5, 'deriv_evals': 0})
 
-        expected_warning_msg = "The optimizer report is not applicable for the DOEDriver Driver " \
+        expected_warning_msg = "The optimizer report is not applicable for Driver type 'DOEDriver', " \
                                "which does not support optimization"
         with assert_warning(DriverWarning, expected_warning_msg):
             opt_report(prob)
-        outfilepath = str(pathlib.Path(prob.get_reports_dir()).joinpath(_default_optimizer_report_filename))
+        outfilepath = prob.get_reports_dir() / _default_optimizer_report_filename
         self.assertFalse(os.path.exists(outfilepath))
 
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
     def test_opt_report_genetic_algorithm(self):
         self.setup_problem_and_run_driver(om.SimpleGADriver,
                                           vars_lower=-50, vars_upper=50.,
                                           cons_lower=0, cons_upper=10.,
                                           )
-        expect = {'deriv_calls': 0}
+        expect = {'deriv_evals': 0}
         self.check_opt_result(expected=expect)
         opt_report(self.prob)
         self.check_opt_report(expected=expect)
 
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
     def test_opt_report_differential_evolution(self):
         prob = om.Problem()
 
@@ -271,8 +295,8 @@ class TestOptimizationReport(unittest.TestCase):
 
         prob.run_driver()
 
-        expect = {'deriv_calls': 0}
-        self.check_opt_result(prob.driver.opt_result, expected=expect)
+        expect = {'deriv_evals': 0}
+        self.check_opt_result(prob.driver.result, expected=expect)
         opt_report(prob)
         self.check_opt_report(prob, expected=expect)
 
@@ -500,6 +524,43 @@ class TestOptimizationReport(unittest.TestCase):
         prob.run_driver()
         opt_report(prob)
 
+    @require_pyoptsparse('SLSQP')
+    def test_opt_report_multiple_con_alias(self):
+        prob = self.prob = om.Problem(reports='optimizer')
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('widths', np.zeros((2, 2))),
+                            promotes=['*'])
+        model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
+        model.add_subsystem('obj', om.ExecComp('o = areas[0, 0] + areas[1, 1]',
+                                               areas=np.zeros((2, 2))),
+                            promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        model.add_design_var('widths', lower=-50.0, upper=50.0)
+        model.add_objective('o')
+
+        model.add_constraint('areas', equals=24.0, indices=[0], flat_indices=True)
+        model.add_constraint('areas', equals=21.0, indices=[1], flat_indices=True, alias='a2')
+        model.add_constraint('areas', equals=3.5, indices=[2], flat_indices=True, alias='a3')
+        model.add_constraint('areas', equals=17.5, indices=[3], flat_indices=True, alias='a4')
+
+        prob.driver = om.pyOptSparseDriver(optimizer='SLSQP')
+        prob.driver.options['print_results'] = False
+
+        prob.setup(mode='fwd')
+
+        prob.run_driver()
+
+        opt_report(self.prob)
+        report_file_path = prob.get_reports_dir() / _default_optimizer_report_filename
+
+        with open(report_file_path, 'r') as f:
+            for line in f.readlines():
+                if 'areas' in line:
+                    self.assertTrue("equality-constraint-violated" not in line)
+
     @hooks_active
     def test_opt_report_hook(self):
         testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
@@ -547,3 +608,6 @@ class TestMPIScatter(unittest.TestCase):
         prob.setup()
         prob.run_driver()
         opt_report(prob)
+
+if __name__ == '__main__':
+    unittest.main()

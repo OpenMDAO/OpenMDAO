@@ -288,7 +288,8 @@
     min-width: 200px;
     border-collapse: separate;
     border-spacing: 0;
-    width: fit-content;
+    /* width: fit-content; */
+    width: 100%;
     height: fit-content;
 }
 
@@ -493,14 +494,6 @@
     border-right: 1px solid #a0a0a0;
     padding: 3px;
     white-space: nowrap;
-}
-
-.window-theme-value-info .window-body table tbody tr.even td {
-    background-color:white;
-}
-
-.window-theme-value-info .window-body table tbody tr.odd td {
-    background-color: #e8ffe8;
 }
 
 .show_value_button {
@@ -1112,3 +1105,8 @@ p.help-text > span {
 
 
 /* ^^^^^^^^^^ End Child Select Window theme ^^^^^^^^^^ */
+
+.scrollable {
+    overflow-y: scroll;
+    overflow-x: hidden;
+}

@@ -1,14 +1,13 @@
 """Test Jupyter doc GUI mods specific to OpenMDAO using Playwright."""
 import asyncio
 from aiounittest import async_test
-import contextlib
 import http.server
 import os
 import pathlib
-import socket
 import sys
 import threading
 import unittest
+
 
 from playwright.async_api import async_playwright
 
@@ -16,23 +15,9 @@ if 'win32' in sys.platform:
     # Windows specific event-loop policy & cmd
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
-from openmdao.utils.gui_testing_utils import _GuiTestCase
+from openmdao.utils.gui_testing_utils import _GuiTestCase, get_free_port
 
 HEADLESS = True  # Set to False if you want to see the browser
-
-def get_free_port():
-    """
-    Get a free port.
-
-    Returns
-    -------
-    port : int
-        a free port
-    """
-    with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as _socket:
-        _socket.bind(('', 0))
-        _, port = _socket.getsockname()
-        return port
 
 # Only can test if the docs have been built
 @unittest.skipUnless(pathlib.Path(__file__).parent.parent.joinpath("_build").exists(),

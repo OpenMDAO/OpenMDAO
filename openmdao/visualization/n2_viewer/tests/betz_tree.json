@@ -1,7 +1,7 @@
 {
     "name": "root",
     "type": "root",
-    "class": "Group",
+    "class": "openmdao.core.group:Group",
     "expressions": null,
     "component_type": null,
     "subsystem_type": "group",
@@ -23,7 +23,7 @@
         {
             "name": "indeps",
             "type": "subsystem",
-            "class": "IndepVarComp",
+            "class": "openmdao.core.indepvarcomp:IndepVarComp",
             "expressions": null,
             "subsystem_type": "component",
             "is_parallel": false,
@@ -40,10 +40,19 @@
                     "dtype": "ndarray",
                     "units": "None",
                     "shape": "(1,)",
+                    "desc": "",
                     "distributed": false,
                     "is_discrete": false,
                     "val": [
                         0.5
+                    ],
+                    "val_min": 0.5,
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_max": 0.5,
+                    "val_max_indices": [
+                        0
                     ]
                 },
                 {
@@ -53,10 +62,19 @@
                     "dtype": "ndarray",
                     "units": "m**2",
                     "shape": "(1,)",
+                    "desc": "",
                     "distributed": false,
                     "is_discrete": false,
                     "val": [
                         10.0
+                    ],
+                    "val_min": 10.0,
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_max": 10.0,
+                    "val_max_indices": [
+                        0
                     ]
                 },
                 {
@@ -66,10 +84,19 @@
                     "dtype": "ndarray",
                     "units": "kg/m**3",
                     "shape": "(1,)",
+                    "desc": "",
                     "distributed": false,
                     "is_discrete": false,
                     "val": [
                         1.225
+                    ],
+                    "val_min": 1.225,
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_max": 1.225,
+                    "val_max_indices": [
+                        0
                     ]
                 },
                 {
@@ -79,14 +106,24 @@
                     "dtype": "ndarray",
                     "units": "m/s",
                     "shape": "(1,)",
+                    "desc": "",
                     "distributed": false,
                     "is_discrete": false,
                     "val": [
                         10.0
+                    ],
+                    "val_min": 10.0,
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_max": 10.0,
+                    "val_max_indices": [
+                        0
                     ]
                 }
             ],
             "options": {
+                "always_opt": false,
                 "distributed": false,
                 "run_root_only": false,
                 "name": "UNDEFINED",
@@ -106,7 +143,7 @@
         {
             "name": "a_disk",
             "type": "subsystem",
-            "class": "ActuatorDisc",
+            "class": "openmdao.test_suite.test_examples.test_betz_limit:ActuatorDisc",
             "expressions": null,
             "subsystem_type": "component",
             "is_parallel": false,
@@ -122,10 +159,19 @@
                     "dtype": "ndarray",
                     "units": "None",
                     "shape": "(1,)",
+                    "desc": "Induced Velocity Factor",
                     "distributed": false,
                     "is_discrete": false,
                     "val": [
                         0.5
+                    ],
+                    "val_min": 0.5,
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_max": 0.5,
+                    "val_max_indices": [
+                        0
                     ]
                 },
                 {
@@ -134,10 +180,19 @@
                     "dtype": "ndarray",
                     "units": "m**2",
                     "shape": "(1,)",
+                    "desc": "Rotor disc area",
                     "distributed": false,
                     "is_discrete": false,
                     "val": [
                         10.0
+                    ],
+                    "val_min": 10.0,
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_max": 10.0,
+                    "val_max_indices": [
+                        0
                     ]
                 },
                 {
@@ -146,10 +201,19 @@
                     "dtype": "ndarray",
                     "units": "kg/m**3",
                     "shape": "(1,)",
+                    "desc": "Air density",
                     "distributed": false,
                     "is_discrete": false,
                     "val": [
                         1.225
+                    ],
+                    "val_min": 1.225,
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_max": 1.225,
+                    "val_max_indices": [
+                        0
                     ]
                 },
                 {
@@ -158,10 +222,19 @@
                     "dtype": "ndarray",
                     "units": "m/s",
                     "shape": "(1,)",
+                    "desc": "Freestream air velocity, upstream of rotor",
                     "distributed": false,
                     "is_discrete": false,
                     "val": [
                         10.0
+                    ],
+                    "val_min": 10.0,
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_max": 10.0,
+                    "val_max_indices": [
+                        0
                     ]
                 },
                 {
@@ -171,10 +244,19 @@
                     "dtype": "ndarray",
                     "units": "m/s",
                     "shape": "(1,)",
+                    "desc": "Air velocity at rotor exit plane",
                     "distributed": false,
                     "is_discrete": false,
                     "val": [
                         0.0
+                    ],
+                    "val_min": 0.0,
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_max": 0.0,
+                    "val_max_indices": [
+                        0
                     ]
                 },
                 {
@@ -184,10 +266,19 @@
                     "dtype": "ndarray",
                     "units": "m/s",
                     "shape": "(1,)",
+                    "desc": "Slipstream air velocity, downstream of rotor",
                     "distributed": false,
                     "is_discrete": false,
                     "val": [
                         0.0
+                    ],
+                    "val_min": 0.0,
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_max": 0.0,
+                    "val_max_indices": [
+                        0
                     ]
                 },
                 {
@@ -197,10 +288,19 @@
                     "dtype": "ndarray",
                     "units": "None",
                     "shape": "(1,)",
+                    "desc": "Thrust Coefficient",
                     "distributed": false,
                     "is_discrete": false,
                     "val": [
                         0.0
+                    ],
+                    "val_min": 0.0,
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_max": 0.0,
+                    "val_max_indices": [
+                        0
                     ]
                 },
                 {
@@ -210,10 +310,19 @@
                     "dtype": "ndarray",
                     "units": "N",
                     "shape": "(1,)",
+                    "desc": "Thrust produced by the rotor",
                     "distributed": false,
                     "is_discrete": false,
                     "val": [
                         0.0
+                    ],
+                    "val_min": 0.0,
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_max": 0.0,
+                    "val_max_indices": [
+                        0
                     ]
                 },
                 {
@@ -223,10 +332,19 @@
                     "dtype": "ndarray",
                     "units": "None",
                     "shape": "(1,)",
+                    "desc": "Power Coefficient",
                     "distributed": false,
                     "is_discrete": false,
                     "val": [
                         0.0
+                    ],
+                    "val_min": 0.0,
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_max": 0.0,
+                    "val_max_indices": [
+                        0
                     ]
                 },
                 {
@@ -236,20 +354,31 @@
                     "dtype": "ndarray",
                     "units": "W",
                     "shape": "(1,)",
+                    "desc": "Power produced by the rotor",
                     "distributed": false,
                     "is_discrete": false,
                     "val": [
                         0.0
+                    ],
+                    "val_min": 0.0,
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_max": 0.0,
+                    "val_max_indices": [
+                        0
                     ]
                 }
             ],
             "options": {
+                "always_opt": false,
                 "distributed": false,
                 "run_root_only": false
             }
         }
     ],
     "options": {
-        "assembled_jac_type": "csc"
+        "assembled_jac_type": "csc",
+        "auto_order": false
     }
 }

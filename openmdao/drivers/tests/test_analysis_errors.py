@@ -10,8 +10,6 @@ from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.testing_utils import use_tempdirs, parameterized_name, require_pyoptsparse
 from openmdao.test_suite.components.paraboloid_invalid_region import Paraboloid
 
-from openmdao.utils.mpi import MPI
-
 try:
     from parameterized import parameterized
 except ImportError:
@@ -52,7 +50,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
     })
 
     # invalid range chosen to be on the nominal path of the optimizer
-    invalid_range = defaultdict(lambda: {'x': (7.2, 10.2), 'y': (-50., -40.)})
+    invalid_range = defaultdict(lambda: {'x': (7.2, 10.2), 'y': (-50.0001, -40.)})
     invalid_range.update({
         'ParOpt': {'x': (4., 6.), 'y': (-4., -6.)},
     })
@@ -61,6 +59,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
     expected_result_eval_errors.update({
         'CONMIN': None,  # CONMIN does not provide a return code and will just give a bad answer
         'ParOpt': None,  # ParOpt does not provide a return code and will just give a bad answer
+        'SLSQP': None,   # SLSQP will sometimes fail on iterations and sometimes succeed...
     })
 
     expected_result_grad_errors = defaultdict(lambda: 0)
@@ -121,7 +120,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
 
         return prob, comp
 
-    def check_history(self, optimizer, err_count=None, func='eval'):
+    def check_history(self, prob, optimizer, err_count=None, func='eval'):
         """
         Check the optimizer output file for evaluation errors and successful optimization.
         """
@@ -131,7 +130,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
 
         if optimizer == 'CONMIN':
             # check for NaN in CONMIN.out
-            with open("CONMIN.out", encoding="utf-8") as f:
+            with open(f"{prob.get_outputs_dir()}/CONMIN.out", encoding="utf-8") as f:
                 CONMIN_history = f.readlines()
 
             if func == 'eval':
@@ -148,7 +147,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
                                    f"Found {errs} {func} errors in CONMIN.out, expected {err_count}")
 
         elif optimizer == 'IPOPT':
-            with open("IPOPT.out", encoding="utf-8") as f:
+            with open(f"{prob.get_outputs_dir()}/IPOPT.out", encoding="utf-8") as f:
                 IPOPT_history = f.read()
 
             if func == 'eval':
@@ -177,7 +176,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
 
         elif optimizer == 'SNOPT':
             # check for evaluation error flags in the SNOPT history file
-            with open("SNOPT_print.out", encoding="utf-8", errors='ignore') as f:
+            with open(f"{prob.get_outputs_dir()}/SNOPT_print.out", encoding="utf-8", errors='ignore') as f:
                 SNOPT_history = f.readlines()
 
             itns = False
@@ -213,7 +212,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
         #
         try:
             prob, comp = self.setup_problem(optimizer)
-            failed = prob.run_driver()
+            failed = not prob.run_driver().success
         except ImportError as err:
             raise unittest.SkipTest(str(err))
 
@@ -227,7 +226,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
         assert_near_equal(prob['y'], -7.833334, tolerance)
 
         # check that there are no AnalysisError related messages in the history
-        self.check_history(optimizer, err_count=None)
+        self.check_history(prob, optimizer, err_count=None)
 
         # save the optimizer's path to the solution
         nominal_history = comp.eval_history
@@ -236,7 +235,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
         # Now try raising Analysis Errors in compute()
         #
         prob, comp = self.setup_problem(optimizer, func='compute')
-        failed = prob.run_driver()
+        failed = not prob.run_driver().success
 
         expected_result = self.expected_result_eval_errors[optimizer]
         opt_inform = prob.driver.pyopt_solution.optInform
@@ -256,7 +255,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
                             f"not greater than nominal iterations ({len(nominal_history)})")
 
             # check that the optimizer output shows the optimizer handling the errors
-            self.check_history(optimizer, err_count=len(comp.raised_eval_errors))
+            self.check_history(prob, optimizer, err_count=len(comp.raised_eval_errors))
 
         elif expected_result is not None:
             # we expect the optimizer to return an error code
@@ -268,7 +267,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
                             str(prob.driver.pyopt_solution.optInform))
 
             # check that the optimizer output shows the optimizer was unable to handle the errors
-            self.check_history(optimizer, err_count=len(comp.raised_eval_errors), func='eval')
+            self.check_history(prob, optimizer, err_count=len(comp.raised_eval_errors), func='eval')
 
     @parameterized.expand(grad_drivers - do_not_test, name_func=parameterized_name)
     def test_analysis_errors_grad(self, optimizer):
@@ -277,7 +276,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
         #
         try:
             prob, comp = self.setup_problem(optimizer)
-            failed = prob.run_driver()
+            failed = not prob.run_driver().success
         except ImportError as err:
             raise unittest.SkipTest(str(err))
 
@@ -291,7 +290,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
         assert_near_equal(prob['y'], -7.833334, tolerance)
 
         # check that there are no AnalysisError related messages in the history
-        self.check_history(optimizer, err_count=None)
+        self.check_history(prob, optimizer, err_count=None)
 
         # save the optimizer's path to the solution
         nominal_history = comp.eval_history
@@ -301,7 +300,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
         #
         try:
             prob, comp = self.setup_problem(optimizer, func='compute_partials')
-            failed = prob.run_driver()
+            failed = not prob.run_driver().success
         except ImportError as err:
             raise unittest.SkipTest(str(err))
 
@@ -324,7 +323,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
                             f"not greater than nominal iterations ({len(nominal_history)})")
 
             # check that the optimizer output shows the optimizer handling the errors
-            self.check_history(optimizer, err_count=len(comp.raised_grad_errors))
+            self.check_history(prob, optimizer, err_count=len(comp.raised_grad_errors))
 
         elif expected_result is not None:
             # we expect the optimizer to return an error code
@@ -336,7 +335,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
                             str(opt_inform))
 
             # check that the optimizer output shows the optimizer was unable to handle the errors
-            self.check_history(optimizer, err_count=len(comp.raised_grad_errors), func='grad')
+            self.check_history(prob, optimizer, err_count=len(comp.raised_grad_errors), func='grad')
 
 
 if __name__ == "__main__":

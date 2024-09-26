@@ -3,7 +3,9 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
+from openmdao.utils.om_warnings import OpenMDAOWarning
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_warning, assert_no_warning
+from openmdao.utils.testing_utils import force_check_partials
 
 
 class TestAddSubtractCompScalars(unittest.TestCase):
@@ -41,7 +43,7 @@ class TestAddSubtractCompScalars(unittest.TestCase):
         assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
-        partials = self.p.check_partials(method='fd', out_stream=None)
+        partials = force_check_partials(self.p, method='fd', out_stream=None)
         assert_check_partials(partials)
 
 
@@ -82,7 +84,7 @@ class TestAddSubtractCompNx1(unittest.TestCase):
         assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
-        partials = self.p.check_partials(method='fd', out_stream=None)
+        partials = force_check_partials(self.p, method='fd', out_stream=None)
         assert_check_partials(partials)
 
 
@@ -123,7 +125,7 @@ class TestAddSubtractCompNx3(unittest.TestCase):
         assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
-        partials = self.p.check_partials(method='fd', out_stream=None)
+        partials = force_check_partials(self.p, method='fd', out_stream=None)
         assert_check_partials(partials)
 
 
@@ -168,7 +170,7 @@ class TestAddSubtractMultipleInputs(unittest.TestCase):
         assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
-        partials = self.p.check_partials(method='fd', out_stream=None)
+        partials = force_check_partials(self.p, method='fd', out_stream=None)
         assert_check_partials(partials)
 
 
@@ -213,7 +215,7 @@ class TestAddSubtractScalingFactors(unittest.TestCase):
         assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
-        partials = self.p.check_partials(method='fd', out_stream=None)
+        partials = force_check_partials(self.p, method='fd', out_stream=None)
         assert_check_partials(partials)
 
 
@@ -256,7 +258,7 @@ class TestAddSubtractMIMO(unittest.TestCase):
         assert_near_equal(z, 3.3*a - 1.5*b + 5*c,1e-16)
 
     def test_partials(self):
-        partials = self.p.check_partials(method='fd', out_stream=None)
+        partials = force_check_partials(self.p, method='fd', out_stream=None)
         assert_check_partials(partials)
 
 
@@ -302,7 +304,7 @@ class TestAddSubtractUnits(unittest.TestCase):
         assert_near_equal(out, expected,1e-8)
 
     def test_partials(self):
-        partials = self.p.check_partials(method='fd', out_stream=None)
+        partials = force_check_partials(self.p, method='fd', out_stream=None)
         assert_check_partials(partials)
 
 
@@ -353,7 +355,7 @@ class TestAddSubtractInit(unittest.TestCase):
         assert_near_equal(out, expected, 1e-8)
 
     def test_partials(self):
-        partials = self.p.check_partials(method='fd', out_stream=None)
+        partials = force_check_partials(self.p, method='fd', out_stream=None)
         assert_check_partials(partials)
 
 
@@ -470,7 +472,6 @@ class TestFeature(unittest.TestCase):
         n = 3
 
         p = om.Problem()
-        model = p.model
 
         # Construct an adder/subtracter here. create a relationship through the add_equation method
         adder = om.AddSubtractComp()
@@ -496,6 +497,35 @@ class TestFeature(unittest.TestCase):
         expected_i = np.array([[100, 200, 300], [0, -1, -2]]).T
         assert_near_equal(p.get_val('totalforcecomp.total_force', units='kN'), expected_i)
 
+
+class TestDuplicateWarning(unittest.TestCase):
+
+    def test_if_warning(self):
+        """
+        Tests if a warning is issued when duplicate inputs are used
+        """
+        comp = om.AddSubtractComp()
+        input_names = ["f1", "f2", "f2", "f1", "f3"]
+        output_name = "f"
+        msg = f"Duplicate inputs are connected to '{output_name}'. This will " \
+              "double count the same value, which may cause unexpected behavior."
+        
+        with assert_warning(OpenMDAOWarning, msg, True):
+            comp.add_equation(output_name, input_names=input_names)
+
+    def test_no_warning(self):
+        """
+        Tests if no warning is issued when there are no duplicate inputs
+        """
+        comp = om.AddSubtractComp()
+        input_names = ["f1", "f2", "f3", "f4", "f5"]
+        output_name = "f"
+        msg = f"Duplicate inputs are connected to '{output_name}'. This will " \
+              "double count the same value, which may cause unexpected behavior."
+        
+        with assert_no_warning(OpenMDAOWarning, msg):
+            comp.add_equation(output_name, input_names=input_names)
+    
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,4 +1,4 @@
-""" Unit tests for the DifferentialEvolutionDriver Driver."""
+""" Unit tests for DifferentialEvolutionDriver."""
 
 import unittest
 import os
@@ -9,6 +9,8 @@ import openmdao.api as om
 
 from openmdao.core.constants import INF_BOUND
 
+from openmdao.drivers.differential_evolution_driver import DifferentialEvolution
+
 from openmdao.test_suite.components.branin import Branin
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.paraboloid_distributed import DistParab
@@ -16,7 +18,7 @@ from openmdao.test_suite.components.sellar_feature import SellarMDA
 
 from openmdao.utils.general_utils import run_driver
 from openmdao.utils.testing_utils import use_tempdirs
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.mpi import MPI
 try:
     from parameterized import parameterized
@@ -27,6 +29,11 @@ try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
     PETScVector = None
+
+try:
+    import pyDOE3
+except ImportError:
+    pyDOE3 = None
 
 extra_prints = False  # enable printing results
 
@@ -43,6 +50,30 @@ def _test_func_name(func, num, param):
     return func.__name__ + '_' + '_'.join(args)
 
 
+class TestErrors(unittest.TestCase):
+
+    @unittest.skipIf(pyDOE3, "only runs if 'pyDOE3' is not installed")
+    def test_no_pyDOE3(self):
+        with self.assertRaises(RuntimeError) as err:
+            DifferentialEvolution(lambda: 0)
+
+        self.assertEqual(str(err.exception),
+                         "DifferentialEvolution requires the 'pyDOE3' package, "
+                         "which can be installed with one of the following commands:\n"
+                         "    pip install openmdao[doe]\n"
+                         "    pip install pyDOE3")
+
+        with self.assertRaises(RuntimeError) as err:
+            om.DifferentialEvolutionDriver()
+
+        self.assertEqual(str(err.exception),
+                         "DifferentialEvolutionDriver requires the 'pyDOE3' package, "
+                         "which can be installed with one of the following commands:\n"
+                         "    pip install openmdao[doe]\n"
+                         "    pip install pyDOE3")
+
+
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
 class TestDifferentialEvolution(unittest.TestCase):
 
     def setUp(self):
@@ -194,6 +225,9 @@ class TestDifferentialEvolution(unittest.TestCase):
         prob.driver.options['max_gen'] = 75
 
         prob.setup()
+
+        prob.set_val('x', [0.3, -0.3])
+
         prob.run_driver()
 
         if extra_prints:
@@ -230,7 +264,7 @@ class TestDifferentialEvolution(unittest.TestCase):
 
         indeps = prob.model.add_subsystem('indeps', om.IndepVarComp())
         indeps.add_output('x', 3)
-        indeps.add_output('y', [4.0, -4])
+        indeps.add_output('y', [4.0, 1.0])
 
         prob.model.add_subsystem('paraboloid1',
                                  om.ExecComp('f = (x+5)**2- 3'))
@@ -278,6 +312,62 @@ class TestDifferentialEvolution(unittest.TestCase):
 
         self.assertEqual(exception.args[0], msg)
 
+    def test_invalid_desvar_values(self):
+
+        expected_err = ("The following design variable initial conditions are out of their specified "
+                        "bounds:"
+                        "\n  indeps.y"
+                        "\n    val: [4.  3.1]"
+                        "\n    lower: [-10.   0.]"
+                        "\n    upper: [10.  3.]"
+                        "\nSet the initial value of the design variable to a valid value or set "
+                        "the driver option['invalid_desvar_behavior'] to 'ignore'.")
+
+        for option in ['warn', 'raise', 'ignore']:
+            with self.subTest(f'invalid_desvar_behavior = {option}'):
+
+                prob = om.Problem()
+
+                indeps = prob.model.add_subsystem('indeps', om.IndepVarComp())
+                indeps.add_output('x', 3)
+                indeps.add_output('y', [4.0, 3.1])
+
+                prob.model.add_subsystem('paraboloid1',
+                                         om.ExecComp('f = (x+5)**2- 3'))
+                prob.model.add_subsystem('paraboloid2',
+                                         om.ExecComp('f = (y[0]-3)**2 + (y[1]-1)**2 - 3',
+                                                     y=[0, 0]))
+                prob.model.connect('indeps.x', 'paraboloid1.x')
+                prob.model.connect('indeps.y', 'paraboloid2.y')
+
+                prob.driver = om.DifferentialEvolutionDriver(invalid_desvar_behavior=option)
+
+                prob.model.add_design_var('indeps.x', lower=-5, upper=5)
+                prob.model.add_design_var('indeps.y', lower=[-10, 0], upper=[10, 3])
+                prob.model.add_objective('paraboloid1.f')
+                prob.model.add_objective('paraboloid2.f')
+                prob.setup()
+
+                # run the optimization
+                if option == 'ignore':
+                    prob.run_driver()
+                elif option == 'raise':
+                    with self.assertRaises(ValueError) as ctx:
+                        prob.run_driver()
+                    self.assertEqual(str(ctx.exception), expected_err)
+                else:
+                    with assert_warning(om.DriverWarning, expected_err):
+                        prob.run_driver()
+
+                if option != 'raise':
+
+                    if extra_prints:
+                        print('indeps.x', prob['indeps.x'])
+                        print('indeps.y', prob['indeps.y'])
+
+                    np.testing.assert_array_almost_equal(prob['indeps.x'], -5)
+                    np.testing.assert_array_almost_equal(prob['indeps.y'], [3, 1])
+
     @parameterized.expand([
         (None, None),
         (INF_BOUND, INF_BOUND),
@@ -305,12 +395,12 @@ class TestDifferentialEvolution(unittest.TestCase):
             prob.final_setup()
 
         # A value of None for lower and upper is changed to +/- INF_BOUND in add_design_var()
-        if lower == None:
+        if lower is None:
             lower = -INF_BOUND
-        if upper == None:
+        if upper is None:
             upper = INF_BOUND
 
-        msg = ("Invalid bounds for design variable 'x.x'. When using "
+        msg = ("Invalid bounds for design variable 'x'. When using "
                "DifferentialEvolutionDriver, values for both 'lower' and 'upper' "
                f"must be specified between +/-INF_BOUND ({INF_BOUND}), "
                f"but they are: lower={lower}, upper={upper}.")
@@ -343,6 +433,7 @@ class TestDifferentialEvolution(unittest.TestCase):
             self.assertLessEqual(1.0 - 1e-6, prob["x"][i])
 
 
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
 class TestDriverOptionsDifferentialEvolution(unittest.TestCase):
 
     def setUp(self):
@@ -375,6 +466,7 @@ class TestDriverOptionsDifferentialEvolution(unittest.TestCase):
         self.assertEqual(prob.driver.options['Pc'], 0.0123)
 
 
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
 class TestMultiObjectiveDifferentialEvolution(unittest.TestCase):
 
     def setUp(self):
@@ -418,8 +510,8 @@ class TestMultiObjectiveDifferentialEvolution(unittest.TestCase):
         prob.driver.options['max_gen'] = 100
         prob.driver.options['multi_obj_exponent'] = 1.
         prob.driver.options['penalty_parameter'] = 10.
-        prob.driver.options['multi_obj_weights'] = {'box.front_area': 0.1,
-                                                    'box.top_area': 0.9}
+        prob.driver.options['multi_obj_weights'] = {'front_area': 0.1,
+                                                    'top_area': 0.9}
         prob.driver.options['multi_obj_exponent'] = 1
 
         prob.model.add_design_var('length', lower=0.1, upper=2.)
@@ -458,8 +550,8 @@ class TestMultiObjectiveDifferentialEvolution(unittest.TestCase):
         prob2.driver.options['max_gen'] = 100
         prob2.driver.options['multi_obj_exponent'] = 1.
         prob2.driver.options['penalty_parameter'] = 10.
-        prob2.driver.options['multi_obj_weights'] = {'box.front_area': 0.9,
-                                                     'box.top_area': 0.1}
+        prob2.driver.options['multi_obj_weights'] = {'front_area': 0.9,
+                                                     'top_area': 0.1}
         prob2.driver.options['multi_obj_exponent'] = 1
 
         prob2.model.add_design_var('length', lower=0.1, upper=2.)
@@ -487,6 +579,7 @@ class TestMultiObjectiveDifferentialEvolution(unittest.TestCase):
         self.assertGreater(h2, h1)  # top area does not depend on height
 
 
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
 class TestConstrainedDifferentialEvolution(unittest.TestCase):
 
     def setUp(self):
@@ -494,9 +587,6 @@ class TestConstrainedDifferentialEvolution(unittest.TestCase):
         # The old implementation of the seed calculation erroneously set the seed to 0
         # regardless of the value of the random_state passed in (in the non-MPI case only).
         os.environ['DifferentialEvolutionDriver_seed'] = '0'
-
-    def tearDown(self):
-        del os.environ['DifferentialEvolutionDriver_seed']  # clean up environment
 
     def tearDown(self):
         del os.environ['DifferentialEvolutionDriver_seed']  # clean up environment
@@ -555,10 +645,10 @@ class TestConstrainedDifferentialEvolution(unittest.TestCase):
     def test_driver_supports(self):
         prob = om.Problem()
 
-        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
 
         # setup the optimization
-        driver = prob.driver = om.DifferentialEvolutionDriver()
+        prob.driver = om.DifferentialEvolutionDriver()
 
         with self.assertRaises(KeyError) as raises_msg:
             prob.driver.supports['equality_constraints'] = False
@@ -755,9 +845,9 @@ class TestConstrainedDifferentialEvolution(unittest.TestCase):
             prob.final_setup()
 
         # A value of None for lower and upper is changed to +/- INF_BOUND in add_constraint()
-        if lower == None:
+        if lower is None:
             lower = -INF_BOUND
-        if upper == None:
+        if upper is None:
             upper = INF_BOUND
 
         msg = ("Invalid bounds for constraint 'const.g'. "
@@ -771,6 +861,7 @@ class TestConstrainedDifferentialEvolution(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
 class MPITestDifferentialEvolution(unittest.TestCase):
     N_PROCS = 2
 
@@ -820,6 +911,7 @@ class MPITestDifferentialEvolution(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
 class MPITestDifferentialEvolutionNoSetSeed(unittest.TestCase):
     N_PROCS = 2
 
@@ -844,18 +936,7 @@ class MPITestDifferentialEvolutionNoSetSeed(unittest.TestCase):
 
 class D1(om.ExplicitComponent):
     def setup(self):
-        comm = self.comm
-        rank = comm.rank
-
-        if rank == 1:
-            start = 1
-            end = 2
-        else:
-            start = 0
-            end = 1
-
-        self.add_input('y2', np.ones((1, ), float), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
+        self.add_input('y2', np.ones((1, ), float), distributed=True)
         self.add_input('x', np.ones((1, ), float), distributed=True)
 
         self.add_output('y1', np.ones((1, ), float), distributed=True)
@@ -872,9 +953,6 @@ class D1(om.ExplicitComponent):
             outputs['y1'] = 28.0 - 0.2*y2 + x
 
     def compute_partials(self, inputs, partials, discrete_inputs=None):
-        y2 = inputs['y2']
-        x = inputs['x']
-
         partials['y1', 'y2'] = -0.2
         if self.comm.rank == 1:
             partials['y1', 'x'] = 2.0
@@ -884,18 +962,7 @@ class D1(om.ExplicitComponent):
 
 class D2(om.ExplicitComponent):
     def setup(self):
-        comm = self.comm
-        rank = comm.rank
-
-        if rank == 1:
-            start = 1
-            end = 2
-        else:
-            start = 0
-            end = 1
-
-        self.add_input('y1', np.ones((1, ), float), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
+        self.add_input('y1', np.ones((1, ), float), distributed=True)
 
         self.add_output('y2', np.ones((1, ), float), distributed=True)
 
@@ -905,7 +972,7 @@ class D2(om.ExplicitComponent):
         y1 = inputs['y1']
 
         if self.comm.rank == 1:
-            outputs['y2'] = y2 = y1**.5 - 3
+            outputs['y2'] = y1**.5 - 3
         else:
             outputs['y2'] = y1**.5 + 7
 
@@ -928,6 +995,7 @@ class Summer(om.ExplicitComponent):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
 @use_tempdirs
 class MPITestDifferentialEvolution4Procs(unittest.TestCase):
     N_PROCS = 4
@@ -994,8 +1062,22 @@ class MPITestDifferentialEvolution4Procs(unittest.TestCase):
 
         model.add_subsystem('p', om.IndepVarComp('x', 3.0), promotes=['x'])
 
-        model.add_subsystem('d1', D1(), promotes=['*'])
-        model.add_subsystem('d2', D2(), promotes=['*'])
+        comm = prob.comm
+        rank = comm.rank
+
+        if rank == 1:
+            start = 1
+            end = 2
+        else:
+            start = 0
+            end = 1
+
+        model.add_subsystem('d1', D1(), promotes_outputs=['*'])
+        model.promotes('d1', inputs=['x'])
+        model.promotes('d1', inputs=['y2'], src_indices=np.arange(start, end, dtype=int))
+
+        model.add_subsystem('d2', D2(), promotes_outputs=['*'])
+        model.promotes('d2', inputs=['y1'], src_indices=np.arange(start, end, dtype=int))
 
         model.add_subsystem('obj_comp', Summer(), promotes_outputs=['*'])
         model.promotes('obj_comp', inputs=['*'], src_indices=om.slicer[:])
@@ -1028,7 +1110,7 @@ class MPITestDifferentialEvolution4Procs(unittest.TestCase):
         # a separate case file should have been written by rank 0 of each parallel model
         # (the top two global ranks)
         rank = prob.comm.rank
-        filename = "cases.sql_%d" % rank
+        filename = f"{prob.get_outputs_dir()}/cases.sql_{rank}"
 
         if rank < num_models:
             expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)

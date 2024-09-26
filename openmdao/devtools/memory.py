@@ -226,7 +226,7 @@ try:
         set1 = set(iters[-2])
         set2 = set(iters[-1])
 
-        return set2 - set1
+        return list(set2 - set1)
 
 
     def list_iter_leaks(leakset, out=sys.stdout):

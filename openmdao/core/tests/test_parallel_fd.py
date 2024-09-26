@@ -1,15 +1,11 @@
 
-
-import time
 import itertools
 import numpy as np
 import unittest
-TestCase = unittest.TestCase
 
 import openmdao.api as om
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
-from openmdao.test_suite.parametric_suite import parametric_suite
 from openmdao.test_suite.components.matmultcomp import MatMultComp
 
 try:
@@ -104,7 +100,7 @@ def setup_diamond_model(par_fds, size, method, par_fd_at):
     return prob
 
 
-class SerialSimpleFDTestCase(TestCase):
+class SerialSimpleFDTestCase(unittest.TestCase):
 
     def test_serial_fd(self):
         size = 15
@@ -126,7 +122,7 @@ class SerialSimpleFDTestCase(TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class ParallelSimpleFDTestCase2(TestCase):
+class ParallelSimpleFDTestCase2(unittest.TestCase):
 
     N_PROCS = 2
 
@@ -152,7 +148,7 @@ class ParallelSimpleFDTestCase2(TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class ParallelFDTestCase5(TestCase):
+class ParallelFDTestCase5(unittest.TestCase):
 
     N_PROCS = 5
 
@@ -175,7 +171,7 @@ class ParallelFDTestCase5(TestCase):
         assert_near_equal(J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
 
 
-class SerialDiamondFDTestCase(TestCase):
+class SerialDiamondFDTestCase(unittest.TestCase):
 
     def test_diamond_fd_totals(self):
         size = 15
@@ -197,11 +193,11 @@ class SerialDiamondFDTestCase(TestCase):
         try:
             setup_diamond_model(0, 10, 'fd', 'model')
         except Exception as err:
-            self.assertEquals(str(err), "Value (0) of option 'num_par_fd' is less than minimum allowed value of 1.")
+            self.assertEqual(str(err), "Value (0) of option 'num_par_fd' is less than minimum allowed value of 1.")
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class ParallelDiamondFDTestCase(TestCase):
+class ParallelDiamondFDTestCase(unittest.TestCase):
 
     N_PROCS = 4
 
@@ -259,7 +255,7 @@ def _test_func_name(func, num, param):
     for p in param.args:
         try:
             arg = p.__name__
-        except:
+        except Exception:
             arg = str(p)
         args.append(arg)
     return func.__name__ + '_' + '_'.join(args)
@@ -272,16 +268,15 @@ class MatMultTestCase(unittest.TestCase):
     @parameterized.expand(itertools.product([20, 21, 22], [2, 3, 4], ['fd', 'cs']),
                           name_func=_test_func_name)
     def test_par_fd(self, size, num_par_fd, method):
+        p = om.Problem()
         if MPI:
-            if MPI.COMM_WORLD.rank == 0:
+            if p.comm.rank == 0:
                 mat = np.random.random(5 * size).reshape((5, size)) - 0.5
             else:
                 mat = None
-            mat = MPI.COMM_WORLD.bcast(mat, root=0)
+            mat = p.comm.bcast(mat, root=0)
         else:
             mat = np.random.random(5 * size).reshape((5, size)) - 0.5
-
-        p = om.Problem()
 
         model = p.model
 
@@ -302,7 +297,7 @@ class MatMultTestCase(unittest.TestCase):
         norm = np.linalg.norm(J['comp.y','indep.x'] - comp.mat)
         self.assertLess(norm, 1.e-7)
         if MPI:
-            self.assertEqual(MPI.COMM_WORLD.allreduce(ncomputes), size)
+            self.assertEqual(p.comm.allreduce(ncomputes), size)
 
         norm = np.linalg.norm(comp._jacobian['y', 'x'] - comp.mat)
         self.assertLess(norm, 1.e-7)
@@ -319,22 +314,22 @@ class MatMultParallelTestCase(unittest.TestCase):
     N_PROCS = 8
 
     def run_model(self, size, num_par_fd1, num_par_fd2, method, total=False):
-        if MPI:
-            if MPI.COMM_WORLD.rank == 0:
-                mat1 = np.random.random(5 * size).reshape((5, size)) - 0.5
-            else:
-                mat1 = None
-            mat1 = MPI.COMM_WORLD.bcast(mat1, root=0)
-        else:
-            mat1 = np.random.random(5 * size).reshape((5, size)) - 0.5
-
-        mat2 = mat1 * 5.0
-
         if total:
             grp = om.Group(num_par_fd=num_par_fd1)
         else:
             grp = om.Group()
         p = om.Problem(model=grp)
+
+        if MPI:
+            if p.comm.rank == 0:
+                mat1 = np.random.random(5 * size).reshape((5, size)) - 0.5
+            else:
+                mat1 = None
+            mat1 = p.comm.bcast(mat1, root=0)
+        else:
+            mat1 = np.random.random(5 * size).reshape((5, size)) - 0.5
+
+        mat2 = mat1 * 5.0
 
         model = p.model
         model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(mat1.shape[1])))
@@ -554,4 +549,3 @@ class ParFDFeatureTestCase(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-

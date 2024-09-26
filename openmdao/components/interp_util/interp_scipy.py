@@ -45,15 +45,10 @@ class InterpScipy(InterpAlgorithm):
     ----------
     _d_dx : ndarray
         Cache of computed gradients with respect to evaluation point.
-    _interp_config : dict
-        Configuration object that stores the number of points required for each interpolation
-        method.
     _ki : list
         Interpolation order to be used in each dimension.
     _supports_d_dvalues : bool
         If True, this algorithm can compute the derivatives with respect to table values.
-    _xi : ndarray
-        Cache of current evaluation point.
     """
 
     def __init__(self, grid, values, interp=None, **kwargs):
@@ -185,7 +180,7 @@ class InterpScipy(InterpAlgorithm):
         # for spline based methods
 
         # requires floating point input
-        xi = xi.astype(np.float)
+        xi = xi.astype(float)
 
         # ensure xi is 2D list of points to evaluate
         if xi.ndim == 1:
@@ -242,7 +237,7 @@ class InterpScipy(InterpAlgorithm):
                     gradient[i] = self._evaluate_splines(local_derivs,
                                                          x[: i],
                                                          ki,
-                                                         compute_gradients=False)
+                                                         compute_gradients=False).item()
 
             # All values have been folded down to a single dimensional array
             # compute the final interpolated results, and gradient w.r.t. the

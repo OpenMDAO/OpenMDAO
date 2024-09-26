@@ -349,11 +349,13 @@ class Window {
      * MutationObserver.
      * @returns {Window} Reference to this.
      */
-    sizeToContent(extraWidth = 0, extraHeight = 2) {
-        let contentWidth = this.body.node().scrollWidth + extraWidth,
-            contentHeight = this.body.node().scrollHeight,
-            headerHeight = this.header.node().offsetHeight,
-            footerHeight = this.hasFooter() ? this.footer.node().offsetHeight : 0;
+    sizeToContent(extraWidth = 0, extraHeight = 2, considerTitle = false) {
+        const bodyWidth = this.body.node().scrollWidth;
+        const titleWidth = this._title.node().scrollWidth + 60;
+        const contentWidth = ((!considerTitle || bodyWidth > titleWidth)? bodyWidth : titleWidth) + extraWidth;
+        const contentHeight = this.body.node().scrollHeight;
+        const headerHeight = this.header.node().offsetHeight
+        const footerHeight = this.hasFooter() ? this.footer.node().offsetHeight : 0;
 
         const totalHeight = contentHeight + headerHeight + footerHeight + extraHeight;
 

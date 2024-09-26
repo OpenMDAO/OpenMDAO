@@ -1,7 +1,6 @@
 """Define the implicit test component (array)."""
 
 import numpy as np
-import scipy.sparse
 
 import openmdao.api as om
 

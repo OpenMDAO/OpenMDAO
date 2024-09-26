@@ -3,7 +3,6 @@
 import numpy as np
 import unittest
 
-from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.assert_utils import assert_near_equal
@@ -45,29 +44,30 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
         Test the direct solver on a component.
         """
         for jac in [None, 'csc', 'dense']:
-            prob = Problem(model=ImplComp4Test())
-            prob.model.nonlinear_solver = NewtonSolver(solve_subsystems=False)
+            prob = Problem()
+            comp = prob.model.add_subsystem('comp', ImplComp4Test())
+            comp.nonlinear_solver = NewtonSolver(solve_subsystems=False)
             if jac in ('csc', 'dense'):
-                prob.model.options['assembled_jac_type'] = jac
-            prob.model.linear_solver = DirectSolver(assemble_jac=jac in ('csc','dense'))
+                comp.options['assembled_jac_type'] = jac
+            comp.linear_solver = DirectSolver(assemble_jac=jac in ('csc','dense'))
             prob.set_solver_print(level=0)
 
             prob.setup()
 
             prob.run_model()
-            assert_near_equal(prob['y'], [-1., 1.])
+            assert_near_equal(prob['comp.y'], [-1., 1.])
 
-            d_inputs, d_outputs, d_residuals = prob.model.get_linear_vectors()
+            d_inputs, d_outputs, d_residuals = comp.get_linear_vectors()
 
             d_residuals.set_val(2.0)
             d_outputs.set_val(0.0)
-            prob.model.run_solve_linear('fwd')
+            comp.run_solve_linear('fwd')
             result = d_outputs.asarray()
             assert_near_equal(result, [-2., 2.])
 
             d_outputs.set_val(2.0)
             d_residuals.set_val(0.0)
-            prob.model.run_solve_linear('rev')
+            comp.run_solve_linear('rev')
             result = d_residuals.asarray()
             assert_near_equal(result, [2., -2.])
 

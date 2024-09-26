@@ -3,15 +3,13 @@
 import os
 import json
 import functools
-import pathlib
 
 import numpy as np
 
 from openmdao.core.constants import _SetupStatus, INF_BOUND
 import openmdao.utils.hooks as hooks
-from openmdao.utils.mpi import MPI
 from openmdao.utils.webview import webview
-from openmdao.utils.general_utils import ignore_errors, default_noraise
+from openmdao.utils.general_utils import default_noraise
 from openmdao.utils.file_utils import _load_and_exec
 from openmdao.utils.reports_system import register_report
 
@@ -103,21 +101,23 @@ def _add_child_rows(row, mval, dval, scaler=None, adder=None, ref=None, ref0=Non
 def _compute_jac_view_info(totals, data, dv_vals, response_vals, coloring):
     start = end = 0
     data['ofslices'] = slices = {}
-    for n, v in response_vals.items():
+    for n in data['oflabels']:
+        v = response_vals[n]
         end += v.size
         slices[n] = [start, end]
         start = end
 
     start = end = 0
     data['wrtslices'] = slices = {}
-    for n, v in dv_vals.items():
+    for n in data['wrtlabels']:
+        v = dv_vals[n]
         end += v.size
         slices[n] = [start, end]
         start = end
 
     nonempty_submats = set()  # submats with any nonzero values
 
-    var_matrix = np.zeros((len(data['ofslices']), len(data['wrtslices'])))
+    var_matrix = np.zeros((len(data['oflabels']), len(data['wrtlabels'])))
 
     matrix = np.abs(totals)
 
@@ -125,9 +125,9 @@ def _compute_jac_view_info(totals, data, dv_vals, response_vals, coloring):
         mask = np.zeros(totals.shape, dtype=bool)
         mask[coloring._nzrows, coloring._nzcols] = 1
 
-    for i, of in enumerate(response_vals):
+    for i, of in enumerate(data['oflabels']):
         ofstart, ofend = data['ofslices'][of]
-        for j, wrt in enumerate(dv_vals):
+        for j, wrt in enumerate(data['wrtlabels']):
             wrtstart, wrtend = data['wrtslices'][wrt]
             # use max of abs value here instead of norm to keep coloring consistent between
             # top level jac and subjacs
@@ -387,26 +387,35 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
         # save old totals
         coloring = driver._get_coloring()
 
-        # assemble data for jacobian visualization
-        data['oflabels'] = driver._get_ordered_nl_responses()
-        data['wrtlabels'] = list(dv_vals)
+        nldvs = driver._get_nl_dvs()
+        ldvs = driver._get_lin_dvs()
+        lin_dv_vals = {n: dv_vals[n] for n in ldvs}
 
+        # assemble data for jacobian visualization
         if driver._total_jac is None:
+            data['oflabels'] = driver._get_ordered_nl_responses()
+            data['wrtlabels'] = list(n for n in dv_vals if n in nldvs)
+
             # this call updates driver._total_jac
             driver._compute_totals(of=data['oflabels'], wrt=data['wrtlabels'],
                                    return_format=driver._total_jac_format)
-        totals = driver._total_jac.J  # .J is always an array even if return format != 'array'
+            totals = driver._total_jac.J  # .J is always an array even if return format != 'array'
+            driver._total_jac = None
+        else:
+            totals = driver._total_jac.J  # .J is always an array even if return format != 'array'
+            data['oflabels'] = list(driver._total_jac.output_meta['fwd'])
+            data['wrtlabels'] = list(driver._total_jac.input_meta['fwd'])
 
         data['linear'] = lindata = {}
         lindata['oflabels'] = [n for n, meta in driver._cons.items() if meta['linear']]
-        lindata['wrtlabels'] = data['wrtlabels']  # needs to mimic data structure
+        lindata['wrtlabels'] = [n for n in dv_vals if n in ldvs]
 
         # check for separation of linear constraints
         if lindata['oflabels']:
             if set(lindata['oflabels']).intersection(data['oflabels']):
                 # linear cons are found in data['oflabels'] so they're not separated
                 lindata['oflabels'] = []
-                lindata['wrtlables'] = []
+                lindata['wrtlabels'] = []
 
         full_response_vals = con_vals.copy()
         full_response_vals.update(obj_vals)
@@ -414,7 +423,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
 
         _compute_jac_view_info(totals, data, dv_vals, response_vals, coloring)
 
-        if lindata['oflabels']:
+        if lindata['oflabels'] and lin_dv_vals:
             lin_response_vals = {n: full_response_vals[n] for n in lindata['oflabels']}
 
             if driver._total_jac_linear is None:
@@ -424,14 +433,14 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
 
                 try:
                     lintotals = driver._compute_totals(of=lindata['oflabels'],
-                                                       wrt=data['wrtlabels'],
+                                                       wrt=lindata['wrtlabels'],
                                                        return_format='array')
                 finally:
                     driver._total_jac = save
             else:
                 lintotals = driver._total_jac_linear.J
 
-            _compute_jac_view_info(lintotals, lindata, dv_vals, lin_response_vals, None)
+            _compute_jac_view_info(lintotals, lindata, lin_dv_vals, lin_response_vals, None)
 
     if driver._problem().comm.rank == 0:
 
@@ -444,10 +453,10 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
         with open(os.path.join(code_dir, viewer), "r", encoding='utf-8') as f:
             template = f.read()
 
-        with open(os.path.join(libs_dir, 'tabulator.min.js'), "r", encoding='utf-8') as f:
+        with open(os.path.join(libs_dir, 'tabulator.5.4.4.min.js'), "r", encoding='utf-8') as f:
             tabulator_src = f.read()
 
-        with open(os.path.join(style_dir, 'tabulator.min.css'), "r", encoding='utf-8') as f:
+        with open(os.path.join(style_dir, 'tabulator.5.4.4.min.css'), "r", encoding='utf-8') as f:
             tabulator_style = f.read()
 
         with open(os.path.join(libs_dir, 'd3.v6.min.js'), "r", encoding='utf-8') as f:
@@ -489,22 +498,25 @@ def _scaling_setup_parser(parser):
                         help="Don't show jacobian info")
 
 
-_run_driver_called = set()
-_run_model_start = set()
-_run_model_done = set()
+_scaling_report_done = set()
 
 
 def _exitfunc(probname):
-    global _run_driver_called
+    global _scaling_report_done
     from openmdao.core.problem import _problem_names
     if probname is None:
         probnames = _problem_names
     else:
         probnames = [probname]
-    missing = [p for p in probnames if p not in _run_driver_called]
+    missing = [p for p in probnames if p not in _scaling_report_done]
     if missing:
-        print(f"\n\nMissing call(s) to run_driver() for Problem(s) {sorted(missing)} "
-              "so couldn't generate corresponding driver scaling report.\n")
+        print(f"\n\nDriver scaling report(s) not generated for Problem(s) {sorted(missing)}\n")
+
+
+def _check_nl_totals(driver, **kwargs):
+    # prevent hook from triggering until we have computed the total jacobian for the nonlinear
+    # constraints and objectives
+    return driver._total_jac is not None
 
 
 def _scaling_cmd(options, user_args):
@@ -518,55 +530,27 @@ def _scaling_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    def _set_run_driver_flag(problem):
-        global _run_driver_called
-        _run_driver_called.add(problem._name)
+    # disable the reports system, we only want the scaling report and then we exit
+    os.environ['OPENMDAO_REPORTS'] = '0'
 
-    def _set_run_model_start(problem):
-        global _run_model_start
-        _run_model_start.add(problem._name)
+    def _do_scaling_report(driver, infile='', outfile=_default_scaling_filename, show_browser=True,
+                           title=None, jac=True):
+        global _scaling_report_done
+        _scaling_report_done.add(driver._problem()._name)
+        if title is None:
+            title = f"Driver scaling for {infile}"
+        driver.scaling_report(outfile=outfile, show_browser=show_browser, title=title, jac=jac)
 
-    def _set_run_model_done(problem):
-        global _run_model_done
-        _run_model_done.add(problem._name)
-
-    def _scaling_check(problem):
-        if problem._name in _run_driver_called:
-            # If run_driver has been called, we know no more user changes are coming.
-            if problem._name not in _run_model_start:
-                problem.run_model()
-            if problem._name in _run_model_done:
-                _scaling(problem)
-
-    def _scaling(problem):
-        driver = problem.driver
-        if options.title:
-            title = options.title
-        else:
-            title = "Driver scaling for %s" % os.path.basename(options.file[0])
-        view_driver_scaling(driver, outfile=options.outfile, show_browser=not options.no_browser,
-                            title=title, jac=not options.nojac)
-        exit()
-
-    # register the hooks
-    hooks._register_hook('final_setup', class_name='Problem', inst_id=options.problem,
-                         post=_scaling_check)
-
-    hooks._register_hook('run_model', class_name='Problem', inst_id=options.problem,
-                         pre=_set_run_model_start, post=_set_run_model_done, ncalls=1)
-
-    hooks._register_hook('run_driver', class_name='Problem', inst_id=options.problem,
-                         pre=_set_run_driver_flag, ncalls=1)
+    hooks._register_hook('_compute_totals', class_name='Driver', inst_id=options.problem,
+                         post=_do_scaling_report, ncalls=1, predicate=_check_nl_totals,
+                         infile=options.file[0], outfile=options.outfile,
+                         show_browser=not options.no_browser, title=options.title,
+                         jac=not options.nojac)
 
     # register an atexit function to check if scaling report was triggered during the script
     import atexit
     atexit.register(functools.partial(_exitfunc, options.problem))
 
-    from openmdao.utils.reports_system import _register_cmdline_report
-    # tell report system not to duplicate effort
-    _register_cmdline_report('scaling')
-
-    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 
@@ -574,7 +558,7 @@ def _scaling_cmd(options, user_args):
 def _run_scaling_report(driver, report_filename=_default_scaling_filename):
 
     prob = driver._problem()
-    scaling_filepath = str(pathlib.Path(prob.get_reports_dir()).joinpath(report_filename))
+    scaling_filepath = prob.get_reports_dir() / report_filename
 
     try:
         prob.driver.scaling_report(outfile=scaling_filepath, show_browser=False)
@@ -589,4 +573,4 @@ def _run_scaling_report(driver, report_filename=_default_scaling_filename):
 
 def _scaling_report_register():
     register_report('scaling', _run_scaling_report, 'Driver scaling report', 'Driver',
-                    '_compute_totals', 'post')
+                    '_compute_totals', 'post', predicate=_check_nl_totals)

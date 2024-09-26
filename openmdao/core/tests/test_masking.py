@@ -2,13 +2,13 @@ import unittest
 import numpy as np
 from numpy.testing import assert_almost_equal
 
-from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, NewtonSolver, \
-    ScipyKrylov, LinearRunOnce, LinearBlockGS
+from openmdao.api import Problem, IndepVarComp, DirectSolver, NewtonSolver, \
+    ScipyKrylov, LinearBlockGS
 
 from openmdao.test_suite.components.double_sellar import DoubleSellar, DoubleSellarImplicit
 
 
-def _build_model(mode, implicit=False):
+def _build_model(mode, implicit=False, asjac='csc'):
     p = Problem()
 
     dv = p.model.add_subsystem('dv', IndepVarComp(), promotes=['*'])
@@ -30,18 +30,20 @@ def _build_model(mode, implicit=False):
     return p
 
 
-def _add_solvers(p):
+def _add_solvers(p, asmjac='csc'):
     p.model.double_sellar.g1.linear_solver = DirectSolver(assemble_jac=True)
     p.model.double_sellar.g1.nonlinear_solver = NewtonSolver(solve_subsystems=False)
+    p.model.double_sellar.g1.options['assembled_jac_type'] = asmjac
 
     p.model.double_sellar.g2.linear_solver = DirectSolver(assemble_jac=True)
     p.model.double_sellar.g2.nonlinear_solver = NewtonSolver(solve_subsystems=False)
+    p.model.double_sellar.g2.options['assembled_jac_type'] = asmjac
 
     newton = p.model.nonlinear_solver = NewtonSolver(solve_subsystems=False)
     newton.linear_solver = ScipyKrylov()
     newton.linear_solver.precon = LinearBlockGS()
 
-    p.model.options['assembled_jac_type'] = 'dense'
+    p.model.options['assembled_jac_type'] = asmjac
     p.model.linear_solver = ScipyKrylov(assemble_jac=True)
     p.model.linear_solver.precon = DirectSolver()
 
@@ -173,14 +175,16 @@ class CSCMaskingImplicitTestCase(unittest.TestCase):
                             np.array([[3.3775959, 2.17131165]]))
 
     def test_mixed_fwd(self):
-        p = _build_model('fwd', implicit=True)
-        _add_solvers(p)
-
-        p.run_model()
-
-        assert_almost_equal(p['double_sellar.g1.y1'], np.array([5.47125755]))
-        assert_almost_equal(p.compute_totals(return_format='array'),
-                            np.array([[3.3775959, 2.17131165]]))
+        for asmjac in ('dense', 'csc'):
+            with self.subTest(asmjac=asmjac):
+                p = _build_model('fwd', implicit=True)
+                _add_solvers(p, asmjac=asmjac)
+        
+                p.run_model()
+        
+                assert_almost_equal(p['double_sellar.g1.y1'], np.array([5.47125755]))
+                assert_almost_equal(p.compute_totals(return_format='array'),
+                                    np.array([[3.3775959, 2.17131165]]))
 
     def test_mixed_subsolve_fwd(self):
         p = _build_model('fwd', implicit=True)

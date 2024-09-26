@@ -29,7 +29,7 @@ class OmStyle extends Style {
     * 6. LN: LNBGS          NL: NLBGS
     * 7. LN: USER
     * 8.                    NL: Newton
-    * 9.                    BROYDEN
+    * 9.                    NL: BROYDEN
     * 10. solve_linear      solve_nonlinear
     * 11. other             other
 
@@ -48,7 +48,7 @@ class OmStyle extends Style {
         ['LN: LNBGS',       'NL: NLBGS',       '#b3de69'],
         ['LN: USER',        null,              '#fccde5'],
         [null,              'NL: Newton',      '#d9d9d9'],
-        [null,              'BROYDEN',         '#bc80bd'],
+        [null,              'NL: BROYDEN',     '#bc80bd'],
         ['solve_linear',    'solve_nonlinear', '#ccebc5'],
         ['other',           'other',           '#ffed6f'],
     ];

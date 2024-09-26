@@ -3,44 +3,28 @@ import json
 import functools
 import builtins
 import os
+import shutil
+import re
+from itertools import zip_longest
 from contextlib import contextmanager
+from pathlib import Path
+
+import numpy as np
 
 try:
     from parameterized import parameterized
 except ImportError:
     parameterized = None
 
-import numpy as np
+from openmdao.utils.general_utils import env_truthy, env_none
+from openmdao.utils.mpi import MPI
 
 
-def _new_setup(self):
-    import os
-    import tempfile
-
-    from openmdao.utils.mpi import MPI
-    self.startdir = os.getcwd()
-    if MPI is None:
-        self.tempdir = tempfile.mkdtemp(prefix='testdir-')
-    elif MPI.COMM_WORLD.rank == 0:
-        self.tempdir = tempfile.mkdtemp(prefix='testdir-')
-        MPI.COMM_WORLD.bcast(self.tempdir, root=0)
-    else:
-        self.tempdir = MPI.COMM_WORLD.bcast(None, root=0)
-
-    os.chdir(self.tempdir)
-    if hasattr(self, 'original_setUp'):
-        self.original_setUp()
-
-
-def _new_teardown(self):
-    import os
-    import shutil
-
-    from openmdao.utils.mpi import MPI
-    if hasattr(self, 'original_tearDown'):
-        self.original_tearDown()
-
+def _cleanup_workdir(self):
     os.chdir(self.startdir)
+
+    if self.old_workdir:
+        os.environ['OPENMDAO_WORKDIR'] = self.old_workdir
 
     if MPI is None:
         rank = 0
@@ -50,10 +34,57 @@ def _new_teardown(self):
         rank = MPI.COMM_WORLD.rank
 
     if rank == 0:
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
+        if not os.environ.get('OPENMDAO_KEEPDIRS'):
+            try:
+                shutil.rmtree(self.tempdir)
+            except OSError:
+                pass
+
+
+def _new_setup(self):
+    import os
+    import tempfile
+
+    from openmdao.utils.mpi import MPI, multi_proc_exception_check
+    self.startdir = os.getcwd()
+    self.old_workdir = os.environ.get('OPENMDAO_WORKDIR', '')
+
+    if MPI is None:
+        self.tempdir = tempfile.mkdtemp()
+    elif MPI.COMM_WORLD.rank == 0:
+        self.tempdir = tempfile.mkdtemp()
+        MPI.COMM_WORLD.bcast(self.tempdir, root=0)
+    else:
+        self.tempdir = MPI.COMM_WORLD.bcast(None, root=0)
+
+    os.chdir(self.tempdir)
+    # on mac tempdir is a symlink which messes some things up, so
+    # use resolve to get the real directory path
+    os.environ['OPENMDAO_WORKDIR'] = str(Path(self.tempdir).resolve())
+    try:
+        if hasattr(self, 'original_setUp'):
+            if MPI is not None and MPI.COMM_WORLD.size > 1:
+                with multi_proc_exception_check(MPI.COMM_WORLD):
+                    self.original_setUp()
+            else:
+                self.original_setUp()
+    except Exception:
+        _cleanup_workdir(self)
+        raise
+
+
+def _new_teardown(self):
+    from openmdao.utils.mpi import MPI, multi_proc_exception_check
+
+    try:
+        if hasattr(self, 'original_tearDown'):
+            if MPI is not None and MPI.COMM_WORLD.size > 1:
+                with multi_proc_exception_check(MPI.COMM_WORLD):
+                    self.original_tearDown()
+            else:
+                self.original_tearDown()
+    finally:
+        _cleanup_workdir(self)
 
 
 def use_tempdirs(cls):
@@ -77,13 +108,14 @@ def use_tempdirs(cls):
     TestCase
         The decorated TestCase class.
     """
-    if getattr(cls, 'setUp', None):
-        setattr(cls, 'original_setUp', getattr(cls, 'setUp'))
-    setattr(cls, 'setUp', _new_setup)
+    if env_truthy('USE_TEMPDIRS') or env_none('USE_TEMPDIRS'):
+        if getattr(cls, 'setUp', None):
+            setattr(cls, 'original_setUp', getattr(cls, 'setUp'))
+        setattr(cls, 'setUp', _new_setup)
 
-    if getattr(cls, 'tearDown', None):
-        setattr(cls, 'original_tearDown', getattr(cls, 'tearDown'))
-    setattr(cls, 'tearDown', _new_teardown)
+        if getattr(cls, 'tearDown', None):
+            setattr(cls, 'original_tearDown', getattr(cls, 'tearDown'))
+        setattr(cls, 'tearDown', _new_teardown)
 
     return cls
 
@@ -195,6 +227,7 @@ class set_env_vars(object):
         fnc : function
             The function being wrapped.
         """
+        @functools.wraps(fnc)
         def wrap(*args, **kwargs):
             saved = {}
             try:
@@ -217,7 +250,7 @@ class set_env_vars(object):
 @contextmanager
 def set_env_vars_context(**kwargs):
     """
-    Decorate a function to temporarily set some environment variables.
+    Context to temporarily set some environment variables.
 
     Parameters
     ----------
@@ -233,7 +266,6 @@ def set_env_vars_context(**kwargs):
         for k, v in kwargs.items():
             saved[k] = os.environ.get(k)
             os.environ[k] = v  # will raise exception if v is not a string
-
         yield
 
     finally:
@@ -243,6 +275,28 @@ def set_env_vars_context(**kwargs):
                 del os.environ[k]
             else:
                 os.environ[k] = v
+
+
+@set_env_vars(OPENMDAO_CHECK_ALL_PARTIALS="1")
+def force_check_partials(prob, *args, **kwargs):
+    r"""
+    Force the checking of partials even for components with _no_check_partials set.
+
+    Parameters
+    ----------
+    prob : Problem
+        The Problem being checked.
+    *args : list
+        Positional args.
+    **kwargs : dict
+        Keyword args.
+
+    Returns
+    -------
+    dict
+        Total derivative comparison data.
+    """
+    return prob.check_partials(*args, **kwargs)
 
 
 class _ModelViewerDataTreeEncoder(json.JSONEncoder):
@@ -327,3 +381,105 @@ class MissingImports(object):
             Traceback object.
         """
         builtins.__import__ = self._cached_import
+
+
+# this recognizes ints and floats with or without scientific notation.
+# it does NOT recognize hex or complex numbers
+num_rgx = re.compile(r"[-]?([0-9]+\.?[0-9]*|[0-9]*\.?[0-9]+)([eE][-+]?[0-9]+)?")
+
+
+def snum_iter(s):
+    """
+    Iterate through a string, yielding numeric strings as numbers along with non-numeric strings.
+
+    Parameters
+    ----------
+    s : str
+        The string to iterate through.
+
+    Yields
+    ------
+    str
+        The next number or non-number.
+    bool
+        True if the string is a number, False otherwise.
+    """
+    if not s:
+        return
+
+    end = 0
+    for m in num_rgx.finditer(s):
+        mstart = m.start()
+
+        if end != mstart:  # need to output the non-num string prior to this match
+            yield (s[end:mstart], False)
+
+        yield (float(m.group()), True)
+
+        end = m.end()
+
+    if end < len(s):  # yield any non-num at end of string
+        yield (s[end:], False)
+
+
+def snum_equal(s1, s2, atol=1e-6, rtol=1e-6):
+    """
+    Compare two strings, and if they contain numbers, compare the numbers subject to tolerance.
+
+    Also compare the non-number parts of the strings exactly.
+
+    Parameters
+    ----------
+    s1 : str
+        First string to compare.
+    s2 : str
+        Second string to compare.
+    atol : float, optional
+        Absolute tolerance. The default is 1e-6.
+    rtol : float, optional
+        Relative tolerance. The default is 1e-6.
+
+    Returns
+    -------
+    bool
+        True if the strings are equal within the tolerance, False otherwise.
+    """
+    for (s1, isnum1), (s2, isnum2) in zip_longest(snum_iter(s1), snum_iter(s2),
+                                                  fillvalue=("", False)):
+        if isnum1 and isnum2:
+            if rtol is None and atol is None:
+                if s1 != s2:
+                    return False
+            else:
+                if rtol is not None and rel_num_diff(s1, s2) > rtol:
+                    return False
+
+                if atol is not None and abs(s1 - s2) > atol:
+                    return False
+
+        elif s1 != s2:
+            return False
+
+    return True
+
+
+def rel_num_diff(n1, n2):
+    """
+    Return the relative numerical difference between two numbers.
+
+    Parameters
+    ----------
+    n1 : float
+        First number to compare.
+    n2 : float
+        Second number to compare.
+
+    Returns
+    -------
+    float
+        Relative difference between the numbers.
+    """
+    if n1 == 0.:
+        return 0. if n2 == 0. else 1.0
+    else:
+        return abs(n2 - n1) / abs(n1)

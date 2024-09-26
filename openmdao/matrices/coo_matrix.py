@@ -1,9 +1,8 @@
 """Define the COOmatrix class."""
 import numpy as np
 from numpy import ndarray
-from scipy.sparse import coo_matrix, csc_matrix
+from scipy.sparse import coo_matrix
 
-from collections import OrderedDict
 
 from openmdao.core.constants import INT_DTYPE
 from openmdao.matrices.matrix import Matrix, _compute_index_map
@@ -49,7 +48,7 @@ class COOMatrix(Matrix):
         """
         submats = self._submats
         metadata = self._metadata
-        key_ranges = self._key_ranges = OrderedDict()
+        key_ranges = self._key_ranges = {}
 
         start = end = 0
         for key, (info, loc, src_indices, shape, factor) in submats.items():
@@ -72,7 +71,11 @@ class COOMatrix(Matrix):
             key_ranges[key] = (start, end, dense, rows)
             start = end
 
-        data = np.zeros(end)
+        if system is not None and system.under_complex_step:
+            data = np.zeros(end, dtype=complex)
+        else:
+            data = np.zeros(end)
+
         rows = np.empty(end, dtype=INT_DTYPE)
         cols = np.empty(end, dtype=INT_DTYPE)
 
@@ -88,11 +91,11 @@ class COOMatrix(Matrix):
                 jac_type = ndarray
 
                 if src_indices is None:
-                    colrange = np.arange(col_offset, col_offset + shape[1], dtype=INT_DTYPE)
+                    colrange = range(col_offset, col_offset + shape[1])
                 else:
                     colrange = src_indices.shaped_array()
+                ncols = len(colrange)
 
-                ncols = colrange.size
                 subrows = rows[start:end]
                 subcols = cols[start:end]
 
@@ -242,15 +245,16 @@ class COOMatrix(Matrix):
         """
         if d_inputs._in_matvec_context():
             input_names = d_inputs._names
+
             mask = None
             for key, val in self._key_ranges.items():
                 if key[1] in input_names:
                     if mask is None:
                         mask = np.ones(self._matrix.data.size, dtype=bool)
-                    ind1, ind2, _, _ = val
-                    mask[ind1:ind2] = False
+                    start, stop, _, _ = val
+                    mask[start:stop] = False
 
-            if mask is not None:
+            if mask is not None and np.any(mask):
                 # convert the mask indices (if necessary) base on sparse matrix type
                 # (CSC, CSR, etc.)
                 return self._convert_mask(mask)
@@ -273,7 +277,7 @@ class COOMatrix(Matrix):
                 self._coo.dtype = complex
         else:
             self._coo.data = self._coo.data.real
-            self._coo.dtype = np.float
+            self._coo.dtype = float
 
     def _convert_mask(self, mask):
         """

@@ -9,21 +9,22 @@ from functools import partial
 
 import numpy as np
 try:
-    from jax import vmap, linear_util
+    import jax
+    from jax import vmap
     import jax.numpy as jnp
-    from jax.config import config
+    # linear_util moved to jax.extend in jax 0.4.17, previous location is deprecated
+    try:
+        from jax.extend import linear_util
+    except ImportError:
+        from jax import linear_util
     from jax.api_util import argnums_partial
     from jax._src.api import _jvp, _vjp
-    config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
+    jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
 except Exception:
     _, err, tb = sys.exc_info()
     if not isinstance(err, ImportError):
         traceback.print_tb(tb)
     jax = None
-
-from openmdao.utils.om_warnings import issue_warning
-from openmdao.vectors.vector import Vector
-from openmdao.core.constants import INT_DTYPE
 
 
 # regex to check for variable names.

@@ -1,5 +1,5 @@
 """Define the OptionsDictionary class."""
-
+import contextlib
 import re
 
 from openmdao.utils.om_warnings import warn_deprecation
@@ -62,8 +62,9 @@ class OptionsDictionary(object):
         If True, no options can be set after declaration.
     _all_recordable : bool
         Flag to determine if all options in UserOptions are recordable.
-    _widget : OptionsWidget
-        If running in a Jupyter notebook, a widget for viewing/setting options.
+    _context_cache : dict
+        A dictionary to store cached option/value pairs when using the
+        OptionsDictionary as a context manager.
     """
 
     def __init__(self, parent_name=None, read_only=False):
@@ -74,6 +75,7 @@ class OptionsDictionary(object):
         self._parent_name = parent_name
         self._read_only = read_only
         self._all_recordable = True
+        self._context_cache = {}
 
     def __getstate__(self):
         """
@@ -130,7 +132,8 @@ class OptionsDictionary(object):
         ----------
         fmt : str
             The formatting of the requested table.  Options are
-            ['github', 'rst', 'html', 'text', 'tabulator'].
+            ['github', 'rst', 'text', 'html', 'tabulator'] and several 'grid' and 'outline'
+            formats that mimic those found in the python 'tabulate' library.
             Default value of 'github' produces a table in GitHub-flavored markdown.
             'html' and 'tabulator' produce output viewable in a browser.
         missingval : str
@@ -307,9 +310,44 @@ class OptionsDictionary(object):
         if meta['check_valid'] is not None:
             meta['check_valid'](name, value)
 
+    def set(self, **kwargs):
+        """
+        Set one or more options in the options dictionary simultaneously.
+
+        Parameters
+        ----------
+        **kwargs
+            Keyword arguments where the option names in the OptionsDictionary are the keywords
+            and the associated values are the values for those options.
+        """
+        for option, val in kwargs.items():
+            self[option] = val
+
+    @contextlib.contextmanager
+    def temporary(self, **kwargs):
+        """
+        Provide a context manager for temporary option values within the context.
+
+        Parameters
+        ----------
+        **kwargs
+            Keyword arguments where the option names in the OptionsDictionary are the keywords
+            and the associated values are the temporary values for those options.
+        """
+        for option, val in kwargs.items():
+            if option not in self._context_cache:
+                self._context_cache[option] = []
+            self._context_cache[option].append(self[option])
+            self[option] = val
+        yield
+        for option, val in kwargs.items():
+            self[option] = self._context_cache[option].pop()
+            if len(self._context_cache[option]) == 0:
+                self._context_cache.pop(option)
+
     def declare(self, name, default=_UNDEFINED, values=None, types=None, desc='',
                 upper=None, lower=None, check_valid=None, allow_none=False, recordable=True,
-                deprecation=None):
+                set_function=None, deprecation=None):
         r"""
         Declare an option.
 
@@ -341,6 +379,9 @@ class OptionsDictionary(object):
             If True, allow None as a value regardless of values or types.
         recordable : bool
             If True, add to recorder.
+        set_function : None or function
+            User-supplied function with arguments (Options metadata, value) that pre-processes
+            value and returns a new value.
         deprecation : str or tuple or None
             If None, it is not deprecated. If a str, use as a DeprecationWarning
             during __setitem__ and __getitem__.  If a tuple of the form (msg, new_name),
@@ -399,6 +440,7 @@ class OptionsDictionary(object):
             'has_been_set': default_provided,
             'allow_none': allow_none,
             'recordable': recordable,
+            'set_function': set_function,
             'deprecation': deprecation,
         }
 
@@ -482,6 +524,10 @@ class OptionsDictionary(object):
             name, meta = self._handle_deprecation(name, meta)
 
         self._assert_valid(name, value)
+
+        # General function test
+        if meta['set_function'] is not None:
+            value = meta['set_function'](meta, value)
 
         meta['val'] = value
         meta['has_been_set'] = True

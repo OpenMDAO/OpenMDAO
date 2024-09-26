@@ -1,7 +1,6 @@
 """ Test for the Backtracking Line Search"""
 
 import sys
-import os
 import unittest
 from math import atan
 
@@ -10,7 +9,6 @@ from io import StringIO
 import numpy as np
 
 import openmdao.api as om
-from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.implicit_newton_linesearch \
     import ImplCompTwoStates, ImplCompTwoStatesArrays
 from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2withDerivatives
@@ -180,8 +178,8 @@ class ParaboloidAE(om.ExplicitComponent):
         """f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
         Optimal solution (minimum): x = 6.6667; y = -7.3333
         """
-        x = inputs['x']
-        y = inputs['y']
+        x = inputs['x'].item()
+        y = inputs['y'].item()
 
         if x < 1.75:
             raise om.AnalysisError('Try Again.')
@@ -190,8 +188,8 @@ class ParaboloidAE(om.ExplicitComponent):
 
     def compute_partials(self, inputs, partials):
         """ Jacobian for our paraboloid."""
-        x = inputs['x']
-        y = inputs['y']
+        x = inputs['x'].item()
+        y = inputs['y'].item()
 
         partials['f_xy', 'x'] = 2.0*x - 6.0 + y
         partials['f_xy', 'y'] = 2.0*y + 8.0 + x
@@ -272,9 +270,9 @@ class ImplCompTwoStatesAE(om.ImplicitComponent):
         self.upper = 1
         self.lower = 0
 
-        x = inputs['x']
-        y = outputs['y']
-        z = outputs['z']
+        x = inputs['x'].item()
+        y = outputs['y'].item()
+        z = outputs['z'].item()
 
         residuals['y'] = y - x - 2.0*z
         residuals['z'] = x*z + z - 4.0
@@ -445,7 +443,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
             assert_near_equal(top['comp.z'][ind], [1.5], 1e-8)
 
         with printoptions(precision=3):
-            msg = (f"'comp.z' exceeds lower bounds\n  Val: [1.333 1.333 1.333]\n  Lower: [1.5 1.5 1.5]\n")
+            msg = ("'comp.z' exceeds lower bounds\n  Val: [1.333 1.333 1.333]\n  Lower: [1.5 1.5 1.5]\n")
             with assert_warning(om.SolverWarning, msg):
                 top.run_model()
 
@@ -456,7 +454,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         top['comp.z'] = 2.4
 
         with printoptions(precision=3):
-            msg = (f"'comp.z' exceeds upper bounds\n  Val: [2.667 2.667 2.667]\n  Upper: [2.6  2.5  2.65]\n")
+            msg = ("'comp.z' exceeds upper bounds\n  Val: [2.667 2.667 2.667]\n  Upper: [2.6  2.5  2.65]\n")
             with assert_warning(om.SolverWarning, msg):
                 top.run_model()
 
@@ -528,8 +526,8 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
 
             def compute(self, inputs, outputs):
                 if self.count < 1:
-                    x = inputs['x']
-                    y = inputs['y']
+                    x = inputs['x'].item()
+                    y = inputs['y'].item()
                     outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
                 else:
                     outputs['f_xy'] = np.inf
@@ -537,8 +535,8 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
                 self.count += 1
 
             def compute_partials(self, inputs, partials):
-                x = inputs['x']
-                y = inputs['y']
+                x = inputs['x'].item()
+                y = inputs['y'].item()
 
                 partials['f_xy', 'x'] = 2.0*x - 6.0 + y
                 partials['f_xy', 'y'] = 2.0*y + 8.0 + x
@@ -742,7 +740,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
 
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 4
-        ls = model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
+        model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
 
         prob.set_solver_print(level=0)
 
@@ -778,14 +776,13 @@ class CompAtan(om.ImplicitComponent):
         self.declare_partials(of='y', wrt='y')
 
     def apply_nonlinear(self, inputs, outputs, residuals):
-        x = inputs['x']
-        y = outputs['y']
+        x = inputs['x'].item()
+        y = outputs['y'].item()
 
         residuals['y'] = (33.0 * atan(y-20.0))**2 + x
 
     def linearize(self, inputs, outputs, jacobian):
-        x = inputs['x']
-        y = outputs['y']
+        y = outputs['y'].item()
 
         jacobian['y', 'y'] = 2178.0*atan(y-20.0) / (y**2 - 40.0*y + 401.0)
         jacobian['y', 'x'] = 1.0
@@ -1035,7 +1032,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='scalar')
+        top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='scalar')
 
         top.setup()
         top.set_val('x', np.array([2., 2, 2]).reshape(3, 1))

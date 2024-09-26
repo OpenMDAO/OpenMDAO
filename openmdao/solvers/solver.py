@@ -11,10 +11,12 @@ from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.constants import _UNDEFINED
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.recorders.recording_manager import RecordingManager
+from openmdao.utils.file_utils import _get_outputs_dir
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.om_warnings import issue_warning, SolverWarning
+from openmdao.utils.general_utils import SolverMeta
 
 
 class SolverInfo(object):
@@ -98,7 +100,7 @@ class SolverInfo(object):
         self.prefix, self.stack = cache
 
 
-class Solver(object):
+class Solver(object, metaclass=SolverMeta):
     """
     Base solver class.
 
@@ -198,6 +200,7 @@ class Solver(object):
         self.supports = OptionsDictionary(parent_name=self.msginfo)
         self.supports.declare('gradients', types=bool, default=False)
         self.supports.declare('implicit_components', types=bool, default=False)
+        self.supports.declare('linesearch', types=bool, default=False)
 
         self._declare_options()
         self.options.update(kwargs)
@@ -216,9 +219,56 @@ class Solver(object):
         str
             Info to prepend to messages.
         """
+        # Default initialization
         if self._system is None:
             return type(self).__name__
+        # Following Dead Weakref
+        elif self._system() is None:
+            return type(self).__name__
         return f"{type(self).__name__} in {self._system().msginfo}"
+
+    def _inf_nan_failure(self):
+        msg = (f"Solver '{self.SOLVER}' on system '{self._system().pathname}': "
+               f"residuals contain 'inf' or 'NaN' after {self._iter_count} iterations.")
+        self.report_failure(msg)
+
+    def _convergence_failure(self):
+        msg = (f"Solver '{self.SOLVER}' on system '{self._system().pathname}' failed to converge "
+               f"in {self._iter_count} iterations.")
+        self.report_failure(msg)
+
+    def can_solve_cycle(self):
+        """
+        Return True if this solver can solve groups with cycles.
+
+        Returns
+        -------
+        bool
+            True if this solver can solve groups with cycles.
+        """
+        return 'maxiter' in self.options and self.options['maxiter'] > 1
+
+    def report_failure(self, msg):
+        """
+        Report a failure that has occurred.
+
+        The msg may be printed or ignored depending on the iprint option, and may raise
+        an AnalysisError depending on the err_on_non_converge option.
+
+        Parameters
+        ----------
+        msg : str
+            Message indicating the failure.
+        """
+        iprint = self.options['iprint']
+        print_flag = self._system().comm.rank == 0 or os.environ.get('USE_PROC_FILES')
+
+        if iprint > -1 and print_flag:
+            print(self._solver_info.prefix + self.SOLVER + msg)
+
+        # Raise AnalysisError if requested.
+        if self.options['err_on_non_converge']:
+            raise AnalysisError(msg)
 
     @property
     def _recording_iter(self):
@@ -274,7 +324,18 @@ class Solver(object):
         depth : int
             depth of the current system (already incremented).
         """
-        self._system = weakref.ref(system)
+        # Default initialization
+        if self._system is None:
+            self._system = weakref.ref(system)
+        # Following Dead Weakref
+        elif self._system() is None:
+            self._system = weakref.ref(system)
+        # Assignment Mismatch
+        elif self._system != weakref.ref(system):
+            raise RuntimeError(f"{type(self).__name__} has already been assigned to "
+                               f"{self._system().msginfo} and cannot also be assigned to "
+                               f"{system.msginfo}.")
+
         self._depth = depth
         self._problem_meta = system._problem_meta
 
@@ -332,7 +393,7 @@ class Solver(object):
 
     def _mpi_print(self, iteration, abs_res, rel_res):
         """
-        Print residuals from an iteration.
+        Print residuals from an iteration if iprint == 2.
 
         Parameters
         ----------
@@ -500,6 +561,36 @@ class Solver(object):
         """
         return self._system().get_reports_dir()
 
+    def use_relevance(self):
+        """
+        Return True if relevance should be active.
+
+        Returns
+        -------
+        bool
+            True if relevance should be active.
+        """
+        return True
+
+    def get_outputs_dir(self, *subdirs, mkdir=True):
+        """
+        Get the path under which all output files of this solver are to be placed.
+
+        Parameters
+        ----------
+        *subdirs : str
+            Subdirectories nested under the relevant problem output directory.
+            To create {prob_output_dir}/a/b one would pass `solver.get_outputs_dir('a', 'b')`.
+        mkdir : bool
+            If True, attempt to create this directory if it does not exist.
+
+        Returns
+        -------
+        pathlib.Path
+           The path of the outputs directory for the problem.
+        """
+        return _get_outputs_dir(self, *subdirs, mkdir=mkdir)
+
 
 class NonlinearSolver(Solver):
     """
@@ -518,6 +609,8 @@ class NonlinearSolver(Solver):
         Saved output values from last successful solve, if any.
     _prev_fail : bool
         If True, previous solve failed.
+    _restarted : bool
+        If True, solve was restarted from a sucessful point.
     """
 
     def __init__(self, **kwargs):
@@ -528,6 +621,7 @@ class NonlinearSolver(Solver):
         self._err_cache = {}
         self._output_cache = None
         self._prev_fail = False
+        self._restarted = False
 
     def _declare_options(self):
         """
@@ -545,9 +639,33 @@ class NonlinearSolver(Solver):
         self.options.declare('stall_tol', default=1e-12,
                              desc='When stall checking is enabled, the threshold below which the '
                                   'residual norm is considered unchanged.')
+        self.options.declare('stall_tol_type', default='rel', values=('abs', 'rel'),
+                             desc='Specifies whether the absolute or relative norm of the '
+                                  'residual is used for stall detection.')
         self.options.declare('restart_from_successful', types=bool, default=False,
                              desc='If True, the states are cached after a successful solve and '
                                   'used to restart the solver in the case of a failed solve.')
+
+    @property
+    def linesearch(self):
+        """
+        Get the linesearch solver associated with this solver.
+
+        Returns
+        -------
+        NonlinearSolver or None
+            The linesearch associated with this solver, or None if it does not support one.
+        """
+        if not self.supports['linesearch']:
+            return None
+        else:
+            return self._linesearch
+
+    @linesearch.setter
+    def linesearch(self, ls):
+        if not self.supports['linesearch']:
+            raise AttributeError(f'{self.msginfo}: This solver does not support a linesearch.')
+        self._linesearch = ls
 
     def _setup_solvers(self, system, depth):
         """
@@ -610,12 +728,15 @@ class NonlinearSolver(Solver):
         """
         Run the iterative solver.
         """
+        system = self._system()
+
         maxiter = self.options['maxiter']
         atol = self.options['atol']
         rtol = self.options['rtol']
         iprint = self.options['iprint']
         stall_limit = self.options['stall_limit']
         stall_tol = self.options['stall_tol']
+        stall_tol_type = self.options['stall_tol_type']
 
         self._mpi_print_header()
 
@@ -631,10 +752,17 @@ class NonlinearSolver(Solver):
         if stall_limit > 0:
             stall_norm = norm0
 
-        while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol and not stalled:
-            with Recording(type(self).__name__, self._iter_count, self) as rec:
+        force_one_iteration = system.under_complex_step
 
-                if stall_count == 3 and not self.linesearch.options['print_bound_enforce']:
+        while ((self._iter_count < maxiter and norm > atol and norm / norm0 > rtol and
+                not stalled) or force_one_iteration):
+
+            if system.under_complex_step:
+                force_one_iteration = False
+
+            with Recording(type(self).__name__, self._iter_count, self) as rec:
+                ls = self.linesearch
+                if stall_count == 3 and ls and not ls.options['print_bound_enforce']:
 
                     self.linesearch.options['print_bound_enforce'] = True
 
@@ -643,11 +771,11 @@ class NonlinearSolver(Solver):
                     else:
                         pathname = ""
 
-                    msg = (f"Your model has stalled three times and may be violating the bounds. "
-                           f"In the future, turn on print_bound_enforce in your solver options "
+                    msg = ("Your model has stalled three times and may be violating the bounds."
+                           " In the future, turn on print_bound_enforce in your solver options "
                            f"here: \n{pathname}nonlinear_solver.linesearch.options"
-                           f"['print_bound_enforce']=True. "
-                           f"\nThe bound(s) being violated now are:\n")
+                           "['print_bound_enforce']=True. \nThe bound(s) being violated now "
+                           "are:\n")
                     issue_warning(msg, category=SolverWarning)
 
                     self._single_iteration()
@@ -667,19 +795,17 @@ class NonlinearSolver(Solver):
 
                 # Check if convergence is stalled.
                 if stall_limit > 0:
-                    rel_norm = rec.rel
-                    norm_diff = np.abs(stall_norm - rel_norm)
+                    norm_for_stall = rec.rel if stall_tol_type == 'rel' else rec.abs
+                    norm_diff = np.abs(stall_norm - norm_for_stall)
                     if norm_diff <= stall_tol:
                         stall_count += 1
                         if stall_count >= stall_limit:
                             stalled = True
                     else:
                         stall_count = 0
-                        stall_norm = rel_norm
+                        stall_norm = norm_for_stall
 
             self._mpi_print(self._iter_count, norm, norm / norm0)
-
-        system = self._system()
 
         # flag for the print statements. we only print on root if USE_PROC_FILES is not set to True
         print_flag = system.comm.rank == 0 or os.environ.get('USE_PROC_FILES')
@@ -689,33 +815,17 @@ class NonlinearSolver(Solver):
         # Solver terminated early because a Nan in the norm doesn't satisfy the while-loop
         # conditionals.
         if np.isinf(norm) or np.isnan(norm):
-            msg = "Solver '{}' on system '{}': residuals contain 'inf' or 'NaN' after {} " + \
-                  "iterations."
-            if iprint > -1 and print_flag:
-                print(prefix + msg.format(self.SOLVER, system.pathname,
-                                          self._iter_count))
+            self._inf_nan_failure()
 
-            # Raise AnalysisError if requested.
-            if self.options['err_on_non_converge']:
-                raise AnalysisError(msg.format(self.SOLVER, system.pathname,
-                                               self._iter_count))
+        # solver stalled.
+        elif stalled:
+            msg = (f"Solver '{self.SOLVER}' on system '{system.pathname}' stalled after "
+                   f"{self._iter_count} iterations.")
+            self.report_failure(msg)
 
         # Solver hit maxiter without meeting desired tolerances.
-        # Or solver stalled.
-        elif stalled or (norm > atol and norm / norm0 > rtol):
-
-            if stalled:
-                msg = "Solver '{}' on system '{}' stalled after {} iterations."
-            else:
-                msg = "Solver '{}' on system '{}' failed to converge in {} iterations."
-
-            if print_flag and iprint > -1:
-                print(prefix + msg.format(self.SOLVER, system.pathname, self._iter_count))
-
-            # Raise AnalysisError if requested.
-            if self.options['err_on_non_converge']:
-                raise AnalysisError(msg.format(self.SOLVER, system.pathname,
-                                               self._iter_count))
+        elif norm > atol and norm / norm0 > rtol:
+            self._convergence_failure()
 
         # Solver converged
         elif print_flag:
@@ -779,7 +889,7 @@ class NonlinearSolver(Solver):
         Perform a Gauss-Seidel iteration over this Solver's subsystems.
         """
         system = self._system()
-        for subsys, _ in system._subsystems_allprocs.values():
+        for subsys in system._relevance.filter(system._all_subsystem_iter()):
             system._transfer('nonlinear', 'fwd', subsys.name)
 
             if subsys._is_local:
@@ -798,6 +908,7 @@ class NonlinearSolver(Solver):
         if the 'restart_from_successful' option is True.
         """
         system = self._system()
+
         if (self.options['restart_from_successful'] and self.options['maxiter'] > 1 and
                 not system.under_approx):
             try:
@@ -805,6 +916,9 @@ class NonlinearSolver(Solver):
                 # the outputs using the cache.
                 if self._prev_fail and self._output_cache is not None:
                     system._outputs.set_val(self._output_cache)
+                    self._restarted = True
+                else:
+                    self._restarted = False
 
                 self.solve()
 
@@ -836,8 +950,6 @@ class LinearSolver(Solver):
 
     Attributes
     ----------
-    _rel_systems : set of str
-        Names of systems relevant to the current solve.
     _assembled_jac : AssembledJacobian or None
         If not None, the AssembledJacobian instance used by this solver.
     _scope_in : set or None or _UNDEFINED
@@ -850,7 +962,6 @@ class LinearSolver(Solver):
         """
         Initialize all attributes.
         """
-        self._rel_systems = None
         self._assembled_jac = None
         self._scope_out = _UNDEFINED
         self._scope_in = _UNDEFINED
@@ -925,7 +1036,7 @@ class LinearSolver(Solver):
         mode : str
             'fwd' or 'rev'.
         rel_systems : set of str
-            Set of names of relevant systems based on the current linear solve.
+            Set of names of relevant systems based on the current linear solve.  Deprecated.
         """
         raise NotImplementedError("class %s does not implement solve()." % (type(self).__name__))
 
@@ -945,9 +1056,12 @@ class LinearSolver(Solver):
 
         self._norm0 = norm0
 
+        system = self._system()
+
         self._mpi_print(self._iter_count, norm, norm / norm0)
 
         while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol:
+
             with Recording(type(self).__name__, self._iter_count, self) as rec:
                 self._single_iteration()
                 self._iter_count += 1
@@ -962,8 +1076,6 @@ class LinearSolver(Solver):
 
             self._mpi_print(self._iter_count, norm, norm / norm0)
 
-        system = self._system()
-
         # flag for the print statements. we only print on root if USE_PROC_FILES is not set to True
         print_flag = system.comm.rank == 0 or os.environ.get('USE_PROC_FILES')
 
@@ -972,35 +1084,18 @@ class LinearSolver(Solver):
         # Solver terminated early because a Nan in the norm doesn't satisfy the while-loop
         # conditionals.
         if np.isinf(norm) or np.isnan(norm):
-            msg = "Solver '{}' on system '{}': residuals contain 'inf' or 'NaN' after {} " + \
-                  "iterations."
-            if iprint > -1 and print_flag:
-                print(prefix + msg.format(self.SOLVER, system.pathname,
-                                          self._iter_count))
-
-            # Raise AnalysisError if requested.
-            if self.options['err_on_non_converge']:
-                raise AnalysisError(msg.format(self.SOLVER, system.pathname,
-                                               self._iter_count))
+            self._inf_nan_failure()
 
         # Solver hit maxiter without meeting desired tolerances.
         elif (norm > atol and norm / norm0 > rtol):
-            msg = "Solver '{}' on system '{}' failed to converge in {} iterations."
-
-            if iprint > -1 and print_flag:
-                print(prefix + msg.format(self.SOLVER, system.pathname,
-                                          self._iter_count))
-
-            # Raise AnalysisError if requested.
-            if self.options['err_on_non_converge']:
-                raise AnalysisError(msg.format(self.SOLVER, system.pathname,
-                                               self._iter_count))
+            self._convergence_failure()
 
         # Solver converged
-        elif iprint == 1 and print_flag:
-            print(prefix + ' Converged in {} iterations'.format(self._iter_count))
-        elif iprint == 2 and print_flag:
-            print(prefix + ' Converged')
+        elif print_flag:
+            if iprint == 1:
+                print(prefix + ' Converged in {} iterations'.format(self._iter_count))
+            elif iprint == 2:
+                print(prefix + ' Converged')
 
     def _run_apply(self):
         """
@@ -1012,8 +1107,7 @@ class LinearSolver(Solver):
         scope_out, scope_in = system._get_matvec_scope()
 
         try:
-            system._apply_linear(self._assembled_jac, self._rel_systems,
-                                 self._mode, scope_out, scope_in)
+            system._apply_linear(self._assembled_jac, self._mode, scope_out, scope_in)
         finally:
             self._recording_iter.pop()
 
@@ -1073,8 +1167,7 @@ class BlockLinearSolver(LinearSolver):
             depth of the current system (already incremented).
         """
         super()._setup_solvers(system, depth)
-        if system._use_derivatives:
-            self._create_rhs_vec()
+        self._rhs_vec = None
 
     def _create_rhs_vec(self):
         system = self._system()
@@ -1084,11 +1177,14 @@ class BlockLinearSolver(LinearSolver):
             self._rhs_vec = system._doutputs.asarray(True)
 
     def _update_rhs_vec(self):
+        if self._rhs_vec is None:
+            self._create_rhs_vec()
+
         if self._mode == 'fwd':
             self._rhs_vec[:] = self._system()._dresiduals.asarray()
         else:
             self._rhs_vec[:] = self._system()._doutputs.asarray()
-        # print("Updating RHS vec to", self._rhs_vec)
+        # print(self._system().pathname, "Updating RHS vec to", self._rhs_vec)  # DO NOT DELETE
 
     def _set_complex_step_mode(self, active):
         """
@@ -1101,6 +1197,8 @@ class BlockLinearSolver(LinearSolver):
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
+        if self._rhs_vec is None:
+            self._create_rhs_vec()
         if active:
             self._rhs_vec = self._rhs_vec.astype(complex)
         else:
@@ -1142,7 +1240,7 @@ class BlockLinearSolver(LinearSolver):
         self._recording_iter.push(('_run_apply', 0))
         try:
             scope_out, scope_in = system._get_matvec_scope()
-            system._apply_linear(self._assembled_jac, self._rel_systems, self._mode,
+            system._apply_linear(self._assembled_jac, self._mode,
                                  self._vars_union(self._scope_out, scope_out),
                                  self._vars_union(self._scope_in, scope_in))
         finally:
@@ -1214,10 +1312,10 @@ class BlockLinearSolver(LinearSolver):
         mode : str
             'fwd' or 'rev'.
         rel_systems : set of str
-            Set of names of relevant systems based on the current linear solve.
+            Set of names of relevant systems based on the current linear solve.  Deprecated.
         """
-        self._rel_systems = rel_systems
         self._mode = mode
-        self._solve()
-
-        self._scope_out = self._scope_in = _UNDEFINED  # reset after solve is done
+        try:
+            self._solve()
+        finally:
+            self._scope_out = self._scope_in = _UNDEFINED  # reset after solve is done

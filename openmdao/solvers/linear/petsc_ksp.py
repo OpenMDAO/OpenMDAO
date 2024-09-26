@@ -1,10 +1,9 @@
 """LinearSolver that uses PetSC KSP to solve for a system's derivatives."""
 
 import numpy as np
-import os
-import sys
 
 from openmdao.solvers.solver import LinearSolver
+from openmdao.solvers.linear.linear_rhs_checker import LinearRHSChecker
 from openmdao.utils.mpi import check_mpi_env
 
 use_mpi = check_mpi_env()
@@ -179,6 +178,8 @@ class PETScKrylov(LinearSolver):
         Preconditioner for linear solve. Default is None for no preconditioner.
     _ksp : dist
         Dictionary of KSP instances (keyed on vector name).
+    _lin_rhs_checker : LinearRHSChecker or None
+        Object for checking the right-hand side of the linear solve.
     """
 
     SOLVER = 'LN: PETScKrylov'
@@ -193,11 +194,9 @@ class PETScKrylov(LinearSolver):
             raise RuntimeError(f"{self.msginfo}: PETSc is not available. "
                                "Set shell variable OPENMDAO_USE_MPI=1 to detect earlier.")
 
-        # initialize dictionary of KSP instances (keyed on vector name)
         self._ksp = None
-
-        # initialize preconditioner to None
         self.precon = None
+        self._lin_rhs_checker = None
 
     def _declare_options(self):
         """
@@ -215,8 +214,17 @@ class PETScKrylov(LinearSolver):
         self.options.declare('precon_side', default='right', values=['left', 'right'],
                              desc='Preconditioner side, default is right.')
 
+        self.options.declare('rhs_checking', types=(bool, dict),
+                             default=False,
+                             desc="If True, check RHS vs. cache and/or zero to avoid some solves."
+                             "Can also be set to a dict of options for the LinearRHSChecker to "
+                             "allow finer control over it. Allowed options are: "
+                             f"{LinearRHSChecker.options}")
+
         # changing the default maxiter from the base class
         self.options['maxiter'] = 100
+
+        self.supports['implicit_components'] = True
 
     def _assembled_jac_solver_iter(self):
         """
@@ -227,6 +235,17 @@ class PETScKrylov(LinearSolver):
         if self.precon is not None:
             for s in self.precon._assembled_jac_solver_iter():
                 yield s
+
+    def use_relevance(self):
+        """
+        Return True if relevance should be active.
+
+        Returns
+        -------
+        bool
+            True if relevance should be active.
+        """
+        return False
 
     def _setup_solvers(self, system, depth):
         """
@@ -243,6 +262,9 @@ class PETScKrylov(LinearSolver):
 
         if self.precon is not None:
             self.precon._setup_solvers(self._system(), self._depth + 1)
+
+        self._lin_rhs_checker = LinearRHSChecker.create(self._system(),
+                                                        self.options['rhs_checking'])
 
     def _set_solver_print(self, level=2, type_='all'):
         """
@@ -300,8 +322,7 @@ class PETScKrylov(LinearSolver):
 
         # apply linear
         scope_out, scope_in = system._get_matvec_scope()
-        system._apply_linear(self._assembled_jac, self._rel_systems, self._mode,
-                             scope_out, scope_in)
+        system._apply_linear(self._assembled_jac, self._mode, scope_out, scope_in)
 
         # stuff resulting value of b vector into result for KSP
         result.array[:] = b_vec.asarray()
@@ -315,8 +336,7 @@ class PETScKrylov(LinearSolver):
         bool
             Flag for indicating child linerization
         """
-        precon = self.precon
-        return (precon is not None) and (precon._linearize_children())
+        return (self.precon is not None) and (self.precon._linearize_children())
 
     def _linearize(self):
         """
@@ -324,6 +344,9 @@ class PETScKrylov(LinearSolver):
         """
         if self.precon is not None:
             self.precon._linearize()
+
+        if self._lin_rhs_checker is not None:
+            self._lin_rhs_checker.clear()
 
     def solve(self, mode, rel_systems=None):
         """
@@ -336,9 +359,8 @@ class PETScKrylov(LinearSolver):
         mode : str
             Derivative mode, can be 'fwd' or 'rev'.
         rel_systems : set of str
-            Names of systems relevant to the current solve.
+            Names of systems relevant to the current solve.  Deprecated.
         """
-        self._rel_systems = rel_systems
         self._mode = mode
 
         system = self._system()
@@ -360,13 +382,21 @@ class PETScKrylov(LinearSolver):
             x_vec = system._dresiduals
             b_vec = system._doutputs
 
-        # create numpy arrays to interface with PETSc
-        sol_array = x_vec.asarray(copy=True)
+            if self._lin_rhs_checker is not None:
+                sol_array, is_zero = self._lin_rhs_checker.get_solution(b_vec.asarray(), system)
+                if is_zero:
+                    x_vec.set_val(0.0)
+                    return
+                if sol_array is not None:
+                    x_vec.set_val(sol_array)
+                    return
+
         rhs_array = b_vec.asarray(copy=True)
+        sol_array = x_vec.asarray(copy=True)
 
         # create PETSc vectors from numpy arrays
-        sol_petsc_vec = PETSc.Vec().createWithArray(sol_array, comm=system.comm)
-        rhs_petsc_vec = PETSc.Vec().createWithArray(rhs_array, comm=system.comm)
+        sol_petsc_vec = PETSc.Vec().createWithArray(sol_array, comm=system._comm)
+        rhs_petsc_vec = PETSc.Vec().createWithArray(rhs_array, comm=system._comm)
 
         # run PETSc solver
         self._iter_count = 0
@@ -377,7 +407,17 @@ class PETScKrylov(LinearSolver):
         # stuff the result into the x vector
         x_vec.set_val(sol_array)
 
+        # as of petsc4py v3.20, the 'converged' attribute has been renamed to 'is_converged'
+        if hasattr(self._ksp, 'is_converged'):
+            if not self._ksp.is_converged:
+                self._convergence_failure()
+        elif not self._ksp.converged:
+            self._convergence_failure()
+
         sol_petsc_vec = rhs_petsc_vec = None
+
+        if not system.under_complex_step and self._lin_rhs_checker is not None and mode == 'rev':
+            self._lin_rhs_checker.add_solution(rhs_array, sol_array, copy=False)
 
     def apply(self, mat, in_vec, result):
         """

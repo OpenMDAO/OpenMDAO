@@ -1,0 +1,8 @@
+repos:
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  # Ruff version (update periodically by running 'pre-commit autoupdate')
+  rev: v0.6.1
+  hooks:
+    # Run the linter.
+    - id: ruff
+      types_or: [ python, pyi, jupyter ]

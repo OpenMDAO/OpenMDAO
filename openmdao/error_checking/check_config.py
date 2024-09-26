@@ -11,13 +11,11 @@ import pickle
 from openmdao.core.group import Group
 from openmdao.core.component import Component
 from openmdao.core.implicitcomponent import ImplicitComponent
-from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.graph_utils import get_sccs_topo
-from openmdao.utils.logger_utils import get_logger
-from openmdao.utils.class_util import overrides_method
+from openmdao.utils.logger_utils import get_logger, TestLogger
 from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook
-from openmdao.utils.general_utils import printoptions, ignore_errors
+from openmdao.utils.general_utils import printoptions
 from openmdao.utils.units import _has_val_mismatch
 from openmdao.utils.file_utils import _load_and_exec, text2html
 from openmdao.utils.om_warnings import issue_warning, SetupWarning
@@ -55,7 +53,10 @@ def _check_cycles(group, infos=None):
               for s in sccs if len(s) > 1]
 
     if cycles and infos is not None:
-        infos.append("   Group '%s' has the following cycles: %s\n" % (group.pathname, cycles))
+        infos.append(f"   Group '{group.pathname}' has the following cycles:")
+        for cycle in cycles:
+            infos.append(f"      {cycle}")
+        infos.append('')
 
     return cycles
 
@@ -71,34 +72,50 @@ def _check_ubcs(group, warnings):
     warnings : list
         List to collect warning messages.
     """
-    cycles = _check_cycles(group)
+    out_of_order = group._check_order(reorder=False, recurse=False)
+    for syspath, conns in out_of_order.items():
+        prefix = f"   In System '{syspath}', subsystem " if syspath else "   System "
+        for tgt, srcs in conns.items():
+            warnings.append(f"{prefix}'{tgt}' executes out-of-order "
+                            f"with respect to its source systems {srcs}\n")
 
-    cycle_idxs = {}
+    parallel_solvers = {}
+    allsubs = group._subsystems_allprocs
+    for sub, _ in allsubs.values():
+        if hasattr(sub, '_mpi_proc_allocator') and sub._mpi_proc_allocator.parallel:
+            parallel_solvers[sub.name] = sub.nonlinear_solver.SOLVER
 
-    for i, cycle in enumerate(cycles):
-        # keep track of cycles so we can detect when a system in
-        # one cycle is out of order with a system in a different cycle.
-        for s in cycle:
-            cycle_idxs[s] = i
+    if parallel_solvers:
+        _check_parallel_solvers(group, parallel_solvers)
 
-    ubcs = _get_used_before_calc_subs(group, group._conn_global_abs_in2out)
 
-    for tgt_system, src_systems in sorted(ubcs.items()):
-        keep_srcs = []
+def _check_parallel_solvers(group, parallel_solvers):
+    """
+    Report any parallel groups that don't have the proper solver.
 
-        for src_system in src_systems:
-            if (src_system not in cycle_idxs or
-                    tgt_system not in cycle_idxs or
-                    cycle_idxs[tgt_system] != cycle_idxs[src_system]):
-                keep_srcs.append(src_system)
+    Parameters
+    ----------
+    group : <Group>
+        The Group being checked.
+    parallel_solvers : dict
+        Dictionary of parallel solvers keyed by subsystem names.
+    """
+    glen = len(group.pathname.split('.')) if group.pathname else 0
 
-        if keep_srcs:
-            if group.pathname:
-                tgt_system = '.'.join((group.pathname, tgt_system))
-                keep_srcs = ['.'.join((group.pathname, n)) for n in keep_srcs]
-            warnings.append("   System '%s' executes out-of-order with "
-                            "respect to its source systems %s\n" %
-                            (tgt_system, sorted(keep_srcs)))
+    for tgt_abs, src_abs in group._conn_global_abs_in2out.items():
+        iparts = tgt_abs.split('.')
+        oparts = src_abs.split('.')
+        src_sys = oparts[glen]
+        tgt_sys = iparts[glen]
+        hierarchy_check = oparts[glen + 1] == iparts[glen + 1]
+
+        if (src_sys in parallel_solvers and tgt_sys in parallel_solvers and
+                (parallel_solvers[src_sys] not in ["NL: NLBJ", "NL: Newton", "NL: BROYDEN"]) and
+                src_sys == tgt_sys and
+                not hierarchy_check):
+            issue_warning("Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver to "
+                          f"'{src_sys}' when connecting components inside parallel groups",
+                          category=SetupWarning)
 
 
 def _check_cycles_prob(prob, logger):
@@ -113,12 +130,14 @@ def _check_cycles_prob(prob, logger):
         The object that manages logging output.
 
     """
-    infos = ["The following groups contain cycles:\n"]
+    infos = ["The following groups contain cycles:"]
     for group in prob.model.system_iter(include_self=True, recurse=True, typ=Group):
         _check_cycles(group, infos)
 
     if len(infos) > 1:
-        logger.info(''.join(infos[:1] + sorted(infos[1:])))
+        logger.info(infos[0])
+        for i in range(1, len(infos)):
+            logger.info(infos[i])
 
 
 def _check_ubcs_prob(prob, logger):
@@ -139,57 +158,6 @@ def _check_ubcs_prob(prob, logger):
 
     if len(warnings) > 1:
         logger.warning(''.join(warnings[:1] + sorted(warnings[1:])))
-
-
-def _get_used_before_calc_subs(group, input_srcs):
-    """
-    Return Systems that are executed out of dataflow order.
-
-    Parameters
-    ----------
-    group : <Group>
-        The Group where we're checking subsystem order.
-    input_srcs : {}
-        dict containing variable abs names for sources of the inputs.
-        This describes all variable connections, either explicit or implicit,
-        in the entire model.
-
-    Returns
-    -------
-    dict
-        A dict mapping names of target Systems to a set of names of their
-        source Systems that execute after them.
-    """
-    parallel_solver = {}
-    allsubs = group._subsystems_allprocs
-    for sub, i in allsubs.values():
-        if hasattr(sub, '_mpi_proc_allocator') and sub._mpi_proc_allocator.parallel:
-            parallel_solver[sub.name] = sub.nonlinear_solver.SOLVER
-
-    glen = len(group.pathname.split('.')) if group.pathname else 0
-
-    ubcs = defaultdict(set)
-    for tgt_abs, src_abs in input_srcs.items():
-        if src_abs is not None:
-            iparts = tgt_abs.split('.')
-            oparts = src_abs.split('.')
-            src_sys = oparts[glen]
-            tgt_sys = iparts[glen]
-            hierarchy_check = True if oparts[glen + 1] == iparts[glen + 1] else False
-
-            if (src_sys in parallel_solver and tgt_sys in parallel_solver and
-                    (parallel_solver[src_sys] not in ["NL: NLBJ", "NL: Newton", "BROYDEN"]) and
-                    src_sys == tgt_sys and
-                    not hierarchy_check):
-                msg = f"Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver " \
-                      f"to '{src_sys}' when connecting components inside parallel groups"
-                issue_warning(msg, category=SetupWarning)
-                ubcs[tgt_abs.rsplit('.', 1)[0]].add(src_abs.rsplit('.', 1)[0])
-            if (src_sys in allsubs and tgt_sys in allsubs and
-                    (allsubs[src_sys].index > allsubs[tgt_sys].index)):
-                ubcs[tgt_sys].add(src_sys)
-
-    return ubcs
 
 
 def _check_dup_comp_inputs(problem, logger):
@@ -395,6 +363,29 @@ def _check_system_configs(problem, logger):
         system.check_config(logger)
 
 
+def _has_ancestor_solver(path, solvers):
+    """
+    Return True if the given path has an ancestor with a solver.
+
+    Parameters
+    ----------
+    path : str
+        The path to the system being checked.
+    solvers : dict
+        Dictionary of solvers keyed by system pathname.
+
+    Returns
+    -------
+    bool
+        True if the given path has an ancestor with a solver.
+    """
+    while path:
+        path, _, _ = path.rpartition('.')
+        if path in solvers:
+            return True
+    return False
+
+
 def _check_solvers(problem, logger):
     """
     Search over all solvers and warn about unsupported configurations.
@@ -412,74 +403,82 @@ def _check_solvers(problem, logger):
     logger : object
         The object that manages logging output.
     """
-    iter_nl_depth = iter_ln_depth = np.inf
+    from openmdao.core.group import Group, iter_solver_info
+    from openmdao.core.implicitcomponent import ImplicitComponent
 
-    for sys in problem.model.system_iter(include_self=True, recurse=True):
-        path = sys.pathname
-        depth = 0 if path == '' else len(path.split('.'))
+    has_nl_solver = {}
+    has_lin_solver = {}
+    group = problem.model
+    lst = []
 
-        # if this system is below both a nonlinear and linear solver, then skip checks
-        if (depth > iter_nl_depth) and (depth > iter_ln_depth):
-            continue
+    for tup in group._sys_tree_visitor(iter_solver_info,
+                                       predicate=lambda s: isinstance(s,
+                                                                      (Group, ImplicitComponent))):
+        path, pathclass, sccs, lnslv, nlslv, lnmaxiter, nlmaxiter, missing, isgrp, \
+            nl_cansolve, lin_cansolve = tup
 
-        # determine if this system is a group and has cycles
-        if isinstance(sys, Group):
-            graph = sys.compute_sys_graph(comps_only=False)
-            sccs = get_sccs_topo(graph)
-            allsubs = sys._subsystems_allprocs
-            has_cycles = [sorted(s, key=lambda n: allsubs[n].index) for s in sccs if len(s) > 1]
-        else:
-            has_cycles = []
+        if isgrp:
+            lst.append(tup)
 
-        # determine if this system has states (is an implicit component)
-        has_states = isinstance(sys, ImplicitComponent)
+        if not isgrp or sccs:  # a group with cycles or an implicit component
+            missing = []
+            if not nl_cansolve and not _has_ancestor_solver(path, has_nl_solver):
+                missing.append('nonlinear')
+            if not lin_cansolve and not _has_ancestor_solver(path, has_lin_solver):
+                missing.append('linear')
 
-        # determine if this system has iterative solvers or implements the solve methods
-        # for handling cycles and implicit components
-        if depth > iter_nl_depth:
-            is_iter_nl = True
-        else:
-            is_iter_nl = (
-                (sys.nonlinear_solver and 'maxiter' in sys.nonlinear_solver.options) or
-                (has_states and overrides_method('solve_nonlinear', sys, ImplicitComponent))
-            )
-            iter_nl_depth = depth if is_iter_nl else np.inf
+            if missing:
+                missing = ' or '.join(missing)
 
-        if depth > iter_ln_depth:
-            is_iter_ln = True
-        else:
-            is_iter_ln = (
-                (sys.linear_solver and
-                 ('maxiter' in sys.linear_solver.options or
-                  isinstance(sys.linear_solver, DirectSolver))) or
-                (has_states and overrides_method('solve_linear', sys, ImplicitComponent))
-            )
-            iter_ln_depth = depth if is_iter_ln else np.inf
-
-        # if there are cycles, then check for iterative nonlinear and linear solvers
-        if has_cycles:
-            if not is_iter_nl:
-                msg = ("Group '%s' contains cycles %s, but does not have an iterative "
-                       "nonlinear solver." % (path, has_cycles))
-                logger.warning(msg)
-            if not is_iter_ln:
-                msg = ("Group '%s' contains cycles %s, but does not have an iterative "
-                       "linear solver." % (path, has_cycles))
+                if isgrp:
+                    sccs = [tuple(sorted(s)) for s in sccs]
+                    msg = (f"Group '{path}' contains cycles {sccs}, but does not have an iterative "
+                           f"{missing} solver.")
+                else:
+                    fncs = []
+                    if 'nonlinear' in missing and nlslv != 'solve_nonlinear':
+                        fncs.append('solve_nonlinear')
+                    if 'linear' in missing and lnslv != 'solve_linear':
+                        fncs.append('solve_linear')
+                    fncs = ' or '.join(fncs)
+                    msg = (f"{pathclass} '{path}' contains implicit variables but does "
+                           f"not implement {fncs} or have an iterative {missing} solver.")
                 logger.warning(msg)
 
-        # if there are implicit components, check for iterative solvers or the appropriate
-        # solve methods
-        if has_states:
-            if not is_iter_nl:
-                msg = ("%s '%s' contains implicit variables, but does not have an "
-                       "iterative nonlinear solver and does not implement 'solve_nonlinear'." %
-                       (sys.__class__.__name__, path))
-                logger.warning(msg)
-            if not is_iter_ln:
-                msg = ("%s '%s' contains implicit variables, but does not have an "
-                       "iterative linear solver and does not implement 'solve_linear'." %
-                       (sys.__class__.__name__, path))
-                logger.warning(msg)
+        if isgrp and lin_cansolve:
+            has_lin_solver[path] = (lnslv, lnmaxiter)
+        if isgrp and nl_cansolve:
+            has_nl_solver[path] = (nlslv, nlmaxiter)
+
+    seen = set()
+    lines = []
+    for tup in lst:
+        path, pathclass, sccs, lnslv, nlslv, lnmaxiter, nlmaxiter, missing, _, \
+            _, _ = tup
+        if sccs:
+            if pathclass in seen:
+                continue
+            if missing == 0 and len(sccs) == 1:
+                continue  # don't show groups without sub-cycles
+
+            seen.add(pathclass)
+            lines.append(f"'{path}' ({pathclass})  NL: {nlslv} (maxiter={nlmaxiter}), LN: "
+                         f"{lnslv} (maxiter={lnmaxiter}):")
+
+            for i, scc in enumerate(sccs):
+                lines.append(f"   Cycle {i}: {sorted(scc)}")
+            if missing:
+                lines.append(f"   Number of non-cycle subsystems: {missing}")
+            lines.append('')
+
+    if lines:
+        final = []
+        final.append("The following groups contain sub-cycles. Performance and/or convergence "
+                     "may improve")
+        final.append("if these sub-cycles are solved separately in their own group.")
+        final.append('')
+        final.extend(lines)
+        logger.warning('\n'.join(final))
 
 
 def _check_missing_recorders(problem, logger):
@@ -646,7 +645,7 @@ _default_checks = {
     'missing_recorders': _check_missing_recorders,
     'unserializable_options': _check_unserializable_options,
     'comp_has_no_outputs': _check_comp_has_no_outputs,
-    'auto_ivc_warnings': _check_auto_ivc_warnings
+    'auto_ivc_warnings': _check_auto_ivc_warnings,
 }
 
 _all_checks = _default_checks.copy()
@@ -708,7 +707,8 @@ class _Log2File(object):
 
 def _run_check_report(prob):
     s = StringIO()
-    for c in _get_checks(prob._check):
+    chk = prob._check if prob._check is not None else True
+    for c in _get_checks(chk):
         if c not in _all_checks:
             print(f"WARNING: '{c}' is not a recognized check.  Available checks are: "
                   f"{sorted(_all_checks)}")
@@ -719,7 +719,7 @@ def _run_check_report(prob):
 
     output = s.getvalue()
     if output:
-        path = pathlib.Path(prob.get_reports_dir()).joinpath('checks.html')
+        path = pathlib.Path(prob.get_reports_dir() / 'checks.html')
         with open(path, 'w') as f:
             f.write(text2html(output))
 
@@ -747,25 +747,28 @@ def _check_config_cmd(options, user_args):
         The post-setup hook function.
     """
     def _check_config(prob):
-        if not MPI or MPI.COMM_WORLD.rank == 0:
+        if not options.checks:
+            options.checks = sorted(_default_checks)
+        elif 'all' in options.checks:
+            options.checks = sorted(_all_non_redundant_checks)
+
+        if not MPI or prob.comm.rank == 0:
             if options.outfile is None:
                 logger = get_logger('check_config', out_stream='stdout',
                                     out_file=None, use_format=True)
             else:
                 logger = get_logger('check_config', out_file=options.outfile, use_format=True)
+        else:
+            # if not rank 0, don't display anything, but still do the config check to prevent
+            # any MPI hangs due to collective calls
+            logger = TestLogger()
 
-            if not options.checks:
-                options.checks = sorted(_default_checks)
-            elif 'all' in options.checks:
-                options.checks = sorted(_all_non_redundant_checks)
-
-            prob.check_config(logger, options.checks)
+        prob.check_config(logger, options.checks)
 
     # register the hook
     _register_hook('final_setup', class_name='Problem', inst_id=options.problem, post=_check_config,
                    exit=True)
 
-    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 

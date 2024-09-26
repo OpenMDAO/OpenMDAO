@@ -90,7 +90,7 @@ class ProcAllocator(object):
                                           np.array(list(range(nsubs)))[min_procs > nproc])
 
             # This is a serial group - all procs get all subsystems
-            return list(range(nsubs)), comm, (0, comm.size)
+            return list(range(nsubs)), comm
 
     def _split_proc_info(self, proc_info, comm):
         """
@@ -170,8 +170,6 @@ class ProcAllocator(object):
                     rimap.append(gimap[ridx])
                 else:
                     rimap.append([ridx])
-
-            print("RIMAP:", rimap)
         else:
             rimap = None
 

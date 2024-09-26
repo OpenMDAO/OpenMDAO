@@ -11,6 +11,7 @@ import numpy as np
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
 from openmdao.utils.logger_utils import TestLogger
+from openmdao.utils.testing_utils import force_check_partials
 
 
 class MetaModelTestCase(unittest.TestCase):
@@ -441,9 +442,7 @@ class MetaModelTestCase(unittest.TestCase):
         prob['x'] = 0.125
         prob.run_model()
 
-        mm._no_check_partials = False  # override skipping of check_partials
-
-        data = prob.check_partials(out_stream=None)
+        data = force_check_partials(prob, out_stream=None)
 
         Jf = data['mm'][('f', 'x')]['J_fwd']
 
@@ -454,7 +453,7 @@ class MetaModelTestCase(unittest.TestCase):
         # Complex step
         prob.setup(force_alloc_complex=True)
         prob.model.mm.set_check_partial_options(wrt='*', method='cs')
-        data = prob.check_partials(out_stream=None)
+        data = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(data, atol=1e-11, rtol=1e-11)
 
@@ -540,7 +539,36 @@ class MetaModelTestCase(unittest.TestCase):
                          np.array(.5*np.sin(prob['trig.x'])),
                          1e-4)
 
-        data = prob.check_partials(out_stream=None)
+        data = force_check_partials(prob, out_stream=None)
+
+        assert_check_partials(data, atol=1e-6, rtol=1e-6)
+
+    def test_vectorized_cs(self):
+        size = 3
+
+        # create a vectorized MetaModelUnStructuredComp for sine
+        trig = om.MetaModelUnStructuredComp(vec_size=size, default_surrogate=om.KrigingSurrogate())
+        trig.add_input('x', np.zeros(size))
+        trig.add_output('y', np.zeros(size))
+
+        # add it to a Problem
+        prob = om.Problem()
+        prob.model.add_subsystem('trig', trig)
+        prob.setup(force_alloc_complex=True)
+        prob.model.trig.set_check_partial_options(wrt='*', method='cs')
+
+        # provide training data
+        trig.options['train_x'] = np.linspace(0, 10, 20)
+        trig.options['train_y'] = .5*np.sin(trig.options['train_x'])
+
+        # train the surrogate and check predicted value
+        prob['trig.x'] = np.array([2.1, 3.2, 4.3])
+        prob.run_model()
+        assert_near_equal(prob['trig.y'],
+                         np.array(.5*np.sin(prob['trig.x'])),
+                         1e-4)
+
+        data = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(data, atol=1e-6, rtol=1e-6)
 
@@ -614,14 +642,14 @@ class MetaModelTestCase(unittest.TestCase):
 
         prob.run_model()
 
-        data = prob.check_partials(out_stream=None)
+        data = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(data, atol=1e-5, rtol=1e-5)
 
         # Complex step
         prob.setup(force_alloc_complex=True)
         prob.model.mm.set_check_partial_options(wrt='*', method='cs')
-        data = prob.check_partials(out_stream=None)
+        data = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(data, atol=1e-11, rtol=1e-11)
 
@@ -740,7 +768,10 @@ class MetaModelTestCase(unittest.TestCase):
                 pass
 
             def predict(self, x):
-                return sin(x)
+                if x.size == 1:
+                    return sin(x.item())
+                else:
+                    return sin(x)
 
         class SinTwoInputsSurrogate(om.SurrogateModel):
             def train(self, x, y):
@@ -908,7 +939,10 @@ class MetaModelTestCase(unittest.TestCase):
                 pass
 
             def predict(self, x):
-                return sin(x)
+                if x.size == 1:
+                    return sin(x.item())
+                else:
+                    return sin(x)
 
         class TrigWithFdInSetup(om.MetaModelUnStructuredComp):
             def setup(self):

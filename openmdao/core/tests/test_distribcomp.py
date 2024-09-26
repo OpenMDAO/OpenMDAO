@@ -10,18 +10,12 @@ from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.array_utils import evenly_distrib_idxs, take_nth
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.om_warnings import DistributedComponentWarning
+from openmdao.utils.variable_table import NA
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
     PETScVector = None
-
-if MPI:
-    rank = MPI.COMM_WORLD.rank
-    commsize = MPI.COMM_WORLD.size
-else:
-    rank = 0
-    commsize = 1
 
 
 class InOutArrayComp(om.ExplicitComponent):
@@ -58,10 +52,10 @@ class DistribCompSimple(om.ExplicitComponent):
         self.add_output('outvec', np.ones(arr_size, float), distributed=True)
 
     def compute(self, inputs, outputs):
-        if MPI and self.comm != MPI.COMM_NULL:
-            if rank == 0:
+        if MPI and self.comm.size > 1:
+            if self.comm.rank == 0:
                 outvec = inputs['invec'] * 0.25
-            elif rank == 1:
+            else:
                 outvec = inputs['invec'] * 0.5
 
             # now combine vecs from different processes
@@ -83,9 +77,11 @@ class DistribInputComp(om.ExplicitComponent):
 
     def compute(self, inputs, outputs):
         if MPI:
+            out = np.ascontiguousarray(outputs['outvec'])
             self.comm.Allgatherv(inputs['invec']*2.0,
-                                 [outputs['outvec'], self.sizes,
+                                 [out, self.sizes,
                                   self.offsets, MPI.DOUBLE])
+            outputs.set_var('outvec', out)
         else:
             outputs['outvec'] = inputs['invec'] * 2.0
 
@@ -96,14 +92,11 @@ class DistribInputComp(om.ExplicitComponent):
         arr_size = self.options['arr_size']
 
         self.sizes, self.offsets = evenly_distrib_idxs(comm.size, arr_size)
-        start = self.offsets[rank]
-        end = start + self.sizes[rank]
 
-        self.add_input('invec', np.ones(self.sizes[rank], float), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
+        # src_indices will be computed automatically
+        self.add_input('invec', np.ones(self.sizes[rank], float), distributed=True)
         self.add_output('outvec', np.ones(arr_size, float), shape=np.int32(arr_size),
                         distributed=True)
-
 
 class DistribOverlappingInputComp(om.ExplicitComponent):
     """Uses 2 procs and takes input var slices"""
@@ -111,6 +104,8 @@ class DistribOverlappingInputComp(om.ExplicitComponent):
     def initialize(self):
         self.options.declare('arr_size', types=int, default=11,
                              desc="Size of input and output vectors.")
+        self.options.declare('local_size', types=int, default=1,
+                             desc="Local size of output vector.")
 
     def compute(self, inputs, outputs):
         outputs['outvec'][:] = 0
@@ -127,24 +122,11 @@ class DistribOverlappingInputComp(om.ExplicitComponent):
         """ component declares the local sizes and sets initial values
         for all distributed inputs and outputs"""
 
-        comm = self.comm
-        rank = comm.rank
-
         arr_size = self.options['arr_size']
-
-        # need to initialize the input to have the correct local size
-        if rank == 0:
-            size = 8
-            start = 0
-            end = 8
-        else:
-            size = 7
-            start = 4
-            end = 11
+        local_size = self.options['local_size']
 
         self.add_output('outvec', np.zeros(arr_size, float), distributed=True)
-        self.add_input('invec', np.ones(size, float), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
+        self.add_input('invec', np.ones(local_size, float), distributed=True)
 
 
 class DistribInputDistribOutputComp(om.ExplicitComponent):
@@ -166,10 +148,6 @@ class DistribInputDistribOutputComp(om.ExplicitComponent):
 
         sizes, offsets = evenly_distrib_idxs(comm.size, arr_size)
         self.sizes = sizes
-        self.offsets = offsets
-
-        start = offsets[rank]
-        end = start + sizes[rank]
 
         # don't set src_indices on the input and just use default behavior
         self.add_input('invec', np.ones(sizes[rank], float), distributed=True)
@@ -202,10 +180,6 @@ class DistribCompWithDerivs(om.ExplicitComponent):
 
         sizes, offsets = evenly_distrib_idxs(comm.size, arr_size)
         self.sizes = sizes
-        self.offsets = offsets
-
-        start = offsets[rank]
-        end = start + sizes[rank]
 
         # don't set src_indices on the input and just use default behavior
         self.add_input('invec', np.ones(sizes[rank], float), distributed=True)
@@ -227,29 +201,20 @@ class DistribInputDistribOutputDiscreteComp(DistribInputDistribOutputComp):
 
 
 class DistribNoncontiguousComp(om.ExplicitComponent):
-    """Uses 2 procs and takes non-contiguous input var slices and has output
-    var slices as well
-    """
+    """Used in tests of non-contiguous input var slices"""
 
     def initialize(self):
-        self.options.declare('arr_size', types=int, default=11,
+        self.options.declare('size', types=int,
                              desc="Size of input and output vectors.")
 
     def compute(self, inputs, outputs):
         outputs['outvec'] = inputs['invec']*2.0
 
     def setup(self):
+        size = self.options['size']
 
-        comm = self.comm
-        rank = comm.rank
-
-        arr_size = self.options['arr_size']
-
-        idxs = list(take_nth(rank, comm.size, range(arr_size)))
-
-        self.add_input('invec', np.ones(len(idxs), float), distributed=True,
-                       src_indices=idxs)
-        self.add_output('outvec', np.ones(len(idxs), float), distributed=True)
+        self.add_input('invec', np.ones(size, float), distributed=True)
+        self.add_output('outvec', np.ones(size, float), distributed=True)
 
 
 class DistribGatherComp(om.ExplicitComponent):
@@ -274,14 +239,11 @@ class DistribGatherComp(om.ExplicitComponent):
 
         arr_size = self.options['arr_size']
 
-        self.sizes, self.offsets = evenly_distrib_idxs(comm.size,
-                                                       arr_size)
-        start = self.offsets[rank]
-        end = start + self.sizes[rank]
+        self.sizes, self.offsets = evenly_distrib_idxs(comm.size, arr_size)
 
         # need to initialize the variable to have the correct local size
-        self.add_input('invec', np.ones(self.sizes[rank], float), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
+        # src_indices will be computed automatically
+        self.add_input('invec', np.ones(self.sizes[rank], float), distributed=True)
         self.add_output('outvec', np.ones(arr_size, float), distributed=True)
 
 
@@ -310,7 +272,7 @@ class NOMPITests(unittest.TestCase):
 
         p = om.Problem()
         top = p.model
-        C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
+        top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribInputComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
 
@@ -369,15 +331,15 @@ class DistributedIO(unittest.TestCase):
     N_PROCS = 2
 
     def test_driver_metadata(self):
-        self.comm = MPI.COMM_WORLD
-
         p = om.Problem()
+        comm = p.comm
+
         d_ivc = p.model.add_subsystem('distrib_ivc',
                                     om.IndepVarComp(distributed=True),
                                     promotes=['*'])
 
         # Sending different values to different ranks
-        if self.comm.rank == 0:
+        if comm.rank == 0:
             ndvs = 3
         else:
             ndvs = 2
@@ -457,7 +419,7 @@ class MPITests(unittest.TestCase):
 
         p = om.Problem()
         top = p.model
-        C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
+        top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribCompSimple(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
 
@@ -478,8 +440,8 @@ class MPITests(unittest.TestCase):
 
         p = om.Problem()
         top = p.model
-        C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
-        C2 = top.add_subsystem("C2", DistribCompWithDerivs(arr_size=size))
+        top.add_subsystem("C1", InOutArrayComp(arr_size=size))
+        top.add_subsystem("C2", DistribCompWithDerivs(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
 
         p.setup()
@@ -502,18 +464,18 @@ class MPITests(unittest.TestCase):
 
         class Model(om.Group):
             def setup(self):
-                C1 = self.add_subsystem("C1", InOutArrayComp(arr_size=size))
-                C2 = self.add_subsystem("C2", DistribCompSimple(arr_size=size))
+                self.add_subsystem("C1", InOutArrayComp(arr_size=size))
+                self.add_subsystem("C2", DistribCompSimple(arr_size=size))
                 self.connect('C1.outvec', 'C2.invec')
 
             def configure(self):
                 # verify list_inputs/list_outputs work in configure
-                inputs = self.C2.list_inputs(shape=True, values=True, out_stream=None)
-                outputs = self.C2.list_outputs(shape=True, values=True, out_stream=None)
+                inputs = self.C2.list_inputs(shape=True, val=True, out_stream=None)
+                outputs = self.C2.list_outputs(shape=True, val=True, out_stream=None)
                 verify(inputs, outputs, full_size=size*2, loc_size=size, pathnames=False, rank=0)
 
-                inputs = self.C2.list_inputs(shape=True, values=True, all_procs=True, out_stream=None)
-                outputs = self.C2.list_outputs(shape=True, values=True, all_procs=True, out_stream=None)
+                inputs = self.C2.list_inputs(shape=True, val=True, all_procs=True, out_stream=None)
+                outputs = self.C2.list_outputs(shape=True, val=True, all_procs=True, out_stream=None)
                 verify(inputs, outputs, full_size=size*2, loc_size=size, pathnames=False)
 
         p = om.Problem(Model())
@@ -540,12 +502,12 @@ class MPITests(unittest.TestCase):
         p.setup()
 
         # verify list_inputs/list_outputs work before final_setup
-        inputs = p.model.C2.list_inputs(shape=True, values=True, out_stream=None)
-        outputs = p.model.C2.list_outputs(shape=True, values=True, out_stream=None)
+        inputs = p.model.C2.list_inputs(shape=True, val=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, val=True, out_stream=None)
         verify(inputs, outputs, size*2, size, pathnames=False, rank=0)
 
-        inputs = p.model.C2.list_inputs(shape=True, values=True, all_procs=True, out_stream=None)
-        outputs = p.model.C2.list_outputs(shape=True, values=True, all_procs=True, out_stream=None)
+        inputs = p.model.C2.list_inputs(shape=True, val=True, all_procs=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, val=True, all_procs=True, out_stream=None)
         verify(inputs, outputs, size*2, size, pathnames=False)
 
         p.final_setup()
@@ -553,23 +515,23 @@ class MPITests(unittest.TestCase):
         p['C1.invec'] = np.ones(size, float) * 5.0
 
         # verify list_inputs/list_outputs work before run
-        inputs = p.model.C2.list_inputs(shape=True, values=True, out_stream=None)
-        outputs = p.model.C2.list_outputs(shape=True, values=True, out_stream=None)
+        inputs = p.model.C2.list_inputs(shape=True, val=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, val=True, out_stream=None)
         verify(inputs, outputs, size*2, size, pathnames=False, rank=0)
 
-        inputs = p.model.C2.list_inputs(shape=True, values=True, all_procs=True, out_stream=None)
-        outputs = p.model.C2.list_outputs(shape=True, values=True, all_procs=True, out_stream=None)
+        inputs = p.model.C2.list_inputs(shape=True, val=True, all_procs=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, val=True, all_procs=True, out_stream=None)
         verify(inputs, outputs, size*2, size, pathnames=False)
 
         p.run_model()
 
         # verify list_inputs/list_outputs work after run
-        inputs = p.model.C2.list_inputs(shape=True, values=True, out_stream=None)
-        outputs = p.model.C2.list_outputs(shape=True, values=True, out_stream=None)
+        inputs = p.model.C2.list_inputs(shape=True, val=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, val=True, out_stream=None)
         verify(inputs, outputs, size*2, size, in_vals=10., out_vals=7.5, pathnames=False, rank=0)
 
-        inputs = p.model.C2.list_inputs(shape=True, values=True, all_procs=True, out_stream=None)
-        outputs = p.model.C2.list_outputs(shape=True, values=True, all_procs=True, out_stream=None)
+        inputs = p.model.C2.list_inputs(shape=True, val=True, all_procs=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, val=True, all_procs=True, out_stream=None)
         verify(inputs, outputs, size*2, size, in_vals=10., out_vals=7.5, pathnames=False)
 
     def test_distrib_list_inputs_outputs(self):
@@ -578,7 +540,7 @@ class MPITests(unittest.TestCase):
         test = self
 
         def verify(inputs, outputs, in_vals=1., out_vals=1., pathnames=False, comm=None, final=True, rank=None):
-            global_shape = (size, ) if final else 'Unavailable'
+            global_shape = (size, ) if final else NA
 
             inputs = sorted(inputs)
             outputs = sorted(outputs)
@@ -615,26 +577,26 @@ class MPITests(unittest.TestCase):
 
             def configure(self):
                 # verify list_inputs/list_outputs work in configure for distributed comp on rank 0 only
-                inputs = self.C2.list_inputs(shape=True, global_shape=True, values=True, out_stream=None)
-                outputs = self.C2.list_outputs(shape=True, global_shape=True, values=True, out_stream=None)
+                inputs = self.C2.list_inputs(shape=True, global_shape=True, val=True, out_stream=None)
+                outputs = self.C2.list_outputs(shape=True, global_shape=True, val=True, out_stream=None)
                 verify(inputs, outputs, pathnames=False, comm=self.comm, final=False, rank=0)
 
                 # verify list_inputs/list_outputs work in configure for distributed comp on all ranks
-                inputs = self.C2.list_inputs(shape=True, global_shape=True, values=True, all_procs=True, out_stream=None)
-                outputs = self.C2.list_outputs(shape=True, global_shape=True, values=True, all_procs=True, out_stream=None)
+                inputs = self.C2.list_inputs(shape=True, global_shape=True, val=True, all_procs=True, out_stream=None)
+                outputs = self.C2.list_outputs(shape=True, global_shape=True, val=True, all_procs=True, out_stream=None)
                 verify(inputs, outputs, pathnames=False, comm=self.comm, final=False)
 
         p = om.Problem(Model())
         p.setup()
 
         # verify list_inputs/list_outputs work before final_setup for distributed comp on rank 0 only
-        inputs = p.model.C2.list_inputs(shape=True, global_shape=True, values=True, out_stream=None)
-        outputs = p.model.C2.list_outputs(shape=True, global_shape=True, values=True, out_stream=None)
+        inputs = p.model.C2.list_inputs(shape=True, global_shape=True, val=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, global_shape=True, val=True, out_stream=None)
         verify(inputs, outputs, pathnames=False, comm=p.comm, final=True, rank=0)
 
         # verify list_inputs/list_outputs work before final_setup for distributed comp on all ranks
-        inputs = p.model.C2.list_inputs(shape=True, global_shape=True, values=True, all_procs=True, out_stream=None)
-        outputs = p.model.C2.list_outputs(shape=True, global_shape=True, values=True, all_procs=True, out_stream=None)
+        inputs = p.model.C2.list_inputs(shape=True, global_shape=True, val=True, all_procs=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, global_shape=True, val=True, all_procs=True, out_stream=None)
         verify(inputs, outputs, pathnames=False, comm=p.comm, final=True)
 
         p.final_setup()
@@ -642,25 +604,25 @@ class MPITests(unittest.TestCase):
         p['C1.invec'] = np.ones(size, float) * 5.0
 
         # verify list_inputs/list_outputs work before run for distributed comp on rank 0 only
-        inputs = p.model.C2.list_inputs(shape=True, global_shape=True, values=True, out_stream=None)
-        outputs = p.model.C2.list_outputs(shape=True, global_shape=True, values=True, out_stream=None)
+        inputs = p.model.C2.list_inputs(shape=True, global_shape=True, val=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, global_shape=True, val=True, out_stream=None)
         verify(inputs, outputs, pathnames=False, comm=p.comm, final=True, rank=0)
 
         # verify list_inputs/list_outputs work before run for distributed comp on all ranks
-        inputs = p.model.C2.list_inputs(shape=True, global_shape=True, values=True, all_procs=True, out_stream=None)
-        outputs = p.model.C2.list_outputs(shape=True, global_shape=True, values=True, all_procs=True, out_stream=None)
+        inputs = p.model.C2.list_inputs(shape=True, global_shape=True, val=True, all_procs=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, global_shape=True, val=True, all_procs=True, out_stream=None)
         verify(inputs, outputs, pathnames=False, comm=p.comm, final=True)
 
         p.run_model()
 
         # verify list_inputs/list_outputs work after run for distributed comp on rank 0 only
-        inputs = p.model.C2.list_inputs(shape=True, global_shape=True, values=True, out_stream=None)
-        outputs = p.model.C2.list_outputs(shape=True, global_shape=True, values=True, out_stream=None)
+        inputs = p.model.C2.list_inputs(shape=True, global_shape=True, val=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, global_shape=True, val=True, out_stream=None)
         verify(inputs, outputs, in_vals=10., out_vals=20., pathnames=False, comm=p.comm, final=True, rank=0)
 
         # verify list_inputs/list_outputs work after run for distributed comp on all ranks
-        inputs = p.model.C2.list_inputs(shape=True, global_shape=True, values=True, all_procs=True, out_stream=None)
-        outputs = p.model.C2.list_outputs(shape=True, global_shape=True, values=True, all_procs=True, out_stream=None)
+        inputs = p.model.C2.list_inputs(shape=True, global_shape=True, val=True, all_procs=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, global_shape=True, val=True, all_procs=True, out_stream=None)
         verify(inputs, outputs, in_vals=10., out_vals=20., pathnames=False, comm=p.comm, final=True)
 
     def test_distrib_idx_in_full_out(self):
@@ -668,7 +630,7 @@ class MPITests(unittest.TestCase):
 
         p = om.Problem()
         top = p.model
-        C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
+        top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribInputComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
 
@@ -687,13 +649,22 @@ class MPITests(unittest.TestCase):
         size = 11
 
         p = om.Problem()
+
         top = p.model
-        C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
+        top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribInputComp(arr_size=size))
-        C3 = top.add_subsystem("C3", om.ExecComp("y=x", x=np.zeros(size*commsize),
-                                                 y=np.zeros(size*commsize)))
-        top.connect('C1.outvec', 'C2.invec')
+        top.add_subsystem("C3", om.ExecComp("y=x", x=np.zeros(size*p.comm.size),
+                                                 y=np.zeros(size*p.comm.size)))
+
+        comm = p.comm
+        rank = comm.rank
+        sizes, offsets = evenly_distrib_idxs(comm.size, size)
+        start = offsets[rank]
+        end = start + sizes[rank]
+
+        top.connect('C1.outvec', 'C2.invec', src_indices=np.arange(start, end, dtype=int))
         top.connect('C2.outvec', 'C3.x', src_indices=om.slicer[:])
+
         p.setup()
 
         # Conclude setup but don't run model.
@@ -711,8 +682,8 @@ class MPITests(unittest.TestCase):
 
         p = om.Problem()
         top = p.model
-        C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
-        C2 = top.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
+        top.add_subsystem("C1", InOutArrayComp(arr_size=size))
+        top.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
         C3 = top.add_subsystem("C3", DistribGatherComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec')
@@ -733,10 +704,14 @@ class MPITests(unittest.TestCase):
 
         p = om.Problem()
         top = p.model
+        comm = p.comm
+
+        idxs = list(take_nth(p.comm.rank, comm.size, range(size)))
+
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
-        C2 = top.add_subsystem("C2", DistribNoncontiguousComp(arr_size=size))
+        C2 = top.add_subsystem("C2", DistribNoncontiguousComp(size=len(idxs)))
         C3 = top.add_subsystem("C3", DistribGatherComp(arr_size=size))
-        top.connect('C1.outvec', 'C2.invec')
+        top.connect('C1.outvec', 'C2.invec', src_indices=idxs)
         top.connect('C2.outvec', 'C3.invec')
         p.setup()
 
@@ -748,12 +723,7 @@ class MPITests(unittest.TestCase):
         p.run_model()
 
         if MPI:
-            if p.comm.rank == 0:
-                self.assertTrue(all(C2._outputs['outvec'] ==
-                                    np.array(list(take_nth(0, 2, range(size))), 'f')*4))
-            else:
-                self.assertTrue(all(C2._outputs['outvec'] ==
-                                    np.array(list(take_nth(1, 2, range(size))), 'f')*4))
+            self.assertTrue(all(C2._outputs['outvec'] == np.array(list(idxs), 'f')*4))
 
             full_list = list(take_nth(0, 2, range(size))) + list(take_nth(1, 2, range(size)))
             self.assertTrue(all(C3._outputs['outvec'] == np.array(full_list, 'f')*4))
@@ -767,10 +737,21 @@ class MPITests(unittest.TestCase):
         size = 11
 
         p = om.Problem()
+
+        # need to initialize the input to have the correct local size
+        if p.comm.rank == 0:
+            local_size = 8
+            start = 0
+            end = 8
+        else:
+            local_size = 7
+            start = 4
+            end = 11
+
         top = p.model
-        C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
-        C2 = top.add_subsystem("C2", DistribOverlappingInputComp(arr_size=size))
-        top.connect('C1.outvec', 'C2.invec')
+        top.add_subsystem("C1", InOutArrayComp(arr_size=size))
+        C2 = top.add_subsystem("C2", DistribOverlappingInputComp(arr_size=size, local_size=local_size))
+        top.connect('C1.outvec', 'C2.invec', src_indices=np.arange(start, end, dtype=int))
         p.setup()
 
         # Conclude setup but don't run model.
@@ -806,8 +787,8 @@ class MPITests(unittest.TestCase):
 
         p = om.Problem()
         top = p.model
-        C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
-        C2 = top.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
+        top.add_subsystem("C1", InOutArrayComp(arr_size=size))
+        top.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
         C3 = top.add_subsystem("C3", NonDistribGatherComp(size=size))
         top.connect('C1.outvec', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec', om.slicer[:])
@@ -827,15 +808,54 @@ class MPITests(unittest.TestCase):
         size = 2
 
         prob = om.Problem()
-        C2 = prob.model.add_subsystem("C", DistribCompSimple(arr_size=size))
+        prob.model.add_subsystem("C", DistribCompSimple(arr_size=size))
 
         with self.assertRaises(RuntimeError) as context:
             prob.setup()
 
-        msg = 'Distributed component input "C.invec" requires an IndepVarComp.'
+        err_msg = str(context.exception).split(':')[-1]
+        self.assertEqual(err_msg, 'Distributed component input "C.invec" is not connected.')
+
+    def test_auto_ivc_error_promoted(self):
+        size = 2
+
+        prob = om.Problem()
+        prob.model.add_subsystem("C", DistribCompSimple(arr_size=size), promotes=['*'])
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.setup()
 
         err_msg = str(context.exception).split(':')[-1]
-        self.assertEqual(err_msg, msg)
+        self.assertEqual(err_msg, 'Distributed component input "C.invec", promoted as "invec", is not connected.')
+
+    def test_bad_distrib_connect(self):
+        class Adder(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', shape_by_conn=True, distributed=True)
+                self.add_output('x_sum', shape=1)
+
+            def compute(self, inputs, outputs):
+                outputs['x_sum'] = np.sum(inputs['x'])
+
+        prob = om.Problem(name='bad_distrib_problem')
+        ivc = prob.model.add_subsystem('ivc',om.IndepVarComp())
+        ivc.add_output('x', val = np.ones(10), distributed=True)
+
+        prob.model.add_subsystem('adder', Adder())
+
+        prob.model.connect('ivc.x0','adder.x')
+
+        try:
+            prob.setup()
+        except Exception as err:
+            self.assertTrue(
+                "\nCollected errors for problem 'bad_distrib_problem':"
+                "\n   <model> <class Group>: Attempted to connect from 'ivc.x0' to 'adder.x', but "
+                "'ivc.x0' doesn't exist. Perhaps you meant to connect to one of the following outputs: ['ivc.x']."
+                "\n   <model> <class Group>: Failed to resolve shapes for ['adder.x']. To see the "
+                "dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'." in str(err))
+        else:
+            self.fail("Exception expected.")
 
 
 class NonParallelTests(unittest.TestCase):
@@ -881,8 +901,8 @@ class ProbRemoteTests(unittest.TestCase):
         top.connect('P.invec1', 'par.C1.invec')
         top.connect('P.invec2', 'par.C2.invec')
 
-        C1 = par.add_subsystem("C1", DistribInputDistribOutputComp(arr_size=size))
-        C2 = par.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
+        par.add_subsystem("C1", DistribInputDistribOutputComp(arr_size=size))
+        par.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
 
         p.setup()
 
@@ -972,7 +992,7 @@ class ProbRemoteTests(unittest.TestCase):
         top.connect('P.invec', 'C1.invec')
         top.connect('P.disc_in', 'C1.disc_in')
 
-        C1 = top.add_subsystem("C1", DistribInputDistribOutputDiscreteComp(arr_size=size))
+        top.add_subsystem("C1", DistribInputDistribOutputDiscreteComp(arr_size=size))
         p.setup()
 
         # Conclude setup but don't run model.
@@ -1062,17 +1082,13 @@ class TestGroupMPI(unittest.TestCase):
     def test_promote_distrib(self):
 
         class MyComp(om.ExplicitComponent):
-            def setup(self):
-                # decide what parts of the array we want based on our rank
-                if self.comm.rank == 0:
-                    idxs = [0, 1, 2]
-                else:
-                    # use [3, -1] here rather than [3, 4] just to show that we
-                    # can use negative indices.
-                    idxs = [3, -1]
+            def initialize(self):
+                self.options.declare('size', types=int, default=1,
+                                     desc="Size of input vector x.")
 
-                self.add_input('x', np.ones(len(idxs)), src_indices=idxs)
-                self.add_output('y', 1.0)
+            def setup(self):
+                self.add_input('x', np.ones(self.options['size']), distributed=True)
+                self.add_output('y', 1.0, distributed=True)
 
             def compute(self, inputs, outputs):
                 outputs['y'] = np.sum(inputs['x'])*2.0
@@ -1082,20 +1098,160 @@ class TestGroupMPI(unittest.TestCase):
         p.model.add_subsystem('indep', om.IndepVarComp('x', np.arange(5, dtype=float)),
                               promotes_outputs=['x'])
 
-        p.model.add_subsystem('C1', MyComp(),
-                              promotes_inputs=['x'])
+        # decide what parts of the array we want based on our rank
+        if p.comm.rank == 0:
+            idxs = [0, 1, 2]
+        else:
+            # use [3, -1] here rather than [3, 4] just to show that we
+            # can use negative indices.
+            idxs = [3, -1]
+
+        p.model.add_subsystem('C1', MyComp(size=len(idxs)))
+        p.model.promotes('C1', inputs=['x'], src_indices=idxs)
 
         p.setup()
         p.set_val('x', np.arange(5, dtype=float))
         p.run_model()
 
         # each rank holds the assigned portion of the input array
-        assert_near_equal(p['C1.x'],
+        assert_near_equal(p.get_val('C1.x', get_remote=False),
                          np.arange(3, dtype=float) if p.model.C1.comm.rank == 0 else
                          np.arange(3, 5, dtype=float))
 
         # the output in each rank is based on the local inputs
-        assert_near_equal(p['C1.y'], 6. if p.model.C1.comm.rank == 0 else 14.)
+        assert_near_equal(p.get_val('C1.y', get_remote=False), 6. if p.model.C1.comm.rank == 0 else 14.)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestDistribCheckMPI(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_distrib_conn_check(self):
+        class Serial2Distributed(om.ExplicitComponent):
+            def setup(self):
+                self.add_input("serial_in", shape=3)
+
+                if self.comm.rank == 0:
+                    self.add_output("dist_out", shape=3, distributed=True)
+                else:
+                    self.add_output("dist_out", shape=0, distributed=True)
+
+            def compute(self, inputs, outputs):
+                if self.comm.rank == 0:
+                    outputs["dist_out"] = inputs["serial_in"]
+
+        class DistributedSum(om.ExplicitComponent):
+            def setup(self):
+                self.add_output("sum", shape=1)
+
+            def compute(self, inputs, outputs):
+                outputs["sum"] = self.comm.bcast(sum(inputs["dist_in"]), root=0)
+
+        class SumGroup(om.Group):
+            def setup(self):
+                self.add_subsystem("s2d", Serial2Distributed(), promotes_inputs=[("serial_in", "in")])
+                self.add_subsystem("sum", DistributedSum(), promotes_outputs=["sum"])
+                self.sum.add_input("dist_in", shape_by_conn=True, distributed=True)
+                self.connect("s2d.dist_out", "sum.dist_in")
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem("ivc", om.IndepVarComp("x", [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]))
+        parallel = model.add_subsystem('parallel', om.ParallelGroup())
+        parallel.add_subsystem('sum1', SumGroup())
+        parallel.add_subsystem('sum2', SumGroup())
+
+        model.connect("ivc.x", "parallel.sum1.in", src_indices=om.slicer[:3])
+        model.connect("ivc.x", "parallel.sum2.in", src_indices=om.slicer[3:])
+
+        prob.setup()
+        prob.run_model()
+
+        assert_near_equal(prob.get_val("parallel.sum1.sum", get_remote=True), 3.0)
+        assert_near_equal(prob.get_val("parallel.sum2.sum", get_remote=True), 12.0)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestCompDistVarErrors(unittest.TestCase):
+    """
+    When a component declares variables in different orders on different ranks
+    or declares variables on some ranks but not others.
+    """
+
+    N_PROCS = 4
+
+    def test_missing_vars(self):
+        class Comp1(om.ExplicitComponent):
+            def setup(self):
+                if self.comm.rank==0:
+                    self.add_output('a', np.zeros((2,3)), distributed=True)
+                elif self.comm.rank==1:
+                    self.add_output('a', np.zeros((1,3)), distributed=True)
+                else:
+                    self.add_output('a', np.zeros((0,3)), distributed=True)
+
+        class Comp2(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('a', distributed=True, shape_by_conn=True)
+                if self.comm.rank==0:
+                    self.add_output('b', np.zeros(2), distributed=True)
+                    self.add_output('c', np.zeros(2), distributed=True)
+                else:
+                    self.add_output('b', np.zeros(0), distributed=True)
+
+        class Group1(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', Comp1(), promotes=['*'])
+                self.add_subsystem('comp2', Comp2(), promotes=['*'])
+
+        prob = om.Problem()
+        prob.model = Group1()
+
+        with self.assertRaises(Exception) as cm:
+            prob.setup(mode='rev')
+
+        self.assertEqual(str(cm.exception),
+                         "'comp2' <class Comp2>: Variable 'c' exists on some ranks and not others. "
+                         "A component must declare all variables in the same order on all ranks, "
+                         "even if the size of the variable is 0 on some ranks.")
+
+    def test_out_of_order_vars(self):
+        class Comp1(om.ExplicitComponent):
+            def setup(self):
+                if self.comm.rank==0:
+                    self.add_output('a', np.zeros((2,3)), distributed=True)
+                elif self.comm.rank==1:
+                    self.add_output('a', np.zeros((1,3)), distributed=True)
+                else:
+                    self.add_output('a', np.zeros((0,3)), distributed=True)
+
+        class Comp2(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('a', distributed=True, shape_by_conn=True)
+                if self.comm.rank==0:
+                    self.add_output('b', np.zeros(2), distributed=True)
+                    self.add_output('c', np.zeros(2), distributed=True)
+                else:
+                    self.add_output('c', np.zeros(1), distributed=True)
+                    self.add_output('b', np.zeros(1), distributed=True)
+
+        class Group1(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', Comp1(), promotes=['*'])
+                self.add_subsystem('comp2', Comp2(), promotes=['*'])
+
+        prob = om.Problem()
+        prob.model = Group1()
+
+        with self.assertRaises(Exception) as cm:
+            prob.setup(mode='rev')
+
+        self.assertEqual(str(cm.exception),
+                         "'comp2' <class Comp2>: Variables have not been declared in the same "
+                         "order on all ranks. A component must declare all variables in the "
+                         "same order on all ranks, even if the size of the variable is 0 on some ranks.")
+
 
 
 if __name__ == '__main__':

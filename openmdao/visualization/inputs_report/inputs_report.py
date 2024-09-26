@@ -1,15 +1,9 @@
 """
 A Viewer for OpenMDAO inputs.
 """
-import pathlib
 import functools
 
 import numpy as np
-
-try:
-    from IPython.display import IFrame, display, HTML
-except ImportError:
-    IFrame = display = None
 
 from openmdao.core.problem import Problem
 from openmdao.utils.mpi import MPI
@@ -27,7 +21,7 @@ def _unit_str(meta):
 
 
 def _get_val_cells(val):
-    if isinstance(val, np.ndarray):
+    if isinstance(val, np.ndarray) and val.size > 0:
         minval = np.min(val)
         maxval = np.max(val)
         if val.size > 5:
@@ -83,7 +77,7 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
                            "final_setup has not been called.")
 
     # get absolute src names of design vars
-    desvars = model.get_design_vars(recurse=True, use_prom_ivc=False)
+    desvars = model.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
 
     headers = ['Absolute Name', 'Input Name', 'Source Name', 'Source is IVC', 'Source is DV',
                'Units', 'Shape', 'Tags', 'Val', 'Min Val', 'Max Val', 'Absolute Source', ]
@@ -105,6 +99,7 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
             val = model.get_val(target, get_remote=True, from_src=not src.startswith('_auto_ivc.'))
             smeta = model._var_allprocs_abs2meta['output'][src]
             src_is_ivc = 'openmdao:indep_var' in smeta['tags']
+
             vcell, mincell, maxcell = _get_val_cells(val)
 
             rows.append([target, prom, sprom, src_is_ivc, src in desvars, _unit_str(meta),
@@ -118,7 +113,7 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
         src_is_ivc = 'openmdao:indep_var' in smeta['tags']
 
         rows.append([target, prom, src, src_is_ivc, src in desvars, '', None, sorted(meta['tags']),
-                     val, None, None])
+                     val, None, None, src])
 
     if not rows:
         column_meta = []
@@ -154,7 +149,7 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
 # inputs report definition
 def _run_inputs_report(prob, report_filename='inputs.html'):
 
-    path = str(pathlib.Path(prob.get_reports_dir()).joinpath(report_filename))
+    path = prob.get_reports_dir() / report_filename
     inputs_report(prob, display=False, outfile=path,
                   title=f'Inputs Report for {prob._name}', tablefmt='tabulator')
 

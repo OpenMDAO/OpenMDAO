@@ -16,7 +16,6 @@ import os.path
 from collections import OrderedDict
 
 from configparser import RawConfigParser as ConfigParser
-from openmdao.utils.om_warnings import warn_deprecation
 
 # pylint: disable=E0611, F0401
 from math import floor, pi
@@ -1019,28 +1018,6 @@ def unit_conversion(old_units, new_units):
     return _find_unit(old_units, error=True).conversion_tuple_to(_find_unit(new_units, error=True))
 
 
-def get_conversion(old_units, new_units):
-    """
-    Return conversion factor and offset between old and new units (deprecated).
-
-    Parameters
-    ----------
-    old_units : str
-        Original units as a string.
-    new_units : str
-        New units to return the value in.
-
-    Returns
-    -------
-    (float, float)
-        Conversion factor and offset.
-    """
-    warn_deprecation("'get_conversion' has been deprecated. Use "
-                     "'unit_conversion' instead.")
-
-    return unit_conversion(old_units, new_units)
-
-
 def convert_units(val, old_units, new_units=None):
     """
     Take a given quantity and return in different units.
@@ -1092,7 +1069,10 @@ def _has_val_mismatch(units1, val1, units2, val2):
             return True
 
         # convert units
-        val1 = convert_units(val1, units1, new_units=units2)
+        try:
+            val1 = convert_units(val1, units1, new_units=units2)
+        except TypeError:
+            return True  # units are not compatible
 
     rtol = 1e-10
     val1 = np.asarray(val1)

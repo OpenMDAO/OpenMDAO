@@ -3,13 +3,14 @@ Utils for dealing with arrays.
 """
 import sys
 from itertools import product
-from copy import copy
 import hashlib
 
 import numpy as np
+
 from scipy.sparse import coo_matrix
 
 from openmdao.core.constants import INT_DTYPE
+from openmdao.utils.numba import numba
 
 
 if sys.version_info >= (3, 8):
@@ -289,6 +290,9 @@ def array_connection_compatible(shape1, shape2):
         fundamental_shape2 = ashape2[np.min(nz2): np.max(nz2) + 1]
     else:
         fundamental_shape2 = np.ones((1,))
+
+    if len(fundamental_shape1) != len(fundamental_shape2):
+        return False
 
     return np.all(fundamental_shape1 == fundamental_shape2)
 
@@ -640,3 +644,269 @@ def array_hash(arr, alg=hashlib.sha1):
         The computed hash.
     """
     return alg(arr.view(np.uint8)).hexdigest()
+
+
+_randgen = np.random.default_rng()
+
+
+def get_random_arr(shape, comm=None, generator=None):
+    """
+    Request a random array, ensuring that its value will be consistent across MPI processes.
+
+    Parameters
+    ----------
+    shape : int
+        Shape of the random array.
+    comm : MPI communicator or None
+        All members of this communicator will receive the random array.
+    generator : random number generator or None
+        If not None, use this as the random number generator if on rank 0.
+
+    Returns
+    -------
+    ndarray
+        The random array.
+    """
+    gen = generator if generator is not None else _randgen
+    if comm is None or comm.size == 1:
+        return gen.random(shape)
+
+    if comm.rank == 0:
+        arr = gen.random(shape)
+    else:
+        arr = np.empty(shape)
+    comm.Bcast(arr, root=0)
+    return arr
+
+
+class ValueRepeater(object):
+    """
+    An iterable over a single value that repeats a given number of times.
+
+    Parameters
+    ----------
+    val : object
+        The value to be repeated.
+    size : int
+        The number of times to repeat the value.
+
+    Attributes
+    ----------
+    val : object
+        The value to be repeated.
+    size : int
+        The number of times to repeat the value.
+
+    Yields
+    ------
+    object
+        The value.
+    """
+
+    def __init__(self, val, size):
+        """
+        Initialize all attributes.
+        """
+        self.val = val
+        self.size = size
+
+    def __iter__(self):
+        """
+        Return an iterator over the value.
+
+        Yields
+        ------
+        object
+            The value.
+        """
+        for i in range(self.size):
+            yield self.val
+
+    def __len__(self):
+        """
+        Return the size of the value.
+
+        Returns
+        -------
+        int
+            The size of the value.
+        """
+        return self.size
+
+    def __contains__(self, item):
+        """
+        Return True if the given item is equal to the value.
+
+        Parameters
+        ----------
+        item : object
+            The item to be checked for containment.
+        """
+        return item == self.val
+
+    def __getitem__(self, idx):
+        """
+        Return the value.
+
+        Parameters
+        ----------
+        idx : int
+            The index of the value to be returned.
+        """
+        i = idx
+        if idx < 0:
+            idx += self.size
+        if idx >= self.size:
+            raise IndexError(f"index {i} is out of bounds for size {self.size}")
+        return self.val
+
+
+def convert_nans_in_nested_list(val_as_list):
+    """
+    Given a list, possibly nested, replace any numpy.nan values with the string "nan".
+
+    This is done since JSON does not handle nan. This code is used to pass variable values
+    to the N2 diagram.
+
+    The modifications to the list values are done in-place to avoid excessive copying of lists.
+
+    Parameters
+    ----------
+    val_as_list : list
+        List, possibly nested, whose nan elements need to be converted.
+    """
+    for i, val in enumerate(val_as_list):
+        if isinstance(val, list):
+            convert_nans_in_nested_list(val)
+        else:
+            if np.isnan(val):
+                val_as_list[i] = "nan"
+            elif np.isinf(val):
+                val_as_list[i] = "infinity"
+            else:
+                val_as_list[i] = val
+
+
+def convert_ndarray_to_support_nans_in_json(val):
+    """
+    Given numpy array of arbitrary dimensions, return the equivalent nested list with nan replaced.
+
+    numpy.nan values are replaced with the string "nan".
+
+    Parameters
+    ----------
+    val : ndarray
+        Numpy array to be converted.
+
+    Returns
+    -------
+    list
+        The equivalent list (possibly nested) with any nan values replaced with the string "nan".
+    """
+    val = np.asarray(val)
+
+    # do a quick check for any nans or infs and if not we can avoid the slow check
+    nans = np.where(np.isnan(val))
+    infs = np.where(np.isinf(val))
+    if nans[0].size == 0 and infs[0].size == 0:
+        return val.tolist()
+
+    val_as_list = val.tolist()
+    convert_nans_in_nested_list(val_as_list)
+    return val_as_list
+
+
+if numba is None:
+    allclose = np.allclose
+
+    def allzero(a):
+        """
+        Return True if all elements of a are zero.
+
+        Parameters
+        ----------
+        a : ndarray
+            Array to be checked for zeros.
+
+        Returns
+        -------
+        bool
+            True if all elements of a are zero.
+        """
+        return not np.any(a)
+
+else:
+
+    @numba.jit(nopython=True, nogil=True)
+    def allclose(a, b, rtol=3e-16, atol=3e-16):
+        """
+        Return True if all elements of a and b are close within the given absolute tolerance.
+
+        Returns when the first non-close element is found.  a and b must have the same size.
+
+        Parameters
+        ----------
+        a : ndarray
+            First array to be compared.
+        b : ndarray
+            Second array to be compared.
+        rtol : float
+            Relative tolerance for comparison.
+        atol : float
+            Absolute tolerance for comparison.
+
+        Returns
+        -------
+        bool
+            True if all elements of a and b are close within the given absolute and
+            relative tolerance.
+        """
+        for i in range(len(a)):
+            aval = a[i]
+            bval = b[i]
+
+            absdiff = aval - bval
+            if absdiff < 0.:
+                absdiff = -absdiff
+
+            if aval < 0.:
+                aval = -aval
+            if bval < 0.:
+                bval = -bval
+
+            if aval < bval:
+                vmax = rtol * bval
+            else:
+                vmax = rtol * aval
+
+            if atol > vmax:
+                vmax = atol
+
+            if absdiff > vmax:
+                return False
+
+        return True
+
+    @numba.jit(nopython=True, nogil=True)
+    def allzero(a):
+        """
+        Return True if all elements of a are zero.
+
+        Unlike np.any, this returns as soon as a non-zero element is found and so can be
+        faster for arrays having nonzero values.  It's comparable in speed (slighly faster) to
+        'not np.any' for arrays that are all zeros.
+
+        Parameters
+        ----------
+        a : ndarray
+            Array to be checked for zeros.
+
+        Returns
+        -------
+        bool
+            True if all elements of a are zero.
+        """
+        for i in range(len(a)):
+            if a[i] != 0.:
+                return False
+        return True

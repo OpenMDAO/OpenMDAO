@@ -9,6 +9,8 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.mpi import MPI
+from openmdao.utils.general_utils import set_pyoptsparse_opt
+from openmdao.utils.testing_utils import use_tempdirs
 
 try:
     from parameterized import parameterized
@@ -23,8 +25,9 @@ except ImportError:
 from openmdao.test_suite.groups.parallel_groups import \
     FanOutGrouped, FanInGrouped2, Diamond, ConvergeDiverge
 
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
 from openmdao.utils.logger_utils import TestLogger
+from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.error_checking.check_config import _default_checks
 
 
@@ -39,30 +42,24 @@ class Noisy(ConvergeDiverge):
 def _test_func_name(func, num, param):
     args = []
     for p in param.args:
-        if not isinstance(p, Iterable):
-            p = {p}
+        if isinstance(p, str) or not isinstance(p, Iterable):
+            p = [p]
         for item in p:
             try:
                 arg = item.__name__
-            except:
+            except Exception:
                 arg = str(item)
             args.append(arg)
     return func.__name__ + '_' + '_'.join(args)
 
 
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestParallelGroups(unittest.TestCase):
-
-    N_PROCS = 2
 
     @parameterized.expand(itertools.product([(om.LinearRunOnce, None)],
                                             [om.NonlinearBlockGS, om.NonlinearRunOnce]),
                           name_func=_test_func_name)
     def test_fan_out_grouped(self, solv_tup, nlsolver):
         prob = om.Problem(FanOutGrouped())
-
-        of=['c2.y', "c3.y"]
-        wrt=['iv.x']
 
         solver, jactype = solv_tup
 
@@ -163,9 +160,10 @@ class TestParallelGroups(unittest.TestCase):
         assert_near_equal(prob['c3.y'], 29.0, 1e-6)
 
     @parameterized.expand(itertools.product([om.LinearRunOnce],
-                                            [om.NonlinearBlockGS, om.NonlinearRunOnce]),
+                                            [om.NonlinearBlockGS, om.NonlinearRunOnce],
+                                            ['fwd', 'rev']),
                           name_func=_test_func_name)
-    def test_diamond(self, solver, nlsolver):
+    def test_diamond(self, solver, nlsolver, mode):
 
         prob = om.Problem()
         prob.model = Diamond()
@@ -173,7 +171,7 @@ class TestParallelGroups(unittest.TestCase):
         prob.model.linear_solver = solver()
         prob.model.nonlinear_solver = nlsolver()
 
-        prob.setup(check=False, mode='fwd')
+        prob.setup(check=False, mode=mode)
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -187,20 +185,11 @@ class TestParallelGroups(unittest.TestCase):
         assert_near_equal(J['c4.y1', 'iv.x'][0][0], 25, 1e-6)
         assert_near_equal(J['c4.y2', 'iv.x'][0][0], -40.5, 1e-6)
 
-        prob.setup(check=False, mode='rev')
-        prob.run_model()
-
-        assert_near_equal(prob['c4.y1'], 46.0, 1e-6)
-        assert_near_equal(prob['c4.y2'], -93.0, 1e-6)
-
-        J = prob.compute_totals(of=unknown_list, wrt=indep_list)
-        assert_near_equal(J['c4.y1', 'iv.x'][0][0], 25, 1e-6)
-        assert_near_equal(J['c4.y2', 'iv.x'][0][0], -40.5, 1e-6)
-
     @parameterized.expand(itertools.product([om.LinearRunOnce],
-                                            [om.NonlinearBlockGS, om.NonlinearRunOnce]),
+                                            [om.NonlinearBlockGS, om.NonlinearRunOnce],
+                                            ['fwd', 'rev']),
                           name_func=_test_func_name)
-    def test_converge_diverge(self, solver, nlsolver):
+    def test_converge_diverge(self, solver, nlsolver, mode):
 
         prob = om.Problem()
         prob.model = ConvergeDiverge()
@@ -208,7 +197,7 @@ class TestParallelGroups(unittest.TestCase):
         prob.model.linear_solver = solver()
         prob.model.nonlinear_solver = nlsolver()
 
-        prob.setup(check=False, mode='fwd')
+        prob.setup(check=False, mode=mode)
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -220,19 +209,65 @@ class TestParallelGroups(unittest.TestCase):
         J = prob.compute_totals(of=unknown_list, wrt=indep_list)
         assert_near_equal(J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
 
-        prob.setup(check=False, mode='rev')
-        prob.run_model()
 
-        assert_near_equal(prob['c7.y1'], -102.7, 1e-6)
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestParallelGroupsMPI2(TestParallelGroups):
 
-        J = prob.compute_totals(of=unknown_list, wrt=indep_list)
-        assert_near_equal(J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
+    N_PROCS = 2
 
-        assert_near_equal(prob['c7.y1'], -102.7, 1e-6)
+    @parameterized.expand(['fwd', 'rev'], name_func=_test_func_name)
+    def test_par_with_only_1_subsystem(self, mode):
+
+        class DistribComp(om.ExplicitComponent):
+            def __init__(self, arr_size=11, **kwargs):
+                super().__init__(**kwargs)
+                self.arr_size = arr_size
+                self.options['distributed'] = True
+
+            def setup(self):
+                comm = self.comm
+                rank = comm.rank
+
+                sizes, _ = evenly_distrib_idxs(comm.size, self.arr_size)
+
+                self.add_input('x', np.ones(sizes[rank]))
+                self.add_output('y', np.ones(sizes[rank]))
+
+                self.declare_partials(of='y', wrt='x', method='cs')
+
+            def compute(self, inputs, outputs):
+                if self.comm.rank == 0:
+                    outputs['y'] = 5.0 * inputs['x']
+                else:
+                    outputs['y'] = 7.0 * inputs['x']
+
+        p = om.Problem()
+        model = p.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', np.ones(3)))
+        par = model.add_subsystem('par', om.ParallelGroup())
+        G = par.add_subsystem('G', om.Group())
+        G.add_subsystem('c1', om.ExecComp('y=2.0*x', shape=3))
+        G.add_subsystem('c2', DistribComp(arr_size=3))
+        model.add_subsystem('c2', om.ExecComp('y=3.0*x', shape=3))
+
+        model.connect('p1.x', 'par.G.c1.x')
+        model.connect('par.G.c1.y', 'par.G.c2.x')
+        model.connect('par.G.c2.y', 'c2.x', src_indices=om.slicer[:])
+
+        model.add_design_var('p1.x', lower=-50.0, upper=50.0)
+        model.add_constraint('par.G.c1.y', lower=-15.0, upper=15.0)
+        model.add_constraint('par.G.c2.y', lower=-15.0, upper=15.0)
+        model.add_objective('c2.y', index=0)
+
+        p.setup(check=False, mode=mode)
+        p.run_model()
+
+        assert_check_totals(p.check_totals(out_stream=None), rtol=2e-5, atol=2e-5)
 
     def test_zero_shape(self):
         raise unittest.SkipTest("zero shapes not fully supported yet")
-        class MultComp(ExplicitComponent):
+        class MultComp(om.ExplicitComponent):
             def __init__(self, mult):
                 self.mult = mult
                 super().__init__()
@@ -271,9 +306,6 @@ class TestParallelGroups(unittest.TestCase):
 
         model.connect('sub.c2.y', 'c2.x')
         model.connect('sub.c3.y', 'c3.x')
-
-        of=['c2.y', "c3.y"]
-        wrt=['iv.x']
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -336,6 +368,57 @@ class TestParallelGroups(unittest.TestCase):
                     break
             else:
                 self.fail("Didn't find '%s' in info messages." % msg)
+
+
+@use_tempdirs
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestDistDriverVars(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def setup_ddv_model(self, con_inds):
+        # check that pyoptsparse is installed. if it is, try to use SLSQP.
+        _, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
+
+        if OPTIMIZER:
+            from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
+        else:
+            raise unittest.SkipTest("pyOptSparseDriver is required.")
+
+        p = om.Problem()
+        model = p.model
+
+        p.driver = pyOptSparseDriver()
+        p.driver.options['optimizer'] = 'SLSQP'
+        p.driver.declare_coloring()
+
+        sub = model.add_subsystem('sub', om.ParallelGroup())
+        sub.add_subsystem('c1', om.ExecComp(['y=-2.0*x']))
+        sub.add_subsystem('c2', om.ExecComp(['y=5.0*x']))
+
+        model.add_subsystem('c3', om.ExecComp(['y=3.0*x1+7.0*x2']))
+
+        model.connect("sub.c1.y", "c3.x1")
+        model.connect("sub.c2.y", "c3.x2")
+
+        model.add_design_var('sub.c1.x', indices=[0])
+        model.add_design_var('sub.c2.x', indices=[0])
+        model.add_objective('c3.y')
+        model.add_constraint('sub.c2.x', indices=con_inds, lower=-100.)
+
+        p.setup()
+        p.run_driver()
+
+    # both of the following test cases raise exceptions before the fix.
+
+    def test_dist_driver_vars_indices(self):
+        # rob's original test case had indices and failed in one place
+        self.setup_ddv_model(con_inds=[0])
+
+    def test_dist_driver_vars(self):
+        # and the case with no indices on the constraint failed in a different place.
+        self.setup_ddv_model(con_inds=None)
+
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -507,6 +590,285 @@ class TestParallelOrdering(unittest.TestCase):
             self.assertEqual(locnames, ['_auto_ivc', 'G1.G2.C1', 'G1.G2.C2', 'G3.C3', 'G3.C4', 'par.G4.C5', 'par.G4.C6', 'C9'])
         else:
             self.assertEqual(locnames, ['_auto_ivc', 'G1.G2.C1', 'G1.G2.C2', 'G3.C3', 'G3.C4', 'par.G5.C7', 'par.G5.C8', 'C9'])
+
+
+class I1O1Comp(om.ExplicitComponent):
+    def __init__(self, idist=False, odist=False, mult=1.0, **kwargs):
+        self.idist = idist
+        self.odist = odist
+        self.mult = 1.0
+        super().__init__(**kwargs)
+
+    def setup(self):
+        self.add_input("x", distributed=self.idist)
+        self.add_output("y", distributed=self.odist)
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = self.mult * inputs['x']
+
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        if mode == 'fwd':
+            if 'y' in d_outputs:
+                if 'x' in d_inputs:
+                    d_outputs['y'] += self.mult * d_inputs['x']
+        else:  # rev
+            if 'y' in d_outputs:
+                if 'x' in d_inputs:
+                    d_inputs['x'] += self.mult * d_outputs['y']
+
+
+class I2O1Comp(om.ExplicitComponent):
+    def __init__(self, idist1=False, idist2=False, odist=False, mult1=1.0, mult2=1.0, **kwargs):
+        self.idist1 = idist1
+        self.idist2 = idist2
+        self.odist = odist
+        self.mult1 = 1.0
+        self.mult2 = 1.0
+        super().__init__(**kwargs)
+
+    def setup(self):
+        self.add_input("x1", distributed=self.idist1)
+        self.add_input("x2", distributed=self.idist2)
+        self.add_output("y", distributed=self.odist)
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = self.mult1 * inputs['x1'] + self.mult2 * inputs['x2']
+
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        if mode == 'fwd':
+            if 'y' in d_outputs:
+                if 'x1' in d_inputs:
+                    d_outputs['y'] += self.mult1 * d_inputs['x1']
+                if 'x2' in d_inputs:
+                    d_outputs['y'] += self.mult2 * d_inputs['x2']
+        else:  # rev
+            if 'y' in d_outputs:
+                if 'x1' in d_inputs:
+                    d_inputs['x1'] += self.mult1 * d_outputs['y']
+                if 'x2' in d_inputs:
+                    d_inputs['x2'] += self.mult2 * d_outputs['y']
+
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestTheoryDocExample(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def setup_model(self):
+        p = om.Problem()
+        model = p.model
+        model.add_subsystem('C1', I1O1Comp())
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestDesvarResponseOrdering(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_desvar_response_ordering(self):
+
+        class MyPhase(om.Group):
+            def setup(self):
+                comp = om.ExecComp("y = x + 2")
+                self.add_subsystem('comp', comp)
+                self.add_design_var('comp.x', 3.0)
+                self.add_constraint('comp.y', lower=4.0)
+
+        class MyPhases(om.ParallelGroup):
+            def setup(self):
+                self.add_subsystem('climb', MyPhase())
+                self.add_subsystem('cruise', MyPhase())
+                self.add_subsystem('descent', MyPhase())
+
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('phases', MyPhases())
+
+        prob.setup()
+
+        dvs = prob.model.get_design_vars(recurse=True, get_sizes=True, use_prom_ivc=True)
+        cons = prob.model.get_constraints(recurse=True, get_sizes=True, use_prom_ivc=False)
+
+        dv_names = [z for z in dvs.keys()]
+        con_names = [z for z in cons.keys()]
+
+        self.assertEqual(dv_names, ['phases.climb.comp.x', 'phases.cruise.comp.x', 'phases.descent.comp.x'])
+        self.assertEqual(con_names, ['phases.climb.comp.y', 'phases.cruise.comp.y', 'phases.descent.comp.y'])
+
+
+
+class SimpleDistComp(om.ExplicitComponent):
+
+    def setup(self):
+        comm = self.comm
+        rank = comm.rank
+
+        sizes, _ = evenly_distrib_idxs(comm.size, 3)
+        io_size = sizes[rank]
+
+        # src_indices will be computed automatically
+        self.add_input('x', val=np.ones(io_size), distributed=True)
+        self.add_input('a', val=-3.0 * np.ones(io_size), distributed=True)
+
+        self.add_output('y', val=np.ones(io_size), distributed=True)
+
+        self.declare_partials('y', ['x', 'a'])
+
+    def compute(self, inputs, outputs):
+        x = inputs['x']
+        a = inputs['a']
+
+        outputs['y'] = 2*x*a + x + a
+
+    def compute_partials(self, inputs, partials):
+        x = inputs['x']
+        a = inputs['a']
+
+        partials['y', 'x'] = np.diag(2.0 * a + 1.0)
+        partials['y', 'a'] = np.diag(2.0 * x + 1.0)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestFD(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_fd_rev_mode(self):
+        size = 3
+
+        p = om.Problem()
+        model = p.model
+
+        model.add_subsystem('p', om.IndepVarComp('x', np.ones(size)), promotes=['*'])
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
+
+        sub.add_subsystem('p2', om.IndepVarComp('a', -3.0 + 0.6 * np.arange(size)), promotes=['*'])
+
+        sub.add_subsystem('C1', om.ExecComp(['xd = x'],
+                                               x=np.ones(size), xd=np.ones(size)),
+                          promotes_inputs=['*'])
+
+        sub.add_subsystem("D1", SimpleDistComp(), promotes_outputs=['*'], promotes_inputs=['a'])
+
+        sub.connect('C1.xd', 'D1.x')
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_constraint('y', lower=0.0)
+
+        sub.approx_totals(method='fd')
+
+        p.setup(mode='rev', force_alloc_complex=True)
+
+        p.run_model()
+
+        data =  p.check_totals(method='fd', out_stream=None)
+
+        assert_check_totals(data, atol=1e-5)
+
+
+
+class DoubleComp(om.ExplicitComponent):
+    # dummy component to use outputs of parallel group
+    def setup(self):
+        self.add_input('x')
+        self.add_output('y', 0.)
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = 2. * inputs['x']
+
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        if mode=='rev':
+            if 'y' in d_outputs:
+                if 'x' in d_inputs:
+                    d_inputs['x'] += 2. * d_outputs['y']
+        else:
+            if 'y' in d_outputs:
+                if 'x' in d_inputs:
+                    d_outputs['y'] += 2. * d_inputs['x']
+
+
+class BcastComp(om.ExplicitComponent):
+    # dummy component to be evaluated in pararallel by om.ParallelGroup
+    def setup(self):
+        self.add_input('x', shape_by_conn=True)
+        self.add_output('y', 0.0)
+
+    def compute(self,inputs,outputs):
+        y = None
+        if self.comm.rank==0: # pretend that this must be computed on one or a subset of procs...
+                            # which may be necessary for various solvers/analyses
+            y = np.sum(inputs['x'])
+
+        # bcast to all procs
+        outputs['y'] = self.comm.bcast(y, root=0)
+
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        if mode == 'rev':
+            if 'y' in d_outputs:
+                # this used to give bad derivatives in parallel group due to non-uniform d_outputs['y'] across procs...
+                if self.comm.rank==0: # compute on first proc
+                    d_inputs['x'] += d_outputs['y']
+
+                # bcast to all procs
+                d_inputs['x'] = self.comm.bcast(d_inputs['x'], root=0)
+        else:
+            if 'y' in d_outputs:
+                if self.comm.rank==0: # compute on first proc
+                    d_outputs['y'] += np.sum(d_inputs['x'])
+
+                # bcast to all procs
+                d_outputs['y'] = self.comm.bcast(d_outputs['y'], root=0)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestSingleRankRunWithBcast(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def setup_model(self, mode):
+        prob = om.Problem()
+        model = prob.model
+
+        # dummy structural design variables
+        model.add_subsystem('indep', om.IndepVarComp('x', 0.01*np.ones(20)))
+        par = model.add_subsystem('par', om.ParallelGroup())
+
+        par.add_subsystem('C1', BcastComp())
+        par.add_subsystem('C2', BcastComp())
+
+        model.connect('indep.x', 'par.C1.x')
+        model.connect('indep.x', 'par.C2.x')
+
+        # add component that uses outputs from parallel components
+        model.add_subsystem('dummy_comp', DoubleComp())
+        model.connect('par.C1.y','dummy_comp.x')
+
+
+        prob.setup(mode=mode)
+        prob.run_model()
+
+        return prob
+
+    def test_bcast_fwd(self):
+        prob = self.setup_model(mode='fwd')
+
+        for i in range(1,3):
+            y = prob.get_val(f'par.C{i}.y',get_remote=True)
+            assert_near_equal(y, 0.2, 1e-6)
+
+        assert_check_totals(prob.check_totals(of=['dummy_comp.y','par.C1.y'],
+                                              wrt=['indep.x'], out_stream=None))
+
+    def test_bcast_rev(self):
+        prob = self.setup_model(mode='rev')
+
+        for i in range(1,3):
+            y = prob.get_val(f'par.C{i}.y',get_remote=True)
+            assert_near_equal(y, 0.2, 1e-6)
+
+        assert_check_totals(prob.check_totals(of=['dummy_comp.y','par.C1.y'],
+                                              wrt=['indep.x'], out_stream=None))
 
 
 if __name__ == "__main__":

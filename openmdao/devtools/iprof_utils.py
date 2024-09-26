@@ -1,6 +1,4 @@
 
-import os
-import sys
 import ast
 
 from inspect import getmembers
@@ -77,7 +75,7 @@ def find_qualified_name(filename, line, cache, full=True):
     if filename not in cache:
         fcache = {}
 
-        with open(filename, 'Ur') as f:
+        with open(filename, 'r') as f:
             contents = f.read()
             if len(contents) > 0 and contents[-1] != '\n':
                 contents += '\n'
@@ -108,7 +106,6 @@ def _setup_func_group():
 
     from openmdao.core.system import System
     from openmdao.core.group import Group
-    from openmdao.core.component import Component
     from openmdao.core.explicitcomponent import ExplicitComponent
     from openmdao.core.problem import Problem
     from openmdao.core.driver import Driver
@@ -119,7 +116,6 @@ def _setup_func_group():
     from openmdao.jacobians.jacobian import Jacobian
     from openmdao.matrices.matrix import Matrix
     from openmdao.vectors.default_vector import DefaultVector, DefaultTransfer
-    from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
 
     for class_ in [System, ExplicitComponent, Problem, Driver, _TotalJacInfo, Solver, LinearSolver,
                    NewtonSolver, Jacobian, Matrix, DefaultVector, DefaultTransfer, Group]:
@@ -146,7 +142,6 @@ def _setup_func_group():
             ('_add_submat', (Matrix,)),
             ('_get_promotion_maps', (System,)),
             ('_set_approx_partials_meta', (System,)),
-            ('_init_relevance', (System,)),
             ('_get_initial_*', (System,)),
             ('_initialize_*', (DefaultVector,)),
             ('_create_*', (DefaultVector,)),
@@ -172,7 +167,7 @@ def _setup_func_group():
             ('_apply', (Jacobian,)),
             ('_initialize', (Jacobian,)),
             ('compute_totals', (_TotalJacInfo, Problem, Driver)),
-            ('compute_totals_approx', (_TotalJacInfo,)),
+            ('_compute_totals_approx', (_TotalJacInfo,)),
             ('compute_jacvec_product', (System,)),
         ],
         'apply_linear': [
@@ -182,14 +177,14 @@ def _setup_func_group():
             ('apply_linear', (System,)),
             ('solve_linear', (System,)),
             ('compute_totals', (_TotalJacInfo, Problem, Driver)),
-            ('compute_totals_approx', (_TotalJacInfo,)),
+            ('_compute_totals_approx', (_TotalJacInfo,)),
             ('compute_jacvec_product', (System,)),
         ],
         'jac': [
             ('_linearize', (System, DirectSolver)),
             ('_setup_jacobians', (System,)),
             ('compute_totals', (_TotalJacInfo, Problem, Driver)),
-            ('compute_totals_approx', (_TotalJacInfo,)),
+            ('_compute_totals_approx', (_TotalJacInfo,)),
             ('_apply_linear', (System,)),
             ('solve', (LinearSolver, NewtonSolver)),
             ('_update', (Jacobian,)),
@@ -234,8 +229,8 @@ def _setup_func_group():
     })
 
     try:
-        from mpi4py import MPI
-        from petsc4py import PETSc
+        from mpi4py import MPI      # noqa: F401
+        from petsc4py import PETSc  # noqa: F401
         from openmdao.vectors.petsc_vector import PETScVector, PETScTransfer
 
         #TODO: this needs work.  Still lots of MPI calls not covered here...

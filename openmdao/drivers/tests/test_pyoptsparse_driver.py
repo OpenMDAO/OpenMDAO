@@ -1,7 +1,9 @@
 """ Unit tests for the Pyoptsparse Driver."""
 
 import copy
+import pathlib
 import unittest
+import os.path
 
 from packaging.version import Version
 
@@ -10,11 +12,13 @@ import numpy as np
 import openmdao.api as om
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.test_suite.components.paraboloid_problem import ParaboloidProblem
 from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
 from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
 from openmdao.utils.testing_utils import use_tempdirs, require_pyoptsparse
+from openmdao.utils.om_warnings import OMDeprecationWarning
 from openmdao.utils.mpi import MPI
 
 
@@ -161,6 +165,7 @@ class TestNotInstalled(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI, "MPI is required.")
+@use_tempdirs
 class TestMPIScatter(unittest.TestCase):
     N_PROCS = 2
 
@@ -187,7 +192,7 @@ class TestMPIScatter(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        proc_vals = MPI.COMM_WORLD.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']])
+        proc_vals = prob.comm.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']])
         np.testing.assert_array_almost_equal(proc_vals[0], proc_vals[1])
 
     @require_pyoptsparse(OPTIMIZER)
@@ -221,14 +226,11 @@ class TestMPIScatter(unittest.TestCase):
 
         prob.run_driver()
 
-        desvar = prob.driver.get_design_var_values()
         con = prob.driver.get_constraint_values()
         obj = prob.driver.get_objective_values()
 
-        assert_near_equal(obj['sum.f_sum'], 0.0, 2e-6)
-        assert_near_equal(con['parab.f_xy'],
-                          np.zeros(7),
-                          1e-5)
+        assert_near_equal(obj['f_sum'], 0.0, 2e-6)
+        assert_near_equal(con['f_xy'], np.zeros(7), 1e-5)
 
     @require_pyoptsparse('ParOpt')
     def test_paropt_distcomp(self):
@@ -261,14 +263,11 @@ class TestMPIScatter(unittest.TestCase):
 
         prob.run_driver()
 
-        desvar = prob.driver.get_design_var_values()
         con = prob.driver.get_constraint_values()
         obj = prob.driver.get_objective_values()
 
         assert_near_equal(obj['sum.f_sum'], 0.0, 4e-6)
-        assert_near_equal(con['parab.f_xy'],
-                          np.zeros(7),
-                          1e-5)
+        assert_near_equal(con['parab.f_xy'], np.zeros(7), 1e-5)
 
 
 @require_pyoptsparse(OPTIMIZER)
@@ -298,10 +297,24 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        result =  prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed, info = " +
-                                 str(prob.driver.pyopt_solution.optInform))
+        self.assertTrue(result.success, "Optimization failed, info = " +
+                         str(prob.driver.pyopt_solution.optInform))
+
+        # Test the result __repr__
+        pattern = (r'Problem:\s*\w+\s*' '\n'
+                   r'Driver:\s*pyOptSparseDriver\s*' '\n'
+                   r'\s*success\s*:\s*(True|False)\s*' '\n'
+                   r'\s*iterations\s*:\s*\d+\s*' '\n'
+                   r'\s*runtime\s*:\s*[\d.E-]+\s*s\s*' '\n'
+                   r'\s*model_evals\s*:\s*\d+\s*' '\n'
+                   r'\s*model_time\s*:\s*[\d.E-]+\s*s\s*' '\n'
+                   r'\s*deriv_evals\s*:\s*\d+\s*' '\n'
+                   r'\s*deriv_time\s*:\s*[\d.E-]+\s*s\s*' '\n'
+                   r'\s*exit_status\s*:\s*SUCCESS\s*')
+
+        self.assertRegex(str(result), pattern)
 
         # Minimum should be at (7.166667, -7.833334)
         assert_near_equal(prob['x'], 7.16667, 1e-6)
@@ -342,7 +355,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -377,7 +390,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -411,7 +424,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -420,13 +433,13 @@ class TestPyoptSparse(unittest.TestCase):
         assert_near_equal(prob['x'], 7.16667, 1e-6)
         assert_near_equal(prob['y'], -7.833334, 1e-6)
 
-        self.assertEqual(prob.driver._quantities, ['comp.f_xy'])
+        self.assertEqual(prob.driver._nl_responses, ['f_xy'])
 
         # make sure multiple driver runs don't grow the list of _quantities
-        quants = copy.copy(prob.driver._quantities)
+        quants = copy.copy(prob.driver._nl_responses)
         for i in range(5):
             prob.run_driver()
-            self.assertEqual(quants, prob.driver._quantities)
+            self.assertEqual(quants, prob.driver._nl_responses)
 
     def test_simple_paraboloid_equality(self):
 
@@ -453,7 +466,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -488,7 +501,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -520,7 +533,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -551,7 +564,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -617,6 +630,41 @@ class TestPyoptSparse(unittest.TestCase):
         assert_near_equal(prob['x'], 19.5, 1e-6)
         assert_near_equal(prob['y'], 5.5, 1e-6)
 
+    def test_minimal_print(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
+        model.set_input_defaults('z', 0)
+
+        parab = om.ExecComp('f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0 + z')
+
+        model.add_subsystem('comp', parab, promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x + y - 25.0'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_design_var('z', lower=-50.0, upper=0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', lower=25)
+        model.add_constraint('x', upper=30)
+        model.add_constraint('y', upper=0)
+        model.add_constraint('z', upper=50)
+
+        prob.setup()
+        prob.driver.options['print_results'] = True
+        prob.run_driver()
+
+        prob.setup()
+        prob.driver.options['print_results'] = 'minimal'
+        prob.run_driver()
+
     def test_simple_array_comp2D(self):
 
         prob = om.Problem()
@@ -641,7 +689,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -673,7 +721,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -733,7 +781,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -775,7 +823,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -810,7 +858,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -850,7 +898,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -955,7 +1003,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='fwd')
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -990,7 +1038,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1024,7 +1072,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1057,7 +1105,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1090,7 +1138,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='fwd')
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1124,7 +1172,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1158,7 +1206,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1191,7 +1239,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1224,7 +1272,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='fwd')
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1257,7 +1305,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1287,7 +1335,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1395,7 +1443,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1514,10 +1562,10 @@ class TestPyoptSparse(unittest.TestCase):
         failed, output = run_driver(prob)
 
         self.assertFalse(failed, "Optimization failed, info = " +
-                                 str(prob.driver.pyopt_solution.optInform))
+                         str(prob.driver.pyopt_solution.optInform))
 
         self.assertTrue('In mode: rev.' in output)
-        self.assertTrue("('comp.f_xy', [0])" in output)
+        self.assertTrue("('f_xy', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
         prob = om.Problem()
@@ -1548,10 +1596,10 @@ class TestPyoptSparse(unittest.TestCase):
         failed, output = run_driver(prob)
 
         self.assertFalse(failed, "Optimization failed, info = " +
-                             str(prob.driver.pyopt_solution.optInform))
+                         str(prob.driver.pyopt_solution.optInform))
 
         self.assertTrue('In mode: fwd.' in output)
-        self.assertTrue("('p2.y', [1])" in output)
+        self.assertTrue("('y', [1])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
     def test_debug_print_option_totals_no_ivc(self):
@@ -1585,10 +1633,10 @@ class TestPyoptSparse(unittest.TestCase):
         failed, output = run_driver(prob)
 
         self.assertFalse(failed, "Optimization failed, info = " +
-                                 str(prob.driver.pyopt_solution.optInform))
+                         str(prob.driver.pyopt_solution.optInform))
 
         self.assertTrue('In mode: rev.' in output)
-        self.assertTrue("('comp.f_xy', [0])" in output)
+        self.assertTrue("('f_xy', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
         prob = om.Problem()
@@ -1619,10 +1667,10 @@ class TestPyoptSparse(unittest.TestCase):
         failed, output = run_driver(prob)
 
         self.assertFalse(failed, "Optimization failed, info = " +
-                             str(prob.driver.pyopt_solution.optInform))
+                         str(prob.driver.pyopt_solution.optInform))
 
         self.assertTrue('In mode: fwd.' in output)
-        self.assertTrue("('p2.y', [1])" in output)
+        self.assertTrue("('y', [1])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
     def test_debug_print_option(self):
@@ -1655,7 +1703,7 @@ class TestPyoptSparse(unittest.TestCase):
         failed, output = run_driver(prob)
 
         self.assertFalse(failed, "Optimization failed, info = " +
-                                 str(prob.driver.pyopt_solution.optInform))
+                         str(prob.driver.pyopt_solution.optInform))
 
         output = output.split('\n')
 
@@ -1668,13 +1716,13 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertTrue(output.count("Objectives") > 1,
                         "Should be more than one objective header printed")
 
-        self.assertTrue(len([s for s in output if s.startswith("{'p1.x")]) > 1,
+        self.assertTrue(len([s for s in output if s.startswith("{'x")]) > 1,
                         "Should be more than one p1.x printed")
-        self.assertTrue(len([s for s in output if "'p2.y'" in s]) > 1,
+        self.assertTrue(len([s for s in output if "'y'" in s]) > 1,
                         "Should be more than one p2.y printed")
-        self.assertTrue(len([s for s in output if s.startswith("{'con.c")]) > 1,
+        self.assertTrue(len([s for s in output if s.startswith("{'c")]) > 1,
                         "Should be more than one con.c printed")
-        self.assertTrue(len([s for s in output if s.startswith("{'comp.f_xy")]) > 1,
+        self.assertTrue(len([s for s in output if s.startswith("{'f_xy")]) > 1,
                         "Should be more than one comp.f_xy printed")
 
     def test_show_exception_bad_opt(self):
@@ -1900,6 +1948,58 @@ class TestPyoptSparse(unittest.TestCase):
 
         self.assertEqual(exception.args[0], msg)
 
+    def test_pyoptsparse_invalid_desvar_values(self):
+
+        expected_err = ("The following design variable initial conditions are out of their specified "
+                        "bounds:"
+                        "\n  paraboloid.x"
+                        "\n    val: [100.]"
+                        "\n    lower: -50.0"
+                        "\n    upper: 50.0"
+                        "\n  paraboloid.y"
+                        "\n    val: [-200.]"
+                        "\n    lower: -50.0"
+                        "\n    upper: 50.0"
+                        "\nSet the initial value of the design variable to a valid value or set "
+                        "the driver option['invalid_desvar_behavior'] to 'ignore'.")
+
+        for option in ['warn', 'raise', 'ignore']:
+            with self.subTest(f'invalid_desvar_behavior = {option}'):
+                # build the model
+                prob = om.Problem()
+
+                prob.model.add_subsystem('paraboloid', om.ExecComp('f = (x-3)**2 + x*y + (y+4)**2 - 3'))
+
+                # setup the optimization
+                prob.driver = pyOptSparseDriver(print_results=False, invalid_desvar_behavior=option)
+                prob.driver.options['optimizer'] = 'SLSQP'
+
+                prob.model.add_design_var('paraboloid.x', lower=-50, upper=50)
+                prob.model.add_design_var('paraboloid.y', lower=-50, upper=50)
+                prob.model.add_objective('paraboloid.f')
+
+                prob.setup()
+
+                # Set initial values.
+                prob.set_val('paraboloid.x', 100.0)
+                prob.set_val('paraboloid.y', -200.0)
+
+                # run the optimization
+                if option == 'ignore':
+                    prob.run_driver()
+                elif option == 'raise':
+                    with self.assertRaises(ValueError) as ctx:
+                        prob.run_driver()
+                    self.assertEqual(str(ctx.exception), expected_err)
+                else:
+                    with assert_warning(om.DriverWarning, expected_err):
+                        prob.run_driver()
+
+                if option != 'raise':
+                    assert_near_equal(prob.get_val('paraboloid.x'), 6.66666666, tolerance=1.0E-5)
+                    assert_near_equal(prob.get_val('paraboloid.y'), -7.33333333, tolerance=1.0E-5)
+                    assert_near_equal(prob.get_val('paraboloid.f'), -27.33333333, tolerance=1.0E-5)
+
     def test_signal_handler_SNOPT(self):
         _, local_opt = set_pyoptsparse_opt('SNOPT')
         if local_opt != 'SNOPT':
@@ -2047,6 +2147,7 @@ class TestPyoptSparse(unittest.TestCase):
             def setup(self):
                 self.add_input('x', 1.0)
                 self.add_output('y', 1.0)
+                self.declare_partials('*', '*')
 
             def compute(self, inputs, outputs):
                 outputs['y'] = 4.8 * inputs['x'] - 3.0
@@ -2097,12 +2198,11 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        with self.assertRaises(RuntimeError) as msg:
+        with self.assertRaises(Exception) as msg:
             prob.run_driver()
 
         self.assertEqual(str(msg.exception),
-                         "Constraints or objectives [('parab.z', inds=[0])] cannot be impacted by the design " + \
-                         "variables of the problem.")
+                         'Constraints or objectives [parab.z] cannot be impacted by the design variables of the problem because no partials were defined for them in their parent component(s).')
 
     def test_singular_jac_error_desvars(self):
         prob = om.Problem()
@@ -2156,12 +2256,9 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.model.add_design_var('x', lower=-50, upper=50)
         prob.model.add_design_var('y', lower=-50, upper=50)
-        prob.model.add_objective('parab.f_xy')
+        prob.model.add_objective('parab.z')
 
         prob.model.add_constraint('const.g', lower=0, upper=10.)
-
-        # This constraint produces a zero row.
-        prob.model.add_constraint('parab.z', equals=12.)
 
         prob.setup()
 
@@ -2186,16 +2283,13 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.model.add_design_var('x', lower=-50, upper=50)
         prob.model.add_design_var('y', lower=-50, upper=50)
-        prob.model.add_objective('parab.f_xy')
+        prob.model.add_objective('parab.z')
 
         prob.model.add_constraint('const.g', lower=0, upper=10.)
 
-        # This constraint produces a zero row.
-        prob.model.add_constraint('parab.z', equals=12.)
-
         prob.setup()
 
-        msg = "Constraints or objectives [('parab.z', inds=[0])] cannot be impacted by the design variables of the problem."
+        msg = 'Constraints or objectives [parab.z] cannot be impacted by the design variables of the problem because no partials were defined for them in their parent component(s).'
 
         with assert_warning(UserWarning, msg):
             prob.run_driver()
@@ -2235,14 +2329,12 @@ class TestPyoptSparse(unittest.TestCase):
     def test_constraint_alias(self):
         p = om.Problem()
 
-        exec = om.ExecComp(['y = x**2',
-                            'z = a + x**2'],
-                        a={'shape': (1,)},
-                        y={'shape': (101,)},
-                        x={'shape': (101,)},
-                        z={'shape': (101,)})
-
-        p.model.add_subsystem('exec', exec)
+        p.model.add_subsystem('exec', om.ExecComp(['y = x**2',
+                                                   'z = a + x**2'],
+                                                  a={'shape': (1,)},
+                                                  y={'shape': (101,)},
+                                                  x={'shape': (101,)},
+                                                  z={'shape': (101,)}))
 
         p.model.add_design_var('exec.a', lower=-1000, upper=1000)
         p.model.add_objective('exec.y', index=50)
@@ -2277,9 +2369,12 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_objective('exec.y', index=50)
         p.model.add_constraint('exec.z', indices=[0], equals=25)
 
-        msg = "Constraint 'exec.z' already exists. Use the 'alias' argument to apply a second constraint"
-        with self.assertRaises(RuntimeError) as msg:
+        with self.assertRaises(RuntimeError) as ctx:
             p.model.add_constraint('exec.z', indices=[-1], lower=20)
+
+        self.assertEqual(str(ctx.exception),
+                         "<class Group>: Constraint 'exec.z' already exists. "
+                         "Use the 'alias' argument to apply a second constraint")
 
     def test_obj_and_con_same_var_different_indices(self):
 
@@ -2340,7 +2435,7 @@ class TestPyoptSparse(unittest.TestCase):
         assert_near_equal(p.get_val('z')[50], -70, tolerance=1e-4)
 
     def test_overlapping_response_indices(self):
-        p = om.Problem()
+        p = om.Problem(name='overlapping_response_indices')
 
         exec = om.ExecComp(['y = x**2',
                             'z = a + x**2'],
@@ -2354,16 +2449,19 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_design_var('exec.a', lower=-1000, upper=1000)
         p.model.add_objective('exec.y', index=50)
         p.model.add_constraint('exec.z', indices=[0, 1], equals=25)
+
+        p.model.add_constraint('exec.z', indices=om.slicer[1:10], lower=20, alias="ALIAS_TEST")
+        p.setup()
 
         # Need to fix up this test to run right
-        msg = "<model> <class Group>: Indices for aliases ['ALIAS_TEST'] are overlapping constraint/objective 'exec.z'."
         with self.assertRaises(RuntimeError) as ctx:
-            p.model.add_constraint('exec.z', indices=om.slicer[1:10], lower=20, alias="ALIAS_TEST")
-            p.setup()
+            p.final_setup()
 
-        self.assertEqual(str(ctx.exception), msg)
+        self.assertEqual(str(ctx.exception),
+           "<model> <class Group>: Indices for aliases ['ALIAS_TEST'] are overlapping "
+           "constraint/objective 'exec.z'.")
 
-        p = om.Problem()
+        p = om.Problem(name='overlapping_response_indices2')
 
         exec = om.ExecComp(['y = x**2',
                             'z = a + x**2'],
@@ -2378,13 +2476,17 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_objective('exec.y', index=50)
         p.model.add_constraint('exec.z', indices=[0, 1], equals=25)
 
+        p.model.add_constraint('exec.z', indices=[0], lower=20, alias="ALIAS_TEST")
+        p.setup()
+
         with self.assertRaises(RuntimeError) as ctx:
-            p.model.add_constraint('exec.z', indices=[0], lower=20, alias="ALIAS_TEST")
-            p.setup()
+            p.final_setup()
 
-        self.assertEqual(str(ctx.exception), msg)
+        self.assertEqual(str(ctx.exception),
+           "<model> <class Group>: Indices for aliases ['ALIAS_TEST'] are overlapping "
+           "constraint/objective 'exec.z'.")
 
-        p = om.Problem()
+        p = om.Problem(name='overlapping_response_indices3')
 
         exec = om.ExecComp(['y = x**2',
                             'z = a + x**2'],
@@ -2399,13 +2501,17 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_objective('exec.y', index=50)
         p.model.add_constraint('exec.z', indices=[0, 1], equals=25)
 
+        p.model.add_constraint('exec.z', indices=[1, 2], lower=20, alias="ALIAS_TEST")
+        p.setup()
+
         with self.assertRaises(RuntimeError) as ctx:
-            p.model.add_constraint('exec.z', indices=[1, 2], lower=20, alias="ALIAS_TEST")
-            p.setup()
+            p.final_setup()
 
-        self.assertEqual(str(ctx.exception), msg)
+        self.assertEqual(str(ctx.exception),
+           "<model> <class Group>: Indices for aliases ['ALIAS_TEST'] are overlapping "
+           "constraint/objective 'exec.z'.")
 
-        p = om.Problem()
+        p = om.Problem(name='overlapping_response_indices4')
 
         exec = om.ExecComp(['y = x**2',
                             'z = a + x**2'],
@@ -2420,11 +2526,15 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_objective('exec.y', index=50)
         p.model.add_constraint('exec.z', indices=[0, 100], equals=25)
 
-        with self.assertRaises(RuntimeError) as ctx:
-            p.model.add_constraint('exec.z', indices=[-1], lower=20, alias="ALIAS_TEST")
-            p.setup()
+        p.model.add_constraint('exec.z', indices=[-1], lower=20, alias="ALIAS_TEST")
+        p.setup()
 
-        self.assertEqual(str(ctx.exception), msg)
+        with self.assertRaises(RuntimeError) as ctx:
+            p.final_setup()
+
+        self.assertEqual(str(ctx.exception),
+            "<model> <class Group>: Indices for aliases ['ALIAS_TEST'] are overlapping "
+            "constraint/objective 'exec.z'.")
 
     def test_constraint_aliases_standalone(self):
         size = 7
@@ -2459,7 +2569,6 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup(force_alloc_complex=True)
         prob.run_model()
 
-        desvar = prob.driver.get_design_var_values()
         con = prob.driver.get_constraint_values()
 
         assert_near_equal(con['a1'], 24.0)
@@ -2651,7 +2760,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         p = om.Problem()
 
-        exec = om.ExecComp(['y = x**2',
+        exec = om.ExecComp(['y = a*x**2',
                             'z = a + x**2'],
                             a={'shape': (1,)},
                             y={'shape': (101,)},
@@ -2684,6 +2793,97 @@ class TestPyoptSparse(unittest.TestCase):
         assert_near_equal(J[('ALIAS_TEST', 'exec.a')].flatten(), np.array([1.]))
         assert_near_equal(p.get_val('exec.z')[0], 25, tolerance=1e-4)
         assert_near_equal(p.get_val('exec.z')[50], -75, tolerance=1e-4)
+
+    def test_prom_names(self):
+
+        p = om.Problem()
+
+        exec = om.ExecComp(['y = a*x**2',
+                            'z = a + x**2'],
+                            a={'shape': (1,)},
+                            y={'shape': (101,)},
+                            x={'shape': (101,)},
+                            z={'shape': (101,)})
+
+        p.model.add_subsystem('exec', exec,
+                              promotes_inputs=['a', 'x'],
+                              promotes_outputs=['y', 'z'])
+
+        p.model.add_design_var('a', lower=-1000, upper=1000)
+        p.model.add_objective('y', index=50)
+        p.model.add_constraint('z', indices=[0], equals=25)
+        p.model.add_constraint('z', indices=[-1], lower=20, alias="ALIAS_TEST")
+
+        p.driver = om.pyOptSparseDriver(optimizer=OPTIMIZER)
+
+        p.setup(mode='rev')
+        p.set_val('x', np.linspace(-10, 10, 101))
+        p.run_driver()
+
+        # check that the pyoptsparse solution uses promoted names
+        sol = p.driver.pyopt_solution
+
+        self.assertEqual(set(sol.variables.keys()), {'a'})
+        self.assertEqual(set(sol.objectives.keys()), {'y'})
+        self.assertEqual(set(sol.constraints.keys()), {'z', 'ALIAS_TEST'})
+
+    def test_hist_file_hotstart(self):
+        filename = "hist_file"
+
+        # run driver and save history
+        prob = ParaboloidProblem()
+        prob.driver = pyOptSparseDriver(print_results=False, hist_file=filename)
+
+        prob.setup()
+        prob.run_driver()
+
+        self.assertTrue(prob.driver.iter_count > 1)
+        self.assertTrue(os.path.exists(filename))
+
+        # run driver and restart from history
+        prob = ParaboloidProblem()
+        prob.driver = pyOptSparseDriver(print_results=False, hotstart_file=filename)
+
+        prob.setup()
+        prob.run_driver()
+
+        self.assertEqual(prob.driver.iter_count, 1)
+
+    def test_hist_file_hotstart_deprecated(self):
+        filename = "hist_file"
+
+        # run driver and save history
+        prob = ParaboloidProblem()
+        driver = prob.driver = pyOptSparseDriver(print_results=False)
+
+        msg = "The 'hist_file' attribute is deprecated. Use the 'hist_file' option instead."
+        with assert_warning(OMDeprecationWarning, msg):
+            driver.hist_file = filename
+        with assert_warning(OMDeprecationWarning, msg):
+            self.assertEqual(driver.hist_file, filename)
+        self.assertEqual(driver.options['hist_file'], filename)
+
+        prob.setup()
+        prob.run_driver()
+
+        self.assertTrue(driver.iter_count > 1)
+        self.assertTrue(os.path.exists(filename))
+
+        # run driver and restart from history
+        prob = ParaboloidProblem()
+        driver = prob.driver = pyOptSparseDriver(print_results=False)
+
+        msg = "The 'hotstart_file' attribute is deprecated. Use the 'hotstart_file' option instead."
+        with assert_warning(OMDeprecationWarning, msg):
+            driver.hotstart_file = filename
+        with assert_warning(OMDeprecationWarning, msg):
+            self.assertEqual(driver.hotstart_file, filename)
+        self.assertEqual(driver.options['hotstart_file'], filename)
+
+        prob.setup()
+        prob.run_driver()
+
+        self.assertEqual(driver.iter_count, 1)
 
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
@@ -2871,7 +3071,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -2911,7 +3111,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
         prob.setup()
 
-        failed = prob.run_driver()
+        failed =  not prob.run_driver().success
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -3034,7 +3234,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         failed, output = run_driver(prob)
 
         self.assertFalse(failed, "Optimization failed, info = " +
-                                 str(prob.driver.pyopt_solution.optInform))
+                         str(prob.driver.pyopt_solution.optInform))
 
         assert_near_equal(prob['z'][0], 1.9776, 1e-3)
         assert_near_equal(prob['z'][1], 0.0, 1e-3)
@@ -3050,7 +3250,6 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         import signal
 
         prob = om.Problem()
-        model = prob.model
 
         prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = "SNOPT"
@@ -3135,6 +3334,178 @@ class TestResizingTestCase(unittest.TestCase):
         p.run_driver()
         p.compute_totals()
 
+@unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
+@use_tempdirs
+class TestPyoptSparseOutputFiles(unittest.TestCase):
+    # dict of optimizers with the values being a list of tuples of ( option_name, output_file_name )
+    optimizers_and_output_files = {
+        # ALPSO uses a single option `filename` to determine name of both output files
+        'ALPSO': [('filename', 'ALPSO_print.out'), ('filename', 'ALPSO_summary.out')],
+        'CONMIN': [('IFILE', 'CONMIN.out')],
+        'IPOPT': [('output_file', 'IPOPT.out')],
+        'PSQP': [('IFILE', 'PSQP.out')],
+        'SLSQP': [('IFILE', 'SLSQP.out')],
+        'SNOPT': [('Print file', 'SNOPT_print.out'), ('Summary file', 'SNOPT_summary.out')]
+    }
+
+    def createParaboloidProblem(self):
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+        prob.set_solver_print(level=0)
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+        prob.setup()
+        return prob
+
+    def run_and_test_default_output_dir(self, optimizer, output_file_names):
+        # default is to put the files in the ouputs directory for the problem
+        # output_file_names is a list of tuples of setting name and output file name
+        prob = self.createParaboloidProblem()
+        prob.driver = pyOptSparseDriver(optimizer=optimizer, print_results=False)
+
+        if optimizer == 'ALPSO':
+            prob.driver.opt_settings['fileout'] = 3 # need this to be 3 to get the output files
+
+        prob.run_driver()
+        default_output_dir = prob.get_outputs_dir()
+        for opt_setting_name, output_file_name in output_file_names:
+            output_file = default_output_dir.joinpath(output_file_name)
+            self.assertTrue(output_file.is_file(),
+                        f"{output_file_name} output file not found at {str(output_file)}")
+
+    def run_and_test_previous_behavior_output_dir(self, optimizer, output_file_names):
+        # Previous behavior is to put files in current working directory. Indicated with None
+        # output_file_names is a list of tuples of setting name and output file name
+        prob = self.createParaboloidProblem()
+        prob.driver = pyOptSparseDriver(optimizer=optimizer, print_results=False)
+
+        if optimizer == 'ALPSO':
+            prob.driver.opt_settings['fileout'] = 3
+
+        prob.driver.options['output_dir'] = None
+
+        prob.run_driver()
+        for opt_setting_name, output_file_name in output_file_names:
+            output_file = prob.get_outputs_dir() / output_file_name
+            self.assertTrue(output_file.is_file(),
+                        f"{output_file_name} output file not found at {str(output_file)}")
+
+    def run_and_test_user_set_output_dir(self, optimizer, output_file_names):
+        # output_file_names is a list of tuples of setting name and output file name
+
+        user_directory_name = 'user_outputs_dir'
+        pathlib.Path(user_directory_name).mkdir(exist_ok=True)
+
+        prob = self.createParaboloidProblem()
+        prob.driver = pyOptSparseDriver(optimizer=optimizer, print_results=False)
+
+        if optimizer == 'ALPSO':
+            prob.driver.opt_settings['fileout'] = 3
+
+        prob.driver.options['output_dir'] = user_directory_name
+
+        prob.run_driver()
+
+        for opt_setting_name, output_file_name in output_file_names:
+            output_file_path = pathlib.Path(user_directory_name).joinpath(output_file_name)
+            self.assertTrue(output_file_path.is_file(),
+                        f"{str(output_file_path)} output file not found at {str(output_file_path)}")
+
+    def test_default_output_dir(self):
+        for optimizer, output_files in self.optimizers_and_output_files.items():
+            _, loc_opt = set_pyoptsparse_opt(optimizer)
+            if loc_opt == optimizer: # Only do optimizers that are installed
+                self.run_and_test_default_output_dir(optimizer, output_files)
+
+    def test_previous_behavior_output_dir(self):
+        for optimizer, output_files in self.optimizers_and_output_files.items():
+            _, loc_opt = set_pyoptsparse_opt(optimizer)
+            if loc_opt == optimizer: # Only do optimizers that are installed
+                self.run_and_test_previous_behavior_output_dir(optimizer, output_files)
+
+    def test_user_set_output_dir(self):
+        for optimizer, output_files in self.optimizers_and_output_files.items():
+            _, loc_opt = set_pyoptsparse_opt(optimizer)
+            if loc_opt == optimizer: # Only do optimizers that are installed
+                self.run_and_test_user_set_output_dir(optimizer, output_files)
+
+
+
+@unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
+@use_tempdirs
+class TestLinearOnlyDVs(unittest.TestCase):
+    def setup_lin_only_dv_problem(self, driver, shape=(2, 3)):
+        prob = om.Problem()
+        prob.driver = driver
+        model = prob.model
+
+        ivc = model.add_subsystem('ivc', om.IndepVarComp())
+        ivc.add_output('x', np.ones(shape))
+        ivc.add_output('y', np.ones(shape))
+        ivc.add_output('z', np.ones(shape))
+
+        model.add_subsystem('comp', om.ExecComp('f_xy=x*2.-y*3.', shape=shape))
+        model.add_subsystem('obj', om.ExecComp('obj = sum(x**2)', obj=1., x=np.ones(shape)))
+        model.add_subsystem('con', om.ExecComp('y=x', shape=shape))
+        model.add_subsystem('con2', om.ExecComp('y=sin(x)', shape=shape))
+        model.add_subsystem('con3', om.ExecComp('y=.2*x', shape=shape), promotes_inputs=['x'])
+        model.add_subsystem('con4', om.ExecComp('y=cos(x)', shape=shape), promotes_inputs=['x'])
+
+        model.linear_solver = om.DirectSolver(assemble_jac=True)
+
+        model.connect('ivc.x', 'comp.x')
+        model.connect('ivc.y', 'comp.y')
+        model.connect('comp.f_xy', 'obj.x')
+        model.connect('ivc.z', 'con.x')
+        model.connect('ivc.x', 'con2.x')
+
+        model.add_design_var('ivc.x', lower=0.0, upper=1.0)
+        model.add_design_var('ivc.y', lower=0.0, upper=1.0)
+        model.add_design_var('ivc.z', lower=0.0, upper=1.0)
+        model.add_design_var('x', lower=0.0, upper=1.0)
+
+        model.add_objective('obj.obj')
+
+        model.add_constraint('con.y', lower=0.0, linear=True)
+        model.add_constraint('con3.y', lower=0.0, linear=True)
+        model.add_constraint('con4.y', lower=0.0)
+        model.add_constraint('con2.y', lower=0.0)
+
+        prob.setup(force_alloc_complex=True, check=False)
+
+        return prob
+
+    def test_lin_only_dvs(self):
+        shape = (2, 5)
+        # do first opt without coloring
+        driver = om.pyOptSparseDriver(optimizer='IPOPT', print_results=False)
+        driver.opt_settings['print_level'] = 5
+        driver.opt_settings['max_iter'] = 1000
+        p = self.setup_lin_only_dv_problem(driver=driver, shape=shape)
+        p.run_model()
+        p.run_driver()
+        nsolves_nocolor = p.driver._total_jac.nsolves
+        assert_check_totals(p.check_totals(method='cs', out_stream=None))
+
+        driver = om.pyOptSparseDriver(optimizer='IPOPT', print_results=False)
+        driver.opt_settings['print_level'] = 5
+        driver.opt_settings['max_iter'] = 1000
+        driver.declare_coloring()
+        p = self.setup_lin_only_dv_problem(driver=driver, shape=shape)
+        p.run_model()
+        p.run_driver()
+
+        jac_nrows = 21
+        rev_colors = 2
+        self.assertGreaterEqual(nsolves_nocolor / p.driver._total_jac.nsolves,
+                                jac_nrows / rev_colors)  # verify coloring is actually happening
+        assert_check_totals(p.check_totals(method='cs', out_stream=None))
 
 if __name__ == "__main__":
     unittest.main()

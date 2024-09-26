@@ -89,6 +89,38 @@ class _ReprClass(object):
     def __hash__(self):
         return hash(self._repr_string)
 
+    def __copy__(self):
+        """
+        Return self instead of a copy.
+
+        This ensures that 'is' and 'is not' comparisons to copies of this object don't break.
+
+        Returns
+        -------
+        _ReprClass instance
+            Return self instead of a copy.
+        """
+        return self
+
+    def __deepcopy__(self, memo):
+        """
+        Return self instead of a copy.
+
+        This ensures that 'is' and 'is not' comparisons to deep copies of this object don't break.
+
+        Parameters
+        ----------
+        memo : dict
+            Keeps track of already copied objects.
+
+        Returns
+        -------
+        _ReprClass instance
+            Return self instead of a copy.
+        """
+        memo[id(self)] = self
+        return self
+
 
 # unique object to check if default is given (when None is an allowed value)
 _UNDEFINED = _ReprClass("UNDEFINED")
@@ -96,3 +128,18 @@ _UNDEFINED = _ReprClass("UNDEFINED")
 # Use this as a special value to be able to tell if the caller set a value for the optional
 # out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
 _DEFAULT_OUT_STREAM = _ReprClass("DEFAULT_OUT_STREAM")
+
+# Used in pyOptSparseDriver and Problem for coloring dir. The default is the reports directory
+#  which includes the directory
+#  named after the Problem name. But when the declare method in that class is called, the driver
+#  does not have a reference to the Problem so can't get the name. This serves as a flag that
+#  the default directory in the reports directory is what is wanted. Then in the run method,
+#  the actual default directory is used
+_DEFAULT_REPORTS_DIR = _ReprClass("DEFAULT_REPORTS_DIR")
+
+# Used in Problem for coloring dir.
+#  named after the Problem name. But when the declare method in that class is called, the driver
+#  does not have a reference to the Problem so can't get the name. This serves as a flag that
+#  the default directory in the reports directory is what is wanted. Then in the run method,
+#  the actual default directory is used
+_DEFAULT_COLORING_DIR = _ReprClass("DEFAULT_COLORING_DIR")

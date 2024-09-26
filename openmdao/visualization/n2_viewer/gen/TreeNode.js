@@ -42,6 +42,10 @@ class TreeNode {
 
         this.parent = parent;
 
+        // All nodes connected to this one as either a source or target
+        this.connSources = new Set();
+        this.connTargets = new Set();
+
         this.sourceParentSet = new Set();
         this.targetParentSet = new Set();
 
@@ -120,7 +124,7 @@ class TreeNode {
     isFilter() { return (this.type == 'filter'); }
 
     /** True if this node can use filters (always false for base class) */
-    canFilter() { return false; } 
+    canFilter() { return false; }
 
     /** Not connectable if this is an input group or parents are minimized. */
     isConnectable() {
@@ -135,11 +139,16 @@ class TreeNode {
         return !(this.draw.hidden || this.draw.filtered);
     }
 
+    /** Return true if there are no children */
+    isLeaf() {
+        return (!this.hasChildren());
+    }
+
     /** True if node is not hidden and has no visible children */
     isVisibleLeaf() {
         if (this.draw.hidden || this.draw.filtered) return false; // Any explicitly hidden node
         if (this.isInputOrOutput()) return !this.draw.filtered; // Variable
-        if (!this.hasChildren()) return true; // Group w/out children
+        if (this.isLeaf()) return true; // Group w/out children
         return this.draw.minimized; // Collapsed non-variable
     }
 
@@ -150,9 +159,12 @@ class TreeNode {
 
     /**
      * Look for the supplied node in the set of child names.
+     * @param {TreeNode} compareNode The node to look for.
+     * @param {Boolean} includeSelf If true, return true if compareNode is us.
      * @returns {Boolean} True if a match is found, otherwise false.
      */
-    hasNodeInChildren(compareNode) {
+    hasNodeInChildren(compareNode, includeSelf = false) {
+        if (includeSelf && compareNode === this) return true;
         return this.childNames.has(compareNode.path);
     }
 
@@ -161,7 +173,8 @@ class TreeNode {
      * @param {TreeNode} [parentLimit = null] Stop searching at this common parent.
      * @returns {Boolean} True if the node is found, otherwise false.
      */
-    hasParent(compareNode, parentLimit = null) {
+    hasParent(compareNode, parentLimit = null, includeSelf = false) {
+        if (includeSelf && compareNode === this) return true;
         for (let obj = this.parent; obj != null && obj !== parentLimit; obj = obj.parent) {
             if (obj === compareNode) {
                 return true;
@@ -186,6 +199,24 @@ class TreeNode {
         if (this.hasParent(compareNode, parentLimit)) return true;
 
         return this.hasNodeInChildren(compareNode);
+    }
+
+    /**
+     * Look for a node with the given path in the lineage of this one.
+     * @param {string} path The path of the node to find.
+     * @returns {TreeNode} The node with the given path.
+     */
+    findNode(path) {
+        if (this.path == path)
+            return this;
+        else if (this.hasChildren()) {
+            for (let child of this.children) {
+                let node = child.findNode(path);
+                if (node != undefined)
+                    return node;
+            }
+        }
+        return undefined;
     }
 
     /**
@@ -232,13 +263,14 @@ class TreeNode {
      * @returns {String} The HTML-safe id.
      */
     static pathToId(path) {
-        return path.replace(/[\.<> :]/g, function (c) {
+        return path.replace(/[\.<> :|]/g, function (c) {
             return {
                 ' ': '__',
                 '<': '_LT',
                 '>': '_GT',
                 '.': '_',
-                ':': '-'
+                ':': '-',
+                '|': '--'
             }[c];
         })
     }
@@ -330,7 +362,7 @@ class FilterNode extends TreeNode {
         node.doFilter(this);
         this.show();
     }
-    
+
     /**
      * Update the node's state and remove it from our children. If nothing is left in
      * the children array, delete it and hide ourselves.
@@ -379,7 +411,7 @@ class FilterNode extends TreeNode {
 
     /** Return the length of the children array or 0 if it doesn't exist. */
     get count() { return (this.hasChildren()? this.children.length : 0); }
-    
+
     /** Don't expand, always stay minimized. */
     expand() { return this; }
 

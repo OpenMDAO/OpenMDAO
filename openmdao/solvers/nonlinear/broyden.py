@@ -10,7 +10,6 @@ from openmdao.solvers.linesearch.backtracking import BoundsEnforceLS
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.om_warnings import issue_warning, SetupWarning
-from openmdao.utils.mpi import MPI
 
 
 CITATION = """@ARTICLE{
@@ -46,7 +45,7 @@ class BroydenSolver(NonlinearSolver):
         Most recent Jacobian matrix.
     linear_solver : LinearSolver
         Linear solver to use for calculating inverse Jacobian.
-    linesearch : NonlinearSolver
+    _linesearch : NonlinearSolver
         Line search algorithm. Default is None for no line search.
     size : int
         Total length of the states being solved.
@@ -76,7 +75,8 @@ class BroydenSolver(NonlinearSolver):
         self.linear_solver = None
 
         # Slot for linesearch
-        self.linesearch = BoundsEnforceLS()
+        self.supports['linesearch'] = True
+        self._linesearch = BoundsEnforceLS()
 
         self.cite = CITATION
 
@@ -152,9 +152,7 @@ class BroydenSolver(NonlinearSolver):
         super()._setup_solvers(system, depth)
         self._recompute_jacobian = True
         self._computed_jacobians = 0
-        iproc = system.comm.rank
 
-        rank = MPI.COMM_WORLD.rank if MPI is not None else 0
         self._disallow_discrete_outputs()
 
         if self.linear_solver is not None:
@@ -308,8 +306,10 @@ class BroydenSolver(NonlinearSolver):
         self._converge_failures = 0
         self._computed_jacobians = 0
 
-        # Execute guess_nonlinear if specified.
-        system._guess_nonlinear()
+        # Execute guess_nonlinear if specified and
+        # we have not restarted from a saved point
+        if not self._restarted and system._has_guess:
+            system._guess_nonlinear()
 
         # When under a complex step from higher in the hierarchy, sometimes the step is too small
         # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
@@ -564,39 +564,39 @@ class BroydenSolver(NonlinearSolver):
         approx_status = system._owns_approx_jac
         system._owns_approx_jac = False
 
-        # Linearize model.
-        ln_solver = self.linear_solver
-        do_sub_ln = ln_solver._linearize_children()
-        my_asm_jac = ln_solver._assembled_jac
-        system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
-        if my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac:
-            my_asm_jac._update(system)
-        self._linearize()
+        try:
+            # Linearize model.
+            ln_solver = self.linear_solver
+            my_asm_jac = ln_solver._assembled_jac
+            system._linearize(my_asm_jac, sub_do_ln=ln_solver._linearize_children())
+            if my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac:
+                my_asm_jac._update(system)
+            self._linearize()
 
-        for wrt_name in states:
-            i_wrt, j_wrt = self._idx[wrt_name]
-            if wrt_name in d_res:
-                d_wrt = d_res[wrt_name]
-
-            for j in range(j_wrt - i_wrt):
-
-                # Increment each variable.
+            for wrt_name in states:
+                i_wrt, j_wrt = self._idx[wrt_name]
                 if wrt_name in d_res:
-                    d_wrt[j] = 1.0
+                    d_wrt = d_res[wrt_name]
 
-                # Solve for total derivatives.
-                ln_solver.solve('fwd')
+                for j in range(j_wrt - i_wrt):
 
-                # Extract results.
-                for of_name in states:
-                    i_of, j_of = self._idx[of_name]
-                    inv_jac[i_of:j_of, i_wrt + j] = d_out[of_name]
+                    # Increment each variable.
+                    if wrt_name in d_res:
+                        d_wrt[j] = 1.0
 
-                if wrt_name in d_res:
-                    d_wrt[j] = 0.0
+                    # Solve for total derivatives.
+                    ln_solver.solve('fwd')
 
-        # Enable local fd
-        system._owns_approx_jac = approx_status
+                    # Extract results.
+                    for of_name in states:
+                        i_of, j_of = self._idx[of_name]
+                        inv_jac[i_of:j_of, i_wrt + j] = d_out[of_name]
+
+                    if wrt_name in d_res:
+                        d_wrt[j] = 0.0
+        finally:
+            # Enable local fd
+            system._owns_approx_jac = approx_status
 
         return inv_jac
 
@@ -617,18 +617,19 @@ class BroydenSolver(NonlinearSolver):
         approx_status = system._owns_approx_jac
         system._owns_approx_jac = False
 
-        # Linearize model.
-        ln_solver = self.linear_solver
-        do_sub_ln = ln_solver._linearize_children()
-        my_asm_jac = ln_solver._assembled_jac
-        system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
-        if my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac:
-            my_asm_jac._update(system)
+        try:
+            # Linearize model.
+            ln_solver = self.linear_solver
+            do_sub_ln = ln_solver._linearize_children()
+            my_asm_jac = ln_solver._assembled_jac
+            system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
+            if my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac:
+                my_asm_jac._update(system)
 
-        inv_jac = self.linear_solver._inverse()
-
-        # Enable local fd
-        system._owns_approx_jac = approx_status
+            inv_jac = self.linear_solver._inverse()
+        finally:
+            # Enable local fd
+            system._owns_approx_jac = approx_status
 
         return inv_jac
 

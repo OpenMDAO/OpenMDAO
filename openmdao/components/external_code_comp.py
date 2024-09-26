@@ -3,13 +3,12 @@ import os
 import sys
 import re
 
-import numpy.distutils
-from numpy.distutils.exec_command import find_executable
+from shutil import which
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.implicitcomponent import ImplicitComponent
-from openmdao.utils.shell_proc import STDOUT, DEV_NULL, ShellProc
+from openmdao.utils.shell_proc import STDOUT, DEV_NULL, ShellProc  # noqa: F401
 
 
 class ExternalCodeDelegate(object):
@@ -40,8 +39,10 @@ class ExternalCodeDelegate(object):
         comp = self._comp
 
         comp.options.declare('command', [], types=(list, str),
-                             desc="Command to be executed. If command is a list, shell=True, "
-                                  "otherwise shell=False")
+                             desc="Command to be executed. If it is a string, then this is the "
+                                  "command line to execute and the 'shell' argument to "
+                                  "'subprocess.Popen()'  is set to True. "
+                                  "If it is a list; the first entry is the command to execute.")
         comp.options.declare('env_vars', {}, desc='Environment variables required by the command.')
         comp.options.declare('poll_delay', 0.0, lower=0.0,
                              desc='Delay between polling for command completion. '
@@ -80,13 +81,13 @@ class ExternalCodeDelegate(object):
         else:
             program_to_execute = comp.options['command'][0]
             if sys.platform == 'win32':
-                if not find_executable(program_to_execute):
+                if not which(program_to_execute):
                     missing = self._check_for_files([program_to_execute])
                     if missing:
                         logger.error("The command to be executed, '%s', "
                                      "cannot be found" % program_to_execute)
             else:
-                if not find_executable(program_to_execute):
+                if not which(program_to_execute):
                     logger.error("The command to be executed, '%s', "
                                  "cannot be found" % program_to_execute)
 
@@ -194,15 +195,13 @@ class ExternalCodeDelegate(object):
         comp = self._comp
 
         if isinstance(command, str):
-            program_to_execute = re.findall(r"^([\w\-]+)", command)[0]
+            # parse for the first word, which may contain dashes and path separators
+            program_to_execute = re.findall(r"^([\w\-\/\:\.]+)", command)[0]
         else:
             program_to_execute = command[0]
 
-        # Suppress message from find_executable function, we'll handle it
-        numpy.distutils.log.set_verbosity(-1)
-
         if sys.platform == 'win32':
-            if not find_executable(program_to_execute):
+            if not which(program_to_execute):
                 missing = self._check_for_files([program_to_execute])
                 if missing:
                     raise ValueError("The command to be executed, '%s', "
@@ -213,7 +212,7 @@ class ExternalCodeDelegate(object):
                 command_for_shell_proc = 'cmd.exe /c ' + str(command)
 
         else:
-            if not find_executable(program_to_execute):
+            if not which(program_to_execute):
                 raise ValueError("The command to be executed, '%s', "
                                  "cannot be found" % program_to_execute)
             command_for_shell_proc = command

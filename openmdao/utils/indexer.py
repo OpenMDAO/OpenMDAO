@@ -9,7 +9,7 @@ from itertools import zip_longest
 
 from openmdao.utils.general_utils import shape2tuple
 from openmdao.utils.array_utils import shape_to_len
-from openmdao.utils.om_warnings import issue_warning, OMDeprecationWarning
+from openmdao.utils.om_warnings import issue_warning
 
 
 def array2slice(arr):
@@ -52,6 +52,69 @@ def _truncate(s):
     if len(s) > 40:
         return s[:20] + ' ... ' + s[-20:]
     return s
+
+
+def combine_ranges(ranges):
+    """
+    Combine a list of (start, end) tuples into the smallest possible list of contiguous ranges.
+
+    The ranges are assumed to be non-overlapping and in ascending order.
+
+    Parameters
+    ----------
+    ranges : list
+        List of (start, end) tuples.
+
+    Returns
+    -------
+    list of tuples
+        List of combined ranges.
+    """
+    rnglist = []
+    if not ranges:
+        return rnglist
+
+    cstart, cend = ranges[0]
+    for start, end in ranges[1:]:
+        if start == cend:
+            cend = end
+        else:
+            rnglist.append((cstart, cend))
+            cstart, cend = start, end
+
+    rnglist.append((cstart, cend))
+
+    return rnglist
+
+
+def ranges2indexer(ranges, src_shape=None):
+    """
+    Convert a list of ranges to an indexer.
+
+    Parameters
+    ----------
+    ranges : list
+        List of (start, end) tuples.
+    src_shape : tuple or None
+        The shape of the source array.
+
+    Returns
+    -------
+    Indexer
+        Indexer object.
+    """
+    ranges = combine_ranges(ranges)
+    if len(ranges) == 1:
+        idx = slice(ranges[0][0], ranges[0][1])
+    elif len(ranges) == 0:
+        idx = slice(0, 0)
+    else:
+        idx = np.concatenate([np.arange(start, end) for start, end in ranges])
+
+    if src_shape is None:
+        src_shape = (ranges[-1][1] - ranges[0][0],)
+
+    return indexer(idx, src_shape=src_shape, flat_src=True)
 
 
 class Indexer(object):
@@ -159,9 +222,9 @@ class Indexer(object):
             raise RuntimeError(f"Can't get indexed_src_shape of {self} because source shape "
                                "is unknown.")
         if self._flat_src:
-            return resolve_shape(shape_to_len(self._src_shape))[self.flat()]
+            return resolve_shape(shape_to_len(self._src_shape)).get_shape(self.flat())
         else:
-            return resolve_shape(self._src_shape)[self()]
+            return resolve_shape(self._src_shape).get_shape(self())
 
     @property
     def indexed_src_size(self):
@@ -174,11 +237,6 @@ class Indexer(object):
             Size of flattened indices.
         """
         return shape_to_len(self.indexed_src_shape)
-
-    def _check_ind_type(self, ind, types):
-        if not isinstance(ind, types):
-            raise TypeError(f"Can't create {type(self).__name__} using this "
-                            f"kind of index: {ind}.")
 
     def flat(self, copy=False):
         """
@@ -224,8 +282,7 @@ class Indexer(object):
         """
         s = self.shaped_instance()
         if s is None:
-            raise ValueError(f"Can't get shaped array of {self} because it has "
-                             "no source shape.")
+            raise ValueError(f"Can't get shaped array of {self} because it has no source shape.")
         return s.as_array(copy=copy, flat=flat)
 
     def apply(self, subidxer):
@@ -261,14 +318,21 @@ class Indexer(object):
         Indexer
             Self is returned to allow chaining.
         """
-        self._src_shape, self._dist_shape, = self._get_shapes(shape, dist_shape)
+        sshape, self._dist_shape, = self._get_shapes(shape, dist_shape)
 
         if shape is not None:
             if self._flat_src is None:
-                self._flat_src = len(self._src_shape) <= 1
-            self._check_bounds()
+                self._flat_src = len(sshape) <= 1
 
-        self._shaped_inst = None
+        if sshape != self._src_shape:
+            self._src_shape = sshape
+            try:
+                self._check_bounds()
+            except Exception:
+                self._src_shape = None
+                self._dist_shape = None
+                raise
+            self._shaped_inst = None
 
         return self
 
@@ -318,7 +382,6 @@ class ShapedIntIndexer(Indexer):
         Initialize attributes.
         """
         super().__init__(flat_src)
-        self._check_ind_type(idx, Integral)
         self._idx = idx
 
     def __call__(self):
@@ -342,6 +405,24 @@ class ShapedIntIndexer(Indexer):
             String representation.
         """
         return f"{self._idx}"
+
+    def apply_offset(self, offset, flat=True):
+        """
+        Apply an offset to this index.
+
+        Parameters
+        ----------
+        offset : int
+            The offset to apply.
+        flat : bool
+            If True, return a flat index.
+
+        Returns
+        -------
+        int
+            The offset index.
+        """
+        return self._idx + offset
 
     def copy(self):
         """
@@ -492,7 +573,6 @@ class ShapedSliceIndexer(Indexer):
         Initialize attributes.
         """
         super().__init__(flat_src)
-        self._check_ind_type(slc, slice)
         if slc.step is None:
             slc = slice(slc.start, slc.stop, 1)
         self._slice = slc
@@ -518,6 +598,24 @@ class ShapedSliceIndexer(Indexer):
             String representation.
         """
         return f"{self._slice}"
+
+    def apply_offset(self, offset, flat=True):
+        """
+        Apply an offset to this index.
+
+        Parameters
+        ----------
+        offset : int
+            The offset to apply.
+        flat : bool
+            If True, return a flat index.
+
+        Returns
+        -------
+        slice
+            The offset slice.
+        """
+        return slice(self._slice.start + offset, self._slice.stop + offset, self._slice.step)
 
     def copy(self):
         """
@@ -751,6 +849,24 @@ class ShapedArrayIndexer(Indexer):
         """
         return _truncate(f"{self._arr}".replace('\n', ''))
 
+    def apply_offset(self, offset, flat=True):
+        """
+        Apply an offset to this index.
+
+        Parameters
+        ----------
+        offset : int
+            The offset to apply.
+        flat : bool
+            If True, return a flat index.
+
+        Returns
+        -------
+        slice
+            The offset slice.
+        """
+        return self.as_array(flat=flat) + offset
+
     def copy(self):
         """
         Copy this Indexer.
@@ -956,6 +1072,26 @@ class ShapedMultiIndexer(Indexer):
         """
         return str(self._tup)
 
+    def apply_offset(self, offset, flat=True):
+        """
+        Apply an offset to this index.
+
+        Parameters
+        ----------
+        offset : int
+            The offset to apply.
+        flat : bool
+            If True, return a flat index.
+
+        Returns
+        -------
+        ndarray
+            The offset array.
+        """
+        if flat:
+            return self.flat() + offset
+        return self.as_array(flat=False) + offset
+
     def copy(self):
         """
         Copy this Indexer.
@@ -996,7 +1132,7 @@ class ShapedMultiIndexer(Indexer):
             The index array into a flat array.
         """
         if self._src_shape is None:
-            raise ValueError(f"Can't determine extent of array because source shape is not known.")
+            raise ValueError("Can't determine extent of array because source shape is not known.")
 
         idxs = np.arange(shape_to_len(self._src_shape), dtype=np.int32).reshape(self._src_shape)
 
@@ -1107,7 +1243,7 @@ class MultiIndexer(ShapedMultiIndexer):
             self._shaped_inst = ShapedMultiIndexer(tuple(idxer.shaped_instance()()
                                                          for idxer in self._idx_list),
                                                    flat_src=self._flat_src)
-        except Exception as err:
+        except Exception:
             self._shaped_inst = None
         else:
             self._shaped_inst.set_src_shape(self._src_shape)
@@ -1167,6 +1303,24 @@ class EllipsisIndexer(Indexer):
             String representation.
         """
         return f"{self._tup}"
+
+    def apply_offset(self, offset, flat=True):
+        """
+        Apply an offset to this index.
+
+        Parameters
+        ----------
+        offset : int
+            The offset to apply.
+        flat : bool
+            If True, return a flat index.
+
+        Returns
+        -------
+        ndarray
+            The offset array.
+        """
+        return self.as_array(flat=flat) + offset
 
     def copy(self):
         """
@@ -1405,7 +1559,7 @@ class resolve_shape(object):
         """
         self._shape = shape2tuple(shape)
 
-    def __getitem__(self, idx):
+    def get_shape(self, idx):
         """
         Return the shape of the result of indexing into the source with index idx.
 
@@ -1446,8 +1600,8 @@ class resolve_shape(object):
                     seen_arr = True
                     if ind.ndim > 1:
                         if arr_shape is not None and arr_shape != ind.shape:
-                            raise ValueError("Multi-index has index sub-arrays of different shapes "
-                                             f"({arr_shape} != {ind.shape}).")
+                            raise ValueError("Multi-index has index sub-arrays of different "
+                                             f"shapes ({arr_shape} != {ind.shape}).")
                         arr_shape = ind.shape
                     else:
                         # only first array idx counts toward shape

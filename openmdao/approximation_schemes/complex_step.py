@@ -1,9 +1,5 @@
 """Complex Step derivative approximations."""
 
-from collections import defaultdict
-
-import numpy as np
-
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
 
@@ -136,7 +132,11 @@ class ComplexStep(ApproximationScheme):
         system._set_complex_step_mode(True)
 
         try:
-            yield from self._compute_approx_col_iter(system, under_cs=True)
+            for tup in self._compute_approx_col_iter(system, under_cs=True):
+                yield tup
+                # this was needed after adding relevance to the NL solve in order to clean
+                # out old results left over in the output array from a previous solve.
+                system._outputs.set_val(saved_outputs)
         finally:
             # Turn off complex step.
             system._set_complex_step_mode(False)

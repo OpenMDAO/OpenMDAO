@@ -4,6 +4,7 @@ from packaging.version import Version
 import numpy as np
 import scipy
 from scipy.sparse.linalg import LinearOperator, gmres
+from openmdao.solvers.linear.linear_rhs_checker import LinearRHSChecker
 
 from openmdao.solvers.solver import LinearSolver
 
@@ -29,6 +30,8 @@ class ScipyKrylov(LinearSolver):
     ----------
     precon : Solver
         Preconditioner for linear solve. Default is None for no preconditioner.
+    _lin_rhs_checker : LinearRHSChecker or None
+        Object for checking the right-hand side of the linear solve.
     """
 
     SOLVER = 'LN: SCIPY'
@@ -39,8 +42,8 @@ class ScipyKrylov(LinearSolver):
         """
         super().__init__(**kwargs)
 
-        # initialize preconditioner to None
         self.precon = None
+        self._lin_rhs_checker = None
 
     def _assembled_jac_solver_iter(self):
         """
@@ -66,9 +69,18 @@ class ScipyKrylov(LinearSolver):
                                   'iteration cost, but may be necessary for convergence. This '
                                   'option applies only to gmres.')
 
+        self.options.declare('rhs_checking', types=(bool, dict),
+                             default=False,
+                             desc="If True, check RHS vs. cache and/or zero to avoid some solves."
+                             "Can also be set to a dict of options for the LinearRHSChecker to "
+                             "allow finer control over it. Allowed options are: "
+                             f"{LinearRHSChecker.options}")
+
         # changing the default maxiter from the base class
         self.options['maxiter'] = 1000
         self.options['atol'] = 1.0e-12
+
+        self.supports['implicit_components'] = True
 
     def _setup_solvers(self, system, depth):
         """
@@ -85,6 +97,9 @@ class ScipyKrylov(LinearSolver):
 
         if self.precon is not None:
             self.precon._setup_solvers(self._system(), self._depth + 1)
+
+        self._lin_rhs_checker = LinearRHSChecker.create(self._system(),
+                                                        self.options['rhs_checking'])
 
     def _set_solver_print(self, level=2, type_='all'):
         """
@@ -113,8 +128,7 @@ class ScipyKrylov(LinearSolver):
         bool
             Flag for indicating child linerization
         """
-        precon = self.precon
-        return (precon is not None) and (precon._linearize_children())
+        return (self.precon is not None) and (self.precon._linearize_children())
 
     def _linearize(self):
         """
@@ -122,6 +136,9 @@ class ScipyKrylov(LinearSolver):
         """
         if self.precon is not None:
             self.precon._linearize()
+
+        if self._lin_rhs_checker is not None:
+            self._lin_rhs_checker.clear()
 
     def _mat_vec(self, in_arr):
         """
@@ -148,8 +165,7 @@ class ScipyKrylov(LinearSolver):
 
         x_vec.set_val(in_arr)
         scope_out, scope_in = system._get_matvec_scope()
-        system._apply_linear(self._assembled_jac, self._rel_systems, self._mode,
-                             scope_out, scope_in)
+        system._apply_linear(self._assembled_jac, self._mode, scope_out, scope_in)
 
         # DO NOT REMOVE: frequently used for debugging
         # print('in', in_arr)
@@ -185,9 +201,8 @@ class ScipyKrylov(LinearSolver):
         mode : str
             'fwd' or 'rev'.
         rel_systems : set of str
-            Names of systems relevant to the current solve.
+            Names of systems relevant to the current solve.  Deprecated.
         """
-        self._rel_systems = rel_systems
         self._mode = mode
 
         system = self._system()
@@ -197,8 +212,7 @@ class ScipyKrylov(LinearSolver):
 
         maxiter = self.options['maxiter']
         atol = self.options['atol']
-
-        fail = False
+        rtol = self.options['rtol']
 
         if mode == 'fwd':
             x_vec = system._doutputs
@@ -206,6 +220,15 @@ class ScipyKrylov(LinearSolver):
         else:  # rev
             x_vec = system._dresiduals
             b_vec = system._doutputs
+
+            if self._lin_rhs_checker is not None:
+                sol_array, is_zero = self._lin_rhs_checker.get_solution(b_vec.asarray(), system)
+                if is_zero:
+                    x_vec.set_val(0.0)
+                    return
+                if sol_array is not None:
+                    x_vec.set_val(sol_array)
+                    return
 
         x_vec_combined = x_vec.asarray()
         size = x_vec_combined.size
@@ -219,21 +242,31 @@ class ScipyKrylov(LinearSolver):
 
         self._iter_count = 0
         if solver is gmres:
-            if Version(scipy.__version__) < Version("1.1"):
-                x, info = solver(linop, b_vec.asarray(True), M=M, restart=restart,
-                                 x0=x_vec_combined, maxiter=maxiter, tol=atol,
-                                 callback=self._monitor)
-            else:
+            if Version(Version(scipy.__version__).base_version) < Version("1.12"):
                 x, info = solver(linop, b_vec.asarray(True), M=M, restart=restart,
                                  x0=x_vec_combined, maxiter=maxiter, tol=atol, atol='legacy',
-                                 callback=self._monitor)
+                                 callback=self._monitor, callback_type='legacy')
+            else:
+                x, info = solver(linop, b_vec.asarray(True), M=M, restart=restart,
+                                 x0=x_vec_combined, maxiter=maxiter, atol=atol, rtol=rtol,
+                                 callback=self._monitor, callback_type='legacy')
         else:
             x, info = solver(linop, b_vec.asarray(True), M=M,
-                             x0=x_vec_combined, maxiter=maxiter, tol=atol,
-                             callback=self._monitor)
+                             x0=x_vec_combined, maxiter=maxiter, tol=atol, atol='legacy',
+                             callback=self._monitor, callback_type='legacy')
 
-        fail |= (info != 0)
-        x_vec.set_val(x)
+        if info == 0:
+            x_vec.set_val(x)
+        elif info > 0:
+            self._convergence_failure()
+        else:
+            msg = (f"Solver '{self.SOLVER}' on system '{self._system().pathname}': "
+                   f"had an illegal input or breakdown (info={info}) after {self._iter_count} "
+                   "iterations.")
+            self.report_failure(msg)
+
+        if not system.under_complex_step and self._lin_rhs_checker is not None and mode == 'rev':
+            self._lin_rhs_checker.add_solution(b_vec.asarray(), x, copy=True)
 
     def _apply_precon(self, in_vec):
         """
@@ -273,3 +306,14 @@ class ScipyKrylov(LinearSolver):
 
         # return resulting value of x vector
         return x_vec.asarray(copy=True)
+
+    def use_relevance(self):
+        """
+        Return True if relevance should be active.
+
+        Returns
+        -------
+        bool
+            True if relevance should be active.
+        """
+        return False

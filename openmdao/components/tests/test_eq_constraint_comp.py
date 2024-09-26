@@ -7,6 +7,14 @@ from numpy.testing import assert_almost_equal
 import openmdao.api as om
 from openmdao.test_suite.components.sellar_feature import SellarIDF
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
+from openmdao.utils.testing_utils import force_check_partials
+
+try:
+    # The exceptions module is new in NumPy 1.25.  Older exceptions remain available
+    # through the main NumPy namespace for compatibility. (Until NumPy 2.0 release)
+    from numpy.exceptions import ComplexWarning
+except ModuleNotFoundError:
+    from numpy import ComplexWarning  # noqa: NPY201
 
 
 class TestEQConstraintComp(unittest.TestCase):
@@ -22,7 +30,7 @@ class TestEQConstraintComp(unittest.TestCase):
 
         prob.run_model()
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -83,7 +91,7 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_almost_equal(prob['f.y'], 27.)
         assert_almost_equal(prob['g.y'], 27.)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -120,7 +128,7 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_almost_equal(prob['f.y'], 27.)
         assert_almost_equal(prob['g.y'], 27.)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -133,7 +141,8 @@ class TestEQConstraintComp(unittest.TestCase):
         model.add_subsystem('f', om.ExecComp('y=3*x-3', x=0.))
         model.add_subsystem('g', om.ExecComp('y=2.3*x+4', x=0.))
         model.add_subsystem('equal', om.EQConstraintComp('y', add_constraint=True, normalize=False,
-                                                         ref0=0, ref=100.0))
+                                                         ref0=0, ref=100.0, linear=True, cache_linear_solution=True,
+                                                         alias='eq_constraint'))
 
         model.connect('indep.x', 'f.x')
         model.connect('indep.x', 'g.x')
@@ -147,7 +156,7 @@ class TestEQConstraintComp(unittest.TestCase):
         prob.setup(mode='fwd')
 
         # verify that the constraint has been added as requested
-        self.assertTrue('equal.y' in model.get_constraints())
+        self.assertTrue('eq_constraint' in model.get_constraints())
 
         # verify that the output is not being normalized
         prob.run_model()
@@ -160,12 +169,17 @@ class TestEQConstraintComp(unittest.TestCase):
 
         prob.run_driver()
 
+        # verify that options are added
+        self.assertEqual(prob.driver._cons['eq_constraint']['linear'], True)
+        self.assertEqual(prob.driver._cons['eq_constraint']['cache_linear_solution'], True)
+        self.assertEqual(prob.driver._cons['eq_constraint']['alias'], 'eq_constraint')
+
         assert_almost_equal(prob['equal.y'], 0.)
         assert_almost_equal(prob['indep.x'], 10.)
         assert_almost_equal(prob['f.y'], 27.)
         assert_almost_equal(prob['g.y'], 27.)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -202,7 +216,7 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_almost_equal(prob['f.y'], np.ones(n)*27.)
         assert_almost_equal(prob['g.y'], np.ones(n)*27.)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -239,7 +253,7 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_almost_equal(prob['f.y'], np.ones(n)*27.)
         assert_almost_equal(prob['g.y'], np.ones(n)*27.)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -284,7 +298,7 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_almost_equal(prob['f.y'], np.ones(n)*27.)
         assert_almost_equal(prob['g.y'], np.ones(n)*27.)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -316,7 +330,7 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_near_equal(prob['indep.x'], 2., 1e-6)
         assert_near_equal(prob['f.y'], 4., 1e-6)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -345,8 +359,8 @@ class TestEQConstraintComp(unittest.TestCase):
         prob.run_driver()
 
         with warnings.catch_warnings():
-            warnings.filterwarnings(action="error", category=np.ComplexWarning)
-            cpd = prob.check_partials(out_stream=None, method='cs')
+            warnings.filterwarnings(action="error", category=ComplexWarning)  # noqa: NPY201
+            cpd = force_check_partials(prob, out_stream=None, method='cs')
 
         assert_check_partials(cpd, atol=1e-10, rtol=1e-10)
 
@@ -382,7 +396,7 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_near_equal(prob['indep.x'], np.ones(n)*2., 1e-6)
         assert_near_equal(prob['f.y'], np.ones(n)*4., 1e-6)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -416,7 +430,7 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_near_equal(prob['indep.x'], np.ones(n)*2., 1e-6)
         assert_near_equal(prob['f.y'], np.ones(n)*4., 1e-6)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -444,7 +458,7 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_near_equal(prob['indep.x'], 2., 1e-6)
         assert_near_equal(prob['f.y'], 4., 1e-6)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -478,7 +492,7 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_near_equal(prob['indep.x'], np.ones(n)*2., 1e-6)
         assert_near_equal(prob['f.y'], np.ones(n)*4., 1e-6)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=2e-5, rtol=2e-5)
 
@@ -501,7 +515,7 @@ class TestEQConstraintComp(unittest.TestCase):
 
         assert_near_equal(prob['equal.y'], np.ones(shape) - rhs, 1e-6)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -536,7 +550,7 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_almost_equal(prob['f.y'], 27.)
         assert_almost_equal(prob['g.y'], 27.)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -613,6 +627,31 @@ class TestEQConstraintComp(unittest.TestCase):
         prob.set_val('eq_comp.k2', np.random.rand(n) * 10)
 
         prob.run_model()
+
+    def test_indices(self):
+        prob = om.Problem()
+        model = prob.model
+
+        n = 20
+
+        model.add_subsystem('indep', om.IndepVarComp('x', np.ones(n)))
+        model.add_subsystem('f', om.ExecComp('y=x**2', x=np.ones(n), y=np.ones(n)))
+        model.add_subsystem('eq_comp', om.EQConstraintComp('y', val=np.ones(n),
+                            indices=[n-2,n-1],
+                            flat_indices=True, add_constraint=True))
+
+        model.connect('indep.x', 'f.x')
+        model.add_design_var('indep.x')
+        model.add_objective('f.y', index=0)
+
+        prob.setup()
+
+        prob.run_driver()
+
+        assert_near_equal(prob.driver._cons['eq_comp.y']['indices']._arr, np.asarray([n-2,n-1], dtype=int))
+        self.assertEqual(prob.driver._cons['eq_comp.y']['flat_indices'], True)
+
+
 
 
 if __name__ == '__main__':  # pragma: no cover

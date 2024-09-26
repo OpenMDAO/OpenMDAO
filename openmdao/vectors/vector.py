@@ -54,11 +54,7 @@ class Vector(object):
     _kind : str
         Specific kind of vector, either 'input', 'output', or 'residual'.
     _system : System
-        Pointer to the owning system.
-    _iproc : int
-        Global processor index.
-    _length : int
-        Length of flattened vector.
+        Weak ref to the owning system.
     _views : dict
         Dictionary mapping absolute variable names to the ndarray views.
     _views_flat : dict
@@ -230,18 +226,23 @@ class Vector(object):
         Yields
         ------
         str
-            Name of each variable.
+            Relative name of each variable.
         ndarray or float
             Value of each variable.
         """
+        if self._system().pathname:
+            plen = len(self._system().pathname) + 1
+        else:
+            plen = 0
+
         if self._under_complex_step:
             for n, v in self._views.items():
                 if n in self._names:
-                    yield n, v
+                    yield n[plen:], v
         else:
             for n, v in self._views.items():
                 if n in self._names:
-                    yield n, v.real
+                    yield n[plen:], v.real
 
     def _name2abs_name(self, name):
         """
@@ -391,13 +392,33 @@ class Vector(object):
             variable value.
         """
         if flat:
-            val = self._views_flat[name]
-        else:
-            val = self._views[name]
+            if self._under_complex_step:
+                return self._views_flat[name]
+            else:
+                return self._views_flat[name].real
 
         if self._under_complex_step:
-            return val
-        return val.real
+            return self._views[name]
+        else:
+            return self._views[name].real
+
+    def _abs_set_val(self, name, val):
+        """
+        Set the variable value using the absolute name.
+
+        No error checking is performed on the name.
+
+        Parameters
+        ----------
+        name : str
+            Absolute name in the owning system's namespace.
+        val : float or ndarray
+            Value to set.
+        """
+        if self._under_complex_step:
+            self._views[name][:] = val
+        else:
+            self._views[name].real[:] = val
 
     def __setitem__(self, name, value):
         """
@@ -488,7 +509,7 @@ class Vector(object):
             This vector times val is added to self.
         """
         raise NotImplementedError('add_scale_vec not defined for vector type '
-                                  f'{ype(self).__name__}')
+                                  f'{type(self).__name__}')
 
     def asarray(self, copy=False):
         """
@@ -702,3 +723,41 @@ class Vector(object):
         """
         raise NotImplementedError(f'get_hash not defined for vector type {type(self).__name__}')
         return ''  # silence lint warning about missing return value.
+
+    def _get_local_views(self, arr=None):
+        """
+        Return a dict of views into an array using local names.
+
+        If arr is not supplied, use our existing internal data array.
+        Note that if arr is not specified, the array used will depend upon the value of
+        _under_complex_step.
+
+        Parameters
+        ----------
+        arr : ndarray or None
+            If not None, create views into this array.
+
+        Returns
+        -------
+        dict
+            A dict of views into the data array keyed using local names.
+        """
+        if arr is None:
+            arr = self.asarray(copy=False)
+        elif len(self) != arr.size:
+            raise RuntimeError(f"{self._system().msginfo}: can't create local view dict because "
+                               f"given array is size {arr.size} but expected size is {len(self)}.")
+
+        dct = {}
+        path = self._system().pathname
+        pathlen = len(path) + 1 if path else 0
+
+        start = end = 0
+        for name, val in self._abs_item_iter(flat=False):
+            end += val.size
+            view = arr[start:end]
+            view.shape = val.shape
+            dct[name[pathlen:]] = view
+            start = end
+
+        return dct

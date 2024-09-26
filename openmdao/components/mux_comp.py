@@ -111,7 +111,7 @@ class MuxComp(ExplicitComponent):
                 in_templates[i].flat[j] = 1
                 temp_out = np.stack(in_templates, axis=ax)
                 cs.append(j)
-                rs.append(int(np.nonzero(temp_out.ravel())[0]))
+                rs.append(int(np.nonzero(temp_out.ravel())[0].item()))
 
             self.declare_partials(of=name, wrt=in_name, rows=rs, cols=cs, val=1.0)
 

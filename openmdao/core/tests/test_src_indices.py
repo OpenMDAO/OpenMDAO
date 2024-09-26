@@ -2,8 +2,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
-from openmdao.utils.om_warnings import  OMDeprecationWarning
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
 
 class Inner(om.Group):
     def setup(self):
@@ -23,7 +22,7 @@ class SrcIndicesTestCase(unittest.TestCase):
     def test_one_nesting(self):
         prob = om.Problem()
         model = prob.model
-        comp = model.add_subsystem('src', om.ExecComp('y=3*x', x=np.zeros((7)), y=np.zeros((7))))
+        model.add_subsystem('src', om.ExecComp('y=3*x', x=np.zeros((7)), y=np.zeros((7))))
         model.add_subsystem('outer', Outer())
         model.connect('src.y', 'outer.desvar_x', src_indices=[2, 4], flat_src_indices=True)
         prob.setup()
@@ -50,7 +49,7 @@ class SrcIndicesTestCase(unittest.TestCase):
 
         g1 = p.model.add_subsystem('g1', om.Group())
         # c2 is vectorized calculations
-        c2 = g1.add_subsystem('c2', om.ExecComp('z = a * y', shape=(4,)))
+        g1.add_subsystem('c2', om.ExecComp('z = a * y', shape=(4,)))
 
         # The ultimate source of a and y may be scalar, or have some other arbitrary shape
         g1.promotes('c2', inputs=['a'], src_indices=[0, 0, 0, 0], src_shape=(1,))
@@ -83,11 +82,11 @@ class SrcIndicesTestCase(unittest.TestCase):
 
         g1 = p.model.add_subsystem('g1', om.Group(), promotes_inputs=['b'])
         # c1 contains scalar calculations
-        c1 = g1.add_subsystem('c1', om.ExecComp('y = a0 + b', shape=(1,)),
-                              promotes_inputs=[('a0', 'a'), 'b'], promotes_outputs=['y'])
+        g1.add_subsystem('c1', om.ExecComp('y = a0 + b', shape=(1,)),
+                         promotes_inputs=[('a0', 'a'), 'b'], promotes_outputs=['y'])
         g2 = g1.add_subsystem('g2', om.Group())
         # c2 is vectorized calculations
-        c2 = g2.add_subsystem('c2', om.ExecComp('z = a * y', shape=(4,)), promotes_inputs=['a', 'y'])
+        g2.add_subsystem('c2', om.ExecComp('z = a * y', shape=(4,)), promotes_inputs=['a', 'y'])
 
         g1.promotes('g2', inputs=['y'], src_indices=[0, 0, 0, 0], src_shape=(1,))
         g1.promotes('g2', inputs=['a'], src_indices=[0, 0, 0, 0], src_shape=(1,))
@@ -127,12 +126,12 @@ class SrcIndicesTestCase(unittest.TestCase):
 
         g1 = p.model.add_subsystem('g1', om.Group(), promotes_inputs=['b'])
         # c1 contains scalar calculations
-        c1 = g1.add_subsystem('c1', om.ExecComp('y = a0 + b', shape=(1,)),
-                              promotes_inputs=[('a0', 'a'), 'b'], promotes_outputs=['y'])
+        g1.add_subsystem('c1', om.ExecComp('y = a0 + b', shape=(1,)),
+                         promotes_inputs=[('a0', 'a'), 'b'], promotes_outputs=['y'])
 
         g2 = g1.add_subsystem('g2', om.Group())
         # c2 is vectorized calculations
-        c2 = g2.add_subsystem('c2',  om.ExecComp('z = a * y', shape=(4,)), promotes_inputs=['a', 'y'])
+        g2.add_subsystem('c2',  om.ExecComp('z = a * y', shape=(4,)), promotes_inputs=['a', 'y'])
 
         g1.promotes('g2', inputs=['a'], src_indices=[0, 0, 0, 0], src_shape=(1,))
         g1.promotes('g2', inputs=['y'], src_indices=[0, 0, 0, 0], src_shape=(1,))
@@ -299,7 +298,7 @@ class SrcIndicesTestCase(unittest.TestCase):
         assert_near_equal(prob['y1'], [75.3*2]*4)
 
     def test_src_shape_mismatch(self):
-        p = om.Problem()
+        p = om.Problem(name='src_shape_mismatch')
         G = p.model.add_subsystem('G', om.Group(), promotes_inputs=['x'])
 
         G.set_input_defaults('x', src_shape=(3,2))
@@ -314,10 +313,13 @@ class SrcIndicesTestCase(unittest.TestCase):
 
         g2.promotes('C2', inputs=['x'], src_indices=[1,5], src_shape=(3,2), flat_src_indices=True)
 
-        with self.assertRaises(RuntimeError) as cm:
+        with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "In connection from '_auto_ivc.v0' to 'G.g1.C1.x', error was: Promoted src_shape of (3, 3) for 'G.g1.C1.x' differs from src_shape (3, 2) for 'x'.")
+        self.assertEqual(cm.exception.args[0],
+           "\nCollected errors for problem 'src_shape_mismatch':"
+           "\n   <model> <class Group>: When connecting '_auto_ivc.v0' to 'G.g1.C1.x': Promoted "
+           "src_shape of (3, 3) for 'G.g1.C1.x' differs from src_shape (3, 2) for 'x'.")
 
     def test_src_indices_on_promotes(self):
         src_shape = (3, 3)
@@ -335,20 +337,23 @@ class SrcIndicesTestCase(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = 2.0 * inputs['x']
 
-        p = om.Problem()
+        p = om.Problem(name='src_indices_on_promotes')
         p.model.add_subsystem('indeps', om.IndepVarComp('x', shape=src_shape))
         p.model.add_subsystem('C1', MyComp(tgt_shape))
         p.model.promotes('C1', any=['x'],
                             src_indices=src_indices,
                             flat_src_indices=flat_src_indices)
         p.model.set_input_defaults('x', src_shape=src_shape)
-
-        with self.assertRaises(IndexError) as cm:
+        with self.assertRaises(Exception) as cm:
             p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "When promoting 'x' from system 'C1' with src_indices [4 5 7 9] and src_shape (3, 3): "
-                         "index 9 is out of bounds for source dimension of size 9.")
+            "\nCollected errors for problem 'src_indices_on_promotes':"
+            "\n   <model> <class Group>: When promoting 'x' from system 'C1' with src_indices "
+            "[4 5 7 9] and src_shape (3, 3): index 9 is out of bounds for source dimension of size 9."
+            "\n   <model> <class Group>: The source indices [4 5 7 9] do not specify a valid shape "
+            "for the connection '_auto_ivc.v0' to 'C1.x'. (target shape=(2, 2), indices_shape=(4,)):"
+            " index 9 is out of bounds for axis 0 with size 9")
 
     def test_connect_slice_src_indices_not_full_size(self):
         p = om.Problem()
@@ -566,7 +571,8 @@ class DoubleNestedParallelMultipointTestCase(unittest.TestCase):
 
         assert_check_totals(p.check_totals(of=['par.G1.G1p.C1_1.y', 'par.G1.G1p.C1_2.y',
                                                'par.G2.G2p.C2_1.y', 'par.G2.G2p.C2_2.y',
-                                               'par.G3.G3s.C3_1.y', 'par.G3.G3s.C3_2.y'], wrt=['x']))
+                                               'par.G3.G3s.C3_1.y', 'par.G3.G3s.C3_2.y'], wrt=['x'],
+                                           show_only_incorrect=True))
 
 
 class TestNestedInputDefaults(unittest.TestCase):

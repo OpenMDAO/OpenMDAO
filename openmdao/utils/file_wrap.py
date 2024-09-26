@@ -7,8 +7,13 @@ Note: This is a work in progress.
 
 import re
 
-from pyparsing import CaselessLiteral, Combine, OneOrMore, Optional, \
-    TokenConverter, Word, nums, oneOf, printables, ParserElement, alphanums
+try:
+    import pyparsing
+    from pyparsing import CaselessLiteral, Combine, OneOrMore, Optional, \
+        TokenConverter, Word, nums, oneOf, printables, ParserElement, alphanums
+except ImportError:
+    pyparsing = None
+    TokenConverter = object
 
 import numpy as np
 
@@ -294,6 +299,10 @@ class InputFileGenerator(object):
         """
         Initialize attributes.
         """
+        if pyparsing is None:
+            raise RuntimeError("The 'pyparsing' package is required to use the file wrapping "
+                               "utilities but it is not installed. Try 'pip install pyparsing'.")
+
         self._template_filename = None
         self._output_filename = None
 
@@ -621,6 +630,10 @@ class FileParser(object):
         """
         Initialize attributes.
         """
+        if pyparsing is None:
+            raise RuntimeError("The 'pyparsing' package is required to use the file wrapping "
+                               "utilities but it is not installed. Try 'pip install pyparsing'.")
+
         self._filename = None
         self._data = []
 

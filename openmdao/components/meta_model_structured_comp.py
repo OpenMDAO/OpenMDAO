@@ -145,9 +145,6 @@ class MetaModelStructuredComp(ExplicitComponent):
         """
         interp_method = self.options['method']
 
-        opts = {}
-        if 'interp_options' in self.options:
-            opts = self.options['interp_options']
         for name, train_data in self.training_outputs.items():
             self.interps[name] = InterpND(method=interp_method,
                                           points=self.inputs, values=train_data,
@@ -167,16 +164,17 @@ class MetaModelStructuredComp(ExplicitComponent):
         super()._setup_partials()
         arange = np.arange(self.options['vec_size'])
         pnames = tuple(self.pnames)
-        dct = {
+        pattern_meta = {
             'rows': arange,
             'cols': arange,
             'dependent': True,
         }
 
         for name in self._var_rel_names['output']:
-            self._declare_partials(of=name, wrt=pnames, dct=dct)
+            self._resolve_partials_patterns(of=name, wrt=pnames, pattern_meta=pattern_meta)
             if self.options['training_data_gradients']:
-                self._declare_partials(of=name, wrt="%s_train" % name, dct={'dependent': True})
+                self._resolve_partials_patterns(of=name, wrt="%s_train" % name,
+                                                pattern_meta={'dependent': True})
 
         # The scipy methods do not support complex step.
         if self.options['method'].startswith('scipy'):
@@ -212,7 +210,7 @@ class MetaModelStructuredComp(ExplicitComponent):
                 varname_causing_error = '.'.join((self.pathname, self.pnames[err.idx]))
                 errmsg = (f"{self.msginfo}: Error interpolating output '{out_name}' "
                           f"because input '{varname_causing_error}' was out of bounds "
-                          f"('{ err.lower}', '{err.upper}') with value '{err.value}'")
+                          f"('{err.lower}', '{err.upper}') with value '{err.value}'")
                 raise AnalysisError(errmsg, inspect.getframeinfo(inspect.currentframe()),
                                     self.msginfo)
 

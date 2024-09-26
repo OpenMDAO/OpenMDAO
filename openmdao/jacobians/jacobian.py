@@ -3,14 +3,11 @@ import weakref
 
 import numpy as np
 
-from collections import defaultdict
 from scipy.sparse import issparse
 
 from openmdao.core.constants import INT_DTYPE
-from openmdao.utils.name_maps import key2abs_key, rel_name2abs_name
-from openmdao.utils.array_utils import sparse_subinds
+from openmdao.utils.name_maps import key2abs_key
 from openmdao.matrices.matrix import sparse_types
-from openmdao.vectors.vector import _full_slice
 
 SUBJAC_META_DEFAULTS = {
     'rows': None,
@@ -40,11 +37,8 @@ class Jacobian(object):
         Dictionary of the sub-Jacobian metadata keyed by absolute names.
     _under_complex_step : bool
         When True, this Jacobian is under complex step, using a complex jacobian.
-    _abs_keys : defaultdict
+    _abs_keys : dict
         A cache dict for key to absolute key.
-    _randgen : Generator or None
-        If not None, use the generator to generate random numbers during computation of
-        sparsity for for simultaneous derivative coloring.
     _col_var_offset : dict
         Maps column name to offset into the result array.
     _col_varnames : list
@@ -60,16 +54,17 @@ class Jacobian(object):
         self._system = weakref.ref(system)
         self._subjacs_info = system._subjacs_info
         self._under_complex_step = False
-        self._abs_keys = defaultdict(bool)
-        self._randgen = None
+        self._abs_keys = {}
         self._col_var_offset = None
         self._col_varnames = None
         self._col2name_ind = None
 
     def _get_abs_key(self, key):
-        abskey = self._abs_keys[key]
-        if not abskey:
-            self._abs_keys[key] = abskey = key2abs_key(self._system(), key)
+        if key in self._abs_keys:
+            return self._abs_keys[key]
+        abskey = key2abs_key(self._system(), key)
+        if abskey is not None:
+            self._abs_keys[key] = abskey
         return abskey
 
     def _abs_key2shape(self, abs_key):
@@ -145,41 +140,39 @@ class Jacobian(object):
             sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
         """
         abs_key = self._get_abs_key(key)
-        if abs_key is not None:
-
-            # You can only set declared subjacobians.
-            if abs_key not in self._subjacs_info:
-                msg = '{}: Variable name pair ("{}", "{}") must first be declared.'
-                raise KeyError(msg.format(self.msginfo, key[0], key[1]))
-
-            subjacs_info = self._subjacs_info[abs_key]
-
-            if issparse(subjac):
-                subjacs_info['val'] = subjac
-            else:
-                rows = subjacs_info['rows']
-
-                if rows is None:
-                    # Dense subjac
-                    subjac = np.atleast_2d(subjac)
-                    if subjac.shape != (1, 1):
-                        shape = self._abs_key2shape(abs_key)
-                        subjac = subjac.reshape(shape)
-
-                    subjacs_info['val'][:] = subjac
-
-                else:
-                    try:
-                        subjacs_info['val'][:] = subjac
-                    except ValueError:
-                        subjac = np.atleast_1d(subjac)
-                        msg = '{}: Sub-jacobian for key {} has the wrong shape ({}), expected ({}).'
-                        raise ValueError(msg.format(self.msginfo, abs_key,
-                                                    subjac.shape, rows.shape))
-
-        else:
+        if abs_key is None:
             msg = '{}: Variable name pair ("{}", "{}") not found.'
             raise KeyError(msg.format(self.msginfo, key[0], key[1]))
+
+        # You can only set declared subjacobians.
+        if abs_key not in self._subjacs_info:
+            msg = '{}: Variable name pair ("{}", "{}") must first be declared.'
+            raise KeyError(msg.format(self.msginfo, key[0], key[1]))
+
+        subjacs_info = self._subjacs_info[abs_key]
+
+        if issparse(subjac):
+            subjacs_info['val'] = subjac
+        else:
+            rows = subjacs_info['rows']
+
+            if rows is None:
+                # Dense subjac
+                subjac = np.atleast_2d(subjac)
+                if subjac.shape != (1, 1):
+                    shape = self._abs_key2shape(abs_key)
+                    subjac = subjac.reshape(shape)
+
+                subjacs_info['val'][:] = subjac
+
+            else:
+                try:
+                    subjacs_info['val'][:] = subjac
+                except ValueError:
+                    subjac = np.atleast_1d(subjac)
+                    msg = '{}: Sub-jacobian for key {} has the wrong shape ({}), expected ({}).'
+                    raise ValueError(msg.format(self.msginfo, abs_key,
+                                                subjac.shape, rows.shape))
 
     def __iter__(self):
         """
@@ -225,6 +218,12 @@ class Jacobian(object):
         if self._system() is None:
             return type(self).__name__
         return '{} in {}'.format(type(self).__name__, self._system().msginfo)
+
+    @property
+    def _randgen(self):
+        s = self._system()
+        if s is not None:
+            return s._problem_meta['coloring_randgen']
 
     def _update(self, system):
         """
@@ -295,6 +294,7 @@ class Jacobian(object):
         else:
             r = self._randgen.random(subjac.shape)
             r += 1.0
+
         return r
 
     def set_complex_step_mode(self, active):
@@ -311,7 +311,7 @@ class Jacobian(object):
         """
         for meta in self._subjacs_info.values():
             if active:
-                meta['val'] = meta['val'].astype(np.complex)
+                meta['val'] = meta['val'].astype(complex)
             else:
                 meta['val'] = meta['val'].real
 
@@ -330,62 +330,6 @@ class Jacobian(object):
         for i, end in enumerate(col_var_info):
             self._col2name_ind[start:end] = i
             start = end
-
-        # for total derivs, we can have sub-indices making some subjacs smaller
-        if system.pathname == '':
-            for key, meta in system._subjacs_info.items():
-                nrows, ncols = meta['shape']
-                if key[0] in system._owns_approx_of_idx:
-                    ridxs = system._owns_approx_of_idx[key[0]]
-                    if len(ridxs) == nrows:
-                        ridxs = _full_slice  # value was already changed
-                    else:
-                        ridxs = ridxs.shaped_array()
-                else:
-                    ridxs = _full_slice
-                if key[1] in system._owns_approx_wrt_idx:
-                    cidxs = system._owns_approx_wrt_idx[key[1]]
-                    if len(cidxs) == ncols:
-                        cidxs = _full_slice  # value was already changed
-                    else:
-                        cidxs = cidxs.shaped_array()
-                else:
-                    cidxs = _full_slice
-
-                if ridxs is not _full_slice or cidxs is not _full_slice:
-                    # replace our local subjac with a smaller one but don't
-                    # change the subjac belonging to the system (which has values
-                    # shared with subsystems)
-                    if self._subjacs_info is system._subjacs_info:
-                        self._subjacs_info = system._subjacs_info.copy()
-                    meta = self._subjacs_info[key] = meta.copy()
-                    val = meta['val']
-
-                    if ridxs is not _full_slice:
-                        nrows = len(ridxs)
-                    if cidxs is not _full_slice:
-                        ncols = len(cidxs)
-
-                    if meta['rows'] is None:  # dense
-                        val = val[ridxs, :]
-                        val = val[:, cidxs]
-                        meta['val'] = val
-                    else:  # sparse
-                        sprows = meta['rows']
-                        spcols = meta['cols']
-                        if ridxs is not _full_slice:
-                            sprows, mask = sparse_subinds(sprows, ridxs)
-                            spcols = spcols[mask]
-                            val = val[mask]
-                        if cidxs is not _full_slice:
-                            spcols, mask = sparse_subinds(spcols, cidxs)
-                            sprows = sprows[mask]
-                            val = val[mask]
-                        meta['rows'] = sprows
-                        meta['cols'] = spcols
-                        meta['val'] = val
-
-                    meta['shape'] = (nrows, ncols)
 
     def set_col(self, system, icol, column):
         """
