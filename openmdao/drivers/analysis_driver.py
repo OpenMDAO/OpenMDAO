@@ -343,10 +343,11 @@ class AnalysisDriver(Driver):
         implicit_outputs = {meta['prom_name'] for _, meta in 
                             self._problem().model.list_outputs(explicit=False, implicit=True)}
 
+        # Responses are recorded by default, add the inputs to be recorded.
         for samp in temp_samples:
             for prom_name in samp:
                 self._all_sampled_vars.add(prom_name)
-                if prom_name in implicit_outputs and prom_name not in self.recding_options['includes']:
+                if prom_name in implicit_outputs and prom_name not in self.recoding_options['includes']:
                     self.recording_options['includes'].append(prom_name)
                 for model_abs_name, model_prom_name in self._problem().model._var_allprocs_abs2prom['input'].items():
                     if model_prom_name == prom_name:
