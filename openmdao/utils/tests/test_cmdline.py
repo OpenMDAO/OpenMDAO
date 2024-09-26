@@ -60,7 +60,7 @@ def _test_func_name(func, num, param):
 
 cmd_tests = [
     # tuple of (command line, dict of dependencies that might not be installed)
-    ('openmdao -h', {}),
+    ('python -m openmdao -h', {}),
     ('openmdao --help', {}),
     ('openmdao --view_reports {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao call_tree openmdao.components.exec_comp.ExecComp.setup', {}),
@@ -68,10 +68,11 @@ cmd_tests = [
     ('openmdao comm_info {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao cite {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao clean --dryrun {}'.format(scriptdir), {}),
+    ('python -m openmdao clean --dryrun {}'.format(scriptdir), {}),
     ('openmdao compute_entry_points openmdao', {}),
     ('openmdao graph --no-display {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot, 'graphviz': graphviz}),
     ('openmdao graph --no-display --type=tree {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot, 'graphviz': graphviz}),
-    ('openmdao graph --no-display --show-vars {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot, 'graphviz': graphviz}),
+    ('python -m openmdao graph --no-display --show-vars {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot, 'graphviz': graphviz}),
     ('openmdao graph --no-display --show-vars --no-recurse {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot, 'graphviz': graphviz}),
     ('openmdao graph --no-display --group=circuit {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot, 'graphviz': graphviz}),
     ('openmdao graph --no-display --group=circuit --show-vars {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot, 'graphviz': graphviz}),
@@ -80,13 +81,13 @@ cmd_tests = [
         {'tornado': tornado}),
     ('openmdao iprof_totals {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao list_installed component command nl_solver lin_solver driver', {}),
-    ('openmdao list_installed component -d', {}),
+    ('python -m openmdao list_installed component -d', {}),
     ('openmdao list_pre_post {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao n2 --no_browser {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao n2 --no_browser {} -- -f bar'.format(os.path.join(scriptdir, 'circle_coloring_needs_args.py')), {}),
     ('openmdao partial_coloring {}'.format(os.path.join(scriptdir, 'circle_coloring_dynpartials.py')), {}),
     ('openmdao scaffold -b ExplicitComponent -c Foo', {}),
-    ('openmdao scaffold -b ImplicitComponent -c Foo', {}),
+    ('python -m openmdao scaffold -b ImplicitComponent -c Foo', {}),
     ('openmdao scaffold -p blahpkg --cmd=hello', {}),
     ('openmdao scaling --no_browser {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao summary {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
@@ -104,7 +105,6 @@ cmd_tests = [
     ('openmdao trace -m {}'.format(os.path.join(scriptdir, 'circle_opt.py')),
         {'psutil': psutil})
 ]
-
 
 @use_tempdirs
 class CmdlineTestCase(unittest.TestCase):
@@ -145,17 +145,21 @@ class CmdlineTestCase(unittest.TestCase):
         self.assertIn(p1_outdir, subdirs)
         self.assertIn(p2_outdir, subdirs)
 
-        proc = subprocess.Popen('openmdao clean -f'.split(),  # nosec: trusted input
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        try:
-            outs, errs = proc.communicate(timeout=10)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            outs, errs = proc.communicate()
+        for om_cmd in ('openmdao', 'python -m openmdao'):
 
-        subdirs = os.listdir(os.getcwd())
-        self.assertNotIn(p1_outdir, subdirs)
-        self.assertNotIn(p2_outdir, subdirs)
+            with self.subTest('Test using command line `{om_cmd}`'):
+
+                proc = subprocess.Popen('openmdao clean -f'.split(),  # nosec: trusted input
+                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                try:
+                    outs, errs = proc.communicate(timeout=10)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    outs, errs = proc.communicate()
+
+                subdirs = os.listdir(os.getcwd())
+                self.assertNotIn(p1_outdir, subdirs)
+                self.assertNotIn(p2_outdir, subdirs)
 
     def test_n2_err(self):
         # command should raise exception but still produce an n2 html file
