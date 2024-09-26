@@ -66,9 +66,10 @@ class AnalysisDriver(Driver):
         self._problem_comm = None
         self._color = None
         self._num_colors = 1
+        self._prev_sample_vars = set()
 
-        self._indep_list = []
-        self._quantities = []
+        self._quantities = set()
+        self._all_sampled_vars = set()
         self._total_jac_format = 'dict'
 
     def _declare_options(self):
@@ -83,6 +84,7 @@ class AnalysisDriver(Driver):
         self.options.declare('procs_per_model', types=int, default=1, lower=1,
                              desc='Number of processors to give each model under MPI.')
 
+
     def add_response(self, name, indices=None, units=None,
                      linear=False, parallel_deriv_color=None,
                      cache_linear_solution=False, flat_indices=None, alias=None):
@@ -94,6 +96,9 @@ class AnalysisDriver(Driver):
 
         The AnalysisDriver.add_response interface does not support any optimization-centric
         arguments associated with constraints or objectives, such as scaling.
+
+        Internally, the driver does add this as an 'objective' to the model for the purposes
+        of tracking derivatives.
 
         Parameters
         ----------
@@ -151,6 +156,8 @@ class AnalysisDriver(Driver):
         MPI.Comm or <FakeComm> or None
             The communicator for the Problem model.
         """
+        self._all_sampled_vars.clear()
+
         self._problem_comm = comm
 
         if not MPI:
@@ -168,7 +175,8 @@ class AnalysisDriver(Driver):
                                    "into %d." % (procs_per_model, full_size))
 
             color = self._color = comm.rank % size
-            return comm.Split(color)
+            new_comm = comm.Split(color)
+            return new_comm
 
     def _get_name(self):
         """
@@ -204,26 +212,32 @@ class AnalysisDriver(Driver):
         # Non-model-inputs would just have their value overridden when evaluating the model.
         # Implicit outputs can override the value given in the case, but it might be a useful mechanism
         # for providing an initial guess.
-        model_inputs =  {meta['prom_name'] for var, meta in model.list_inputs(is_indep_var=True, out_stream=None)}
-        model_implicit_outputs = {meta['prom_name'] for var, meta in model.list_outputs(explicit=False, out_stream=None)}
+        model_inputs =  {meta['prom_name'] for _, meta in model.list_inputs(is_indep_var=True, out_stream=None)}
+        model_implicit_outputs = {meta['prom_name'] for _, meta in model.list_outputs(explicit=False, out_stream=None)}
         self._allowable_vars = model_inputs | model_implicit_outputs
         self.iter_count = 0
-
         n_procs = comm.size
 
-        if MPI and n_procs > 1:
+        if self.options['run_parallel'] and MPI and n_procs > 1:
             batch_size = self.options['batch_size']
-            rank_cycler = itertools.cycle(range(n_procs))
+            color_cycler = itertools.cycle(range(self._num_colors))
             samples_complete = False
             job_queues = None
+            colors = comm.gather(self._color, root=0)
+            
+            if comm.rank == 0:
+                color_to_rank_map = {num: [i for i, x in enumerate(colors) 
+                                     if x == num] for num in set(colors)}
         
             while not samples_complete:
                 if comm.rank == 0:
                     job_queues = [deque() for _ in range(n_procs)]
                     # Rank 0 pushes batch_size jobs to the ranks in job_queues
                     for i, sample in enumerate(self._samples):
-                        rank_idx = next(rank_cycler)
-                        job_queues[rank_idx].appendleft((self.iter_count, sample))
+                        # Ranks of the same color get the same samples
+                        color_idx = next(color_cycler)
+                        for rank_idx in color_to_rank_map[color_idx]:
+                            job_queues[rank_idx].appendleft((self.iter_count, sample))
                         self.iter_count += 1
                         if i >= batch_size - 1:
                             # Break once batch_size samples obtained
@@ -266,19 +280,36 @@ class AnalysisDriver(Driver):
         iter_count : int
             The iteration of the AnalysisDriver to which this case corresponds.
         """
+        comm = self._problem_comm
         metadata = {}
 
+        sample_vars = set()
+
         for var, meta in sample.items():
+            sample_vars.add(var)
             val = meta['val']
             units = meta.get('units', None)
             idxs = meta.get('indices', None)
-            if var not in self._allowable_vars:
-                issue_warning(msg='Variable `{var}` is neither an independent variable\n'
-                              'nor an implicit output in the model.\n'
+            # If we've given the model more procs than necessary,
+            # then it will not have inputs/implicit outputs on some ranks.
+            # Check that self._allowable_vars is not empty before we warn.
+            if self._allowable_vars and var not in self._allowable_vars:
+                issue_warning(msg=f'Variable `{var}` is neither an independent variable\n'
+                              f'nor an implicit output in the model on rank {comm.rank}.\n'
                               'Setting its value in the case data will have no\n'
                               'impact on the outputs of the model after execution.',
                               category=DriverWarning)
             self._problem().model.set_val(var, val, units, idxs)
+
+        if self._prev_sample_vars and sample_vars != self._prev_sample_vars:
+            new_vars = self._prev_sample_vars - sample_vars
+            missing_vars = sample_vars - self._prev_sample_vars
+            info = f'Missing variables: {missing_vars}\n' if missing_vars else ''
+            info += f'New variables: {new_vars}\n' if new_vars else ''
+            issue_warning(msg=f'The variables in sample {iter_count} differ from\n'
+                          f'the previous sample\'s variables.\n{info}',
+                          category=DriverWarning)
+        self._prev_sample_vars = sample_vars
                 
         with RecordingDebugging(self._get_name(), iter_count, self):
             try:
@@ -296,6 +327,12 @@ class AnalysisDriver(Driver):
             # save reference to metadata for use in record_iteration
             self._metadata = metadata
 
+        if self.recording_options['record_derivatives']:
+            self._compute_totals(of=list(self._responses.keys()),
+                                 wrt=list(self._all_sampled_vars),
+                                 return_format=self._total_jac_format,
+                                 driver_scaling=False)
+
     def _setup_recording(self):
         """
         Set up case recording.
@@ -306,8 +343,9 @@ class AnalysisDriver(Driver):
         implicit_outputs = {meta['prom_name'] for _, meta in 
                             self._problem().model.list_outputs(explicit=False, implicit=True)}
 
-        for case in temp_samples:
-            for prom_name in case:
+        for samp in temp_samples:
+            for prom_name in samp:
+                self._all_sampled_vars.add(prom_name)
                 if prom_name in implicit_outputs and prom_name not in self.recding_options['includes']:
                     self.recording_options['includes'].append(prom_name)
                 for model_abs_name, model_prom_name in self._problem().model._var_allprocs_abs2prom['input'].items():
