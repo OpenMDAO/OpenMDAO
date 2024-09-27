@@ -564,6 +564,17 @@ class TestRecorderCheckConfig(unittest.TestCase):
         expected_warning = "The Problem has no recorder of any kind attached"
         testlogger.find_in('warning', expected_warning)
 
+    def test_check_problem_recorder_set(self):
+        p = om.Problem()
+        p.add_recorder(self.recorder)
+
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 0)
+
     def test_check_driver_recorder_set(self):
         p = om.Problem()
         p.driver.add_recorder(self.recorder)

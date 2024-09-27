@@ -492,6 +492,10 @@ def _check_missing_recorders(problem, logger):
     logger : object
         The object that manages logging output.
     """
+    # Look for a Problem recorder
+    if problem._rec_mgr._recorders:
+        return
+
     # Look for Driver recorder
     if problem.driver._rec_mgr._recorders:
         return
