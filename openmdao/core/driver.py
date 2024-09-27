@@ -26,9 +26,6 @@ from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, \
     DriverWarning, OMDeprecationWarning, warn_deprecation
 
 
-def_use_shape_correction = bool(os.environ.get('OPENMDAO_JAC_SHAPE_CORRECTION', ''))
-
-
 class DriverResult():
     """
     A container that stores information pertaining to the result of a driver execution.
@@ -1381,8 +1378,7 @@ class Driver(object):
                          min_improve_pct=coloring_mod._DEF_COMP_SPARSITY_ARGS['min_improve_pct'],
                          show_summary=coloring_mod._DEF_COMP_SPARSITY_ARGS['show_summary'],
                          show_sparsity=coloring_mod._DEF_COMP_SPARSITY_ARGS['show_sparsity'],
-                         use_scaling=coloring_mod._DEF_COMP_SPARSITY_ARGS['use_scaling'],
-                         use_shape_correction=def_use_shape_correction):
+                         use_scaling=coloring_mod._DEF_COMP_SPARSITY_ARGS['use_scaling']):
         """
         Set options for total deriv coloring.
 
@@ -1405,8 +1401,6 @@ class Driver(object):
             If True, display sparsity with coloring info after generating coloring.
         use_scaling : bool
             If True, use driver scaling when generating the sparsity.
-        use_shape_correction : bool
-            If True, use shape correction if computing bidirectional coloring.
         """
         self._coloring_info.coloring = None
         self._coloring_info.num_full_jacs = num_full_jacs
@@ -1421,7 +1415,6 @@ class Driver(object):
         self._coloring_info.show_summary = show_summary
         self._coloring_info.show_sparsity = show_sparsity
         self._coloring_info.use_scaling = use_scaling
-        self._coloring_info.use_shape_correction = use_shape_correction
 
     def use_fixed_coloring(self, coloring=coloring_mod._STD_COLORING_FNAME):
         """

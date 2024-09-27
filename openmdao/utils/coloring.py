@@ -150,8 +150,6 @@ class ColoringMeta(object):
         If True, use driver scaling when computing sparsity.
     msginfo : str
         Prefix for warning/error messages.
-    use_shape_correction : bool
-        If True, use shape correction if computing bidirectional coloring.
 
     Attributes
     ----------
@@ -179,8 +177,6 @@ class ColoringMeta(object):
         If True, use driver scaling when computing sparsity.
     msginfo : str
         Prefix for warning/error messages.
-    use_shape_correction : bool
-        If True, use shape correction if computing bidirectional coloring.
     _coloring : Coloring or None
         The coloring object.
     _failed : bool
@@ -194,7 +190,7 @@ class ColoringMeta(object):
 
     def __init__(self, num_full_jacs=3, tol=1e-25, orders=None, min_improve_pct=5.,
                  show_summary=True, show_sparsity=False, dynamic=False, static=None,
-                 perturb_size=1e-9, use_scaling=False, msginfo='', use_shape_correction=False):
+                 perturb_size=1e-9, use_scaling=False, msginfo=''):
         """
         Initialize data structures.
         """
@@ -208,7 +204,6 @@ class ColoringMeta(object):
         self.static = static
         self.perturb_size = perturb_size
         self.use_scaling = use_scaling
-        self.use_shape_correction = use_shape_correction
         self.msginfo = msginfo
         self._coloring = None
         self._failed = False
@@ -451,8 +446,6 @@ class Partial_ColoringMeta(ColoringMeta):
         If None, do not attempt to use a static coloring.
     msginfo : str
         Prefix for warning/error messages.
-    use_shape_correction : bool
-        If True, use shape correction if computing bidirectional coloring.
 
     Attributes
     ----------
@@ -478,16 +471,14 @@ class Partial_ColoringMeta(ColoringMeta):
 
     def __init__(self, wrt_patterns=('*',), method='fd', form=None, step=None, per_instance=True,
                  perturb_size=1e-9, num_full_jacs=3, tol=1e-25, orders=None, min_improve_pct=5.,
-                 show_summary=True, show_sparsity=False, dynamic=False, static=None, msginfo='',
-                 use_shape_correction=False):
+                 show_summary=True, show_sparsity=False, dynamic=False, static=None, msginfo=''):
         """
         Initialize data structures.
         """
         super().__init__(num_full_jacs=num_full_jacs, tol=tol, orders=orders,
                          min_improve_pct=min_improve_pct, show_summary=show_summary,
                          show_sparsity=show_sparsity, dynamic=dynamic, static=static,
-                         perturb_size=perturb_size, msginfo=msginfo,
-                         use_shape_correction=use_shape_correction)
+                         perturb_size=perturb_size, msginfo=msginfo)
         if wrt_patterns is None:
             wrt_patterns = ()
         elif isinstance(wrt_patterns, str):
@@ -2248,7 +2239,7 @@ def _color_partition(J, Jprows, Jpcols, shape):
     return [col_groups, col2row]
 
 
-def MNCO_bidir(J, use_shape_correction=False):
+def MNCO_bidir(J):
     """
     Compute bidirectional coloring using Minimum Nonzero Count Order (MNCO).
 
@@ -2260,9 +2251,6 @@ def MNCO_bidir(J, use_shape_correction=False):
     ----------
     J : coo_matrix
         Jacobian sparsity matrix (boolean).
-    use_shape_correction : bool
-        When True, the algorithm will use a shape correction technique to try to improve the
-        coloring for non-square matrices.
 
     Returns
     -------
@@ -2310,21 +2298,12 @@ def MNCO_bidir(J, use_shape_correction=False):
     Jf_nz_max = 0   # max row nonzeros in Jf
     Jr_nz_max = 0   # max col nonzeros in Jr
 
-    # if use_shape_correction is True, we differ from the algorithm in the paper slightly because
-    # we add ncols and nrows to different sides of the inequality in order to prevent bad colorings
-    # when we have matrices that are very non-square.
-    if use_shape_correction:
-        ccols = ncols
-        crows = nrows
-    else:
-        ccols = crows = 0
-
     while M_rows.size > 0:
         # the algorithm is minimizing the total of the max number of nonzero
         # columns in Jf + the max number of nonzero rows in Jr, so it's basically minimizing
         # the upper bound of the number of colors that will be needed.
 
-        if ccols + Jr_nz_max + max(Jf_nz_max, nnz_r) < (crows + Jf_nz_max + max(Jr_nz_max, nnz_c)):
+        if Jr_nz_max + max(Jf_nz_max, nnz_r) < (Jf_nz_max + max(Jr_nz_max, nnz_c)):
             Jf_rows[r] = M_cols[M_rows == r]
             Jf_nz_max = max(nnz_r, Jf_nz_max)
 
@@ -2597,7 +2576,7 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
     return coo_matrix((np.ones(nzrows.size, dtype=bool), (nzrows, nzcols)), shape=shape), spmeta
 
 
-def _compute_coloring(J, mode, use_shape_correction=False):
+def _compute_coloring(J, mode):
     """
     Compute a good coloring in a specified dominant direction.
 
@@ -2608,9 +2587,6 @@ def _compute_coloring(J, mode, use_shape_correction=False):
     mode : str
         The direction for solving for total derivatives.  Must be 'fwd', 'rev' or 'auto'.
         If 'auto', use bidirectional coloring.
-    use_shape_correction : bool
-        When True, the algorithm will use a shape correction technique to try to improve the
-        coloring for non-square matrices if doing bidirectional coloring.
 
     Returns
     -------
@@ -2628,7 +2604,7 @@ def _compute_coloring(J, mode, use_shape_correction=False):
             nzrows, nzcols = np.nonzero(J)
             J = coo_matrix((np.ones(nzrows.size, dtype=bool), (nzrows, nzcols)), shape=J.shape)
 
-        coloring = MNCO_bidir(J, use_shape_correction=use_shape_correction)
+        coloring = MNCO_bidir(J)
         fallback = _compute_coloring(J, 'fwd')
         if coloring.total_solves() >= fallback.total_solves():
             coloring = fallback
@@ -2763,7 +2739,7 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
                                                    run_model=run_model, of=ofs, wrt=wrts,
                                                    driver=driver)
         if driver:
-            coloring = _compute_coloring(J, mode, driver._coloring_info.use_shape_correction)
+            coloring = _compute_coloring(J, mode)
         else:
             coloring = None
 

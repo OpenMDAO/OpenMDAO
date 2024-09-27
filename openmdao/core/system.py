@@ -1516,8 +1516,7 @@ class System(object, metaclass=SystemMeta):
                          perturb_size=_DEFAULT_COLORING_META['perturb_size'],
                          min_improve_pct=_DEFAULT_COLORING_META['min_improve_pct'],
                          show_summary=_DEFAULT_COLORING_META['show_summary'],
-                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity'],
-                         use_shape_correction=False):
+                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity']):
         """
         Set options for deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -1553,8 +1552,6 @@ class System(object, metaclass=SystemMeta):
             If True, display summary information after generating coloring.
         show_sparsity : bool
             If True, plot sparsity with coloring info after generating coloring.
-        use_shape_correction : bool
-            If True, use shape correction if computing bidirectional coloring.
         """
         if method not in ('fd', 'cs', 'jax'):
             raise RuntimeError(
@@ -1591,7 +1588,6 @@ class System(object, metaclass=SystemMeta):
         options.min_improve_pct = min_improve_pct
         options.show_summary = show_summary
         options.show_sparsity = show_sparsity
-        options.use_shape_correction = use_shape_correction
         if form is not None:
             options.form = form
         if step is not None:
@@ -1821,7 +1817,7 @@ class System(object, metaclass=SystemMeta):
 
         sparsity_time = time.perf_counter() - sparsity_start_time
 
-        coloring = _compute_coloring(sparsity, direction, info.use_shape_correction)
+        coloring = _compute_coloring(sparsity, direction)
 
         # restore original inputs/outputs
         self._inputs.set_val(starting_inputs)
