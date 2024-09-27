@@ -1198,6 +1198,26 @@ class BidirectionalTestCase(unittest.TestCase):
 
         self.assertEqual(tot_colors, expected_colors)
 
+    def test_bidir_3colorblock(self):
+        J = np.array(
+            [[1, 1, 1, 1, 1, 1, 1],
+             [1, 1, 0, 0, 0, 0, 0],
+             [1, 1, 0, 0, 0, 0, 0],
+             [1, 1, 0, 0, 0, 0, 0],
+             [0, 0, 1, 1, 0, 0, 0],
+             [0, 0, 1, 1, 0, 0, 0],
+             [0, 0, 1, 1, 0, 0, 0],
+             [0, 0, 0, 0, 1, 1, 0],
+             [0, 0, 0, 0, 1, 1, 0],
+             [0, 0, 0, 0, 1, 1, 0],
+             [0, 0, 0, 0, 0, 0, 1]]
+        )
+
+        coloring = _compute_coloring(J, 'auto')
+        tot_size, tot_colors, fwd_solves, rev_solves, pct = coloring._solves_info()
+
+        self.assertEqual(tot_colors, 3)
+
 
 def _get_random_mat(rows, cols, comm, generator=None):
     gen = generator if generator is not None else np.random.default_rng()
