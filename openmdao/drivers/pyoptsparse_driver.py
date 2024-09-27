@@ -478,9 +478,7 @@ class pyOptSparseDriver(Driver):
 
                         if name in self._con_subjacs:
                             resjac = self._con_subjacs[name]
-                            jac = {n: resjac[n] for n in wrts if n in resjac}
-                            if not jac:
-                                jac = None
+                            jac = {n: resjac[n] for n in wrts}
                         else:
                             jac = None
 
@@ -514,9 +512,7 @@ class pyOptSparseDriver(Driver):
                                 if relevance.is_relevant(meta['source'])]
                         if name in self._con_subjacs:
                             resjac = self._con_subjacs[name]
-                            jac = {n: resjac[n] for n in wrts if n in resjac}
-                            if not jac:
-                                jac = None
+                            jac = {n: resjac[n] for n in wrts}
                         else:
                             jac = None
 

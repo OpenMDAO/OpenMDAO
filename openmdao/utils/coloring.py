@@ -2242,6 +2242,7 @@ def _color_partition(J, Jprows, Jpcols, shape):
         col2row[col] = csc.getcol(col).indices
 
     for i, group in enumerate(col_groups):
+        # don't include any columns that have no nonzero row entries in this partition
         col_groups[i] = [c for c in sorted(group) if col2row[c] is not None]
 
     return [col_groups, col2row]

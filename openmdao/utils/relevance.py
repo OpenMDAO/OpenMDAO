@@ -133,7 +133,8 @@ class Relevance(object):
         """
         assert model.pathname == '', "Relevance can only be initialized on the top level Group."
 
-        self._active = False if _no_relevance else None  # allow relevance to be turned on later
+        # permanently disable relevance if _no_relevance is True
+        self._active = False if _no_relevance else None
         self._rel_array_cache = rel_array_cache
         self._graph = model._dataflow_graph
         self._rel_array_cache = {}
