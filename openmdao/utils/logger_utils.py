@@ -213,8 +213,8 @@ class TestLogger(object):
             The message to match.
         """
         if not self.contains(typ, message):
-            raise RuntimeError(f'Message "{message}" not found in:\n'
-                               f'{',\n'.join(self._msgs[typ])}.')
+            msgs = ',\n'.join(self._msgs[typ])
+            raise RuntimeError(f'Message "{message}" not found in:\n{msgs}.')
 
     def find_match_in(self, typ, pattern):
         """
@@ -233,5 +233,5 @@ class TestLogger(object):
         for msg in self._msgs[typ]:
             if fnmatch(msg, pattern):
                 return
-        raise RuntimeError(f'Message with pattern "{pattern}" not found in:\n'
-                           f'{',\n'.join(self._msgs[typ])}.')
+        msgs = ',\n'.join(self._msgs[typ])
+        raise RuntimeError(f'Message with pattern "{pattern}" not found in:\n{msgs}')
