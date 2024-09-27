@@ -518,10 +518,10 @@ class ExplicitComponent(Component):
             Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
             Unscaled, dimensional output variables read via outputs[key].
-        discrete_inputs : dict like or None
-            If not None, dict like object containing discrete input values.
-        discrete_outputs : dict like or None
-            If not None, dict like object containing discrete output values.
+        discrete_inputs : dict-like or None
+            If not None, dict-like object containing discrete input values.
+        discrete_outputs : dict-like or None
+            If not None, dict-like object containing discrete output values.
         """
         global _tuplist
 

@@ -22,7 +22,7 @@ from openmdao.solvers.linesearch.tests.test_backtracking import ImplCompTwoState
 
 from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRecorded, \
     assertDriverIterDataRecorded, assertSystemIterDataRecorded, assertSolverIterDataRecorded, \
-    assertViewerDataRecorded, assertSystemMetaclassdataIdsRecorded, assertSystemIterCoordsRecorded, \
+    assertViewerDataRecorded, assertSystemMetadataIdsRecorded, assertSystemIterCoordsRecorded, \
     assertDriverDerivDataRecorded, assertProblemDerivDataRecorded
 
 from openmdao.recorders.tests.recorder_test_utils import run_driver
@@ -473,7 +473,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        distributed: False",
             "        run_root_only: False",
             "        always_opt: False",
-            "        use_jit: True", 
+            "        use_jit: True",
             "        name: UNDEFINED",
             "        val: 1.0",
             "        shape: None",
@@ -491,7 +491,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        distributed: False",
             "        run_root_only: False",
             "        always_opt: False",
-            "        use_jit: True", 
+            "        use_jit: True",
             "        name: UNDEFINED",
             "        val: 1.0",
             "        shape: None",
@@ -509,12 +509,12 @@ class TestSqliteRecorder(unittest.TestCase):
             "        distributed: False",
             "        run_root_only: False",
             "        always_opt: False",
-            "        use_jit: True", 
+            "        use_jit: True",
             "    Subsystem : con",
             "        derivs_method: None",
             "        run_root_only: False",
             "        always_opt: False",
-            "        use_jit: True", 
+            "        use_jit: True",
             "        has_diag_partials: False",
             "        units: None",
             "        shape: None",
@@ -1960,7 +1960,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         # Just make sure all Systems had some metadata recorded
-        assertSystemMetaclassdataIdsRecorded(self, prob.get_outputs_dir() / self.filename, [
+        assertSystemMetadataIdsRecorded(self, prob.get_outputs_dir() / self.filename, [
             'root',
             '_auto_ivc',
             'mda',
@@ -1999,7 +1999,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         # Just make sure all Systems had some metadata recorded
-        assertSystemMetaclassdataIdsRecorded(self, prob.get_outputs_dir() / self.filename, [
+        assertSystemMetadataIdsRecorded(self, prob.get_outputs_dir() / self.filename, [
             'root',
             '_auto_ivc',
             'mda',
