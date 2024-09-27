@@ -2236,13 +2236,13 @@ def _color_partition(J, Jprows, Jpcols, shape):
 
     col_adj_matrix = None
 
-    for i, group in enumerate(col_groups):
-        col_groups[i] = sorted(group)
-
     csc = csc_matrix((np.ones(Jprows.size), (Jprows, Jpcols)), shape=shape)
     col2row = [None] * ncols
     for col in np.unique(Jpcols):
         col2row[col] = csc.getcol(col).indices
+
+    for i, group in enumerate(col_groups):
+        col_groups[i] = [c for c in sorted(group) if col2row[c] is not None]
 
     return [col_groups, col2row]
 
