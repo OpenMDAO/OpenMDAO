@@ -1298,12 +1298,17 @@ class _TotalJacInfo(object):
 
         if fwd:
             for i in inds:
+                row = row_col_map[i]
+                if row is None:
+                    continue
                 J[row_col_map[i], i] = reduced_derivs[row_col_map[i]]
+
                 if dist:
                     self._jac_setter_dist(i, mode)
         else:  # rev
             for i in inds:
-                J[i, row_col_map[i]] = reduced_derivs[row_col_map[i]]
+                col = row_col_map[i]
+                J[i, col] = reduced_derivs[col]
                 if dist:
                     self._jac_setter_dist(i, mode)
 

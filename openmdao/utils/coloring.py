@@ -1584,13 +1584,15 @@ class Coloring(object):
             if coloring._fwd is not None:
                 for idx_fwd, (_cols, _nz_rows) in enumerate(coloring.color_nonzero_iter('fwd')):
                     for _row_idx, _col_idx in zip(_nz_rows, _cols):
-                        fwd_map.update({(i, _col_idx): idx_fwd for i in _row_idx})
+                        if _row_idx is not None:
+                            fwd_map.update({(i, _col_idx): idx_fwd for i in _row_idx})
 
             rev_map = {}
             if coloring._rev is not None:
                 for idx_rev, (_rows, _nz_cols) in enumerate(coloring.color_nonzero_iter('rev')):
                     for _row_idx, _col_idx in zip(_rows, _nz_cols):
-                        rev_map.update({(_row_idx, j): idx_rev for j in _col_idx})
+                        if _row_idx is not None:
+                            rev_map.update({(_row_idx, j): idx_rev for j in _col_idx})
 
             for i in range(nrows * ncols):
                 r = data['row_idx'][i]
@@ -2133,7 +2135,6 @@ def _Jc2col_matrix_direct(J, Jrows, Jcols, shape):
 
     # mark col_matrix[col1, col2] as True when Jpart[row, col1] is True OR Jpart[row, col2] is True
     for row in np.unique(Jrows):
-        Jfullrow = J.getrow(row)
         partrow = csr.getrow(row).indices
 
         for col in partrow:
@@ -2142,6 +2143,7 @@ def _Jc2col_matrix_direct(J, Jrows, Jcols, shape):
         if partrow.size > 1:
             Jrow[:] = False
             Jrow[partrow] = True
+            Jfullrow = J.getrow(row)
             for col1, col2 in combinations(Jfullrow.indices, 2):
                 if Jrow[col1] or Jrow[col2]:
                     dok[col1, col2] = True
