@@ -37,9 +37,7 @@ class AnalysisDriver(Driver):
         In MPI, the cached color is used to determine which samples to run on this proc.
     _num_colors : int
         The number of total MPI colors for the run.
-    _indep_list : list
-        List of design variables, used to compute derivatives.
-    _prev_sampled_vars : set
+    _prev_sample_vars : set
         The set of variables seen in the previous iteration of the driver on this rank.
     _all_sampled_vars : set
         The set of all variables being set by this analysis driver.
@@ -220,13 +218,13 @@ class AnalysisDriver(Driver):
         model_inputs =  {meta['prom_name'] for _, meta in model.list_inputs(is_indep_var=True, out_stream=None)}
         model_implicit_outputs = {meta['prom_name'] for _, meta in model.list_outputs(explicit=False, out_stream=None)}
         self._allowable_vars = model_inputs | model_implicit_outputs
-        self.iter_count = 0
         n_procs = comm.size
 
         if self.options['run_parallel'] and MPI and n_procs > 1:
             batch_size = self.options['batch_size']
             color_cycler = itertools.cycle(range(self._num_colors))
             samples_complete = False
+            sample_num = 0
             job_queues = None
             colors = comm.gather(self._color, root=0)
             
@@ -242,8 +240,8 @@ class AnalysisDriver(Driver):
                         # Ranks of the same color get the same samples
                         color_idx = next(color_cycler)
                         for rank_idx in color_to_rank_map[color_idx]:
-                            job_queues[rank_idx].appendleft((self.iter_count, sample))
-                        self.iter_count += 1
+                            job_queues[rank_idx].appendleft((sample_num, sample))
+                        sample_num += 1
                         if i >= batch_size - 1:
                             # Break once batch_size samples obtained
                             break
@@ -258,8 +256,8 @@ class AnalysisDriver(Driver):
                 
                 # Now each proc does the jobs in its queue
                 while q:
-                    iter_count, sample = q.pop()
-                    self._run_sample(sample, iter_count)
+                    sample_num, sample = q.pop()
+                    self._run_sample(sample, sample_num)
                 
                 # Wait for all processors to run their jobs.
                 # Then repeat until samples are exhausted.
@@ -267,13 +265,12 @@ class AnalysisDriver(Driver):
 
         else:           
             # Not under MPI
-            for sample in self._samples:
-                self._run_sample(sample, iter_count=self.iter_count)
-                self.iter_count += 1
+            for sample_num, sample in enumerate(self._samples):
+                self._run_sample(sample, sample_num)
 
         return False
 
-    def _run_sample(self, sample, iter_count):
+    def _run_sample(self, sample, sample_num):
         """
         Run case, save exception info and mark the metadata if the case fails.
 
@@ -282,10 +279,11 @@ class AnalysisDriver(Driver):
         sample : dict
             A dictionary keyed by variable name with each value being a dictionary with a 'val' key, and optionally
             keys for 'units' and 'indices'.
-        iter_count : int
+        sample_num : int
             The iteration of the AnalysisDriver to which this case corresponds.
         """
         comm = self._problem_comm
+        self.iter_count = sample_num
         metadata = {}
 
         sample_vars = set()
@@ -311,12 +309,12 @@ class AnalysisDriver(Driver):
             missing_vars = sample_vars - self._prev_sample_vars
             info = f'Missing variables: {missing_vars}\n' if missing_vars else ''
             info += f'New variables: {new_vars}\n' if new_vars else ''
-            issue_warning(msg=f'The variables in sample {iter_count} differ from\n'
+            issue_warning(msg=f'The variables in sample {sample_num} differ from\n'
                           f'the previous sample\'s variables.\n{info}',
                           category=DriverWarning)
         self._prev_sample_vars = sample_vars
                 
-        with RecordingDebugging(self._get_name(), iter_count, self):
+        with RecordingDebugging(self._get_name(), self.iter_count, self):
             try:
                 self._run_solve_nonlinear()
                 metadata['success'] = 1

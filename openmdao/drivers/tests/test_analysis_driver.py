@@ -159,7 +159,7 @@ class TestAnalysisDriverParallel(unittest.TestCase):
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = AnalysisDriver(samples=fullfact3, debug_print=['totals'])
+        prob.driver = AnalysisDriver(samples=fullfact3)
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
         prob.driver.recording_options.set(record_derivatives=True)
 
