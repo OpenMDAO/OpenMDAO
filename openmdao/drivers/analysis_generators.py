@@ -21,7 +21,6 @@ class AnalysisGenerator(Iterator):
         A dictionary whose keys are promoted paths of variables to be set, and whose
         keys are the arguments to `set_val`.
     """
-    
     def __init__(self, var_dict):
         super().__init__()
         self._run_count = 0
@@ -55,7 +54,7 @@ class AnalysisGenerator(Iterator):
         Returns
         -------
         dict
-            A dictionary containing the promoted paths of variables to 
+            A dictionary containing the promoted paths of variables to
             be set by the AnalysisDriver
 
         """

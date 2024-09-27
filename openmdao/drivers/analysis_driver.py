@@ -86,7 +86,6 @@ class AnalysisDriver(Driver):
         self.options.declare('procs_per_model', types=int, default=1, lower=1,
                              desc='Number of processors to give each model under MPI.')
 
-
     def add_response(self, name, indices=None, units=None,
                      linear=False, parallel_deriv_color=None,
                      cache_linear_solution=False, flat_indices=None, alias=None):
@@ -173,8 +172,8 @@ class AnalysisDriver(Driver):
             if full_size != size * procs_per_model:
                 raise RuntimeError("The total number of processors is not evenly divisible by the "
                                    "specified number of processors per model.\n Provide a "
-                                   f"number of processors that is a multiple of {procs_per_model}, or "
-                                   "specify a number of processors per model that divides "
+                                   f"number of processors that is a multiple of {procs_per_model}, "
+                                   "or specify a number of processors per model that divides "
                                    f"into {full_size}.")
 
             color = self._color = comm.rank % size
@@ -191,7 +190,7 @@ class AnalysisDriver(Driver):
             The name of this DOE driver and its case generator.
         """
         return self._name
-    
+
     def run(self):
         """
         Generate samples and run the model for each set of generated input values.
@@ -211,12 +210,14 @@ class AnalysisDriver(Driver):
         self.result.reset()
         self.iter_count = 0
 
-        # The variables that may be included in samples are the inputs or implicit outputs in the model.
+        # Variables allowed samples are the inputs or implicit outputs in the model.
         # Non-model-inputs would just have their value overridden when evaluating the model.
-        # Implicit outputs can override the value given in the case, but it might be a useful mechanism
-        # for providing an initial guess.
-        model_inputs =  {meta['prom_name'] for _, meta in model.list_inputs(is_indep_var=True, out_stream=None)}
-        model_implicit_outputs = {meta['prom_name'] for _, meta in model.list_outputs(explicit=False, out_stream=None)}
+        # Implicit outputs can override the value given in the case, but it might be a
+        # useful mechanism for providing an initial guess.
+        model_inputs = {meta['prom_name'] for _, meta in
+                        model.list_inputs(is_indep_var=True, out_stream=None)}
+        model_implicit_outputs = {meta['prom_name'] for _, meta
+                                  in model.list_outputs(explicit=False, out_stream=None)}
         self._allowable_vars = model_inputs | model_implicit_outputs
         n_procs = comm.size
 
@@ -227,11 +228,11 @@ class AnalysisDriver(Driver):
             sample_num = 0
             job_queues = None
             colors = comm.gather(self._color, root=0)
-            
+
             if comm.rank == 0:
-                color_to_rank_map = {num: [i for i, x in enumerate(colors) 
+                color_to_rank_map = {num: [i for i, x in enumerate(colors)
                                      if x == num] for num in set(colors)}
-        
+
             while not samples_complete:
                 if comm.rank == 0:
                     job_queues = [deque() for _ in range(n_procs)]
@@ -247,23 +248,23 @@ class AnalysisDriver(Driver):
                             break
                     else:
                         samples_complete = True
-     
+
                 # Broadcast the samples_complete signal from root to all ranks
                 samples_complete = comm.bcast(samples_complete, root=0)
-                    
+
                 # Scatter the job list to each rank
                 q = comm.scatter(job_queues, root=0)
-                
+
                 # Now each proc does the jobs in its queue
                 while q:
                     sample_num, sample = q.pop()
                     self._run_sample(sample, sample_num)
-                
+
                 # Wait for all processors to run their jobs.
                 # Then repeat until samples are exhausted.
                 comm.barrier()
 
-        else:           
+        else:
             # Not under MPI
             for sample_num, sample in enumerate(self._samples):
                 self._run_sample(sample, sample_num)
@@ -277,8 +278,9 @@ class AnalysisDriver(Driver):
         Parameters
         ----------
         sample : dict
-            A dictionary keyed by variable name with each value being a dictionary with a 'val' key, and optionally
-            keys for 'units' and 'indices'.
+            A dictionary keyed by variable name with each value being
+            a dictionary with a 'val' key, and optionally keys for
+            'units' and 'indices'.
         sample_num : int
             The iteration of the AnalysisDriver to which this case corresponds.
         """
@@ -313,7 +315,7 @@ class AnalysisDriver(Driver):
                           f'the previous sample\'s variables.\n{info}',
                           category=DriverWarning)
         self._prev_sample_vars = sample_vars
-                
+
         with RecordingDebugging(self._get_name(), self.iter_count, self):
             try:
                 self._run_solve_nonlinear()
@@ -342,17 +344,20 @@ class AnalysisDriver(Driver):
         """
         # We don't necessarily know a-priori what variables are in our case generators.
         # Tee the samples and add the variables defined within to be recorded.
+        model = self._problem().model
+        abs2prom_inputs = model._var_allprocs_abs2prom['input']
+        rec_includes = self.recording_options['includes']
         self._samples, temp_samples = itertools.tee(self._samples)
-        implicit_outputs = {meta['prom_name'] for _, meta in 
-                            self._problem().model.list_outputs(explicit=False, implicit=True)}
+        implicit_outputs = {meta['prom_name'] for _, meta in
+                            model.list_outputs(explicit=False, implicit=True)}
 
         # Responses are recorded by default, add the inputs to be recorded.
         for samp in temp_samples:
             for prom_name in samp:
                 self._all_sampled_vars.add(prom_name)
-                if prom_name in implicit_outputs and prom_name not in self.recoding_options['includes']:
+                if prom_name in implicit_outputs and prom_name not in rec_includes:
                     self.recording_options['includes'].append(prom_name)
-                for model_abs_name, model_prom_name in self._problem().model._var_allprocs_abs2prom['input'].items():
+                for model_abs_name, model_prom_name in abs2prom_inputs.items():
                     if model_prom_name == prom_name:
                         if model_abs_name not in self.recording_options['includes']:
                             self.recording_options['includes'].append(model_abs_name)

@@ -25,7 +25,6 @@ from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, \
     DriverWarning, warn_deprecation
 
 
-
 class OptimizationDriver(Driver):
     """
     Base-class for all optimizing drivers.
