@@ -35,10 +35,14 @@ class AnalysisDriver(Driver):
         The MPI communicator for the Problem.
     _color : int or None
         In MPI, the cached color is used to determine which samples to run on this proc.
+    _num_colors : int
+        The number of total MPI colors for the run.
     _indep_list : list
         List of design variables, used to compute derivatives.
-    _quantities : list
-        Contains the objectives plus nonlinear constraints, used to compute derivatives.
+    _prev_sampled_vars : set
+        The set of variables seen in the previous iteration of the driver on this rank.
+    _all_sampled_vars : set
+        The set of all variables being set by this analysis driver.
     """
 
     def __init__(self, samples=None, **kwargs):
@@ -67,8 +71,6 @@ class AnalysisDriver(Driver):
         self._color = None
         self._num_colors = 1
         self._prev_sample_vars = set()
-
-        self._quantities = set()
         self._all_sampled_vars = set()
         self._total_jac_format = 'dict'
 
@@ -80,7 +82,9 @@ class AnalysisDriver(Driver):
                              desc='Set to True to execute samples in parallel.')
         self.options.declare('batch_size', types=int, default=1000,
                              desc='Number of samples to distribute among the processors '
-                             'at a time when run_parallel is True.')
+                             'at a time when run_parallel is True. This should be limited when '
+                             'the memory required to store the batch size of samples grows too '
+                             'large.')
         self.options.declare('procs_per_model', types=int, default=1, lower=1,
                              desc='Number of processors to give each model under MPI.')
 
@@ -156,6 +160,7 @@ class AnalysisDriver(Driver):
         MPI.Comm or <FakeComm> or None
             The communicator for the Problem model.
         """
+        self._prev_sample_vars.clear()
         self._all_sampled_vars.clear()
 
         self._problem_comm = comm
@@ -170,9 +175,9 @@ class AnalysisDriver(Driver):
             if full_size != size * procs_per_model:
                 raise RuntimeError("The total number of processors is not evenly divisible by the "
                                    "specified number of processors per model.\n Provide a "
-                                   "number of processors that is a multiple of %d, or "
+                                   f"number of processors that is a multiple of {procs_per_model}, or "
                                    "specify a number of processors per model that divides "
-                                   "into %d." % (procs_per_model, full_size))
+                                   f"into {full_size}.")
 
             color = self._color = comm.rank % size
             new_comm = comm.Split(color)

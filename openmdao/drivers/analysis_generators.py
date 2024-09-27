@@ -83,10 +83,10 @@ class ZipGenerator(AnalysisGenerator):
         """
         super()._setup(var_dict)
         sampler = (c['val'] for c in var_dict.values())
-        _lens = (len(_c) for _c in sampler)
-        if len(set(_lens)) != 1:
+        _lens = {name: len(meta['val']) for name, meta in var_dict.items()}
+        if len(set([_l for _l in _lens.values()])) != 1:
             raise ValueError('ZipGenerator requires that val '
-                             f'for all var_dict have the same length: {_lens}')
+                             f'for all var_dict have the same length:\n{_lens}')
         sampler = (c['val'] for c in var_dict.values())
         self._iter = zip(*sampler)
 
