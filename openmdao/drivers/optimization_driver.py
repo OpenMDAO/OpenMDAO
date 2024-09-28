@@ -75,8 +75,6 @@ class OptimizationDriver(Driver):
     _remote_objs : dict
         Dict of objectives that are remote on at least one proc. Values are
         (owning rank, size).
-    _rec_mgr : <RecordingManager>
-        Object that manages all recorders added to this driver.
     _coloring_info : dict
         Metadata pertaining to total coloring.
     _total_jac_format : str

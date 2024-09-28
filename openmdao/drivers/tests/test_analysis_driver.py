@@ -12,7 +12,7 @@ from openmdao.utils.assert_utils import assert_warning, assert_warnings, assert_
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
 from openmdao.drivers.analysis_driver import AnalysisDriver
-from openmdao.drivers.analysis_generators import ProductGenerator, ZipGenerator
+from openmdao.drivers.analysis_generator import ProductGenerator, ZipGenerator
 
 # from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
 

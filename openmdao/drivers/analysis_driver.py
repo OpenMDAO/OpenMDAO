@@ -90,7 +90,7 @@ class AnalysisDriver(Driver):
                      linear=False, parallel_deriv_color=None,
                      cache_linear_solution=False, flat_indices=None, alias=None):
         r"""
-        Add a response variable to the System associated with this AnalysisDriver.
+        Add a response variable to the model associated with this AnalysisDriver.
 
         For AnalysisDriver, a response is an "output of interest" that we want to monitor
         as a result of changes made in the various samples.
@@ -108,19 +108,8 @@ class AnalysisDriver(Driver):
         indices : sequence of int, optional
             If variable is an array, these indicate which entries are of
             interest for this particular response.
-        index : int, optional
-            If variable is an array, this indicates which entry is of
-            interest for this particular response.
         units : str, optional
             Units to convert to before applying scaling.
-        adder : float or ndarray, optional
-            Value to add to the model value to get the scaled value for the driver. adder
-            is first in precedence.  adder and scaler are an alterantive to using ref
-            and ref0.
-        scaler : float or ndarray, optional
-            Value to multiply the model value to get the scaled value for the driver. scaler
-            is second in precedence. adder and scaler are an alterantive to using ref
-            and ref0.
         linear : bool
             Set to True if constraint is linear. Default is False.
         parallel_deriv_color : str
