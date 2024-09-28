@@ -386,11 +386,11 @@ test       **Required**  ['a', 'b']         N/A                    Test integer 
         expected_msg = "Can't find aliased option 'foo3' for deprecated option 'test3'."
         self.assertEqual(context.exception.args[0], expected_msg)
 
-    def test_bad_option_name(self):
+    def test_supported_option_name(self):
         opt = OptionsDictionary()
-        msg = "'foo:bar' is not a valid python name and will become an invalid option name in a future release. You can prevent this warning (and future exceptions) by declaring this option using a valid python name."
 
-        with assert_warning(OMDeprecationWarning, msg):
+        # We will continue to support ":" in option names.
+        with assert_no_warning(OMDeprecationWarning):
             opt.declare('foo:bar', 1.0)
 
     def test_context_manager(self):

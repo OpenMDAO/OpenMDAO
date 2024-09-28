@@ -490,7 +490,8 @@ class Component(System):
                     self._subjacs_info[abs_key]['sparsity'] = tup
 
     def add_input(self, name, val=1.0, shape=None, units=None, desc='', tags=None,
-                  shape_by_conn=False, copy_shape=None, compute_shape=None, distributed=None):
+                  shape_by_conn=False, copy_shape=None, compute_shape=None,
+                  require_connection=False, distributed=None):
         """
         Add an input variable to the component.
 
@@ -519,6 +520,8 @@ class Component(System):
         compute_shape : function
             A function taking a dict arg containing names and shapes of this component's outputs
             and returning the shape of this input.
+        require_connection : bool
+            If True and this input is not a design variable, it must be connected to an output.
         distributed : bool
             If True, this variable is a distributed variable, so it can have different sizes/values
             across MPI processes.
@@ -591,11 +594,12 @@ class Component(System):
             'flat_src_indices': None,
             'units': units,
             'desc': desc,
-            'distributed': distributed,
             'tags': make_set(tags),
             'shape_by_conn': shape_by_conn,
             'compute_shape': compute_shape,
             'copy_shape': copy_shape,
+            'require_connection': require_connection,
+            'distributed': distributed,
         }
 
         # this will get reset later if comm size is 1

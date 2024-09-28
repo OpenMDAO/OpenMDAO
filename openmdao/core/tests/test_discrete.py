@@ -783,6 +783,7 @@ class DiscreteTestCase(unittest.TestCase):
                                      'global_size': 1,
                                      'has_src_indices': False,
                                      'prom_name': 'comp.a',
+                                     'require_connection': False,
                                      'shape': (1,),
                                      'shape_by_conn': False,
                                      'size': 1,
