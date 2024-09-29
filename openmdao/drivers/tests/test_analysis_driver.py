@@ -11,9 +11,6 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.utils.assert_utils import assert_warning, assert_warnings, assert_near_equal
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
-from openmdao.drivers.analysis_driver import AnalysisDriver
-from openmdao.drivers.analysis_generator import ProductGenerator, ZipGenerator
-
 # from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
 
 
@@ -128,7 +125,7 @@ class TestAnalysisDriverParallel(unittest.TestCase):
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = AnalysisDriver(samples=fullfact3)
+        prob.driver = om.AnalysisDriver(samples=fullfact3)
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.driver.add_response('f_xy', units=None, indices=[0])
@@ -159,7 +156,7 @@ class TestAnalysisDriverParallel(unittest.TestCase):
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = AnalysisDriver(samples=fullfact3)
+        prob.driver = om.AnalysisDriver(samples=fullfact3)
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
         prob.driver.recording_options.set(record_derivatives=True)
 
@@ -197,7 +194,7 @@ class TestAnalysisDriverParallel(unittest.TestCase):
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = AnalysisDriver(samples=ProductGenerator(samples))
+        prob.driver = om.AnalysisDriver(samples=om.ProductGenerator(samples))
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.driver.add_response('f_xy', units=None, indices=[0])
@@ -226,7 +223,7 @@ class TestAnalysisDriverParallel(unittest.TestCase):
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = AnalysisDriver(samples=ProductGenerator(samples))
+        prob.driver = om.AnalysisDriver(samples=om.ProductGenerator(samples))
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
         # from openmdao.recorders.stream_recorder import StreamRecorder
         # prob.driver.add_recorder(StreamRecorder())
@@ -259,7 +256,7 @@ class TestAnalysisDriverParallel(unittest.TestCase):
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = AnalysisDriver(samples=ZipGenerator(samples))
+        prob.driver = om.AnalysisDriver(samples=om.ZipGenerator(samples))
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.driver.add_response('f_xy', units=None, indices=[0])
@@ -285,7 +282,7 @@ class TestAnalysisDriverParallel(unittest.TestCase):
                    'y': {'val': [0.0, 0.5, 1.0, 1.5]}}
 
         with self.assertRaises(ValueError) as e:
-            ZipGenerator(samples)
+            om.ZipGenerator(samples)
 
         expected = ("ZipGenerator requires that val for all var_dict have the same length:\n"
                    "{'x': 5, 'y': 4}")
@@ -345,7 +342,7 @@ class TestAnalysisDriver(unittest.TestCase):
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = AnalysisDriver(samples=samples)
+        prob.driver = om.AnalysisDriver(samples=samples)
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.driver.add_response('f_xy', units=None, indices=[0])
@@ -391,7 +388,7 @@ class TestAnalysisDriver(unittest.TestCase):
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = AnalysisDriver(samples=samples)
+        prob.driver = om.AnalysisDriver(samples=samples)
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.driver.add_response('f_xy', units=None, indices=[0])
