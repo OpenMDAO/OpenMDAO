@@ -3,6 +3,7 @@
 import sys
 import os
 import unittest
+import platform
 
 from io import StringIO
 from tempfile import mkstemp
@@ -3131,7 +3132,9 @@ class DummyClass(object):
         # for the instance is not available since the module containing it was removed
 
         # need to check for warning being issued about not being able to read it
-        with assert_warning(RuntimeWarning, "While reading system options from case recorder, the following errors occurred: No module named 'mymodule'"):
+        with assert_warning(RuntimeWarning,
+                            "While reading parab_with_dummy_metadata component options from case recorder, "
+                            "the following errors occurred: No module named 'mymodule'"):
             cr = om.CaseReader('test_reading_non_importable_objects_in_system_options_out/cases.sql')
 
         # Check to see that all the component options for the DummyClass are retrievable from the case recorder file
@@ -3180,6 +3183,65 @@ class DummyClass(object):
 
         objs = case.get_objectives()
         self.assertEqual(set(objs.keys()), {'z'})
+
+    def test_pickle_vulnerability(self):
+        # test handling of vulnerability https://github.com/advisories/GHSA-g4r7-86gm-pgqc
+        class Payload:
+            def __init__(self, func):
+                self.func = func
+
+            def __reduce__(self):
+                if self.func == 'system':
+                    return os.system, ('touch pwned.txt',)
+                elif self.func == 'eval':
+                    return eval, ("__import__('os').system('touch pwned.txt')",)
+                elif self.func == 'exec':
+                    return exec, ("__import__('os').system('touch pwned.txt')",)
+
+        class PayloadComp(om.ExplicitComponent):
+            def __init__(self, func, **kwargs):
+                self.func = func
+                super().__init__(**kwargs)
+
+            def initialize(self):
+                self.options.declare('payload', Payload(self.func))
+
+            def setup(self):
+                self.add_input('x')
+                self.add_output('y')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 2 * inputs['x']
+
+        os_module = 'nt' if platform.system() == 'Windows' else 'posix'
+        test_matrix = (
+            ('system', f"'{os_module}.system' is forbidden"),
+            ('eval', "'builtins.eval' is forbidden"),
+            ('exec', "'builtins.exec' is forbidden"),
+        )
+
+        for func, msg in test_matrix:
+            with self.subTest(func):
+                prob = om.Problem()
+                model = prob.model
+                model.add_subsystem('comp1', PayloadComp(func), promotes=['*'])
+                model.add_subsystem('comp2', om.ExecComp('z = y * 2'), promotes=['*'])
+
+                filename = f"{func}.sql"
+                model.add_recorder(om.SqliteRecorder(filename))
+
+                prob.setup()
+                prob.run_model()
+
+                self.maxDiff = None
+                with assert_warning(RuntimeWarning,
+                                    "While reading comp1 component options from case recorder, "
+                                    f"the following errors occurred: Error unpickling global, {msg}"):
+                    om.CaseReader(prob.get_outputs_dir() / filename)
+
+                # the payload should not have been allowed to execute
+                files = os.listdir(os.getcwd())
+                self.assertTrue('pwned.txt' not in files, "Payload was allowed to execute")
 
 
 @use_tempdirs

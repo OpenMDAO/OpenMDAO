@@ -1,16 +1,11 @@
 """Define the OptionsDictionary class."""
 import contextlib
-import re
 
 from openmdao.utils.om_warnings import warn_deprecation
 from openmdao.utils.notebook_utils import notebook
 from openmdao.visualization.tables.table_builder import generate_table
 
 from openmdao.core.constants import _UNDEFINED
-
-
-# regex to check for valid names.
-namecheck_rgx = re.compile('[a-zA-Z_][_a-zA-Z0-9]*')
 
 
 #
@@ -387,13 +382,6 @@ class OptionsDictionary(object):
             during __setitem__ and __getitem__.  If a tuple of the form (msg, new_name),
             display msg as with str, and forward any __setitem__/__getitem__ to new_name.
         """
-        match = namecheck_rgx.match(name)
-        if match is None or match.group() != name:
-            warn_deprecation(f"'{name}' is not a valid python name and will become an invalid "
-                             "option name in a future release. You can prevent this warning (and "
-                             "future exceptions) by declaring this option using a valid python "
-                             "name.")
-
         if values is not None and not isinstance(values, (set, list, tuple)):
             self._raise(f"In declaration of option '{name}', the 'values' arg must be of type None,"
                         f" list, or tuple - not {values}.", exc_type=TypeError)
