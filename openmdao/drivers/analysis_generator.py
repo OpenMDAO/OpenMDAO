@@ -28,7 +28,6 @@ class AnalysisGenerator(Iterator):
         A running count of the samples obtained from the iterator.
     _var_dict : dict
         An internal copy of the var_dict used to create the generator.
-
     """
 
     def __init__(self, var_dict):
@@ -75,7 +74,6 @@ class AnalysisGenerator(Iterator):
         dict
             A dictionary containing the promoted paths of variables to
             be set by the AnalysisDriver
-
         """
         d = {}
         vals = next(self._iter)
