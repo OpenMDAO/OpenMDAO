@@ -55,7 +55,9 @@ In other highlights...
 - Updated Case list methods to handle missing residuals data [#3334](https://github.com/OpenMDAO/OpenMDAO/pull/3334)
 - Fixed a bug in testing utils [#3335](https://github.com/OpenMDAO/OpenMDAO/pull/3335)
 - Fix transformation of b-splines onto [0, 1] in InterpND. [#3338](https://github.com/OpenMDAO/OpenMDAO/pull/3338)
-- Fix for bug in code for linear only desvars in pyoptsparse driver that turned off coloring in some cases [#3343](https://github.com/OpenMDAO/OpenMDAO/pull/3343)
+- Fix for bug in code for linear only desvars in pyoptsparse driver that turned off coloring in some cases. [#3343](https://github.com/OpenMDAO/OpenMDAO/pull/3343)
+- Fix confusing warning during prob.setup(check=True) when recorder is attached to problem. [#3368](https://github.com/OpenMDAO/OpenMDAO/pull/3368)
+- Fix for bug when using array ref/ref0 values on a connected input with src_indices. [#3370](https://github.com/OpenMDAO/OpenMDAO/pull/3370)
 
 ## Miscellaneous
 
@@ -76,6 +78,7 @@ In other highlights...
 - Remove --with-deps argument from playwright install [#3354](https://github.com/OpenMDAO/OpenMDAO/pull/3354)
 - Updated GitHub workflows [#3361](https://github.com/OpenMDAO/OpenMDAO/pull/3361)
 - Added logic to prevent calling some unsafe functions in SqliteCaseReader [#3363](https://github.com/OpenMDAO/OpenMDAO/pull/3363)
+- Re-enabled a test that was previously unreliable on CI [#3367](https://github.com/OpenMDAO/OpenMDAO/pull/3367)
 
 ***********************************
 # Release Notes for OpenMDAO 3.34.2
