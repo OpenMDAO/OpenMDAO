@@ -2134,8 +2134,8 @@ def _Jc2col_matrix_direct(J, Jrows, Jcols, shape):
         if partrow.size > 1:
             Jrow[:] = False
             Jrow[partrow] = True
-            Jfullrow = J.getrow(row)
-            for col1, col2 in combinations(Jfullrow.indices, 2):
+            Jfullrow = J.getrow(row).indices
+            for col1, col2 in combinations(Jfullrow, 2):
                 if Jrow[col1] or Jrow[col2]:
                     dok[col1, col2] = True
                     dok[col2, col1] = True
@@ -2259,6 +2259,7 @@ def MNCO_bidir(J):
     """
     nzrows, nzcols = J.row, J.col
     nrows, ncols = J.shape
+    skip = max(nrows, ncols) + 1
 
     coloring = Coloring(sparsity=J)
 
@@ -2268,10 +2269,10 @@ def MNCO_bidir(J):
     sparse = csc_matrix((np.ones(nzrows.size, dtype=bool), (nzrows, nzcols)), shape=J.shape)
 
     for c in range(ncols):
-        M_col_nonzeros[c] = sparse.getcol(c).indices.size
+        M_col_nonzeros[c] = sparse.getcol(c).size
     sparse = sparse.tocsr()
     for r in range(nrows):
-        M_row_nonzeros[r] = sparse.getrow(r).indices.size
+        M_row_nonzeros[r] = sparse.getrow(r).size
 
     sparse = None
 
@@ -2283,52 +2284,54 @@ def MNCO_bidir(J):
     row_i = col_i = 0
 
     # partition J into Jf and Jr
-    # Jf is colored by column and those columns will be solved in fwd mode
-    # Jr is colored by row and those rows will be solved in reverse mode
+    # Jf is colored by column and those columns will be solved in fwd mode. It is built up from
+    # bottom to top (by row).
+    # Jr is colored by row and those rows will be solved in reverse mode. It is built up from
+    # right to left (by column).
     # We build Jf from bottom up (by row) and Jr from right to left (by column).
-
-    # get index of row with fewest nonzeros and col with fewest nonzeros
-    r = M_row_nonzeros.argmin()
-    c = M_col_nonzeros.argmin()
-
-    # get number of nonzeros in the selected row and column
-    nnz_r = M_row_nonzeros[r]
-    nnz_c = M_col_nonzeros[c]
 
     Jf_nz_max = 0   # max row nonzeros in Jf
     Jr_nz_max = 0   # max col nonzeros in Jr
 
     while M_rows.size > 0:
         # the algorithm is minimizing the total of the max number of nonzero
-        # columns in Jf + the max number of nonzero rows in Jr, so it's basically minimizing
+        # rows in Jf + the max number of nonzero columns in Jr, so it's basically minimizing
         # the upper bound of the number of colors that will be needed.
 
-        if Jr_nz_max + max(Jf_nz_max, nnz_r) < (Jf_nz_max + max(Jr_nz_max, nnz_c)):
-            Jf_rows[r] = M_cols[M_rows == r]
-            Jf_nz_max = max(nnz_r, Jf_nz_max)
+        # get index of row with fewest nonzeros and col with fewest nonzeros
+        r = M_row_nonzeros.argmin()
+        c = M_col_nonzeros.argmin()
 
-            M_row_nonzeros[r] = ncols + 1  # make sure we don't pick this one again
+        # get number of nonzeros in the selected row and column
+        nnz_c = M_col_nonzeros[c]
+        nnz_r = M_row_nonzeros[r]
+
+        if Jr_nz_max + max(Jf_nz_max, nnz_r) < (Jf_nz_max + max(Jr_nz_max, nnz_c)):
+            # add a row to Jf
+            Jf_rows[r] = M_cols[M_rows == r]
+            if nnz_r > Jf_nz_max:
+                Jf_nz_max = nnz_r
+
+            M_row_nonzeros[r] = skip  # make sure we don't pick this one again
+            # decrement all column nonzeros for columns in the row we just removed
             M_col_nonzeros[Jf_rows[r]] -= 1
 
-            # remove row r
+            # remove row r from M
             keep = M_rows != r
-            r = M_row_nonzeros.argmin()
-            c = M_col_nonzeros.argmin()
-            nnz_r = M_row_nonzeros[r]
 
             row_i += 1
         else:
+            # add a column to Jr
             Jr_cols[c] = M_rows[M_cols == c]
-            Jr_nz_max = max(nnz_c, Jr_nz_max)
+            if nnz_c > Jr_nz_max:
+                Jr_nz_max = nnz_c
 
-            M_col_nonzeros[c] = nrows + 1  # make sure we don't pick this one again
+            M_col_nonzeros[c] = skip  # make sure we don't pick this one again
+            # decrement all row nonzeros for rows in the column we just removed
             M_row_nonzeros[Jr_cols[c]] -= 1
 
-            # remove column c
+            # remove column c from M
             keep = M_cols != c
-            r = M_row_nonzeros.argmin()
-            c = M_col_nonzeros.argmin()
-            nnz_c = M_col_nonzeros[c]
 
             col_i += 1
 
