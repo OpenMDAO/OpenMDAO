@@ -1,7 +1,6 @@
 """
 Design-of-Experiments Driver.
 """
-from collections.abc import Iterable
 from collections import deque
 import itertools
 import traceback
@@ -9,13 +8,14 @@ import traceback
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.core.analysis_error import AnalysisError
 
+from openmdao.drivers.analysis_generator import AnalysisGenerator
 from openmdao.utils.mpi import MPI
 from openmdao.utils.om_warnings import issue_warning, DriverWarning
 
 
 class AnalysisDriver(Driver):
     """
-    Design-of-Experiments Driver.
+    A driver for repeatedly running the model with a list of sampled data.
 
     Parameters
     ----------
@@ -27,7 +27,7 @@ class AnalysisDriver(Driver):
 
     Attributes
     ----------
-    _samples : Sequence
+    _samples : list or tuple or AnalysisGenerator
         A list of samples to be executed by the AnalysisDriver.
     _name : str
         The name used to identify this driver in recorded samples.
@@ -39,20 +39,17 @@ class AnalysisDriver(Driver):
         The number of total MPI colors for the run.
     _prev_sample_vars : set
         The set of variables seen in the previous iteration of the driver on this rank.
-    _all_sampled_vars : set
-        The set of all variables being set by this analysis driver.
     """
 
-    def __init__(self, samples=None, **kwargs):
+    def __init__(self, samples, **kwargs):
         """
         Construct an AnalysisDriver.
         """
-        if samples is None:
-            self._samples = []
-        elif isinstance(samples, Iterable) and not isinstance(samples, str):
+        if isinstance(samples, (list, tuple, AnalysisGenerator)):
             self._samples = samples
         else:
-            raise ValueError(f'If given, samples must be Iterable but got {type(samples)}')
+            raise ValueError('If given, samples must be a list, tuple, '
+                             f'or derived from AnalysisDriver but got {type(samples)}')
 
         super().__init__(**kwargs)
 
@@ -69,7 +66,6 @@ class AnalysisDriver(Driver):
         self._color = None
         self._num_colors = 1
         self._prev_sample_vars = set()
-        self._all_sampled_vars = set()
         self._total_jac_format = 'dict'
 
     def _declare_options(self):
@@ -147,7 +143,6 @@ class AnalysisDriver(Driver):
             The communicator for the Problem model.
         """
         self._prev_sample_vars.clear()
-        self._all_sampled_vars.clear()
 
         self._problem_comm = comm
 
@@ -208,7 +203,7 @@ class AnalysisDriver(Driver):
         model_implicit_outputs = {meta['prom_name'] for _, meta
                                   in model.list_outputs(explicit=False, out_stream=None)}
         self._allowable_vars = model_inputs | model_implicit_outputs
-        n_procs = comm.size
+        n_procs = 1 if comm is None else comm.size
 
         if self.options['run_parallel'] and MPI and n_procs > 1:
             batch_size = self.options['batch_size']
@@ -274,6 +269,7 @@ class AnalysisDriver(Driver):
             The iteration of the AnalysisDriver to which this case corresponds.
         """
         comm = self._problem_comm
+        rank = 0 if self._problem_comm is None else comm.rank
         self.iter_count = sample_num
         metadata = {}
 
@@ -289,7 +285,7 @@ class AnalysisDriver(Driver):
             # Check that self._allowable_vars is not empty before we warn.
             if self._allowable_vars and var not in self._allowable_vars:
                 issue_warning(msg=f'Variable `{var}` is neither an independent variable\n'
-                              f'nor an implicit output in the model on rank {comm.rank}.\n'
+                              f'nor an implicit output in the model on rank {rank}.\n'
                               'Setting its value in the case data will have no\n'
                               'impact on the outputs of the model after execution.',
                               category=DriverWarning)
@@ -323,9 +319,23 @@ class AnalysisDriver(Driver):
 
         if self.recording_options['record_derivatives']:
             self._compute_totals(of=list(self._responses.keys()),
-                                 wrt=list(self._all_sampled_vars),
+                                 wrt=list(self._get_sampled_vars()),
                                  return_format=self._total_jac_format,
                                  driver_scaling=False)
+    
+    def _get_sampled_vars(self):
+        """
+        Return all of the variables (promoted name) to be sampeld by this driver.
+        """
+        if hasattr(self._samples, '_get_sampled_vars'):
+            return set(self._samples._get_sampled_vars())
+        elif isinstance(self._samples, (list, tuple)):
+            try:
+                return set(self._samples[0].keys())
+            except IndexError:
+                pass
+        raise AttributeError('The samples for AnalysisDriver must be a list, tuple, '
+                             'or an AnalysisGenerator that provides a _get_sampled_vars() method')
 
     def _setup_recording(self):
         """
@@ -336,20 +346,17 @@ class AnalysisDriver(Driver):
         model = self._problem().model
         abs2prom_inputs = model._var_allprocs_abs2prom['input']
         rec_includes = self.recording_options['includes']
-        self._samples, temp_samples = itertools.tee(self._samples)
         implicit_outputs = {meta['prom_name'] for _, meta in
                             model.list_outputs(explicit=False, implicit=True)}
 
         # Responses are recorded by default, add the inputs to be recorded.
-        for samp in temp_samples:
-            for prom_name in samp:
-                self._all_sampled_vars.add(prom_name)
-                if prom_name in implicit_outputs and prom_name not in rec_includes:
-                    self.recording_options['includes'].append(prom_name)
-                for model_abs_name, model_prom_name in abs2prom_inputs.items():
-                    if model_prom_name == prom_name:
-                        if model_abs_name not in self.recording_options['includes']:
-                            self.recording_options['includes'].append(model_abs_name)
+        for prom_name in self._get_sampled_vars():
+            if prom_name in implicit_outputs and prom_name not in rec_includes:
+                self.recording_options['includes'].append(prom_name)
+            for model_abs_name, model_prom_name in abs2prom_inputs.items():
+                if model_prom_name == prom_name:
+                    if model_abs_name not in self.recording_options['includes']:
+                        self.recording_options['includes'].append(model_abs_name)
 
         if MPI:
             run_parallel = self.options['run_parallel']

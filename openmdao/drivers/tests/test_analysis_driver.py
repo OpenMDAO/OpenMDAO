@@ -1,6 +1,7 @@
 """
 Test Analysis Driver and Generators.
 """
+import csv
 import glob
 import unittest
 
@@ -411,6 +412,80 @@ class TestAnalysisDriver(unittest.TestCase):
                 cr = om.CaseReader(file)
                 num_recorded_cases += len(cr.list_cases(out_stream=None))
             self.assertEqual(num_recorded_cases, 1)
+
+    def test_csv(self):
+        
+        ### Part 1 - Create a CSV file of the cases we want to run
+        
+        var_dict = {'x': {'val': [0.0, 0.5, 1.0], 'units': None, 'indices': [0]},
+                    'y': {'val': [0.0, 0.5, 1.0], 'units': None, 'indices': [0]}}
+
+        case_gen = om.ProductGenerator(var_dict)
+        cases_csv_data = []
+
+        row_0 = {v: data['units'] for v, data in var_dict.items()}
+        row_1 = {v: data['indices'] for v, data in var_dict.items()}
+
+        cases_csv_data = [row_0, row_1]
+
+        for c in case_gen:
+            case_i = {}
+            for k, v in c.items():
+                case_i[k] = v['val']
+            cases_csv_data.append(case_i)
+
+        with open('samples.csv', 'w') as f:
+            writer = csv.DictWriter(f, fieldnames=var_dict.keys())
+            writer.writeheader()
+            writer.writerows(cases_csv_data)
+        
+        ### Part 2 - Run the CSVGenerator on the file we just created
+        
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('paraboloid', Paraboloid(), promotes_inputs=['x', 'y'], promotes_outputs=['f_xy'])
+
+        prob.setup()
+
+        # # create DOEDriver using generated CSV file
+        from openmdao.drivers.analysis_generator import CSVGenerator
+        prob.driver = om.AnalysisDriver(CSVGenerator('samples.csv', has_units=True, has_indices=True))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.run_driver()
+        prob.cleanup()
+
+        # expected = [
+        #     {'p1.x': np.array([0.]), 'p2.y': np.array([0., 0.])},
+        #     {'p1.x': np.array([1., 0.]), 'p2.y': np.array([0., 0.])},
+        #     {'p1.x': np.array([0., 1.]), 'p2.y': np.array([0., 0.])},
+        #     {'p1.x': np.array([1., 1.]), 'p2.y': np.array([0., 0.])},
+        #     {'p1.x': np.array([0., 0.]), 'p2.y': np.array([1., 0.])},
+        #     {'p1.x': np.array([1., 0.]), 'p2.y': np.array([1., 0.])},
+        #     {'p1.x': np.array([0., 1.]), 'p2.y': np.array([1., 0.])},
+        #     {'p1.x': np.array([1., 1.]), 'p2.y': np.array([1., 0.])},
+        #     {'p1.x': np.array([0., 0.]), 'p2.y': np.array([0., 1.])},
+        #     {'p1.x': np.array([1., 0.]), 'p2.y': np.array([0., 1.])},
+        #     {'p1.x': np.array([0., 1.]), 'p2.y': np.array([0., 1.])},
+        #     {'p1.x': np.array([1., 1.]), 'p2.y': np.array([0., 1.])},
+        #     {'p1.x': np.array([0., 0.]), 'p2.y': np.array([1., 1.])},
+        #     {'p1.x': np.array([1., 0.]), 'p2.y': np.array([1., 1.])},
+        #     {'p1.x': np.array([0., 1.]), 'p2.y': np.array([1., 1.])},
+        #     {'p1.x': np.array([1., 1.]), 'p2.y': np.array([1., 1.])},
+        # ]
+
+        # cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
+        # cases = cr.list_cases('driver', out_stream=None)
+
+        # self.assertEqual(len(cases), 16)
+
+        # for case, expected_case in zip(cases, expected):
+        #     outputs = cr.get_case(case).outputs
+        #     self.assertEqual(outputs['p1.x'][0], expected_case['p1.x'][0])
+        #     self.assertEqual(outputs['p2.y'][0], expected_case['p2.y'][0])
+        #     self.assertEqual(outputs['p1.x'][1], expected_case['p1.x'][1])
+        #     self.assertEqual(outputs['p2.y'][1], expected_case['p2.y'][1])
 
 
 if __name__ == "__main__":

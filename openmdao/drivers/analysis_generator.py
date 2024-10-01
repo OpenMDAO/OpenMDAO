@@ -7,6 +7,7 @@ of variables and values to be tested, produce some set of sample values to be ev
 """
 
 from collections.abc import Iterator
+import csv
 import itertools
 
 
@@ -56,6 +57,12 @@ class AnalysisGenerator(Iterator):
         """
         self._run_count = 0
 
+    def _get_sampled_vars(self):
+        """
+        Return the set of variable names whose value are provided by this generator.
+        """
+        return self._var_dict.keys()
+
     def __next__(self):
         """
         Provide a dictionary of the next point to be analyzed.
@@ -97,7 +104,6 @@ class ZipGenerator(AnalysisGenerator):
         set in each itearation with their values to be assumed (required),
         units (optional), and indices (optional).
     """
-
     def _setup(self):
         """
         Set up the iterator which provides each case.
@@ -141,3 +147,60 @@ class ProductGenerator(AnalysisGenerator):
         super()._setup()
         sampler = (c['val'] for c in self._var_dict.values())
         self._iter = itertools.product(*sampler)
+
+
+class CSVGenerator(AnalysisGenerator):
+    """
+    A generator which provides cases for AnalysisDriver by pulling rows from a CSV file.
+
+    Parameters
+    ----------
+    filename : str
+        The filename for the CSV file containing the variable data.
+    has_units : bool
+        If True, the second line of the CSV contains the units of each variable.
+    has_indices : bool
+        If True, the line after units (if present) contains the indices being set.
+    """
+    def __init__(self, filename, has_units=False, has_indices=False):
+        self._filename = filename
+        self._has_units = has_units
+        self._has_indices = has_indices
+
+        self._csv_file = open(self._filename, 'r')
+        self._csv_reader = csv.DictReader(self._csv_file)
+
+        self._var_names = set(self._csv_reader.fieldnames)
+
+        self._ret_val = {var: {'units': None, 'indices': None} for var in self._csv_reader.fieldnames}
+
+        if self._has_units:
+            var_units_dict = next(self._csv_reader)
+            for var, units in var_units_dict.items():
+                self._ret_val[var]['units'] = None if not units else units
+
+        if self._has_indices:
+            var_idxs_dict = next(self._csv_reader)
+            for var, idxs in var_idxs_dict.items():
+                self._ret_val[var]['indices'] = eval(idxs, {'__builtins__': None})  # nosec: scope limited
+
+    def _get_sampled_vars(self):
+        return self._var_names
+
+    def __next__(self):
+        try:
+            var_val_dict = next(self._csv_reader)
+            for var, val in var_val_dict.items():
+                self._ret_val[var]['val'] = val
+            return self._ret_val
+        except StopIteration:
+            # Close the file and propagate the exception
+            self._csv_file.close()
+            raise
+    
+    def __del__(self):
+        """
+        Ensure the file is closed if we don't exhaust the iterator.
+        """
+        if self._csv_file and not self._csv_file.closed:
+            self._csv_file.close()
