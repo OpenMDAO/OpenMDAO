@@ -234,7 +234,7 @@ class CSVGenerator(AnalysisGenerator):
             # Close the file and propagate the exception
             self._csv_file.close()
             raise
-    
+
     def __del__(self):
         """
         Ensure the file is closed if we don't exhaust the iterator.

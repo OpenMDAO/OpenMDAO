@@ -322,7 +322,7 @@ class AnalysisDriver(Driver):
                                  wrt=list(self._get_sampled_vars()),
                                  return_format=self._total_jac_format,
                                  driver_scaling=False)
-    
+
     def _get_sampled_vars(self):
         """
         Return all of the variables (promoted name) to be sampeld by this driver.
