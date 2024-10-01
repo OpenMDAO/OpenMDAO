@@ -451,12 +451,19 @@ class Group(System):
                                                "not supported yet.".format(self.msginfo))
 
                         if not src_indices._flat_src:
-                            src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
+                            src_indices = _flatten_src_indices(src_indices.as_array(),
+                                                               meta_in['shape'],
                                                                meta_out['global_shape'],
                                                                meta_out['global_size'])
 
-                        ref = ref[src_indices]
-                        ref0 = ref0[src_indices]
+                        if np.ndim(ref) > 0:
+                            ref = ref[src_indices]
+                        else:  # ref is scalar so ref0 must be an array
+                            ref = np.full(ref0.shape, ref)
+                        if np.ndim(ref0) > 0:
+                            ref0 = ref0[src_indices]
+                        else:  # ref0 is scalar so ref must be an array
+                            ref0 = np.full(ref.shape, ref0)
 
                 # Compute scaling arrays for inputs using a0 and a1
                 # Example:
