@@ -104,6 +104,7 @@ class ZipGenerator(AnalysisGenerator):
         set in each itearation with their values to be assumed (required),
         units (optional), and indices (optional).
     """
+
     def _setup(self):
         """
         Set up the iterator which provides each case.
@@ -153,6 +154,23 @@ class CSVGenerator(AnalysisGenerator):
     """
     A generator which provides cases for AnalysisDriver by pulling rows from a CSV file.
 
+    Attributes
+    ----------
+    _filename : str
+        The filename of the CSV file providing the samples.
+    _has_units : bool
+        If True, indicates that the CSV file contains a row of the units for each variable.
+    _has_indices : bool
+        If True, indicates that the CSV file contains a row of indices being provided for each variable.
+    _csv_file : file
+        The file object for the CSV file.
+    _csv_reader : DictReader
+        The reader object for the CSV file.
+    _var_names : set of str
+        The set of variable names provided by this CSVGenerator.
+    _ret_val : dict
+        The dict which is returned by each call to __next__.
+
     Parameters
     ----------
     filename : str
@@ -162,7 +180,20 @@ class CSVGenerator(AnalysisGenerator):
     has_indices : bool
         If True, the line after units (if present) contains the indices being set.
     """
+
     def __init__(self, filename, has_units=False, has_indices=False):
+        """
+        Instantiate CSVGenerator.
+
+        Parameters
+        ----------
+        filename : str
+            The filename for the CSV file containing the variable data.
+        has_units : bool
+            If True, the second line of the CSV contains the units of each variable.
+        has_indices : bool
+            If True, the line after units (if present) contains the indices being set.
+        """
         self._filename = filename
         self._has_units = has_units
         self._has_indices = has_indices
@@ -172,7 +203,8 @@ class CSVGenerator(AnalysisGenerator):
 
         self._var_names = set(self._csv_reader.fieldnames)
 
-        self._ret_val = {var: {'units': None, 'indices': None} for var in self._csv_reader.fieldnames}
+        self._ret_val = {var: {'units': None, 'indices': None}
+                         for var in self._csv_reader.fieldnames}
 
         if self._has_units:
             var_units_dict = next(self._csv_reader)
@@ -182,12 +214,16 @@ class CSVGenerator(AnalysisGenerator):
         if self._has_indices:
             var_idxs_dict = next(self._csv_reader)
             for var, idxs in var_idxs_dict.items():
-                self._ret_val[var]['indices'] = eval(idxs, {'__builtins__': None})  # nosec: scope limited
+                idxs = eval(idxs, {'__builtins__': None})  # nosec: scope limited
+                self._ret_val[var]['indices'] = idxs
 
     def _get_sampled_vars(self):
         return self._var_names
 
     def __next__(self):
+        """
+        Provide the data from the next row of the csv file.
+        """
         try:
             var_val_dict = next(self._csv_reader)
             for var, val in var_val_dict.items():
