@@ -1,7 +1,7 @@
 ***********************************
 # Release Notes for OpenMDAO 3.35.0
 
-Sept 30, 2024
+Oct 1, 2024
 
 OpenMDAO 3.35.0 includes a significant change in the way outputs from a particular OpenMDAO execution are handled. These changes are summarized in [POEM 097](https://github.com/OpenMDAO/POEMs/pull/198). Previously, outputs from a run were stored in various locations, including the current working directory, and a reports directory. Derivative coloring files were stored in a coloring_dir folder in the current working directory, and all of these could be overridden by running different OpenMDAO scripts in the same directory on the user's computer.
 
@@ -18,12 +18,12 @@ Additionally, we now provide an `openmdao.api.clean_outputs()` method as well as
 
 In other highlights...
 
-- We now support of numpy 2.0.
+- We now support numpy 2.0.
 - A new implicit component, `InputResidsComp` has been added. This is probably the simplest possible use case for an implicit component, where the residuals are given as inputs.
 - We've added a new `setup_residuals` method in `ImplicitComponent`, which like `setup_partials`, delays the addition of residuals until the shape of inputs and outputs are known.
-- The OpenMDAO command-line tools are accessible via the more pythonic `python -m openmdao` command. We also added a `view_reports` subcommand to quickly bring up the reports associated with a given case.
+- The OpenMDAO command-line tools are accessible via the more pythonic `python -m openmdao` command. We also added a `--view_reports` option to the `openmdao` command to quickly bring up the reports associated with the given script.
 - The `add_input` method now allows the user to specify `require_connection=True`, which will result in an error if the input is left unconnected.
-- Python 3.8 reaches end-of-life next month, and our minimum supported Python version is increased to 3.9.
+- Python 3.8 reaches end-of-life this month (October 2024), and our minimum supported Python version is increased to 3.9.
 
 ## New Features
 
@@ -32,10 +32,8 @@ In other highlights...
 - Added InputResidsComp to the list of components. Added `setup_residuals` method for compatibility with dynamic shaping. [#3295](https://github.com/OpenMDAO/OpenMDAO/pull/3295)
 - POEM 097 Implementation - Part 2 [#3298](https://github.com/OpenMDAO/OpenMDAO/pull/3298)
 - POEM 097 - Part 3 [#3314](https://github.com/OpenMDAO/OpenMDAO/pull/3314)
-- Added `openmdao clean` command line utility and `openmdao.api.clean_outputs` function. [#3318](https://github.com/OpenMDAO/OpenMDAO/pull/3318)
+- Added `openmdao clean` command line utility and `openmdao.api.clean_outputs` function. [#3318](https://github.com/OpenMDAO/OpenMDAO/pull/3318) [#3329](https://github.com/OpenMDAO/OpenMDAO/pull/3329)
 - Added better error msg when a distributed variable is part of an invalid connection or is unconnected [#3321](https://github.com/OpenMDAO/OpenMDAO/pull/3321)
-- Added code linting with Ruff to the test workflow [#3323](https://github.com/OpenMDAO/OpenMDAO/pull/3323)
-- Added a pre-commit configuration to enable automatic linting with ruff [#3326](https://github.com/OpenMDAO/OpenMDAO/pull/3326) [#3329](https://github.com/OpenMDAO/OpenMDAO/pull/3329) [#3333](https://github.com/OpenMDAO/OpenMDAO/pull/3333)
 - Duplicate problem names are now a warning, not an error [#3340](https://github.com/OpenMDAO/OpenMDAO/pull/3340)
 - Removed outdated checks and warnings regarding changes to distributed components [#3348](https://github.com/OpenMDAO/OpenMDAO/pull/3348)
 - Added a `--view_reports` option to the `openmdao` command [#3349](https://github.com/OpenMDAO/OpenMDAO/pull/3349)
@@ -58,12 +56,15 @@ In other highlights...
 - Fix for bug in code for linear only desvars in pyoptsparse driver that turned off coloring in some cases. [#3343](https://github.com/OpenMDAO/OpenMDAO/pull/3343)
 - Fix confusing warning during prob.setup(check=True) when recorder is attached to problem. [#3368](https://github.com/OpenMDAO/OpenMDAO/pull/3368)
 - Fix for bug when using array ref/ref0 values on a connected input with src_indices. [#3370](https://github.com/OpenMDAO/OpenMDAO/pull/3370)
+- Fix for index typo in System._abs_get_val method and removed redundant code. [#3375](https://github.com/OpenMDAO/OpenMDAO/pull/3375)
 
 ## Miscellaneous
 
 - Updated a couple of tests to pass the NumPy 2.x compatibility check [#3291](https://github.com/OpenMDAO/OpenMDAO/pull/3291)
 - Addressed a couple of issues that were causing the 'latest' test workflow to fail [#3319](https://github.com/OpenMDAO/OpenMDAO/pull/3319)
+- Added code linting with Ruff to the test workflow [#3323](https://github.com/OpenMDAO/OpenMDAO/pull/3323)
 - Addressed a NumPy 2.1 deprecated keyword argument [#3325](https://github.com/OpenMDAO/OpenMDAO/pull/3325)
+- Added a pre-commit configuration to enable automatic linting with ruff [#3326](https://github.com/OpenMDAO/OpenMDAO/pull/3326) [#3333](https://github.com/OpenMDAO/OpenMDAO/pull/3333)
 - Updated test workflow to trigger pycycle tests [#3328](https://github.com/OpenMDAO/OpenMDAO/pull/3328)
 - Remove references to conda in the docs [#3330](https://github.com/OpenMDAO/OpenMDAO/pull/3330)
 - Added sub-cycle information to the 'solvers' config check and fixed 'openmdao view_reports' command line tool. [#3331](https://github.com/OpenMDAO/OpenMDAO/pull/3331)
