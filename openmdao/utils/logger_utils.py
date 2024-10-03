@@ -2,6 +2,8 @@
 
 import sys
 import logging
+from fnmatch import fnmatch
+
 
 # If any method that creates handlers is called twice (e.g., setup reconfigure or during tests),
 # then we need to prevent another one from being created. Since we have multiple loggers now, we
@@ -211,5 +213,25 @@ class TestLogger(object):
             The message to match.
         """
         if not self.contains(typ, message):
-            raise RuntimeError('Message "{}" not found in {}.'.format(message,
-                                                                      ',\n'.join(self._msgs[typ])))
+            msgs = ',\n'.join(self._msgs[typ])
+            raise RuntimeError(f'Message "{message}" not found in:\n{msgs}.')
+
+    def find_match_in(self, typ, pattern):
+        """
+        Find a message with the given pattern among the stored messages.
+
+        Raises an exception if a message with the given pattern isn't found.
+
+        Parameters
+        ----------
+        typ : str
+            Type of messages ('error', 'warning', 'info') to be searched.
+
+        pattern : str
+            The pattern to match.
+        """
+        for msg in self._msgs[typ]:
+            if fnmatch(msg, pattern):
+                return
+        msgs = ',\n'.join(self._msgs[typ])
+        raise RuntimeError(f'Message with pattern "{pattern}" not found in:\n{msgs}')
