@@ -361,7 +361,7 @@ class TestParallelGroupsMPI2(TestParallelGroups):
             self.assertEqual(len(testlogger.get('error')), 1)
             self.assertTrue(testlogger.contains('warning',
                                                 "Only want to see this on rank 0"))
-            self.assertEqual(len(testlogger.get('info')), len(_default_checks) + 1)
+            self.assertEqual(len(testlogger.get('info')), 2*len(_default_checks) + 1)
             self.assertTrue(msg in testlogger.get('error')[0])
             for info in testlogger.get('info'):
                 if msg in info:
