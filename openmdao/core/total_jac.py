@@ -1486,6 +1486,12 @@ class _TotalJacInfo(object):
         finally:
             self.model._recording_iter.pop()
 
+        # try:
+        #     print('4:',list(self.J[4,:]))
+        #     print('5:',list(self.J[5,:]))
+        # except:
+        #     pass
+
         return self.J_final
 
     def _compute_totals_approx(self, progress_out_stream=None):

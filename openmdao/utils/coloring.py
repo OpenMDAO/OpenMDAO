@@ -2284,11 +2284,8 @@ def MNCO_bidir(J):
     row_i = col_i = 0
 
     # partition J into Jf and Jr
-    # Jf is colored by column and those columns will be solved in fwd mode. It is built up from
-    # bottom to top (by row).
-    # Jr is colored by row and those rows will be solved in reverse mode. It is built up from
-    # right to left (by column).
-    # We build Jf from bottom up (by row) and Jr from right to left (by column).
+    # Jf is colored by column and those columns will be solved in fwd mode.
+    # Jr is colored by row and those rows will be solved in reverse mode.
 
     Jf_nz_max = 0   # max row nonzeros in Jf
     Jr_nz_max = 0   # max col nonzeros in Jr
@@ -2335,6 +2332,7 @@ def MNCO_bidir(J):
 
             col_i += 1
 
+        # M gets smaller by one row or one column
         M_rows = M_rows[keep]
         M_cols = M_cols[keep]
 
