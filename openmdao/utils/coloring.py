@@ -183,6 +183,10 @@ class ColoringMeta(object):
         If True, coloring was already generated but failed.
     _approx : bool
         If True, this is an approx coloring.
+    randomize_subjacs : bool
+        If True, use random subjacs when computing sparsity.
+    randomize_seeds : bool
+        If True, use random seeds when computing sparsity.
     """
 
     _meta_names = {'num_full_jacs', 'tol', 'orders', 'min_improve_pct', 'show_summary',
@@ -208,6 +212,8 @@ class ColoringMeta(object):
         self._coloring = None
         self._failed = False
         self._approx = False
+        self.randomize_subjacs = True
+        self.randomize_seeds = False
 
     def do_compute_coloring(self):
         """
@@ -2093,7 +2099,7 @@ def _2col_adj_rows_cols(J):
     return csc_matrix((np.ones(adjrows.size, dtype=bool), (adjrows, adjcols)), shape=(ncols, ncols))
 
 
-def _Jc2col_matrix_direct(J, Jrows, Jcols, shape):
+def _Jc2col_matrix_direct(J, Jrows, Jcols):
     """
     Convert a partitioned jacobian sparsity matrix to a column adjacency matrix.
 
@@ -2110,14 +2116,13 @@ def _Jc2col_matrix_direct(J, Jrows, Jcols, shape):
         Nonzero rows of a partition of the matrix being colored.
     Jcols : ndarray
         Nonzero columns of a partition of the matrix being colored.
-    shape : tuple
-        Shape of the partition of the matrix being colored.
 
     Returns
     -------
     tuple
         (nzrows, nzcols, shape) of column adjacency matrix.
     """
+    shape = J.shape
     _, ncols = shape
 
     Jrow = np.zeros(ncols, dtype=bool)
@@ -2196,7 +2201,7 @@ def _get_full_disjoint_col_matrix_cols(col_adj_matrix):
     return color_groups
 
 
-def _color_partition(J, Jprows, Jpcols, shape):
+def _color_partition(J, Jprows, Jpcols):
     """
     Compute a single directional fwd coloring using partition Jpart.
 
@@ -2210,8 +2215,6 @@ def _color_partition(J, Jprows, Jpcols, shape):
         Nonzero rows of a partition of the matrix being colored.
     Jpcols : ndarray
         Nonzero columns of a partition of the matrix being colored.
-    shape : tuple
-        Shape of a partition of the matrix being colored.
 
     Returns
     -------
@@ -2220,9 +2223,10 @@ def _color_partition(J, Jprows, Jpcols, shape):
     list
         List of nonzero rows for each column.
     """
+    shape = J.shape
     _, ncols = shape
 
-    col_adj_matrix = _Jc2col_matrix_direct(J, Jprows, Jpcols, shape)
+    col_adj_matrix = _Jc2col_matrix_direct(J, Jprows, Jpcols)
     col_groups = _get_full_disjoint_col_matrix_cols(col_adj_matrix)
 
     col_adj_matrix = None
@@ -2304,31 +2308,26 @@ def MNCO_bidir(J):
         nnz_r = M_row_nonzeros[r]
 
         if Jr_nz_max + max(Jf_nz_max, nnz_r) < (Jf_nz_max + max(Jr_nz_max, nnz_c)):
-            # add a row to Jf
-            Jf_rows[r] = M_cols[M_rows == r]
+
+            Jf_rows[r] = M_cols[M_rows == r]  # add a row to Jf
+            keep = M_rows != r  # remove row r from M
+            M_row_nonzeros[r] = skip  # make sure we don't pick this row again
+            M_col_nonzeros[Jf_rows[r]] -= 1  # -1 all column nonzeros for columns in removed row
+
             if nnz_r > Jf_nz_max:
-                Jf_nz_max = nnz_r
-
-            M_row_nonzeros[r] = skip  # make sure we don't pick this one again
-            # decrement all column nonzeros for columns in the row we just removed
-            M_col_nonzeros[Jf_rows[r]] -= 1
-
-            # remove row r from M
-            keep = M_rows != r
+                Jf_nz_max = nnz_r  # update max nonzero rows in Jf
 
             row_i += 1
+
         else:
-            # add a column to Jr
-            Jr_cols[c] = M_rows[M_cols == c]
+
+            Jr_cols[c] = M_rows[M_cols == c]  # add a column to Jr
+            keep = M_cols != c  # remove column c from M
+            M_col_nonzeros[c] = skip  # make sure we don't pick this one again
+            M_row_nonzeros[Jr_cols[c]] -= 1  # -1 all row nonzeros for rows in removed column
+
             if nnz_c > Jr_nz_max:
                 Jr_nz_max = nnz_c
-
-            M_col_nonzeros[c] = skip  # make sure we don't pick this one again
-            # decrement all row nonzeros for rows in the column we just removed
-            M_row_nonzeros[Jr_cols[c]] -= 1
-
-            # remove column c from M
-            keep = M_cols != c
 
             col_i += 1
 
@@ -2353,7 +2352,7 @@ def MNCO_bidir(J):
         Jf_rows = None
         Jfr = np.hstack(Jfr)
         Jfc = np.hstack(Jfc)
-        coloring._fwd = _color_partition(J, Jfr, Jfc, J.shape)
+        coloring._fwd = _color_partition(J, Jfr, Jfc)
         Jfr = Jfc = None
 
     if col_i > 0:
@@ -2369,7 +2368,7 @@ def MNCO_bidir(J):
         Jr_cols = None
         Jrr = np.hstack(Jrr)
         Jrc = np.hstack(Jrc)
-        coloring._rev = _color_partition(J.T, Jrc, Jrr, J.T.shape)
+        coloring._rev = _color_partition(J.T, Jrc, Jrr)
 
     if nzrows.size != nnz_Jf + nnz_Jr:
         raise RuntimeError("Nonzero mismatch for J vs. Jf and Jr")
@@ -2455,7 +2454,7 @@ def _tol_sweep(arr, tol=_DEF_COMP_SPARSITY_ARGS['tol'], orders=_DEF_COMP_SPARSIT
 
 
 @contextmanager
-def _compute_total_coloring_context(problem):
+def _compute_total_coloring_context(problem, coloring_info):
     """
     Context manager for computing total jac sparsity for simultaneous coloring.
 
@@ -2463,15 +2462,22 @@ def _compute_total_coloring_context(problem):
     ----------
     problem : Problem
         The problem where coloring will be done.
+    coloring_info : ColoringMeta or None
+        Metadata object for coloring.
     """
     problem._metadata['coloring_randgen'] = np.random.default_rng(41)  # set seed for consistency
     problem._computing_coloring = True
+    if coloring_info is not None:
+        problem._metadata['randomize_subjacs'] = coloring_info.randomize_subjacs
+        problem._metadata['randomize_seeds'] = coloring_info.randomize_seeds
 
     try:
         yield
     finally:
         problem._metadata['coloring_randgen'] = None
         problem._computing_coloring = False
+        problem._metadata['randomize_subjacs'] = True
+        problem._metadata['randomize_seeds'] = False
 
 
 def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
@@ -2540,13 +2546,17 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
                                "must be provided or design_vars/constraints/objective must be "
                                "added to the driver.")
 
-    use_driver = driver and driver._coloring_info.use_scaling
+    needs_scaling = driver and driver._coloring_info.use_scaling
+    if driver:
+        colorinfo = driver._coloring_info
+    else:
+        colorinfo = None
 
-    with _compute_total_coloring_context(prob):
+    with _compute_total_coloring_context(prob, colorinfo):
         start_time = time.perf_counter()
         fullJ = None
-        for i in range(num_full_jacs):
-            if use_driver:
+        for _ in range(num_full_jacs):
+            if needs_scaling:
                 Jabs = driver._compute_totals(of=of, wrt=wrt, return_format='array')
             else:
                 Jabs = prob.compute_totals(of=of, wrt=wrt, return_format='array',
@@ -2558,6 +2568,10 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
 
         Jabs = None
         elapsed = time.perf_counter() - start_time
+
+    if driver:
+        # force driver to recreate total jacobian using coloring
+        driver._total_jac = None
 
     fullJ *= (1.0 / np.max(fullJ))
 
@@ -2768,9 +2782,6 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
             if abs_out.startswith('_auto_ivc.'):
                 abs_in = _convert_auto_ivc_to_conn_name(conns, abs_out)
                 abs2prom['output'][abs_out] = abs2prom['input'][abs_in]
-
-    if driver:
-        driver._total_jac = None
 
     # if we're running under MPI, make sure the coloring object is identical on all ranks
     # by broadcasting rank 0's coloring to the other ranks.
