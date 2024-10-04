@@ -10,6 +10,7 @@ import weakref
 import pathlib
 import textwrap
 import traceback
+import time
 import atexit
 
 from collections import defaultdict, namedtuple
@@ -1082,14 +1083,17 @@ class Problem(object, metaclass=ProblemMeta):
         started, and the rest of the framework is prepared for execution.
         """
         driver = self.driver
+        model = self.model
 
-        responses = self.model.get_responses(recurse=True, use_prom_ivc=True)
-        designvars = self.model.get_design_vars(recurse=True, use_prom_ivc=True)
+        responses = model.get_responses(recurse=True, use_prom_ivc=True)
+        designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
 
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-            self.model._final_setup()
+            model._final_setup()
 
-        response_size, desvar_size = driver._update_voi_meta(self.model, responses, designvars)
+        model._check_required_connections()
+
+        response_size, desvar_size = driver._update_voi_meta(model, responses, designvars)
 
         # update mode if it's been set to 'auto'
         if self._orig_mode == 'auto':
@@ -1103,7 +1107,7 @@ class Problem(object, metaclass=ProblemMeta):
         #  this part of _final_setup still needs to happen so that change takes effect
         #  in subsequent runs
         if self._metadata['setup_status'] >= _SetupStatus.POST_FINAL_SETUP:
-            self.model._setup_solver_print()
+            model._setup_solver_print()
 
         driver._setup_driver(self)
 
@@ -2510,8 +2514,11 @@ class Problem(object, metaclass=ProblemMeta):
                 print(f"WARNING: '{c}' is not a recognized check.  Available checks are: "
                       f"{sorted(_all_checks)}")
                 continue
-            logger.info(f'checking {c}')
+            logger.info(f'checking {c}...')
+            beg = time.perf_counter()
             _all_checks[c](self, logger)
+            end = time.perf_counter()
+            logger.info(f"    {c} check complete ({(end - beg):.6f} sec).")
 
         if checks and check_file_path is not None and reports_dir_exists:
             # turn text file written to reports dir into an html file to be viewable from the

@@ -451,12 +451,19 @@ class Group(System):
                                                "not supported yet.".format(self.msginfo))
 
                         if not src_indices._flat_src:
-                            src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
+                            src_indices = _flatten_src_indices(src_indices.as_array(),
+                                                               meta_in['shape'],
                                                                meta_out['global_shape'],
                                                                meta_out['global_size'])
 
-                        ref = ref[src_indices]
-                        ref0 = ref0[src_indices]
+                        if np.ndim(ref) > 0:
+                            ref = ref[src_indices]
+                        else:  # ref is scalar so ref0 must be an array
+                            ref = np.full(ref0.shape, ref)
+                        if np.ndim(ref0) > 0:
+                            ref0 = ref0[src_indices]
+                        else:  # ref0 is scalar so ref must be an array
+                            ref0 = np.full(ref.shape, ref0)
 
                 # Compute scaling arrays for inputs using a0 and a1
                 # Example:
@@ -782,6 +789,27 @@ class Group(System):
 
         # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
+
+    def _check_required_connections(self):
+        conns = self._conn_global_abs_in2out
+        abs2prom = self._var_allprocs_abs2prom['input']
+        abs2meta_in = self._var_allprocs_abs2meta['input']
+        discrete_in = self._var_allprocs_discrete['input']
+        desvar = self.get_design_vars()
+
+        for abs_tgt, src in conns.items():
+            if src.startswith('_auto_ivc.'):
+                prom_tgt = abs2prom[abs_tgt]
+
+                # Ignore inputs that are declared as design vars.
+                if abs_tgt in discrete_in or (desvar and prom_tgt in desvar):
+                    continue
+
+                if abs2meta_in[abs_tgt]['require_connection']:
+                    promoted_as = f', promoted as "{prom_tgt}",' if prom_tgt != abs_tgt else ''
+                    self._collect_error(f'{self.msginfo}: Input "{abs_tgt}"{promoted_as} '
+                                        'requires a connection but is not connected.',
+                                        ident=(prom_tgt, abs_tgt))
 
     def _get_dataflow_graph(self):
         """
@@ -4248,7 +4276,7 @@ class Group(System):
         graph = nx.DiGraph()
 
         if comps_only:
-            # add all compoenents as nodes in the graph so they'll be there even if unconnected.
+            # add all components as nodes in the graph so they'll be there even if unconnected.
             comps = set(v.rpartition('.')[0] for v in chain(self._var_allprocs_abs2prom['output'],
                                                             self._var_allprocs_abs2prom['input']))
             graph.add_nodes_from(comps)

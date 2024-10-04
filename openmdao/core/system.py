@@ -77,11 +77,11 @@ _recordable_funcs = frozenset(['_apply_linear', '_apply_nonlinear', '_solve_line
 
 # the following are local metadata that will also be accessible for vars on all procs
 global_meta_names = {
-    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc', 'shape_by_conn',
-              'compute_shape', 'copy_shape'),
+    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc',
+              'shape_by_conn', 'compute_shape', 'copy_shape', 'require_connection'),
     'output': ('units', 'shape', 'size', 'desc',
-               'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags', 'shape_by_conn',
-               'compute_shape', 'copy_shape'),
+               'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags',
+               'shape_by_conn', 'compute_shape', 'copy_shape'),
 }
 
 allowed_meta_names = {
@@ -5248,18 +5248,19 @@ class System(object, metaclass=SystemMeta):
         if get_remote and (distrib or abs_name in vars_to_gather) and self.comm.size > 1:
             owner = self._owning_rank[abs_name]
             myrank = self.comm.rank
+            if distrib:
+                idx = self._var_allprocs_abs2idx[abs_name]
+                sizes = self._var_sizes[typ][:, idx]
+                # TODO: could cache these offsets
+                offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
+                offsets[1:] = np.cumsum(sizes[:-1])
+                if val is _UNDEFINED:
+                    loc_val = np.zeros(sizes[myrank])
+                else:
+                    loc_val = np.ascontiguousarray(val)
+                val = np.zeros(np.sum(sizes))
             if rank is None:  # bcast
                 if distrib:
-                    idx = self._var_allprocs_abs2idx[abs_name]
-                    sizes = self._var_sizes[typ][:, idx]
-                    # TODO: could cache these offsets
-                    offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
-                    offsets[1:] = np.cumsum(sizes[:-1])
-                    if val is _UNDEFINED:
-                        loc_val = np.zeros(sizes[myrank])
-                    else:
-                        loc_val = np.ascontiguousarray(val)
-                    val = np.zeros(np.sum(sizes))
                     self.comm.Allgatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE])
                     if not flat:
                         val.shape = meta['global_shape'] if get_remote else meta['shape']
@@ -5271,16 +5272,6 @@ class System(object, metaclass=SystemMeta):
                     val = new_val
             else:  # retrieve to rank
                 if distrib:
-                    idx = self._var_allprocs_abs2idx[abs_name]
-                    sizes = self._var_sizes[typ][:, idx]
-                    # TODO: could cache these offsets
-                    offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
-                    offsets[1:] = np.cumsum(sizes[:-1])
-                    if val is _UNDEFINED:
-                        loc_val = np.zeros(sizes[idx])
-                    else:
-                        loc_val = np.ascontiguousarray(val)
-                    val = np.zeros(np.sum(sizes))
                     self.comm.Gatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE], root=rank)
                     if not flat:
                         val.shape = meta['global_shape'] if get_remote else meta['shape']
