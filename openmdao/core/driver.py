@@ -1378,7 +1378,8 @@ class Driver(object):
                          min_improve_pct=coloring_mod._DEF_COMP_SPARSITY_ARGS['min_improve_pct'],
                          show_summary=coloring_mod._DEF_COMP_SPARSITY_ARGS['show_summary'],
                          show_sparsity=coloring_mod._DEF_COMP_SPARSITY_ARGS['show_sparsity'],
-                         use_scaling=coloring_mod._DEF_COMP_SPARSITY_ARGS['use_scaling']):
+                         use_scaling=coloring_mod._DEF_COMP_SPARSITY_ARGS['use_scaling'],
+                         randomize_subjacs=True, randomize_seeds=False):
         """
         Set options for total deriv coloring.
 
@@ -1401,6 +1402,10 @@ class Driver(object):
             If True, display sparsity with coloring info after generating coloring.
         use_scaling : bool
             If True, use driver scaling when generating the sparsity.
+        randomize_subjacs : bool
+            If True, use random subjacobians corresponding to their declared sparsity patterns.
+        randomize_seeds : bool
+            If True, use random seeds when computing the sparsity.
         """
         self._coloring_info.coloring = None
         self._coloring_info.num_full_jacs = num_full_jacs
@@ -1415,6 +1420,8 @@ class Driver(object):
         self._coloring_info.show_summary = show_summary
         self._coloring_info.show_sparsity = show_sparsity
         self._coloring_info.use_scaling = use_scaling
+        self._coloring_info.randomize_subjacs = randomize_subjacs
+        self._coloring_info.randomize_seeds = randomize_seeds
 
     def use_fixed_coloring(self, coloring=coloring_mod._STD_COLORING_FNAME):
         """
