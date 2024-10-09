@@ -98,9 +98,6 @@ class InputResidsComp(ImplicitComponent):
         This method is used because input/residual sizes
         may not be known until final setup.
         """
-        size = self._get_var_meta('x', 'size')
-        rng = np.arange(size)
-        self.declare_partials('y', 'x', rows=rng, cols=rng, val=3.0)
         for name in self._var_rel_names['input']:
             resid_name = 'resid_' + name
             size = self._var_rel2meta[name]['size']
