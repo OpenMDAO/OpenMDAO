@@ -41,13 +41,13 @@ class AnalysisDriver(Driver):
         The set of variables seen in the previous iteration of the driver on this rank.
     """
 
-    def __init__(self, samples, **kwargs):
+    def __init__(self, samples=None, **kwargs):
         """
         Construct an AnalysisDriver.
         """
         if isinstance(samples, (list, tuple, AnalysisGenerator)):
             self._samples = samples
-        else:
+        elif samples is not None:
             raise ValueError('If given, samples must be a list, tuple, '
                              f'or derived from AnalysisDriver but got {type(samples)}')
 
