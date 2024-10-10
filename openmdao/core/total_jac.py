@@ -1493,6 +1493,9 @@ class _TotalJacInfo(object):
         finally:
             self.model._recording_iter.pop()
 
+        if self.simul_coloring is not None and self.simul_coloring._subtractions is not None:
+            self.simul_coloring._apply_subtractions(self.J)
+
         return self.J_final
 
     def _compute_totals_approx(self, progress_out_stream=None):

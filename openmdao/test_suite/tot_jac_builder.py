@@ -3,8 +3,12 @@ A tool to make it easier to investigate coloring of jacobians with different spa
 """
 
 import numpy as np
+from scipy.sparse import coo_matrix
 
+import openmdao.api as om
 from openmdao.utils.coloring import _compute_coloring
+from openmdao.utils.assert_utils import assert_near_equal
+
 
 class TotJacBuilder(object):
     def __init__(self, rows, cols):
@@ -56,8 +60,8 @@ class TotJacBuilder(object):
             row_idx += shape[0]
             col_idx += shape[1]
 
-    def color(self, mode='auto', fname=None):
-        self.coloring = _compute_coloring(self.J, mode)
+    def color(self, mode='auto', fname=None, direct=True):
+        self.coloring = _compute_coloring(self.J, mode, direct=direct)
         if self.coloring is not None and fname is not None:
             self.coloring.save(fname)
         return self.coloring
@@ -171,6 +175,69 @@ def rand_jac():
                                    min_shape=(minr,minc),
                                    max_shape=(minr+rnd(10),minc+rnd(10)),
                                    n_random_pts=rnd(15))
+
+
+class SparsityComp(om.ExplicitComponent):
+    def __init__(self, sparsity, **kwargs):
+        super(SparsityComp, self).__init__(**kwargs)
+        self.sparsity = sparsity
+
+    def setup(self):
+        self.add_input('x', shape=self.sparsity.shape[1])
+        self.add_output('y', shape=self.sparsity.shape[0])
+
+        sparsity = coo_matrix(self.sparsity)
+        self.data = np.linspace(2.0, 21.0, num=len(sparsity.data))
+        #self.data = np.random.random(len(sparsity.data))
+        self.declare_partials('y', 'x', rows=sparsity.row, cols=sparsity.col)
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = self.sparsity.dot(inputs['x'])
+
+    def compute_partials(self, inputs, partials):
+        partials['y', 'x'] = self.data
+
+
+def check_sparsity_tot_coloring(sparsity, direct=True, tolerance=1e-15, tol_type='rel'):
+    """
+    Check total derivatives of a top level SparsityComp with and without total coloring.
+
+    Parameters
+    ----------
+    sparsity : ndarray or coo_matrix
+        Sparsity structure to be tested.
+    direct : bool
+        If True, use direct method when bidirectional coloring, else substitution method.
+    """
+    # compute totals without coloring
+    p = om.Problem()
+    model = p.model
+    model.add_subsystem('comp', SparsityComp(sparsity))
+    model.add_design_var('comp.x')
+    model.add_constraint('comp.y')
+    p.driver = om.ScipyOptimizeDriver()
+    p.driver.options['optimizer'] = 'SLSQP'
+    p.setup()
+    p.run_model()
+    J = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
+
+    # compute totals with coloring
+    p = om.Problem()
+    model = p.model
+    model.add_subsystem('comp', SparsityComp(sparsity))
+    model.add_design_var('comp.x')
+    model.add_constraint('comp.y')
+    p.driver = om.ScipyOptimizeDriver()
+    p.driver.options['optimizer'] = 'SLSQP'
+    p.driver.declare_coloring(direct=direct)
+    p.setup()
+    p.run_model()
+    Jcolor = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
+    # print("J\n",J)
+    # print("Jcolor\n",Jcolor)
+
+    # make sure totals match for both cases
+    assert_near_equal(J, Jcolor, tolerance=tolerance, tol_type=tol_type)
 
 
 if __name__ == '__main__':

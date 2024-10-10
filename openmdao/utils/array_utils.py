@@ -564,6 +564,8 @@ def rand_sparsity(shape, density_ratio, dtype=bool):
     # get rid of dup rows/cols
     coo.sum_duplicates()
 
+    coo.data[:] = 1  # set all nonzero values to 1. For bool won't matter, but need for other dtypes
+
     return coo
 
 

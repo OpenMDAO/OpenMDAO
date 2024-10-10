@@ -23,7 +23,7 @@ from openmdao.utils.array_utils import array_viz
 from openmdao.utils.coloring import _compute_coloring, compute_total_coloring, Coloring
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.testing_utils import use_tempdirs, set_env_vars
-from openmdao.test_suite.tot_jac_builder import TotJacBuilder
+from openmdao.test_suite.tot_jac_builder import TotJacBuilder, check_sparsity_tot_coloring
 from openmdao.utils.general_utils import run_driver, printoptions
 from openmdao.utils.assert_utils import assert_check_totals
 
@@ -1175,6 +1175,7 @@ class BidirectionalTestCase(unittest.TestCase):
             builder.color('auto')
             tot_size, tot_colors, fwd_solves, rev_solves, pct = builder.coloring._solves_info()
 
+            check_sparsity_tot_coloring(builder.J)
             # changing the bidir coloring alg made most cases better, but this one went from 3 to 4
             self.assertEqual(tot_colors, 4)
 
