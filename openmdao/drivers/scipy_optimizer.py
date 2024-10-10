@@ -190,7 +190,7 @@ class ScipyOptimizeDriver(Driver):
                              "ignore - don't perform check.")
         self.options.declare('singular_jac_tol', default=1e-16,
                              desc='Tolerance for zero row/column check.')
-        self.options.declare('minimize_constraint_violation', default=False, types=bool,
+        self.options.declare('minimize_constraint_violation', default=False, values=[False, 'L1', 'L2'],
                             desc='Set to True to minimize the sum of constraint violations '
                             'instead of the objective function.')
 
@@ -348,7 +348,7 @@ class ScipyOptimizeDriver(Driver):
         lincons = []  # list of linear constraints
         self._obj_and_nlcons = list(self._objs)
 
-        if opt in _constraint_optimizers:
+        if opt in _constraint_optimizers or self.options['minimize_constraint_violation']:
             # get list of linear constraints and precalculate gradients for them (if any)
             if opt in _constraint_grad_optimizers:
                 lincons = [name for name, meta in self._cons.items() if meta.get('linear')]
@@ -653,7 +653,7 @@ class ScipyOptimizeDriver(Driver):
             self._con_cache = self.get_constraint_values()
 
             # Get the objective function evaluations
-            if self.options['minimize_constraint_violation']:
+            if self.options['minimize_constraint_violation'] == 'L1':
                 # Compute sum of constraint violations
                 f_new = 0.0
                 for name, meta in self._cons.items():
@@ -672,6 +672,28 @@ class ScipyOptimizeDriver(Driver):
                             violation += np.maximum(0.0, lower - con_val)
                         if upper != 1e30:
                             violation += np.maximum(0.0, con_val - upper)
+
+                    f_new += np.sum(violation)
+
+            elif self.options['minimize_constraint_violation'] == 'L2':
+                # Compute sum of squared constraint violations
+                f_new = 0.0
+                for name, meta in self._cons.items():
+                    con_val = self._con_cache[name]
+                    size = con_val.size
+
+                    equals = meta['equals']
+                    lower = meta['lower']
+                    upper = meta['upper']
+
+                    violation = np.zeros(size)
+                    if equals is not None:
+                        violation += (con_val - equals) ** 2
+                    else:
+                        if lower != -1e30:
+                            violation += np.maximum(0.0, lower - con_val) ** 2
+                        if upper != 1e30:
+                            violation += np.maximum(0.0, con_val - upper) ** 2
 
                     f_new += np.sum(violation)
             else:
@@ -816,7 +838,7 @@ class ScipyOptimizeDriver(Driver):
         # print('   xnew', x_new)
         # print('   grad', grad[0, :])
 
-        if self.options['minimize_constraint_violation']:
+        if self.options['minimize_constraint_violation'] == 'L1':
             # Compute gradient of sum of constraint violations
             violation_grad = np.zeros_like(grad[0, :])
             row = 1  # start from the first constraint
@@ -845,6 +867,38 @@ class ScipyOptimizeDriver(Driver):
                         for i in range(size):
                             if upper_violation[i] > 0:
                                 violation_grad += con_grad[i, :]
+                row += size
+
+            grad[0, :] = violation_grad
+            return grad[0, :]
+
+        elif self.options['minimize_constraint_violation'] == 'L2':
+            # Compute gradient of sum of squared constraint violations
+            violation_grad = np.zeros_like(grad[0, :])
+            row = 1  # start from the first constraint
+            for name, meta in self._cons.items():
+                con_val = self._con_cache[name]
+                size = con_val.size
+                con_grad = grad[row:row + size, :]
+                equals = meta['equals']
+                lower = meta['lower']
+                upper = meta['upper']
+
+                if equals is not None:
+                    violation = con_val - equals
+                    for i in range(size):
+                        violation_grad += 2 * violation[i] * con_grad[i, :]
+                else:
+                    if lower is not None:
+                        lower_violation = lower - con_val
+                        for i in range(size):
+                            if lower_violation[i] > 0:
+                                violation_grad += -2 * lower_violation[i] * con_grad[i, :]
+                    if upper is not None:
+                        upper_violation = con_val - upper
+                        for i in range(size):
+                            if upper_violation[i] > 0:
+                                violation_grad += 2 * upper_violation[i] * con_grad[i, :]
                 row += size
 
             grad[0, :] = violation_grad
