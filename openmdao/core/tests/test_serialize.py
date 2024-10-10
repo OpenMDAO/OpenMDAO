@@ -27,6 +27,20 @@ class SerializeTestCase(unittest.TestCase):
 
         om.n2(p, show_browser=False)
 
+    def test_recordable_only(self):
+        p = om.Problem()
+
+        comp = p.model.add_subsystem('foo', BadOptionComp(bad=object()))
+
+        p.setup()
+        p.final_setup()
+
+        self.assertDictEqual(dict(comp.options.items(recordable_only=True)), {
+            'always_opt': False,
+            'distributed': False,
+            'run_root_only': False
+        })
+
 
 if __name__ == '__main__':
     unittest.main()
