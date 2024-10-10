@@ -335,7 +335,7 @@ class OptionsDictionary(object):
             self._context_cache[option].append(self[option])
             self[option] = val
         yield
-        for option, val in kwargs.items():
+        for option in kwargs:
             self[option] = self._context_cache[option].pop()
             if len(self._context_cache[option]) == 0:
                 self._context_cache.pop(option)

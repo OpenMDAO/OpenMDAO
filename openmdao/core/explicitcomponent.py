@@ -1,6 +1,9 @@
 """Define the ExplicitComponent class."""
+import inspect
 
 import numpy as np
+from types import MethodType
+
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.core.component import Component
@@ -8,6 +11,12 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE, _UNDEFINED
+from openmdao.utils.jax_utils import jax, jit, ExplicitCompJaxify, \
+    compute_partials as _jax_compute_partials, \
+    compute_jacvec_product as _jax_compute_jacvec_product, ReturnChecker, _jax_register_pytree_class
+
+
+_tuplist = (tuple, list)
 
 
 class ExplicitComponent(Component):
@@ -23,6 +32,10 @@ class ExplicitComponent(Component):
     ----------
     _has_compute_partials : bool
         If True, the instance overrides compute_partials.
+    _vjp_hash : int or None
+        Hash value for the last set of inputs to the compute_primal function.
+    _vjp_fun : function or None
+        The vector-Jacobian product function.
     """
 
     def __init__(self, **kwargs):
@@ -33,6 +46,8 @@ class ExplicitComponent(Component):
 
         self._has_compute_partials = overrides_method('compute_partials', self, ExplicitComponent)
         self.options.undeclare('assembled_jac_type')
+        self._vjp_hash = None
+        self._vjp_fun = None
 
     @property
     def nonlinear_solver(self):
@@ -66,7 +81,7 @@ class ExplicitComponent(Component):
         """
         Configure this system to assign children settings and detect if matrix_free.
         """
-        if self.matrix_free == _UNDEFINED:
+        if self.matrix_free is _UNDEFINED:
             self.matrix_free = overrides_method('compute_jacvec_product', self, ExplicitComponent)
 
     def _jac_wrt_iter(self, wrt_matches=None):
@@ -83,7 +98,7 @@ class ExplicitComponent(Component):
         Yields
         ------
         str
-            Name of 'wrt' variable.
+            Absolute name of 'wrt' variable.
         int
             Starting index.
         int
@@ -129,19 +144,13 @@ class ExplicitComponent(Component):
         # call the super version of setup_partials. This is still in the final setup.
         for out_abs, meta in self._var_abs2meta['output'].items():
 
-            # No need to FD outputs wrt other outputs
-            abs_key = (out_abs, out_abs)
-            if abs_key in self._subjacs_info:
-                if 'method' in self._subjacs_info[abs_key]:
-                    del self._subjacs_info[abs_key]['method']
-
             size = meta['size']
-
-            # ExplicitComponent jacobians have -1 on the diagonal.
             if size > 0:
+
+                # ExplicitComponent jacobians have -1 on the diagonal.
                 arange = np.arange(size, dtype=INT_DTYPE)
 
-                self._subjacs_info[abs_key] = {
+                self._subjacs_info[out_abs, out_abs] = {
                     'rows': arange,
                     'cols': arange,
                     'shape': (size, size),
@@ -481,7 +490,7 @@ class ExplicitComponent(Component):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        if not (self._has_compute_partials or self._approx_schemes):
+        if self.matrix_free or not (self._has_compute_partials or self._approx_schemes):
             return
 
         self._check_first_linearize()
@@ -500,18 +509,36 @@ class ExplicitComponent(Component):
         """
         Compute outputs given inputs. The model is assumed to be in an unscaled state.
 
+        An inherited component may choose to either override this function or to define a
+        compute_primal function.
+
         Parameters
         ----------
         inputs : Vector
             Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
             Unscaled, dimensional output variables read via outputs[key].
-        discrete_inputs : dict or None
-            If not None, dict containing discrete input values.
-        discrete_outputs : dict or None
-            If not None, dict containing discrete output values.
+        discrete_inputs : dict-like or None
+            If not None, dict-like object containing discrete input values.
+        discrete_outputs : dict-like or None
+            If not None, dict-like object containing discrete output values.
         """
-        pass
+        global _tuplist
+
+        if self.compute_primal is None:
+            return
+
+        returns = \
+            self.compute_primal(*self._get_compute_primal_invals(inputs, discrete_inputs))
+
+        if not isinstance(returns, _tuplist):
+            returns = (returns,)
+
+        if not discrete_outputs:
+            outputs.set_vals(returns)
+        else:
+            outputs.set_vals(returns[:outputs.nvars()])
+            self._discrete_outputs.set_vals(returns[outputs.nvars():])
 
     def compute_partials(self, inputs, partials, discrete_inputs=None):
         """
@@ -562,3 +589,115 @@ class ExplicitComponent(Component):
             True if this is an explicit component.
         """
         return True
+
+    def _get_compute_primal_invals(self, inputs, discrete_inputs):
+        """
+        Yield the inputs expected by the compute_primal method.
+
+        Parameters
+        ----------
+        inputs : Vector
+            Unscaled, dimensional input variables Vector.
+        discrete_inputs : dict or None
+            If not None, dict containing discrete input values.
+
+        Yields
+        ------
+        any
+            Inputs expected by the compute_primal method.
+        """
+        yield from inputs.values()
+        if discrete_inputs:
+            yield from discrete_inputs.values()
+
+    def _get_compute_primal_argnames(self):
+        """
+        Return the expected argnames for the compute_primal method.
+
+        Returns
+        -------
+        list
+            List of argnames expected by the compute_primal method.
+        """
+        argnames = []
+        argnames.extend(self._var_rel_names['input'])
+        if self._discrete_inputs:
+            argnames.extend(self._discrete_inputs)
+        return argnames
+
+    def _setup_jax(self, from_group=False):
+        """
+        Set up the jax interface for this component.
+
+        Parameters
+        ----------
+        from_group : bool
+            If True, this is being called from a Group setup.
+        """
+        if self.matrix_free is True:
+            self.compute_jacvec_product = MethodType(_jax_compute_jacvec_product, self)
+        else:
+            self.compute_partials = MethodType(_jax_compute_partials, self)
+            self._has_compute_partials = True
+
+        if self.compute_primal is None:
+            # convert the compute method to a compute_primal method
+            jaxifier = ExplicitCompJaxify(self, verbose=True)
+
+            if jaxifier.get_self_statics:
+                self.get_self_statics = MethodType(jaxifier.get_self_statics, self)
+            # replace existing compute method with base class method, so that compute_primal
+            # will be called.
+            self.compute = MethodType(ExplicitComponent.compute, self)
+
+            self.compute_primal = MethodType(jaxifier.compute_primal, self)
+            self._compute_primal_returns_tuple = True
+        else:
+            # check that compute_primal args are in the correct order
+            args = list(inspect.signature(self.compute_primal).parameters)
+            if args and args[0] == 'self':
+                args = args[1:]
+            compargs = self._get_compute_primal_argnames()
+            if args != compargs:
+                raise RuntimeError(f"{self.msginfo}: compute_primal method args {args} don't match "
+                                   f"the expected args {compargs}.")
+
+            # determine if the compute_primal method returns a tuple
+            self._compute_primal_returns_tuple = ReturnChecker(self.compute_primal).returns_tuple()
+
+        if not from_group and self.options['use_jit']:
+            static_argnums = []
+            idx = len(self._var_rel_names['input']) + 1
+            static_argnums.extend(range(idx, idx + len(self._discrete_inputs)))
+            self.compute_primal = MethodType(jit(self.compute_primal.__func__,
+                                                 static_argnums=static_argnums), self)
+
+        _jax_register_pytree_class(self.__class__)
+
+    def _get_jac_func(self):
+        """
+        Return the jacobian function for this component.
+
+        In forward mode, jax.jacfwd is used, and in reverse mode, jax.jacrev is used.  The direction
+        is chosen automatically based on the sizes of the inputs and outputs.
+
+        Returns
+        -------
+        function
+            The jacobian function.
+        """
+        # TODO: modify this to use relevance and possibly compile multiple jac functions depending
+        # on DV/response so that we don't compute any derivatives that are always zero.
+        if self._jac_func_ is None:
+            fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
+            nstatic = len(self._discrete_inputs)
+            wrt_idxs = list(range(1, len(self._var_abs2meta['input']) + 1))
+            self._jac_func_ = MethodType(fjax(self.compute_primal.__func__, argnums=wrt_idxs), self)
+
+            if self.options['use_jit']:
+                static_argnums = tuple(range(1 + len(wrt_idxs), 1 + len(wrt_idxs) + nstatic))
+                self._jac_func_ = MethodType(jit(self._jac_func_.__func__,
+                                                 static_argnums=static_argnums),
+                                             self)
+
+        return self._jac_func_

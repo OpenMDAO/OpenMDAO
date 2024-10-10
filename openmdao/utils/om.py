@@ -1,5 +1,5 @@
 """
-A console script wrapper for multiple openmdao functions.
+OpenMDAO CLI functions.
 """
 
 import sys
@@ -52,6 +52,8 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.file_utils import clean_outputs
 from openmdao.utils.find_cite import print_citations
 from openmdao.utils.code_utils import _calltree_setup_parser, _calltree_exec
+from openmdao.utils.jax_utils import _to_compute_primal_setup_parser, \
+    _to_compute_primal_exec
 from openmdao.utils.coloring import _total_coloring_setup_parser, _total_coloring_cmd, \
     _partial_coloring_setup_parser, _partial_coloring_cmd, \
     _view_coloring_setup_parser, _view_coloring_exec
@@ -602,6 +604,9 @@ _command_map = {
     'summary': (_config_summary_setup_parser, _config_summary_cmd,
                 'Print a short top-level summary of the problem.'),
     'timing': (_timing_setup_parser, _timing_cmd, 'Collect timing information for all systems.'),
+    'to_compute_primal': (_to_compute_primal_setup_parser, _to_compute_primal_exec,
+                          'Convert a component to use compute_primal instead of compute or '
+                          'apply_nonlinear.'),
     'total_coloring': (_total_coloring_setup_parser, _total_coloring_cmd,
                        'Compute a coloring for the total jacobian.'),
     'trace': (_itrace_setup_parser, _itrace_exec, 'Dump trace output.'),

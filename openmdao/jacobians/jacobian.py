@@ -91,6 +91,27 @@ class Jacobian(object):
             sz = abs2meta['output'][wrt]['size']
         return (abs2meta['output'][of]['size'], sz)
 
+    def get_metadata(self, key):
+        """
+        Get metadata for the given key.
+
+        Parameters
+        ----------
+        key : (str, str)
+            Promoted or relative name pair of sub-Jacobian.
+
+        Returns
+        -------
+        dict
+            Metadata dict for the given key.
+        """
+        abs_key = self._get_abs_key(key)
+        if abs_key in self._subjacs_info:
+            return self._subjacs_info[abs_key]
+        else:
+            msg = '{}: Variable name pair ("{}", "{}") not found.'
+            raise KeyError(msg.format(self.msginfo, key[0], key[1]))
+
     def __contains__(self, key):
         """
         Return whether there is a subjac for the given promoted or relative name pair.
@@ -253,7 +274,7 @@ class Jacobian(object):
         mode : str
             'fwd' or 'rev'.
         """
-        pass
+        raise NotImplementedError(f"Class {type(self).__name__} does not implement _apply.")
 
     def _randomize_subjac(self, subjac, key):
         """

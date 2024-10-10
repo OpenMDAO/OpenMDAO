@@ -213,7 +213,10 @@ class TestImplicitFuncComp(unittest.TestCase):
         p.set_val('comp.a', 2.)
         p.set_val('comp.b', -8.)
         p.set_val('comp.c', 6.)
+        p.set_val('comp.x', -5.)  # just to make value != 1.0
         p.run_model()
+
+        assert_near_equal(p.get_val('comp.x'), 1.0)
 
         assert_check_partials(p.check_partials(includes=['comp'], out_stream=None), atol=1e-5)
         assert_check_totals(p.check_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'], out_stream=None))

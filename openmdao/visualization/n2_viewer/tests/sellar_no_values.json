@@ -74,9 +74,11 @@
                 }
             ],
             "options": {
+                "derivs_method": null,
                 "distributed": false,
                 "run_root_only": false,
                 "always_opt": false,
+                "use_jit": true,
                 "name": "UNDEFINED",
                 "val": 1.0,
                 "shape": null,
@@ -178,14 +180,17 @@
                             ],
                             "options": {
                                 "assembled_jac_type": "csc",
+                                "derivs_method": null,
                                 "distributed": false,
                                 "run_root_only": false,
-                                "always_opt": false
+                                "always_opt": false,
+                                "use_jit": true
                             }
                         }
                     ],
                     "options": {
                         "assembled_jac_type": "csc",
+                        "derivs_method": null,
                         "auto_order": false
                     }
                 },
@@ -245,9 +250,11 @@
                         }
                     ],
                     "options": {
+                        "derivs_method": null,
                         "distributed": false,
                         "run_root_only": false,
-                        "always_opt": false
+                        "always_opt": false,
+                        "use_jit": true
                     }
                 },
                 {
@@ -296,14 +303,17 @@
                         }
                     ],
                     "options": {
+                        "derivs_method": null,
                         "distributed": false,
                         "run_root_only": false,
-                        "always_opt": false
+                        "always_opt": false,
+                        "use_jit": true
                     }
                 }
             ],
             "options": {
                 "assembled_jac_type": "csc",
+                "derivs_method": null,
                 "auto_order": false
             }
         },
@@ -375,8 +385,10 @@
                 }
             ],
             "options": {
+                "derivs_method": null,
                 "run_root_only": false,
                 "always_opt": false,
+                "use_jit": true,
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,
@@ -422,8 +434,10 @@
                 }
             ],
             "options": {
+                "derivs_method": null,
                 "run_root_only": false,
                 "always_opt": false,
+                "use_jit": true,
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,
@@ -469,8 +483,10 @@
                 }
             ],
             "options": {
+                "derivs_method": null,
                 "run_root_only": false,
                 "always_opt": false,
+                "use_jit": true,
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,
@@ -481,6 +497,7 @@
     ],
     "options": {
         "assembled_jac_type": "csc",
+        "derivs_method": null,
         "nonlinear_solver": "NL: Newton",
         "nl_atol": null,
         "nl_maxiter": null,

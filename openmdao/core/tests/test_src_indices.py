@@ -3,6 +3,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
+from openmdao.utils.testing_utils import use_tempdirs
 
 class Inner(om.Group):
     def setup(self):
@@ -437,6 +438,7 @@ class SrcIndicesFeatureTestCase(unittest.TestCase):
         assert_near_equal(p['G.g2.C2.y'], inp[:, :-1].flatten()[[1,5]]*2.)
 
 
+@use_tempdirs
 class SrcIndicesMPITestCase(unittest.TestCase):
     N_PROCS = 2
 
@@ -498,6 +500,7 @@ class SrcIndicesSerialMultipoint2(unittest.TestCase):
         p.run_model()
 
 
+@use_tempdirs
 class Multipoint2TooManyProcs(SrcIndicesSerialMultipoint2):
     N_PROCS = 3
 
@@ -528,14 +531,16 @@ class SrcIndicesSerialMultipoint3(unittest.TestCase):
         assert_check_totals(p.check_totals(of=['par.g1.C1.y', 'par.g2.C2.y', 'par.g3.C3.y'], wrt=['par.x']))
 
 
+@use_tempdirs
 class Multipoint3SameProcs(SrcIndicesSerialMultipoint3):
     N_PROCS = 3
 
 
+@use_tempdirs
 class Multipoint3TooManyProcs(SrcIndicesSerialMultipoint3):
     N_PROCS = 4
 
-
+@use_tempdirs
 class DoubleNestedParallelMultipointTestCase(unittest.TestCase):
     N_PROCS = 6
 

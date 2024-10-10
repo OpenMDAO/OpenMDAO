@@ -54,7 +54,7 @@ from openmdao.utils.reports_system import get_reports_to_activate, activate_repo
     clear_reports, _load_report_plugins
 from openmdao.utils.general_utils import pad_name, LocalRangeIterable, \
     _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs, \
-    ProblemMeta
+    ProblemMetaclass
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
@@ -133,7 +133,7 @@ def _default_prob_name():
     return name.stem
 
 
-class Problem(object, metaclass=ProblemMeta):
+class Problem(object, metaclass=ProblemMetaclass):
     """
     Top-level container for the systems and drivers.
 
@@ -966,8 +966,6 @@ class Problem(object, metaclass=ProblemMeta):
 
         self._orig_mode = mode
 
-        model_comm = self.driver._setup_comm(comm)
-
         # this metadata will be shared by all Systems/Solvers in the system tree
         self._metadata = {
             'name': self._name,  # the name of this Problem
@@ -1021,7 +1019,10 @@ class Problem(object, metaclass=ProblemMeta):
             'relevance_cache': {},  # cache of relevance objects
             'rel_array_cache': {},  # cache of relevance arrays
             'ncompute_totals': 0,  # number of times compute_totals has been called
+            'jax_group': None,  # not None if a Group is currently performing a jax operation
         }
+
+        model_comm = self.driver._setup_comm(comm)
 
         if parent:
             if isinstance(parent, Problem):

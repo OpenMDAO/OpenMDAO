@@ -344,6 +344,9 @@ class TestViewerData(unittest.TestCase):
         prob.setup()
         prob.final_setup()
 
+        # Uncomment to update regression data
+        # save_viewer_data(_get_viewer_data(prob), 'betz_tree.json')
+
         # check expected viewer data
         self.check_viewer_data(_get_viewer_data(prob), 'betz_tree.json')
 

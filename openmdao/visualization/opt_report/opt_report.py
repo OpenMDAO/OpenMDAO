@@ -126,8 +126,6 @@ def opt_report(prob, outfile=None):
     if not outfile:
         outfile = _default_optimizer_report_filename
 
-    outfilepath = pathlib.Path(prob.get_reports_dir(force=True)).joinpath(outfile)
-
     driver_scaling = True
 
     get_prom_name = prob.model._get_prom_name
@@ -178,12 +176,12 @@ def opt_report(prob, outfile=None):
 
     driver_info_html = _make_opt_value_table(driver)
 
-    this_dir = os.path.dirname(os.path.abspath(__file__))
-
     if create:
+        this_dir = os.path.dirname(os.path.abspath(__file__))
         with open(os.path.join(this_dir, _optimizer_report_template), 'r', encoding='utf-8') as f:
             template = f.read()
 
+        outfilepath = pathlib.Path(prob.get_reports_dir(force=True)).joinpath(outfile)
         with open(outfilepath, 'w') as f:
             s = template.format(title=prob._name, header=header_html, objs=objs_html,
                                 desvars=desvars_html, cons=cons_html, driver=driver_info_html,

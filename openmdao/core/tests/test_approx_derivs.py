@@ -288,7 +288,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         prob.run_model()
         model.run_linearize(driver=prob.driver)
 
-        Jfd = model._jacobian
+        Jfd = model._jacobian.J_dict
         assert_near_equal(Jfd['comp.y1', 'p1.x1'], comp.JJ[0:2, 0:2], 1e-6)
         assert_near_equal(Jfd['comp.y1', 'p2.x2'], comp.JJ[0:2, 2:4], 1e-6)
         assert_near_equal(Jfd['comp.y2', 'p1.x1'], comp.JJ[2:4, 0:2], 1e-6)
@@ -1092,7 +1092,7 @@ class TestGroupComplexStep(unittest.TestCase):
         prob.run_model()
         model.run_linearize(driver=prob.driver)
 
-        Jfd = model._jacobian
+        Jfd = model._jacobian.J_dict
         assert_near_equal(Jfd['comp.y1', 'p1.x1'], comp.JJ[0:2, 0:2], 1e-6)
         assert_near_equal(Jfd['comp.y1', 'p2.x2'], comp.JJ[0:2, 2:4], 1e-6)
         assert_near_equal(Jfd['comp.y2', 'p1.x1'], comp.JJ[2:4, 0:2], 1e-6)
@@ -2525,6 +2525,7 @@ class ParallelFDParametricTestCase(unittest.TestCase):
             # Reverse Derivatives Check
             totals = param_instance.compute_totals('rev')
             assert_near_equal(totals, expected_totals, 1e-4)
+
 
 class CheckTotalsParallelGroup(unittest.TestCase):
 

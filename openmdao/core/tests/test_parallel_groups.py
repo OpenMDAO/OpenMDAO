@@ -456,7 +456,8 @@ class TestParallelListStates(unittest.TestCase):
 
         p.setup()
         p.final_setup()
-        self.assertEqual(sorted(p.model._list_states_allprocs()), ['par.C1.x', 'par.C2.x', 'par.C4.x'])
+        self.assertEqual(sorted(p.model._list_states_allprocs()),
+                         ['par.C1.x', 'par.C2.x', 'par.C4.x'])
 
 
 class ExComp(om.ExplicitComponent):

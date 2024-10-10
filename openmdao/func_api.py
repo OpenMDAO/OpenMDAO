@@ -5,9 +5,7 @@ API to associate metadata with and retrieve metadata from function objects.
 import sys
 import traceback
 from numbers import Number
-import ast
 import inspect
-import textwrap
 import warnings
 import numpy as np
 from contextlib import contextmanager
@@ -20,6 +18,9 @@ except Exception:
     if not isinstance(err, ImportError):
         traceback.print_tb(tb)
     jax = None
+
+
+from openmdao.utils.code_utils import get_return_names
 
 
 _allowed_add_input_args = {
@@ -504,8 +505,7 @@ class OMWrappedFunc(object):
             name of the return value if it has a simple name, otherwise None.
         """
         input_names = set(self.get_input_names())
-        return [n if n not in input_names else None
-                for n in _FuncRetNameCollector(self._f).get_return_names()]
+        return [n if n not in input_names else None for n in get_return_names(self._f)]
 
     def _compute_out_shapes(self, ins, outs):
         """
@@ -751,22 +751,17 @@ def jax_decorate(func):
     """
     g = func.__globals__
 
-    try:
-        src = inspect.getsource(func)
-    except OSError:
-        src = None
-
-    savenp = g['np'] if 'np' in g and g['np'] is np and (src is None or 'np.' in src) else False
-    savenumpy = g['numpy'] if 'numpy' in g and (src is None or 'numpy' in src) else False
+    savenp = g['np'] if 'np' in g and g['np'] is np else False
+    savenumpy = g['numpy'] if 'numpy' in g and g['numpy'] is np else False
 
     if savenp or savenumpy:
-        def _wrap(*args):
+        def _wrap(*args, **kwargs):
             if savenp:
                 g['np'] = jnp
             if savenumpy:
                 g['numpy'] = jnp
             try:
-                ret = func(*args)
+                ret = func(*args, **kwargs)
             finally:
                 if savenp:
                     g['np'] = savenp
@@ -778,82 +773,3 @@ def jax_decorate(func):
         return _wrap
     else:
         return func  # no wrapping needed
-
-
-class _FuncRetNameCollector(ast.NodeVisitor):
-    """
-    An ast.NodeVisitor that records return value names.
-
-    Each instance of this is single-use.  If needed multiple times create a new instance
-    each time.  It also assumes that the AST to be visited contains only a single function
-    definition.
-
-    Attributes
-    ----------
-    _ret_infos : list
-        List containing one entry for each return statement, with each entry containing a list of
-        name (or None) for each function return value.
-    """
-
-    def __init__(self, func):
-        super().__init__()
-        self._ret_infos = []
-        self.visit(ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec'))
-
-    def get_return_names(self):
-        """
-        Return a list of (name or None) for each return value.
-
-        If there are multiple returns that differ by name or number of return values, an exception
-        will be raised.  If one entry in one return list has a name and another is None, the name
-        will take precedence and no exception will be raised.
-
-        Returns
-        -------
-        list
-            The list of return names.  Some entries will be None if there was no simple name
-            associated with a given return value.
-        """
-        if len(self._ret_infos) == 0:
-            return []
-        if len(self._ret_infos) == 1:
-            return self._ret_infos[0]
-
-        names = self._ret_infos[0].copy()
-        length = len(names)
-        for lst in self._ret_infos:
-            if len(lst) != length:
-                raise RuntimeError("Function has multiple return statements with differing numbers "
-                                   "of return values.")
-
-            for i, (name, newname) in enumerate(zip(names, lst)):
-                if name is None:
-                    names[i] = newname
-                elif newname is not None and name != newname:
-                    raise RuntimeError("Function has multiple return statements with different "
-                                       f"return value names of {sorted((name, newname))} for "
-                                       f"return value {i}.")
-        return names
-
-    def _get_return_attrs(self, node):
-        if isinstance(node, ast.Name):
-            self._ret_infos[-1].append(node.id)
-        else:
-            self._ret_infos[-1].append(None)
-
-    def visit_Return(self, node):
-        """
-        Visit a Return node.
-
-        Parameters
-        ----------
-        node : ASTnode
-            The return node being visited.
-        """
-        self._ret_infos.append([])
-
-        if isinstance(node.value, ast.Tuple):
-            for n in node.value.elts:
-                self._get_return_attrs(n)
-        else:
-            self._get_return_attrs(node.value)

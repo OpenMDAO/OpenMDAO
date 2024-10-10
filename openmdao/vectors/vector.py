@@ -4,7 +4,6 @@ import weakref
 import hashlib
 
 import numpy as np
-from numpy import ndim
 
 from openmdao.utils.name_maps import prom_name2abs_name
 from openmdao.utils.indexer import Indexer, indexer
@@ -214,10 +213,14 @@ class Vector(object):
             for n, v in self._views.items():
                 if n in self._names:
                     yield v
+                else:
+                    yield np.zeros_like(v)
         else:
             for n, v in self._views.items():
                 if n in self._names:
                     yield v.real
+                else:
+                    yield np.zeros_like(v.real)
 
     def items(self):
         """
@@ -284,7 +287,7 @@ class Vector(object):
         path = system.pathname
         idx = len(path) + 1 if path else 0
 
-        return (n[idx:] for n in system._var_abs2meta[self._typ] if n in self._names)
+        return (n[idx:] for n in self._views if n in self._names)
 
     def _abs_item_iter(self, flat=True):
         """
@@ -580,26 +583,21 @@ class Vector(object):
 
         Parameters
         ----------
-        vals : ndarray, float, or iter of ndarrays and/or floats
+        vals : iter of ndarrays
             Values for each variable contained in this vector, in the proper order.
         """
         arr = self.asarray()
 
-        if self.nvars() == 1:
-            if ndim(vals) == 0:
-                arr[:] = vals
+        start = end = 0
+        for v in vals:
+            try:
+                end += v.size
+            except AttributeError:  # assume a plain float
+                arr[start] = v
+                end += 1
             else:
-                arr[:] = vals.ravel()
-        else:
-            start = end = 0
-            for v in vals:
-                if ndim(v) == 0:
-                    end += 1
-                    arr[start] = v
-                else:
-                    end += v.size
-                    arr[start:end] = v.ravel()
-                start = end
+                arr[start:end] = v.ravel()
+            start = end
 
     def set_var(self, name, val, idxs=_full_slice, flat=False, var_name=None):
         """

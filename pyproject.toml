@@ -120,6 +120,8 @@ muxcomp = "openmdao.components.mux_comp:MuxComp"
 splinecomp = "openmdao.components.spline_comp:SplineComp"
 submodelcomp = "openmdao.components.submodel_comp:SubmodelComp"
 vectormagnitudecomp = "openmdao.components.vector_magnitude_comp:VectorMagnitudeComp"
+jaxexplicitcomponent = "openmdao.components.jax_explicit_comp:JaxExplicitComponent"
+jaximplicitcomponent = "openmdao.components.jax_implicit_comp:JaxImplicitComponent"
 
 [project.entry-points.openmdao_driver]
 differentialevolutiondriver = "openmdao.drivers.differential_evolution_driver:DifferentialEvolutionDriver"

@@ -15,7 +15,7 @@ from openmdao.core.constants import INT_DTYPE, _SetupStatus
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path, has_match
-from openmdao.utils.general_utils import _src_name_iter
+from openmdao.utils.general_utils import _src_name_iter, DriverMetaclass
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
@@ -189,7 +189,7 @@ class DriverResult():
         return _track_time
 
 
-class Driver(object):
+class Driver(object, metaclass=DriverMetaclass):
     """
     Top-level container for the systems and drivers.
 

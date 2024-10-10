@@ -85,6 +85,7 @@ class IndepVarComp(ExplicitComponent):
                                  "in IndepVarComp." % illegal)
 
         self._no_check_partials = True
+        self.options['derivs_method'] = None
 
     def initialize(self):
         """
@@ -225,6 +226,17 @@ class IndepVarComp(ExplicitComponent):
         """
         # define this for IndepVarComp to avoid overhead of ExplicitComponent._linearize.
         pass
+
+    def compute_primal(self):
+        """
+        Compute the outputs.
+
+        Returns
+        -------
+        tuple
+            A tuple containing the output values.
+        """
+        return tuple(self._outputs.values())
 
     def _apply_nonlinear(self):
         """
