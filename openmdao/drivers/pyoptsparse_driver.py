@@ -84,7 +84,7 @@ DEFAULT_OPT_SETTINGS['IPOPT'] = {
 }
 
 CITATIONS = """@article{Wu_pyoptsparse_2020,
-    author = {Ella Wu and Gaetan Kenway and Charles A. Mader and John Jasa and
+    author = {Neil Wu and Gaetan Kenway and Charles A. Mader and John Jasa and
      Joaquim R. R. A. Martins},
     title = {{pyOptSparse:} A {Python} framework for large-scale constrained
      nonlinear optimization of sparse systems},
@@ -651,6 +651,9 @@ class pyOptSparseDriver(Driver):
             # These are various failed statuses.
             if optimizer == 'IPOPT':
                 if exit_status not in {0, 1}:
+                    self.fail = True
+            elif optimizer == 'PSQP':
+                if exit_status not in {1, 2, 3, 4}:
                     self.fail = True
             else:
                 # exit status may be the empty string for optimizers that don't support it
