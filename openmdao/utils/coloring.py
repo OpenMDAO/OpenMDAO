@@ -2104,7 +2104,7 @@ class Coloring(object):
         vals = np.hstack(vals)
         return coo_matrix((vals, (Jrows, Jcols)), shape=self._shape)
 
-    def _get_subtractions(self, Jf, Jr, overlapf, overlapr):
+    def _get_subtractions(self, Jf, Jr):
         """
         Return the list of subtractions to be applied to the jacobian.
 
@@ -2114,10 +2114,6 @@ class Coloring(object):
             Forward jacobian.
         Jr : coo_matrix
             Reverse jacobian.
-        overlapf : dict
-            Overlaps for the forward jacobian.
-        overlapr : dict
-            Overlaps for the reverse jacobian.
 
         Returns
         -------
@@ -2125,14 +2121,13 @@ class Coloring(object):
             List of subtractions to be applied to the jacobian, keyed on row, col pairs.
         """
         subtractions = {}
-        if (self._fwd is None or self._rev is None) or (not overlapf and not overlapr):
+        if (self._fwd is None or self._rev is None):
             return subtractions
 
         sparse_coloring = self._get_sparse_coloring()
 
         V = self._getV()
         JrV = Jr.dot(V)
-
         if JrV.data.size > 0:
             for color in range(JrV.shape[1]):
                 JrVcol = JrV.getcol(color)  # columns of JrV correspond to colors
@@ -2158,8 +2153,8 @@ class Coloring(object):
         WTJf = W.T.dot(Jf)
         if WTJf.data.size > 0:
             for color in range(WTJf.shape[0]):
-                WTJfrow = WTJf.getrow(color)  # rows of WtJf correspond to colors
-                _, nzcols = WTJfrow.nonzero()  # any nz columns in this row overlap with fwd colors
+                # any nz columns in this row overlap with fwd colors
+                _, nzcols = WTJf.getrow(color).nonzero()
                 if nzcols.size > 0:
                     color_rows = set(self._rev[0][color])
                     for nzcol in nzcols:
@@ -2177,7 +2172,7 @@ class Coloring(object):
                             subfromrow = subfrom[0]
                             subtractions.setdefault((subfromrow, nzcol), []).extend(tosub)
 
-        return subtractions
+        return _sort_subtractions(subtractions)
 
 
 def _order_by_ID(col_adj_matrix):
@@ -2500,7 +2495,7 @@ def _color_partition(J, Jprows, Jpcols, direct=True, overlap=None):
     return [col_groups, col2row]
 
 
-def _get_sorted_subtractions(allsubs, full_ovrs):
+def _sort_subtractions(allsubs):
     graph = nx.DiGraph()
     for pos, subtractions in allsubs.items():
         for sub in subtractions:
@@ -2652,23 +2647,16 @@ def MNCO_bidir(J, direct=True):
         Jrc = np.hstack(Jrc)
 
     overlap = set()
-    overlapr = set()
     if row_i > 0:
         coloring._fwd = _color_partition(J, Jfr, Jfc, direct=direct, overlap=overlap)
 
+    overlapr = set()
     if col_i > 0:
         coloring._rev = _color_partition(J.T, Jrc, Jrr, direct=direct, overlap=overlapr)
         overlapr = {(c, r) for r, c in overlapr}
 
-    full_ovrs = {}
-
-    for r, c in overlap:  # loop over overlaps in Jf (built by adding rows)
-        full_ovrs[r, c] = (rowcols[r, True], True)
-    for r, c in overlapr:  # loop over overlaps in Jr (built by adding columns)
-        assert (r, c) not in full_ovrs
-        full_ovrs[r, c] = (rowcols[c, False], False)
-
     if not direct and row_i > 0 and col_i > 0:
+        full_ovrs = overlap | overlapr
 
         Jf = coo_matrix((np.ones(Jfr.size), (Jfr, Jfc)), shape=J.shape)
         Jr = coo_matrix((np.ones(Jrr.size), (Jrr, Jrc)), shape=J.shape)
@@ -2676,10 +2664,10 @@ def MNCO_bidir(J, direct=True):
         # if Jfr.size > 0 and Jrr.size > 0:
         #     coloring.display_bokeh(show=True)
 
-        subs = coloring._get_subtractions(Jf, Jr, overlap, overlapr)
-        subs = _get_sorted_subtractions(subs, full_ovrs)
-
-        coloring._subtractions = subs
+        if len(full_ovrs) > 0:
+            coloring._subtractions = coloring._get_subtractions(Jf, Jr)
+        else:
+            coloring._subtractions = {}
 
     if nzrows.size != nnz_Jf + nnz_Jr:
         raise RuntimeError("Nonzero mismatch for J vs. Jf and Jr")
