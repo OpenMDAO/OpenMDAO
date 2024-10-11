@@ -233,11 +233,21 @@ def check_sparsity_tot_coloring(sparsity, direct=True, tolerance=1e-15, tol_type
     p.setup()
     p.run_model()
     Jcolor = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
-    # print("J\n",J)
-    # print("Jcolor\n",Jcolor)
+
+    if p.driver._coloring_info.coloring is not None and not p.driver._coloring_info._failed:
+        print(p.driver._coloring_info.coloring)
 
     # make sure totals match for both cases
-    assert_near_equal(J, Jcolor, tolerance=tolerance, tol_type=tol_type)
+    try:
+        assert_near_equal(J, Jcolor, tolerance=tolerance, tol_type=tol_type)
+    except Exception:
+        diff = np.abs(J - Jcolor)
+        mask = diff <= tolerance
+        diff[mask] = 0.0
+        with np.printoptions(linewidth=999, threshold=1000):
+            print("Good J\n", J)
+            print("J diff\n", diff)
+        raise
 
 
 if __name__ == '__main__':

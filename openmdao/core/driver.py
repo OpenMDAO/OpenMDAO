@@ -1406,6 +1406,9 @@ class Driver(object):
             If True, use random subjacobians corresponding to their declared sparsity patterns.
         randomize_seeds : bool
             If True, use random seeds when computing the sparsity.
+        direct : bool
+            If using bidirectional coloring, use the direct method when computing the column
+            adjacency matrix instead of the substitution method.
         """
         self._coloring_info.coloring = None
         self._coloring_info.num_full_jacs = num_full_jacs
