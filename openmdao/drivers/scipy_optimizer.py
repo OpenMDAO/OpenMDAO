@@ -193,6 +193,8 @@ class ScipyOptimizeDriver(Driver):
         self.options.declare('minimize_constraint_violation', default=False, values=[False, 'L1', 'L2'],
                             desc='Set to True to minimize the sum of constraint violations '
                             'instead of the objective function.')
+        self.options.declare('constraint_violation_scaler', default=1.0, types=float,
+                            desc='Scaler to be used when `minimize_constraint_violation` is On')
 
     def _get_name(self):
         """
@@ -653,6 +655,7 @@ class ScipyOptimizeDriver(Driver):
             self._con_cache = self.get_constraint_values()
 
             # Get the objective function evaluations
+            con_viol_scaler = self.options['constraint_violation_scaler']
             if self.options['minimize_constraint_violation'] == 'L1':
                 # Compute sum of constraint violations
                 f_new = 0.0
@@ -673,7 +676,7 @@ class ScipyOptimizeDriver(Driver):
                         if upper != 1e30:
                             violation += np.maximum(0.0, con_val - upper)
 
-                    f_new += np.sum(violation)
+                    f_new += con_viol_scaler*np.sum(violation)
 
             elif self.options['minimize_constraint_violation'] == 'L2':
                 # Compute sum of squared constraint violations
@@ -695,7 +698,7 @@ class ScipyOptimizeDriver(Driver):
                         if upper != 1e30:
                             violation += np.maximum(0.0, con_val - upper) ** 2
 
-                    f_new += np.sum(violation)
+                    f_new += con_viol_scaler * np.sum(violation)
             else:
                 # Gets the true objective function
                 for obj in self.get_objective_values().values():
@@ -838,6 +841,7 @@ class ScipyOptimizeDriver(Driver):
         # print('   xnew', x_new)
         # print('   grad', grad[0, :])
 
+        con_viol_scaler = self.options['constraint_violation_scaler']
         if self.options['minimize_constraint_violation'] == 'L1':
             # Compute gradient of sum of constraint violations
             violation_grad = np.zeros_like(grad[0, :])
@@ -869,7 +873,7 @@ class ScipyOptimizeDriver(Driver):
                                 violation_grad += con_grad[i, :]
                 row += size
 
-            grad[0, :] = violation_grad
+            grad[0, :] = con_viol_scaler*violation_grad
             return grad[0, :]
 
         elif self.options['minimize_constraint_violation'] == 'L2':
@@ -901,7 +905,7 @@ class ScipyOptimizeDriver(Driver):
                                 violation_grad += 2 * upper_violation[i] * con_grad[i, :]
                 row += size
 
-            grad[0, :] = violation_grad
+            grad[0, :] = con_viol_scaler*violation_grad
             return grad[0, :]
         else:
             # Returns the gradient of the constraints
