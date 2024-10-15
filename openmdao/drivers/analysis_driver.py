@@ -72,7 +72,7 @@ class AnalysisDriver(Driver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        self.options.declare('run_parallel', types=bool, default=True,
+        self.options.declare('run_parallel', types=bool, default=False,
                              desc='Set to True to execute samples in parallel.')
         self.options.declare('batch_size', types=int, default=1000,
                              desc='Number of samples to distribute among the processors '
