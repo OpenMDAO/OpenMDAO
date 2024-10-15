@@ -59,7 +59,8 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
         for file in _get_files():
             with self.subTest(file):
                 with open(file) as f:
-                    json_data = json.load(f)
+                    data = f.read()
+                    json_data = json.loads(data)
                     for i in json_data['cells']:
                         if 'execution_count' in i and i['execution_count'] is not None:
                             msg = "Clear output with 'reset_notebook path_to_notebook.ipynb'"
@@ -83,13 +84,14 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
         mpi_header.extend(header)
 
         for file in _get_files():
-            with open(file) as f:
+            with open(file, 'r') as f:
 
                 # This one is exempt from these lint rules.
                 if 'getting_started.ipynb'  in file:
                     continue
 
-                json_data = json.load(f)
+                data = f.read()
+                json_data = json.loads(data)
 
                 for cell in json_data['cells']:
                     if cell['cell_type'] == 'code':
@@ -129,7 +131,8 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
         """
         for file in _get_files():
             with open(file) as f:
-                json_data = json.load(f)
+                data = f.read()
+                json_data = json.loads(data)
                 for block in json_data['cells'][1:]:
 
                     # Don't check markup cells
@@ -164,7 +167,8 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
 
         for file in _get_files():
             with open(file) as f:
-                json_data = json.load(f)
+                data = f.read()
+                json_data = json.loads(data)
                 blocks = json_data['cells']
                 for block in blocks[1:]:
 
