@@ -2125,8 +2125,7 @@ class Coloring(object):
 
         sparse_coloring = self._get_sparse_coloring()
 
-        V = self._getV()
-        JrV = Jr.dot(V)
+        JrV = Jr.dot(self._getV())
         if JrV.data.size > 0:
             for color in range(JrV.shape[1]):
                 JrVcol = JrV.getcol(color)  # columns of JrV correspond to colors
@@ -2148,8 +2147,7 @@ class Coloring(object):
                             subfromcol = subfrom[0]
                             subtractions.setdefault((nzrow, subfromcol), []).extend(tosub)
 
-        W = self._getW()
-        WTJf = W.T.dot(Jf)
+        WTJf = self._getW().T.dot(Jf)
         if WTJf.data.size > 0:
             for color in range(WTJf.shape[0]):
                 # any nz columns in this row overlap with fwd colors
@@ -2285,17 +2283,20 @@ def _Jc2col_matrix_direct(J, Jrows, Jcols):
         nzr = []
         nzc = []
         partrow = csr.getrow(row).indices
+        fullrow = J.getrow(row).indices
 
-        nzr.extend(partrow)
-        nzc.extend(partrow)
-
-        if partrow.size > 1:
-            Jrow[:] = False
+        if fullrow.size > 1:
             Jrow[partrow] = True
-            for col1, col2 in combinations(J.getrow(row).indices, 2):
+            for col1, col2 in combinations(fullrow, 2):
                 if Jrow[col1] or Jrow[col2]:
                     nzr.append(col1)
                     nzc.append(col2)
+            Jrow[partrow] = False
+
+        elif partrow.size == 1:
+            nzr.append(partrow[0])
+            nzc.append(partrow[0])
+
         if nzr:
             allnzr.append(nzr)
             allnzc.append(nzc)
@@ -2354,12 +2355,9 @@ def _Jc2col_matrix_substitution(J, part_rows, part_cols, overlap):
         nzc = []
         partrow_cols = part_csr.getrow(row).indices
 
-        nzr.extend(partrow_cols)
-        nzc.extend(partrow_cols)
-
         if partrow_cols.size > 1:
-            Jrow[:] = False
             Jrow[partrow_cols] = True
+
             # col1 and col2 are both nonzero in the full matrix for this row
             for col1, col2 in combinations(J.getrow(row).indices, 2):
                 if Jrow[col1]:
@@ -2372,6 +2370,13 @@ def _Jc2col_matrix_substitution(J, part_rows, part_cols, overlap):
                 elif Jrow[col2]:
                     # one is in the partition, the other is not
                     overlap.add((row, col2))
+
+            Jrow[partrow_cols] = False
+
+        else:  # partrow_cols.size == 1
+            nzr.append(partrow_cols[0])
+            nzc.append(partrow_cols[0])
+            overlap.add((row, partrow_cols[0]))
 
         if nzr:
             allnzr.append(nzr)
@@ -2488,6 +2493,9 @@ def _color_partition(J, Jprows, Jpcols, direct=True, overlap=None):
         for i, group in enumerate(col_groups):
             # don't include any columns that have no nonzero row entries in this partition
             col_groups[i] = [c for c in sorted(group) if col2row[c] is not None]
+
+        # eliminate any empty column groups
+        col_groups = [cg for cg in col_groups if cg]
 
     return [col_groups, col2row]
 

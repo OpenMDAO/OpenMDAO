@@ -188,8 +188,9 @@ class SparsityComp(om.ExplicitComponent):
         self.add_output('y', shape=self.sparsity.shape[0])
 
         sparsity = coo_matrix(self.sparsity)
-        #self.data = np.linspace(2.0, 21.0, num=len(sparsity.data))
-        self.data = np.random.random(len(sparsity.data))
+        sparsity.data = np.arange(sparsity.data.size) + 1.
+        self.data = sparsity.data
+        self.sparsity = sparsity.toarray()
         self.declare_partials('y', 'x', rows=sparsity.row, cols=sparsity.col)
 
     def compute(self, inputs, outputs):

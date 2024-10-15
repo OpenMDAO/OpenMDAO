@@ -11,6 +11,7 @@ import numpy as np
 from io import StringIO
 
 from numpy.testing import assert_almost_equal
+from scipy.sparse import coo_matrix
 try:
     from scipy.sparse import load_npz
 except ImportError:
@@ -1180,15 +1181,15 @@ class BidirectionalTestCase(unittest.TestCase):
             self.assertEqual(tot_colors, 4)
 
     @parameterized.expand(itertools.product(
-        [('n4c6-b15', 2), ('can_715', 32), ('lp_finnis', 14), ('ash608', 6), ('ash331', 6),
-         ('D_6', 27), ('Harvard500', 29), ('illc1033', 5)],
+        [('n4c6-b15', 3), ('can_715', 35), ('lp_finnis', 14), ('ash608', 6), ('ash331', 6),
+         ('D_6', 27), ('Harvard500', 32), ('illc1033', 5)],
         ), name_func=_test_func_name
     )
     @unittest.skipIf(load_npz is None, "scipy version too old")
     def test_bidir_coloring(self, tup):
         matname, expected_colors = tup
         matdir = os.path.join(os.path.dirname(openmdao.test_suite.__file__), 'matrices')
-        mode = 'rev'
+        mode = 'auto'
 
         # uses matrices from the sparse matrix collection website (sparse.tamu.edu)
         matfile = os.path.join(matdir, matname + '.npz')
@@ -1197,14 +1198,12 @@ class BidirectionalTestCase(unittest.TestCase):
 
         mat = load_npz(matfile).tocoo()
         mat.data = np.asarray(mat.data, dtype=bool)
+
+        check_sparsity_tot_coloring(mat, direct=True, mode=mode)
+        check_sparsity_tot_coloring(mat, direct=False, mode=mode)
+
         coloring = _compute_coloring(mat, mode)
-        shape = mat.shape
-
         tot_size, tot_colors, fwd_solves, rev_solves, pct = coloring._solves_info()
-
-        if shape[0] * shape[1] < 100000:
-            check_sparsity_tot_coloring(mat, direct=True, mode=mode)
-
         self.assertEqual(tot_colors, expected_colors)
 
     def test_bidir_3colorblock(self):
@@ -1223,7 +1222,12 @@ class BidirectionalTestCase(unittest.TestCase):
              [0, 0, 0, 0, 0, 0, 1, 1]]
         )
 
-        coloring = _compute_coloring(J, 'auto')
+        mode = 'auto'
+        mat = coo_matrix(J)
+        check_sparsity_tot_coloring(mat, direct=True, mode=mode)
+        check_sparsity_tot_coloring(mat, direct=False, mode=mode)
+
+        coloring = _compute_coloring(mat, mode)
         tot_size, tot_colors, fwd_solves, rev_solves, pct = coloring._solves_info()
 
         self.assertEqual(tot_colors, 3)
