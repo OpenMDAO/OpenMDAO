@@ -10,6 +10,7 @@ import weakref
 import pathlib
 import textwrap
 import traceback
+import time
 import atexit
 
 from collections import defaultdict, namedtuple
@@ -2510,8 +2511,11 @@ class Problem(object, metaclass=ProblemMeta):
                 print(f"WARNING: '{c}' is not a recognized check.  Available checks are: "
                       f"{sorted(_all_checks)}")
                 continue
-            logger.info(f'checking {c}')
+            logger.info(f'checking {c}...')
+            beg = time.perf_counter()
             _all_checks[c](self, logger)
+            end = time.perf_counter()
+            logger.info(f"    {c} check complete ({(end - beg):.6f} sec).")
 
         if checks and check_file_path is not None and reports_dir_exists:
             # turn text file written to reports dir into an html file to be viewable from the
