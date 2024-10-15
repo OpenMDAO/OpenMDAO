@@ -1188,6 +1188,7 @@ class BidirectionalTestCase(unittest.TestCase):
     def test_bidir_coloring(self, tup):
         matname, expected_colors = tup
         matdir = os.path.join(os.path.dirname(openmdao.test_suite.__file__), 'matrices')
+        mode = 'rev'
 
         # uses matrices from the sparse matrix collection website (sparse.tamu.edu)
         matfile = os.path.join(matdir, matname + '.npz')
@@ -1196,10 +1197,13 @@ class BidirectionalTestCase(unittest.TestCase):
 
         mat = load_npz(matfile).tocoo()
         mat.data = np.asarray(mat.data, dtype=bool)
-        coloring = _compute_coloring(mat, 'auto')
-        mat = None
+        coloring = _compute_coloring(mat, mode)
+        shape = mat.shape
 
         tot_size, tot_colors, fwd_solves, rev_solves, pct = coloring._solves_info()
+
+        if shape[0] * shape[1] < 100000:
+            check_sparsity_tot_coloring(mat, direct=True, mode=mode)
 
         self.assertEqual(tot_colors, expected_colors)
 

@@ -8,6 +8,7 @@ from scipy.sparse import coo_matrix
 import openmdao.api as om
 from openmdao.utils.coloring import _compute_coloring
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.devtools.debug import compare_jacs
 
 
 class TotJacBuilder(object):
@@ -187,8 +188,8 @@ class SparsityComp(om.ExplicitComponent):
         self.add_output('y', shape=self.sparsity.shape[0])
 
         sparsity = coo_matrix(self.sparsity)
-        self.data = np.linspace(2.0, 21.0, num=len(sparsity.data))
-        #self.data = np.random.random(len(sparsity.data))
+        #self.data = np.linspace(2.0, 21.0, num=len(sparsity.data))
+        self.data = np.random.random(len(sparsity.data))
         self.declare_partials('y', 'x', rows=sparsity.row, cols=sparsity.col)
 
     def compute(self, inputs, outputs):
@@ -198,7 +199,7 @@ class SparsityComp(om.ExplicitComponent):
         partials['y', 'x'] = self.data
 
 
-def check_sparsity_tot_coloring(sparsity, direct=True, tolerance=1e-15, tol_type='rel'):
+def check_sparsity_tot_coloring(sparsity, direct=True, tolerance=1e-15, tol_type='rel', mode='auto'):
     """
     Check total derivatives of a top level SparsityComp with and without total coloring.
 
@@ -209,6 +210,8 @@ def check_sparsity_tot_coloring(sparsity, direct=True, tolerance=1e-15, tol_type
     direct : bool
         If True, use direct method when bidirectional coloring, else substitution method.
     """
+    import sys
+
     # compute totals without coloring
     p = om.Problem()
     model = p.model
@@ -217,7 +220,7 @@ def check_sparsity_tot_coloring(sparsity, direct=True, tolerance=1e-15, tol_type
     model.add_constraint('comp.y')
     p.driver = om.ScipyOptimizeDriver()
     p.driver.options['optimizer'] = 'SLSQP'
-    p.setup()
+    p.setup(mode=mode)
     p.run_model()
     J = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
 
@@ -230,12 +233,9 @@ def check_sparsity_tot_coloring(sparsity, direct=True, tolerance=1e-15, tol_type
     p.driver = om.ScipyOptimizeDriver()
     p.driver.options['optimizer'] = 'SLSQP'
     p.driver.declare_coloring(direct=direct)
-    p.setup()
+    p.setup(mode=mode)
     p.run_model()
     Jcolor = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
-
-    if p.driver._coloring_info.coloring is not None and not p.driver._coloring_info._failed:
-        print(p.driver._coloring_info.coloring)
 
     # make sure totals match for both cases
     try:
@@ -244,9 +244,14 @@ def check_sparsity_tot_coloring(sparsity, direct=True, tolerance=1e-15, tol_type
         diff = np.abs(J - Jcolor)
         mask = diff <= tolerance
         diff[mask] = 0.0
+        if p.driver._coloring_info.coloring is not None and not p.driver._coloring_info._failed:
+            print(p.driver._coloring_info.coloring, file=sys.stderr)
+
         with np.printoptions(linewidth=999, threshold=1000):
-            print("Good J\n", J)
-            print("J diff\n", diff)
+            print("Good J\n", J, file=sys.stderr)
+            drows, dcols = np.nonzero(diff)
+            print("J shape", J.shape, file=sys.stderr)
+            print("J diff\n", list(zip(drows, dcols)), file=sys.stderr)
         raise
 
 

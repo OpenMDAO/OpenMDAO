@@ -1493,7 +1493,7 @@ class _TotalJacInfo(object):
         finally:
             self.model._recording_iter.pop()
 
-        if self.simul_coloring is not None and self.simul_coloring._subtractions is not None:
+        if self.simul_coloring is not None and self.simul_coloring._subtractions:
             self.simul_coloring._apply_subtractions(self.J)
 
         return self.J_final

@@ -2036,10 +2036,9 @@ class Coloring(object):
             return abs_name
 
     def _apply_subtractions(self, J):
-        with np.printoptions(linewidth=999, threshold=1000):
-            for pos, subs in self._subtractions:
-                tosub = sum(J[k] for k in subs)
-                J[pos] -= tosub
+        for pos, subs in self._subtractions:
+            tosub = sum(J[k] for k in subs)
+            J[pos] -= tosub
 
     def _getV(self):
         if self._fwd is None:
@@ -2369,11 +2368,9 @@ def _Jc2col_matrix_substitution(J, part_rows, part_cols, overlap):
                         nzc.append(col2)
                     else:
                         # one is in the partition, the other is not
-                        # overlap[row, col1] = 1
                         overlap.add((row, col1))
                 elif Jrow[col2]:
                     # one is in the partition, the other is not
-                    # overlap[row, col2] = 1
                     overlap.add((row, col2))
 
         if nzr:
@@ -2660,9 +2657,6 @@ def MNCO_bidir(J, direct=True):
 
         Jf = coo_matrix((np.ones(Jfr.size), (Jfr, Jfc)), shape=J.shape)
         Jr = coo_matrix((np.ones(Jrr.size), (Jrr, Jrc)), shape=J.shape)
-
-        # if Jfr.size > 0 and Jrr.size > 0:
-        #     coloring.display_bokeh(show=True)
 
         if len(full_ovrs) > 0:
             coloring._subtractions = coloring._get_subtractions(Jf, Jr)
@@ -2977,6 +2971,8 @@ def _compute_coloring(J, mode, direct=True):
     coloring._meta['coloring_time'] = time.perf_counter() - start_time
     if start_mem is not None:
         coloring._meta['coloring_memory'] = mem_usage() - start_mem
+
+    # coloring.display_bokeh(show=True)
 
     return coloring
 
