@@ -2980,8 +2980,6 @@ def _compute_coloring(J, mode, direct=True):
     if start_mem is not None:
         coloring._meta['coloring_memory'] = mem_usage() - start_mem
 
-    # coloring.display_bokeh(show=True)
-
     return coloring
 
 
