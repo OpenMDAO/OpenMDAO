@@ -12,14 +12,14 @@ from openmdao.devtools.debug import compare_jacs
 
 
 class TotJacBuilder(object):
-    def __init__(self, rows, cols):
-        self.J = np.zeros((rows, cols), dtype=bool)
+    def __init__(self, nrows, ncols):
+        self.J = np.zeros((nrows, ncols), dtype=bool)
         self.coloring = None
 
     def add_random_points(self, npoints):
         nrows, ncols = self.J.shape
 
-        zro = self.J is False
+        zro = self.J == False
         flat = self.J[zro].flatten()
         flat[:npoints] = True
         np.random.shuffle(flat)
@@ -68,7 +68,11 @@ class TotJacBuilder(object):
         return self.coloring
 
     def show(self):
-        self.coloring.display_txt()
+        try:
+            self.coloring.display_bokeh(show=True)
+        except Exception:
+            print("Bokeh not available, using ASCII display.")
+            self.coloring.display_txt()
 
         maxdeg_fwd = np.max(np.count_nonzero(self.J, axis=1))
         maxdeg_rev = np.max(np.count_nonzero(self.J, axis=0))
@@ -179,6 +183,28 @@ def rand_jac():
 
 
 class SparsityComp(om.ExplicitComponent):
+    """
+    A simple component that multiplies a sparse matrix by an input vector.
+
+    The sparsity structure is defined by the 'sparsity' argument, and the data values are
+    just the (index + 1) of the nonzeros in the sparsity structure.
+
+    This component is used to test the coloring of the total jacobian.  A Problem is set up
+    with a model containing only this component, and the total jacobian is computed with and
+    without coloring.  The two jacobians are compared to ensure they are the same.
+
+    Parameters
+    ----------
+    sparsity : ndarray or coo_matrix
+        Sparsity structure to be tested.
+
+    Attributes
+    ----------
+    sparsity : ndarray
+        Dense version of the sparsity structure.
+    data : ndarray
+        Data values for the sparsity structure.
+    """
     def __init__(self, sparsity, **kwargs):
         super(SparsityComp, self).__init__(**kwargs)
         self.sparsity = sparsity
@@ -209,7 +235,8 @@ def check_sparsity_tot_coloring(sparsity, direct=True, tolerance=1e-15, tol_type
     sparsity : ndarray or coo_matrix
         Sparsity structure to be tested.
     direct : bool
-        If True, use direct method when bidirectional coloring, else substitution method.
+        If True, use the direct method to compute the column adjacency matrix when bidirectional
+        coloring, else use the substitution method.
     """
     import sys
 
@@ -265,7 +292,7 @@ if __name__ == '__main__':
                         help="Build an Eisenstat's example matrix of size n+1 x n.",
                         action="store", type=int, default=-1, dest="eisenstat")
     parser.add_argument("-m", "--mode", type=str, dest="mode",
-                        help="Direction of coloring (default is auto). Only used with -e.",
+                        help="Direction of coloring (default is auto).",
                         default="auto")
     parser.add_argument('-s', '--save', dest="save", default=None,
                         help="Output file for jacobian so it can be reloaded and colored using"
