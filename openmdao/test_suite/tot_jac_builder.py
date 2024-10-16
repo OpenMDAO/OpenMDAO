@@ -169,10 +169,10 @@ class TotJacBuilder(object):
         return builder
 
 
-def rand_jac():
+def rand_jac(minrows=(1, 10), mincols=(1, 10)):
     rnd = np.random.randint
-    minr = rnd(1, 10)
-    minc = rnd(1, 10)
+    minr = rnd(*minrows)
+    minc = rnd(*mincols)
 
     return  TotJacBuilder.make_jac(n_dense_rows=rnd(5), row_density=np.random.rand(),
                                    n_dense_cols=rnd(5), col_density=np.random.rand(),
@@ -200,10 +200,8 @@ class SparsityComp(om.ExplicitComponent):
 
     Attributes
     ----------
-    sparsity : ndarray
+    sparsity : coo_matrix
         Dense version of the sparsity structure.
-    data : ndarray
-        Data values for the sparsity structure.
     """
     def __init__(self, sparsity, **kwargs):
         super(SparsityComp, self).__init__(**kwargs)
@@ -213,17 +211,20 @@ class SparsityComp(om.ExplicitComponent):
         self.add_input('x', shape=self.sparsity.shape[1])
         self.add_output('y', shape=self.sparsity.shape[0])
 
-        sparsity = coo_matrix(self.sparsity)
+        if isinstance(self.sparsity, np.ndarray):
+            self.sparsity = coo_matrix(self.sparsity)
+        else:
+            self.sparsity = self.sparsity.tocoo()
+
+        sparsity = self.sparsity
         sparsity.data = np.arange(sparsity.data.size) + 1.
-        self.data = sparsity.data
-        self.sparsity = sparsity.toarray()
         self.declare_partials('y', 'x', rows=sparsity.row, cols=sparsity.col)
 
     def compute(self, inputs, outputs):
         outputs['y'] = self.sparsity.dot(inputs['x'])
 
     def compute_partials(self, inputs, partials):
-        partials['y', 'x'] = self.data
+        partials['y', 'x'] = self.sparsity.data
 
 
 def check_sparsity_tot_coloring(sparsity, direct=True, tolerance=1e-15, tol_type='rel', mode='auto'):
