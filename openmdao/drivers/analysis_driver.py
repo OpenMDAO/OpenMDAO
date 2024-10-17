@@ -325,7 +325,7 @@ class AnalysisDriver(Driver):
 
     def _get_sampled_vars(self):
         """
-        Return all of the variables (promoted name) to be sampeld by this driver.
+        Return all of the variables (promoted name) to be sampled by this driver.
         """
         if hasattr(self._samples, '_get_sampled_vars'):
             return set(self._samples._get_sampled_vars())
@@ -344,19 +344,17 @@ class AnalysisDriver(Driver):
         # We don't necessarily know a-priori what variables are in our case generators.
         # Tee the samples and add the variables defined within to be recorded.
         model = self._problem().model
-        abs2prom_inputs = model._var_allprocs_abs2prom['input']
         rec_includes = self.recording_options['includes']
         implicit_outputs = {meta['prom_name'] for _, meta in
-                            model.list_outputs(explicit=False, implicit=True)}
+                            model.list_outputs(explicit=False, implicit=True, out_stream=None)}
+        prom2abs_in = model._var_allprocs_prom2abs_list['input']
 
         # Responses are recorded by default, add the inputs to be recorded.
         for prom_name in self._get_sampled_vars():
             if prom_name in implicit_outputs and prom_name not in rec_includes:
                 self.recording_options['includes'].append(prom_name)
-            for model_abs_name, model_prom_name in abs2prom_inputs.items():
-                if model_prom_name == prom_name:
-                    if model_abs_name not in self.recording_options['includes']:
-                        self.recording_options['includes'].append(model_abs_name)
+            elif prom_name in prom2abs_in.keys():
+                self.recording_options['includes'].append(prom_name)
 
         if MPI:
             run_parallel = self.options['run_parallel']

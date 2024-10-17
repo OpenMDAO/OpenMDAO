@@ -290,6 +290,78 @@ class TestAnalysisDriverParallel(unittest.TestCase):
 
         self.assertEqual(expected, str(e.exception))
 
+    def test_parallel_system(self):
+        import numpy as np
+        import openmdao.api as om
+
+        class FanInGrouped(om.Group):
+            """
+            Topology where two components in a Group feed a single component
+            outside of that Group.
+            """
+
+            def __init__(self):
+                super().__init__()
+
+                self.set_input_defaults('x1', 1.0)
+                self.set_input_defaults('x2', 1.0)
+
+                self.sub = self.add_subsystem('sub', om.ParallelGroup(),
+                                            promotes_inputs=['x1', 'x2'])
+
+                self.sub.add_subsystem('c1', om.ExecComp(['y=-2.0*x']),
+                                    promotes_inputs=[('x', 'x1')])
+                self.sub.add_subsystem('c2', om.ExecComp(['y=5.0*x']),
+                                    promotes_inputs=[('x', 'x2')])
+
+                self.add_subsystem('c3', om.ExecComp(['y=3.0*x1+7.0*x2']))
+
+                self.connect("sub.c1.y", "c3.x1")
+                self.connect("sub.c2.y", "c3.x2")
+
+        prob = om.Problem(FanInGrouped())
+
+        # Note the absense of adding design varaibles here, compared to DOEGenerator
+       
+        # the FanInGrouped model uses 2 processes, so we can run
+        # two instances of the model at a time, each using 2 of our 4 procs
+        procs_per_model = 2
+        prob.driver = om.AnalysisDriver(om.ProductGenerator({'x1': {'val': np.linspace(0.0, 1.0, 10)},
+                                                            'x2': {'val': np.linspace(0.0, 1.0, 10)}}),
+                                        run_parallel=True,
+                                        procs_per_model=procs_per_model)
+        # prob.driver.add_response('c3.y')
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+        prob.driver.recording_options['includes'].append('sub.c1.x')
+        prob.driver.recording_options['includes'].append('sub.c2.x')
+
+
+        prob.setup()
+        prob.final_setup()
+        prob.run_driver()
+        prob.cleanup()
+
+
+        num_models = prob.comm.size // procs_per_model
+        rank = prob.comm.rank
+
+        if rank < num_models:
+            filename = f'cases.sql_{rank}'
+            cr = om.CaseReader(prob.get_outputs_dir() / filename)
+            cases = cr.list_cases(source='driver', out_stream=None)
+
+            case_nums = {int(s.split('|')[-1]) for s in cases}
+
+            # On rank 0 we should have even cases, with odd cases on rank 1
+            self.assertSetEqual(case_nums, {i for i in range(rank, 100, 2)})
+
+            last_case = cr.get_cases(source='driver')[-1]
+            print(last_case)
+            print('inputs')
+            print(last_case.list_inputs())
+            print('outputs')
+            print(last_case.list_outputs())
+
     # def test_beam_np4(self):
 
     #     if MPI.COMM_WORLD.size == 1:
