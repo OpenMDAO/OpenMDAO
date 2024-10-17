@@ -1,3 +1,4 @@
+import sys
 from functools import partial
 import unittest
 
@@ -41,16 +42,18 @@ class TestJaxUtils(unittest.TestCase):
         assert_near_equal(result**2, x)
         self.assertIsInstance(result, jaxlib.xla_extension.ArrayImpl)
 
-    def test_register_jax_component(self):
+    def test_jax_component_option(self):
         """Test that the registration of jax-compatible components works."""
-        try:
-            import jax
-        except ImportError:
-            self.skipTest('jax is not available but required for this test.')
         import numpy as np
 
-        @om.register_jax_component
-        class PowComp(om.ExplicitComponent):
+        if sys.version_info < (3, 9):
+            self.skipTest('JaxExplicitComponent requires Python 3.9+')
+
+        from openmdao.utils.jax_utils import jax
+        if jax is None:
+            self.skipTest('jax is not available.')
+
+        class PowComp(om.JaxExplicitComponent):
 
             def initialize(self):
                 self.options.declare('vec_size', types=(int,))
@@ -61,56 +64,31 @@ class TestJaxUtils(unittest.TestCase):
                 self.add_input('x', shape=(n,))
                 self.add_output('f', shape=(n,))
 
-                # The partials are a dense row in this case (1 row x N inputs)
-                # There is no need to specify a sparsity pattern.
                 ar = np.arange(n, dtype=int)
                 self.declare_partials(of='f', wrt='x', rows=ar, cols=ar)
 
-            @partial(jax.jit, static_argnums=(0,))
-            def _compute_partials_jacfwd(self, x):
-                deriv_func = jax.jacfwd(self.compute_primal, argnums=[0])
-                # Here we make sure we extract the diagonal of the computed jacobian, since we
-                # know it will have the only non-zero values.
-                return jax.numpy.diagonal(deriv_func(x)[0])
+            def get_self_statics(self):
+                return (self.options['pow'],)
 
-            @partial(jax.jit, static_argnums=(0,))
             def compute_primal(self, x):
                 return x**self.options['pow']
 
-            def compute(self, inputs, outputs):
-                outputs['f'] = self.compute_primal(*inputs.values())
-
-            def compute_partials(self, inputs, partials):
-                # Since the partials are sparse and stored in a flat array, ravel
-                # the resulting derivative jacobian.
-                partials['f', 'x'] = self._compute_partials_jacfwd(*inputs.values()).ravel()
-
-            def _tree_flatten(self):
-                """
-                Per the jax documentation, these are the attributes
-                of this class that we need to reference in the jax jitted
-                methods of the class.
-                There are no dynamic values or arrays, only self.options is used.
-                Note that we do not change the options during the evaluation of
-                these methods.
-                """
-                children = ()  # arrays / dynamic values
-                aux_data = {'options': self.options}  # static values
-                return (children, aux_data)
-
-            @classmethod
-            def _tree_unflatten(cls, aux_data, children):
-                """
-                Per the jax documentation, this method is needed by jax.jit since
-                we are referencing attributes of the class (self.options) in our
-                jitted methods.
-                """
-                return cls(*children, **aux_data)
-
         p = om.Problem()
-        p.model.add_subsystem('c', PowComp(vec_size=11, pow=2))
-        p.setup(force_alloc_complex=True)
-        p.set_val('c.x', np.linspace(0, 10, 11))
+        powcomp = p.model.add_subsystem('c', PowComp(derivs_method='jax', vec_size=11, pow=2))
+        # deriv shape: [(11, 1, 11, 1)]
+        p.setup(mode='fwd', force_alloc_complex=True)
+        c_x = np.linspace(1, 10, 11)#.reshape(11, 1)
+        p.set_val('c.x', c_x)
         p.run_model()
-        assert_near_equal(np.sqrt(p.get_val('c.f')), p.get_val('c.x'))
-        assert_check_partials(p.check_partials(method='cs', compact_print=True, out_stream=None))
+        assert_near_equal(p.get_val('c.f'), c_x ** 2)
+        assert_check_partials(p.check_partials(method='cs', show_only_incorrect=False))
+
+        p.set_val('c.x', c_x)
+        powcomp.options['pow'] = 3  # change the option to verify that re-jit happens
+        p.run_model()
+        assert_near_equal(p.get_val('c.f'), c_x ** 3)
+        assert_check_partials(p.check_partials(method='cs', show_only_incorrect=False))
+
+
+if __name__ == '__main__':
+    unittest.main()

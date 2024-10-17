@@ -39,7 +39,7 @@ from openmdao.utils.om_warnings import issue_warning, \
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, all_ancestors, match_prom_or_abs, \
     ensure_compatible, env_truthy, make_traceback, _is_slicer_op, _wrap_comm, _unwrap_comm, \
-    _om_mpi_debug, SystemMeta
+    _om_dump, SystemMetaclass
 from openmdao.utils.file_utils import _get_outputs_dir
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -173,7 +173,7 @@ def collect_errors(method):
     return wrapper
 
 
-class System(object, metaclass=SystemMeta):
+class System(object, metaclass=SystemMetaclass):
     """
     Base class for all systems in OpenMDAO.
 
@@ -396,6 +396,10 @@ class System(object, metaclass=SystemMeta):
     _during_sparsity : bool
         If True, we're doing a sparsity computation and uncolored approxs need to be restricted
         to only colored columns.
+    compute_primal : function or None
+        Function that computes the primal for the given system.
+    _jac_func_ : function or None
+        Function that computes the jacobian using AD (jax).  Not used if jax is not active.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -413,6 +417,8 @@ class System(object, metaclass=SystemMeta):
         self.options.declare('assembled_jac_type', values=['csc', 'dense'], default='csc',
                              desc='Linear solver(s) in this group or implicit component, '
                                   'if using an assembled jacobian, will use this type.')
+        self.options.declare('derivs_method', default=None, values=['jax', 'cs', 'fd', None],
+                             desc='The method to use for computing derivatives')
 
         # Case recording options
         self.recording_options = OptionsDictionary(parent_name=type(self).__name__)
@@ -540,7 +546,12 @@ class System(object, metaclass=SystemMeta):
 
         self._during_sparsity = False
 
-    if _om_mpi_debug:
+        if not hasattr(self, 'compute_primal'):
+            self.compute_primal = None
+
+        self._jac_func_ = None  # for computing jacobian using AD (jax)
+
+    if _om_dump:
         @property
         def comm(self):
             """
@@ -1640,6 +1651,101 @@ class System(object, metaclass=SystemMeta):
 
         return True
 
+    def compute_sparsity(self):
+        """
+        Compute the sparsity of the partial jacobian.
+
+        Returns
+        -------
+        coo_matrix
+            The sparsity matrix.
+        dict
+            Metadata about the sparsity computation.
+        """
+        use_jax = self.options['derivs_method'] == 'jax'
+        if not use_jax:
+            approx_scheme = self._get_approx_scheme(self._coloring_info['method'])
+
+        save_first_call = self._first_call_to_linearize
+        self._first_call_to_linearize = False
+
+        # for groups, this does some setup of approximations
+        self._setup_approx_coloring()
+
+        # tell approx scheme to limit itself to only colored columns
+        if not use_jax:
+            approx_scheme._reset()
+            self._during_sparsity = True
+
+        self._coloring_info._update_wrt_matches(self)
+
+        save_jac = self._jacobian
+
+        # use special sparse jacobian to collect sparsity info
+        self._jacobian = _ColSparsityJac(self, self._coloring_info)
+
+        from openmdao.core.group import Group
+        is_total = isinstance(self, Group)
+        is_explicit = self.is_explicit()
+
+        # compute perturbations
+        starting_inputs = self._inputs.asarray(copy=True)
+        in_offsets = starting_inputs.copy()
+        in_offsets[in_offsets == 0.0] = 1.0
+        in_offsets *= self._coloring_info['perturb_size']
+
+        starting_outputs = self._outputs.asarray(copy=True)
+
+        if not is_explicit:
+            out_offsets = starting_outputs.copy()
+            out_offsets[out_offsets == 0.0] = 1.0
+            out_offsets *= self._coloring_info['perturb_size']
+
+        starting_resids = self._residuals.asarray(copy=True)
+
+        for i in range(self._coloring_info['num_full_jacs']):
+            # randomize inputs (and outputs if implicit)
+            if i > 0:
+                self._inputs.set_val(starting_inputs +
+                                     in_offsets * np.random.random(in_offsets.size))
+                if not is_explicit:
+                    self._outputs.set_val(starting_outputs +
+                                          out_offsets * np.random.random(out_offsets.size))
+                if is_total:
+                    with self._relevance.nonlinear_active('iter'):
+                        self._solve_nonlinear()
+                else:
+                    self._apply_nonlinear()
+
+                if not use_jax:
+                    for scheme in self._approx_schemes.values():
+                        scheme._reset()  # force a re-initialization of approx
+
+            if use_jax:
+                self._jax_linearize()
+            else:
+                self.run_linearize(sub_do_ln=False)
+
+        sparsity, sp_info = self._jacobian.get_sparsity(self)
+
+        self._jacobian = save_jac
+
+        if not use_jax:
+            self._during_sparsity = False
+
+            # revert uncolored approx back to normal
+            for scheme in self._approx_schemes.values():
+                scheme._reset()
+
+        # restore original inputs/outputs
+        self._inputs.set_val(starting_inputs)
+        self._outputs.set_val(starting_outputs)
+        self._residuals.set_val(starting_resids)
+
+        self._first_call_to_linearize = save_first_call
+
+        return sparsity, sp_info
+
     def _compute_coloring(self, recurse=False, **overrides):
         """
         Compute a coloring of the partial jacobian.
@@ -1678,13 +1784,7 @@ class System(object, metaclass=SystemMeta):
 
         info = self._coloring_info
 
-        use_jax = False
-        try:
-            if self.options['use_jax']:
-                info['method'] = 'jax'
-                use_jax = True
-        except KeyError:
-            pass
+        use_jax = self.options['derivs_method'] == 'jax'
 
         info.update(overrides)
 
@@ -1738,101 +1838,19 @@ class System(object, metaclass=SystemMeta):
                     approx_scheme._reset()
             return [coloring]
 
-        save_first_call = self._first_call_to_linearize
-        self._first_call_to_linearize = False
         sparsity_start_time = time.perf_counter()
-
-        # for groups, this does some setup of approximations
-        self._setup_approx_coloring()
-
-        # tell approx scheme to limit itself to only colored columns
-        if not use_jax:
-            approx_scheme._reset()
-            self._during_sparsity = True
-
-        info._update_wrt_matches(self)
-
-        save_jac = self._jacobian
-
-        # use special sparse jacobian to collect sparsity info
-        self._jacobian = _ColSparsityJac(self, info)
-
-        from openmdao.core.group import Group
-        is_total = isinstance(self, Group)
-        is_explicit = self.is_explicit()
-
-        # compute perturbations
-        starting_inputs = self._inputs.asarray(copy=True)
-        in_offsets = starting_inputs.copy()
-        in_offsets[in_offsets == 0.0] = 1.0
-        in_offsets *= info['perturb_size']
-
-        starting_outputs = self._outputs.asarray(copy=True)
-
-        if not is_explicit:
-            out_offsets = starting_outputs.copy()
-            out_offsets[out_offsets == 0.0] = 1.0
-            out_offsets *= info['perturb_size']
-
-        starting_resids = self._residuals.asarray(copy=True)
-
-        for i in range(info['num_full_jacs']):
-            # randomize inputs (and outputs if implicit)
-            if i > 0:
-                self._inputs.set_val(starting_inputs +
-                                     in_offsets * np.random.random(in_offsets.size))
-                if not is_explicit:
-                    self._outputs.set_val(starting_outputs +
-                                          out_offsets * np.random.random(out_offsets.size))
-                if is_total:
-                    with self._relevance.nonlinear_active('iter'):
-                        self._solve_nonlinear()
-                else:
-                    self._apply_nonlinear()
-
-                if not use_jax:
-                    for scheme in self._approx_schemes.values():
-                        scheme._reset()  # force a re-initialization of approx
-
-            if use_jax:
-                self._jax_linearize()
-            else:
-                self.run_linearize(sub_do_ln=False)
-
-        sparsity, sp_info = self._jacobian.get_sparsity(self)
-
-        self._jacobian = save_jac
-
-        if not use_jax:
-            self._during_sparsity = False
-
-            # revert uncolored approx back to normal
-            for scheme in self._approx_schemes.values():
-                scheme._reset()
+        sparsity, sp_info = self.compute_sparsity()
+        sparsity_time = time.perf_counter() - sparsity_start_time
 
         if use_jax:
             direction = self._mode
         else:
             direction = 'fwd'
 
-        sparsity_time = time.perf_counter() - sparsity_start_time
-
         coloring = _compute_coloring(sparsity, direction)
-
-        # restore original inputs/outputs
-        self._inputs.set_val(starting_inputs)
-        self._outputs.set_val(starting_outputs)
-        self._residuals.set_val(starting_resids)
 
         if not self._finalize_coloring(coloring, info, sp_info, sparsity_time):
             return [None]
-
-        self._first_call_to_linearize = save_first_call
-
-        if not use_jax:
-            approx = self._get_approx_scheme(coloring._meta['method'])
-            # force regen of approx groups during next compute_approximations
-            approx._reset()
 
         return [coloring]
 
@@ -2790,6 +2808,10 @@ class System(object, metaclass=SystemMeta):
         """
         Set this system's nonlinear solver.
         """
+        # from openmdao.core.group import Group
+        # if not isinstance(self, Group):
+        #     raise TypeError("nonlinear_solver can only be set on a Group.")
+
         self._nonlinear_solver = solver
 
     @property
@@ -2829,6 +2851,14 @@ class System(object, metaclass=SystemMeta):
     @property
     def _relevance(self):
         return self._problem_meta['relevance']
+
+    @property
+    def _jax_group(self):
+        return self._problem_meta['jax_group']
+
+    @_jax_group.setter
+    def _jax_group(self, val):
+        self._problem_meta['jax_group'] = val
 
     @property
     def _static_mode(self):
@@ -6329,6 +6359,17 @@ class System(object, metaclass=SystemMeta):
         """
         return False
 
+    def best_partial_deriv_direction(self):
+        """
+        Return the best direction for partial deriv calculations based on input and output sizes.
+
+        Returns
+        -------
+        str
+            The best direction for derivative calculations, 'fwd' or 'rev'.
+        """
+        return 'fwd' if len(self._outputs) > len(self._inputs) else 'rev'
+
     def _get_sys_promotion_tree(self, tree=None):
         """
         Return a dict of all subsystems and their promoted inputs/outputs.
@@ -6600,6 +6641,31 @@ class System(object, metaclass=SystemMeta):
             Array of sizes of the variable on all procs.
         """
         return self._var_sizes[io][:, self._var_allprocs_abs2idx[name]]
+
+    def get_self_statics(self):
+        """
+        Override this in derived classes if compute_primal references static values.
+
+        Do NOT include self._discrete_inputs in the returned tuple.  Include things like
+        self.options['opt_name'], etc., that are used in compute_primal but are assumed to be
+        constant during derivative computation.
+
+        Return value MUST be a tuple. Don't forget the trailing comma if tuple has only one item.
+        Return value MUST be hashable.
+
+        The order of these values doesn't matter.  They are only checked (by computing their hash)
+        to see if they have changed since the last time compute_primal was jitted, and if so,
+        compute_primal will be re-jitted.
+
+        Returns
+        -------
+        tuple
+            Tuple containing all static values required by compute_primal.
+        """
+        return ()
+
+    def _setup_jax(self, from_group=False):
+        pass
 
     def _sys_tree_visitor(self, func, predicate=None, recurse=True, include_self=True,
                           yield_none=False, *args, **kwargs):

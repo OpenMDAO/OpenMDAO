@@ -27,6 +27,7 @@ import openmdao.utils.hooks as hooks
 from openmdao.utils.file_utils import _load_and_exec
 from openmdao.utils.om_warnings import issue_warning, OMDeprecationWarning, DerivativesWarning
 from openmdao.utils.reports_system import register_report
+from openmdao.utils.array_utils import submat_sparsity_iter
 from openmdao.devtools.memory import mem_usage
 from openmdao.utils.name_maps import rel_name2abs_name
 
@@ -1756,39 +1757,6 @@ class Coloring(object):
         J[self._nzrows, self._nzcols] = dtype(1)
         return J
 
-    def _jac2subjac_sparsity(self):
-        """
-        Given a boolean jacobian and variable names and sizes, compute subjac sparsity.
-
-        Returns
-        -------
-        dict
-            Nested dict of form sparsity[of][wrt] = (rows, cols, shape)
-        """
-        sparsity = {}
-        row_start = row_end = 0
-
-        for of, of_size in zip(self._row_vars, self._row_var_sizes):
-            sparsity[of] = {}
-            row_end += of_size
-            rowbool = np.logical_and(self._nzrows >= row_start, self._nzrows < row_end)
-
-            col_start = col_end = 0
-            for wrt, wrt_size in zip(self._col_vars, self._col_var_sizes):
-                col_end += wrt_size
-                colbool = np.logical_and(self._nzcols >= col_start, self._nzcols < col_end)
-                mask = np.logical_and(rowbool, colbool)
-
-                # save sparsity structure as  (rows, cols, shape)
-                sparsity[of][wrt] = (self._nzrows[mask] - row_start, self._nzcols[mask] - col_start,
-                                     (of_size, wrt_size))
-
-                col_start = col_end
-
-            row_start = row_end
-
-        return sparsity
-
     def get_subjac_sparsity(self):
         """
         Compute the sparsity structure of each subjacobian based on the full jac sparsity.
@@ -1801,26 +1769,19 @@ class Coloring(object):
             Mapping of (of, wrt) keys to their corresponding (nzrows, nzcols, shape).
         """
         if self._row_vars and self._col_vars and self._row_var_sizes and self._col_var_sizes:
-            return self._jac2subjac_sparsity()
+            sparsity = {}
+            for of, wrt, nzrows, nzcols, shape in self._subjac_sparsity_iter():
+                if of not in sparsity:
+                    sparsity[of] = {}
+                sparsity[of][wrt] = (nzrows, nzcols, shape)
 
     def _subjac_sparsity_iter(self):
-        subjac_sparsity = self.get_subjac_sparsity()
-
-        if subjac_sparsity is None:
+        if self._row_vars and self._col_vars and self._row_var_sizes and self._col_var_sizes:
+            yield from submat_sparsity_iter(zip(self._row_vars, self._row_var_sizes),
+                                            zip(self._col_vars, self._col_var_sizes),
+                                            self._nzrows, self._nzcols, self._shape)
+        else:
             raise RuntimeError("Coloring doesn't have enough info to compute subjac sparsity.")
-
-        ostart = oend = 0
-        for of, sub in subjac_sparsity.items():
-            istart = iend = 0
-            for i, (wrt, tup) in enumerate(sub.items()):
-                nzrows, nzcols, shape = tup
-                iend += shape[1]
-                if i == 0:
-                    oend += shape[0]
-                if nzrows.size > 0:
-                    yield (of, wrt, list(nzrows), list(nzcols), ostart, oend, istart, iend)
-                istart = iend
-            ostart = oend
 
     def get_declare_partials_calls(self):
         """
@@ -1833,9 +1794,9 @@ class Coloring(object):
             string may be cut and pasted into a component's setup() method.
         """
         lines = []
-        for of, wrt, nzrows, nzcols, _, _, _, _ in self._subjac_sparsity_iter():
+        for of, wrt, nzrows, nzcols, _ in self._subjac_sparsity_iter():
             lines.append("    self.declare_partials(of='%s', wrt='%s', rows=%s, cols=%s)" %
-                         (of, wrt, nzrows, nzcols))
+                         (of, wrt, list(nzrows), list(nzcols)))
         return '\n'.join(lines)
 
     def get_row_var_coloring(self, varname):
@@ -3192,10 +3153,9 @@ class _ColSparsityJac(object):
         for _, _, end, _, _, _ in system._jac_wrt_iter(coloring_info.wrt_matches):
             pass
 
-        ncols = end
-        self._col_list = [None] * ncols
-        self._ncols = ncols
         self._nrows = nrows
+        self._ncols = end
+        self._col_list = [None] * self._ncols
 
     def set_col(self, system, i, column):
         # record only the nonzero part of the column.

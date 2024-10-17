@@ -39,6 +39,7 @@ from openmdao.utils.relevance import get_relevance
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     PromotionWarning, MPIWarning, DerivativesWarning
 from openmdao.utils.class_util import overrides_method
+from openmdao.utils.jax_utils import jax
 from openmdao.core.total_jac import _TotalJacInfo
 
 # regex to check for valid names.
@@ -201,6 +202,10 @@ class Group(System):
         within this group, keyed by active response.  These determine if contributions
         from all ranks will be added together to get the correct input values when derivatives
         in the larger model are being solved using reverse mode.
+    _is_explicit : bool or None
+        True if neither this Group nor any of its descendants contains implicit systems or cycles.
+    _ivcs : dict
+        Dict containing metadata for each independent variable.
     _bad_conn_vars : set
         Set of variables involved in invalid connections.
     _sys_graph_cache : dict
@@ -234,6 +239,8 @@ class Group(System):
         self._post_components = None
         self._iterated_components = None
         self._fd_rev_xfer_correction_dist = {}
+        self._is_explicit = None
+        self._ivcs = {}
         self._bad_conn_vars = None
         self._sys_graph_cache = None
 
@@ -674,6 +681,28 @@ class Group(System):
 
         self._setup_procs_finished = True
 
+    def is_explicit(self):
+        """
+        Return True if this Group contains only explicit systems and has no cycles.
+
+        Returns
+        -------
+        bool
+            True if this is an explicit component.
+        """
+        if self._is_explicit is None:
+            self._is_explicit = True
+            for subsys in self._subsystems_myproc:
+                if not subsys.is_explicit():
+                    self._is_explicit = False
+                    break
+
+            # check for cycles
+            if self._is_explicit:
+                self._is_explicit = nx.is_directed_acyclic_graph(self.compute_sys_graph())
+
+        return self._is_explicit
+
     def _configure_check(self):
         """
         Do any error checking on i/o and connections.
@@ -696,7 +725,7 @@ class Group(System):
         for subsys in self._sorted_sys_iter():
             states.extend(subsys._list_states())
 
-        return sorted(states)
+        return states
 
     def _list_states_allprocs(self):
         """
@@ -712,7 +741,7 @@ class Group(System):
             byproc = self.comm.allgather(self._list_states())
             for proc_states in byproc:
                 all_states.update(proc_states)
-            return sorted(all_states)
+            return all_states
         else:
             return self._list_states()
 
@@ -780,6 +809,7 @@ class Group(System):
         # the connections.
         self._setup_global_connections()
         self._setup_dynamic_shapes()
+        self._setup_jax()
 
         self._top_level_post_connections()
 
@@ -1062,8 +1092,9 @@ class Group(System):
         self._setup_residuals()
 
         if self._use_derivatives:
-            # must call this before vector setup because it determines if we need to alloc commplex
             self._setup_partials()
+
+        self._setup_vectors(self._get_root_vectors())
 
         self._fd_rev_xfer_correction_dist = {}
 
@@ -1082,8 +1113,6 @@ class Group(System):
                 self._update_dataflow_graph(responses)
 
         self._problem_meta['relevance'] = get_relevance(self, responses, desvars)
-
-        self._setup_vectors(self._get_root_vectors())
 
         # Transfers do not require recursion, but they have to be set up after the vector setup.
         self._setup_transfers()
@@ -1644,6 +1673,7 @@ class Group(System):
         abs2prom = self._var_abs2prom
 
         allprocs_abs2meta = {'input': {}, 'output': {}}
+        self._ivcs = {}
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
 
@@ -1811,9 +1841,12 @@ class Group(System):
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
             self._discrete_outputs = _DictValues(self._var_discrete['output'])
         else:
-            self._discrete_inputs = self._discrete_outputs = ()
+            self._discrete_inputs = self._discrete_outputs = {}
 
         self._vars_to_gather = self._find_vars_to_gather()
+
+        # create mapping of indep var names to their metadata
+        self._ivcs = self.get_indep_vars(local=False)
 
     def _resolve_group_input_defaults(self, show_warnings=False):
         """
@@ -2294,6 +2327,55 @@ class Group(System):
 
         for inp in src_ind_inputs:
             allprocs_abs2meta_in[inp]['has_src_indices'] = True
+
+    def get_indep_vars(self, local):
+        """
+        Return a dict of independant variables contained in this group or any of its subgroups.
+
+        Parameters
+        ----------
+        local : bool
+            If True, return only the variables local to the current process.
+
+        Returns
+        -------
+        dict
+            Dict of all independant variables in this group and their corresponding metadata.
+        """
+        abs2meta = self._var_abs2meta['output'] if local else self._var_allprocs_abs2meta['output']
+        return {n: meta for n, meta in abs2meta.items() if 'openmdao:indep_var' in meta['tags']}
+
+    def get_boundary_vars(self, io, local):
+        """
+        Return a set of inputs or outputs connected to variables outside of this Group.
+
+        Parameters
+        ----------
+        io : str
+            Either 'input' or 'output'.
+        local : bool
+            If True, return only the variables local to the current process.
+
+        Returns
+        -------
+        set
+            Set of absolute inputs or outputs connected to variables outside of this Group.
+        """
+        assert io in ('input', 'output'), \
+            f"io must be either 'input' or 'output', but '{io}' was given."
+        # _var_*_abs2prom contains both continuous and discrete variables
+        vnames = self._var_abs2prom[io] if local else self._var_allprocs_abs2prom[io]
+        return set(vnames).difference(self._conn_global_abs_in2out)
+
+    def _setup_jax(self, from_group=False):
+        if jax is None:
+            return
+
+        # recurse down the tree and setup
+        # jax anywhere below where it's active, then return.
+        for subsys in self._subsystems_myproc:
+            if isinstance(subsys, Group) or subsys.options['derivs_method'] == 'jax':
+                subsys._setup_jax(from_group)
 
     def _setup_dynamic_shapes(self):
         """
@@ -3741,8 +3823,9 @@ class Group(System):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        if self._tot_jac is not None and self._owns_approx_jac:
-            self._jacobian = self._tot_jac.J_dict
+        if (self._tot_jac is not None and self._owns_approx_jac and
+                not isinstance(self._jacobian, coloring_mod._ColSparsityJac)):
+            self._jacobian = self._tot_jac
         elif self._jacobian is None:
             self._jacobian = DictionaryJacobian(self)
 
@@ -3895,40 +3978,39 @@ class Group(System):
             subsys._get_missing_partials(missing)
 
     def _approx_subjac_keys_iter(self):
+        yield from self._subjac_keys_iter()
+
+    def _subjac_keys_iter(self):
         # yields absolute keys (no aliases)
         totals = self.pathname == ''
 
         wrt = set()
-        ivc = set()
+        ivc = set(self.get_indep_vars(local=False))
         pro2abs = self._var_allprocs_prom2abs_list
 
         if totals:
             # When computing totals, weed out inputs connected to anything inside our system unless
             # the source is an indepvarcomp.
-            all_abs2meta_out = self._var_allprocs_abs2meta['output']
             if self._owns_approx_wrt:
-                for meta in self._owns_approx_wrt.values():
-                    src = meta['source']
-                    if 'openmdao:indep_var' in all_abs2meta_out[src]['tags']:
-                        wrt.add(src)
+                wrt = {m['source'] for m in self._owns_approx_wrt.values()}
+                diff = wrt.difference(ivc)
+                if diff:
+                    bad = [n for n, m in self._owns_approx_wrt.items() if m['source'] in diff]
+                    raise RuntimeError("When computing total derivatives for the model, the "
+                                       "following wrt variables are not independent variables or "
+                                       "do not have an independant variable as a source: "
+                                       f"{sorted(bad)}")
+                wrt = wrt.intersection(ivc)
             else:
-                for abs_inps in pro2abs['input'].values():
-                    for inp in abs_inps:
-                        src = self._conn_global_abs_in2out[inp]
-                        if 'openmdao:indep_var' in all_abs2meta_out[src]['tags']:
-                            wrt.add(src)
-                            ivc.add(src)
-                        break
+                wrt = ivc
 
         else:
             for abs_inps in pro2abs['input'].values():
-                for inp in abs_inps:
+                if abs_inps[0] not in self._conn_abs_in2out:
                     # If connection is inside of this Group, perturbation of all implicitly
-                    # connected inputs will be handled properly via internal transfers. Otherwise,
-                    # we need to add all implicitly connected inputs separately.
-                    if inp in self._conn_abs_in2out:
-                        break
-                    wrt.add(inp)
+                    # connected inputs will be handled properly via internal transfers.
+                    # Otherwise, we need to add all implicitly connected inputs separately.
+                    wrt.update(abs_inps)
 
             # get rid of any old stuff in here
             self._owns_approx_of = self._owns_approx_wrt = None
@@ -3947,7 +4029,7 @@ class Group(System):
                 # Create approximations for the ones we need.
 
                 _of, _wrt = key
-                # Skip explicit res wrt outputs
+                # Skip res wrt outputs
                 if _wrt in of and _wrt not in ivc:
 
                     # Support for specifying a desvar as an obj/con.
@@ -4657,6 +4739,9 @@ class Group(System):
         self._var_allprocs_abs2meta[io] = {}
         self._var_allprocs_abs2meta[io].update(auto_ivc._var_allprocs_abs2meta[io])
         self._var_allprocs_abs2meta[io].update(old)
+
+        # add all auto_ivc vars to our _loc_ivcs
+        self._ivcs.update(auto_ivc._var_abs2meta[io])
 
         self._approx_subjac_keys = None  # this will force re-initialization
         self._setup_procs_finished = True

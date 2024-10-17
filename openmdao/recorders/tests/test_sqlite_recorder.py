@@ -153,7 +153,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs = expected_objectives
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
-        assertDriverIterDataRecorded(self, 
+        assertDriverIterDataRecorded(self,
                                      prob.get_outputs_dir() / self.filename,
                                      expected_data,
                                      self.eps)
@@ -181,7 +181,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs = expected_constraints
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
-        assertDriverIterDataRecorded(self, 
+        assertDriverIterDataRecorded(self,
                                      prob.get_outputs_dir() / self.filename,
                                      expected_data,
                                      self.eps)
@@ -220,9 +220,9 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs, None),)
-        assertDriverIterDataRecorded(self, 
+        assertDriverIterDataRecorded(self,
                                      prob.get_outputs_dir() / self.filename,
-                                     expected_data, 
+                                     expected_data,
                                      self.eps)
 
         expected_derivs = {
@@ -233,9 +233,9 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_data = ((coordinate, (t0, t1), expected_derivs),)
-        assertDriverDerivDataRecorded(self, 
+        assertDriverDerivDataRecorded(self,
                                      prob.get_outputs_dir() / self.filename,
-                                     expected_data, 
+                                     expected_data,
                                      self.eps)
 
     def test_recorder_setup_timing(self):
@@ -370,9 +370,9 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs = expected_constraints
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, None, None),)
-        assertDriverIterDataRecorded(self, 
+        assertDriverIterDataRecorded(self,
                                      prob.get_outputs_dir() / self.filename,
-                                     expected_data, 
+                                     expected_data,
                                      self.eps)
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
@@ -415,9 +415,9 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs, None),)
-        assertDriverIterDataRecorded(self, 
+        assertDriverIterDataRecorded(self,
                                      prob.get_outputs_dir() / self.filename,
-                                     expected_data, 
+                                     expected_data,
                                      self.eps)
 
         expected_derivs = {
@@ -428,9 +428,9 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_data = ((coordinate, (t0, t1), expected_derivs),)
-        assertDriverDerivDataRecorded(self, 
+        assertDriverDerivDataRecorded(self,
                                      prob.get_outputs_dir() / self.filename,
-                                     expected_data, 
+                                     expected_data,
                                      self.eps)
 
     def test_double_run_driver_option_overwrite(self):
@@ -466,11 +466,14 @@ class TestSqliteRecorder(unittest.TestCase):
             "Run Number: 0",
             "    Subsystem : root",
             "        assembled_jac_type: csc",
+            "        derivs_method: None",
             "        auto_order: False",
             "    Subsystem : p1",
+            "        derivs_method: None",
             "        distributed: False",
             "        run_root_only: False",
             "        always_opt: False",
+            "        use_jit: True",
             "        name: UNDEFINED",
             "        val: 1.0",
             "        shape: None",
@@ -484,9 +487,11 @@ class TestSqliteRecorder(unittest.TestCase):
             "        res_ref: None",
             "        tags: None",
             "    Subsystem : p2",
+            "        derivs_method: None",
             "        distributed: False",
             "        run_root_only: False",
             "        always_opt: False",
+            "        use_jit: True",
             "        name: UNDEFINED",
             "        val: 1.0",
             "        shape: None",
@@ -500,12 +505,16 @@ class TestSqliteRecorder(unittest.TestCase):
             "        res_ref: None",
             "        tags: None",
             "    Subsystem : comp",
+            "        derivs_method: None",
             "        distributed: False",
             "        run_root_only: False",
             "        always_opt: False",
+            "        use_jit: True",
             "    Subsystem : con",
+            "        derivs_method: None",
             "        run_root_only: False",
             "        always_opt: False",
+            "        use_jit: True",
             "        has_diag_partials: False",
             "        units: None",
             "        shape: None",
@@ -515,7 +524,7 @@ class TestSqliteRecorder(unittest.TestCase):
         ]
 
         for i, line in enumerate(text):
-            self.assertEqual(line, expected[i])
+            self.assertEqual(line, expected[i], f"line {i}: {line} != {expected[i]}")
 
         stream = StringIO()
 
@@ -527,12 +536,13 @@ class TestSqliteRecorder(unittest.TestCase):
             "Run Number: 1",
             "    Subsystem : root",
             "        assembled_jac_type: dense",
+            "        derivs_method: None",
             "        auto_order: False",
             ""
         ]
 
         for i, line in enumerate(text):
-            self.assertEqual(line, expected[i])
+            self.assertEqual(line, expected[i], f"line {i}: {line} != {expected[i]}")
 
     def test_double_run_model_option_overwrite(self):
         prob = ParaboloidProblem()
@@ -567,11 +577,14 @@ class TestSqliteRecorder(unittest.TestCase):
             "Run Number: 0",
             "    Subsystem : root",
             "        assembled_jac_type: csc",
+            "        derivs_method: None",
             "        auto_order: False",
             "    Subsystem : p1",
+            "        derivs_method: None",
             "        distributed: False",
             "        run_root_only: False",
             "        always_opt: False",
+            "        use_jit: True",
             "        name: UNDEFINED",
             "        val: 1.0",
             "        shape: None",
@@ -585,9 +598,11 @@ class TestSqliteRecorder(unittest.TestCase):
             "        res_ref: None",
             "        tags: None",
             "    Subsystem : p2",
+            "        derivs_method: None",
             "        distributed: False",
             "        run_root_only: False",
             "        always_opt: False",
+            "        use_jit: True",
             "        name: UNDEFINED",
             "        val: 1.0",
             "        shape: None",
@@ -601,12 +616,16 @@ class TestSqliteRecorder(unittest.TestCase):
             "        res_ref: None",
             "        tags: None",
             "    Subsystem : comp",
+            "        derivs_method: None",
             "        distributed: False",
             "        run_root_only: False",
             "        always_opt: False",
+            "        use_jit: True",
             "    Subsystem : con",
+            "        derivs_method: None",
             "        run_root_only: False",
             "        always_opt: False",
+            "        use_jit: True",
             "        has_diag_partials: False",
             "        units: None",
             "        shape: None",
@@ -616,7 +635,7 @@ class TestSqliteRecorder(unittest.TestCase):
         ]
 
         for i, line in enumerate(text):
-            self.assertEqual(line, expected[i])
+            self.assertEqual(line, expected[i], f"line {i}: {line} != {expected[i]}")
 
         stream = StringIO()
 
@@ -628,12 +647,13 @@ class TestSqliteRecorder(unittest.TestCase):
             "Run Number: 1",
             "    Subsystem : root",
             "        assembled_jac_type: dense",
+            "        derivs_method: None",
             "        auto_order: False",
             ""
         ]
 
         for i, line in enumerate(text):
-            self.assertEqual(line, expected[i])
+            self.assertEqual(line, expected[i], f"line {i}: {line} != {expected[i]}")
 
     def test_simple_driver_recording_with_prefix(self):
         prob = ParaboloidProblem()
@@ -680,7 +700,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = (
             (run2_coord, (run2_t0, run2_t1), expected_outputs, expected_inputs, None),
         )
-        assertDriverIterDataRecorded(self, prob.get_outputs_dir() / self.filename, 
+        assertDriverIterDataRecorded(self, prob.get_outputs_dir() / self.filename,
                                      expected_data, self.eps, prefix='Run2')
 
         expected_derivs = {
@@ -693,10 +713,10 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = (
             (run1_coord, (run1_t0, run1_t1), expected_derivs),
         )
-        assertDriverDerivDataRecorded(self, 
+        assertDriverDerivDataRecorded(self,
                                      prob.get_outputs_dir() / self.filename,
-                                     expected_data, 
-                                     self.eps, 
+                                     expected_data,
+                                     self.eps,
                                      prefix='Run1')
 
     def test_driver_everything_recorded_by_default(self):
@@ -729,9 +749,9 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs.update(expected_constraints)
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs, None),)
-        assertDriverIterDataRecorded(self, 
+        assertDriverIterDataRecorded(self,
                                      prob.get_outputs_dir() / self.filename,
-                                     expected_data, 
+                                     expected_data,
                                      self.eps)
 
     def test_driver_records_metadata(self):
@@ -797,7 +817,7 @@ class TestSqliteRecorder(unittest.TestCase):
             'tree_children_length': 6,
             'abs2prom': abs2prom,
         }
-        assertViewerDataRecorded(self, 
+        assertViewerDataRecorded(self,
                                  prob.get_outputs_dir() / self.filename,
                                  expected_problem_metadata)
 
@@ -1267,7 +1287,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
                           expected_solver_output, expected_solver_residuals),)
-        assertSolverIterDataRecorded(self, prob.get_outputs_dir() / self.filename, 
+        assertSolverIterDataRecorded(self, prob.get_outputs_dir() / self.filename,
                                      expected_data, self.eps, prefix='run_again')
 
     def test_record_solver_includes_excludes(self):
@@ -3157,7 +3177,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         # Instantiate your CaseReader
         cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
-        
+
         # Get the first case from the recorder
         case = cr.get_case('after_run_driver')
 
