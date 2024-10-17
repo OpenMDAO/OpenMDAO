@@ -2,8 +2,6 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix, csc_matrix
 
-from collections import OrderedDict
-
 from openmdao.core.constants import INT_DTYPE
 
 # scipy sparse types allowed to be subjacs
@@ -41,8 +39,8 @@ class Matrix(object):
         """
         self._comm = comm
         self._matrix = None
-        self._submats = OrderedDict()
-        self._metadata = OrderedDict()
+        self._submats = {}
+        self._metadata = {}
 
     def _add_submat(self, key, info, irow, icol, src_indices, shape, factor=None):
         """

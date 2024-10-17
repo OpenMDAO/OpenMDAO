@@ -333,7 +333,7 @@ class AssembledJacobian(Jacobian):
         if ext_mtx is not None:
             ext_mtx._pre_update()
 
-        if self._randgen:
+        if self._randgen and system._problem_meta['randomize_subjacs']:
             for key in iters:
                 int_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['val'], key))
 

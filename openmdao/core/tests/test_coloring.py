@@ -11,6 +11,7 @@ import numpy as np
 from io import StringIO
 
 from numpy.testing import assert_almost_equal
+from scipy.sparse import coo_matrix
 try:
     from scipy.sparse import load_npz
 except ImportError:
@@ -23,8 +24,9 @@ from openmdao.utils.array_utils import array_viz
 from openmdao.utils.coloring import _compute_coloring, compute_total_coloring, Coloring
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.testing_utils import use_tempdirs, set_env_vars
-from openmdao.test_suite.tot_jac_builder import TotJacBuilder
+from openmdao.test_suite.tot_jac_builder import TotJacBuilder, check_sparsity_tot_coloring
 from openmdao.utils.general_utils import run_driver, printoptions
+from openmdao.utils.assert_utils import assert_check_totals
 
 import openmdao.test_suite
 
@@ -254,7 +256,7 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
     if recorder:
         p.driver.add_recorder(recorder)
 
-    p.setup(mode=mode, derivatives=derivs, check=check)
+    p.setup(force_alloc_complex=True, mode=mode, derivatives=derivs, check=check)
     if use_vois:
         p.run_driver()
     else:
@@ -289,9 +291,9 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         p.driver._compute_totals()
         p_color.driver._compute_totals()
 
-        # coloring saves 16 solves per driver iter  (5 vs 21)
+        # coloring saves 17 solves per driver iter  (4 vs 21)
         self.assertEqual(p.model._solve_count, 21)
-        self.assertEqual(p_color.model._solve_count, 5)
+        self.assertEqual(p_color.model._solve_count, 4)
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_total_coloring_snopt_auto_autoivc(self):
@@ -310,9 +312,9 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         p.driver._compute_totals()
         p_color.driver._compute_totals()
 
-        # coloring saves 16 solves per driver iter  (5 vs 21)
+        # coloring saves 17 solves per driver iter  (4 vs 21)
         self.assertEqual(p.model._solve_count, 21)
-        self.assertEqual(p_color.model._solve_count, 5)
+        self.assertEqual(p_color.model._solve_count, 4)
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_total_coloring_display_txt(self):
@@ -347,9 +349,9 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         p.driver._compute_totals()
         p_color.driver._compute_totals()
 
-        # coloring saves 16 solves per driver iter  (5 vs 21)
+        # coloring saves 17 solves per driver iter  (4 vs 21)
         self.assertEqual(p.model._solve_count, 21)
-        self.assertEqual(p_color.model._solve_count, 5)
+        self.assertEqual(p_color.model._solve_count, 4)
 
         partial_coloring = p_color.model._get_subsystem('arctan_yox')._coloring_info.coloring
         expected = [
@@ -361,8 +363,8 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
             self.assertEqual(d.strip(), expected[i])
 
         fwd_solves, rev_solves = p_color.driver._coloring_info.coloring.get_row_var_coloring('delta_theta_con.g')
-        self.assertEqual(fwd_solves, 4)
-        self.assertEqual(rev_solves, 0)
+        self.assertEqual(fwd_solves, 0)
+        self.assertEqual(rev_solves, 1)
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_total_coloring_snopt_auto_dyn_partials_assembled_jac(self):
@@ -380,9 +382,9 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         p.driver._compute_totals()
         p_color.driver._compute_totals()
 
-        # coloring saves 16 solves per driver iter  (5 vs 21)
+        # coloring saves 17 solves per driver iter  (4 vs 21)
         self.assertEqual(p.model._solve_count, 21)
-        self.assertEqual(p_color.model._solve_count, 5)
+        self.assertEqual(p_color.model._solve_count, 4)
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_total_coloring_snopt_auto_assembled(self):
@@ -400,9 +402,9 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         p.driver._compute_totals()
         p_color.driver._compute_totals()
 
-        # coloring saves 16 solves per driver iter  (5 vs 21)
+        # coloring saves 17 solves per driver iter  (4 vs 21)
         self.assertEqual(p.model._solve_count, 21)
-        self.assertEqual(p_color.model._solve_count, 5)
+        self.assertEqual(p_color.model._solve_count, 4)
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_fwd_simul_coloring_snopt_approx_cs(self):
@@ -553,13 +555,13 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         p.driver._compute_totals()
         p_color.driver._compute_totals()
 
-        # coloring saves 16 solves per driver iter  (5 vs 21)
+        # coloring saves 17 solves per driver iter  (4 vs 21)
         self.assertEqual(p.model._solve_count, 21)
-        self.assertEqual(p_color.model._solve_count, 5)
+        self.assertEqual(p_color.model._solve_count, 4)
 
         # test __repr__
         rep = repr(p_color.driver._coloring_info.coloring)
-        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21), pct nonzero: 13.42, tol: 1e-15)')
+        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: bidirectional, ncolors: 4, shape: (22, 21), pct nonzero: 13.42, tol: 1e-15)')
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_print_options_total_with_coloring_fwd(self):
@@ -730,9 +732,11 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         p.driver._compute_totals()
         p_color.driver._compute_totals()
 
-        # coloring saves 16 solves per driver iter  (5 vs 21)
+        # coloring saves 17 solves per driver iter  (4 vs 21)
         self.assertEqual(p.model._solve_count, 21)
-        self.assertEqual(p_color.model._solve_count, 5)
+        self.assertEqual(p_color.model._solve_count, 4)
+
+        assert_check_totals(p_color.check_totals(method='cs', show_only_incorrect=True))
 
     def test_dynamic_total_coloring_auto_con_alias_pyoptsparse_slsqp(self):
         # This test makes sure that coloring works with aliased constraints.
@@ -759,9 +763,9 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         p.driver._compute_totals()
         p_color.driver._compute_totals()
 
-        # coloring saves 16 solves per driver iter  (5 vs 21)
+        # coloring saves 14 solves per driver iter  (4 vs 21)
         self.assertEqual(p.model._solve_count, 21)
-        self.assertEqual(p_color.model._solve_count, 5)
+        self.assertEqual(p_color.model._solve_count, 4)
 
 
 @use_tempdirs
@@ -795,9 +799,9 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         p.driver._compute_totals()
         p_color.driver._compute_totals()
 
-        # coloring saves 16 solves per driver iter  (5 vs 21)
+        # coloring saves 17 solves per driver iter  (4 vs 21)
         self.assertEqual(p.model._solve_count, 21)
-        self.assertEqual(p_color.model._solve_count, 5)
+        self.assertEqual(p_color.model._solve_count, 4)
 
     def test_min_improve_pct(self):
         # first, run w/o coloring
@@ -833,9 +837,9 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         p.driver._compute_totals()
         p_color.driver._compute_totals()
 
-        # coloring saves 16 solves per driver iter  (5 vs 21)
+        # coloring saves 17 solves per driver iter  (4 vs 21)
         self.assertEqual(p.model._solve_count, 21)
-        self.assertEqual(p_color.model._solve_count, 5)
+        self.assertEqual(p_color.model._solve_count, 4)
 
     def test_problem_total_coloring_auto(self):
 
@@ -844,7 +848,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
                                           of=['r_con.g', 'theta_con.g', 'delta_theta_con.g',
                                               'l_conx.g', 'y', 'area'],
                                           wrt=['x', 'y', 'r'])
-        self.assertEqual(coloring.total_solves(), 5)
+        self.assertEqual(coloring.total_solves(), 4)
 
     def test_problem_total_coloring_auto_mixed_vois(self):
 
@@ -853,7 +857,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
                                           of=['r_con.g', 'theta_con.g', 'delta_theta_con.g',
                                               'l_conx.g', 'y', 'circle.area'],
                                           wrt=['x', 'y', 'r'])
-        self.assertEqual(coloring.total_solves(), 5)
+        self.assertEqual(coloring.total_solves(), 4)
         om.display_coloring(source=coloring, as_text=True, show=False)  # leave this in because at one point it caused an exception
         om.display_coloring(source=coloring, show=False)
 
@@ -1065,8 +1069,8 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
             sys.stdout = save_out
 
         self.assertTrue('Jacobian shape: (22, 21)  (13.42% nonzero)' in summary)
-        self.assertTrue('FWD solves: 5   REV solves: 0' in summary)
-        self.assertTrue('Total colors vs. total size: 5 vs 21  (76.19% improvement)' in summary)
+        self.assertTrue('FWD solves: 3   REV solves: 1' in summary)
+        self.assertTrue('Total colors vs. total size: 4 vs 21  (80.95% improvement)' in summary)
         self.assertTrue('Time to compute sparsity:' in summary)
         self.assertTrue('Time to compute coloring:' in summary)
 
@@ -1089,7 +1093,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
         p_color = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
         coloring = p_color.driver._coloring_info.coloring
         rep = repr(coloring)
-        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21), pct nonzero: 13.42, tol: 1e-15)')
+        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: bidirectional, ncolors: 4, shape: (22, 21), pct nonzero: 13.42, tol: 1e-15)')
 
         dense_J = np.ones((50, 50), dtype=bool)
         coloring = _compute_coloring(dense_J, 'auto')
@@ -1172,17 +1176,20 @@ class BidirectionalTestCase(unittest.TestCase):
             builder.color('auto')
             tot_size, tot_colors, fwd_solves, rev_solves, pct = builder.coloring._solves_info()
 
-            self.assertEqual(tot_colors, 3)
+            check_sparsity_tot_coloring(builder.J)
+            # changing the bidir coloring alg made most cases better, but this one went from 3 to 4
+            self.assertEqual(tot_colors, 4)
 
     @parameterized.expand(itertools.product(
-        [('n4c6-b15', 3), ('can_715', 21), ('lp_finnis', 14), ('ash608', 6), ('ash331', 6),
-         ('D_6', 27), ('Harvard500', 26), ('illc1033', 5)],
+        [('n4c6-b15', 3), ('can_715', 35), ('lp_finnis', 14), ('ash608', 6), ('ash331', 6),
+         ('D_6', 27), ('Harvard500', 32), ('illc1033', 5)],
         ), name_func=_test_func_name
     )
     @unittest.skipIf(load_npz is None, "scipy version too old")
     def test_bidir_coloring(self, tup):
         matname, expected_colors = tup
         matdir = os.path.join(os.path.dirname(openmdao.test_suite.__file__), 'matrices')
+        mode = 'auto'
 
         # uses matrices from the sparse matrix collection website (sparse.tamu.edu)
         matfile = os.path.join(matdir, matname + '.npz')
@@ -1191,12 +1198,39 @@ class BidirectionalTestCase(unittest.TestCase):
 
         mat = load_npz(matfile).tocoo()
         mat.data = np.asarray(mat.data, dtype=bool)
-        coloring = _compute_coloring(mat, 'auto')
-        mat = None
 
+        check_sparsity_tot_coloring(mat, direct=True, mode=mode)
+        check_sparsity_tot_coloring(mat, direct=False, mode=mode)
+
+        coloring = _compute_coloring(mat, mode)
+        tot_size, tot_colors, fwd_solves, rev_solves, pct = coloring._solves_info()
+        self.assertEqual(tot_colors, expected_colors)
+
+    def test_bidir_3colorblock(self):
+        J = np.array(
+            [[1, 1, 1, 1, 1, 1, 1, 1],
+             [1, 1, 0, 0, 0, 0, 0, 0],
+             [1, 1, 0, 0, 0, 0, 0, 0],
+             [1, 1, 0, 0, 0, 0, 0, 0],
+             [0, 0, 1, 1, 0, 0, 0, 0],
+             [0, 0, 1, 1, 0, 0, 0, 0],
+             [0, 0, 1, 1, 0, 0, 0, 0],
+             [0, 0, 0, 0, 1, 1, 0, 0],
+             [0, 0, 0, 0, 1, 1, 0, 0],
+             [0, 0, 0, 0, 1, 1, 0, 0],
+             [0, 0, 0, 0, 0, 0, 1, 1],
+             [0, 0, 0, 0, 0, 0, 1, 1]]
+        )
+
+        mode = 'auto'
+        mat = coo_matrix(J)
+        check_sparsity_tot_coloring(mat, direct=True, mode=mode)
+        check_sparsity_tot_coloring(mat, direct=False, mode=mode)
+
+        coloring = _compute_coloring(mat, mode)
         tot_size, tot_colors, fwd_solves, rev_solves, pct = coloring._solves_info()
 
-        self.assertEqual(tot_colors, expected_colors)
+        self.assertEqual(tot_colors, 3)
 
 
 def _get_random_mat(rows, cols, comm, generator=None):
