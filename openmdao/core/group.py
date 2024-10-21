@@ -1974,6 +1974,16 @@ class Group(System):
                                 abs_in2prom_info[tgt][tree_level] = \
                                     _PromotesInfo(src_shape=src_shape, prom=prom,
                                                   promoted_from=self.pathname)
+                else:
+                    # check for discrete targets
+                    for tgt in prom2abs_in[prom]:
+                        if tgt in self._discrete_inputs:
+                            # for discretes we can only set the value (no units/indices)
+                            {self._collect_error(f"{self.msginfo}: Cannot set '{key}={meta[key]}'"
+                                                 f" for discrete variable '{tgt}'.")
+                             for key in ('units', 'src_shape') if key in meta}
+
+                            self._discrete_inputs[tgt] = meta['val']
 
                 meta.update(fullmeta)
 
