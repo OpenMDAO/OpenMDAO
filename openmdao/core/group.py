@@ -1978,12 +1978,13 @@ class Group(System):
                     # check for discrete targets
                     for tgt in prom2abs_in[prom]:
                         if tgt in self._discrete_inputs:
-                            # for discretes we can only set the value (no units/indices)
-                            {self._collect_error(f"{self.msginfo}: Cannot set '{key}={meta[key]}'"
-                                                 f" for discrete variable '{tgt}'.")
-                             for key in ('units', 'src_shape') if key in meta}
-
-                            self._discrete_inputs[tgt] = meta['val']
+                            for key, val in meta.items():
+                                # for discretes we can only set the value (not units/src_shape)
+                                if key == 'val':
+                                    self._discrete_inputs[tgt] = val
+                                elif key in ('units', 'src_shape'):
+                                    self._collect_error(f"{self.msginfo}: Cannot set '{key}={val}'"
+                                                        f" for discrete variable '{tgt}'.")
 
                 meta.update(fullmeta)
 
