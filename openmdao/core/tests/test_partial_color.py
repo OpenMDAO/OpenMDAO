@@ -1,4 +1,4 @@
-
+import sys
 import unittest
 import itertools
 from fnmatch import fnmatchcase
@@ -197,8 +197,17 @@ class SparseFuncCompImplicit(ImplicitFuncComp):
             start = end
         flines.append('    return ' + ','.join([f"r{n}" for n,_ in ofs]))
         fbody = '\n'.join(flines)
-        exec(fbody)  # nosec trusted input
-        f = omf.wrap(locals()['func'])
+
+        if sys.version_info >= (3,13):
+            # https://docs.python.org/3/whatsnew/3.13.html#pep667-porting-notes-py
+            # Code execution functions that implicitly target locals() (such as exec and eval)
+            # must be passed an explicit namespace to access their results in an optimized scope.
+            tmp_locals = dict()
+            exec(fbody, locals=tmp_locals)  # nosec trusted input
+            f = omf.wrap(tmp_locals['func'])
+        else:
+            exec(fbody)  # nosec trusted input
+            f = omf.wrap(locals()['func'])
 
         for name, sz in wrts:
             f.add_input(name, shape=sz)

@@ -48,10 +48,10 @@ jobs:
       matrix:
         include:
           # test latest versions on ubuntu
-          # Include PETSc/pyOptSparse, which require NumPy<2
+          # Include pyOptSparse, which requires NumPy<2
           - NAME: Ubuntu Latest, NumPy<2
             OS: ubuntu-latest
-            PY: 3
+            PY: '3.12'
             NUMPY: '<2'
             PETSc: true
             PYOPTSPARSE: true
@@ -60,25 +60,31 @@ jobs:
             BUILD_DOCS: true
 
           # test latest versions on ubuntu
-          # Exclude PETSc/pyOptSparse, which require NumPy<2
-          - NAME: Ubuntu Latest, NumPy 2 (No PETSc/pyOptSparse)
+          # Exclude pyOptSparse, which requires NumPy<2
+          # NumPy>=2.1 is required with Python 3.13
+          - NAME: Ubuntu Latest, NumPy 2 (No pyOptSparse)
             OS: ubuntu-latest
-            PY: 3
+            PY: '3.13'
+            NUMPY: '>=2.1'
+            PETSc: true
 
           # test latest versions on macos
-          # Include PETSc/pyOptSparse, which require NumPy<2
+          # Include pyOptSparse, which requires NumPy<2
           - NAME: MacOS Latest, NumPy<2
             OS: macos-13
-            PY: 3
+            PY: '3.12'
             NUMPY: '<2'
             PETSc: true
             PYOPTSPARSE: true
 
           # test latest versions on macos
-          # Exclude PETSc/pyOptSparse, which require NumPy<2
-          - NAME: MacOS Latest, NumPy 2 (No PETSc/pyOptSparse)
+          # Exclude pyOptSparse, which require NumPy<2
+          # NumPy>=2.1 is required with Python 3.13
+          - NAME: MacOS Latest, NumPy 2 (No pyOptSparse)
             OS: macos-13
-            PY: 3
+            PY: '3.13'
+            NUMPY: '>=2.1'
+            PETSc: true
 
     runs-on: ${{ matrix.OS }}
 
