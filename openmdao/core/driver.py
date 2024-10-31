@@ -729,22 +729,13 @@ class Driver(object, metaclass=DriverMetaclass):
 
         # includes and excludes for outputs are specified using _promoted_ names
         # vectors are keyed on absolute name, discretes on relative/promoted name
-        myinputs = myoutputs = myresiduals = []
+        myinputs = myoutputs = myresiduals = set()
 
         if recording_options['record_outputs']:
             match_names.update(abs2prom_output.values())
             myoutputs = {n for n, prom in abs2prom_output.items() if check_path(prom, incl, excl)}
 
-            model_outs = model._outputs
-
-            if model._var_discrete['output']:
-                # if we have discrete outputs then residual name set doesn't match output one
-                if recording_options['record_residuals']:
-                    myresiduals = [n for n in myoutputs if model_outs._contains_abs(n)]
-            elif recording_options['record_residuals']:
-                myresiduals = myoutputs
-
-        elif recording_options['record_residuals']:
+        if recording_options['record_residuals']:
             match_names.update(model._residuals)
             myresiduals = [n for n in model._residuals._abs_iter()
                            if check_path(abs2prom_output[n], incl, excl)]
