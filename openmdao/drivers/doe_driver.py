@@ -111,15 +111,30 @@ class DOEDriver(Driver):
             procs_per_model = self.options['procs_per_model']
 
             full_size = comm.size
-            size = full_size // procs_per_model
-            if full_size != size * procs_per_model:
+            nchunks = full_size // procs_per_model
+            if full_size != nchunks * procs_per_model:
                 raise RuntimeError("The total number of processors is not evenly divisible by the "
                                    "specified number of processors per model.\n Provide a "
                                    "number of processors that is a multiple of %d, or "
                                    "specify a number of processors per model that divides "
                                    "into %d." % (procs_per_model, full_size))
 
-            color = self._color = comm.rank % size
+            # a 'color' is assigned to each subsystem, with
+            # an entry for each processor it will be given
+            # e.g. [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3]
+            # Doing it this way forces the lower level comms to be laid out in the same rank
+            # order as the full comm, which is necessary for the coloring to work properly.
+            # In the docs, setting key=rank on the Split call is supposed to do this, but
+            # it doesn't seem to work.  Otherwise we could just do
+            # comm.Split(comm.rank%nchunks, key=comm.rank).
+            colors = np.empty(full_size, dtype=int)
+            for i in range(nchunks):
+                offset = procs_per_model * i
+                colors[offset:offset + procs_per_model] = i
+
+            color = colors[comm.rank]
+
+            # return comm.Split(comm.rank%nchunks, key=comm.rank)  # doesn't work
             return comm.Split(color)
 
     def _set_name(self):
@@ -287,20 +302,3 @@ class DOEDriver(Driver):
                     recorder.record_on_process = True
 
         super()._setup_recording()
-
-    def _get_recorder_metadata(self, case_name):
-        """
-        Return metadata from the latest iteration for use in the recorder.
-
-        Parameters
-        ----------
-        case_name : str
-            Name of current case.
-
-        Returns
-        -------
-        dict
-            Metadata dictionary for the recorder.
-        """
-        self._metadata['name'] = case_name
-        return self._metadata
