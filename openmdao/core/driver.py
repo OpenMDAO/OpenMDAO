@@ -732,8 +732,8 @@ class Driver(object, metaclass=DriverMetaclass):
         myinputs = myoutputs = myresiduals = []
 
         if recording_options['record_outputs']:
-            match_names = match_names | set(abs2prom_output.values())
-            myoutputs = [n for n, prom in abs2prom_output.items() if check_path(prom, incl, excl)]
+            match_names.update(abs2prom_output.values())
+            myoutputs = {n for n, prom in abs2prom_output.items() if check_path(prom, incl, excl)}
 
             model_outs = model._outputs
 
@@ -745,11 +745,10 @@ class Driver(object, metaclass=DriverMetaclass):
                 myresiduals = myoutputs
 
         elif recording_options['record_residuals']:
-            match_names = match_names | set(model._residuals.keys())
+            match_names.update(model._residuals)
             myresiduals = [n for n in model._residuals._abs_iter()
                            if check_path(abs2prom_output[n], incl, excl)]
 
-        myoutputs = set(myoutputs)
         if recording_options['record_desvars']:
             myoutputs.update(_src_name_iter(self._designvars))
         if recording_options['record_objectives'] or recording_options['record_responses']:
@@ -760,8 +759,12 @@ class Driver(object, metaclass=DriverMetaclass):
         # inputs (if in options). inputs use _absolute_ names for includes/excludes
         if 'record_inputs' in recording_options:
             if recording_options['record_inputs']:
-                match_names = match_names | set(abs2prom_inputs.keys())
-                myinputs = [n for n in abs2prom_inputs if check_path(n, incl, excl)]
+                match_names.update(abs2prom_inputs)
+                match_names.update(model._var_allprocs_prom2abs_list['input'])
+                myinputs = {n for n in abs2prom_inputs if check_path(n, incl, excl)}
+                for p, abs_list in model._var_allprocs_prom2abs_list['input'].items():
+                    if check_path(p, incl, excl):
+                        myinputs.update(abs_list)
 
         # check that all exclude/include globs have at least one matching output or input name
         for pattern in excl:
