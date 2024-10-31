@@ -4743,23 +4743,23 @@ class System(object, metaclass=SystemMetaclass):
             var_dicts.append(real_vars['input'])
         if outputs:
             var_dicts.append(real_vars['output'])
-        if inputs:
+        if inputs and disc_vars['input']:
             var_dicts.append(disc_vars['input'])
-        if outputs:
+        if outputs and disc_vars['output']:
             var_dicts.append(disc_vars['output'])
 
-        # For components with no children, self._subsystems_allprocs is empty.
+        # For components, self._subsystems_allprocs is empty.
         if self._subsystems_allprocs:
             if local:
                 from openmdao.core.component import Component
-                it = self.system_iter(recurse=True, typ=Component)
+                it = [s.pathname for s in self.system_iter(recurse=True, typ=Component)]
             else:
-                it = iter(subsys for subsys, _ in self._subsystems_allprocs.values())
+                it = list(self._allprocs_exec_order())
 
-            for subsys in it:
-                prefix = subsys.pathname + '.'
+            for path in it:
+                prefix = path + '.'
                 for var_name in chain(*var_dicts):
-                    if not variables or var_name in variables:
+                    if variables is None or var_name in variables:
                         if var_name.startswith(prefix):
                             var_list.append(var_name)
         else:
@@ -5377,7 +5377,7 @@ class System(object, metaclass=SystemMetaclass):
                 caller = self._problem_meta['model_ref']()
             return caller._get_input_from_src(name, abs_names, conns, units=simp_units,
                                               indices=indices, get_remote=get_remote, rank=rank,
-                                              vec_name='nonlinear', flat=flat, scope_sys=self)
+                                              vec_name=vec_name, flat=flat, scope_sys=self)
         else:
             val = self._abs_get_val(abs_names[0], get_remote, rank, vec_name, kind, flat)
 
@@ -5955,7 +5955,7 @@ class System(object, metaclass=SystemMetaclass):
                         if vec._contains_abs(name):
                             vdict[name] = get(name, get_remote=True, rank=0,
                                               vec_name=vec_name, kind=kind)
-                        else:
+                        elif name in prom2abs_in:
                             ivc_path = conns[prom2abs_in[name][0]]
                             vdict[name] = get(ivc_path, get_remote=True, rank=0,
                                               vec_name=vec_name, kind='output')
@@ -6726,3 +6726,21 @@ class System(object, metaclass=SystemMetaclass):
                         res = func(s, *args, **kwargs)
                         if res is not None:
                             yield res
+
+    def _allprocs_exec_order(self):
+        """
+        Return a list of system pathnames in order of execution across all processes.
+
+        Returns
+        -------
+        list of str
+            List of system pathnames in order of execution
+        """
+        from openmdao.core.component import Component
+
+        seen = set()
+        for path in self._sys_tree_visitor(lambda s: s.pathname,
+                                           predicate=lambda s: isinstance(s, Component)):
+            if path not in seen:
+                seen.add(path)
+                yield path
