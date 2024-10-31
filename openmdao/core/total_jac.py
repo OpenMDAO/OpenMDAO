@@ -484,8 +484,8 @@ class _TotalJacInfo(object):
                     start = end
 
             if full_j_srcs:
-                full_src_inds = np.hstack(full_j_srcs)
-                full_tgt_inds = np.hstack(full_j_tgts)
+                full_src_inds = np.hstack(full_j_srcs, dtype=INT_DTYPE)
+                full_tgt_inds = np.hstack(full_j_tgts, dtype=INT_DTYPE)
             else:
                 full_src_inds = np.zeros(0, dtype=INT_DTYPE)
                 full_tgt_inds = np.zeros(0, dtype=INT_DTYPE)
