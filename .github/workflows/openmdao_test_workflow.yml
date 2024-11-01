@@ -140,12 +140,12 @@ jobs:
           - NAME: Ubuntu Oldest
             OS: ubuntu-latest
             PY: '3.9'
-            NUMPY: '1.23'
+            NUMPY: '1.24'
             SCIPY: '1.9'
             OPENMPI: '4.0'
             MPI4PY: '3.0'
             PETSc: '3.13'
-            PYOPTSPARSE: 'v2.9.0'
+            PYOPTSPARSE: 'v2.10.2'
             SNOPT: '7.2'
             OPTIONAL: '[all]'
             TESTS: true
@@ -647,9 +647,9 @@ jobs:
           python -m pip install --upgrade pip
 
           echo "============================================================="
-          echo "Install lxml for Windows (No Python 3.11 version on pypi)"
+          echo "Install mkl 2024.1.0 (test failure with 2024.2.2)"
           echo "============================================================="
-          conda install lxml
+          conda install mkl=2024.1.0
 
           echo "============================================================="
           echo "Install OpenMDAO"
