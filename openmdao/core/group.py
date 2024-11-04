@@ -2999,11 +2999,12 @@ class Group(System):
                     # out_shape != in_shape is allowed if there's no ambiguity in storage order
                     if (in_shape is None or out_shape is None or
                             not array_connection_compatible(in_shape, out_shape)):
-                        self._collect_error(
-                            f"{self.msginfo}: The source and target shapes do not match or "
-                            f"are ambiguous for the connection '{abs_out}' to '{abs_in}'. "
-                            f"The source shape is {out_shape} "
-                            f"but the target shape is {in_shape}.", ident=(abs_out, abs_in))
+                        with np.printoptions(legacy='1.21'):
+                            self._collect_error(
+                                f"{self.msginfo}: The source and target shapes do not match or "
+                                f"are ambiguous for the connection '{abs_out}' to '{abs_in}'. "
+                                f"The source shape is {out_shape} "
+                                f"but the target shape is {in_shape}.", ident=(abs_out, abs_in))
                         continue
 
                 elif src_indices is not None:

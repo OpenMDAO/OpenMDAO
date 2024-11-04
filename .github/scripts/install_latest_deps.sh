@@ -18,6 +18,8 @@ echo "Install latest versions of 'docs' dependencies"
 echo "============================================================="
 python -m pip install --upgrade --pre matplotlib
 python -m pip install --upgrade --pre numpydoc
+echo "*** ipykernel 7.x seems to be broken at the moment"
+python -m pip install 'ipykernel<7'
 python -m pip install --upgrade --pre jupyter-book
 python -m pip install --upgrade --pre sphinx-sitemap
 python -m pip install --upgrade --pre ipyparallel
