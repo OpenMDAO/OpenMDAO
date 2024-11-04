@@ -119,23 +119,27 @@ class DOEDriver(Driver):
                                    "specify a number of processors per model that divides "
                                    "into %d." % (procs_per_model, full_size))
 
-            # a 'color' is assigned to each subsystem, with
-            # an entry for each processor it will be given
-            # e.g. [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3]
-            # Doing it this way forces the lower level comms to be laid out in the same rank
-            # order as the full comm, which is necessary for the coloring to work properly.
-            # In the docs, setting key=rank on the Split call is supposed to do this, but
-            # it doesn't seem to work.  Otherwise we could just do
-            # comm.Split(comm.rank%ncolors, key=comm.rank).
-            colors = np.empty(full_size, dtype=int)
-            for i in range(ncolors):
-                offset = procs_per_model * i
-                colors[offset:offset + procs_per_model] = i
+            # # a 'color' is assigned to each subsystem, with
+            # # an entry for each processor it will be given
+            # # e.g. [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3]
+            # # Doing it this way forces the lower level comms to be laid out in the same rank
+            # # order as the full comm, which is necessary for the coloring to work properly.
+            # # In the docs, setting key=rank on the Split call is supposed to do this, but
+            # # it doesn't seem to work.  Otherwise we could just do
+            # # comm.Split(comm.rank%ncolors, key=comm.rank).
+            # colors = np.empty(full_size, dtype=int)
+            # for i in range(ncolors):
+            #     offset = procs_per_model * i
+            #     colors[offset:offset + procs_per_model] = i
 
-            self._color = colors[comm.rank]
+            # self._color = colors[comm.rank]
 
-            # return comm.Split(comm.rank%ncolors, key=comm.rank)  # doesn't work
-            self.comm = comm.Split(self._color)
+            # # return comm.Split(comm.rank%ncolors, key=comm.rank)  # doesn't work
+            # self.comm = comm.Split(self._color)
+            # return self.comm
+
+            color = self._color = comm.rank % ncolors
+            self.comm = comm.Split(color)
             return self.comm
 
     def _set_name(self):

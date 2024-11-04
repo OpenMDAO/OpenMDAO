@@ -4265,10 +4265,6 @@ class System(object, metaclass=SystemMetaclass):
                     if print_max:
                         meta['max'] = np.round(np.max(meta['val']), np_precision)
 
-        # # NOTE: calls to _abs_get_val() above are collective calls and must be done on all procs
-        # if not (outputs or inputs) or (not all_procs and self.comm.rank != 0):
-        #     return {} if return_format == 'dict' else []
-
         # remove metadata we don't want to show/return
         to_remove = ['discrete']
         if not print_tags:
@@ -5965,20 +5961,20 @@ class System(object, metaclass=SystemMetaclass):
                             vdict[name] = get(ivc_path, get_remote=True, rank=0,
                                               vec_name=vec_name, kind='output')
             else:
-                io = 'input' if kind == 'input' else 'output'
-                meta = self._var_allprocs_abs2meta[io]
+                # io = 'input' if kind == 'input' else 'output'
+                # meta = self._var_allprocs_abs2meta[io]
                 for name in variables:
-                    if self._owning_rank[name] == 0 and not meta[name]['distributed']:
-                        # if using a serial recorder and rank 0 owns the variable,
-                        # use local value on rank 0 and do nothing on other ranks.
-                        if rank == 0:
-                            if vec._contains_abs(name):
-                                vdict[name] = vec._abs_get_val(name, flat=False)
-                            elif name[offset:] in discrete_vec:
-                                vdict[name] = discrete_vec[name[offset:]]['val']
-                    else:
-                        vdict[name] = self.get_val(name, get_remote=True, rank=0,
-                                                   vec_name=vec_name, kind=kind, from_src=False)
+                    # if self._owning_rank[name] == 0 and not meta[name]['distributed']:
+                    #     # if using a serial recorder and rank 0 owns the variable,
+                    #     # use local value on rank 0 and do nothing on other ranks.
+                    #     if rank == 0:
+                    #         if vec._contains_abs(name):
+                    #             vdict[name] = vec._abs_get_val(name, flat=False)
+                    #         elif name[offset:] in discrete_vec:
+                    #             vdict[name] = discrete_vec[name[offset:]]['val']
+                    # else:
+                    vdict[name] = self.get_val(name, get_remote=True, rank=0,
+                                               vec_name=vec_name, kind=kind, from_src=False)
 
         return vdict
 

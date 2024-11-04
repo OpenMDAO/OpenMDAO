@@ -147,6 +147,11 @@ class RecordingManager(object):
                                "and non-parallel recorders.")
         return pset.pop()
 
+    def _check_gather(self):
+        for rec in self._recorders:
+            if rec._do_gather:
+                return True
+
 
 def _get_all_requesters(problem):
     yield problem

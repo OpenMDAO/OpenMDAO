@@ -2226,7 +2226,7 @@ class TestParallelDistribDOE(unittest.TestCase):
                     for n3 in [-50., 50.]:
                         self.assertEqual(x_inputs.count([n1, n2, n3]), 8)
 
-        elif rank == 2:
+        elif rank == 1:
             values = []
 
             cr = om.CaseReader(filename0)

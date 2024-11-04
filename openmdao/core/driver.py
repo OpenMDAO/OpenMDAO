@@ -1781,6 +1781,8 @@ def record_iteration(requester, prob, case_name):
     # Get the data to record (collective calls that get across all ranks)
     model = prob.model
     parallel = rec_mgr._check_parallel() if model.comm.size > 1 else False
+    do_gather = rec_mgr._check_gather()
+    local = parallel and not do_gather
 
     inputs, outputs, residuals = model.get_nonlinear_vectors()
     discrete_inputs = model._discrete_inputs
@@ -1791,13 +1793,13 @@ def record_iteration(requester, prob, case_name):
     filt = requester._filtered_vars_to_record
 
     if opts['record_inputs'] and (inputs._names or len(discrete_inputs) > 0):
-        data['input'] = model._retrieve_data_of_kind(filt, 'input', 'nonlinear', parallel)
+        data['input'] = model._retrieve_data_of_kind(filt, 'input', 'nonlinear', local)
 
     if opts['record_outputs'] and (outputs._names or len(discrete_outputs) > 0):
-        data['output'] = model._retrieve_data_of_kind(filt, 'output', 'nonlinear', parallel)
+        data['output'] = model._retrieve_data_of_kind(filt, 'output', 'nonlinear', local)
 
     if opts['record_residuals'] and residuals._names:
-        data['residual'] = model._retrieve_data_of_kind(filt, 'residual', 'nonlinear', parallel)
+        data['residual'] = model._retrieve_data_of_kind(filt, 'residual', 'nonlinear', local)
 
     from openmdao.core.problem import Problem
     if isinstance(requester, Problem):

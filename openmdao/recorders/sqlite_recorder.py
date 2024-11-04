@@ -197,10 +197,7 @@ class SqliteRecorder(CaseRecorder):
 
         if MPI and comm and comm.size > 1:
             if self._record_on_proc:
-                if not self._parallel:
-                    # recording only on this proc
-                    filepath = self._filepath
-                else:
+                if self._parallel:
                     # recording on multiple procs, so a separate file for each recording proc
                     # plus a file for the common metadata, written by the lowest recording rank
                     rank = comm.rank
@@ -221,6 +218,9 @@ class SqliteRecorder(CaseRecorder):
                         self.metadata_connection = sqlite3.connect(metadata_filepath)
                     else:
                         self._record_metadata = False
+                else:
+                    # recording only on this proc
+                    filepath = self._filepath
         else:
             # no MPI or comm size == 1
             filepath = self._filepath
