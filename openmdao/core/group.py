@@ -4494,7 +4494,9 @@ class Group(System):
                             if src_indices._flat_src:
                                 val.ravel()[src_indices.flat()] = value.flat
                             else:
-                                val[src_indices()] = value
+                                # Squeeze out singleton dimensions so that we can assign
+                                # values of different shapes when the storage order is unambiguous.
+                                np.squeeze(val[src_indices()])[...] = np.squeeze(value)
                         except Exception as err:
                             src = self._conn_global_abs_in2out[tgt]
                             msg = f"{self.msginfo}: The source indices " + \
