@@ -4192,6 +4192,11 @@ class System(object, metaclass=SystemMetaclass):
         if scaling:
             keys.extend(('ref', 'ref0', 'res_ref'))
 
+        if all_procs:
+            local = True
+        else:
+            local = False
+
         outputs = self.get_io_metadata(('output',), keys, includes, excludes,
                                        is_indep_var, is_design_var, tags,
                                        get_remote=True,
@@ -4260,9 +4265,9 @@ class System(object, metaclass=SystemMetaclass):
                     if print_max:
                         meta['max'] = np.round(np.max(meta['val']), np_precision)
 
-        # NOTE: calls to _abs_get_val() above are collective calls and must be done on all procs
-        if not (outputs or inputs) or (not all_procs and self.comm.rank != 0):
-            return {} if return_format == 'dict' else []
+        # # NOTE: calls to _abs_get_val() above are collective calls and must be done on all procs
+        # if not (outputs or inputs) or (not all_procs and self.comm.rank != 0):
+        #     return {} if return_format == 'dict' else []
 
         # remove metadata we don't want to show/return
         to_remove = ['discrete']
@@ -4282,7 +4287,7 @@ class System(object, metaclass=SystemMetaclass):
         var_dict = {}
 
         var_list = self._get_vars_exec_order(inputs=True, outputs=True,
-                                             variables=variables, local=True)
+                                             variables=variables, local=local)
         for var_name in var_list:
             if var_name in outputs:
                 var_dict[var_name] = outputs[var_name]
@@ -4291,9 +4296,13 @@ class System(object, metaclass=SystemMetaclass):
                 var_dict[var_name] = inputs[var_name]
                 var_dict[var_name]['io'] = 'input'
 
-        if all_procs or self.comm.rank == 0:
-            write_var_table(self.pathname, var_list, 'all', var_dict,
-                            True, print_arrays, out_stream)
+        if not (all_procs or self.comm.rank == 0):
+            out_stream = None
+        write_var_table(self.pathname, var_list, 'all', var_dict,
+                        True, print_arrays, out_stream)
+
+        if not (outputs or inputs) or (not all_procs and self.comm.rank != 0):
+            return {} if return_format == 'dict' else []
 
         return var_dict if return_format == 'dict' else list(var_dict.items())
 
@@ -4419,10 +4428,6 @@ class System(object, metaclass=SystemMetaclass):
                     if print_max:
                         meta['max'] = np.round(np.max(meta['val']), np_precision)
 
-        # NOTE: calls to _abs_get_val() above are collective calls and must be done on all procs
-        if not inputs or (not all_procs and self.comm.rank != 0):
-            return {} if return_format == 'dict' else []
-
         to_remove = ['discrete']
         if not print_tags:
             to_remove.append('tags')
@@ -4435,9 +4440,12 @@ class System(object, metaclass=SystemMetaclass):
                 except KeyError:
                     pass
 
-        if out_stream:
-            self._write_table('input', inputs, hierarchical, print_arrays, all_procs,
-                              out_stream)
+        if not (all_procs or self.comm.rank == 0):
+            out_stream = None
+        self._write_table('input', inputs, hierarchical, print_arrays, all_procs, out_stream)
+
+        if not inputs or (not all_procs and self.comm.rank != 0):
+            return {} if return_format == 'dict' else []
 
         if self.pathname:
             # convert to relative names
@@ -4611,10 +4619,6 @@ class System(object, metaclass=SystemMetaclass):
             for name in to_remove:
                 del outputs[name]
 
-        # NOTE: calls to _abs_get_val() above are collective calls and must be done on all procs
-        if not outputs or (not all_procs and self.comm.rank != 0):
-            return {} if return_format == 'dict' else []
-
         # remove metadata we don't want to show/return
         to_remove = ['discrete']
         if not print_tags:
@@ -4629,13 +4633,14 @@ class System(object, metaclass=SystemMetaclass):
                     pass
 
         rel_idx = len(self.pathname) + 1 if self.pathname else 0
+        if not (all_procs or self.comm.rank == 0):
+            out_stream = None
 
         states = set(self._list_states())
         if explicit:
             expl_outputs = {n: m for n, m in outputs.items() if n not in states}
-            if out_stream:
-                self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
-                                  all_procs, out_stream)
+            self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
+                              all_procs, out_stream)
 
             if self.name:  # convert to relative name
                 expl_outputs = [(n[rel_idx:], meta) for n, meta in expl_outputs.items()]
@@ -4654,13 +4659,17 @@ class System(object, metaclass=SystemMetaclass):
                             impl_outputs[n] = m
             else:
                 impl_outputs = {n: m for n, m in outputs.items() if n in states}
-            if out_stream:
-                self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
-                                  all_procs, out_stream)
+            if not (all_procs or self.comm.rank == 0):
+                out_stream = None
+            self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
+                              all_procs, out_stream)
             if self.name:  # convert to relative name
                 impl_outputs = [(n[rel_idx:], meta) for n, meta in impl_outputs.items()]
             else:
                 impl_outputs = list(impl_outputs.items())
+
+        if not outputs or (not all_procs and self.comm.rank != 0):
+            return {} if return_format == 'dict' else []
 
         if explicit and implicit:
             outputs = expl_outputs + impl_outputs
@@ -4697,9 +4706,6 @@ class System(object, metaclass=SystemMetaclass):
             Where to send human readable output.
             Set to None to suppress.
         """
-        if out_stream is None:
-            return
-
         if self._outputs is None:
             var_list = var_data.keys()
         else:
@@ -4707,9 +4713,8 @@ class System(object, metaclass=SystemMetaclass):
             outputs = not inputs
             var_list = self._get_vars_exec_order(inputs=inputs, outputs=outputs, variables=var_data)
 
-        if all_procs or self.comm.rank == 0:
-            write_var_table(self.pathname, var_list, var_type, var_data,
-                            hierarchical, print_arrays, out_stream)
+        write_var_table(self.pathname, var_list, var_type, var_data,
+                        hierarchical, print_arrays, out_stream)
 
     def _get_vars_exec_order(self, inputs=False, outputs=False, variables=None, local=False):
         """

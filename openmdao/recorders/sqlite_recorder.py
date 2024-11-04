@@ -370,6 +370,11 @@ class SqliteRecorder(CaseRecorder):
                 else:
                     objectives[name] = data
 
+        # _get_vars_exec_order makes a collective MPI call so need to call in all procs
+        inputs = list(system.abs_name_iter('input', local=False, discrete=True))
+        outputs = list(system.abs_name_iter('output', local=False, discrete=True))
+        var_order = system._get_vars_exec_order(inputs=True, outputs=True, local=False)
+
         if self.connection:
 
             if driver is not None:
@@ -377,11 +382,6 @@ class SqliteRecorder(CaseRecorder):
                 responses = driver._responses
                 constraints = driver._cons
                 objectives = driver._objs
-
-            inputs = list(system.abs_name_iter('input', local=False, discrete=True))
-            outputs = list(system.abs_name_iter('output', local=False, discrete=True))
-
-            var_order = system._get_vars_exec_order(inputs=True, outputs=True, local=False)
 
             # merge current abs2prom and prom2abs with this system's version
             self._abs2prom['input'].update(system._var_allprocs_abs2prom['input'])

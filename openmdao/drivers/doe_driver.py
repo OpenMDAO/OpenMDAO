@@ -111,8 +111,8 @@ class DOEDriver(Driver):
             procs_per_model = self.options['procs_per_model']
 
             full_size = comm.size
-            nchunks = full_size // procs_per_model
-            if full_size != nchunks * procs_per_model:
+            ncolors = full_size // procs_per_model
+            if full_size != ncolors * procs_per_model:
                 raise RuntimeError("The total number of processors is not evenly divisible by the "
                                    "specified number of processors per model.\n Provide a "
                                    "number of processors that is a multiple of %d, or "
@@ -126,16 +126,17 @@ class DOEDriver(Driver):
             # order as the full comm, which is necessary for the coloring to work properly.
             # In the docs, setting key=rank on the Split call is supposed to do this, but
             # it doesn't seem to work.  Otherwise we could just do
-            # comm.Split(comm.rank%nchunks, key=comm.rank).
+            # comm.Split(comm.rank%ncolors, key=comm.rank).
             colors = np.empty(full_size, dtype=int)
-            for i in range(nchunks):
+            for i in range(ncolors):
                 offset = procs_per_model * i
                 colors[offset:offset + procs_per_model] = i
 
-            color = colors[comm.rank]
+            self._color = colors[comm.rank]
 
-            # return comm.Split(comm.rank%nchunks, key=comm.rank)  # doesn't work
-            return comm.Split(color)
+            # return comm.Split(comm.rank%ncolors, key=comm.rank)  # doesn't work
+            self.comm = comm.Split(self._color)
+            return self.comm
 
     def _set_name(self):
         """
@@ -270,12 +271,11 @@ class DOEDriver(Driver):
         list
             list of name, value tuples for the design variables.
         """
-        size = self._problem_comm.size // self.options['procs_per_model']
+        ncolors = self._problem_comm.size // self.options['procs_per_model']
         color = self._color
 
-        generator = self.options['generator']
-        for i, case in enumerate(generator(design_vars, model)):
-            if i % size == color:
+        for i, case in enumerate(self.options['generator'](design_vars, model)):
+            if i % ncolors == color:
                 yield case
 
     def _setup_recording(self):
@@ -293,8 +293,7 @@ class DOEDriver(Driver):
                     if procs_per_model == 1:
                         recorder.record_on_process = True
                     else:
-                        size = self._problem_comm.size // procs_per_model
-                        if self._problem_comm.rank < size:
+                        if self.comm.rank == 0:
                             recorder.record_on_process = True
 
                 elif self._problem_comm.rank == 0:
