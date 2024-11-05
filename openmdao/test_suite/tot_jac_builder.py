@@ -200,25 +200,23 @@ class SparsityComp(om.ExplicitComponent):
 
     Attributes
     ----------
-    sparsity : coo_matrix
-        Dense version of the sparsity structure.
+    sparsity : coo_matrix or ndarray
+        Dense or sparse version of the sparsity structure.
     """
     def __init__(self, sparsity, **kwargs):
         super(SparsityComp, self).__init__(**kwargs)
-        self.sparsity = sparsity
+        if isinstance(sparsity, np.ndarray):
+            self.sparsity = coo_matrix(sparsity)
+        else:
+            self.sparsity = sparsity.tocoo()
+
+        self.sparsity.data = np.arange(1, self.sparsity.data.size + 1)
 
     def setup(self):
         self.add_input('x', shape=self.sparsity.shape[1])
         self.add_output('y', shape=self.sparsity.shape[0])
 
-        if isinstance(self.sparsity, np.ndarray):
-            self.sparsity = coo_matrix(self.sparsity)
-        else:
-            self.sparsity = self.sparsity.tocoo()
-
-        sparsity = self.sparsity
-        sparsity.data = np.arange(sparsity.data.size) + 1.
-        self.declare_partials('y', 'x', rows=sparsity.row, cols=sparsity.col)
+        self.declare_partials('y', 'x', rows=self.sparsity.row, cols=self.sparsity.col)
 
     def compute(self, inputs, outputs):
         outputs['y'] = self.sparsity.dot(inputs['x'])
