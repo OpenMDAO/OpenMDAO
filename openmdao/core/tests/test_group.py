@@ -3161,6 +3161,109 @@ class TestGroupAddInput(unittest.TestCase):
            "promoted input 'x' with conflicting values for 'val'. Call <group>.set_input_defaults('x', val=?), "
            "where <group> is the model to remove the ambiguity.")
 
+    def test_set_input_defaults_discrete(self):
+        import math
+        import openmdao.api as om
+
+        density = {
+            'steel': 7.85,  # g/cm^3
+            'aluminum': 2.7  # g/cm^3
+        }
+
+        class SquarePlate(om.ExplicitComponent):
+            """
+            Calculate the weight of a square plate.
+
+            material is a discrete input (default: steel)
+            """
+
+            def setup(self):
+                self.add_discrete_input('material', 'steel')
+
+                self.add_input('length', 1.0, units='cm')
+                self.add_input('width', 1.0, units='cm')
+                self.add_input('thickness', 1.0, units='cm')
+
+                self.add_output('weight', 1.0, units='g')
+
+            def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+                length = inputs['length']
+                width = inputs['width']
+                thickness = inputs['thickness']
+                material = discrete_inputs['material']
+
+                outputs['weight'] = length * width * thickness * density[material]
+
+        class CirclePlate(om.ExplicitComponent):
+            """
+            Calculate the weight of a circular plate.
+
+            material is a discrete input (default: aluminum)
+            """
+
+            def setup(self):
+                self.add_discrete_input('material', 'aluminum')
+
+                self.add_input('radius', 1.0, units='cm')
+                self.add_input('thickness', 1.0, units='g')
+
+                self.add_output('weight', 1.0, units='g')
+
+            def compute(self, inputs, outputs, discrete_inputs, discrete_output):
+                radius = inputs['radius']
+                thickness = inputs['thickness']
+                material = discrete_inputs['material']
+
+                outputs['weight'] =  math.pi * radius**2 * thickness * density[material]
+
+        #
+        # first check that we get errors when using invalid args to set defaults on a discrete
+        #
+        p = om.Problem()
+        model = p.model
+
+        model.add_subsystem('square', SquarePlate(), promotes_inputs=['material'])
+        model.add_subsystem('circle', CirclePlate(), promotes_inputs=['material'])
+
+        # setting input defaults for units/src_shape is not valid for a discrete and will generate errors
+        model.set_input_defaults('material', 'steel', units='kg', src_shape=(1,))
+        expect_errors = [
+            f"Collected errors for problem '{p._get_inst_id()}':",
+            "   <model> <class Group>: Cannot set 'units=kg' for discrete variable 'circle.material'.",
+            "   <model> <class Group>: Cannot set 'src_shape=(1,)' for discrete variable 'circle.material'.",
+            "   <model> <class Group>: Cannot set 'units=kg' for discrete variable 'square.material'.",
+            "   <model> <class Group>: Cannot set 'src_shape=(1,)' for discrete variable 'square.material'.",
+        ]
+
+        with self.assertRaises(Exception) as cm:
+            p.setup()
+
+        err_msgs = cm.exception.args[0].split('\n')
+        for err_msg in expect_errors:
+            self.assertTrue(err_msg in err_msgs,
+                            err_msg + ' not found in:\n' + cm.exception.args[0])
+
+        #
+        # now make sure that setting just the default value for a discrete works as expected
+        #
+        p = om.Problem()
+        model = p.model
+
+        model.add_subsystem('square', SquarePlate(), promotes_inputs=['material'])
+        model.add_subsystem('circle', CirclePlate(), promotes_inputs=['material'])
+
+        model.set_input_defaults('material', 'steel')
+
+        p.setup()
+        p.run_model()
+
+        inputs = model.list_inputs(return_format='dict', out_stream=None)
+        self.assertEqual(inputs['square.material']['val'], 'steel')
+        self.assertEqual(inputs['circle.material']['val'], 'steel')
+
+        assert_near_equal(p['square.weight'], 7.85)
+        assert_near_equal(p['circle.weight'], 24.66150233, 1e-6)
+
 
 class MultComp(om.ExplicitComponent):
     """
