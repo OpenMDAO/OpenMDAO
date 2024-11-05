@@ -502,15 +502,17 @@ class Solver(object, metaclass=SolverMetaclass):
         vec_name = 'nonlinear' if isinstance(self, NonlinearSolver) else 'linear'
         filt = self._filtered_vars_to_record
         parallel = self._rec_mgr._check_parallel() if system.comm.size > 1 else False
+        do_gather = self._rec_mgr._check_gather()
+        local = parallel and not do_gather
 
         if self.recording_options['record_outputs']:
-            data['output'] = system._retrieve_data_of_kind(filt, 'output', vec_name, parallel)
+            data['output'] = system._retrieve_data_of_kind(filt, 'output', vec_name, local)
 
         if self.recording_options['record_inputs']:
-            data['input'] = system._retrieve_data_of_kind(filt, 'input', vec_name, parallel)
+            data['input'] = system._retrieve_data_of_kind(filt, 'input', vec_name, local)
 
         if self.recording_options['record_solver_residuals']:
-            data['residual'] = system._retrieve_data_of_kind(filt, 'residual', vec_name, parallel)
+            data['residual'] = system._retrieve_data_of_kind(filt, 'residual', vec_name, local)
 
         self._rec_mgr.record_iteration(self, data, metadata)
 

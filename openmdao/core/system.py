@@ -4972,6 +4972,8 @@ class System(object, metaclass=SystemMetaclass):
 
         if self._rec_mgr._recorders:
             parallel = self._rec_mgr._check_parallel() if self.comm.size > 1 else False
+            do_gather = self._rec_mgr._check_gather()
+            local = parallel and not do_gather
             options = self.recording_options
             metadata = create_local_meta(self.pathname)
 
@@ -5001,13 +5003,13 @@ class System(object, metaclass=SystemMetaclass):
 
             data = {'input': {}, 'output': {}, 'residual': {}}
             if options['record_inputs'] and (inputs._names or len(discrete_inputs) > 0):
-                data['input'] = self._retrieve_data_of_kind(filt, 'input', vec_name, parallel)
+                data['input'] = self._retrieve_data_of_kind(filt, 'input', vec_name, local)
 
             if options['record_outputs'] and (outputs._names or len(discrete_outputs) > 0):
-                data['output'] = self._retrieve_data_of_kind(filt, 'output', vec_name, parallel)
+                data['output'] = self._retrieve_data_of_kind(filt, 'output', vec_name, local)
 
             if options['record_residuals'] and residuals._names:
-                data['residual'] = self._retrieve_data_of_kind(filt, 'residual', vec_name, parallel)
+                data['residual'] = self._retrieve_data_of_kind(filt, 'residual', vec_name, local)
 
             self._rec_mgr.record_iteration(self, data, metadata)
 
@@ -5884,7 +5886,7 @@ class System(object, metaclass=SystemMetaclass):
 
         return val
 
-    def _retrieve_data_of_kind(self, filtered_vars, kind, vec_name, parallel=False):
+    def _retrieve_data_of_kind(self, filtered_vars, kind, vec_name, local=False):
         """
         Retrieve variables, either local or remote, in the filtered_vars list.
 
@@ -5896,8 +5898,8 @@ class System(object, metaclass=SystemMetaclass):
             Either 'input', 'output', or 'residual'.
         vec_name : str
             Either 'nonlinear' or 'linear'.
-        parallel : bool
-            If True, recorders are parallel, so only local values should be saved in each proc.
+        local : bool
+            If True, only local values should be saved in each proc.
 
         Returns
         -------
@@ -5939,7 +5941,7 @@ class System(object, metaclass=SystemMetaclass):
                         else:
                             ivc_path = conns[prom2abs_in[name][0]]
                             vdict[ivc_path] = srcget(ivc_path, False)
-            elif parallel:
+            elif local:
                 get = self._abs_get_val
                 vdict = {}
                 if discrete_vec:
@@ -5961,18 +5963,7 @@ class System(object, metaclass=SystemMetaclass):
                             vdict[name] = get(ivc_path, get_remote=True, rank=0,
                                               vec_name=vec_name, kind='output')
             else:
-                # io = 'input' if kind == 'input' else 'output'
-                # meta = self._var_allprocs_abs2meta[io]
                 for name in variables:
-                    # if self._owning_rank[name] == 0 and not meta[name]['distributed']:
-                    #     # if using a serial recorder and rank 0 owns the variable,
-                    #     # use local value on rank 0 and do nothing on other ranks.
-                    #     if rank == 0:
-                    #         if vec._contains_abs(name):
-                    #             vdict[name] = vec._abs_get_val(name, flat=False)
-                    #         elif name[offset:] in discrete_vec:
-                    #             vdict[name] = discrete_vec[name[offset:]]['val']
-                    # else:
                     vdict[name] = self.get_val(name, get_remote=True, rank=0,
                                                vec_name=vec_name, kind=kind, from_src=False)
 
