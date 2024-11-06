@@ -2768,6 +2768,9 @@ def _compute_total_coloring_context(problem, coloring_info):
     """
     problem._metadata['coloring_randgen'] = np.random.default_rng(41)  # set seed for consistency
     problem._computing_coloring = True
+    saved_rand_subjacs = problem._metadata['randomize_subjacs']
+    saved_rand_seeds = problem._metadata['randomize_seeds']
+
     if coloring_info is not None:
         problem._metadata['randomize_subjacs'] = coloring_info.randomize_subjacs
         problem._metadata['randomize_seeds'] = coloring_info.randomize_seeds
@@ -2777,8 +2780,8 @@ def _compute_total_coloring_context(problem, coloring_info):
     finally:
         problem._metadata['coloring_randgen'] = None
         problem._computing_coloring = False
-        problem._metadata['randomize_subjacs'] = True
-        problem._metadata['randomize_seeds'] = False
+        problem._metadata['randomize_subjacs'] = saved_rand_subjacs
+        problem._metadata['randomize_seeds'] = saved_rand_seeds
 
 
 def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
@@ -3509,6 +3512,7 @@ class _ColSparsityJac(object):
         self._col_list = [None] * ncols
         self._ncols = ncols
         self._nrows = nrows
+        self._randgen = None
 
     def set_col(self, system, i, column):
         # record only the nonzero part of the column.

@@ -335,10 +335,10 @@ class AssembledJacobian(Jacobian):
 
         if self._randgen and system._problem_meta['randomize_subjacs']:
             for key in iters:
-                int_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['val'], key))
+                int_mtx._update_submat(key, self._rand_subjac(key))
 
             for key in iters_in_ext:
-                ext_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['val'], key))
+                ext_mtx._update_submat(key, self._rand_subjac(key))
         else:
 
             for key in iters:

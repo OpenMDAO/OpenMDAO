@@ -13,9 +13,11 @@ from io import StringIO
 from numpy.testing import assert_almost_equal
 from scipy.sparse import coo_matrix
 try:
-    from scipy.sparse import load_npz
+    from scipy.sparse import load_npz, coo_matrix
+    from scipy.io import mmread
 except ImportError:
     load_npz = None
+    mmread = None
 
 import openmdao.api as om
 from openmdao.core.problem import _clear_problem_names
@@ -24,7 +26,7 @@ from openmdao.utils.array_utils import array_viz
 from openmdao.utils.coloring import _compute_coloring, compute_total_coloring, Coloring
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.testing_utils import use_tempdirs, set_env_vars
-from openmdao.test_suite.tot_jac_builder import TotJacBuilder, check_sparsity_tot_coloring
+from openmdao.test_suite.tot_jac_builder import TotJacBuilder, check_sparsity_tot_coloring, loadmat
 from openmdao.utils.general_utils import run_driver, printoptions
 from openmdao.utils.assert_utils import assert_check_totals
 
@@ -1181,22 +1183,17 @@ class BidirectionalTestCase(unittest.TestCase):
             self.assertEqual(tot_colors, 4)
 
     @parameterized.expand(itertools.product(
-        [('n4c6-b15', 3), ('can_715', 35), ('lp_finnis', 14), ('ash608', 6), ('ash331', 6),
-         ('D_6', 27), ('Harvard500', 32), ('illc1033', 5)],
+        [('n4c6-b15.npz', 3), ('can_715.npz', 35), ('lp_finnis.npz', 14), ('ash608.npz', 6),
+         ('ash331.npz', 6), ('D_6.npz', 27), ('Harvard500.npz', 32), ('illc1033.npz', 5)],
         ), name_func=_test_func_name
     )
-    @unittest.skipIf(load_npz is None, "scipy version too old")
+    @unittest.skipIf(load_npz is None or mmread is None, "scipy version too old")
     def test_bidir_coloring(self, tup):
         matname, expected_colors = tup
         matdir = os.path.join(os.path.dirname(openmdao.test_suite.__file__), 'matrices')
         mode = 'auto'
 
-        # uses matrices from the sparse matrix collection website (sparse.tamu.edu)
-        matfile = os.path.join(matdir, matname + '.npz')
-        if not os.path.exists(matfile):
-            raise unittest.SkipTest("Matrix test file were not included.")
-
-        mat = load_npz(matfile).tocoo()
+        mat = loadmat(os.path.join(matdir, matname))
         mat.data = np.asarray(mat.data, dtype=bool)
 
         check_sparsity_tot_coloring(mat, direct=True, mode=mode)
