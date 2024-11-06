@@ -335,7 +335,7 @@ class OptionsDictionary(object):
             self._context_cache[option].append(self[option])
             self[option] = val
         yield
-        for option, val in kwargs.items():
+        for option in kwargs:
             self[option] = self._context_cache[option].pop()
             if len(self._context_cache[option]) == 0:
                 self._context_cache.pop(option)
@@ -548,9 +548,14 @@ class OptionsDictionary(object):
         else:
             self._raise(f"Option '{name}' is required but has not been set.")
 
-    def items(self):
+    def items(self, recordable_only=False):
         """
         Yield name and value of options.
+
+        Parameters
+        ----------
+        recordable_only : bool
+            If True, return only recordable options.
 
         Yields
         ------
@@ -560,10 +565,11 @@ class OptionsDictionary(object):
             Value of the option.
         """
         for key, val in self._dict.items():
-            try:
-                yield key, val['val']
-            except KeyError:
-                yield key, val['value']
+            if not recordable_only or val['recordable']:
+                try:
+                    yield key, val['val']
+                except KeyError:
+                    yield key, val['value']
 
     def _handle_deprecation(self, name, meta):
         """

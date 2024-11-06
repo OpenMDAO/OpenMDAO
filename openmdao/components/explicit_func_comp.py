@@ -6,9 +6,10 @@ import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 import openmdao.func_api as omf
-from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore, _add_options, \
-    jac_forward, jac_reverse, _get_tangents
+from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore, \
+    jac_forward, jac_reverse, _get_tangents, _ensure_iter
 from openmdao.utils.array_utils import shape_to_len
+from openmdao.utils.om_warnings import issue_warning
 
 try:
     import jax
@@ -69,9 +70,9 @@ class ExplicitFuncComp(ExplicitComponent):
             self._compute._setup()
 
         if self._compute._use_jax:
-            self.options['use_jax'] = True
+            self.options['derivs_method'] = 'jax'
 
-        if self.options['use_jax']:
+        if self.options['derivs_method'] == 'jax':
             if jax is None:
                 raise RuntimeError(f"{self.msginfo}: jax is not installed. "
                                    "Try 'pip install openmdao[jax]' with Python>=3.8.")
@@ -81,27 +82,21 @@ class ExplicitFuncComp(ExplicitComponent):
         self._tangent_direction = None
 
         self._compute_partials = compute_partials
-        if self.options['use_jax'] and self.options['use_jit']:
+        if self.options['derivs_method'] == 'jax' and self.options['use_jit']:
             static_argnums = [i for i, m in enumerate(self._compute._inputs.values())
                               if 'is_option' in m]
             try:
                 self._compute_jax = jit(self._compute_jax, static_argnums=static_argnums)
             except Exception as err:
-                raise RuntimeError(f"{self.msginfo}: failed jit compile of compute function: {err}")
-
-    def _declare_options(self):
-        """
-        Declare options before kwargs are processed in the init method.
-        """
-        super()._declare_options()
-        _add_options(self)
+                issue_warning(f"{self.msginfo}: failed jit compile of compute function: {err}. "
+                              "Falling back to using non-jitted function.")
 
     def setup(self):
         """
         Define out inputs and outputs.
         """
         optignore = {'is_option'}
-        use_jax = self.options['use_jax'] and jax is not None
+        use_jax = self.options['derivs_method'] == 'jax' and jax is not None
 
         for name, meta in self._compute.get_input_meta():
             _check_var_name(self, name)
@@ -124,6 +119,11 @@ class ExplicitFuncComp(ExplicitComponent):
                 self._dev_arrays_to_np_arrays(kwargs)
             self.add_output(name, **kwargs)
 
+    def _setup_jax(self, from_group=False):
+        # TODO: this is here to prevent the ExplicitComponent base class from trying to do its
+        # own jax setup if derivs_method is 'jax'. We should probably refactor this...
+        pass
+
     def _dev_arrays_to_np_arrays(self, meta):
         if 'val' in meta:
             if isinstance(meta['val'], JaxArray):
@@ -140,7 +140,7 @@ class ExplicitFuncComp(ExplicitComponent):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        if self.options['use_jax']:
+        if self.options['derivs_method'] == 'jax':
             if self._mode != self._tangent_direction:
                 # force recomputation of coloring and tangents
                 self._first_call_to_linearize = True
@@ -250,7 +250,7 @@ class ExplicitFuncComp(ExplicitComponent):
         outputs : Vector
             Unscaled, dimensional output variables.
         """
-        outputs.set_vals(self._compute(*self._func_values(inputs)))
+        outputs.set_vals(_ensure_iter(self._compute(*self._func_values(inputs))))
 
     def _setup_partials(self):
         """
