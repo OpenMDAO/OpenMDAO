@@ -28,6 +28,7 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
 from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import \
     MultipointBeamGroup
+from openmdao.test_suite.groups.parallel_groups import FanInGrouped
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_equal_numstrings
 from openmdao.utils.general_utils import set_pyoptsparse_opt, determine_adder_scaler, printoptions
 from openmdao.utils.general_utils import remove_whitespace
@@ -4663,6 +4664,69 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         prob.load_case(seventh_slsqp_iteration_case)
 
         assert_model_matches_case(seventh_slsqp_iteration_case, prob.model)
+
+
+@use_tempdirs
+class TestCaseReaderMPI4(unittest.TestCase):
+
+    N_PROCS = 4
+
+    def test_prom_input(self):
+
+        # run cases in parallel with 2 procs per model
+        # (cases will be split between the 2 parallel model instances)
+        run_parallel = True
+        procs_per_model = 2
+
+        prob = om.Problem(FanInGrouped())
+        model = prob.model
+
+        model.add_design_var('x1', lower=0.0, upper=1.0)
+
+        model.add_objective('c3.y')
+
+        samples = [
+            [('x1', 0.)],
+            [('x1', .1)],
+            [('x1', .2)],
+            [('x1', 0.3)],
+            [('x1', 0.4)],
+            [('x1', 0.5)],
+            [('x1', 0.6)],
+            [('x1', 0.7)],
+            [('x1', 0.8)],
+            [('x1', 0.9)],
+        ]
+
+        prob.driver = om.DOEDriver(samples)
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+        prob.driver.recording_options['includes'].append('x1')
+        prob.driver.recording_options['includes'].append('x2')
+
+        prob.driver.options['run_parallel'] = run_parallel
+        prob.driver.options['procs_per_model'] = procs_per_model
+
+        prob.setup()
+        prob.final_setup()
+
+        prob.run_driver()
+        prob.cleanup()
+
+        expected_outputs = ['x1', 'c3.y']
+        expected_inputs = ['x2']
+
+        if prob.comm.rank == 0:
+            rec_file = prob.get_outputs_dir() / f'cases.sql_{prob.comm.rank}'
+            cr = om.CaseReader(rec_file)
+
+            cases = cr.list_cases('driver')
+            for caseid in cases:
+                case = cr.get_case(caseid)
+                for out in expected_outputs:
+                    self.assertIn(out, case.outputs)
+                for inp in expected_inputs:
+                    self.assertIn(inp, case.inputs)
+                print(case.outputs, case.inputs)
 
 
 if __name__ == "__main__":
