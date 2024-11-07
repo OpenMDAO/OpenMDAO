@@ -528,36 +528,28 @@ class TestAnalysisDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        # expected = [
-        #     {'p1.x': np.array([0.]), 'p2.y': np.array([0., 0.])},
-        #     {'p1.x': np.array([1., 0.]), 'p2.y': np.array([0., 0.])},
-        #     {'p1.x': np.array([0., 1.]), 'p2.y': np.array([0., 0.])},
-        #     {'p1.x': np.array([1., 1.]), 'p2.y': np.array([0., 0.])},
-        #     {'p1.x': np.array([0., 0.]), 'p2.y': np.array([1., 0.])},
-        #     {'p1.x': np.array([1., 0.]), 'p2.y': np.array([1., 0.])},
-        #     {'p1.x': np.array([0., 1.]), 'p2.y': np.array([1., 0.])},
-        #     {'p1.x': np.array([1., 1.]), 'p2.y': np.array([1., 0.])},
-        #     {'p1.x': np.array([0., 0.]), 'p2.y': np.array([0., 1.])},
-        #     {'p1.x': np.array([1., 0.]), 'p2.y': np.array([0., 1.])},
-        #     {'p1.x': np.array([0., 1.]), 'p2.y': np.array([0., 1.])},
-        #     {'p1.x': np.array([1., 1.]), 'p2.y': np.array([0., 1.])},
-        #     {'p1.x': np.array([0., 0.]), 'p2.y': np.array([1., 1.])},
-        #     {'p1.x': np.array([1., 0.]), 'p2.y': np.array([1., 1.])},
-        #     {'p1.x': np.array([0., 1.]), 'p2.y': np.array([1., 1.])},
-        #     {'p1.x': np.array([1., 1.]), 'p2.y': np.array([1., 1.])},
-        # ]
+        expected = [
+            {'x': np.array([0.0]), 'y': np.array([0.0])},
+            {'x': np.array([0.0]), 'y': np.array([0.5])},
+            {'x': np.array([0.0]), 'y': np.array([1.0])},
+            {'x': np.array([0.5]), 'y': np.array([0.0])},
+            {'x': np.array([0.5]), 'y': np.array([0.5])},
+            {'x': np.array([0.5]), 'y': np.array([1.0])},
+            {'x': np.array([1.0]), 'y': np.array([0.0])},
+            {'x': np.array([1.0]), 'y': np.array([0.5])},
+            {'x': np.array([1.0]), 'y': np.array([1.0])},
+        ]
 
-        # cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
-        # cases = cr.list_cases('driver', out_stream=None)
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
+        cases = cr.list_cases('driver', out_stream=None)
 
-        # self.assertEqual(len(cases), 16)
+        self.assertEqual(len(cases), len(expected))
 
-        # for case, expected_case in zip(cases, expected):
-        #     outputs = cr.get_case(case).outputs
-        #     self.assertEqual(outputs['p1.x'][0], expected_case['p1.x'][0])
-        #     self.assertEqual(outputs['p2.y'][0], expected_case['p2.y'][0])
-        #     self.assertEqual(outputs['p1.x'][1], expected_case['p1.x'][1])
-        #     self.assertEqual(outputs['p2.y'][1], expected_case['p2.y'][1])
+        for case, expected_case in zip(cases, expected):
+            inputs = cr.get_case(case).inputs
+            self.assertEqual(inputs['x'][0], expected_case['x'][0])
+            self.assertEqual(inputs['y'][0], expected_case['y'][0])
+
 
 
 if __name__ == "__main__":

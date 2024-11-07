@@ -343,6 +343,7 @@ class AnalysisDriver(Driver):
         """
         # We don't necessarily know a-priori what variables are in our case generators.
         # Tee the samples and add the variables defined within to be recorded.
+        comm = self._problem_comm
         model = self._problem().model
         rec_includes = self.recording_options['includes']
         implicit_outputs = {meta['prom_name'] for _, meta in
@@ -371,7 +372,7 @@ class AnalysisDriver(Driver):
                         if self._problem_comm.rank < size:
                             recorder.record_on_process = True
 
-                elif self._problem_comm.rank == 0:
+                elif comm is None or comm.rank == 0:
                     # if not running samples in parallel, then just record on proc 0
                     recorder.record_on_process = True
 
