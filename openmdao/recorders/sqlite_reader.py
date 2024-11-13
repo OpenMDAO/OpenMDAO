@@ -329,20 +329,9 @@ class SqliteCaseReader(BaseCaseReader):
                 self._auto_ivc_map = auto_ivc_map = {}
                 abs2prom_in = self._abs2prom['input']
                 for target, src in self._conns.items():
-                    if src.startswith('_auto_ivc.'):
-                        if src not in auto_ivc_map:
-                            auto_ivc_map[src] = []
-                        auto_ivc_map[src].append(target)
-                for output, input_list in auto_ivc_map.items():
-                    if len(input_list) > 1:
-                        for input_name in input_list:
-                            # If this recorder is on a component, we might have only a subset of
-                            # the metadata dictionary, but one of them will be in there.
-                            if input_name in abs2prom_in:
-                                auto_ivc_map[output] = abs2prom_in[input_name]
-                                break
-                    else:
-                        auto_ivc_map[output] = abs2prom_in[input_list[0]]
+                    if src.startswith('_auto_ivc.') and src not in auto_ivc_map:
+                        if target in abs2prom_in:
+                            auto_ivc_map[src] = abs2prom_in[target]
 
         elif version in (1, 2):
             abs2prom = row['abs2prom']
@@ -1406,7 +1395,7 @@ class CaseTable(object):
         str
             The source of the case.
         """
-        table = self._table_name.split('_')[0]  # remove "_iterations" from table name
+        table = self._table_name.partition('_')[0]  # remove "_iterations" from table name
 
         for global_iter in self._global_iterations:
             record_type, row, source = global_iter[1], global_iter[2], global_iter[3]
