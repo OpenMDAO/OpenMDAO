@@ -1704,11 +1704,11 @@ class SolverCases(CaseTable):
         system_solve = source_system.split('.')[-1] + '._solve_nonlinear'
         system_coord_len = iteration_coordinate.index(system_solve) + len(system_solve)
         system_coord_nodes = len(iteration_coordinate[:system_coord_len].split('|')) + 1
-        iter_coord_nodes = len(iteration_coordinate.split('|'))
+        num_coord_nodes = iteration_coordinate.count('|') + 1
 
-        if iter_coord_nodes == system_coord_nodes + 2:
+        if num_coord_nodes == system_coord_nodes + 2:
             return source_system + '.nonlinear_solver'
-        elif iter_coord_nodes == system_coord_nodes + 4:
+        elif num_coord_nodes == system_coord_nodes + 4:
             return source_system + '.nonlinear_solver.linesearch'
         else:
             raise RuntimeError("Can't parse solver iteration coordinate: %s" % iteration_coordinate)
