@@ -2021,7 +2021,7 @@ class System(object, metaclass=SystemMetaclass):
         """
         Set up case recording.
         """
-        if self._rec_mgr._recorders:
+        if self._rec_mgr.has_recorders():
             myinputs = myoutputs = myresiduals = []
 
             options = self.recording_options
@@ -2031,7 +2031,6 @@ class System(object, metaclass=SystemMetaclass):
             # includes and excludes for outputs are specified using promoted names
             # includes and excludes for inputs are specified using _absolute_ names
             abs2prom_output = self._var_allprocs_abs2prom['output']
-            abs2prom_inputs = self._var_allprocs_abs2prom['input']
 
             # set of promoted output names and absolute input and residual names
             # used for matching includes/excludes
@@ -2040,9 +2039,9 @@ class System(object, metaclass=SystemMetaclass):
             # includes and excludes for inputs are specified using _absolute_ names
             # vectors are keyed on absolute name, discretes on relative/promoted name
             if options['record_inputs']:
-                match_names.update(abs2prom_inputs.keys())
-                myinputs = sorted([n for n in abs2prom_inputs
-                                   if check_path(n, incl, excl)])
+                abs2prom_inputs = self._var_allprocs_abs2prom['input']
+                match_names.update(abs2prom_inputs)
+                myinputs = sorted([n for n in abs2prom_inputs if check_path(n, incl, excl)])
 
             # includes and excludes for outputs are specified using _promoted_ names
             # vectors are keyed on absolute name, discretes on relative/promoted name
@@ -2060,7 +2059,7 @@ class System(object, metaclass=SystemMetaclass):
                     myresiduals = myoutputs
 
             elif options['record_residuals']:
-                match_names.update(self._residuals.keys())
+                match_names.update(self._residuals)
                 myresiduals = [n for n in self._residuals._abs_iter()
                                if check_path(abs2prom_output[n], incl, excl)]
 

@@ -370,9 +370,10 @@ class SqliteRecorder(CaseRecorder):
                 else:
                     objectives[name] = data
 
-        # _get_vars_exec_order makes a collective MPI call so need to call in all procs
         inputs = list(system.abs_name_iter('input', local=False, discrete=True))
         outputs = list(system.abs_name_iter('output', local=False, discrete=True))
+
+        # _get_vars_exec_order makes a collective MPI call so need to call in all procs
         var_order = system._get_vars_exec_order(inputs=True, outputs=True, local=False)
 
         if self.connection:

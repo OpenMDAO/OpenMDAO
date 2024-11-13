@@ -355,6 +355,12 @@ class Driver(object, metaclass=DriverMetaclass):
         self.result = DriverResult(self)
         self._has_scaling = False
 
+        self._filtered_vars_to_record = {
+            'input': [],
+            'output': [],
+            'residual': []
+        }
+
     def _get_inst_id(self):
         if self._problem is None:
             return None
@@ -784,8 +790,9 @@ class Driver(object, metaclass=DriverMetaclass):
         """
         Set up case recording.
         """
-        self._filtered_vars_to_record = self._get_vars_to_record()
-        self._rec_mgr.startup(self, self._problem().comm)
+        if self._rec_mgr.has_recorders():
+            self._filtered_vars_to_record = self._get_vars_to_record()
+            self._rec_mgr.startup(self, self._problem().comm)
 
     def _run(self):
         """

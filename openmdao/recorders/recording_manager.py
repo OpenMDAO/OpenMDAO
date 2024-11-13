@@ -8,7 +8,7 @@ from openmdao.utils.om_warnings import issue_warning
 
 class RecordingManager(object):
     """
-    Object that routes function calls to all attached recorders.
+    Object that routes function calls to all recorders that are attached to the same object.
 
     Attributes
     ----------
