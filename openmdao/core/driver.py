@@ -355,12 +355,6 @@ class Driver(object, metaclass=DriverMetaclass):
         self.result = DriverResult(self)
         self._has_scaling = False
 
-        self._filtered_vars_to_record = {
-            'input': [],
-            'output': [],
-            'residual': []
-        }
-
     def _get_inst_id(self):
         if self._problem is None:
             return None
