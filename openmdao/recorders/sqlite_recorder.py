@@ -286,13 +286,13 @@ class SqliteRecorder(CaseRecorder):
         if MPI and comm and comm.size > 1:
             comm.barrier()
 
-    def _cleanup_abs2meta(self):
+    def _make_abs2meta_serializable(self):
         """
         Convert all abs2meta variable properties to a form that can be dumped as JSON.
         """
-        for name in self._abs2meta:
-            for prop in self._abs2meta[name]:
-                self._abs2meta[name][prop] = make_serializable(self._abs2meta[name][prop])
+        for meta in self._abs2meta.values():
+            for prop, val in meta.items():
+                meta[prop] = make_serializable(val)
 
     def _make_var_setting_serializable(self, var_settings):
         """
@@ -453,7 +453,7 @@ class SqliteRecorder(CaseRecorder):
                         meta.update(system._var_allprocs_abs2meta[io][name])
                         break
 
-            self._cleanup_abs2meta()
+            self._make_abs2meta_serializable()
 
             # store the updated abs2prom and prom2abs
             abs2prom = zlib.compress(json.dumps(self._abs2prom).encode('ascii'))
