@@ -235,11 +235,24 @@ class Case(object):
                 return self.outputs[name]
             except KeyError:
                 if name in self._auto_ivc_map:
-                    return self.inputs[self._auto_ivc_map[name]]
-                if self.inputs is not None:
-                    return self.inputs[name]
-        elif self.inputs is not None:
-            return self.inputs[name]
+                    try:
+                        return self.inputs[self._auto_ivc_map[name]]
+                    except KeyError:
+                        pass  # keep original name passed in
+
+            if name in self._prom2abs['input'] and name not in self._abs2prom['input']:
+                absin = self._prom2abs['input'][name][0]
+                absout = self._conns[absin]
+                try:
+                    return self.outputs[self._abs2prom['output'][absout]]
+                except KeyError:
+                    pass
+
+        if self.inputs is not None:
+            try:
+                return self.inputs[name]
+            except KeyError:
+                pass
 
         raise KeyError('Variable name "%s" not found.' % name)
 
@@ -305,21 +318,15 @@ class Case(object):
         if name in meta:
             return meta[name]['units']
 
-        proms = self._prom2abs
+        prom2abs = self._prom2abs
 
-        if name in proms['output']:
-            abs_name = proms['output'][name][0]
+        if name in prom2abs['output']:
+            abs_name = prom2abs['output'][name][0]
             return meta[abs_name]['units']
 
-        elif name in proms['input']:
-            if len(proms['input'][name]) > 1:
-                # The promoted name maps to multiple absolute names, require absolute name.
-                msg = "Can't get units for the promoted name '%s' because it refers to " + \
-                      "multiple inputs: %s. Access the units using an absolute path name."
-                raise RuntimeError(msg % (name, str(proms['input'][name])))
-
-            abs_name = proms['input'][name][0]
-            return meta[abs_name]['units']
+        elif name in prom2abs['input']:
+            abs_name = prom2abs['input'][name][0]
+            return meta[self._conns[abs_name]]['units']
 
         raise KeyError('Variable name "{}" not found.'.format(name))
 
@@ -1301,14 +1308,10 @@ class PromAbsDict(dict):
                     in_key = auto_ivc_map[key]
                     super().__setitem__(in_key, self._values[key])
                 elif key in abs2prom:
-                    prom_key = abs2prom[key]
-                    if prom_key in self:
-                        # We already set a value for this promoted name, which means
-                        # it is an input that maps to multiple absolute names. Set the
-                        # value to AMBIGOUS and require access via absolute name.
-                        super().__setitem__(prom_key, _AMBIGOUS_PROM_NAME)
+                    if in_prom2abs is None:  # this is an abs input
+                        super().__setitem__(key, self._values[key])
                     else:
-                        super().__setitem__(prom_key, self._values[key])
+                        super().__setitem__(abs2prom[key], self._values[key])
                 elif DERIV_KEY_SEP in key:
                     # derivative keys will be a string in the form of 'of!wrt'
                     abs_keys, prom_key = self._deriv_keys(key)

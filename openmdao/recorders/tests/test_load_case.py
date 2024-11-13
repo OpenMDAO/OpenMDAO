@@ -85,9 +85,16 @@ class TestLoadCase(unittest.TestCase):
         prob.setup()
 
         expected_warnings = [
-            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'y1', recorded in the case is not found in the model."),
-            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'y2', recorded in the case is not found in the model."),
-            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'z', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'con_cmp1.y1', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'mda.d2.y1', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'obj_cmp.y1', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'con_cmp2.y2', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'mda.d1.y2', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'obj_cmp.y2', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'mda.d1.z', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'mda.d2.z', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'obj_cmp.z', recorded in the case is not found in the model."),
+
             (OpenMDAOWarning, "<model> <class Group>: Output variable, 'z', recorded in the case is not found in the model."),
             (OpenMDAOWarning, "<model> <class Group>: Output variable, 'con1', recorded in the case is not found in the model."),
             (OpenMDAOWarning, "<model> <class Group>: Output variable, 'con2', recorded in the case is not found in the model."),
@@ -236,11 +243,11 @@ class TestLoadCase(unittest.TestCase):
                 super().compute_partials(inputs, outputs)
 
 
-        # Setup the optimization 
-        prob = om.Problem() 
+        # Setup the optimization
+        prob = om.Problem()
         prob.model.add_subsystem(
             'paraboloid', ParaboloidWithDiscreteOutput())
-        prob.driver = om.ScipyOptimizeDriver() 
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
 
         # Setup Recorder

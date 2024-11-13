@@ -729,7 +729,9 @@ class Driver(object, metaclass=DriverMetaclass):
 
         # includes and excludes for outputs are specified using _promoted_ names
         # vectors are keyed on absolute name, discretes on relative/promoted name
-        myinputs = myoutputs = myresiduals = set()
+        myinputs = set()
+        myoutputs = set()
+        myresiduals = set()
 
         if recording_options['record_outputs']:
             match_names.update(abs2prom_output.values())
@@ -751,11 +753,13 @@ class Driver(object, metaclass=DriverMetaclass):
         if 'record_inputs' in recording_options:
             if recording_options['record_inputs']:
                 match_names.update(abs2prom_inputs)
-                match_names.update(model._var_allprocs_prom2abs_list['input'])
                 myinputs = {n for n in abs2prom_inputs if check_path(n, incl, excl)}
-                for p, abs_list in model._var_allprocs_prom2abs_list['input'].items():
+
+                match_names.update(model._var_allprocs_prom2abs_list['input'])
+                for p in model._var_allprocs_prom2abs_list['input']:
                     if check_path(p, incl, excl):
-                        myinputs.update(abs_list)
+                        src = model.get_source(p)
+                        myoutputs.add(src)
 
         # check that all exclude/include globs have at least one matching output or input name
         for pattern in excl:
