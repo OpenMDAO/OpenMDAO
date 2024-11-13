@@ -1473,7 +1473,6 @@ class DriverCases(CaseTable):
                          'driver_iterations', 'iteration_coordinate', giter,
                          prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
                          var_info)
-        self._var_info = var_info
 
     def cases(self, cache=False):
         """
