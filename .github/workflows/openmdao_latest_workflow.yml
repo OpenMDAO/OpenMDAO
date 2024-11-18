@@ -131,6 +131,8 @@ jobs:
         with:
           python-version: ${{ matrix.PY }}
           miniforge-version: latest
+          conda-remove-defaults: true
+          channels: conda-forge
 
       - name: Install MacOS-specific dependencies
         if: matrix.OS == 'macos-13'
