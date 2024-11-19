@@ -254,10 +254,11 @@ if __name__ == '__main__':
 
     class SubGroup(Group):
         def setup(self):
-            create_dyncomps(self, num_comps, 2, 2, 2, var_factory=FloatFactory(vec_size))
-            cname = f"C{num_comps-1}"
-            self.add_objective(f"{cname}.o0")
-            self.add_constraint(f"{cname}.o1", lower=0.0)
+            create_dyncomps(self, num_comps, 2, 2, 2,
+                            var_factory=lambda: np.zeros(vec_size))
+            cname = "C%d"%(num_comps-1)
+            self.add_objective("%s.o0" % cname)
+            self.add_constraint("%s.o1" % cname, lower=0.0)
 
 
     p = Problem()
@@ -273,11 +274,11 @@ if __name__ == '__main__':
 
     par = g.add_subsystem("par", ParallelGroup())
     for pt in range(pts):
-        ptname = f"G{pt}"
+        ptname = "G%d"%pt
         ptg = par.add_subsystem(ptname, SubGroup())
         #create_dyncomps(ptg, num_comps, 2, 2, 2,
                             #var_factory=lambda: np.zeros(vec_size))
-        g.connect("P.x", f"par.{ptname}.C0.i0")
+        g.connect("P.x", "par.%s.C0.i0" % ptname)
 
         #cname = ptname + '.' + "C%d"%(num_comps-1)
         #g.add_objective("par.%s.o0" % cname)
