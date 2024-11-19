@@ -13,7 +13,7 @@ from openmdao.utils.testing_utils import use_tempdirs, require_pyoptsparse
 from openmdao.recorders.view_case_recorder import view_case_recorder
 
 
-# @use_tempdirs
+@use_tempdirs
 class TestViewCaseRecorder(unittest.TestCase):
 
     def setup_sellar_problem(self, problem_recorder_filename=None, driver_recorder_filename=None):
