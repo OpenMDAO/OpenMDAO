@@ -65,7 +65,8 @@ from openmdao.utils.entry_points import _list_installed_setup_parser, _list_inst
 from openmdao.utils.reports_system import _list_reports_setup_parser, _list_reports_cmd, \
     _view_reports_setup_parser, _view_reports_cmd
 from openmdao.visualization.graph_viewer import _graph_setup_parser, _graph_cmd
-from openmdao.recorders.view_case_recorder import _view_case_recorder_setup_parser, _view_case_recorder_cmd
+from openmdao.recorders.view_case_recorder import _view_case_recorder_setup_parser, \
+    _view_case_recorder_cmd
 
 
 def _view_connections_setup_parser(parser):
@@ -612,7 +613,8 @@ _command_map = {
                        'Compute a coloring for the total jacobian.'),
     'trace': (_itrace_setup_parser, _itrace_exec, 'Dump trace output.'),
     'tree': (_tree_setup_parser, _tree_cmd, 'Print the system tree.'),
-    'view_case_recorder': (_view_case_recorder_setup_parser, _view_case_recorder_cmd, 'View a case recorder file.'),
+    'view_case_recorder': (_view_case_recorder_setup_parser, _view_case_recorder_cmd,
+                           'View a case recorder file.'),
     'view_coloring': (_view_coloring_setup_parser, _view_coloring_exec, 'View a colored jacobian.'),
     'view_connections': (_view_connections_setup_parser, _view_connections_cmd,
                          'View connections showing values and source/target units.'),
