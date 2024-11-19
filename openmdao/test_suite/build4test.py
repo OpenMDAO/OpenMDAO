@@ -36,21 +36,22 @@ class DynComp(ExplicitComponent):
     """
     def __init__(self, ninputs, noutputs,
                  nl_sleep=0.001, ln_sleep=0.001,
-                 var_factory=FloatFactory()):
+                 var_factory=float, vf_args=()):
         super().__init__()
 
         self.ninputs = ninputs
         self.noutputs = noutputs
         self.var_factory = var_factory
+        self.vf_args = vf_args
         self.nl_sleep = nl_sleep
         self.ln_sleep = ln_sleep
 
     def setup(self):
         for i in range(self.ninputs):
-            self.add_input(f'i{i}', self.var_factory('input', i))
+            self.add_input(f'i{i}', self.var_factory(*self.vf_args))
 
         for i in range(self.noutputs):
-            self.add_output(f'o{i}', self.var_factory('output', i))
+            self.add_output(f'o{i}', self.var_factory(*self.vf_args))
 
     def compute(self, inputs, outputs):
         time.sleep(self.nl_sleep)
@@ -60,20 +61,6 @@ class DynComp(ExplicitComponent):
         Jacobian for Sellar discipline 1.
         """
         time.sleep(self.ln_sleep)
-
-
-class DynCompFactory(object):
-    def __init__(self, ninputs=10, noutputs=10, nl_sleep=0.001, ln_sleep=0.001,
-                 var_factory=FloatFactory()):
-        self.ninputs = ninputs
-        self.noutputs = noutputs
-        self.var_factory = var_factory
-        self.nl_sleep = nl_sleep
-        self.ln_sleep = ln_sleep
-
-    def __call__(self):
-        return DynComp(self.ninputs, self.noutputs, self.nl_sleep, self.ln_sleep,
-                       self.var_factory)
 
 
 class DynComp2(ExplicitComponent):
@@ -122,8 +109,7 @@ class DynComp2Factory(object):
 
 
 def make_subtree(parent, nsubgroups, levels,
-                 ncomps, ninputs, noutputs, nconns, var_factory=FloatFactory(),
-                 comp_factory=DynCompFactory()):
+                 ncomps, ninputs, noutputs, nconns, var_factory=float):
     """Construct a system subtree under the given parent group."""
 
     if levels <= 0:
@@ -131,28 +117,27 @@ def make_subtree(parent, nsubgroups, levels,
 
     if levels == 1:  # add leaf nodes
         create_dyncomps(parent, ncomps, ninputs, noutputs, nconns,
-                        var_factory=var_factory, comp_factory=comp_factory)
+                        var_factory=var_factory)
     else:  # add more subgroup levels
         for i in range(nsubgroups):
-            g = parent.add_subsystem(f"G{i}", Group())
+            g = parent.add_subsystem("G%d"%i, Group())
             make_subtree(g, nsubgroups, levels-1,
                          ncomps, ninputs, noutputs, nconns,
-                         var_factory=var_factory, comp_factory=comp_factory)
+                         var_factory=var_factory)
 
 
-def create_dyncomps(parent, ncomps, nconns,
-                    var_factory=FloatFactory(), comp_factory=DynCompFactory()):
-    """
-    Create a specified number of comp_factory() components with a specified number
+def create_dyncomps(parent, ncomps, ninputs, noutputs, nconns,
+                    var_factory=float):
+    """Create a specified number of DynComps with a specified number
     of variables (ninputs and noutputs), and add them to the given parent
     and add the number of specified connections.
     """
     for i in range(ncomps):
-        parent.add_subsystem(f"C{i}", comp_factory(var_factory=var_factory))
+        parent.add_subsystem("C%d" % i, DynComp(ninputs, noutputs, var_factory=var_factory))
 
         if i > 0:
             for j in range(nconns):
-                parent.connect(f"C{i-1}.o{j}", f"C{i}.i{j}")
+                parent.connect("C%d.o%d" % (i-1,j), "C%d.i%d" % (i, j))
 
 
 def create_testcomps(ncomps, comp_factory):
@@ -198,10 +183,11 @@ def recursive_split(parent, complist, nsplits, max_levels, level=0, path=None):
             recursive_split(g, subcomps, nsplits, max_levels, level + 1, path + [gname])
 
 
-def build_test_model(ncomps, ninputs, noutputs, splits_per_group, max_levels, var_factory):
+def build_test_model(ncomps, ninputs, noutputs, splits_per_group, max_levels, shape):
     model = Group()
     complist = [[name, None, comp] for name, comp in
-                create_testcomps(ncomps, DynComp2Factory(ninputs, noutputs, 1.1, var_factory))]
+                create_testcomps(ncomps, DynComp2Factory(ninputs, noutputs, 1.1,
+                                                         FloatFactory(shape)))]
     recursive_split(model, complist, splits_per_group, max_levels)
     connect_comps(model, complist, ninputs, noutputs)
     for i in range(ninputs):
