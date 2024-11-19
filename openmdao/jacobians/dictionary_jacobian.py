@@ -6,8 +6,6 @@ from openmdao.jacobians.jacobian import Jacobian
 from openmdao.core.constants import INT_DTYPE
 
 
-# import line_profiler
-
 class DictionaryJacobian(Jacobian):
     """
     No global <Jacobian>; use dictionary of user-supplied sub-Jacobians.
@@ -111,7 +109,6 @@ class DictionaryJacobian(Jacobian):
 
         return self._iter_keys
 
-    # @line_profiler.profile
     def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """
         Compute matrix-vector product.
