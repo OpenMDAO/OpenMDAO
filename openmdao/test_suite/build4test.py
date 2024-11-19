@@ -142,7 +142,7 @@ def create_dyncomps(parent, ncomps, ninputs, noutputs, nconns,
 
 def create_testcomps(ncomps, comp_factory):
     """
-    Yield ncomps instances of the given comp_factory.
+    Yield ncomps instances returned from the given component factory.
     """
     for i in range(ncomps):
         yield f"C{i}", comp_factory()
@@ -159,6 +159,24 @@ def connect_comps(model, complist, ninputs, noutputs):
 
 
 def recursive_split(parent, complist, nsplits, max_levels, level=0, path=None):
+    """
+    Add levels to the system tree while splitting up the current component list.
+
+    Parameters
+    ----------
+    parent : Group
+        The parent group.
+    complist : list
+        List of components to split up.
+    nsplits : int
+        Number of splits to make.
+    max_levels : int
+        Maximum number of levels in the system tree.
+    level : int
+        Current level in the system tree.
+    path : list or None
+        List of names of parents in the system tree.
+    """
     if path is None:
         path = []
 
@@ -184,6 +202,30 @@ def recursive_split(parent, complist, nsplits, max_levels, level=0, path=None):
 
 
 def build_test_model(ncomps, ninputs, noutputs, splits_per_group, max_levels, shape):
+    """
+    Create a test problem that has design vars and responses and can compute derivatives.
+
+    Parameters
+    ----------
+    ncomps : int
+        Number of components in the model.
+    ninputs : int
+        Number of inputs to each component.
+    noutputs : int
+        Number of outputs from each component.
+    splits_per_group : int
+        Each Group has sub-Groups added based on the number of splits of the current list
+        of components.
+    max_levels : int
+        Maximum number of levels in the system tree.
+    shape : tuple
+        Shape of the input and output variables.
+
+    Returns
+    -------
+    Group
+        The model.
+    """
     model = Group()
     complist = [[name, None, comp] for name, comp in
                 create_testcomps(ncomps, DynComp2Factory(ninputs, noutputs, 1.1,
@@ -198,13 +240,6 @@ def build_test_model(ncomps, ninputs, noutputs, splits_per_group, max_levels, sh
         for i in range(1, noutputs):
             model.add_constraint(f"{complist[-1][1]}.o{i}", lower=0.0)
     return model
-
-
-# create all test components
-# recursively split them into groups by nsplit
-# each split group is a subgroup of the parent group
-# must be at least 1 component per group
-# create connections between components (sequentially, from comp i to comp i+1)
 
 
 if __name__ == '__main__':
