@@ -193,7 +193,7 @@ def build_test_model(ncomps, ninputs, noutputs, splits_per_group, max_levels, sh
     for i in range(ninputs):
         model.add_design_var(f"{complist[0][1]}.i{i}")
     if noutputs > 0:
-        model.add_objective(f"{complist[-1][1]}.o0", index=0)
+        model.add_objective(f"{complist[-1][1]}.o0", index=0, flat_indices=True)
     if noutputs > 1:
         for i in range(1, noutputs):
             model.add_constraint(f"{complist[-1][1]}.o{i}", lower=0.0)
