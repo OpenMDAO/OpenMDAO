@@ -180,7 +180,7 @@ def _elide_string(s, max_length):
     return s[:half_length] + '...' + s[-half_length:]
 
 
-def view_case_recorder(case_recorder_file):
+def view_case_recorder(case_recorder_file, show=True):
     """
     View the contents of a case recorder file as a dashboard.
 
@@ -188,6 +188,8 @@ def view_case_recorder(case_recorder_file):
     ----------
     case_recorder_file : str
         The path to the case recorder file to view.
+    show : bool
+        If True, show the dashboard. If False, do not show. Mostly for running tests.
     """
     cr = om.CaseReader(case_recorder_file)
 
@@ -432,29 +434,28 @@ def view_case_recorder(case_recorder_file):
         main_layout=None,
     )
 
-    show = True
-    threaded = False
     port = 0
     home_dir = "."
     assets_dir = pathlib.Path(
         importlib.util.find_spec("openmdao").origin
     ).parent.joinpath("recorders/assets/")
 
-    if port == 0:
-        port = get_free_port()
-    server = pn.serve(
-        template,
-        port=port,
-        address="localhost",
-        websocket_origin=f"localhost:{port}",
-        show=show,
-        threaded=threaded,
-        static_dirs={
-            "home": home_dir,
-            "assets": assets_dir,
-        },
-    )
-    server.stop()
+    if show:
+        if port == 0:
+            port = get_free_port()
+        server = pn.serve(
+            template,
+            port=port,
+            address="localhost",
+            websocket_origin=f"localhost:{port}",
+            show=True,
+            threaded=False,
+            static_dirs={
+                "home": home_dir,
+                "assets": assets_dir,
+            },
+        )
+        server.stop()
 
 
 if __name__ == "__main__":
