@@ -29,9 +29,9 @@ except ImportError:
         return 5000
 
 
-def _view_case_recorder_setup_parser(parser):
+def _view_cases_setup_parser(parser):
     """
-    Set up the subparser for the 'openmdao view_case_recorder' command.
+    Set up the subparser for the 'openmdao view_cases' command.
 
     Parameters
     ----------
@@ -45,9 +45,9 @@ def _view_case_recorder_setup_parser(parser):
     )
 
 
-def _view_case_recorder_cmd(options, user_args):
+def _view_cases_cmd(options, user_args):
     """
-    Run the view_case_recorder command.
+    Run the view_cases command.
 
     Parameters
     ----------
@@ -59,7 +59,7 @@ def _view_case_recorder_cmd(options, user_args):
     if not options.case_recorder_file:
         raise argparse.ArgumentError("case_recorder_file argument missing")
 
-    view_case_recorder(options.case_recorder_file)
+    view_cases(options.case_recorder_file)
 
 
 # boolean value user interface filter elements. Lets user filter based on true, false, or either
@@ -180,7 +180,7 @@ def _elide_string(s, max_length):
     return s[:half_length] + '...' + s[-half_length:]
 
 
-def view_case_recorder(case_recorder_file, show=True):
+def view_cases(case_recorder_file, show=True):
     """
     View the contents of a case recorder file as a dashboard.
 
@@ -460,6 +460,6 @@ def view_case_recorder(case_recorder_file, show=True):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    _view_case_recorder_setup_parser(parser)
+    _view_cases_setup_parser(parser)
     args = parser.parse_args()
-    _view_case_recorder_cmd(args, None)
+    _view_cases_cmd(args, None)

@@ -8,11 +8,16 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
 from openmdao.utils.testing_utils import use_tempdirs, require_pyoptsparse
 
-from openmdao.recorders.view_case_recorder import view_case_recorder
+from openmdao.recorders.view_cases import view_cases
 
+try:
+    import panel
+except ImportError:
+    panel = None
 
 @use_tempdirs
-class TestViewCaseRecorder(unittest.TestCase):
+@unittest.skipUnless(panel, "requires 'panel'")
+class TestViewCases(unittest.TestCase):
 
     def setup_sellar_problem(self, problem_recorder_filename=None, driver_recorder_filename=None):
         prob = om.Problem()
@@ -47,7 +52,7 @@ class TestViewCaseRecorder(unittest.TestCase):
         prob.run_driver()
         
         # just see if it has an exception
-        view_case_recorder(prob.get_outputs_dir() / problem_recorder_filename, show=False)
+        view_cases(prob.get_outputs_dir() / problem_recorder_filename, show=False)
 
     @require_pyoptsparse('SLSQP')
     def test_viewing_driver_case_recorder_file(self):
@@ -57,7 +62,7 @@ class TestViewCaseRecorder(unittest.TestCase):
         prob.run_driver()
         
         # just see if it has an exception
-        view_case_recorder(prob.get_outputs_dir() / driver_recorder_filename, show=False)
+        view_cases(prob.get_outputs_dir() / driver_recorder_filename, show=False)
 
 
 if __name__ == '__main__':
