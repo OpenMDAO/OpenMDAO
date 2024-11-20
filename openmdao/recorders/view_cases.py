@@ -8,10 +8,15 @@ import importlib
 import openmdao.api as om
 from openmdao.utils.om_warnings import CaseRecorderWarning, issue_warning
 
-import pandas as pd
+try:
+    import panel as pn
+except ModuleNotFoundError:
+    pn = None
 
-import panel as pn
-from panel.theme import DefaultTheme
+try:
+    import pandas as pd
+except ModuleNotFoundError:
+    pd = None
 
 try:
     from openmdao.utils.gui_testing_utils import get_free_port
@@ -191,6 +196,22 @@ def view_cases(case_recorder_file, show=True):
     show : bool
         If True, show the dashboard. If False, do not show. Mostly for running tests.
     """
+    if pn is None:
+        raise RuntimeError(
+            "The view_cases function requires the 'panel' package, "
+            "which can be installed with one of the following commands:\n"
+            "    pip install openmdao[visualization]\n"
+            "    pip install panel"
+        )
+
+    if pd is None:
+        raise RuntimeError(
+            "The view_cases function requires the 'pandas' package, "
+            "which can be installed with one of the following commands:\n"
+            "    pip install openmdao[visualization]\n"
+            "    pip install pandas"
+        )
+
     cr = om.CaseReader(case_recorder_file)
 
     tabs_list = []
@@ -429,7 +450,7 @@ def view_cases(case_recorder_file, show=True):
         accent_base_color="black",
         header_background="rgb(0, 212, 169)",
         background_color="white",
-        theme=DefaultTheme,
+        theme=pn.theme.DefaultTheme,
         theme_toggle=False,
         main_layout=None,
     )
