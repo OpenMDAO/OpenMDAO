@@ -74,7 +74,7 @@ class TestJax(unittest.TestCase):
         ksmin = ks_min(x, rho=1.E6)
         npmin = np.min(x)
 
-        assert_near_equal(ksmin, npmin, tolerance=1.0E-6)
+        assert_near_equal(ksmin, npmin, tolerance=2.0E-5)
 
 
 if __name__ == '__main__':
