@@ -276,13 +276,7 @@ if __name__ == '__main__':
     for pt in range(pts):
         ptname = "G%d"%pt
         ptg = par.add_subsystem(ptname, SubGroup())
-        #create_dyncomps(ptg, num_comps, 2, 2, 2,
-                            #var_factory=lambda: np.zeros(vec_size))
         g.connect("P.x", "par.%s.C0.i0" % ptname)
-
-        #cname = ptname + '.' + "C%d"%(num_comps-1)
-        #g.add_objective("par.%s.o0" % cname)
-        #g.add_constraint("par.%s.o1" % cname, lower=0.0)
 
     p.setup()
     p.final_setup()
