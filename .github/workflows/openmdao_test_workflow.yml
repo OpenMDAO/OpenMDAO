@@ -207,13 +207,11 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: ${{ matrix.PY }}
+          conda-remove-defaults: true
           channels: conda-forge
 
       - name: Install OpenMDAO
         run: |
-          echo "Make sure we are not using anaconda packages"
-          conda config --remove channels defaults
-
           conda install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
 
           python -m pip install --upgrade pip
@@ -639,6 +637,7 @@ jobs:
         with:
           python-version: ${{ matrix.PY }}
           channels: conda-forge
+          conda-remove-defaults: true
 
       - name: Install OpenDMAO
         run: |

@@ -45,7 +45,7 @@ all = [
 ]
 docs = [
     "ipyparallel",
-    "jupyter-book==0.14",
+    "jupyter-book<2",
     "matplotlib",
     "numpydoc>=1.1",
     "sphinx-sitemap",

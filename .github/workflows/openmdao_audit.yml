@@ -49,6 +49,8 @@ jobs:
         with:
           python-version: 3.12
           miniforge-version: latest
+          conda-remove-defaults: true
+          channels: conda-forge
 
       - name: Install lxml
         if: matrix.OS == 'windows-latest'
