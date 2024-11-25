@@ -1517,6 +1517,8 @@ def _decorate_functs(attrs, predicate, decorator):
 
     Parameters
     ----------
+    cname : str
+        The name of the class containing the functions.
     attrs : dict
         The attribute dict containing the functions to be decorated.
     predicate : function
@@ -1530,18 +1532,17 @@ def _decorate_functs(attrs, predicate, decorator):
 
 
 if env_truthy('OPENMDAO_DUMP'):
-    # OPENMDAO_DUMP can have values like 'stdout', 'stderr', 'rank', 'pid', 'mpi' or
-    # combos like 'rank,pid' or 'stdout,mpi'
-    # mpi means to wrap (most) comm calls with debug printouts
-    # rank means to include the rank in the dump file name, e.g., om_dump_0.out
-    # pid means to include the pid in the dump file name, e.g., om_dump_12345.out
+    # OPENMDAO_DUMP can have values like 'stdout', 'stderr', 'rank', 'pid', 'rank,pid', 'pid,rank'
+    # 'rank' means to include the rank in the dump file name, e.g., om_dump_0.out
+    # 'pid' means to include the pid in the dump file name, e.g., om_dump_12345.out
     # if rank and pid are both included, the file name will be, e.g., om_dump_0_12345.out
     # stdout means to dump to stdout (so rank and pid are ignored)
     # stderr means to dump to stderr (so rank and pid are ignored)
     # if OPENMDAO_DUMP is just a plain truthy value, like '1', then we dump to a file
     # named om_dump.out.
+    _om_dump = True
+
     parts = [s.strip() for s in os.environ['OPENMDAO_DUMP'].split(',')]
-    _om_mpi_debug = 'mpi' in parts or 'rank' in parts
     if 'stdout' in parts:
         _dump_stream = sys.stdout
     elif 'stderr' in parts:
@@ -1574,32 +1575,34 @@ if env_truthy('OPENMDAO_DUMP'):
         kwargs['flush'] = True
         print(*args, **kwargs)
 
-    def dbg(funct):
+    def dbg(cname):
         """
-        Print function entry and exit.
+        Decorate function to print function entry and exit.
 
         Parameters
         ----------
-        funct : function
-            The function being decorated.
+        cname : str
+            The name of the class containing the function.
 
         Returns
         -------
         function
             The decorated function.
         """
-        def wrapper(*args, **kwargs):
-            try:
-                path = args[0].msginfo + '.'
-            except Exception:
-                path = ''
-            indent = call_depth2indent()
-            om_dump(f"{indent}--> {path}{funct.__name__}")
-            ret = funct(*args, **kwargs)
-            om_dump(f"{indent}<-- {path}{funct.__name__}")
-            return ret
+        def _dbg(funct):
+            def wrapper(*args, **kwargs):
+                try:
+                    path = args[0].pathname + '.'
+                except Exception:
+                    path = ''
+                indent = call_depth2indent()
+                om_dump(f"{indent}--> {cname}:{path}{funct.__name__}")
+                ret = funct(*args, **kwargs)
+                om_dump(f"{indent}<-- {cname}:{path}{funct.__name__}")
+                return ret
 
-        return wrapper
+            return wrapper
+        return _dbg
 
     class DebugMeta(type):
         """
@@ -1638,17 +1641,60 @@ if env_truthy('OPENMDAO_DUMP'):
             class
                 The class with trace output added to some methods
             """
-            _decorate_functs(attrs, _trace_predicate, dbg)
+            _decorate_functs(attrs, _trace_predicate, dbg(name))
             return super().__new__(metaclass, name, bases, attrs)
 
-    SystemMeta = DebugMeta
-    ProblemMeta = DebugMeta
-    SolverMeta = DebugMeta
+    SystemMetaclass = DebugMeta
+    ProblemMetaclass = DebugMeta
+    SolverMetaclass = DebugMeta
+    DriverMetaclass = DebugMeta
+
+    def _comm_debug_decorator(fn, scope):  # pragma no cover
+        def _wrap(*args, **kwargs):
+            sc = '' if scope is None else f"{scope}."
+            indent = call_depth2indent()
+            om_dump(f"{indent}--> {sc}{fn.__name__}")
+            ret = fn(*args, **kwargs)
+            om_dump(f"{indent}<-- {sc}{fn.__name__}")
+            return ret
+        return _wrap
+
+    class _DebugComm(object):  # pragma no cover
+        """
+        Debugging wrapper for an MPI communicator.
+        """
+
+        def __init__(self, comm, scope):
+            if isinstance(comm, _DebugComm):
+                self.__dict__['_comm'] = comm._comm
+            else:
+                self.__dict__['_comm'] = comm
+            self.__dict__['_scope'] = scope
+            for name in ['bcast', 'Bcast', 'gather', 'Gather', 'scatter', 'Scatter',
+                         'allgather', 'Allgather', 'allreduce', 'Allreduce',
+                         'send', 'Send', 'recv', 'Recv', 'sendrecv', 'Sendrecv']:
+                self.__dict__[name] = _comm_debug_decorator(getattr(self._comm, name), scope)
+
+        def __getattr__(self, name):
+            return getattr(self._comm, name)
+
+        def __setattr__(self, name, val):
+            setattr(self._comm, name, val)
+
+    def _wrap_comm(comm, scope=None):  # pragma no cover
+        return _DebugComm(comm, scope)
+
+    def _unwrap_comm(comm):  # pragma no cover
+        if isinstance(comm, _DebugComm):
+            return comm._comm
+        return comm
 
 else:
+    _om_dump = False
+
     def om_dump(*args, **kwargs):
         """
-        Dump to 'om_dump<rank>_<pid>.out' if OPENMDAO_DUMP is truthy in the environment.
+        Do nothing.
 
         Parameters
         ----------
@@ -1661,7 +1707,7 @@ else:
 
     def dbg(funct):
         """
-        Print function entry and exit.
+        Do nothing.
 
         Parameters
         ----------
@@ -1671,61 +1717,16 @@ else:
         Returns
         -------
         function
-            The decorated function.
+            The function.
         """
         return funct
 
-    SystemMeta = type
-    ProblemMeta = type
-    SolverMeta = type
+    SystemMetaclass = type
+    ProblemMetaclass = type
+    SolverMetaclass = type
+    DriverMetaclass = type
     DebugMeta = type
 
-    _om_mpi_debug = False
-
-
-def _comm_debug_decorator(fn, scope):  # pragma no cover
-    def _wrap(*args, **kwargs):
-        sc = '' if scope is None else f"{scope}."
-        indent = call_depth2indent()
-        om_dump(f"{indent}--> {sc}{fn.__name__}")
-        ret = fn(*args, **kwargs)
-        om_dump(f"{indent}<-- {sc}{fn.__name__}")
-        return ret
-    return _wrap
-
-
-class _DebugComm(object):  # pragma no cover
-    """
-    Debugging wrapper for an MPI communicator.
-    """
-
-    def __init__(self, comm, scope):
-        if isinstance(comm, _DebugComm):
-            self.__dict__['_comm'] = comm._comm
-        else:
-            self.__dict__['_comm'] = comm
-        self.__dict__['_scope'] = scope
-        for name in ['bcast', 'Bcast', 'gather', 'Gather', 'scatter', 'Scatter',
-                     'allgather', 'Allgather', 'allreduce', 'Allreduce',
-                     'send', 'Send', 'recv', 'Recv', 'sendrecv', 'Sendrecv']:
-            self.__dict__[name] = _comm_debug_decorator(getattr(self._comm, name), scope)
-
-    def __getattr__(self, name):
-        return getattr(self._comm, name)
-
-    def __setattr__(self, name, val):
-        setattr(self._comm, name, val)
-
-
-if _om_mpi_debug:
-    def _wrap_comm(comm, scope=None):  # pragma no cover
-        return _DebugComm(comm, scope)
-
-    def _unwrap_comm(comm):  # pragma no cover
-        if isinstance(comm, _DebugComm):
-            return comm._comm
-        return comm
-else:
     def _wrap_comm(comm, scope=None):
         return comm
 

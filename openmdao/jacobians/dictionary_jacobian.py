@@ -144,7 +144,6 @@ class DictionaryJacobian(Jacobian):
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             for abs_key in self._iter_abs_keys(system):
                 res_name, other_name = abs_key
-                ofvec = rflat(res_name) if res_name in d_res_names else None
 
                 if other_name in d_out_names:
                     wrtvec = oflat(other_name)
@@ -152,6 +151,8 @@ class DictionaryJacobian(Jacobian):
                     wrtvec = iflat(other_name)
                 else:
                     wrtvec = None
+
+                ofvec = rflat(res_name) if res_name in d_res_names else None
 
                 if fwd:
                     if is_explicit and res_name is other_name and wrtvec is not None:
@@ -352,10 +353,10 @@ class _CheckingJacobian(DictionaryJacobian):
 
                     arr = scratch[start:end]
                     arr[:] = column[start:end]
-                    arr[row_inds] = 0.
-                    nzs = np.nonzero(arr)
-                    if nzs[0].size > 0:
+                    arr[row_inds] = 0.  # zero out the rows that are covered by sparsity
+                    nzs = np.nonzero(arr)[0]
+                    if nzs.size > 0:
                         self._errors.append(f"{system.msginfo}: User specified sparsity (rows/cols)"
                                             f" for subjac '{of}' wrt '{wrt}' is incorrect. There "
                                             f"are non-covered nonzeros in column {loc_idx} at "
-                                            f"row(s) {nzs[0]}.")
+                                            f"row(s) {nzs}.")

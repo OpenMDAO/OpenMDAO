@@ -123,6 +123,8 @@ class Relevance(object):
         Maps seed variable names to the source of the seed.
     _rel_array_cache : dict
         Cache of relevance arrays stored by array hash.
+    empty : bool
+        If True, relevance is empty and no relevance checking will be performed.
     """
 
     def __init__(self, model, fwd_meta, rev_meta, rel_array_cache):
@@ -139,6 +141,7 @@ class Relevance(object):
         self._no_dv_responses = []
         self._redundant_adjoint_systems = None
         self._seed_cache = {}
+        self.empty = False
 
         # seed var(s) for the current derivative operation
         self._seed_vars = {'fwd': (), 'rev': ()}
@@ -495,6 +498,9 @@ class Relevance(object):
         self._single_seed2relsys = {'fwd': {}, 'rev': {}}
 
         if not fwd_meta or not rev_meta:
+            self.empty = True
+            self._sys2idx = {}
+            self._var2idx = {}
             return
 
         # this set contains all variables and some or all components
@@ -862,6 +868,8 @@ class Relevance(object):
         bool
             True if any of the given variables are relevant.
         """
+        if self.empty:
+            return False
         if not self._active:
             return True
 

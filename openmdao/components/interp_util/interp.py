@@ -81,7 +81,7 @@ class InterpND(object):
     extrapolate : bool
         If False, when interpolated values are requested outside of the domain of the input
         data, a ValueError is raised. If True, then the methods are allowed to extrapolate.
-        Default is True (raise an exception).
+        Default is False (raise an exception).
     num_cp : None or int
         Optional. When specified, use a linear distribution of num_cp control points. If you
         are using 'bsplines' as the method, then num_cp must be set instead of points.
@@ -99,7 +99,6 @@ class InterpND(object):
     extrapolate : bool
         If False, when interpolated values are requested outside of the domain of the input data,
         a ValueError is raised. If True, then the methods are allowed to extrapolate.
-        Default is True.
     grid : tuple
         Collection of points that determine the regular grid.
     table : <InterpTable>
