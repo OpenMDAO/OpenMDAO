@@ -1217,9 +1217,9 @@ class BlockLinearSolver(LinearSolver):
         Parameters
         ----------
         slv_vars : set, None, or _UNDEFINED
-            First variable set.
+            First variable set, from the current solver.
         sys_vars : set, None, or _UNDEFINED
-            Second variable set.
+            Second variable set, from above.
 
         Returns
         -------
@@ -1228,8 +1228,11 @@ class BlockLinearSolver(LinearSolver):
         """
         if sys_vars is None or slv_vars is None:
             return None
-        if slv_vars is _UNDEFINED:
+        if slv_vars is _UNDEFINED or not slv_vars:
             return sys_vars
+        if not sys_vars:
+            return slv_vars
+
         return sys_vars.union(slv_vars)
 
     def _run_apply(self, init=False):
@@ -1300,8 +1303,15 @@ class BlockLinearSolver(LinearSolver):
         scope_in : set, None, or _UNDEFINED
             Inputs relevant to possible lower level calls to _apply_linear on Components.
         """
-        self._scope_out = scope_out
-        self._scope_in = scope_in
+        if scope_out is _UNDEFINED or scope_out is None:
+            self._scope_out = scope_out
+        else:
+            self._scope_out = scope_out.intersection(self._system()._var_abs2meta['output'])
+
+        if scope_in is _UNDEFINED or scope_in is None:
+            self._scope_in = scope_in
+        else:
+            self._scope_in = scope_in.intersection(self._system()._var_abs2meta['input'])
 
     def solve(self, mode, rel_systems=None):
         """
