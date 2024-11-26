@@ -288,8 +288,9 @@ def view_cases(case_recorder_file, show=True):
         case0_inputs_pane = pn.Column(pn.pane.Markdown("# Inputs"))
         if case0.inputs:
             df_case0_inputs = pd.DataFrame(list(case0.inputs.keys()),
-                                        columns=[f"{len(case0.inputs.keys())} Inputs"])
-            case0_inputs_table_pane = pn.widgets.Tabulator(df_case0_inputs, **tabulator_defaults)
+                                           columns=[f"{len(case0.inputs.keys())} Inputs"])
+            case0_inputs_table_pane = pn.widgets.Tabulator(df_case0_inputs,
+                                                           **tabulator_defaults)
         else:
             case0_inputs_table_pane = pn.pane.Markdown("### There are no inputs in Case 0")
         case0_inputs_pane.append(case0_inputs_table_pane)
@@ -298,7 +299,8 @@ def view_cases(case_recorder_file, show=True):
         if case0.outputs:
             df_case0_outputs = pd.DataFrame(list(case0.outputs.keys()),
                                             columns=[f"{len(case0.outputs.keys())} Outputs"])
-            case0_outputs_table_pane = pn.widgets.Tabulator(df_case0_outputs, **tabulator_defaults)
+            case0_outputs_table_pane = pn.widgets.Tabulator(df_case0_outputs,
+                                                            **tabulator_defaults)
         else:
             case0_outputs_table_pane = pn.pane.Markdown("### There are no outputs in Case 0")
         case0_outputs_pane.append(case0_outputs_table_pane)
@@ -306,8 +308,9 @@ def view_cases(case_recorder_file, show=True):
         case0_residuals_pane = pn.Column(pn.pane.Markdown("# Residuals"))
         if case0.residuals:
             df_case0_residuals = pd.DataFrame(list(case0.residuals.keys()),
-                                            columns=[f"{len(case0.residuals.keys())} Residuals"])
-            case0_residuals_table_pane = pn.widgets.Tabulator(df_case0_residuals, **tabulator_defaults)
+                                              columns=[f"{len(case0.residuals.keys())} Residuals"])
+            case0_residuals_table_pane = pn.widgets.Tabulator(df_case0_residuals,
+                                                              **tabulator_defaults)
         else:
             case0_residuals_table_pane = pn.pane.Markdown("### There are no residuals in Case 0")
         case0_residuals_pane.append(case0_residuals_table_pane)
