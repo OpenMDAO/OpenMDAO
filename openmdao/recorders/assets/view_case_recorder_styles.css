@@ -1,0 +1,22 @@
+a.title {
+    font-size: var(--type-ramp-plus-2-font-size);
+    line-height: var(--type-ramp-plus-2-line-height);
+}
+
+nav#header {
+    height: 22px;
+}
+
+:host(.bk-above) .bk-header .bk-tab, :host(.bk-left) .bk-header .bk-tab, :host(.bk-right) .bk-header .bk-tab, :host(.bk-below) .bk-header .bk-tab {
+    border-width: 1px;
+    padding-bottom: 5px;
+    line-height: 10px;
+}
+
+.bk-header .bk-tab.bk-active {
+    background: #ededed !important;
+}
+
+.bk-header .bk-tab {
+    height: 25px;;
+}
