@@ -278,53 +278,57 @@ def view_cases(case_recorder_file, show=True):
     tabs_list.append(("Cases", cases_pane))
 
     # Give the user an idea of what is in a case by showing them
-    # what is are the Case 0 inputs, outputs and residuals if available
-    # TODO ideally would show more info about all cases. Not sure how to do that concisely yet
-    case0 = cases[0]
-    case0_inputs_pane = pn.Column(pn.pane.Markdown("# Inputs"))
-    if case0.inputs:
-        df_case0_inputs = pd.DataFrame(list(case0.inputs.keys()),
-                                       columns=[f"{len(case0.inputs.keys())} Inputs"])
-        case0_inputs_table_pane = pn.widgets.Tabulator(df_case0_inputs, **tabulator_defaults)
-    else:
-        case0_inputs_table_pane = pn.pane.Markdown("### There are no inputs in Case 0")
-    case0_inputs_pane.append(case0_inputs_table_pane)
+    # what is are the Case inputs, outputs and residuals if available
 
-    case0_outputs_pane = pn.Column(pn.pane.Markdown("# Outputs"))
-    if case0.outputs:
-        df_case0_outputs = pd.DataFrame(list(case0.outputs.keys()),
-                                        columns=[f"{len(case0.outputs.keys())} Outputs"])
-        case0_outputs_table_pane = pn.widgets.Tabulator(df_case0_outputs, **tabulator_defaults)
-    else:
-        case0_outputs_table_pane = pn.pane.Markdown("### There are no outputs in Case 0")
-    case0_outputs_pane.append(case0_outputs_table_pane)
+    sources = cr.list_sources()
+    for source in sources:
+        case0_id = cr.list_cases(source)[0]
+        case0 = cr.get_case(case0_id)
 
-    case0_residuals_pane = pn.Column(pn.pane.Markdown("# Residuals"))
-    if case0.residuals:
-        df_case0_residuals = pd.DataFrame(list(case0.residuals.keys()),
-                                          columns=[f"{len(case0.residuals.keys())} Residuals"])
-        case0_residuals_table_pane = pn.widgets.Tabulator(df_case0_residuals, **tabulator_defaults)
-    else:
-        case0_residuals_table_pane = pn.pane.Markdown("### There are no residuals in Case 0")
-    case0_residuals_pane.append(case0_residuals_table_pane)
+        case0_inputs_pane = pn.Column(pn.pane.Markdown("# Inputs"))
+        if case0.inputs:
+            df_case0_inputs = pd.DataFrame(list(case0.inputs.keys()),
+                                        columns=[f"{len(case0.inputs.keys())} Inputs"])
+            case0_inputs_table_pane = pn.widgets.Tabulator(df_case0_inputs, **tabulator_defaults)
+        else:
+            case0_inputs_table_pane = pn.pane.Markdown("### There are no inputs in Case 0")
+        case0_inputs_pane.append(case0_inputs_table_pane)
 
-    case0_variables_pane = pn.Column(
-        f"There are {len(case0.inputs)if case0.inputs else 0} inputs,"
-        f" {len(case0.outputs) if case0.outputs else 0} outputs,"
-        f" and {len(case0.residuals) if case0.residuals else 0} residuals in Case 0.",
-        pn.Row(
-            case0_inputs_pane,
-            case0_outputs_pane,
-            case0_residuals_pane,
-            sizing_mode="stretch_width",
-            styles={
-                "display": "flex",
-                "justify-content": "space-between",
-                "width": "100%",
-            },
-        ),
-    )
-    tabs_list.append(("Case 0 variables", case0_variables_pane))
+        case0_outputs_pane = pn.Column(pn.pane.Markdown("# Outputs"))
+        if case0.outputs:
+            df_case0_outputs = pd.DataFrame(list(case0.outputs.keys()),
+                                            columns=[f"{len(case0.outputs.keys())} Outputs"])
+            case0_outputs_table_pane = pn.widgets.Tabulator(df_case0_outputs, **tabulator_defaults)
+        else:
+            case0_outputs_table_pane = pn.pane.Markdown("### There are no outputs in Case 0")
+        case0_outputs_pane.append(case0_outputs_table_pane)
+
+        case0_residuals_pane = pn.Column(pn.pane.Markdown("# Residuals"))
+        if case0.residuals:
+            df_case0_residuals = pd.DataFrame(list(case0.residuals.keys()),
+                                            columns=[f"{len(case0.residuals.keys())} Residuals"])
+            case0_residuals_table_pane = pn.widgets.Tabulator(df_case0_residuals, **tabulator_defaults)
+        else:
+            case0_residuals_table_pane = pn.pane.Markdown("### There are no residuals in Case 0")
+        case0_residuals_pane.append(case0_residuals_table_pane)
+
+        case0_variables_pane = pn.Column(
+            f"There are {len(case0.inputs)if case0.inputs else 0} inputs,"
+            f" {len(case0.outputs) if case0.outputs else 0} outputs,"
+            f" and {len(case0.residuals) if case0.residuals else 0} residuals in Case 0.",
+            pn.Row(
+                case0_inputs_pane,
+                case0_outputs_pane,
+                case0_residuals_pane,
+                sizing_mode="stretch_width",
+                styles={
+                    "display": "flex",
+                    "justify-content": "space-between",
+                    "width": "100%",
+                },
+            ),
+        )
+        tabs_list.append((f"Variables recorded for {source}", case0_variables_pane))
 
     # variables pane
 
