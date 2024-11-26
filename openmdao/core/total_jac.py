@@ -16,6 +16,7 @@ from openmdao.utils.mpi import MPI, check_mpi_env
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.relevance import get_relevance
+from openmdao.utils.array_utils import get_random_arr
 
 
 use_mpi = check_mpi_env()
@@ -87,6 +88,8 @@ class _TotalJacInfo(object):
         If True, perform a single directional derivative.
     relevance : dict
         Dict of relevance dictionaries for each var of interest.
+    add_coloring_noise : bool
+        If True, add noise to the seed during coloring (sparsity) generation.
     """
 
     def __init__(self, problem, of, wrt, return_format, approx=False,
@@ -143,6 +146,7 @@ class _TotalJacInfo(object):
         self.approx = approx
         self.coloring_info = coloring_info
         self.nsolves = 0
+        self.add_coloring_noise = problem._metadata['randomize_seeds']
 
         try:
             self._linear_only_dvs = set(driver._lin_dvs).difference(driver._nl_dvs)
@@ -728,6 +732,9 @@ class _TotalJacInfo(object):
             seed[:] = _directional_rng.random(seed.size)
             seed *= 2.0
             seed -= 1.0
+        elif self.add_coloring_noise:
+            seed[:] = -(get_random_arr(seed.size, self.model.comm,
+                                       self.model._problem_meta['coloring_randgen']) + 0.5)
         elif simul_coloring and simul_color_mode is not None:
             imeta = defaultdict(bool)
             imeta['coloring'] = simul_coloring
@@ -738,7 +745,7 @@ class _TotalJacInfo(object):
                 all_vois = set()
 
                 for i in ilist:
-                    cache_lin_sol, voiname, voisrc = idx_map[i]
+                    cache_lin_sol, _, voisrc = idx_map[i]
                     cache |= cache_lin_sol
                     all_vois.add(voisrc)
 
@@ -1298,12 +1305,15 @@ class _TotalJacInfo(object):
 
         if fwd:
             for i in inds:
-                J[row_col_map[i], i] = reduced_derivs[row_col_map[i]]
+                row = row_col_map[i]
+                J[row, i] = reduced_derivs[row]
+
                 if dist:
                     self._jac_setter_dist(i, mode)
         else:  # rev
             for i in inds:
-                J[i, row_col_map[i]] = reduced_derivs[row_col_map[i]]
+                col = row_col_map[i]
+                J[i, col] = reduced_derivs[col]
                 if dist:
                     self._jac_setter_dist(i, mode)
 
@@ -1487,6 +1497,9 @@ class _TotalJacInfo(object):
                     self._print_derivatives()
         finally:
             self.model._recording_iter.pop()
+
+        if self.simul_coloring is not None and self.simul_coloring._subtractions:
+            self.simul_coloring._apply_subtractions(self.J)
 
         return self.J_final
 

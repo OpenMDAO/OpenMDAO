@@ -47,7 +47,6 @@ class COOMatrix(Matrix):
             data, rows, cols that can be used to construct a COO matrix.
         """
         submats = self._submats
-        metadata = self._metadata
         key_ranges = self._key_ranges = {}
 
         start = end = 0
@@ -79,6 +78,7 @@ class COOMatrix(Matrix):
         rows = np.empty(end, dtype=INT_DTYPE)
         cols = np.empty(end, dtype=INT_DTYPE)
 
+        metadata = self._metadata
         for key, (start, end, dense, jrows) in key_ranges.items():
             info, loc, src_indices, shape, factor = submats[key]
             irow, icol = loc

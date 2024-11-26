@@ -1015,6 +1015,9 @@ class Problem(object, metaclass=ProblemMetaclass):
                                 # current derivative solve.
             'coloring_randgen': None,  # If total coloring is being computed, will contain a random
                                        # number generator, else None.
+            'randomize_subjacs': True,  # If True, randomize subjacs before computing total sparsity
+            'randomize_seeds': False,  # If True, randomize seed vectors when computing total
+                                       # sparsity
             'group_by_pre_opt_post': self.options['group_by_pre_opt_post'],  # see option
             'relevance_cache': {},  # cache of relevance objects
             'rel_array_cache': {},  # cache of relevance arrays
