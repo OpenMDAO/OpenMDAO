@@ -65,6 +65,7 @@ from openmdao.utils.entry_points import _list_installed_setup_parser, _list_inst
 from openmdao.utils.reports_system import _list_reports_setup_parser, _list_reports_cmd, \
     _view_reports_setup_parser, _view_reports_cmd
 from openmdao.visualization.graph_viewer import _graph_setup_parser, _graph_cmd
+from openmdao.visualization.realtime_opt_plot.realtime_opt_plot import _realtime_opt_plot_setup_parser, _realtime_opt_plot_cmd
 
 
 def _view_connections_setup_parser(parser):
@@ -598,6 +599,8 @@ _command_map = {
     'n2': (_n2_setup_parser, _n2_cmd, 'Display an interactive N2 diagram of the problem.'),
     'partial_coloring': (_partial_coloring_setup_parser, _partial_coloring_cmd,
                          'Compute coloring(s) for specified partial jacobians.'),
+    'realtime_opt_plot': (_realtime_opt_plot_setup_parser, _realtime_opt_plot_cmd,
+                  "Run the realtime optimization progress plot tool"),
     'scaffold': (_scaffold_setup_parser, _scaffold_exec,
                  'Generate a simple scaffold for a component.'),
     'scaling': (_scaling_setup_parser, _scaling_cmd, 'View driver scaling report.'),
