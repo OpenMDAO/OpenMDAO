@@ -1,6 +1,6 @@
 """ A real-plot of the optimization process"""
 
-from bokeh.models import ColumnDataSource
+from bokeh.models import ColumnDataSource, Legend
 from bokeh.plotting import curdoc, figure
 from bokeh.server.server import Server
 from tornado.ioloop import IOLoop
@@ -68,7 +68,7 @@ class CaseTracker:
             value = next(iter(objs.values()))
             value = float(value)
             new_data = {
-                "counter": driver_case.counter,
+                "counter": int(driver_case.counter),
                 "obj": value,
             }
             self._case_ids_read.append(
@@ -131,10 +131,44 @@ class RealTimeOptPlot(object):
 
         source = ColumnDataSource(dict(iteration=[], obj=[]))
 
-        p = figure(height=500, tools="xpan,xwheel_zoom,xbox_zoom,reset")
+        # p = figure(height=500, tools="xpan,xwheel_zoom,xbox_zoom,reset")
+        p = figure(tools="xpan,xwheel_zoom,xbox_zoom,reset",
+                   width_policy="max" , height_policy="max",
+                   title="Real-time Optimization Progress Plot",
+        )
         p.x_range.follow = "start"
 
-        p.line(x="iteration", y="obj", line_width=3, color="navy", source=source)
+        p.title.text_font_size = '25px'
+        p.title.text_color = "black"
+        p.title.text_font = "arial"
+        p.title.align = "center"
+        p.title.background_fill_color = "#cccccc"
+
+        l1 = p.line(x="iteration", y="obj", line_width=3, color="navy", source=source)
+        p.xaxis.axis_label = "Driver iterations"
+        p.yaxis.axis_label = "Model variables"
+        p.xaxis.minor_tick_line_color = None
+        
+        p.axis.axis_label_text_font_style = 'bold'
+        p.axis.axis_label_text_font_size = '20pt'
+
+        legend = Legend(items=[
+                ("obj" , [l1]),
+            ], location="center")
+
+        p.add_layout(legend, 'right')
+
+        
+        p.legend.title = 'Model Variables'
+        p.legend.title_text_font_style = "bold"
+        p.legend.title_text_font_size = "20px"
+
+        p.xgrid.band_hatch_pattern = "/"
+        p.xgrid.band_hatch_alpha = 0.6
+        p.xgrid.band_hatch_color = "lightgrey"
+        p.xgrid.band_hatch_weight = 0.5
+        p.xgrid.band_hatch_scale = 10
+
 
         case_tracker = CaseTracker()
 
@@ -171,20 +205,37 @@ def realtime_opt_plot(case_recorder_filename):
     # server = Server({'/': modify_doc}, port=port)
     # server.start()
     
-    server = Server({'/': Application(FunctionHandler(_make_realtime_opt_plot_doc))}, port=port_number)
-    server.io_loop.add_callback(server.show, "/")
+    # server = Server({'/': Application(FunctionHandler(_make_realtime_opt_plot_doc))}, port=port_number)
+    # server.io_loop.add_callback(server.show, "/")  # Need this to have browser window open
     # server.start()
+    # print(f"Bokeh server running on http://localhost:{port_number}")
+    # try:
+    #     IOLoop.current().start()
+    # except KeyboardInterrupt:
+    #     print("Server stopped.")
 
-    # url = f"http://localhost:{port_number}"
+
+    try:
+        server = Server({'/': Application(FunctionHandler(_make_realtime_opt_plot_doc))}, port=port_number)
+        server.start()
+        server.io_loop.add_callback(server.show, "/")
+        
+        print(f"Bokeh server running on http://localhost:{port_number}")
+        server.io_loop.start()
+    except KeyboardInterrupt as e:
+        print(f"Server stopped due to keyboard interrupt")
+    except Exception as e:
+        print(f"Error starting Bokeh server: {e}")
+    finally:
+        print("Stopping server")
+        server.stop()
+
+
+    # url = f"http://localhost:{port_number}/"
     # server.show(url)
 
-    print(f"Bokeh server running on http://localhost:{port_number}")
     
-    # # Run the IOLoop
-    try:
-        IOLoop.current().start()
-    except KeyboardInterrupt:
-        print("Server stopped.")
+    # Run the IOLoop
 
 
 
