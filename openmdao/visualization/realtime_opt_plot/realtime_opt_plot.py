@@ -26,7 +26,6 @@ def _realtime_opt_plot_setup_parser(parser):
     parser.add_argument(
         "case_recorder_filename",
         type=str,
-        nargs="*",
         help="Name of openmdao case recorder filename. It should contain driver cases",
     )
 
@@ -48,29 +47,38 @@ def _realtime_opt_plot_cmd(options, user_args):
 
 
 class CaseTracker:
-    def __init__(self):
+    def __init__(self, case_recorder_filename):
         self._case_ids_read = []
+        self._cr = SqliteCaseReader(case_recorder_filename)
 
     def get_new_cases(self):
         # need to read this each time since the constructor does all of the actual reading
         # TODO - add code SqliteCaseReader for reading real-time data
-        cr = SqliteCaseReader("create_cr_files_out/driver_history.db")
-        case_ids = cr.list_cases("driver", out_stream=None)
+        # cr = SqliteCaseReader("create_cr_files_out/driver_history.db")
+        case_ids = self._cr.list_cases("driver", out_stream=None)
         new_case_ids = [
             case_id for case_id in case_ids if case_id not in set(self._case_ids_read)
         ]
         if new_case_ids:
             # just get the first one
             case_id = new_case_ids[0]
-            driver_case = cr.get_case(case_id)
+            driver_case = self._cr.get_case(case_id)
             objs = driver_case.get_objectives()
+            design_vars = driver_case.get_design_vars()
+            constraints = driver_case.get_constraints()
             # assume only one obj
-            value = next(iter(objs.values()))
-            value = float(value)
+            obj = next(iter(objs.values()))
+            obj = float(obj)
             new_data = {
                 "counter": int(driver_case.counter),
-                "obj": value,
+                "obj": obj,
             }
+            # get des vars
+            desvars = {}
+            for name, value in design_vars.items():
+                desvars[name] = value
+            new_data["desvars"] = desvars
+
             self._case_ids_read.append(
                 case_id
             )  # remember that this one has been plotted
@@ -84,7 +92,6 @@ class RealTimeOptPlot(object):
 
         source = ColumnDataSource(dict(iteration=[], obj=[]))
 
-        # p = figure(height=500, tools="xpan,xwheel_zoom,xbox_zoom,reset")
         p = figure(tools="xpan,xwheel_zoom,xbox_zoom,reset",
                    width_policy="max" , height_policy="max",
                    title="Real-time Optimization Progress Plot",
@@ -123,7 +130,7 @@ class RealTimeOptPlot(object):
         p.xgrid.band_hatch_scale = 10
 
 
-        case_tracker = CaseTracker()
+        case_tracker = CaseTracker(case_recorder_filename)
 
         def update():
             new_data = case_tracker.get_new_cases()
