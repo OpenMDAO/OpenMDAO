@@ -86,7 +86,7 @@ class CaseTracker:
         return None
     def get_desvar_names(self):
         case_ids = self._cr.list_cases("driver", out_stream=None)
-        driver_case = self._cr.get_case(case_id[0])
+        driver_case = self._cr.get_case(case_ids[0])
         design_vars = driver_case.get_design_vars()
         return design_vars.keys()
 
@@ -120,6 +120,13 @@ class RealTimeOptPlot(object):
         p.title.background_fill_color = "#cccccc"
 
         l1 = p.line(x="iteration", y="obj", line_width=3, color="navy", source=source)
+        
+        desvar_names = case_tracker.get_desvar_names()
+        desvar_lines = []
+        for desvar_name in desvar_names:
+            desvar_line = p.line(x="iteration", y=desvar_name, line_width=3, color="navy", source=source)
+            desvar_lines.append(desvar_line)
+
         p.xaxis.axis_label = "Driver iterations"
         p.yaxis.axis_label = "Model variables"
         p.xaxis.minor_tick_line_color = None
@@ -127,9 +134,12 @@ class RealTimeOptPlot(object):
         p.axis.axis_label_text_font_style = 'bold'
         p.axis.axis_label_text_font_size = '20pt'
 
-        legend = Legend(items=[
+        legend_items = [
                 ("obj" , [l1]),
-            ], location="center")
+            ]
+        for i, desvar_name in enumerate(desvar_names):
+            legend_items.append((desvar_name, [desvar_lines[i]]))
+        legend = Legend(items=legend_items, location="center")
 
         p.add_layout(legend, 'right')
 
@@ -151,7 +161,10 @@ class RealTimeOptPlot(object):
             if new_data:
                 obj = new_data["obj"]
                 counter = new_data["counter"]
-                source.stream({"iteration": [counter], "obj": [obj]})
+                source_stream_dict = {"iteration": [counter], "obj": [obj]}
+                for desvar_name, desvar_value in new_data["desvars"].items():
+                    source_stream_dict[desvar_name] = desvar_value
+                source.stream(source_stream_dict)
 
         doc.add_root(p)
         doc.add_periodic_callback(update, 50)
