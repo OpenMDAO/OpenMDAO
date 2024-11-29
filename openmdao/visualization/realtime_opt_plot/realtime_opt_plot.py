@@ -78,53 +78,6 @@ class CaseTracker:
         return None
 
 
-# def realtime_opt_plot(case_recorder_filename):
-#     source = ColumnDataSource(dict(iteration=[], obj=[]))
-
-#     p = figure(height=500, tools="xpan,xwheel_zoom,xbox_zoom,reset")
-#     p.x_range.follow = "start"
-
-#     p.line(x="iteration", y="obj", line_width=3, color="navy", source=source)
-
-#     case_tracker = CaseTracker()
-
-
-#     # Function to update the data source
-#     def update():
-#         new_data = case_tracker.get_new_cases()
-#         if new_data:
-#             obj = new_data["obj"]
-#             counter = new_data["counter"]
-#             source.stream({"iteration": [counter], "obj": [obj]})
-
-
-#     curdoc().add_root(p)
-#     curdoc().add_periodic_callback(update, 50)
-#     curdoc().title = "OpenMDAO Optimization"
-
-#     if port == 0:
-#         port = get_free_port()
-
-# def modify_doc(doc):
-#     source = ColumnDataSource(dict(iteration=[], obj=[]))
-
-#     p = figure(height=500, tools="xpan,xwheel_zoom,xbox_zoom,reset")
-#     p.x_range.follow = "start"
-
-#     p.line(x="iteration", y="obj", line_width=3, color="navy", source=source)
-
-#     case_tracker = CaseTracker()
-
-#     def update():
-#         new_data = case_tracker.get_new_cases()
-#         if new_data:
-#             obj = new_data["obj"]
-#             counter = new_data["counter"]
-#             source.stream({"iteration": [counter], "obj": [obj]})
-
-#     doc.add_root(p)
-#     doc.add_periodic_callback(update, 50)
-#     doc.title = "OpenMDAO Optimization"
 
 class RealTimeOptPlot(object):
     def __init__(self, case_recorder_filename, doc):
@@ -200,20 +153,6 @@ def realtime_opt_plot(case_recorder_filename):
         RealTimeOptPlot(case_recorder_filename, doc=doc)
 
     port_number = get_free_port()
-    
-    # Create and start the Bokeh server
-    # server = Server({'/': modify_doc}, port=port)
-    # server.start()
-    
-    # server = Server({'/': Application(FunctionHandler(_make_realtime_opt_plot_doc))}, port=port_number)
-    # server.io_loop.add_callback(server.show, "/")  # Need this to have browser window open
-    # server.start()
-    # print(f"Bokeh server running on http://localhost:{port_number}")
-    # try:
-    #     IOLoop.current().start()
-    # except KeyboardInterrupt:
-    #     print("Server stopped.")
-
 
     try:
         server = Server({'/': Application(FunctionHandler(_make_realtime_opt_plot_doc))}, port=port_number)
@@ -229,20 +168,3 @@ def realtime_opt_plot(case_recorder_filename):
     finally:
         print("Stopping server")
         server.stop()
-
-
-    # url = f"http://localhost:{port_number}/"
-    # server.show(url)
-
-    
-    # Run the IOLoop
-
-
-
-
-
-# if __name__ == "__main__":
-#     parser = argparse.ArgumentParser()
-#     _realtime_opt_plot_setup_parser(parser)
-#     args = parser.parse_args()
-#     _realtime_opt_plot_cmd(args, None)
