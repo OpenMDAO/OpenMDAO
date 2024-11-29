@@ -84,13 +84,28 @@ class CaseTracker:
             )  # remember that this one has been plotted
             return new_data
         return None
+    def get_desvar_names(self):
+        case_ids = self._cr.list_cases("driver", out_stream=None)
+        driver_case = self._cr.get_case(case_id[0])
+        design_vars = driver_case.get_design_vars()
+        return design_vars.keys()
+
 
 
 
 class RealTimeOptPlot(object):
     def __init__(self, case_recorder_filename, doc):
 
-        source = ColumnDataSource(dict(iteration=[], obj=[]))
+        case_tracker = CaseTracker(case_recorder_filename)
+
+        source_dict = { 'iteration': [], 'obj': []}
+
+        desvar_names = case_tracker.get_desvar_names()
+        for desvar_name in desvar_names:
+            source_dict[desvar_name] = []
+
+        source = ColumnDataSource(source_dict)
+        # source = ColumnDataSource(dict(iteration=[], obj=[]))
 
         p = figure(tools="xpan,xwheel_zoom,xbox_zoom,reset",
                    width_policy="max" , height_policy="max",
@@ -130,7 +145,6 @@ class RealTimeOptPlot(object):
         p.xgrid.band_hatch_scale = 10
 
 
-        case_tracker = CaseTracker(case_recorder_filename)
 
         def update():
             new_data = case_tracker.get_new_cases()
