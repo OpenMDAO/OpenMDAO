@@ -318,13 +318,13 @@ else:
                 has_nocolors = group._comm.allreduce(has_nocolors)
                 if has_nocolors:
                     full_xfer_in, full_xfer_out = _setup_index_views(total_size_nocolor,
-                                                                    xfer_in_nocolor,
-                                                                    xfer_out_nocolor)
+                                                                     xfer_in_nocolor,
+                                                                     xfer_out_nocolor)
 
                     transfers[(None, '@nocolor')] = PETScTransfer(vectors['input']['nonlinear'],
-                                                                vectors['output']['nonlinear'],
-                                                                full_xfer_in, full_xfer_out,
-                                                                group._comm)
+                                                                  vectors['output']['nonlinear'],
+                                                                  full_xfer_in, full_xfer_out,
+                                                                  group._comm)
 
                     for sname, inds in xfer_out_nocolor.items():
                         transfers[(sname, '@nocolor')] = \
