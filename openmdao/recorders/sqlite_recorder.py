@@ -728,7 +728,8 @@ class SqliteRecorder(CaseRecorder):
                     m.execute("INSERT INTO driver_metadata(id, model_viewer_data) VALUES(?,?)",
                               (key, json_data))
             except sqlite3.IntegrityError:
-                print("Model viewer data has already been recorded for %s." % key)
+                # This recorder already has model data.
+                pass
 
     def record_metadata_system(self, system, run_number=None):
         """
