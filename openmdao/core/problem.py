@@ -2149,6 +2149,15 @@ class Problem(object, metaclass=ProblemMetaclass):
         # Design vars
         desvars = self.driver._designvars
         vals = self.driver.get_design_var_values(get_remote=True, driver_scaling=driver_scaling)
+        if not driver_scaling:
+            desvars = desvars.copy()
+            for meta in desvars.values():
+                scaler = meta['scaler'] if meta.get('scaler') is not None else 1.
+                adder = meta['adder'] if meta.get('adder') is not None else 0.
+                if 'lower' in meta:
+                    meta['lower'] = meta['lower'] / scaler - adder
+                if 'upper' in meta:
+                    meta['upper'] = meta['upper'] / scaler - adder
         header = "Design Variables"
         def_desvar_opts = [opt for opt in ('indices',) if opt not in desvar_opts and
                            _find_dict_meta(desvars, opt)]
@@ -2168,6 +2177,15 @@ class Problem(object, metaclass=ProblemMetaclass):
         # Constraints
         cons = self.driver._cons
         vals = self.driver.get_constraint_values(driver_scaling=driver_scaling)
+        if not driver_scaling:
+            cons = cons.copy()
+            for meta in cons.values():
+                scaler = meta['scaler'] if meta.get('scaler') is not None else 1.
+                adder = meta['adder'] if meta.get('adder') is not None else 0.
+                if 'lower' in meta:
+                    meta['lower'] = meta['lower'] / scaler - adder
+                if 'upper' in meta:
+                    meta['upper'] = meta['upper'] / scaler - adder
         header = "Constraints"
         # detect any cons that use aliases
         def_cons_opts = [opt for opt in ('indices', 'alias') if opt not in cons_opts and
