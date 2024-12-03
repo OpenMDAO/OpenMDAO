@@ -2,6 +2,7 @@
 import numpy as np
 from openmdao.utils.mpi import check_mpi_env
 from openmdao.core.constants import INT_DTYPE
+from openmdao.utils.general_utils import om_dump
 
 use_mpi = check_mpi_env()
 _empty_idx_array = np.array([], dtype=INT_DTYPE)
@@ -176,7 +177,7 @@ else:
             mypathlen = len(group.pathname) + 1 if group.pathname else 0
 
             has_par_coloring = group._problem_meta['has_par_deriv_color']
-            has_nocolors = 0
+            has_nocolor_xfers = 0
 
             xfer_in = defaultdict(list)
             xfer_out = defaultdict(list)
@@ -251,7 +252,8 @@ else:
                                     oidxlist_nc.append(oarr)
                                     iidxlist_nc.append(input_inds)
                                     size_nc += len(input_inds)
-                                    has_nocolors = 1
+                                    has_nocolor_xfers = 1
+                                    om_dump("nocolor inds:", oarr, input_inds)
                                 else:
                                     oidxlist.append(oarr)
                                     iidxlist.append(input_inds)
@@ -315,8 +317,8 @@ else:
                                                  xfer_in[sname], inds, group._comm)
 
             if has_par_coloring:
-                has_nocolors = group._comm.allreduce(has_nocolors)
-                if has_nocolors:
+                has_nocolor_xfers = group._comm.allreduce(has_nocolor_xfers)
+                if has_nocolor_xfers:
                     full_xfer_in, full_xfer_out = _setup_index_views(total_size_nocolor,
                                                                      xfer_in_nocolor,
                                                                      xfer_out_nocolor)
