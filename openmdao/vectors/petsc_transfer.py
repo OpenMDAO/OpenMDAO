@@ -253,7 +253,7 @@ else:
                                     iidxlist_nc.append(input_inds)
                                     size_nc += len(input_inds)
                                     has_nocolor_xfers = 1
-                                    om_dump("nocolor inds:", oarr, input_inds)
+                                    om_dump(group.pathname, "nocolor inds:", oarr, input_inds)
                                 else:
                                     oidxlist.append(oarr)
                                     iidxlist.append(input_inds)
