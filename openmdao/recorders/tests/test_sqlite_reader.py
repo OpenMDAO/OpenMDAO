@@ -4717,8 +4717,7 @@ class TestCaseReaderMPI4(unittest.TestCase):
                     rec_file = f'{fbase}_{rank}'
                 cr = om.CaseReader(rec_file)
 
-                cases = cr.list_cases('driver')
-                for caseid in cases:
+                for caseid in cr.list_cases('driver'):
                     case = cr.get_case(caseid)
                     for out in expected_outputs:
                         self.assertIn(out, case.outputs)

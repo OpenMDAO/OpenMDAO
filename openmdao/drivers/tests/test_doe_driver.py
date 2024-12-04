@@ -1298,8 +1298,8 @@ class TestDOEDriver(unittest.TestCase):
         inputs = case.inputs
         outputs = case.outputs
         for name in ('x', 'y'):
-            self.assertTrue(isinstance(inputs[name], np.ndarray))
-            self.assertTrue(inputs[name].shape, (2,))
+            self.assertTrue(isinstance(inputs['parab.' + name], np.ndarray))
+            self.assertTrue(inputs['parab.' + name].shape, (2,))
             self.assertTrue(isinstance(outputs[name], np.ndarray))
             self.assertTrue(outputs[name].shape, (2,))
 

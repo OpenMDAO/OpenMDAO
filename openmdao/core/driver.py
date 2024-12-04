@@ -257,6 +257,8 @@ class Driver(object, metaclass=DriverMetaclass):
         DriverResult object containing information for use in the optimization report.
     _has_scaling : bool
         If True, scaling has been set for this driver.
+    _filtered_vars_to_record : dict or None
+        Variables to record based on recording options.
     """
 
     def __init__(self, **kwargs):
@@ -354,6 +356,7 @@ class Driver(object, metaclass=DriverMetaclass):
         self.options.update(kwargs)
         self.result = DriverResult(self)
         self._has_scaling = False
+        self._filtered_vars_to_record = None
 
     def _get_inst_id(self):
         if self._problem is None:
@@ -1807,6 +1810,10 @@ def record_iteration(requester, prob, case_name):
     opts = requester.recording_options
     data = {'input': {}, 'output': {}, 'residual': {}}
     filt = requester._filtered_vars_to_record
+    if filt is None:  # recorder is not initialized
+        # this will raise the proper exception
+        rec_mgr.record_iteration(requester, data, requester._get_recorder_metadata(case_name))
+        return
 
     if opts['record_inputs'] and (inputs._names or len(discrete_inputs) > 0):
         data['input'] = model._retrieve_data_of_kind(filt, 'input', 'nonlinear', local)
