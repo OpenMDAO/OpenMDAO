@@ -1301,7 +1301,7 @@ class PromAbsDict(dict):
         else:
             # numpy structured array, which will always use absolute names
             self._values = values[0]
-            self._keys = values.dtype.names
+            self._keys = values.dtype.fields
             for key in self._keys:
                 if key in auto_ivc_map:
                     # key is auto_ivc, so translate to a readable input name.
