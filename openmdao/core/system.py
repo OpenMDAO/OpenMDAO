@@ -4754,7 +4754,7 @@ class System(object, metaclass=SystemMetaclass):
                 from openmdao.core.component import Component
                 it = [s.pathname for s in self.system_iter(recurse=True, typ=Component)]
             else:
-                it = list(self._allprocs_exec_order())
+                it = self._allprocs_exec_order()
 
             for path in it:
                 prefix = path + '.'

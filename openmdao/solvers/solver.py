@@ -504,8 +504,7 @@ class Solver(object, metaclass=SolverMetaclass):
         vec_name = 'nonlinear' if isinstance(self, NonlinearSolver) else 'linear'
         filt = self._filtered_vars_to_record
         parallel = self._rec_mgr._check_parallel() if system.comm.size > 1 else False
-        do_gather = self._rec_mgr._check_gather()
-        local = parallel and not do_gather
+        local = parallel and not self._rec_mgr._check_gather()
 
         if self.recording_options['record_outputs']:
             data['output'] = system._retrieve_data_of_kind(filt, 'output', vec_name, local)
