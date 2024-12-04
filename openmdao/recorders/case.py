@@ -5,8 +5,6 @@ A Case class.
 import sys
 import itertools
 
-from collections import OrderedDict
-
 from fnmatch import fnmatchcase
 
 import numpy as np
@@ -19,8 +17,6 @@ from openmdao.utils.variable_table import write_var_table, NA
 from openmdao.utils.general_utils import match_prom_or_abs
 from openmdao.utils.units import unit_conversion, simplify_unit
 from openmdao.recorders.sqlite_recorder import format_version as current_version
-
-_AMBIGOUS_PROM_NAME = object()
 
 
 class Case(object):
@@ -1117,9 +1113,7 @@ class Case(object):
         if isinstance(var_data, dict):
             var_dict = var_data
         else:
-            var_dict = OrderedDict()
-            for name, meta in var_data:
-                var_dict[name] = meta
+            var_dict = {name: meta for name, meta in var_data}
 
         # determine pathname of the system
         if self.source in ('root', 'driver', 'problem', 'root.nonlinear_solver'):
@@ -1266,60 +1260,50 @@ class PromAbsDict(dict):
         if isinstance(values, dict):
             # dict of values, keyed on either absolute or promoted names
             self._values = {}
-            for key in values.keys():
+            for key, val in values.items():
                 if key in auto_ivc_map:
                     # key is auto_ivc, so translate to a readable input name.
-                    self._values[key] = values[key]
-                    in_key = auto_ivc_map[key]
-                    super().__setitem__(in_key, values[key])
+                    self._values[key] = val
+                    super().__setitem__(auto_ivc_map[key], val)
                 elif key in abs2prom:
                     # key is absolute name
-                    self._values[key] = values[key]
-                    prom_key = abs2prom[key]
-                    super().__setitem__(prom_key, values[key])
+                    self._values[key] = val
+                    super().__setitem__(abs2prom[key], val)
                 elif key in prom2abs:
                     # key is promoted name
                     for abs_key in prom2abs[key]:
-                        self._values[abs_key] = values[key]
-                    super().__setitem__(key, values[key])
+                        self._values[abs_key] = val
+                    super().__setitem__(key, val)
                 elif isinstance(key, tuple) or DERIV_KEY_SEP in key:
                     # derivative keys can be either (of, wrt) or 'of!wrt'
                     abs_keys, prom_key = self._deriv_keys(key)
                     for abs_key in abs_keys:
-                        self._values[abs_key] = values[key]
-                    super().__setitem__(prom_key, values[key])
-                elif in_prom2abs is not None and key in in_prom2abs:
-                    # Auto-ivc outputs, use abs source (which is prom source.)
-                    self._values[key] = values[key]
-                    super().__setitem__(key, values[key])
+                        self._values[abs_key] = val
+                    super().__setitem__(prom_key, val)
                 else:
-                    # Constraint alias support.
-                    self._values[key] = values[key]
-                    super().__setitem__(key, values[key])
+                    self._values[key] = val
+                    super().__setitem__(key, val)
 
             self._keys = self._values.keys()
         else:
             # numpy structured array, which will always use absolute names
             self._values = values[0]
             self._keys = values.dtype.fields
-            for key in self._keys:
+            for key, val in zip(self._keys, self._values):
                 if key in auto_ivc_map:
                     # key is auto_ivc, so translate to a readable input name.
-                    in_key = auto_ivc_map[key]
-                    super().__setitem__(in_key, self._values[key])
+                    super().__setitem__(auto_ivc_map[key], val)
                 elif key in abs2prom:
                     if in_prom2abs is None:  # this is an abs input
-                        super().__setitem__(key, self._values[key])
+                        super().__setitem__(key, val)
                     else:
-                        super().__setitem__(abs2prom[key], self._values[key])
+                        super().__setitem__(abs2prom[key], val)
                 elif DERIV_KEY_SEP in key:
                     # derivative keys will be a string in the form of 'of!wrt'
                     abs_keys, prom_key = self._deriv_keys(key)
-                    super().__setitem__(prom_key, self._values[key])
-                elif in_prom2abs is not None and key in in_prom2abs:
-                    # Auto-ivc outputs, use abs source (which is prom source.)
-                    # TODO - maybe get rid of this by always saving the source name
-                    super().__setitem__(key, self._values[key])
+                    super().__setitem__(prom_key, val)
+                else:
+                    super().__setitem__(key, val)
 
     def _deriv_keys(self, key):
         """
@@ -1401,15 +1385,7 @@ class PromAbsDict(dict):
                 return self._values[self._auto_ivc_map[key]]
 
         elif key in self:
-            # promoted name
-            val = super().__getitem__(key)
-            if val is _AMBIGOUS_PROM_NAME:
-                msg = "The promoted name '%s' is invalid because it refers to multiple " + \
-                      "inputs: %s. Access the value using an absolute path name or the " + \
-                      "connected output variable instead."
-                raise RuntimeError(msg % (key, str(self._prom2abs[key])))
-            else:
-                return val
+            return super().__getitem__(key)
 
         elif isinstance(key, tuple) or self._DERIV_KEY_SEP in key:
             # derivative keys can be either (of, wrt) or 'of!wrt'

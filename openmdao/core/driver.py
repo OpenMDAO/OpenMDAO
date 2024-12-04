@@ -761,8 +761,7 @@ class Driver(object, metaclass=DriverMetaclass):
                 match_names.update(model._var_allprocs_prom2abs_list['input'])
                 for p in model._var_allprocs_prom2abs_list['input']:
                     if check_path(p, incl, excl):
-                        src = model.get_source(p)
-                        myoutputs.add(src)
+                        myoutputs.add(model.get_source(p))
 
         # check that all exclude/include globs have at least one matching output or input name
         for pattern in excl:
@@ -770,7 +769,7 @@ class Driver(object, metaclass=DriverMetaclass):
                 issue_warning(f"{obj.msginfo}: No matches for pattern '{pattern}' in "
                               "recording_options['excludes'].")
         for pattern in incl:
-            if not has_match(pattern, match_names):
+            if pattern != '*' and not has_match(pattern, match_names):
                 issue_warning(f"{obj.msginfo}: No matches for pattern '{pattern}' in "
                               "recording_options['includes'].")
 

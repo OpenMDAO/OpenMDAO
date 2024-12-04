@@ -1543,6 +1543,8 @@ if env_truthy('OPENMDAO_DUMP'):
     _om_dump = True
 
     parts = [s.strip() for s in os.environ['OPENMDAO_DUMP'].split(',')]
+    notrace = 'notrace' in parts
+
     if 'stdout' in parts:
         _dump_stream = sys.stdout
     elif 'stderr' in parts:
@@ -1650,10 +1652,17 @@ if env_truthy('OPENMDAO_DUMP'):
             _decorate_functs(attrs, _trace_predicate, dbg(name))
             return super().__new__(metaclass, name, bases, attrs)
 
-    SystemMetaclass = DebugMeta
-    ProblemMetaclass = DebugMeta
-    SolverMetaclass = DebugMeta
-    DriverMetaclass = DebugMeta
+    if notrace:
+        SystemMetaclass = type
+        ProblemMetaclass = type
+        SolverMetaclass = type
+        DriverMetaclass = type
+        DebugMeta = type
+    else:
+        SystemMetaclass = DebugMeta
+        ProblemMetaclass = DebugMeta
+        SolverMetaclass = DebugMeta
+        DriverMetaclass = DebugMeta
 
     def _comm_debug_decorator(fn, scope):  # pragma no cover
         def _wrap(*args, **kwargs):
