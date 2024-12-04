@@ -3,18 +3,23 @@ A tool to make it easier to investigate coloring of jacobians with different spa
 """
 
 import numpy as np
+from scipy.sparse import coo_matrix
 
+import openmdao.api as om
 from openmdao.utils.coloring import _compute_coloring
+from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.devtools.debug import compare_jacs
+
 
 class TotJacBuilder(object):
-    def __init__(self, rows, cols):
-        self.J = np.zeros((rows, cols), dtype=bool)
+    def __init__(self, nrows, ncols):
+        self.J = np.zeros((nrows, ncols), dtype=bool)
         self.coloring = None
 
     def add_random_points(self, npoints):
         nrows, ncols = self.J.shape
 
-        zro = self.J is False
+        zro = self.J == False
         flat = self.J[zro].flatten()
         flat[:npoints] = True
         np.random.shuffle(flat)
@@ -56,14 +61,18 @@ class TotJacBuilder(object):
             row_idx += shape[0]
             col_idx += shape[1]
 
-    def color(self, mode='auto', fname=None):
-        self.coloring = _compute_coloring(self.J, mode)
+    def color(self, mode='auto', fname=None, direct=True):
+        self.coloring = _compute_coloring(self.J, mode, direct=direct)
         if self.coloring is not None and fname is not None:
             self.coloring.save(fname)
         return self.coloring
 
     def show(self):
-        self.coloring.display_txt()
+        try:
+            self.coloring.display_bokeh(show=True)
+        except Exception:
+            print("Bokeh not available, using ASCII display.")
+            self.coloring.display_txt()
 
         maxdeg_fwd = np.max(np.count_nonzero(self.J, axis=1))
         maxdeg_rev = np.max(np.count_nonzero(self.J, axis=0))
@@ -160,10 +169,10 @@ class TotJacBuilder(object):
         return builder
 
 
-def rand_jac():
+def rand_jac(minrows=(1, 10), mincols=(1, 10)):
     rnd = np.random.randint
-    minr = rnd(1, 10)
-    minc = rnd(1, 10)
+    minr = rnd(*minrows)
+    minc = rnd(*mincols)
 
     return  TotJacBuilder.make_jac(n_dense_rows=rnd(5), row_density=np.random.rand(),
                                    n_dense_cols=rnd(5), col_density=np.random.rand(),
@@ -171,6 +180,106 @@ def rand_jac():
                                    min_shape=(minr,minc),
                                    max_shape=(minr+rnd(10),minc+rnd(10)),
                                    n_random_pts=rnd(15))
+
+
+class SparsityComp(om.ExplicitComponent):
+    """
+    A simple component that multiplies a sparse matrix by an input vector.
+
+    The sparsity structure is defined by the 'sparsity' argument, and the data values are
+    just the (index + 1) of the nonzeros in the sparsity structure.
+
+    This component is used to test the coloring of the total jacobian.  A Problem is set up
+    with a model containing only this component, and the total jacobian is computed with and
+    without coloring.  The two jacobians are compared to ensure they are the same.
+
+    Parameters
+    ----------
+    sparsity : ndarray or coo_matrix
+        Sparsity structure to be tested.
+
+    Attributes
+    ----------
+    sparsity : coo_matrix or ndarray
+        Dense or sparse version of the sparsity structure.
+    """
+    def __init__(self, sparsity, **kwargs):
+        super(SparsityComp, self).__init__(**kwargs)
+        if isinstance(sparsity, np.ndarray):
+            self.sparsity = coo_matrix(sparsity)
+        else:
+            self.sparsity = sparsity.tocoo()
+
+        self.sparsity.data = np.arange(1, self.sparsity.data.size + 1)
+
+    def setup(self):
+        self.add_input('x', shape=self.sparsity.shape[1])
+        self.add_output('y', shape=self.sparsity.shape[0])
+
+        self.declare_partials('y', 'x', rows=self.sparsity.row, cols=self.sparsity.col)
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = self.sparsity.dot(inputs['x'])
+
+    def compute_partials(self, inputs, partials):
+        partials['y', 'x'] = self.sparsity.data
+
+
+def check_sparsity_tot_coloring(sparsity, direct=True, tolerance=1e-15, tol_type='rel', mode='auto'):
+    """
+    Check total derivatives of a top level SparsityComp with and without total coloring.
+
+    Parameters
+    ----------
+    sparsity : ndarray or coo_matrix
+        Sparsity structure to be tested.
+    direct : bool
+        If True, use the direct method to compute the column adjacency matrix when bidirectional
+        coloring, else use the substitution method.
+    """
+    import sys
+
+    # compute totals without coloring
+    p = om.Problem()
+    model = p.model
+    model.add_subsystem('comp', SparsityComp(sparsity))
+    model.add_design_var('comp.x')
+    model.add_constraint('comp.y')
+    p.driver = om.ScipyOptimizeDriver()
+    p.driver.options['optimizer'] = 'SLSQP'
+    p.setup(mode=mode)
+    p.run_model()
+    J = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
+
+    # compute totals with coloring
+    p = om.Problem()
+    model = p.model
+    model.add_subsystem('comp', SparsityComp(sparsity))
+    model.add_design_var('comp.x')
+    model.add_constraint('comp.y')
+    p.driver = om.ScipyOptimizeDriver()
+    p.driver.options['optimizer'] = 'SLSQP'
+    p.driver.declare_coloring(direct=direct)
+    p.setup(mode=mode)
+    p.run_model()
+    Jcolor = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
+
+    # make sure totals match for both cases
+    try:
+        assert_near_equal(J, Jcolor, tolerance=tolerance, tol_type=tol_type)
+    except Exception:
+        diff = np.abs(J - Jcolor)
+        mask = diff <= tolerance
+        diff[mask] = 0.0
+        if p.driver._coloring_info.coloring is not None and not p.driver._coloring_info._failed:
+            print(p.driver._coloring_info.coloring, file=sys.stderr)
+
+        with np.printoptions(linewidth=999, threshold=1000):
+            print("Good J\n", J, file=sys.stderr)
+            drows, dcols = np.nonzero(diff)
+            print("J shape", J.shape, file=sys.stderr)
+            print("J diff\n", list(zip(drows, dcols)), file=sys.stderr)
+        raise
 
 
 if __name__ == '__main__':
@@ -182,7 +291,7 @@ if __name__ == '__main__':
                         help="Build an Eisenstat's example matrix of size n+1 x n.",
                         action="store", type=int, default=-1, dest="eisenstat")
     parser.add_argument("-m", "--mode", type=str, dest="mode",
-                        help="Direction of coloring (default is auto). Only used with -e.",
+                        help="Direction of coloring (default is auto).",
                         default="auto")
     parser.add_argument('-s', '--save', dest="save", default=None,
                         help="Output file for jacobian so it can be reloaded and colored using"

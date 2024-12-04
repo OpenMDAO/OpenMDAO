@@ -305,7 +305,7 @@ def _check_hanging_inputs(problem, logger):
             unconns.append((prom_tgt, abs_tgt))
 
     if unconns:
-        msg = ["The following inputs are not connected:\n"]
+        msg = ["The following inputs are connected to Auto IVC output variables:\n"]
         for prom_tgt, abs_tgt in sorted(unconns):
             msg.append(f'  {prom_tgt} ({abs_tgt})\n')
         logger.warning(''.join(msg))

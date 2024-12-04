@@ -2056,6 +2056,77 @@ class TestProblem(unittest.TestCase):
         self.assertTrue('-20.' in output[14]) # con
         self.assertTrue('3.18' in output[21]) # obj
 
+    def test_list_driver_vars_driver_scaling_bounds(self):
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', 35.0, units='degF')
+
+        model.add_subsystem('p', ivc, promotes=['x'])
+        model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
+                                                 x={'val': 2.0, 'units': 'degF'},
+                                                 y1={'val': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y1'])
+
+        model.add_subsystem('comp2', om.ExecComp('y2 = 3.0*x',
+                                                 x={'val': 2.0, 'units': 'degF'},
+                                                 y2={'val': 2.0, 'units': 'degF'}),
+                            promotes=['x', 'y2'])
+
+        model.add_design_var('x', units='degC', lower=0.0, upper=100.0, scaler=3.5, adder=77.0)
+        model.add_constraint('y1', units='degC', lower=0.0, upper=100.0, scaler=3.5, adder=77.0)
+        model.add_objective('y2', units='degC', scaler=3.5, adder=77.0)
+
+        recorder = om.SqliteRecorder('cases.sql')
+        prob.driver.add_recorder(recorder)
+
+        prob.driver.recording_options['record_objectives'] = True
+        prob.driver.recording_options['record_constraints'] = True
+        prob.driver.recording_options['record_desvars'] = True
+
+        prob.setup()
+
+        prob.run_driver()
+
+        # Driver Scaling
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+
+        try:
+            prob.list_driver_vars(desvar_opts=['lower', 'upper'], cons_opts=['lower', 'upper'])
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+
+        self.assertTrue('275.' in output[5])  # design var: x, value
+        self.assertTrue('269.' in output[5])  # design var: x, lower bound
+        self.assertTrue('619.' in output[5])  # design var: x, upper bound
+        self.assertTrue('343.' in output[12]) # constraint: y1, value
+        self.assertTrue('269.' in output[12]) # constraint: y1, lower bound
+        self.assertTrue('619.' in output[12]) # constraint: y1, upper bound
+        self.assertTrue('411.' in output[19]) # objective: y2, value
+
+        # Model Scaling
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+
+        try:
+            prob.list_driver_vars(driver_scaling=False, desvar_opts=['lower', 'upper'], cons_opts=['lower', 'upper'])
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+
+        self.assertTrue('35.'  in output[5])  # design var: x, value
+        self.assertTrue('0.'   in output[5])  # design var: x, lower bound
+        self.assertTrue('100.' in output[5])  # design var: x, upper bound
+        self.assertTrue('70.'  in output[12]) # constraint: y1, value
+        self.assertTrue('100.' in output[12]) # constraint: y1, lower bound
+        self.assertTrue('0.'   in output[12]) # constraint: y1, upper bound
+        self.assertTrue('105.' in output[19]) # objective: y2, value
+
     def test_feature_list_driver_vars(self):
 
         prob = om.Problem(model=SellarDerivatives())
