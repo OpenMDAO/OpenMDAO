@@ -1,19 +1,17 @@
 """
 Class definitions for Relevance and related classes.
 """
-import os
-
 from contextlib import contextmanager
 from collections import defaultdict
 
 import numpy as np
 
-from openmdao.utils.general_utils import all_ancestors, _contains_all, get_rev_conns
+from openmdao.utils.general_utils import all_ancestors, _contains_all, get_rev_conns, env_truthy
 from openmdao.utils.graph_utils import get_sccs_topo
 from openmdao.utils.array_utils import array_hash
 from openmdao.utils.om_warnings import issue_warning
 
-_no_relevance = bool(os.environ.get('OPENMDAO_NO_RELEVANCE', ''))
+_no_relevance = env_truthy('OPENMDAO_NO_RELEVANCE')
 
 
 def get_relevance(model, of, wrt):

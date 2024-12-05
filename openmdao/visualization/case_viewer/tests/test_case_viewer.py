@@ -30,7 +30,11 @@ class TestCaseRetrieval(unittest.TestCase):
         # setup the optimization
         prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.add_recorder(om.SqliteRecorder('parab_record.sql'))
+
+        recorder = om.SqliteRecorder('parab_record.sql')
+        prob.driver.add_recorder(recorder)
+        prob.model.add_recorder(recorder)
+        prob.add_recorder(recorder)
 
         prob.driver.recording_options['includes'] = ['*']
         prob.driver.recording_options['record_desvars'] = True
@@ -48,6 +52,8 @@ class TestCaseRetrieval(unittest.TestCase):
         prob.setup()
 
         prob.run_driver()
+
+        prob.record("final")
 
     def test_get_vars(self):
         cr = om.CaseReader(self._prob.get_outputs_dir() / 'parab_record.sql')
