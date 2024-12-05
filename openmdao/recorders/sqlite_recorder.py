@@ -7,7 +7,6 @@ from io import BytesIO
 import os.path
 import gc
 import sqlite3
-from itertools import chain
 
 import json
 import numpy as np
@@ -370,9 +369,6 @@ class SqliteRecorder(CaseRecorder):
                 else:
                     objectives[name] = data
 
-        inputs = list(system.abs_name_iter('input', local=False, discrete=True))
-        outputs = list(system.abs_name_iter('output', local=False, discrete=True))
-
         # _get_vars_exec_order makes a collective MPI call so need to call in all procs
         var_order = system._get_vars_exec_order(inputs=True, outputs=True, local=False)
 
@@ -391,68 +387,36 @@ class SqliteRecorder(CaseRecorder):
                 if v not in self._prom2abs['input']:
                     self._prom2abs['input'][v] = abs_names
                 else:
-                    self._prom2abs['input'][v] = list(set(chain(self._prom2abs['input'][v],
-                                                                abs_names)))
+                    lst = self._prom2abs['input'][v]
+                    old = set(lst)
+                    for name in abs_names:
+                        if name not in old:
+                            lst.append(name)
 
             # for outputs, there can be only one abs name per promoted name
             for v, abs_names in system._var_allprocs_prom2abs_list['output'].items():
                 self._prom2abs['output'][v] = abs_names
 
-            # absolute pathname to metadata mappings for continuous & discrete variables
-            # discrete mapping is sub-keyed on 'output' & 'input'
-            real_meta_in = system._var_allprocs_abs2meta['input']
-            real_meta_out = system._var_allprocs_abs2meta['output']
-            disc_meta_in = system._var_allprocs_discrete['input']
-            disc_meta_out = system._var_allprocs_discrete['output']
+            for name, meta in system.abs_meta_iter('output', local=False, discrete=True):
+                if name not in self._abs2meta:
+                    meta = meta.copy()
+                    self._abs2meta[name] = meta
+                    meta['type'] = ['output']
+                    meta['explicit'] = name not in states
 
-            all_var_info = [(outputs, 'output'),
-                            (desvars, 'desvar'), (responses, 'response'),
-                            (objectives, 'objective'), (constraints, 'constraint')]
+            for name, meta in system.abs_meta_iter('input', local=False, discrete=True):
+                if name not in self._abs2meta:
+                    meta = meta.copy()
+                    self._abs2meta[name] = meta
+                    meta['type'] = ['input']
+                    meta['explicit'] = True
 
-            for varinfo, var_type in all_var_info:
-                if var_type != 'output':
-                    varinfo = varinfo.items()
-
-                for data in varinfo:
-
-                    # Design variables, constraints and objectives can be requested by input name.
-                    if var_type != 'output':
-                        name, vmeta = data
-                        srcname = vmeta['source']
-                    else:
-                        srcname = name = data
-
-                    if srcname not in self._abs2meta:
-                        if srcname in real_meta_out:
-                            self._abs2meta[srcname] = real_meta_out[srcname].copy()
-                        elif srcname in disc_meta_out:
-                            self._abs2meta[srcname] = disc_meta_out[srcname].copy()
-                        elif name in system._responses:
-                            for io in self._prom2abs:
-                                if srcname in self._prom2abs[io]:
-                                    abs_in = self._prom2abs[io][srcname][0]
-                                    self._abs2meta[srcname] = real_meta_in[abs_in].copy()
-                                    break
-                        self._abs2meta[srcname]['type'] = []
-                        self._abs2meta[srcname]['explicit'] = srcname not in states
-
-                    if var_type not in self._abs2meta[srcname]['type']:
-                        self._abs2meta[srcname]['type'].append(var_type)
-
-            for name in inputs:
-                try:
-                    self._abs2meta[name] = real_meta_in[name].copy()
-                except KeyError:
-                    self._abs2meta[name] = disc_meta_in[name].copy()
-                self._abs2meta[name]['type'] = ['input']
-                self._abs2meta[name]['explicit'] = True
-
-            # merge current abs2meta with this system's version
-            for name, meta in self._abs2meta.items():
-                for io in ('input', 'output'):
-                    if name in system._var_allprocs_abs2meta[io]:
-                        meta.update(system._var_allprocs_abs2meta[io][name])
-                        break
+            for varinfo, var_type in [(desvars, 'desvar'), (responses, 'response'),
+                                      (objectives, 'objective'), (constraints, 'constraint')]:
+                for name, vmeta in varinfo.items():
+                    srcname = vmeta['source']
+                    self._abs2meta[srcname]['type'].append(var_type)
+                    self._abs2meta[srcname]['explicit'] = srcname not in states
 
             self._make_abs2meta_serializable()
 

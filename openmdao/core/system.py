@@ -669,6 +669,42 @@ class System(object, metaclass=SystemMetaclass):
             else:
                 yield from self._var_allprocs_discrete[iotype]
 
+    def abs_meta_iter(self, iotype, local=True, cont=True, discrete=False):
+        """
+        Iterate over absolute variable names and their metadata for this System.
+
+        By setting appropriate values for 'cont' and 'discrete', yielded variable
+        names can be continuous only, discrete only, or both.
+
+        Parameters
+        ----------
+        iotype : str
+            Either 'input' or 'output'.
+        local : bool
+            If True, include only names of local variables. Default is True.
+        cont : bool
+            If True, include names of continuous variables.  Default is True.
+        discrete : bool
+            If True, include names of discrete variables.  Default is False.
+
+        Yields
+        ------
+        str, dict
+        """
+        if cont:
+            if local:
+                yield from self._var_abs2meta[iotype].items()
+            else:
+                yield from self._var_allprocs_abs2meta[iotype].items()
+
+        if discrete:
+            if local:
+                prefix = self.pathname + '.' if self.pathname else ''
+                for name, meta in self._var_discrete[iotype].items():
+                    yield prefix + name, meta
+            else:
+                yield from self._var_allprocs_discrete[iotype].items()
+
     def _jac_of_iter(self):
         """
         Iterate over (name, offset, end, slice, dist_sizes) for each 'of' (row) var in the jacobian.
