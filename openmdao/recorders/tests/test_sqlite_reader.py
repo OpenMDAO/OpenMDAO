@@ -416,6 +416,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         np.testing.assert_almost_equal(case.inputs['d1.y2'], [12.05848815, ])
         np.testing.assert_almost_equal(case.outputs['obj'], [28.58830817, ])
         np.testing.assert_almost_equal(case.residuals['obj'], [0.0, ],)
+        np.testing.assert_almost_equal(case['d1.y2'], [12.05848815, ])
+        np.testing.assert_almost_equal(case['obj'], [28.58830817, ])
 
         # Test to see if the case keys (iteration coords) come back correctly
         for i, iter_coord in enumerate(cr.list_cases('root.d1', recurse=False, out_stream=None)):
