@@ -54,7 +54,7 @@ from openmdao.utils.reports_system import get_reports_to_activate, activate_repo
     clear_reports, _load_report_plugins
 from openmdao.utils.general_utils import pad_name, LocalRangeIterable, \
     _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs, \
-    ProblemMeta
+    ProblemMetaclass
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
@@ -133,7 +133,7 @@ def _default_prob_name():
     return name.stem
 
 
-class Problem(object, metaclass=ProblemMeta):
+class Problem(object, metaclass=ProblemMetaclass):
     """
     Top-level container for the systems and drivers.
 
@@ -966,8 +966,6 @@ class Problem(object, metaclass=ProblemMeta):
 
         self._orig_mode = mode
 
-        model_comm = self.driver._setup_comm(comm)
-
         # this metadata will be shared by all Systems/Solvers in the system tree
         self._metadata = {
             'name': self._name,  # the name of this Problem
@@ -1017,11 +1015,17 @@ class Problem(object, metaclass=ProblemMeta):
                                 # current derivative solve.
             'coloring_randgen': None,  # If total coloring is being computed, will contain a random
                                        # number generator, else None.
+            'randomize_subjacs': True,  # If True, randomize subjacs before computing total sparsity
+            'randomize_seeds': False,  # If True, randomize seed vectors when computing total
+                                       # sparsity
             'group_by_pre_opt_post': self.options['group_by_pre_opt_post'],  # see option
             'relevance_cache': {},  # cache of relevance objects
             'rel_array_cache': {},  # cache of relevance arrays
             'ncompute_totals': 0,  # number of times compute_totals has been called
+            'jax_group': None,  # not None if a Group is currently performing a jax operation
         }
+
+        model_comm = self.driver._setup_comm(comm)
 
         if parent:
             if isinstance(parent, Problem):
@@ -1132,6 +1136,8 @@ class Problem(object, metaclass=ProblemMeta):
             raise RuntimeError(f"{self.msginfo}: Cannot call set_order without calling setup after")
 
         # set up recording, including any new recorders since last setup
+        # TODO: We should be smarter and only setup the recording when new recorders have
+        # been added.
         if self._metadata['setup_status'] >= _SetupStatus.POST_SETUP:
             driver._setup_recording()
             self._setup_recording()
@@ -2143,6 +2149,15 @@ class Problem(object, metaclass=ProblemMeta):
         # Design vars
         desvars = self.driver._designvars
         vals = self.driver.get_design_var_values(get_remote=True, driver_scaling=driver_scaling)
+        if not driver_scaling:
+            desvars = desvars.copy()
+            for meta in desvars.values():
+                scaler = meta['scaler'] if meta.get('scaler') is not None else 1.
+                adder = meta['adder'] if meta.get('adder') is not None else 0.
+                if 'lower' in meta:
+                    meta['lower'] = meta['lower'] / scaler - adder
+                if 'upper' in meta:
+                    meta['upper'] = meta['upper'] / scaler - adder
         header = "Design Variables"
         def_desvar_opts = [opt for opt in ('indices',) if opt not in desvar_opts and
                            _find_dict_meta(desvars, opt)]
@@ -2162,6 +2177,15 @@ class Problem(object, metaclass=ProblemMeta):
         # Constraints
         cons = self.driver._cons
         vals = self.driver.get_constraint_values(driver_scaling=driver_scaling)
+        if not driver_scaling:
+            cons = cons.copy()
+            for meta in cons.values():
+                scaler = meta['scaler'] if meta.get('scaler') is not None else 1.
+                adder = meta['adder'] if meta.get('adder') is not None else 0.
+                if 'lower' in meta:
+                    meta['lower'] = meta['lower'] / scaler - adder
+                if 'upper' in meta:
+                    meta['upper'] = meta['upper'] / scaler - adder
         header = "Constraints"
         # detect any cons that use aliases
         def_cons_opts = [opt for opt in ('indices', 'alias') if opt not in cons_opts and

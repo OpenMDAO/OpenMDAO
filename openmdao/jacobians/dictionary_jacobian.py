@@ -139,12 +139,11 @@ class DictionaryJacobian(Jacobian):
         iflat = d_inputs._abs_get_val
         subjacs_info = self._subjacs_info
         is_explicit = system.is_explicit()
-        randgen = self._randgen
+        do_randomize = self._randgen is not None and system._problem_meta['randomize_subjacs']
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             for abs_key in self._iter_abs_keys(system):
                 res_name, other_name = abs_key
-                ofvec = rflat(res_name) if res_name in d_res_names else None
 
                 if other_name in d_out_names:
                     wrtvec = oflat(other_name)
@@ -152,6 +151,8 @@ class DictionaryJacobian(Jacobian):
                     wrtvec = iflat(other_name)
                 else:
                     wrtvec = None
+
+                ofvec = rflat(res_name) if res_name in d_res_names else None
 
                 if fwd:
                     if is_explicit and res_name is other_name and wrtvec is not None:
@@ -173,7 +174,7 @@ class DictionaryJacobian(Jacobian):
 
                 if left_vec is not None and right_vec is not None:
                     subjac_info = subjacs_info[abs_key]
-                    if randgen:
+                    if do_randomize:
                         subjac = self._randomize_subjac(subjac_info['val'], abs_key)
                     else:
                         subjac = subjac_info['val']
@@ -352,10 +353,10 @@ class _CheckingJacobian(DictionaryJacobian):
 
                     arr = scratch[start:end]
                     arr[:] = column[start:end]
-                    arr[row_inds] = 0.
-                    nzs = np.nonzero(arr)
-                    if nzs[0].size > 0:
+                    arr[row_inds] = 0.  # zero out the rows that are covered by sparsity
+                    nzs = np.nonzero(arr)[0]
+                    if nzs.size > 0:
                         self._errors.append(f"{system.msginfo}: User specified sparsity (rows/cols)"
                                             f" for subjac '{of}' wrt '{wrt}' is incorrect. There "
                                             f"are non-covered nonzeros in column {loc_idx} at "
-                                            f"row(s) {nzs[0]}.")
+                                            f"row(s) {nzs}.")

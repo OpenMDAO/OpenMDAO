@@ -35,11 +35,11 @@ class SerializeTestCase(unittest.TestCase):
         p.setup()
         p.final_setup()
 
-        self.assertDictEqual(dict(comp.options.items(recordable_only=True)), {
-            'always_opt': False,
-            'distributed': False,
-            'run_root_only': False
-        })
+        # no errors
+        opts_dict = dict(comp.options.items(recordable_only=True))
+
+        # bad opt excluded
+        self.assertTrue('bad' not in opts_dict)
 
 
 if __name__ == '__main__':

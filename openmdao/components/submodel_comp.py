@@ -489,7 +489,7 @@ class SubmodelComp(ExplicitComponent):
             # prevent config check that will fail due to name changes
             self._coloring_info.dynamic = True
 
-            for of, wrt, nzrows, nzcols, _, _, _, _ in coloring._subjac_sparsity_iter():
+            for of, wrt, nzrows, nzcols, _ in coloring._subjac_sparsity_iter():
                 self.declare_partials(of=self._to_outer_output(of),
                                       wrt=self._to_outer_input(wrt),
                                       rows=nzrows, cols=nzcols)
@@ -574,7 +574,7 @@ class SubmodelComp(ExplicitComponent):
                 if key not in self._zero_partials:
                     partials[key] = tot
         else:
-            for of, wrt, nzrows, nzcols, _, _, _, _ in coloring._subjac_sparsity_iter():
+            for of, wrt, nzrows, nzcols, _ in coloring._subjac_sparsity_iter():
                 partials[(self._to_outer_output(of), self._to_outer_input(wrt))] = \
                     tots[of, wrt][nzrows, nzcols].ravel()
 

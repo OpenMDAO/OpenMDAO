@@ -1,16 +1,17 @@
 """
 Class definitions for Relevance and related classes.
 """
-
 from contextlib import contextmanager
 from collections import defaultdict
 
 import numpy as np
 
-from openmdao.utils.general_utils import all_ancestors, _contains_all, get_rev_conns
+from openmdao.utils.general_utils import all_ancestors, _contains_all, get_rev_conns, env_truthy
 from openmdao.utils.graph_utils import get_sccs_topo
 from openmdao.utils.array_utils import array_hash
 from openmdao.utils.om_warnings import issue_warning
+
+_no_relevance = env_truthy('OPENMDAO_NO_RELEVANCE')
 
 
 def get_relevance(model, of, wrt):
@@ -122,6 +123,8 @@ class Relevance(object):
         Maps seed variable names to the source of the seed.
     _rel_array_cache : dict
         Cache of relevance arrays stored by array hash.
+    empty : bool
+        If True, relevance is empty and no relevance checking will be performed.
     """
 
     def __init__(self, model, fwd_meta, rev_meta, rel_array_cache):
@@ -130,13 +133,15 @@ class Relevance(object):
         """
         assert model.pathname == '', "Relevance can only be initialized on the top level Group."
 
-        self._active = None  # allow relevance to be turned on later
+        # permanently disable relevance if _no_relevance is True
+        self._active = False if _no_relevance else None
         self._rel_array_cache = rel_array_cache
         self._graph = model._dataflow_graph
         self._rel_array_cache = {}
         self._no_dv_responses = []
         self._redundant_adjoint_systems = None
         self._seed_cache = {}
+        self.empty = False
 
         # seed var(s) for the current derivative operation
         self._seed_vars = {'fwd': (), 'rev': ()}
@@ -493,6 +498,9 @@ class Relevance(object):
         self._single_seed2relsys = {'fwd': {}, 'rev': {}}
 
         if not fwd_meta or not rev_meta:
+            self.empty = True
+            self._sys2idx = {}
+            self._var2idx = {}
             return
 
         # this set contains all variables and some or all components
@@ -860,6 +868,8 @@ class Relevance(object):
         bool
             True if any of the given variables are relevant.
         """
+        if self.empty:
+            return False
         if not self._active:
             return True
 

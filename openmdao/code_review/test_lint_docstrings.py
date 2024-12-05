@@ -557,9 +557,8 @@ class LintTestCase(unittest.TestCase):
                         clss = getattr(mod, class_name)
 
                         methods = [x for x in dir(clss)
-                                   if (inspect.ismethod(getattr(clss, x)) or
-                                       inspect.isfunction(getattr(clss, x))) and
-                                   x in clss.__dict__]
+                                   if x in clss.__dict__ and (inspect.ismethod(getattr(clss, x)) or
+                                                              inspect.isfunction(getattr(clss, x)))]
 
                         # Loop over class methods.
                         for method_name in methods:

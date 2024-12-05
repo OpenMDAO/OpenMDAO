@@ -333,7 +333,7 @@ def config_summary(problem, stream=sys.stdout):
         printer()
         conns = model._conn_global_abs_in2out
         printer("Total connections: %d   Total transfer data size: %d" %
-                (len(conns), sum(meta['input'][n]['size'] for n in conns)))
+                (len(conns), sum(meta['input'][n]['size'] for n in conns if n in meta['input'])))
 
     printer()
     printer("Driver type: %s" % problem.driver.__class__.__name__)

@@ -652,6 +652,9 @@ class pyOptSparseDriver(Driver):
             if optimizer == 'IPOPT':
                 if exit_status not in {0, 1}:
                     self.fail = True
+            elif optimizer == 'PSQP':
+                if exit_status not in {1, 2, 3, 4}:
+                    self.fail = True
             else:
                 # exit status may be the empty string for optimizers that don't support it
                 if exit_status and exit_status > 2:
@@ -711,8 +714,6 @@ class pyOptSparseDriver(Driver):
             if self._user_termination_flag:
                 func_dict = self.get_objective_values()
                 func_dict.update(self.get_constraint_values(lintype='nonlinear'))
-                # convert func_dict to use promoted names
-                func_dict = model._prom_names_dict(func_dict)
                 return func_dict, 2
 
             # Execute the model
@@ -752,9 +753,6 @@ class pyOptSparseDriver(Driver):
         if fail > 0 and self._fill_NANs:
             for name in func_dict:
                 func_dict[name].fill(np.nan)
-
-        # convert func_dict to use promoted names
-        func_dict = model._prom_names_dict(func_dict)
 
         # print("Functions calculated")
         # print(dv_dict)
@@ -870,7 +868,7 @@ class pyOptSparseDriver(Driver):
                             sens_dict[okey][ikey].fill(np.nan)
 
         # convert sens_dict to use promoted names
-        sens_dict = model._prom_names_jac(sens_dict)
+        # sens_dict = model._prom_names_jac(sens_dict)
 
         # print("Derivatives calculated")
         # print(dv_dict)

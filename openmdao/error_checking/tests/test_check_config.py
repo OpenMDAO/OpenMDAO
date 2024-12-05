@@ -420,7 +420,7 @@ class TestCheckConfig(unittest.TestCase):
         prob.final_setup()
 
         expected_warning = (
-            "The following inputs are not connected:\n"
+            "The following inputs are connected to Auto IVC output variables:\n"
             "  cycle.d1.y2 (cycle.d1.y2)\n"
             "  x (cycle.d1.x)\n"
             "  x (obj_cmp.x)\n"

@@ -15,7 +15,7 @@ from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_M
     global_meta_names, collect_errors
 from openmdao.core.constants import INT_DTYPE
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.utils.array_utils import shape_to_len
+from openmdao.utils.array_utils import shape_to_len, submat_sparsity_iter
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key
 from openmdao.utils.mpi import MPI
@@ -25,7 +25,7 @@ from openmdao.utils.indexer import Indexer, indexer
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
     DerivativesWarning, warn_deprecation
-from openmdao.utils.code_utils import is_lambda, LambdaPickleWrapper
+from openmdao.utils.code_utils import is_lambda, LambdaPickleWrapper, get_partials_deps
 
 
 _forbidden_chars = {'.', '*', '?', '!', '[', ']'}
@@ -90,6 +90,9 @@ class Component(System):
         If True, the check_partials function will ignore this component.
     _has_distrib_outputs : bool
         If True, this component has at least one distributed output.
+    _compute_primals_out_shape : tuple or None
+        Cached (shape, istuple) of the output from compute_primal function.  If istuple is True,
+        then shape is a tuple of shapes, otherwise it is a single shape.
     """
 
     def __init__(self, **kwargs):
@@ -108,6 +111,28 @@ class Component(System):
         self._declared_partial_checks = []
         self._no_check_partials = False
         self._has_distrib_outputs = False
+        self._compute_primals_out_shape = None
+
+    def _tree_flatten(self):
+        """
+        Return a flattened pytree representation of this component.
+
+        We treat this component, when passed as 'self' into a function that is used by jax, as a
+        pytree with no continuous data.
+
+        Returns
+        -------
+        Tuple
+            A tuple containing continuous and static data.
+        """
+        return ((), {'_self_': self, '_statics_': self.get_self_statics()})
+
+    @staticmethod
+    def _tree_unflatten(aux_data, children):
+        """
+        Return the same instance of this component that was returned by the _tree_flatten method.
+        """
+        return aux_data['_self_']
 
     def _declare_options(self):
         """
@@ -126,6 +151,9 @@ class Component(System):
                              desc='If True, force nonlinear operations on this component to be '
                                   'included in the optimization loop even if this component is not '
                                   'relevant to the design variables and responses.')
+        self.options.declare('use_jit', types=bool, default=True,
+                             desc='If True, attempt to use jit on compute_primal, assuming jax or '
+                             'some other AD package is active.')
 
     def setup(self):
         """
@@ -279,7 +307,7 @@ class Component(System):
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
             self._discrete_outputs = _DictValues(self._var_discrete['output'])
         else:
-            self._discrete_inputs = self._discrete_outputs = ()
+            self._discrete_inputs = self._discrete_outputs = {}
 
         if self.comm.size > 1:
             # check that same variables are declared on all procs
@@ -356,6 +384,26 @@ class Component(System):
             self._jacobian = DictionaryJacobian(system=self)
 
         self.setup_partials()  # hook for component writers to specify sparsity patterns
+
+        if self.options['derivs_method'] in ('cs', 'fd'):
+            if self.matrix_free:
+                raise RuntimeError(f"{self.msginfo}: derivs_method of 'cs' or 'fd' is not "
+                                   "allowed for a matrix free component.")
+            self._has_approx = True
+            method = self.options['derivs_method']
+            self._get_approx_scheme(method)
+            if not self._declared_partials_patterns:
+                if self.compute_primal is None:
+                    raise RuntimeError(f"{self.msginfo}: compute_primal must be defined if using "
+                                       "a derivs_method option of 'cs' or 'fd'")
+                # declare all partials as 'cs' or 'fd'
+                for of, wrt in get_partials_deps(self.compute_primal,
+                                                 self._var_rel_names['output']):
+                    self.declare_partials(of, wrt, method=method)
+            else:
+                # declare only those partials that have been declared
+                for meta in self._declared_partials_patterns.values():
+                    meta['method'] = method
 
         # check to make sure that if num_par_fd > 1 that this system is actually doing FD.
         # Unfortunately we have to do this check after system setup has been called because that's
@@ -464,7 +512,7 @@ class Component(System):
     def _promoted_wrt_iter(self):
         yield from self._get_partials_wrts()
 
-    def _update_subjac_sparsity(self, sparsity):
+    def _update_subjac_sparsity(self, sparsity_iter):
         """
         Update subjac sparsity info based on the given coloring.
 
@@ -475,19 +523,17 @@ class Component(System):
 
         Parameters
         ----------
-        sparsity : dict
-            A nested dict of the form dct[of][wrt] = (rows, cols, shape)
+        sparsity_iter : iter of tuple
+            Tuple of the form (of, wrt, rows, cols, shape).
         """
         # sparsity uses relative names, so we need to convert to absolute
         prefix = self.pathname + '.'
-        for of, sub in sparsity.items():
-            of = prefix + of
-            for wrt, tup in sub.items():
-                wrt = prefix + wrt
-                abs_key = (of, wrt)
-                if abs_key in self._subjacs_info:
-                    # add sparsity info to existing partial info
-                    self._subjacs_info[abs_key]['sparsity'] = tup
+        for of, wrt, rows, cols, shape in sparsity_iter:
+            if rows is None:
+                continue
+            abs_key = (prefix + of, prefix + wrt)
+            if abs_key in self._subjacs_info:
+                self._subjacs_info[abs_key]['sparsity'] = (rows, cols, shape)
 
     def add_input(self, name, val=1.0, shape=None, units=None, desc='', tags=None,
                   shape_by_conn=False, copy_shape=None, compute_shape=None,
@@ -563,12 +609,11 @@ class Component(System):
             raise TypeError(f"{self.msginfo}: The compute_shape argument should be a function but "
                             f"a '{type(compute_shape).__name__}' was given.")
 
-        if (shape_by_conn or copy_shape or compute_shape):
+        if shape_by_conn or copy_shape or compute_shape:
             if shape is not None or ndim(val) > 0:
-                raise ValueError("%s: If shape is to be set dynamically using 'shape_by_conn', "
-                                 "'copy_shape', or 'compute_shape', 'shape' and 'val' should be a "
-                                 "scalar, but shape of '%s' and val of '%s' was given for variable"
-                                 " '%s'." % (self.msginfo, shape, val, name))
+                raise ValueError("%s: If shape is to be set dynamically, 'shape' and 'val' should "
+                                 "be a scalar, but shape of '%s' and val of '%s' was given for "
+                                 "variable '%s'." % (self.msginfo, shape, val, name))
         else:
             # value, shape: based on args, making sure they are compatible
             val, shape = ensure_compatible(name, val, shape)
@@ -835,7 +880,7 @@ class Component(System):
             raise TypeError(f"{self.msginfo}: The copy_shape argument should be a str or None but "
                             f"a '{type(copy_shape).__name__}' was given.")
 
-        if compute_shape and not isinstance(compute_shape, types.FunctionType):
+        if compute_shape and not isinstance(compute_shape, (types.FunctionType, types.MethodType)):
             raise TypeError(f"{self.msginfo}: The compute_shape argument should be a function but "
                             f"a '{type(compute_shape).__name__}' was given.")
 
@@ -1053,7 +1098,6 @@ class Component(System):
             meta = info[abs_key]
             meta['method'] = method
             meta.update(kwargs)
-            info[abs_key] = meta
 
     def declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None,
                          method='exact', step=None, form=None, step_calc=None, minimum_step=None):
@@ -1498,7 +1542,7 @@ class Component(System):
             else:
                 dist_in = abs2meta_out[wrt]['distributed']
 
-            if dist_in and not dist_out and not self.matrix_free:
+            if dist_in and not dist_out and not matfree:
                 rel_key = abs_key2rel_key(self, abs_key)
                 raise RuntimeError(f"{self.msginfo}: component has defined partial {rel_key} "
                                    "which is a non-distributed output wrt a distributed input."
@@ -1721,7 +1765,7 @@ class Component(System):
             if coloring_mod._use_partial_sparsity:
                 coloring = self._get_coloring()
                 if coloring is not None:
-                    self._update_subjac_sparsity(coloring.get_subjac_sparsity())
+                    self._update_subjac_sparsity(coloring._subjac_sparsity_iter())
                 if self._jacobian is not None:
                     self._jacobian._restore_approx_sparsity()
 
@@ -1861,6 +1905,43 @@ class Component(System):
         meta['base'] = 'ExplicitComponent' if self.is_explicit() else 'ImplicitComponent'
         return meta
 
+    def check_subjac_sparsity(self):
+        """
+        Check the declared sparsity of the sub-jacobians vs. the computed sparsity.
+        """
+        sparsity, _ = self.compute_sparsity()
+        full_nzrows = sparsity.row
+        full_nzcols = sparsity.col
+
+        def row_size_iter():
+            for of, start, end, _, _ in self._jac_of_iter():
+                yield of, end - start
+
+        def col_size_iter():
+            for wrt, start, end, _, _, _ in self._jac_wrt_iter():
+                yield wrt, end - start
+
+        prefix_len = len(self.pathname) + 1
+        for of, wrt, sjrows, sjcols, _ in submat_sparsity_iter(row_size_iter(), col_size_iter(),
+                                                               full_nzrows, full_nzcols,
+                                                               (len(self._outputs),
+                                                                len(self._inputs))):
+            if (of, wrt) in self._subjacs_info:
+                meta = self._subjacs_info[of, wrt]
+                if meta['rows'] is None and sjrows is not None:
+                    issue_warning(f"Sparsity pattern for {of} wrt {wrt} was declared with "
+                                  "rows=None, but a sparsity pattern has been computed.\n"
+                                  f"rows = {sjrows}\ncols = {sjcols}\n")
+                elif not np.all(np.asarray(meta['rows']) == sjrows):
+                    issue_warning(f"Sparsity pattern for {of} wrt {wrt} was declared with "
+                                  f"rows={meta['rows']} and col={meta['cols']}, but a different "
+                                  "sparsity pattern has been computed:\n"
+                                  f"rows = {sjrows}\ncols = {sjcols}\n")
+            else:
+                issue_warning(f"{self.msginfo}: Partial for {of[prefix_len:]} wrt "
+                              f"{wrt[prefix_len:]} was not declared but is nonzero.\n"
+                              f"rows = {sjrows}\ncols = {sjcols}\n")
+
 
 class _DictValues(object):
     """
@@ -1882,5 +1963,21 @@ class _DictValues(object):
     def __len__(self):
         return len(self._dict)
 
+    def __iter__(self):
+        return iter(self._dict)
+
+    def __bool__(self):
+        return bool(self._dict)
+
+    def keys(self):
+        return self._dict.keys()
+
     def items(self):
-        return [(key, self._dict[key]['val']) for key in self._dict]
+        return [(key, meta['val']) for key, meta in self._dict.items()]
+
+    def values(self):
+        return [meta['val'] for meta in self._dict.values()]
+
+    def set_vals(self, vals):
+        for key, val in zip(self._dict, vals):
+            self[key] = val

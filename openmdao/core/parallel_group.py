@@ -189,6 +189,22 @@ class ParallelGroup(Group):
         else:
             super()._get_relevance_modifiers(grad_groups, always_opt_comps)
 
+    def is_explicit(self):
+        """
+        Return True if this Group contains only explicit systems and has no cycles.
+
+        Returns
+        -------
+        bool
+            True if this is an explicit component.
+        """
+        if self._is_explicit is None:
+            self._is_explicit = super().is_explicit()
+            if self.comm.size > 1:
+                self._is_explicit = self.comm.allreduce(int(self._is_explicit)) > 0
+
+        return self._is_explicit
+
     def _sys_tree_visitor(self, func, predicate=None, recurse=True, include_self=True,
                           *args, **kwargs):
         """
