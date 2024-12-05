@@ -801,8 +801,8 @@ class TestSqliteRecorder(unittest.TestCase):
                 'con_cmp2.y2': 'y2'
             },
             'output': {
-                '_auto_ivc.v0': '_auto_ivc.v0',
-                '_auto_ivc.v1': '_auto_ivc.v1',
+                '_auto_ivc.v0': 'z',
+                '_auto_ivc.v1': 'x',
                 'd1.y1': 'y1',
                 'd2.y2': 'y2',
                 'obj_cmp.obj': 'obj',

@@ -3992,8 +3992,12 @@ class System(object, metaclass=SystemMetaclass):
             disc2meta = disc_metadict[iotype]
 
             for abs_name, prom in it[iotype].items():
-                if not match_prom_or_abs(abs_name, prom, includes, excludes):
-                    continue
+                if abs_name.startswith('_auto_ivc.'):
+                    if not match_prom_or_abs(abs_name, abs_name, includes, excludes):
+                        continue
+                else:
+                    if not match_prom_or_abs(abs_name, prom, includes, excludes):
+                        continue
 
                 rel_name = abs_name[rel_idx:]
                 if abs_name in all2meta[iotype]:  # continuous
@@ -6510,8 +6514,13 @@ class System(object, metaclass=SystemMetaclass):
             try:
                 abs_outs = self._var_allprocs_prom2abs_list['output'][outprom]
             except KeyError:
-                raise KeyError(f"{self.msginfo}: Promoted output variable '{outprom}' was not "
-                               "found.")
+                # outprom might be an inprom mapped to an auto_ivc
+                try:
+                    inabs = self._var_allprocs_prom2abs_list['input'][outprom]
+                    abs_outs = [self._conn_global_abs_in2out[inabs[0]]]
+                except KeyError:
+                    raise KeyError(f"{self.msginfo}: Promoted output variable '{outprom}' was not "
+                                   "found.")
 
             plist_outs = self._get_promote_lists(tree, abs_outs, 'out')
 
