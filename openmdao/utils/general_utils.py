@@ -1489,7 +1489,7 @@ def _default_predicate(name, obj):
     """
     if isfunction(obj) or ismethod(obj):
         for n in ['solve', 'apply', 'compute', 'setup', 'coloring', 'linearize', 'get_outputs_dir',
-                  'approx', 'static']:
+                  'approx', 'static', 'run', 'grad', 'jacvec', 'design', 'obj']:
             if n in name:
                 return True
     return False
