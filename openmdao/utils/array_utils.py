@@ -530,7 +530,7 @@ def dv_abs_complex(x, x_deriv):
 
 def rand_sparsity(shape, density_ratio, dtype=bool):
     """
-    Return a random boolean COO matrix of the given shape with given percent density.
+    Return a random COO matrix of the given shape with given percent density.
 
     Row and column indices are generated using random integers so some duplication
     is possible, resulting in a matrix with somewhat lower density than specified.
@@ -563,6 +563,8 @@ def rand_sparsity(shape, density_ratio, dtype=bool):
 
     # get rid of dup rows/cols
     coo.sum_duplicates()
+
+    coo.data[:] = 1  # set all nonzero values to 1. For bool won't matter, but need for other dtypes
 
     return coo
 

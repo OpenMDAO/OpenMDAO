@@ -78,6 +78,7 @@ test = [
     "websockets>8",
 ]
 visualization = [
+    "panel",
     "bokeh>=2.4.0",
     "colorama",
     "matplotlib",
