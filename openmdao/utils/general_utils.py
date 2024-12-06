@@ -1463,7 +1463,7 @@ def _default_predicate(name, obj):
         True if the method should be traced.
     """
     for n in ['solve', 'apply', 'compute', 'setup', 'coloring', 'linearize', 'get_outputs_dir',
-                'approx', 'static', 'get_vars', 'abs_get']:
+              'approx', 'static', 'get_vars', 'abs_get']:
         if n in name:
             return True
     return False
@@ -1511,18 +1511,20 @@ SolverMetaclass = type
 DriverMetaclass = type
 DebugMeta = type
 
+
 def om_dump(*args, **kwargs):
-    """
+    r"""
     Do nothing.
 
     Parameters
     ----------
-    args : list
+    *args : list
         Positional args.
-    kwargs : dict
+    **kwargs : dict
         Named args.
     """
     pass
+
 
 def dbg(funct):
     """
@@ -1544,8 +1546,10 @@ def dbg(funct):
 def _wrap_comm(comm, scope=None):
     return comm
 
+
 def _unwrap_comm(comm):
     return comm
+
 
 _om_dump = env_truthy('OPENMDAO_DUMP')
 # OPENMDAO_DUMP can have values like 'stdout', 'stderr', 'rank', 'pid', 'rank,pid', 'pid,rank'
@@ -1702,8 +1706,8 @@ if _om_dump:
                     self.__dict__['_comm'] = comm
                 self.__dict__['_scope'] = scope
                 for name in ['bcast', 'Bcast', 'gather', 'Gather', 'scatter', 'Scatter',
-                            'allgather', 'Allgather', 'Allgatherv', 'allreduce', 'Allreduce',
-                            'send', 'Send', 'recv', 'Recv', 'sendrecv', 'Sendrecv']:
+                             'allgather', 'Allgather', 'Allgatherv', 'allreduce', 'Allreduce',
+                             'send', 'Send', 'recv', 'Recv', 'sendrecv', 'Sendrecv']:
                     self.__dict__[name] = _comm_debug_decorator(getattr(self._comm, name), scope)
 
             def __getattr__(self, name):
