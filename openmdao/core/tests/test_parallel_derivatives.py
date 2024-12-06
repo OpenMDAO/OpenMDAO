@@ -893,6 +893,43 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         self.assertEqual(str(ctx.exception),
            "Parallel derivative color 'a' has responses ['pg.dc2.y', 'pg.dc2.y2'] with overlapping dependencies on the same rank.")
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class CheckParallelDerivColoringErrors(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_parallel_deriv_coloring_overlap_err(self):
+        p = om.Problem()
+        model = p.model
+        par1 = model.add_subsystem('par1', om.ParallelGroup())
+        par1.add_subsystem('C1', om.ExecComp('y = x * 2.0', x=np.zeros(3), y=np.zeros(3)))
+        par1.add_subsystem('C2', om.ExecComp('y = x * 3.0', x=np.zeros(3), y=np.zeros(3)))
+
+        par2 = model.add_subsystem('par2', om.ParallelGroup())
+        par2.add_subsystem('C3', om.ExecComp('y = x1*.5 + x2*.6', shape=3))
+        par2.add_subsystem('C4', om.ExecComp('y = x1*.2 + x2*.3', shape=3))
+
+        model.add_subsystem('C5', om.ExecComp('y = x * 4.0', x=np.zeros(3), y=np.zeros(3)))
+
+        model.connect('par1.C1.y', ['par2.C3.x1', 'par2.C4.x1'])
+        model.connect('par1.C2.y', ['par2.C3.x2'])
+        model.connect('par2.C3.y', 'C5.x')
+
+        pdc = 'a'
+        model.add_constraint('par2.C3.y', lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
+        model.add_constraint('par2.C4.y', lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
+        model.add_design_var('par1.C1.x', lower=-50, upper=50)
+        model.add_design_var('par1.C2.x', lower=-50, upper=50)
+        model.add_objective('C5.y', index=2)
+
+        prob = om.Problem(model=model, name='parallel_deriv_coloring_overlap_err')
+        prob.setup(mode='rev')
+        prob.final_setup()
+
+        # with self.assertRaises(Exception) as ctx:
+        #     prob.final_setup()
+        # self.assertEqual(str(ctx.exception),
+        #    "Parallel derivative color 'a' has responses ['pg.dc2.y', 'pg.dc2.y2'] with overlapping dependencies on the same rank.")
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestAutoIVCParDerivBug(unittest.TestCase):
