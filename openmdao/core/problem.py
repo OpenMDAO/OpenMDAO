@@ -14,7 +14,7 @@ import time
 import atexit
 
 from collections import defaultdict, namedtuple
-from itertools import product
+from itertools import product, chain
 
 from io import StringIO, TextIOBase
 
@@ -2680,30 +2680,24 @@ class Problem(object, metaclass=ProblemMetaclass):
                                             get_sizes=False)
 
         problem_indep_vars = []
-        indep_var_names = set()
 
         col_names = ['name', 'units', 'val']
         if options is not None:
             col_names.extend(options)
 
         abs2meta = model._var_allprocs_abs2meta['output']
+        abs2prom = model._var_allprocs_abs2prom['output']
+        abs2disc = model._var_allprocs_discrete['output']
 
-        prom2src = {}
-        for prom in self.model._var_allprocs_prom2abs_list['input']:
-            src = model.get_source(prom)
-            if 'openmdao:indep_var' in abs2meta[src]['tags']:
-                prom2src[prom] = src
-
-        for prom, src in prom2src.items():
-            name = prom if src.startswith('_auto_ivc.') else src
-
-            if (include_design_vars or name not in design_vars) \
-                    and name not in indep_var_names:
-                meta = abs2meta[src]
-                meta = {key: meta[key] for key in col_names if key in meta}
-                meta['val'] = self.get_val(prom)
-                problem_indep_vars.append((name, meta))
-                indep_var_names.add(name)
+        seen = set()
+        for absname, meta in chain(abs2meta.items(), abs2disc.items()):
+            if 'openmdao:indep_var' in meta['tags']:
+                name = abs2prom[absname]
+                if (include_design_vars or name not in design_vars) and name not in seen:
+                    meta = {key: meta[key] for key in col_names if key in meta}
+                    meta['val'] = self.get_val(name)
+                    problem_indep_vars.append((name, meta))
+                    seen.add(name)
 
         if out_stream is not None:
             header = f'Problem {self._name} Independent Variables'

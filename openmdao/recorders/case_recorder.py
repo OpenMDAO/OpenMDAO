@@ -134,7 +134,7 @@ class CaseRecorder(object):
 
         if MPI and comm and comm.size > 1:
             record_on_ranks = comm.allgather(self._record_on_proc)
-            recording_ranks = [rnk for rnk, rec in enumerate(record_on_ranks) if rec is True]
+            recording_ranks = [rnk for rnk, rec in enumerate(record_on_ranks) if rec]
             if recording_ranks:
                 # recording ranks have been specified
                 self._recording_ranks = recording_ranks

@@ -7,7 +7,7 @@ from openmdao.core.constants import INT_DTYPE
 from openmdao.vectors.vector import _full_slice
 from openmdao.utils.array_utils import get_input_idx_split, ValueRepeater
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.general_utils import _convert_auto_ivc_to_conn_name, LocalRangeIterable
+from openmdao.utils.general_utils import LocalRangeIterable
 from openmdao.utils.mpi import check_mpi_env
 from openmdao.utils.rangemapper import RangeMapper
 
@@ -541,8 +541,10 @@ class ApproximationScheme(object):
 
                     if self._progress_out:
                         end_time = time.perf_counter()
-                        prom_name = _convert_auto_ivc_to_conn_name(
-                            system._conn_global_abs_in2out, wrt)
+                        if wrt in system._var_allprocs_abs2prom['output']:
+                            prom_name = system._var_allprocs_abs2prom['output'][wrt]
+                        else:
+                            prom_name = system._var_allprocs_abs2prom['input'][wrt]
                         self._progress_out.write(f"{fd_count + 1}/{len(result)}: Checking "
                                                  f"derivatives with respect to: "
                                                  f"'{prom_name} [{vecidxs}]' ... "

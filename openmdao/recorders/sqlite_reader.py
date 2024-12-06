@@ -320,15 +320,6 @@ class SqliteCaseReader(BaseCaseReader):
                 if 'upper' in meta and meta['upper'] is not None:
                     meta['upper'] = np.resize(np.array(meta['upper']), meta['shape'])
 
-            # Map source names to input display text.
-            if version >= 11:
-                abs2prom_in = self._abs2prom['input']
-                for target, src in self._conns.items():
-                    if src.startswith('_auto_ivc.'):
-                        if target in abs2prom_in:
-                            if src in self._abs2meta:  # this contains all inputs and outputs
-                                self._abs2prom['output'][src] = abs2prom_in[target]
-
         elif version in (1, 2):
             abs2prom = row['abs2prom']
             prom2abs = row['prom2abs']

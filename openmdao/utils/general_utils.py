@@ -21,27 +21,6 @@ from openmdao.utils.array_utils import shape_to_len
 _float_inf = float('inf')
 
 
-def _convert_auto_ivc_to_conn_name(conns_dict, name):
-    """
-    Convert name of auto_ivc val to promoted input name.
-
-    Parameters
-    ----------
-    conns_dict : dict
-        Dictionary of global connections.
-    name : str
-        Name of auto_ivc to be found.
-
-    Returns
-    -------
-    str
-        Promoted input name.
-    """
-    for key, val in conns_dict.items():
-        if val == name:
-            return key
-
-
 def ensure_compatible(name, value, shape=None, indices=None):
     """
     Make value compatible with the specified shape or the shape of indices.

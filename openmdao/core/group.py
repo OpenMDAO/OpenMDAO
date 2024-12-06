@@ -4700,10 +4700,10 @@ class Group(System):
                     auto_ivc.add_discrete_output(loc_out_name, val=val)
 
                 src = conns[abs_in]
-                if src in auto_ivc.auto2tgt:
-                    auto_ivc.auto2tgt[src].append(abs_in)
+                if src in auto2tgt:
+                    auto2tgt[src].append(abs_in)
                 else:
-                    auto_ivc.auto2tgt[src] = [abs_in]
+                    auto2tgt[src] = [abs_in]
 
         if not prom2auto:
             return auto_ivc

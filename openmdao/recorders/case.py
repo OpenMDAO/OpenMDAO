@@ -220,11 +220,6 @@ class Case(object):
                 return self.outputs[name]
             except KeyError:
                 pass
-                # if name in self._auto_ivc_map:
-                #     try:
-                #         return self.inputs[self._auto_ivc_map[name]]
-                #     except KeyError:
-                #         pass  # keep original name passed in
 
             if name in self._prom2abs['input'] and name not in self._abs2prom['input']:
                 absin = self._prom2abs['input'][name][0]
@@ -485,14 +480,10 @@ class Case(object):
                     if iotype == 'output':
                         out_meta = meta
                     else:
-                        src_name = self._conns[abs_name]
-                        out_meta = abs2meta[src_name]
+                        out_meta = abs2meta[self._conns[abs_name]]
 
                     src_tags = out_meta['tags'] if 'tags' in out_meta else {}
-                    if is_indep_var:
-                        if 'openmdao:indep_var' not in src_tags:
-                            continue
-                    elif 'openmdao:indep_var' in src_tags:
+                    if is_indep_var != ('openmdao:indep_var' in src_tags):
                         continue
 
                 # handle is_design_var
@@ -501,16 +492,12 @@ class Case(object):
                         out_name = abs_name
                     else:
                         # input, get connected output
-                        src_name = self._conns[abs_name]
-                        out_name = abs2prom['output'][src_name]
+                        out_name = abs2prom['output'][self._conns[abs_name]]
 
                     if out_name.startswith('_auto_ivc.'):
                         out_name = abs2prom['output'][out_name]
 
-                    if is_design_var:
-                        if out_name not in des_vars:
-                            continue
-                    elif out_name in des_vars:
+                    if is_design_var != (out_name in des_vars):
                         continue
 
                 # handle tags
@@ -1354,11 +1341,10 @@ class PromAbsDict(dict):
         elif key in self:
             return super().__getitem__(key)
 
-        elif key in self._abs2prom and key.startswith('_auto_ivc.'):
-            try:
-                return self._values[self._abs2prom[key]]
-            except (KeyError, ValueError):
-                pass
+        elif key in self._abs2prom:
+            prom = self._abs2prom[key]
+            if prom in self._keys:
+                return self._values[prom]
 
         elif isinstance(key, tuple) or self._DERIV_KEY_SEP in key:
             # derivative keys can be either (of, wrt) or 'of!wrt'
