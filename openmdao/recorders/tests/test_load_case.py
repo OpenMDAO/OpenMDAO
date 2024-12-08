@@ -85,9 +85,16 @@ class TestLoadCase(unittest.TestCase):
         prob.setup()
 
         expected_warnings = [
-            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'y1', recorded in the case is not found in the model."),
-            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'y2', recorded in the case is not found in the model."),
-            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'z', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'con_cmp1.y1', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'mda.d2.y1', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'obj_cmp.y1', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'con_cmp2.y2', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'mda.d1.y2', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'obj_cmp.y2', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'mda.d1.z', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'mda.d2.z', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'obj_cmp.z', recorded in the case is not found in the model."),
+
             (OpenMDAOWarning, "<model> <class Group>: Output variable, 'z', recorded in the case is not found in the model."),
             (OpenMDAOWarning, "<model> <class Group>: Output variable, 'con1', recorded in the case is not found in the model."),
             (OpenMDAOWarning, "<model> <class Group>: Output variable, 'con2', recorded in the case is not found in the model."),
@@ -98,15 +105,15 @@ class TestLoadCase(unittest.TestCase):
         with assert_warnings(expected_warnings):
             prob.load_case(case)
 
-    def test_load_equivalent_model(self):
+    def test_load_equivalent_model_driver(self):
         prob = SellarProblem(SellarDerivativesGrouped)
-
-        prob.model.add_recorder(self.recorder)
 
         driver = prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
         driver.recording_options['record_desvars'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
+
+        prob.driver.add_recorder(self.recorder)
 
         prob.setup()
         prob.run_driver()
@@ -114,13 +121,51 @@ class TestLoadCase(unittest.TestCase):
 
         cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
-        system_cases = cr.list_cases('root', out_stream=None)
-        case = cr.get_case(system_cases[0])
+        cases = cr.list_cases('driver', out_stream=None)
+        case = cr.get_case(cases[0])
 
         # try to load it into a different version of the Sellar model
         # this should succeed with no warnings due to the two models
-        # having the same promoted inputs/outputs, even though the
-        # underlying model heierarchy has changed
+        # having the same promoted outputs, even though the
+        # underlying model heierarchy has changed.  Note that this only
+        # works for outputs.  If inputs are loaded, the model being loaded
+        # into must match the model saved in the recorder.
+        prob = SellarProblem()
+        prob.setup()
+
+        with assert_no_warning(UserWarning):
+            prob.load_case(case)
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+    def test_load_equivalent_model_system(self):
+        prob = SellarProblem(SellarDerivativesGrouped)
+
+        driver = prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
+        driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = True
+
+        prob.model.recording_options['record_inputs'] = False
+        prob.model.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
+
+        cases = cr.list_cases('root', out_stream=None)
+        case = cr.get_case(cases[0])
+
+        # try to load it into a different version of the Sellar model
+        # this should succeed with no warnings due to the two models
+        # having the same promoted outputs, even though the
+        # underlying model heierarchy has changed.  Note that this only
+        # works for outputs.  If inputs are loaded, the model being loaded
+        # into must match the model saved in the recorder.
         prob = SellarProblem()
         prob.setup()
 
@@ -236,11 +281,11 @@ class TestLoadCase(unittest.TestCase):
                 super().compute_partials(inputs, outputs)
 
 
-        # Setup the optimization 
-        prob = om.Problem() 
+        # Setup the optimization
+        prob = om.Problem()
         prob.model.add_subsystem(
             'paraboloid', ParaboloidWithDiscreteOutput())
-        prob.driver = om.ScipyOptimizeDriver() 
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
 
         # Setup Recorder

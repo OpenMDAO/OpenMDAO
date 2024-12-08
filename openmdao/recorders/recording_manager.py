@@ -8,7 +8,7 @@ from openmdao.utils.om_warnings import issue_warning
 
 class RecordingManager(object):
     """
-    Object that routes function calls to all attached recorders.
+    Object that routes function calls to all recorders that are attached to the same object.
 
     Attributes
     ----------
@@ -146,6 +146,11 @@ class RecordingManager(object):
             raise RuntimeError("OpenMDAO currently does not support a mixture of parallel "
                                "and non-parallel recorders.")
         return pset.pop()
+
+    def _check_gather(self):
+        for rec in self._recorders:
+            if rec._do_gather:
+                return True
 
 
 def _get_all_requesters(problem):

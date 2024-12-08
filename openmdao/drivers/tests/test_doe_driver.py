@@ -1298,8 +1298,8 @@ class TestDOEDriver(unittest.TestCase):
         inputs = case.inputs
         outputs = case.outputs
         for name in ('x', 'y'):
-            self.assertTrue(isinstance(inputs[name], np.ndarray))
-            self.assertTrue(inputs[name].shape, (2,))
+            self.assertTrue(isinstance(inputs['parab.' + name], np.ndarray))
+            self.assertTrue(inputs['parab.' + name].shape, (2,))
             self.assertTrue(isinstance(outputs[name], np.ndarray))
             self.assertTrue(outputs[name].shape, (2,))
 
@@ -1680,6 +1680,23 @@ class TestParallelDOE4Proc(unittest.TestCase):
             [('x1', 1.), ('x2', 1.)],
         ]
 
+    def _check_outputs(self, prob, casereader, cases, expected, tomatch, parallel=True):
+        num_models = prob.comm.size // prob.driver.options['procs_per_model']
+        # cases recorded on this proc
+        if parallel:
+            my_expected = [ex for i, ex in enumerate(expected) if i % num_models == prob.driver._color]
+        else:
+            my_expected = expected
+        self.assertEqual(len(cases), len(my_expected))
+
+        for exp, case in zip(my_expected, cases):
+            outputs = casereader.get_case(case).outputs
+
+            for name in tomatch:
+                self.assertEqual(outputs[name], exp[name])
+
+        return len(my_expected)
+
     def test_indivisible_error(self):
         prob = om.Problem()
 
@@ -1815,31 +1832,21 @@ class TestParallelDOE4Proc(unittest.TestCase):
             num_cases = 0
 
             # we can run two models in parallel on our 4 procs
-            num_models = prob.comm.size // procs_per_model
 
             # a separate case file will be written by rank 0 of each parallel model
             # (the top two global ranks)
             rank = prob.comm.rank
             filename = prob.get_outputs_dir() / f"cases.sql_{rank}"
 
-            if rank < num_models:
+            if prob.driver.comm.rank == 0:
                 expect_msg = f"Cases from rank {rank} are being written to {filename}."
                 self.assertIn(expect_msg, output)
 
                 cr = om.CaseReader(filename)
                 cases = cr.list_cases('driver')
-
-                # cases recorded on this proc
                 num_cases = len(cases)
-                self.assertEqual(num_cases, len(expected) // num_models+(rank < len(expected) % num_models))
 
-                for n, case in enumerate(cases):
-                    idx = n * num_models + rank  # index of expected case
-
-                    outputs = cr.get_case(case).outputs
-
-                    for name in ('x1', 'x2', 'c3.y'):
-                        self.assertEqual(outputs[name], expected[idx][name])
+                self._check_outputs(prob, cr, cases, expected, ('x1', 'x2', 'c3.y'))
             else:
                 self.assertFalse("Cases from rank %d are being written" % rank in output)
                 self.assertFalse(os.path.exists(filename))
@@ -1898,24 +1905,11 @@ class TestParallelDOE4Proc(unittest.TestCase):
         expect_msg = f"Cases from rank {rank} are being written to {filename}."
         self.assertTrue(expect_msg in output)
 
-        # we are running 4 models in parallel, each using 1 proc
-        num_models = prob.comm.size // procs_per_model
-
         cr = om.CaseReader(filename)
         cases = cr.list_cases('driver', out_stream=None)
-
-        # cases recorded on this proc
         num_cases = len(cases)
-        self.assertEqual(num_cases, len(expected) // num_models + (rank < len(expected) % num_models))
 
-        for n, case in enumerate(cases):
-            idx = n * num_models + rank  # index of expected case
-
-            outputs = cr.get_case(case).outputs
-
-            self.assertEqual(outputs['x1'], expected[idx]['x1'])
-            self.assertEqual(outputs['x2'], expected[idx]['x2'])
-            self.assertEqual(outputs['c3.y'], expected[idx]['c3.y'])
+        self._check_outputs(prob, cr, cases, expected, ('x1', 'x2', 'c3.y'))
 
         # total number of cases recorded across all requested procs
         num_cases = prob.comm.allgather(num_cases)
@@ -1977,12 +1971,7 @@ class TestParallelDOE4Proc(unittest.TestCase):
             num_cases = len(cases)
             self.assertEqual(num_cases, len(expected))
 
-            for idx, case in enumerate(cases):
-                outputs = cr.get_case(case).outputs
-
-                self.assertEqual(outputs['x1'], expected[idx]['x1'])
-                self.assertEqual(outputs['x2'], expected[idx]['x2'])
-                self.assertEqual(outputs['c3.y'], expected[idx]['c3.y'])
+            self._check_outputs(prob, cr, cases, expected, ('x1', 'x2', 'c3.y'), parallel=run_parallel)
         else:
             # confirm that redundant recordings are not created
             self.assertFalse("Cases from rank %d are being written" % rank in output)
@@ -2043,12 +2032,7 @@ class TestParallelDOE4Proc(unittest.TestCase):
             num_cases = len(cases)
             self.assertEqual(num_cases, len(expected))
 
-            for idx, case in enumerate(cases):
-                outputs = cr.get_case(case).outputs
-
-                self.assertEqual(outputs['x1'], expected[idx]['x1'])
-                self.assertEqual(outputs['x2'], expected[idx]['x2'])
-                self.assertEqual(outputs['c3.y'], expected[idx]['c3.y'])
+            self._check_outputs(prob, cr, cases, expected, ('x1', 'x2', 'c3.y'), parallel=run_parallel)
         else:
             # confirm that redundant recordings are not created
             self.assertFalse("Cases from rank %d are being written" % rank in output)
@@ -2224,8 +2208,8 @@ class TestParallelDistribDOE(unittest.TestCase):
 
         # check recorded cases from each case file
         rank = prob.comm.rank
+        filename0 = prob.get_outputs_dir() / f"cases.sql_{rank}"
         if rank == 0:
-            filename0 = prob.get_outputs_dir() / "cases.sql_0"
             values = []
 
             cr = om.CaseReader(filename0)
@@ -2243,7 +2227,6 @@ class TestParallelDistribDOE(unittest.TestCase):
                         self.assertEqual(x_inputs.count([n1, n2, n3]), 8)
 
         elif rank == 1:
-            filename0 = prob.get_outputs_dir() / "cases.sql_1"
             values = []
 
             cr = om.CaseReader(filename0)
