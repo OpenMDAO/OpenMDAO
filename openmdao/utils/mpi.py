@@ -229,8 +229,8 @@ def multi_proc_exception_check(comm):  # pragma no cover
         failed = comm.allreduce(fail)
         if failed:
             if fail:
-                info = (MPI.COMM_WORLD.rank , exc_type, ''.join(traceback.format_tb(tb)),
-                       exc)
+                info = (MPI.COMM_WORLD.rank, exc_type, ''.join(traceback.format_tb(tb)),
+                        exc)
             else:
                 info = None
 
