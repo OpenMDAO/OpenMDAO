@@ -924,7 +924,8 @@ class CheckParallelDerivColoringErrors(unittest.TestCase):
         prob = om.Problem(model=model, name='parallel_deriv_coloring_overlap_err')
         prob.setup(mode='rev')
         prob.final_setup()
-
+        prob.run_model()
+        # prob.check_totals(show_only_incorrect=True)
         # with self.assertRaises(Exception) as ctx:
         #     prob.final_setup()
         # self.assertEqual(str(ctx.exception),

@@ -6,10 +6,12 @@ from collections import defaultdict
 
 import numpy as np
 
-from openmdao.utils.general_utils import all_ancestors, _contains_all, get_rev_conns, env_truthy
+from openmdao.utils.general_utils import all_ancestors, _contains_all, get_rev_conns, env_truthy, \
+    om_dump
 from openmdao.utils.graph_utils import get_sccs_topo
 from openmdao.utils.array_utils import array_hash
 from openmdao.utils.om_warnings import issue_warning
+
 
 _no_relevance = env_truthy('OPENMDAO_NO_RELEVANCE')
 
@@ -959,12 +961,16 @@ class Relevance(object):
         if isinstance(rev_seeds, str):
             rev_seeds = [rev_seeds]
 
+        om_dump('iter_seed_pair_relevance', fwd_seeds, rev_seeds)
+
         for seed in fwd_seeds:
             for rseed in rev_seeds:
                 inter = self._get_rel_array(self._seed_var_map, self._single_seed2relvars,
                                             seed, rseed)
+                om_dump(f"seed={seed}, rseed={rseed}, inter={[int(i) for i in inter]}")
                 if np.any(inter):
                     inter = self._rel_names_iter(inter, self._var2idx)
+                    om_dump(f"filtered inter={list(inter)}")
                     yield seed, rseed, self._apply_node_filter(inter, filt)
 
     def _apply_node_filter(self, names, filt):
@@ -1119,6 +1125,7 @@ class Relevance(object):
                 if response in responses and self._graph.nodes[response]['local']:
                     rescolor = responses[response]['parallel_deriv_color']
                     if rescolor:
+                        om_dump(f"response {response} has color {rescolor}, relset={relset}")
                         pd_err_chk[rescolor][response] = relset
 
         # check to make sure we don't have any overlapping dependencies between vars of the
@@ -1127,7 +1134,10 @@ class Relevance(object):
         for pdcolor, dct in pd_err_chk.items():
             for vname, relset in dct.items():
                 for n, nds in dct.items():
+                    om_dump(f"checking {vname} vs {n}")
+                    om_dump(f"  {relset} vs {nds}")
                     if vname != n and relset.intersection(nds):
+                        om_dump("ERROR found!")
                         if pdcolor not in errs:
                             errs[pdcolor] = []
                         errs[pdcolor].append(vname)
