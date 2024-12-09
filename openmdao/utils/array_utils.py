@@ -985,6 +985,7 @@ else:
                     ret[i] = a[a_ind] * b[b_ind]
                 return ret
 
+
 def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, shape):
     """
     Yield the sparsity of each submatrix, based on variable names and sizes.

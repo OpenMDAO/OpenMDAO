@@ -373,8 +373,8 @@ class pyOptSparseDriver(Driver):
 
         # Only need initial run if we have linear constraints or if we are using an optimizer that
         # doesn't perform one initially.
-        model_ran = False
-        if optimizer in run_required or linear_constraints:
+        model_ran = bool(self.options['hotstart_file'])
+        if not model_ran and (optimizer in run_required or linear_constraints):
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 self._run_solve_nonlinear()
                 rec.abs = 0.0
