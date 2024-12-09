@@ -11,7 +11,6 @@ class OmModelData extends ModelData {
             console.info("Unconnected nodes: ", this.unconnectedInputs);
 
         this._initSubSystemChildren(this.root);
-        this._updateAutoIvcNames();
 
         debugInfo("New model: ", this);
         // this.errorCheck();
@@ -114,24 +113,6 @@ class OmModelData extends ModelData {
     }
 
     /**
-     * Find the target of an Auto-IVC variable.
-     * @param {String} elementPath The full path of the element to check. Must start with _auto_ivc.
-     * @return {String} The absolute path of the target element, or undefined if not found.
-     */
-    getAutoIvcTgt(elementPath) {
-        if (!elementPath.match(/^_auto_ivc.*$/)) return undefined;
-
-        for (const conn of this.conns) {
-            if (conn.src == elementPath) {
-                return conn.tgt;
-            }
-        }
-
-        console.warn(`No target connection found for ${elementPath}.`)
-        return undefined;
-    }
-
-    /**
      * Create an array in each node containing references to its
      * children that are subsystems. Runs recursively over the node's
      * children array.
@@ -173,25 +154,6 @@ class OmModelData extends ModelData {
      */
     _newConnectionObj(conn) {
         return new OmNodeConnection(conn, this.nodePaths, this.sysPathnamesList);
-    }
-
-    /**
-     * If the Auto-IVC component exists, rename its child variables to their
-     * promoted names so they can be easily recognized instead of as v0, v1, etc.
-     */
-    _updateAutoIvcNames() {
-        const aivc = this.nodePaths['_auto_ivc'];
-        if (aivc !== undefined && aivc.hasChildren()) {
-            for (const ivc of aivc.children) {
-                if (!ivc.isFilter()) {
-                    const tgtPath = this.getAutoIvcTgt(ivc.path);
-
-                    if (tgtPath !== undefined) {
-                        ivc.promotedName = this.nodePaths[tgtPath].promotedName;
-                    }
-                }
-            }
-        }
     }
 
     /**
