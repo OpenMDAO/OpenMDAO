@@ -1183,7 +1183,6 @@ class Relevance(object):
                                 "know because it doesn't track dependencies of variables down "
                                 "to the index level.")
 
-
         if msg:
             raise RuntimeError('\n'.join(msg))
 
