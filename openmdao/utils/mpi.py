@@ -221,7 +221,7 @@ def multi_proc_exception_check(comm):  # pragma no cover
         try:
             yield
         except Exception:
-            exc = sys.exc_info()
+            exc_type, exc, tb = sys.exc_info()
             fail = 1
         else:
             fail = 0
@@ -229,17 +229,19 @@ def multi_proc_exception_check(comm):  # pragma no cover
         failed = comm.allreduce(fail)
         if failed:
             if fail:
-                msg = (f"{exc[1]}", exc[0])
+                info = (MPI.COMM_WORLD.rank, exc_type, ''.join(traceback.format_tb(tb)),
+                        exc)
             else:
-                msg = None
-            for i, tup in enumerate(comm.allgather(msg)):
-                if tup is not None:
-                    if i == comm.rank:
-                        msg = f"Exception raised on rank {i}: {exc[1]}"
-                        raise exc[0](msg).with_traceback(exc[2])
-                    else:
-                        m, exc = tup
-                        raise exc(f"Exception raised on rank {i}: {m}")
+                info = None
+
+            gathered = [tup for tup in comm.allgather(info) if tup is not None]
+            ranks = sorted(set([tup[0] for tup in gathered]))
+            _, exc_type, tbtext, exc = gathered[0]
+
+            if comm.rank == 0:
+                raise exc_type(f"Exception raised on ranks {ranks}: first traceback:\n{tbtext}")
+            else:
+                raise exc_type(f"Exception raised on ranks {ranks}: {exc}")
 
 
 if MPI:

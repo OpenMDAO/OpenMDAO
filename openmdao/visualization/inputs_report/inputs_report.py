@@ -95,7 +95,10 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
         for target, meta in model._var_allprocs_abs2meta['input'].items():
             prom = model._var_allprocs_abs2prom['input'][target]
             src = connections[target]
-            sprom = model._var_allprocs_abs2prom['output'][src]
+            if src.startswith('_auto_ivc.'):
+                sprom = src
+            else:
+                sprom = model._var_allprocs_abs2prom['output'][src]
             val = model.get_val(target, get_remote=True, from_src=not src.startswith('_auto_ivc.'))
             smeta = model._var_allprocs_abs2meta['output'][src]
             src_is_ivc = 'openmdao:indep_var' in smeta['tags']

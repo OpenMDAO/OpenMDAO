@@ -28,10 +28,16 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
 from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import \
     MultipointBeamGroup
+from openmdao.test_suite.groups.parallel_groups import FanInGrouped
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_equal_numstrings
 from openmdao.utils.general_utils import set_pyoptsparse_opt, determine_adder_scaler, printoptions
 from openmdao.utils.general_utils import remove_whitespace
 from openmdao.utils.testing_utils import use_tempdirs
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 # check that pyoptsparse is installed
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
@@ -256,7 +262,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check source vars
         source_vars = cr.list_source_vars('driver', out_stream=None)
-        self.assertEqual(sorted(source_vars['inputs']), ['x', 'y1', 'y2', 'z'])
+        self.assertEqual(sorted(source_vars['inputs']), ['con_cmp1.y1', 'con_cmp2.y2', 'mda.d1.x', 'mda.d1.y2', 'mda.d1.z', 'mda.d2.y1', 'mda.d2.z', 'obj_cmp.x', 'obj_cmp.y1', 'obj_cmp.y2', 'obj_cmp.z'])
         self.assertEqual(sorted(source_vars['outputs']), ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z'])
 
         # check that we got the correct number of cases
@@ -389,15 +395,15 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check source vars
         source_vars = cr.list_source_vars('root', out_stream=None)
-        self.assertEqual(sorted(source_vars['inputs']), ['x', 'y1', 'y2', 'z'])
+        self.assertEqual(sorted(source_vars['inputs']), ['con_cmp1.y1', 'con_cmp2.y2', 'd1.x', 'd1.y2', 'd1.z', 'd2.y1', 'd2.z', 'obj_cmp.x', 'obj_cmp.y1', 'obj_cmp.y2', 'obj_cmp.z'])
         self.assertEqual(sorted(source_vars['outputs']), ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z'])
 
         source_vars = cr.list_source_vars('root.d1', out_stream=None)
-        self.assertEqual(sorted(source_vars['inputs']), ['x', 'y2', 'z'])
+        self.assertEqual(sorted(source_vars['inputs']), ['d1.x', 'd1.y2', 'd1.z'])
         self.assertEqual(sorted(source_vars['outputs']), ['y1'])
 
         source_vars = cr.list_source_vars('root.obj_cmp', out_stream=None)
-        self.assertEqual(sorted(source_vars['inputs']), ['x', 'y1', 'y2', 'z'])
+        self.assertEqual(sorted(source_vars['inputs']), ['obj_cmp.x', 'obj_cmp.y1', 'obj_cmp.y2', 'obj_cmp.z'])
         self.assertEqual(sorted(source_vars['outputs']), ['obj'])
 
         # Test to see if we got the correct number of cases
@@ -410,6 +416,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         np.testing.assert_almost_equal(case.inputs['d1.y2'], [12.05848815, ])
         np.testing.assert_almost_equal(case.outputs['obj'], [28.58830817, ])
         np.testing.assert_almost_equal(case.residuals['obj'], [0.0, ],)
+        np.testing.assert_almost_equal(case['d1.y2'], [12.05848815, ])
+        np.testing.assert_almost_equal(case['obj'], [28.58830817, ])
 
         # Test to see if the case keys (iteration coords) come back correctly
         for i, iter_coord in enumerate(cr.list_cases('root.d1', recurse=False, out_stream=None)):
@@ -444,7 +452,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check source vars
         source_vars = cr.list_source_vars('root.nonlinear_solver', out_stream=None)
-        self.assertEqual(sorted(source_vars['inputs']), ['x', 'y1', 'y2', 'z'])
+        self.assertEqual(sorted(source_vars['inputs']), ['con_cmp1.y1', 'con_cmp2.y2', 'd1.x', 'd1.y2', 'd1.z', 'd2.y1', 'd2.z', 'obj_cmp.x', 'obj_cmp.y1', 'obj_cmp.y2', 'obj_cmp.z'])
         self.assertEqual(sorted(source_vars['outputs']), ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z'])
 
         # Test to see if we got the correct number of cases
@@ -1706,7 +1714,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         case = cr.get_case(cases[-1])
 
         for name in expected:
-            if name[0] in ['p', 'o', 'c']:
+            if name != 'y1' and not name.startswith('d1.'):
                 # system d1 does not record params, obj and cons
                 msg = "'Variable name \"%s\" not found.'" % name
                 with self.assertRaises(KeyError) as cm:
@@ -1821,7 +1829,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                               om.convert_units(100.0, 'ft', 'm')-25.0,
                               1e-6)
 
-    def test_get_ambiguous_input(self):
+    def test_get_prom_input(self):
         model = om.Group()
         model.add_recorder(self.recorder)
 
@@ -1851,36 +1859,12 @@ class TestSqliteCaseReader(unittest.TestCase):
         assert_near_equal(case.get_val('G2.C1.m'), 1., 1e-6)
         assert_near_equal(case.get_val('G2.C2.f'), 3.280839895, 1e-6)
 
-        # 'a' is ambiguous.. which input do you want when accessing 'a'?
-        msg = "The promoted name 'a' is invalid because it refers to multiple inputs:" + \
-              " ['G2.C1.m', 'G2.C2.f']. Access the value using an absolute path name " + \
-              "or the connected output variable instead."
+        assert_near_equal(case['a'], 1., 1e-6)
+        assert_near_equal(case.get_val('a'), 1., 1e-6)
+        assert_near_equal(case.get_val('a', units='m'), 1., 1e-6)
+        assert_near_equal(case.get_val('a', units='ft'), 3.280839895, 1e-6)
 
-        with self.assertRaises(RuntimeError) as cm:
-            case['a']
-        self.assertEqual(str(cm.exception), msg)
-
-        with self.assertRaises(RuntimeError) as cm:
-            case.get_val('a')
-        self.assertEqual(str(cm.exception), msg)
-
-        with self.assertRaises(RuntimeError) as cm:
-            case.get_val('a', units='m')
-        self.assertEqual(str(cm.exception), msg)
-
-        with self.assertRaises(RuntimeError) as cm:
-            case.get_val('a', units='ft')
-        self.assertEqual(str(cm.exception), msg)
-
-        # 'a' is ambiguous.. which input's units do you want when accessing 'a'?
-        # (test the underlying function, currently only called from inside get_val)
-        msg = "Can't get units for the promoted name 'a' because it refers to " + \
-              "multiple inputs: ['G2.C1.m', 'G2.C2.f']. Access the units using " + \
-              "an absolute path name."
-
-        with self.assertRaises(RuntimeError) as cm:
-            case._get_units('a')
-        self.assertEqual(str(cm.exception), msg)
+        self.assertEqual(case._get_units('a'), 'm')
 
     def test_get_vars(self):
         prob = SellarProblem(nonlinear_solver=om.NonlinearBlockGS,
@@ -2218,9 +2202,9 @@ class TestSqliteCaseReader(unittest.TestCase):
         # check inputs, outputs and residuals for last case
         case = cr.get_case(system_cases[-1])
 
-        self.assertEqual(list(case.inputs.keys()), ['x', 'y1', 'y2', 'z'])
-        self.assertEqual(case.inputs['y1'], prob['y1'])
-        self.assertEqual(case.inputs['y2'], prob['y2'])
+        self.assertEqual(list(case.inputs.keys()), ['obj_cmp.x', 'obj_cmp.y1', 'obj_cmp.y2', 'obj_cmp.z'])
+        self.assertEqual(case.inputs['obj_cmp.y1'], prob['obj_cmp.y1'])
+        self.assertEqual(case.inputs['obj_cmp.y2'], prob['obj_cmp.y2'])
 
         self.assertEqual(list(case.outputs.keys()), ['obj'])
         self.assertEqual(case.outputs['obj'], prob['obj'])
@@ -2248,7 +2232,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         case = cr.get_case(root_solver_cases[-1])
 
-        expected_inputs = ['x', 'y1', 'y2', 'z']
+        expected_inputs = ['con_cmp1.y1', 'con_cmp2.y2', 'mda.d1.x', 'mda.d1.y2', 'mda.d1.z', 'mda.d2.y1', 'mda.d2.z', 'obj_cmp.x', 'obj_cmp.y1', 'obj_cmp.y2', 'obj_cmp.z']
         expected_outputs = ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']
 
         # input values must be accessed using absolute path names
@@ -2284,7 +2268,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         case = cr.get_case(mda_solver_cases[-1])
 
-        expected_inputs = ['x', 'y1', 'y2', 'z']
+        expected_inputs = ['mda.d1.x', 'mda.d1.y2', 'mda.d1.z', 'mda.d2.y1', 'mda.d2.z']
         expected_outputs = ['y1', 'y2']
 
         # input values must be accessed using absolute path names
@@ -3396,11 +3380,17 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         model_vars = cr.list_source_vars('root')
         self.assertEqual(('inputs:', sorted(model_vars['inputs']), 'outputs:', sorted(model_vars['outputs'])),
-                         ('inputs:', ['x', 'y1', 'y2', 'z'], 'outputs:', ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']))
+                         ('inputs:', ['con_cmp1.y1', 'con_cmp2.y2',
+                                      'cycle.d1.x', 'cycle.d1.y2', 'cycle.d1.z', 'cycle.d2.y1', 'cycle.d2.z',
+                                      'obj_cmp.x', 'obj_cmp.y1', 'obj_cmp.y2', 'obj_cmp.z'],
+                          'outputs:', ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']))
 
         solver_vars = cr.list_source_vars('root.nonlinear_solver')
         self.assertEqual(('inputs:', sorted(solver_vars['inputs']), 'outputs:', sorted(solver_vars['outputs'])),
-                         ('inputs:', ['x', 'y1', 'y2', 'z'], 'outputs:', ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']))
+                         ('inputs:', ['con_cmp1.y1', 'con_cmp2.y2',
+                                      'cycle.d1.x', 'cycle.d1.y2', 'cycle.d1.z', 'cycle.d2.y1', 'cycle.d2.z',
+                                      'obj_cmp.x', 'obj_cmp.y1', 'obj_cmp.y2', 'obj_cmp.z'],
+                          'outputs:', ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']))
 
     def test_feature_reading_driver_derivatives(self):
 
@@ -4268,7 +4258,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
         solver_vars = cr.list_source_vars('root.mda.nonlinear_solver', out_stream=None)
         self.assertEqual(('inputs:', sorted(solver_vars['inputs']), 'outputs:', sorted(solver_vars['outputs'])),
-                         ('inputs:', ['x', 'y1', 'y2', 'z'], 'outputs:', ['y1', 'y2']))
+                         ('inputs:', ['mda.d1.x', 'mda.d1.y2', 'mda.d1.z', 'mda.d2.y1', 'mda.d2.z'], 'outputs:', ['y1', 'y2']))
 
         #
         # check system cases
@@ -4308,7 +4298,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
         case = cr.get_case(root_solver_cases[-1])
 
-        expected_inputs = ['x', 'y1', 'y2', 'z']
+        expected_inputs = ['con_cmp1.y1', 'con_cmp2.y2', 'mda.d1.x', 'mda.d1.y2', 'mda.d1.z', 'mda.d2.y1', 'mda.d2.z', 'obj_cmp.x', 'obj_cmp.y1', 'obj_cmp.y2', 'obj_cmp.z']
         expected_outputs = ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']
 
         self.assertEqual(sorted(case.inputs.keys()), expected_inputs)
@@ -4327,7 +4317,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
         case = cr.get_case(mda_solver_cases[-1])
 
-        expected_inputs = ['x', 'y1', 'y2', 'z']
+        expected_inputs = ['mda.d1.x', 'mda.d1.y2', 'mda.d1.z', 'mda.d2.y1', 'mda.d2.z']
         expected_outputs = ['y1', 'y2']
 
         self.assertEqual(sorted(case.inputs.keys()), expected_inputs)
@@ -4663,6 +4653,79 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         prob.load_case(seventh_slsqp_iteration_case)
 
         assert_model_matches_case(seventh_slsqp_iteration_case, prob.model)
+
+
+@use_tempdirs
+class TestCaseReaderMPI4(unittest.TestCase):
+
+    N_PROCS = 4
+
+    def test_prom_input(self):
+
+        # run cases in parallel with 2 procs per model
+        # (cases will be split between the 2 parallel model instances)
+        run_parallel = True
+        procs_per_model = 2
+
+        prob = om.Problem(FanInGrouped())
+        model = prob.model
+
+        model.add_design_var('x1', lower=0.0, upper=1.0)
+
+        model.add_objective('c3.y')
+
+        samples = [
+            [('x1', 0.)],
+            [('x1', .1)],
+            [('x1', .2)],
+            [('x1', 0.3)],
+            [('x1', 0.4)],
+            [('x1', 0.5)],
+            [('x1', 0.6)],
+            [('x1', 0.7)],
+            [('x1', 0.8)],
+            [('x1', 0.9)],
+        ]
+
+        prob.driver = om.DOEDriver(samples)
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+        prob.driver.recording_options['includes'].append('x1')
+        prob.driver.recording_options['includes'].append('x2')
+        prob.driver.recording_options['includes'].append('sub.c2.x')
+
+        prob.driver.options['run_parallel'] = run_parallel
+        prob.driver.options['procs_per_model'] = procs_per_model
+
+        prob.setup()
+        prob.final_setup()
+
+        prob.run_driver()
+        prob.cleanup()
+
+        expected_outputs = ['x1', 'x2', 'c3.y']
+        expected_inputs = ['sub.c2.x']
+
+        fbase = prob.get_outputs_dir() / 'cases.sql'
+        if prob.comm.size == 1:
+            ranks = [0]
+        else:
+            ranks = [0, 1]
+
+        for rank in ranks:
+            if prob.comm.rank == rank:
+                if prob.comm.size == 1:
+                    rec_file = fbase
+                else:
+                    rec_file = f'{fbase}_{rank}'
+                cr = om.CaseReader(rec_file)
+
+                for caseid in cr.list_cases('driver'):
+                    case = cr.get_case(caseid)
+                    for out in expected_outputs:
+                        self.assertIn(out, case.outputs)
+                    for inp in expected_inputs:
+                        self.assertIn(inp, case.inputs)
+                    print(case.outputs, case.inputs)
 
 
 if __name__ == "__main__":

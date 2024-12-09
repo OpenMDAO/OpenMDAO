@@ -215,7 +215,7 @@ def deserialize(json_data, abs2meta, prom2abs, conns):
         Variable names and values parsed from the JSON string.
     """
     values = json.loads(json_data)
-    if values is None:
+    if not values:
         return None
 
     all_array = True

@@ -348,33 +348,35 @@ class Solver(object, metaclass=SolverMetaclass):
         if isinstance(self, LinearSolver) and not system._use_derivatives:
             return
 
-        self._rec_mgr.startup(self, self._problem_meta['comm'])
+        if self._rec_mgr.has_recorders():
+            self._rec_mgr.startup(self, self._problem_meta['comm'])
 
-        myoutputs = myresiduals = myinputs = []
-        incl = self.recording_options['includes']
-        excl = self.recording_options['excludes']
+            myoutputs = myresiduals = myinputs = []
+            incl = self.recording_options['includes']
+            excl = self.recording_options['excludes']
 
-        # doesn't matter if we're a linear or nonlinear solver.  The names for
-        # inputs, outputs, and residuals are the same for both the 'linear' and 'nonlinear'
-        # vectors.
-        if system.pathname:
-            incl = ['.'.join((system.pathname, i)) for i in incl]
-            excl = ['.'.join((system.pathname, i)) for i in excl]
+            # doesn't matter if we're a linear or nonlinear solver.  The names for
+            # inputs, outputs, and residuals are the same for both the 'linear' and 'nonlinear'
+            # vectors.
+            if system.pathname:
+                incl = ['.'.join((system.pathname, i)) for i in incl]
+                excl = ['.'.join((system.pathname, i)) for i in excl]
 
-        if self.recording_options['record_solver_residuals']:
-            myresiduals = [n for n in system._residuals._abs_iter() if check_path(n, incl, excl)]
+            if self.recording_options['record_solver_residuals']:
+                myresiduals = [n for n in system._residuals._abs_iter()
+                               if check_path(n, incl, excl)]
 
-        if self.recording_options['record_outputs']:
-            myoutputs = [n for n in system._outputs._abs_iter() if check_path(n, incl, excl)]
+            if self.recording_options['record_outputs']:
+                myoutputs = [n for n in system._outputs._abs_iter() if check_path(n, incl, excl)]
 
-        if self.recording_options['record_inputs']:
-            myinputs = [n for n in system._inputs._abs_iter() if check_path(n, incl, excl)]
+            if self.recording_options['record_inputs']:
+                myinputs = [n for n in system._inputs._abs_iter() if check_path(n, incl, excl)]
 
-        self._filtered_vars_to_record = {
-            'input': myinputs,
-            'output': myoutputs,
-            'residual': myresiduals
-        }
+            self._filtered_vars_to_record = {
+                'input': myinputs,
+                'output': myoutputs,
+                'residual': myresiduals
+            }
 
     def _set_solver_print(self, level=2, type_='all'):
         """
@@ -502,15 +504,16 @@ class Solver(object, metaclass=SolverMetaclass):
         vec_name = 'nonlinear' if isinstance(self, NonlinearSolver) else 'linear'
         filt = self._filtered_vars_to_record
         parallel = self._rec_mgr._check_parallel() if system.comm.size > 1 else False
+        local = parallel and not self._rec_mgr._check_gather()
 
         if self.recording_options['record_outputs']:
-            data['output'] = system._retrieve_data_of_kind(filt, 'output', vec_name, parallel)
+            data['output'] = system._retrieve_data_of_kind(filt, 'output', vec_name, local)
 
         if self.recording_options['record_inputs']:
-            data['input'] = system._retrieve_data_of_kind(filt, 'input', vec_name, parallel)
+            data['input'] = system._retrieve_data_of_kind(filt, 'input', vec_name, local)
 
         if self.recording_options['record_solver_residuals']:
-            data['residual'] = system._retrieve_data_of_kind(filt, 'residual', vec_name, parallel)
+            data['residual'] = system._retrieve_data_of_kind(filt, 'residual', vec_name, local)
 
         self._rec_mgr.record_iteration(self, data, metadata)
 

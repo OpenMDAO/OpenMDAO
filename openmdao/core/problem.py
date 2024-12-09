@@ -14,7 +14,7 @@ import time
 import atexit
 
 from collections import defaultdict, namedtuple
-from itertools import product
+from itertools import product, chain
 
 from io import StringIO, TextIOBase
 
@@ -2415,32 +2415,23 @@ class Problem(object, metaclass=ProblemMetaclass):
                 if set_later(name):
                     continue
 
-                if name in prom2abs_in:
-                    for abs_name in prom2abs_in[name]:
-                        if set_later(abs_name):
-                            continue
+                if name in abs2meta_in or name in abs2meta_disc_in:
+                    abs_name = name
 
-                        if isinstance(case, dict):
-                            val = inputs[name]['val']
-                        else:
-                            # need a unique abs_name to get value from a case
-                            # if there is a matching abs_name in the case, use that value
-                            # otherwise use the value of the first matching abs_name
-                            case_abs_names = case._prom2abs['input'][name]
-                            if abs_name in case_abs_names:
-                                val = case.inputs[abs_name]
-                            else:
-                                val = case.inputs[case_abs_names[0]]
-                        try:
-                            varmeta = abs2meta_in[abs_name]
-                        except KeyError:
-                            # Var may be discrete
-                            varmeta = abs2meta_disc_in[abs_name]
-                        if varmeta.get('distributed') and model.comm.size > 1:
-                            sizes = model._var_sizes['input'][:, abs2idx[abs_name]]
-                            model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
-                        else:
-                            model.set_val(abs_name, val)
+                    if isinstance(case, dict):
+                        val = inputs[name]['val']
+                    else:
+                        val = case.inputs[abs_name]
+                    try:
+                        varmeta = abs2meta_in[abs_name]
+                    except KeyError:
+                        # Var may be discrete
+                        varmeta = abs2meta_disc_in[abs_name]
+                    if varmeta.get('distributed') and model.comm.size > 1:
+                        sizes = model._var_sizes['input'][:, abs2idx[abs_name]]
+                        model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
+                    else:
+                        model.set_val(abs_name, val)
                 else:
                     issue_warning(f"{model.msginfo}: Input variable, '{name}', recorded "
                                   "in the case is not found in the model.")
@@ -2689,30 +2680,24 @@ class Problem(object, metaclass=ProblemMetaclass):
                                             get_sizes=False)
 
         problem_indep_vars = []
-        indep_var_names = set()
 
         col_names = ['name', 'units', 'val']
         if options is not None:
             col_names.extend(options)
 
         abs2meta = model._var_allprocs_abs2meta['output']
+        abs2prom = model._var_allprocs_abs2prom['output']
+        abs2disc = model._var_allprocs_discrete['output']
 
-        prom2src = {}
-        for prom in self.model._var_allprocs_prom2abs_list['input']:
-            src = model.get_source(prom)
-            if 'openmdao:indep_var' in abs2meta[src]['tags']:
-                prom2src[prom] = src
-
-        for prom, src in prom2src.items():
-            name = prom if src.startswith('_auto_ivc.') else src
-
-            if (include_design_vars or name not in design_vars) \
-                    and name not in indep_var_names:
-                meta = abs2meta[src]
-                meta = {key: meta[key] for key in col_names if key in meta}
-                meta['val'] = self.get_val(prom)
-                problem_indep_vars.append((name, meta))
-                indep_var_names.add(name)
+        seen = set()
+        for absname, meta in chain(abs2meta.items(), abs2disc.items()):
+            if 'openmdao:indep_var' in meta['tags']:
+                name = abs2prom[absname]
+                if (include_design_vars or name not in design_vars) and name not in seen:
+                    meta = {key: meta[key] for key in col_names if key in meta}
+                    meta['val'] = self.get_val(name)
+                    problem_indep_vars.append((name, meta))
+                    seen.add(name)
 
         if out_stream is not None:
             header = f'Problem {self._name} Independent Variables'

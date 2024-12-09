@@ -41,6 +41,8 @@ class CaseRecorder(object):
         The unique iteration coordinate of where an iteration originates.
     _parallel : bool
         Flag indicating if this recorder will record on multiple processes.
+    _do_gather : bool
+        Flag indicating if this recorder will gather data from all ranks in the requestor's comm.
     _record_on_proc : bool or None
         Flag indicating if this recorder will record on the current process (None if unspecified).
     _recording_ranks : list
@@ -75,6 +77,9 @@ class CaseRecorder(object):
         # By default, this is False, but it will be set to True if the recorder
         # will record data on multiple processes
         self._parallel = False
+
+        # gather variables from all ranks in the requestor's comm if necessary
+        self._do_gather = False
 
         # Flag indicating if recording will be performed on the current process.
         # If the value is not set to True on any process (the default), then
@@ -129,7 +134,7 @@ class CaseRecorder(object):
 
         if MPI and comm and comm.size > 1:
             record_on_ranks = comm.allgather(self._record_on_proc)
-            recording_ranks = [rnk for rnk, rec in enumerate(record_on_ranks) if rec is True]
+            recording_ranks = [rnk for rnk, rec in enumerate(record_on_ranks) if rec]
             if recording_ranks:
                 # recording ranks have been specified
                 self._recording_ranks = recording_ranks
@@ -138,6 +143,8 @@ class CaseRecorder(object):
                 # default to just record on rank 0
                 self._record_on_proc = comm.rank == 0
                 self._recording_ranks = [0]
+
+            self._do_gather = len(recording_ranks) < comm.size
 
     def _get_metadata_system(self, system):
         """
@@ -225,7 +232,7 @@ class CaseRecorder(object):
         **kwargs : keyword args
             Some implementations of record_iteration need additional args.
         """
-        if not self._parallel or self._record_on_proc is True:
+        if not self._parallel or self._record_on_proc:
             self._counter += 1
 
             self._iteration_coordinate = \

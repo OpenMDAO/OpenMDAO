@@ -290,19 +290,17 @@ def _check_hanging_inputs(problem, logger):
     if isinstance(model, Component):
         return
 
-    conns = model._conn_global_abs_in2out
-    abs2prom = model._var_allprocs_abs2prom['input']
-    desvar = problem.driver._designvars
+    abs2prom_in = model._var_allprocs_abs2prom['input']
+    desvars = problem.driver._designvars
     unconns = []
-    for abs_tgt, src in conns.items():
-        if src.startswith('_auto_ivc.'):
-            prom_tgt = abs2prom[abs_tgt]
+    for tgts in model._auto_ivc.auto2tgt.values():
+        prom_tgt = abs2prom_in[tgts[0]]
+        # Ignore inputs that are declared as design vars.
+        if desvars and prom_tgt in desvars:
+            continue
 
-            # Ignore inputs that are declared as design vars.
-            if desvar and prom_tgt in desvar:
-                continue
-
-            unconns.append((prom_tgt, abs_tgt))
+        for tgt in tgts:
+            unconns.append((prom_tgt, tgt))
 
     if unconns:
         msg = ["The following inputs are connected to Auto IVC output variables:\n"]
