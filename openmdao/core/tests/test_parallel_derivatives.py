@@ -890,8 +890,8 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         prob.setup(mode='rev')
         with self.assertRaises(Exception) as ctx:
             prob.final_setup()
-        self.assertEqual(str(ctx.exception),
-           "Parallel derivative color 'a' has responses ['pg.dc2.y', 'pg.dc2.y2'] with overlapping dependencies on the same rank.")
+        self.assertEqual(str(ctx.exception.args[0]),
+           "Parallel derivative color 'a' has responses ['pg.dc2.y', 'pg.dc2.y2'] with overlapping dependencies ['pg.dc2.x'] on the same rank.")
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class CheckParallelDerivColoringErrors(unittest.TestCase):
@@ -923,13 +923,10 @@ class CheckParallelDerivColoringErrors(unittest.TestCase):
 
         prob = om.Problem(model=model, name='parallel_deriv_coloring_overlap_err')
         prob.setup(mode='rev')
-        prob.final_setup()
-        prob.run_model()
-        # prob.check_totals(show_only_incorrect=True)
-        # with self.assertRaises(Exception) as ctx:
-        #     prob.final_setup()
-        # self.assertEqual(str(ctx.exception),
-        #    "Parallel derivative color 'a' has responses ['pg.dc2.y', 'pg.dc2.y2'] with overlapping dependencies on the same rank.")
+        with self.assertRaises(Exception) as ctx:
+            prob.final_setup()
+        self.assertEqual(str(ctx.exception),
+           "Parallel derivative color 'a' has responses ['par2.C3.y', 'par2.C4.y'] with overlapping dependencies ['par1.C1.x', 'par1.C1.y'] on the same rank.")
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

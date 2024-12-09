@@ -969,8 +969,8 @@ class Relevance(object):
                                             seed, rseed)
                 om_dump(f"seed={seed}, rseed={rseed}, inter={[int(i) for i in inter]}")
                 if np.any(inter):
-                    inter = self._rel_names_iter(inter, self._var2idx)
-                    om_dump(f"filtered inter={list(inter)}")
+                    inter = list(self._rel_names_iter(inter, self._var2idx))
+                    om_dump(f"unfiltered inter={inter}")
                     yield seed, rseed, self._apply_node_filter(inter, filt)
 
     def _apply_node_filter(self, names, filt):
@@ -1112,46 +1112,83 @@ class Relevance(object):
     def _par_deriv_err_check(self, group, responses, desvars):
         pd_err_chk = defaultdict(dict)
         mode = group._problem_meta['mode']  # 'fwd', 'rev', or 'auto'
+        dup = {}
 
         if mode in ('fwd', 'auto'):
-            for desvar, response, relset in self.iter_seed_pair_relevance(inputs=True):
-                if desvar in desvars and self._graph.nodes[desvar]['local']:
-                    dvcolor = desvars[desvar]['parallel_deriv_color']
-                    if dvcolor:
-                        pd_err_chk[dvcolor][desvar] = relset
+            for desvar, meta in desvars.items():
+                dvcolor = meta['parallel_deriv_color']
+                if dvcolor:
+                    depnodes = self._dependent_nodes(desvar, 'fwd', local=False)
+                    relvars = depnodes - self._all_systems
+                    for relvar in relvars:
+                        if relvar not in dup:
+                            dup[relvar] = group.get_var_dup_info(relvar, None)
+                    pd_err_chk[dvcolor][desvar] = {r: dup[r] for r in relvars if not dup[r][0]}
 
         if mode in ('rev', 'auto'):
-            for desvar, response, relset in self.iter_seed_pair_relevance(outputs=True):
-                if response in responses and self._graph.nodes[response]['local']:
-                    rescolor = responses[response]['parallel_deriv_color']
-                    if rescolor:
-                        om_dump(f"response {response} has color {rescolor}, relset={relset}")
-                        pd_err_chk[rescolor][response] = relset
+            for response, meta in responses.items():
+                rescolor = meta['parallel_deriv_color']
+                if rescolor:
+                    depnodes = self._dependent_nodes(response, 'rev', local=False)
+                    relvars = depnodes - self._all_systems
+                    for relvar in relvars:
+                        if relvar not in dup:
+                            dup[relvar] = group.get_var_dup_info(relvar, None)
+                    pd_err_chk[rescolor][response] = {r: dup[r] for r in relvars if not dup[r][0]}
 
         # check to make sure we don't have any overlapping dependencies between vars of the
         # same color
         errs = {}
         for pdcolor, dct in pd_err_chk.items():
-            for vname, relset in dct.items():
+            for vname, reldict in dct.items():
+                relset = set(reldict)
                 for n, nds in dct.items():
-                    om_dump(f"checking {vname} vs {n}")
-                    om_dump(f"  {relset} vs {nds}")
-                    if vname != n and relset.intersection(nds):
-                        om_dump("ERROR found!")
-                        if pdcolor not in errs:
-                            errs[pdcolor] = []
-                        errs[pdcolor].append(vname)
+                    if vname != n:
+                        overlap = relset.intersection(nds)
+                        if overlap:
+                            if pdcolor not in errs:
+                                errs[pdcolor] = []
+                            # split up overlaps between distributed and non-distributed vars
+                            dist_ovr = {r for r in overlap if nds[r][2]}
+                            nondist_ovr = overlap - dist_ovr
+                            errs[pdcolor].append((vname, nondist_ovr, dist_ovr))
 
-        all_errs = group.comm.allgather(errs)
+        # all_errs = group.comm.allgather(errs)
         msg = []
-        for errdct in all_errs:
-            for color, names in errdct.items():
-                vtype = 'design variable' if mode == 'fwd' else 'response'
+        warn_msg = []
+        for color, tups in errs.items():
+            vtype = 'design variable' if mode == 'fwd' else 'response'
+            dist_names = []
+            nondist_names = []
+            dist_ovr = set()
+            nondist_ovr = set()
+            for name, nondist, dist in tups:
+                if dist:
+                    dist_names.append(name)
+                    dist_ovr.update(dist)
+                if nondist:
+                    nondist_names.append(name)
+                    nondist_ovr.update(nondist)
+
+            if nondist_names:
                 msg.append(f"Parallel derivative color '{color}' has {vtype}s "
-                           f"{sorted(names)} with overlapping dependencies on the same rank.")
+                           f"{sorted(nondist_names)} with overlapping dependencies "
+                           f"{sorted(nondist_ovr)} on the same rank.")
+            if dist_names:
+                warn_msg.append(f"Parallel derivative color '{color}' has {vtype}s "
+                                f"{sorted(dist_names)} that may have overlapping distributed "
+                                f"variable dependencies {sorted(dist_ovr)} on different ranks."
+                                " Since the overlapping variables are distributed, it's "
+                                "possible that this is not a problem, but OpenMDAO doesn't "
+                                "know because it doesn't track dependencies of variables down "
+                                "to the index level.")
+
 
         if msg:
             raise RuntimeError('\n'.join(msg))
+
+        if warn_msg:
+            issue_warning('\n'.join(warn_msg))
 
     def _setup_nonlinear_relevance(self, model, designvars, responses):
         """
