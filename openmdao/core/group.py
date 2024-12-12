@@ -4700,10 +4700,10 @@ class Group(System):
                     auto_ivc.add_discrete_output(loc_out_name, val=val)
 
                 src = conns[abs_in]
-                if src in auto_ivc.auto2tgt:
-                    auto_ivc.auto2tgt[src].append(abs_in)
+                if src in auto2tgt:
+                    auto2tgt[src].append(abs_in)
                 else:
-                    auto_ivc.auto2tgt[src] = [abs_in]
+                    auto2tgt[src] = [abs_in]
 
         if not prom2auto:
             return auto_ivc
@@ -4731,10 +4731,16 @@ class Group(System):
         p2abs.update(old)
         self._var_allprocs_prom2abs_list[io] = p2abs
 
-        # auto_ivc never promotes anything
-        self._var_abs2prom[io].update({n: n for n in auto_ivc._var_abs2prom[io]})
-        self._var_allprocs_abs2prom[io].update({n: n for n in
-                                                auto_ivc._var_allprocs_abs2prom[io]})
+        # set up auto_ivc abs2prom such that promoted name of the auto_ivc output is the same
+        # as the promoted name of the input that it is connected to
+        abs2prom = self._var_abs2prom[io]
+        abs2prom_in = self._var_allprocs_abs2prom['input']
+        for n in auto_ivc._var_abs2prom[io]:
+            abs2prom[n] = abs2prom_in[auto2tgt[n][0]]
+
+        all_abs2prom = self._var_allprocs_abs2prom[io]
+        for n in auto_ivc._var_allprocs_abs2prom[io]:
+            all_abs2prom[n] = abs2prom_in[auto2tgt[n][0]]
 
         self._var_discrete[io].update({'_auto_ivc.' + k: v for k, v in
                                        auto_ivc._var_discrete[io].items()})
