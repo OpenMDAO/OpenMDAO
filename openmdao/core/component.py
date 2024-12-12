@@ -1,7 +1,6 @@
 """Define the Component class."""
 
 import sys
-import types
 from collections import defaultdict
 from collections.abc import Iterable
 from itertools import product
@@ -559,8 +558,8 @@ class Component(System):
             raise TypeError(f"{self.msginfo}: The copy_shape argument should be a str or None but "
                             f"a '{type(copy_shape).__name__}' was given.")
 
-        if compute_shape and not isinstance(compute_shape, types.FunctionType):
-            raise TypeError(f"{self.msginfo}: The compute_shape argument should be a function but "
+        if compute_shape and not callable(compute_shape):
+            raise TypeError(f"{self.msginfo}: The compute_shape argument should be callable but "
                             f"a '{type(compute_shape).__name__}' was given.")
 
         if (shape_by_conn or copy_shape or compute_shape):
@@ -835,8 +834,8 @@ class Component(System):
             raise TypeError(f"{self.msginfo}: The copy_shape argument should be a str or None but "
                             f"a '{type(copy_shape).__name__}' was given.")
 
-        if compute_shape and not isinstance(compute_shape, types.FunctionType):
-            raise TypeError(f"{self.msginfo}: The compute_shape argument should be a function but "
+        if compute_shape and not callable(compute_shape):
+            raise TypeError(f"{self.msginfo}: The compute_shape argument should be callable but "
                             f"a '{type(compute_shape).__name__}' was given.")
 
         if compute_shape is not None and is_lambda(compute_shape):
