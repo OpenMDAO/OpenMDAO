@@ -282,7 +282,7 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
         raise ValueError(error_string)
 
 
-def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6):
+def xassert_check_totals(totals_data, atol=1e-6, rtol=1e-6):
     """
     Raise assertion if any entry from the return from check_totals is above a tolerance.
 
@@ -342,6 +342,86 @@ def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6):
 
     if fails or incon_keys:
         raise ValueError('\n\n'.join(fail_list))
+
+
+def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6):
+    """
+    Raise assertion if any entry from the return from check_totals is above a tolerance.
+
+    Parameters
+    ----------
+    totals_data : Dict of Dicts of Tuples of Floats
+        First key:
+            is the (output, input) tuple of strings;
+        Second key:
+            is one of ['rel error', 'abs error', 'magnitude', 'fdstep'];
+
+        For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
+            forward - fd, adjoint - fd, forward - adjoint.
+    atol : float
+        Absolute error. Default is 1e-6.
+    rtol : float
+        Relative error. Default is 1e-6.
+    """
+    fails = []
+    incon_keys = set()
+    for key, dct in totals_data.items():
+        if 'inconsistent_keys' in dct:
+            incon_keys = dct['inconsistent_keys']
+        J_fd = dct['J_fd']
+        try:
+            nrows, ncols = J_fd.shape
+        except ValueError:
+            nrows = J_fd.shape
+            ncols = 1
+
+        if 'J_fwd' in dct:
+            J_fwd = dct['J_fwd']
+            try:
+                np.testing.assert_allclose(
+                    J_fwd,
+                    J_fd,
+                    atol=atol,
+                    rtol=rtol,
+                    verbose=False,
+                    equal_nan=False,
+                    err_msg=(f"Forward derivatives of {key[0]} w.r.t {key[1]} do not match finite "
+                             "difference.")
+                )
+            except Exception as err:
+                fails.append(err.args[0])
+                if nrows < 20 and ncols < 20:
+                    with np.printoptions(linewidth=10000):
+                        fails[-1] += '\nJ_fwd:\n' + np.array2string(J_fwd)
+                        fails[-1] += '\nJ_fd:\n' + np.array2string(J_fd)
+
+        if 'J_rev' in dct:
+            J_rev = dct['J_rev']
+            try:
+                np.testing.assert_allclose(
+                    J_rev,
+                    J_fd,
+                    atol=atol,
+                    rtol=rtol,
+                    verbose=False,
+                    equal_nan=False,
+                    err_msg=(f"Reverse derivatives of {key[0]} w.r.t {key[1]} do not match finite "
+                             "difference.")
+                )
+            except Exception as err:
+                fails.append(err.args[0])
+                if nrows < 20 and ncols < 20:
+                    with np.printoptions(linewidth=10000):
+                        fails[-1] += '\nJ_rev:\n' + np.array2string(J_rev)
+                        fails[-1] += '\nJ_fd:\n' + np.array2string(J_fd)
+
+    if incon_keys:
+        ders = [f"{sof} wrt {swrt}" for sof, swrt in sorted(incon_keys)]
+        fails.append(f"During total derivative computation, the following partial derivatives "
+                     f"resulted in serial inputs that were inconsistent across processes: {ders}.")
+
+    if fails:
+        raise ValueError('\n\n'.join(fails))
 
 
 def assert_no_approx_partials(system, include_self=True, recurse=True, method='any', excludes=None):

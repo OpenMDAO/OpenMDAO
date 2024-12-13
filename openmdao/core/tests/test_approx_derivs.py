@@ -2989,8 +2989,6 @@ class TestFDWithParallelSubGroups(unittest.TestCase):
         prob.setup(mode='fwd', force_alloc_complex=True)
         prob.run_model()
         prob.compute_totals()
-        import pprint
-        pprint.pprint({n: m['val'] for n,m in prob.model.sub._jacobian._subjacs_info.items()})
         assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
 
     def test_2ivcs_fdgroupwithcrisscrosspars_1sink_rev(self):
@@ -3057,4 +3055,12 @@ class TestFDWithParallelSubGroups4(TestFDWithParallelSubGroups):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    # unittest.main()
+    for io in ('rev',):  # ('fwd', 'rev'):
+        print(f"{io} mode")
+        prob = _setup_2ivcs_fdgroupwithpar_1sink(size=2)
+        prob.setup(mode=io, force_alloc_complex=True)
+        prob.run_model()
+        print(prob.compute_totals(return_format='array'))
+        tdata =  prob.check_totals(method='fd', out_stream=None)
+        assert_check_totals(tdata, atol=3e-6)

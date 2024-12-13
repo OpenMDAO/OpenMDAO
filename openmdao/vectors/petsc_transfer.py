@@ -2,7 +2,6 @@
 import numpy as np
 from openmdao.utils.mpi import check_mpi_env
 from openmdao.core.constants import INT_DTYPE
-from openmdao.utils.general_utils import om_dump
 
 use_mpi = check_mpi_env()
 _empty_idx_array = np.array([], dtype=INT_DTYPE)
@@ -253,7 +252,6 @@ else:
                                     iidxlist_nc.append(input_inds)
                                     size_nc += len(input_inds)
                                     has_nocolor_xfers = 1
-                                    om_dump(group.pathname, "nocolor inds:", oarr, input_inds)
                                 else:
                                     oidxlist.append(oarr)
                                     iidxlist.append(input_inds)

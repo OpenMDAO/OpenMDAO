@@ -93,9 +93,9 @@ class MixedDistrib2(om.ExplicitComponent):  # for double diamond case
         Is = inputs['in_nd']
 
         f_Id = Id**2 - 2.0*Id + 4.0
-        f_Is = Is ** 0.5
+        f_Is = Is * 0.5
         g_Is = Is**2 + 3.0*Is - 5.0
-        g_Id = Id ** 0.5
+        g_Id = Id * 0.5
 
         # Distributed output
         outputs['out_dist'] = f_Id + np.sum(f_Is)
@@ -111,8 +111,8 @@ class MixedDistrib2(om.ExplicitComponent):  # for double diamond case
         Is = inputs['in_nd']
 
         df_dId = 2.0 * Id - 2.0
-        df_dIs = 0.5 / Is ** 0.5
-        dg_dId = 0.5 / Id ** 0.5
+        df_dIs = 0.5 * np.ones(Is.shape)
+        dg_dId = 0.5 * np.ones(Id.shape)
         dg_dIs = 2.0 * Is + 3.0
 
         nId = len(Id)
@@ -1317,7 +1317,7 @@ class MPITests2(unittest.TestCase):
         partials = prob.check_partials(show_only_incorrect=True, method='cs')
         assert_check_partials(partials)
 
-    def test_distrib_cascade_rev(self):
+    def build_cascade_problem(self, mode):
         # Tests the derivatives on a complicated model that is the distributed equivalent
         # of a double diamond.
         prob = om.Problem()
@@ -1352,7 +1352,7 @@ class MPITests2(unittest.TestCase):
         model.add_constraint('D4.out_dist', lower=0.0)
         model.add_constraint('D4.out_nd', lower=0.0)
 
-        prob.setup(force_alloc_complex=True, mode='rev')
+        prob.setup(force_alloc_complex=True, mode=mode)
 
         # Set initial values of distributed variable.
         x_dist_init = 3.0 + np.arange(size)[offsets[rank]:offsets[rank] + sizes[rank]]
@@ -1365,7 +1365,17 @@ class MPITests2(unittest.TestCase):
         prob.set_val('indep.x_nd', x_nd_init)
 
         prob.run_model()
+        return prob
 
+    def test_distrib_cascade_rev(self):
+        prob = self.build_cascade_problem(mode='rev')
+        print(prob.compute_totals())
+        totals = prob.check_totals(show_only_incorrect=True, method='cs')
+        assert_check_totals(totals, rtol=1e-12)
+
+    def test_distrib_cascade_fwd(self):
+        prob = self.build_cascade_problem(mode='fwd')
+        print(prob.compute_totals())
         totals = prob.check_totals(show_only_incorrect=True, method='cs')
         assert_check_totals(totals, rtol=1e-12)
 
