@@ -1,4 +1,56 @@
 ***********************************
+# Release Notes for OpenMDAO 3.36.0
+
+Dec 13, 2024
+
+OpenMDAO 3.36.0 introduces `JaxExplicitComponent` and `JaxImplicitComponent`, which make working with Jax and using
+its algorithmic differentiation capability far easier than before. While Jax is not yet a mandatory dependency for
+OpenMDAO, we strongly urge users to start experimenting with it because it can dramatically speed up development time.
+
+The jacobian coloring algorithm, used to more efficiently compute total derivatives for models with sparse
+total jacobians, was overhauled in a way that should be more consistent and more performant than before.
+
+OpenMDAO now provides a dashboard utility for examining the contents of recording database files.
+
+In another significant change, AutoIVC outputs can now be recorded more easily. Recording items by the promoted name
+will always record the _output_, while specifying an input by absolute name will result in it being recorded as an input.
+Since OpenMDAO no longer has "dangling" inputs, recording by absolute name is only really necessary when debugging the
+input values as seen by a component. 
+
+## New Features
+
+- Added JaxExplicitComponent and JaxImplicitComponent [#3359](https://github.com/OpenMDAO/OpenMDAO/pull/3359)
+- Added timing to output from Problem checks [#3371](https://github.com/OpenMDAO/OpenMDAO/pull/3371)
+- Added 'recordable_only' option to OptionsDictionary items method. [#3379](https://github.com/OpenMDAO/OpenMDAO/pull/3379)
+- Updated code & test workflow for Python 3.13 compatibility [#3388](https://github.com/OpenMDAO/OpenMDAO/pull/3388)
+- Added a command line tool to display a dashboard of the contents of case recorder files [#3400](https://github.com/OpenMDAO/OpenMDAO/pull/3400)
+- Updated `list_driver_vars` to scale upper and lower bounds when `driver_scaling` is False [#3406](https://github.com/OpenMDAO/OpenMDAO/pull/3406)
+- Fixed bug that occurred when recording inputs by absolute name. [#3410](https://github.com/OpenMDAO/OpenMDAO/pull/3410)
+
+## Bug Fixes
+
+- Removed unnecessary shape correction of jacobian when doing bidirectional coloring and fixed bidirectional coloring bug [#3369](https://github.com/OpenMDAO/OpenMDAO/pull/3369)
+- Fix for index typo in System._abs_get_val method and removed redundant code [#3375](https://github.com/OpenMDAO/OpenMDAO/pull/3375)
+- Updated PSQP exit criteria for pyOptSparseDriver [#3383](https://github.com/OpenMDAO/OpenMDAO/pull/3383)
+- BugFix: OpenMDAO Summary Report with discrete inputs [#3384](https://github.com/OpenMDAO/OpenMDAO/pull/3384)
+- Fixed an option serialization test [#3386](https://github.com/OpenMDAO/OpenMDAO/pull/3386)
+- Fixed error when using set_input_defaults with a different but acceptable default value shape. [#3391](https://github.com/OpenMDAO/OpenMDAO/pull/3391)
+
+## Miscellaneous
+
+- Update pyOptSparse citation [#3380](https://github.com/OpenMDAO/OpenMDAO/pull/3380)
+- InputResidsComp cleanup [#3382](https://github.com/OpenMDAO/OpenMDAO/pull/3382)
+- Added additional documentation for the `set_input_defaults` function [#3387](https://github.com/OpenMDAO/OpenMDAO/pull/3387)
+- Fixed docstring for InterpND extrapolate option [#3398](https://github.com/OpenMDAO/OpenMDAO/pull/3398)
+- A couple of performance fixes. [#3401](https://github.com/OpenMDAO/OpenMDAO/pull/3401)
+- Cleaned up documentation to clarify that commands like "pip install" are meant to be run at the command prompt. [#3404](https://github.com/OpenMDAO/OpenMDAO/pull/3404)
+- Fixed the search function in the documentation [#3405](https://github.com/OpenMDAO/OpenMDAO/pull/3405)
+-  Changed language in the 'check unconnected inputs' config check to avoid confusion [#3407](https://github.com/OpenMDAO/OpenMDAO/pull/3407)
+- Suppress an annoying warning when recorder setup happens multiple times. [#3408](https://github.com/OpenMDAO/OpenMDAO/pull/3408)
+- Fixed link in first_analysis.ipynb [#3414](https://github.com/OpenMDAO/OpenMDAO/pull/3414)
+- Fixed link in models_with_solvers_implicit.ipynb [#3415](https://github.com/OpenMDAO/OpenMDAO/pull/3415)
+
+***********************************
 # Release Notes for OpenMDAO 3.35.0
 
 Oct 1, 2024
