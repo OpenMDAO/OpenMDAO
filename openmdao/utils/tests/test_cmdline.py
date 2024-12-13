@@ -128,28 +128,28 @@ class CmdlineTestCase(unittest.TestCase):
     def test_clean(self):
         import openmdao.api as om
 
-        p1 = om.Problem()
-        p1.model.add_subsystem('exec', om.ExecComp('y = a + b'))
-        p1.setup()
-        p1.run_model()
-
-        p2 = om.Problem()
-        p2.model.add_subsystem('exec', om.ExecComp('z = a * b'))
-        p2.setup()
-        p2.run_model()
-
-        p1_outdir = os.path.basename(str(p1.get_outputs_dir()))
-        p2_outdir = os.path.basename(str(p2.get_outputs_dir()))
-
-        subdirs = os.listdir(os.getcwd())
-        self.assertIn(p1_outdir, subdirs)
-        self.assertIn(p2_outdir, subdirs)
-
         for om_cmd in ('openmdao', 'python -m openmdao'):
 
             with self.subTest('Test using command line `{om_cmd}`'):
 
-                proc = subprocess.Popen('openmdao clean -f'.split(),  # nosec: trusted input
+                p1 = om.Problem()
+                p1.model.add_subsystem('exec', om.ExecComp('y = a + b'))
+                p1.setup()
+                p1.run_model()
+
+                p2 = om.Problem()
+                p2.model.add_subsystem('exec', om.ExecComp('z = a * b'))
+                p2.setup()
+                p2.run_model()
+
+                p1_outdir = os.path.basename(str(p1.get_outputs_dir()))
+                p2_outdir = os.path.basename(str(p2.get_outputs_dir()))
+
+                subdirs = os.listdir(os.getcwd())
+                self.assertIn(p1_outdir, subdirs)
+                self.assertIn(p2_outdir, subdirs)
+
+                proc = subprocess.Popen(f'{om_cmd} clean -f'.split(),  # nosec: trusted input
                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 try:
                     outs, errs = proc.communicate(timeout=10)
