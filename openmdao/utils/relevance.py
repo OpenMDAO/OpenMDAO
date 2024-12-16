@@ -11,6 +11,7 @@ from openmdao.utils.graph_utils import get_sccs_topo
 from openmdao.utils.array_utils import array_hash
 from openmdao.utils.om_warnings import issue_warning
 
+
 _no_relevance = env_truthy('OPENMDAO_NO_RELEVANCE')
 
 
@@ -942,8 +943,12 @@ class Relevance(object):
 
         Yields
         ------
+        tuple
+            Forward seed(s)
+        tuple
+            Reverse seed(s)
         set
-            Set of names of relevant variables.
+            Variables relevant to the forward and reverse seeds.
         """
         filt = _get_io_filter(inputs, outputs)
         if filt is True:  # everything is filtered out
@@ -1106,42 +1111,82 @@ class Relevance(object):
     def _par_deriv_err_check(self, group, responses, desvars):
         pd_err_chk = defaultdict(dict)
         mode = group._problem_meta['mode']  # 'fwd', 'rev', or 'auto'
+        model = group._problem_meta['model_ref']()
+        distvars = {n for n, m in model._var_allprocs_abs2meta['output'].items()
+                    if m['distributed']}
+        distvars.update(n for n, m in model._var_allprocs_abs2meta['input'].items()
+                        if m['distributed'])
 
         if mode in ('fwd', 'auto'):
-            for desvar, response, relset in self.iter_seed_pair_relevance(inputs=True):
-                if desvar in desvars and self._graph.nodes[desvar]['local']:
-                    dvcolor = desvars[desvar]['parallel_deriv_color']
+            for dvmeta in desvars.values():
+                desvar = dvmeta['source']
+                resps = tuple(sorted(m['source'] for m in responses.values()))
+                if self._graph.nodes[desvar]['local']:
+                    dvcolor = dvmeta['parallel_deriv_color']
                     if dvcolor:
-                        pd_err_chk[dvcolor][desvar] = relset
+                        inter = self._get_rel_array(self._seed_var_map, self._single_seed2relvars,
+                                                    desvar, resps)
+                        if np.any(inter):
+                            inter = list(self._rel_names_iter(inter, self._var2idx))
+                            pd_err_chk[dvcolor][desvar] = set(inter)
 
         if mode in ('rev', 'auto'):
-            for desvar, response, relset in self.iter_seed_pair_relevance(outputs=True):
-                if response in responses and self._graph.nodes[response]['local']:
-                    rescolor = responses[response]['parallel_deriv_color']
+            for resmeta in responses.values():
+                response = resmeta['source']
+                dvs = tuple(sorted(m['source'] for m in desvars.values()))
+                if self._graph.nodes[response]['local']:
+                    rescolor = resmeta['parallel_deriv_color']
                     if rescolor:
-                        pd_err_chk[rescolor][response] = relset
+                        inter = self._get_rel_array(self._seed_var_map, self._single_seed2relvars,
+                                                    dvs, response)
+                        if np.any(inter):
+                            inter = list(self._rel_names_iter(inter, self._var2idx))
+                            pd_err_chk[rescolor][response] = set(inter)
 
         # check to make sure we don't have any overlapping dependencies between vars of the
         # same color
         errs = {}
+        warns = {}
         for pdcolor, dct in pd_err_chk.items():
-            for vname, relset in dct.items():
-                for n, nds in dct.items():
-                    if vname != n and relset.intersection(nds):
-                        if pdcolor not in errs:
-                            errs[pdcolor] = []
-                        errs[pdcolor].append(vname)
+            for vname, relvars in dct.items():
+                for n, relvars2 in dct.items():
+                    if vname != n:
+                        inter = relvars.intersection(relvars2)
+                        distinter = inter.intersection(distvars)
+                        inter -= distinter
+                        if inter:
+                            if pdcolor not in errs:
+                                errs[pdcolor] = []
+                            errs[pdcolor].append(vname)
+                        if distinter:
+                            if pdcolor not in warns:
+                                warns[pdcolor] = []
+                            warns[pdcolor].append(vname)
 
-        all_errs = group.comm.allgather(errs)
-        msg = []
-        for errdct in all_errs:
+        colors = defaultdict(set)
+        wcolors = defaultdict(set)
+        for errdct, warndct in group.comm.allgather((errs, warns)):
             for color, names in errdct.items():
-                vtype = 'design variable' if mode == 'fwd' else 'response'
-                msg.append(f"Parallel derivative color '{color}' has {vtype}s "
-                           f"{sorted(names)} with overlapping dependencies on the same rank.")
+                colors[color].update(names)
+            for color, names in warndct.items():
+                wcolors[color].update(names)
+
+        msg = []
+        for color, names in colors.items():
+            vtype = 'design variable' if mode == 'fwd' else 'response'
+            msg.append(f"Parallel derivative color '{color}' has {vtype}s "
+                       f"{sorted(names)} with overlapping dependencies on the same rank.")
 
         if msg:
             raise RuntimeError('\n'.join(msg))
+
+        if wcolors:
+            for color, names in wcolors.items():
+                vtype = 'design variable' if mode == 'fwd' else 'response'
+                issue_warning(f"Parallel derivative color '{color}' has {vtype}s "
+                              f"{sorted(names)} with overlapping dependencies on distributed "
+                              "variables. This may be valid, but OpenMDAO doesn't check for "
+                              "same rank overlaps at the index level.")
 
     def _setup_nonlinear_relevance(self, model, designvars, responses):
         """

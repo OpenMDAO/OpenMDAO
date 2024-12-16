@@ -6653,7 +6653,17 @@ class System(object, metaclass=SystemMetaclass):
         tuple
             A tuple of the form (is_duplicated, num_zeros, is_distributed).
         """
-        nz = np.count_nonzero(self._var_sizes[io][:, self._var_allprocs_abs2idx[name]])
+        if io is None:
+            io = 'output' if name in self._var_allprocs_abs2meta['output'] else 'input'
+
+        try:
+            idx = self._var_allprocs_abs2idx[name]
+        except KeyError:
+            if name in self._var_allprocs_discrete[io]:
+                return False, 0, False
+            raise KeyError(f"{self.msginfo}: {io} variable '{name}' not found.")
+
+        nz = np.count_nonzero(self._var_sizes[io][:, idx])
 
         if self._var_allprocs_abs2meta[io][name]['distributed']:
             return False, self._var_sizes[io].shape[0] - nz, True  # distributed vars are never dups

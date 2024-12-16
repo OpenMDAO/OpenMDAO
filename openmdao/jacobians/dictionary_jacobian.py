@@ -154,23 +154,24 @@ class DictionaryJacobian(Jacobian):
 
                 ofvec = rflat(res_name) if res_name in d_res_names else None
 
+                if fwd and is_explicit and res_name is other_name and wrtvec is not None:
+                    # skip the matvec mult completely for identity subjacs
+                    ofvec -= wrtvec
+                    continue
+
+                if abs_key in self._key_owner and abs_key in system._cross_keys:
+                    wrtowner = system._owning_rank[other_name]
+                    if system.comm.rank == wrtowner:
+                        system.comm.bcast(wrtvec, root=wrtowner)
+                    else:
+                        wrtvec = system.comm.bcast(None, root=wrtowner)
+
                 if fwd:
-                    if is_explicit and res_name is other_name and wrtvec is not None:
-                        # skip the matvec mult completely for identity subjacs
-                        ofvec -= wrtvec
-                        continue
                     left_vec = ofvec
                     right_vec = wrtvec
                 else:  # rev
                     left_vec = wrtvec
                     right_vec = ofvec
-
-                if abs_key in self._key_owner and abs_key in system._cross_keys:
-                    wrtowner = system._owning_rank[other_name]
-                    if system.comm.rank == wrtowner:
-                        system.comm.bcast(right_vec, root=wrtowner)
-                    else:
-                        right_vec = system.comm.bcast(None, root=wrtowner)
 
                 if left_vec is not None and right_vec is not None:
                     subjac_info = subjacs_info[abs_key]
@@ -207,14 +208,15 @@ class DictionaryJacobian(Jacobian):
                         system.comm.bcast(left_vec, root=owner)
                     elif owner is not None:
                         left_vec = system.comm.bcast(None, root=owner)
-                        if fwd:
-                            if res_name in d_res_names:
-                                d_residuals._abs_set_val(res_name, left_vec)
-                        else:  # rev
-                            if other_name in d_out_names:
-                                d_outputs._abs_set_val(other_name, left_vec)
-                            elif other_name in d_inp_names:
-                                d_inputs._abs_set_val(other_name, left_vec)
+                        if left_vec is not None:
+                            if fwd:
+                                if res_name in d_res_names:
+                                    d_residuals._abs_set_val(res_name, left_vec)
+                            else:  # rev
+                                if other_name in d_out_names:
+                                    d_outputs._abs_set_val(other_name, left_vec)
+                                elif other_name in d_inp_names:
+                                    d_inputs._abs_set_val(other_name, left_vec)
 
 
 class _CheckingJacobian(DictionaryJacobian):

@@ -956,3 +956,41 @@ def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, s
 
             if submat.row.size > 0:  # only yield if nonzero
                 yield (of, wrt, submat.row, submat.col, submat.shape)
+
+
+def idxs2minmax_tuples(idxs):
+    """
+    Convert a flat array of indices into a list of contiguous (min, max) tuples.
+
+    Note that to convert these tuples to slices or ranges, you would use slice(min, max+1)
+    or range(min, max+1).
+
+    Parameters
+    ----------
+    idxs : ndarray
+        Array of indices.
+
+    Returns
+    -------
+    list
+        List of contiguous ranges.
+    """
+    # TODO: make a fast version of this using numba or cython
+    ranges = []
+    if idxs.size > 0:
+        # handle negative indices
+        if np.min(idxs) < 0:
+            idxs = idxs.copy()
+            idxs[idxs < 0] += idxs.size
+        idxs = np.sort(idxs)
+        diff = np.empty(idxs.size, dtype=int)
+        diff[0] = 1
+        diff[1:] = np.diff(idxs)
+        range_bounds = np.nonzero(diff > 1)[0]
+        start = 0
+        for end in range_bounds:
+            ranges.append((idxs[start], idxs[end - 1]))
+            start = end
+        ranges.append((idxs[start], idxs[-1]))
+
+    return ranges
