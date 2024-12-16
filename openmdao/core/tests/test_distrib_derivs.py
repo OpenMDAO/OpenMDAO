@@ -93,9 +93,12 @@ class MixedDistrib2(om.ExplicitComponent):  # for double diamond case
         Is = inputs['in_nd']
 
         f_Id = Id**2 - 2.0*Id + 4.0
-        f_Is = Is * 0.5
-        g_Is = Is**2 + 3.0*Is - 5.0
-        g_Id = Id * 0.5
+        f_Is = Is ** 0.5
+        # got rid of -5 here because it resulted in negative sqrt later on.
+        # this wasn't detected earlier due to a bug in assert_check_totals that
+        # didn't handle nans correctly.
+        g_Is = Is**2 + 3.0*Is
+        g_Id = Id ** 0.5
 
         # Distributed output
         outputs['out_dist'] = f_Id + np.sum(f_Is)
@@ -111,8 +114,8 @@ class MixedDistrib2(om.ExplicitComponent):  # for double diamond case
         Is = inputs['in_nd']
 
         df_dId = 2.0 * Id - 2.0
-        df_dIs = 0.5 * np.ones(Is.shape)
-        dg_dId = 0.5 * np.ones(Id.shape)
+        df_dIs = 0.5 / Is ** 0.5
+        dg_dId = 0.5 / Id ** 0.5
         dg_dIs = 2.0 * Is + 3.0
 
         nId = len(Id)
