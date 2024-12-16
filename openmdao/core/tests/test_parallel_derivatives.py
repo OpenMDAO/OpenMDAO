@@ -962,7 +962,7 @@ def tim_test_problem(psize):
             self.connect('Comp1.y', 'ParallelGroup1.Con2.x')
             self.connect('Comp1.y', 'ParallelGroup1.Con3.x')
 
-            color = None  # 'parcon'
+            color = 'parcon'
             self.add_design_var('Comp1.x')
             self.add_design_var('ParallelGroup1.Con1.c')
             self.add_design_var('ParallelGroup1.Con2.c')
@@ -1012,10 +1012,13 @@ class CheckParallel2DerivColoringErrors(unittest.TestCase):
     def test_par_deriv_coloring_not_enough_procs_rev(self):
         p = tim_test_problem(psize=4)
         p.setup(mode='rev')
-        p.run_model()
 
-        Jdata = p.check_totals(show_only_incorrect=True)
-        assert_check_totals(Jdata)
+        with self.assertRaises(Exception) as ctx:
+            p.run_model()
+        self.assertEqual(str(ctx.exception),
+           "Parallel derivative color 'parcon' has responses ['ParallelGroup1.Con1.y', 'ParallelGroup1.Con3.y'] with overlapping dependencies on the same rank.")
+
+        # assert_check_totals(p.check_totals(show_only_incorrect=True))
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class CheckParallel3DerivColoringErrors(unittest.TestCase):
