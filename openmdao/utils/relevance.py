@@ -969,7 +969,7 @@ class Relevance(object):
                 inter = self._get_rel_array(self._seed_var_map, self._single_seed2relvars,
                                             seed, rseed)
                 if np.any(inter):
-                    inter = list(self._rel_names_iter(inter, self._var2idx))
+                    inter = self._rel_names_iter(inter, self._var2idx)
                     yield seed, rseed, self._apply_node_filter(inter, filt)
 
     def _apply_node_filter(self, names, filt):
@@ -1187,51 +1187,6 @@ class Relevance(object):
                               f"{sorted(names)} with overlapping dependencies on distributed "
                               "variables. This may be valid, but OpenMDAO doesn't check for "
                               "same rank overlaps at the index level.")
-
-    # def _par_deriv_err_check(self, group, responses, desvars):
-    #     pd_err_chk = defaultdict(dict)
-    #     mode = group._problem_meta['mode']  # 'fwd', 'rev', or 'auto'
-
-    #     if mode in ('fwd', 'auto'):
-    #         for desvar, response, relset in self.iter_seed_pair_relevance(inputs=True):
-    #             if desvar in desvars and self._graph.nodes[desvar]['local']:
-    #                 dvcolor = desvars[desvar]['parallel_deriv_color']
-    #                 if dvcolor:
-    #                     if desvar in pd_err_chk[dvcolor]:
-    #                         pd_err_chk[dvcolor][desvar].update(relset)
-    #                     pd_err_chk[dvcolor][desvar] = relset
-
-    #     if mode in ('rev', 'auto'):
-    #         for dv, response, relset in self.iter_seed_pair_relevance(outputs=True, inputs=True):
-    #             if response in responses and self._graph.nodes[response]['local']:
-    #                 rescolor = responses[response]['parallel_deriv_color']
-    #                 if rescolor:
-    #                     if response in pd_err_chk[rescolor]:
-    #                         pd_err_chk[rescolor][response].update(relset)
-    #                     else:
-    #                         pd_err_chk[rescolor][response] = relset
-
-    #     # check to make sure we don't have any overlapping dependencies between vars of the
-    #     # same color
-    #     errs = {}
-    #     for pdcolor, dct in pd_err_chk.items():
-    #         for vname, relvars in dct.items():
-    #             for n, relvars2 in dct.items():
-    #                 if vname != n and relvars.intersection(relvars2):
-    #                     if pdcolor not in errs:
-    #                         errs[pdcolor] = []
-    #                     errs[pdcolor].append(vname)
-
-    #     all_errs = group.comm.allgather(errs)
-    #     msg = []
-    #     for errdct in all_errs:
-    #         for color, names in errdct.items():
-    #             vtype = 'design variable' if mode == 'fwd' else 'response'
-    #             msg.append(f"Parallel derivative color '{color}' has {vtype}s "
-    #                        f"{sorted(names)} with overlapping dependencies on the same rank.")
-
-    #     if msg:
-    #         raise RuntimeError('\n'.join(msg))
 
     def _setup_nonlinear_relevance(self, model, designvars, responses):
         """

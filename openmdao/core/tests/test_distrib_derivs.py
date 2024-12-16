@@ -1369,13 +1369,11 @@ class MPITests2(unittest.TestCase):
 
     def test_distrib_cascade_rev(self):
         prob = self.build_cascade_problem(mode='rev')
-        print(prob.compute_totals())
         totals = prob.check_totals(show_only_incorrect=True, method='cs')
         assert_check_totals(totals, rtol=1e-12)
 
     def test_distrib_cascade_fwd(self):
         prob = self.build_cascade_problem(mode='fwd')
-        print(prob.compute_totals())
         totals = prob.check_totals(show_only_incorrect=True, method='cs')
         assert_check_totals(totals, rtol=1e-12)
 
