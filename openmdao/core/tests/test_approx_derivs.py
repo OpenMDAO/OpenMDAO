@@ -3055,12 +3055,4 @@ class TestFDWithParallelSubGroups4(TestFDWithParallelSubGroups):
 
 
 if __name__ == "__main__":
-    # unittest.main()
-    for io in ('rev',):  # ('fwd', 'rev'):
-        print(f"{io} mode")
-        prob = _setup_2ivcs_fdgroupwithpar_1sink(size=2)
-        prob.setup(mode=io, force_alloc_complex=True)
-        prob.run_model()
-        print(prob.compute_totals(return_format='array'))
-        tdata =  prob.check_totals(method='fd', out_stream=None)
-        assert_check_totals(tdata, atol=3e-6)
+    unittest.main()
