@@ -282,68 +282,6 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
         raise ValueError(error_string)
 
 
-def xassert_check_totals(totals_data, atol=1e-6, rtol=1e-6):
-    """
-    Raise assertion if any entry from the return from check_totals is above a tolerance.
-
-    Parameters
-    ----------
-    totals_data : Dict of Dicts of Tuples of Floats
-        First key:
-            is the (output, input) tuple of strings;
-        Second key:
-            is one of ['rel error', 'abs error', 'magnitude', 'fdstep'];
-
-        For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
-            forward - fd, adjoint - fd, forward - adjoint.
-    atol : float
-        Absolute error. Default is 1e-6.
-    rtol : float
-        Relative error. Default is 1e-6.
-    """
-    fails = []
-    incon_keys = set()
-    for key, dct in totals_data.items():
-        if 'inconsistent_keys' in dct:
-            incon_keys = dct['inconsistent_keys']
-
-        Jname = 'J_fwd' if 'J_fwd' in dct else 'J_rev'
-        try:
-            dct[Jname]
-            dct['J_fd']
-        except Exception as err:
-            raise err.__class__(f"For key {key}: {err}")
-        try:
-            for i in range(3):
-                erel, eabs = dct['rel error'][i], dct['abs error'][i]
-                if erel is not None and not np.isnan(erel):
-                    if erel > rtol:
-                        raise ValueError(f"rel tolerance of {erel} > allowed rel tolerance "
-                                         f"of {rtol}.")
-                if eabs is not None:
-                    if eabs > atol:
-                        raise ValueError(f"abs tolerance of {eabs} > allowed abs tolerance "
-                                         f"of {atol}.")
-        except ValueError as err:
-            fails.append((key, dct, err, Jname))
-
-    fail_list = []
-
-    if fails:
-        fail_list.extend(
-            [f"Totals differ for {key}:\nAnalytic:\n{dct[Jname]}\nFD:\n{dct['J_fd']}\n{err}"
-             for key, dct, err, Jname in fails])
-
-    if incon_keys:
-        ders = [f"{sof} wrt {swrt}" for sof, swrt in sorted(incon_keys)]
-        fail_list.append(f"During total derivative computation, the following partial derivatives "
-                         "resulted in serial inputs that were inconsistent across processes: "
-                         f"{ders}.")
-
-    if fails or incon_keys:
-        raise ValueError('\n\n'.join(fail_list))
-
-
 def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6):
     """
     Raise assertion if any entry from the return from check_totals is above a tolerance.
