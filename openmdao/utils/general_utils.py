@@ -21,27 +21,6 @@ from openmdao.utils.array_utils import shape_to_len
 _float_inf = float('inf')
 
 
-def _convert_auto_ivc_to_conn_name(conns_dict, name):
-    """
-    Convert name of auto_ivc val to promoted input name.
-
-    Parameters
-    ----------
-    conns_dict : dict
-        Dictionary of global connections.
-    name : str
-        Name of auto_ivc to be found.
-
-    Returns
-    -------
-    str
-        Promoted input name.
-    """
-    for key, val in conns_dict.items():
-        if val == name:
-            return key
-
-
 def ensure_compatible(name, value, shape=None, indices=None):
     """
     Make value compatible with the specified shape or the shape of indices.
@@ -689,9 +668,7 @@ def make_serializable(o):
     if isinstance(o, _container_classes):
         return [make_serializable(item) for item in o]
     elif isinstance(o, dict):
-        s_key = [make_serializable_key(item) for item in o.keys()]
-        s_val = [make_serializable(item) for item in o.values()]
-        return dict(zip(s_key, s_val))
+        return {make_serializable_key(k): make_serializable(v) for k, v in o.items()}
     elif isinstance(o, np.ndarray):
         return o.tolist()
     elif isinstance(o, np.number):
@@ -757,9 +734,7 @@ def default_noraise(o):
     if isinstance(o, _container_classes):
         return [default_noraise(item) for item in o]
     elif isinstance(o, dict):
-        s_key = [make_serializable_key(item) for item in o.keys()]
-        s_val = [default_noraise(item) for item in o.values()]
-        return dict(zip(s_key, s_val))
+        return {make_serializable_key(k): default_noraise(v) for k, v in o.items()}
     elif isinstance(o, np.ndarray):
         return o.tolist()
     elif isinstance(o, np.number):
