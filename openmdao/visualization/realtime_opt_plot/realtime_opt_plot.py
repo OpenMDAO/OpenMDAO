@@ -1,11 +1,15 @@
 """ A real-plot of the optimization process"""
 
-from bokeh.models import ColumnDataSource, Legend, LegendItem, LinearAxis, Range1d
+from bokeh.models import ColumnDataSource, Legend, LegendItem, LinearAxis, Range1d, ScrollBox
 from bokeh.plotting import curdoc, figure
 from bokeh.server.server import Server
 from tornado.ioloop import IOLoop
 from bokeh.palettes import Category10, Category20, d3
 from bokeh.layouts import row, column, Spacer
+
+import numpy as np
+
+
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
 
 try:
@@ -53,6 +57,8 @@ class CaseTracker:
         self._case_recorder_filename = case_recorder_filename
         # self._cr = SqliteCaseReader(case_recorder_filename)
         self.source = None
+        
+        self._initial_cr_with_one_case = None
 
     def get_new_cases(self):
         # need to read this each time since the constructor does all of the actual reading
@@ -98,37 +104,76 @@ class CaseTracker:
             return new_data
         return None
 
+    def get_obj_names(self):
+        if self._initial_cr_with_one_case is None:
+            cr = SqliteCaseReader(self._case_recorder_filename)
+            case_ids = cr.list_cases("driver", out_stream=None)
+            if len(case_ids) > 0:
+                self._initial_cr_with_one_case = cr
+            else:
+                return None
+        case_ids = self._initial_cr_with_one_case.list_cases("driver", out_stream=None)
+        driver_case = self._initial_cr_with_one_case.get_case(case_ids[0])
+        obj_vars = driver_case.get_objectives()
+        return obj_vars.keys()
+
     def get_desvar_names(self):
-        self._cr = SqliteCaseReader(self._case_recorder_filename)
-        case_ids = self._cr.list_cases("driver", out_stream=None)
-        driver_case = self._cr.get_case(case_ids[0])
+        if self._initial_cr_with_one_case is None:
+            cr = SqliteCaseReader(self._case_recorder_filename)
+            case_ids = cr.list_cases("driver", out_stream=None)
+            if len(case_ids) > 0:
+                self._initial_cr_with_one_case = cr
+            else:
+                return None
+        case_ids = self._initial_cr_with_one_case.list_cases("driver", out_stream=None)
+        driver_case = self._initial_cr_with_one_case.get_case(case_ids[0])
         design_vars = driver_case.get_design_vars()
         return design_vars.keys()
 
     def get_cons_names(self):
-        self._cr = SqliteCaseReader(self._case_recorder_filename)
-        case_ids = self._cr.list_cases("driver", out_stream=None)
-        driver_case = self._cr.get_case(case_ids[0])
+        if self._initial_cr_with_one_case is None:
+            cr = SqliteCaseReader(self._case_recorder_filename)
+            case_ids = cr.list_cases("driver", out_stream=None)
+            if len(case_ids) > 0:
+                self._initial_cr_with_one_case = cr
+            else:
+                return None
+        case_ids = self._initial_cr_with_one_case.list_cases("driver", out_stream=None)
+        driver_case = self._initial_cr_with_one_case.get_case(case_ids[0])
         cons = driver_case.get_constraints()
         return cons.keys()
 
     def get_obj_names(self):
-        self._cr = SqliteCaseReader(self._case_recorder_filename)
-        case_ids = self._cr.list_cases("driver", out_stream=None)
-        driver_case = self._cr.get_case(case_ids[0])
+        if self._initial_cr_with_one_case is None:
+            cr = SqliteCaseReader(self._case_recorder_filename)
+            case_ids = cr.list_cases("driver", out_stream=None)
+            if len(case_ids) > 0:
+                self._initial_cr_with_one_case = cr
+            else:
+                return None
+        case_ids = self._initial_cr_with_one_case.list_cases("driver", out_stream=None)
+        driver_case = self._initial_cr_with_one_case.get_case(case_ids[0])
         obj_vars = driver_case.get_objectives()
         return obj_vars.keys()
     
     def get_units(self, name):
-        self._cr = SqliteCaseReader(self._case_recorder_filename)
-        case_ids = self._cr.list_cases("driver", out_stream=None)
-        driver_case = self._cr.get_case(case_ids[0])
+        if self._initial_cr_with_one_case is None:
+            cr = SqliteCaseReader(self._case_recorder_filename)
+            case_ids = cr.list_cases("driver", out_stream=None)
+            if len(case_ids) > 0:
+                self._initial_cr_with_one_case = cr
+            else:
+                return None
+        case_ids = self._initial_cr_with_one_case.list_cases("driver", out_stream=None)
+        driver_case = self._initial_cr_with_one_case.get_case(case_ids[0])
         try:
             units = driver_case._get_units(name)
         except RuntimeError as err:
             if str(err).startswith("Can't get units for the promoted name"):
                 return "Ambiguous"
             raise
+        except KeyError as err:
+            return "Unavailable"
             
         return units
 
@@ -136,15 +181,56 @@ class CaseTracker:
 class RealTimeOptPlot(object):
     def __init__(self, case_recorder_filename, doc):
         
+        print("RealTimeOptPlot.__init__")
+        
         self._source = None
 
         case_tracker = CaseTracker(case_recorder_filename)
        
+       
+        from bokeh.models.tools import BoxZoomTool, ResetTool, HoverTool, PanTool
+
         # Make the figure and all the settings for it
-        p = figure(tools="xpan,xwheel_zoom,xbox_zoom,reset",
+        p = figure(
+            tools=[BoxZoomTool(),ResetTool()],
+            # tooltips="Data point @x has the value @y",
+            # tools="xpan,xwheel_zoom,xbox_zoom,reset",
                    width_policy="max" , height_policy="max",
                    title="Real-time Optimization Progress Plot",
         )
+        p.add_tools(PanTool(dimensions="width"))
+        # tooltips=[("Value", "@y")]
+        
+        
+        # tooltips = [
+        #     ("index", "$index"),
+        #     ("(x,y)", "($x, $y)"),
+        # #     ("radius", "@radius"),
+        # #     ("fill color", "$color[hex, swatch]:fill_color"),
+        # #     ("fill color", "$color[hex]:fill_color"),
+        # #     ("fill color", "$color:fill_color"),
+        # #     ("fill color", "$swatch:fill_color"),
+        # #     ("foo", "@foo"),
+        # #     ("bar", "@bar"),
+        # ]
+        
+        
+        
+        # Create tooltips dynamically for all variables
+        # tooltips = [("index", "$index")]
+        # for name in  list(case_tracker.get_obj_names()) + list(case_tracker.get_cons_names()) + list(case_tracker.get_desvar_names()) :
+        #     tooltips.append((f'{name}', f'@{name}{{0.2f}}'))
+
+
+        # hover = HoverTool(
+        #     # tooltips=tooltips,
+        #     # formatters={
+        #     #     '@date': 'datetime',  # use 'datetime' formatter for '@date' field
+        #     # },
+        #     # mode='vline'  # display tooltips for all points on a vertical line
+        # )
+        # p.add_tools(hover)
+
 
         # Add an invisible line renderer. To avoid this warning message
         #     (MISSING_RENDERERS): Plot has no renderers
@@ -181,6 +267,8 @@ class RealTimeOptPlot(object):
             if self._source is None:
                 new_data = case_tracker.get_new_cases()
                 if new_data:
+                    
+                    # print("source is none and new data")
                     ####  make the source dict
                     source_dict = { 'iteration': []}
                     
@@ -199,16 +287,29 @@ class RealTimeOptPlot(object):
                     for con_name in con_names:
                         source_dict[con_name] = []
                         
+                        
+                    # print(f"{len(obj_names)=}")
+                    # print(f"{len(desvar_names)=}")
+                    # print(f"{len(con_names)=}")
+                        
                     self._source = ColumnDataSource(source_dict)
+
+                    # print(f"{self=}")
+                    # print(f"{id(self)=}")
+                    # print(f"set {self._source=}")
 
                     #### make the lines and legends
                     palette = Category20[20]
                     i_color = 0  # index of line across all variables: obj, desvars, cons
                     legend_items = []
 
+
+                    print("make Objective legend items, line")
                     # Objective
                     legend_items.append(LegendItem(label="OBJECTIVE"))  # the only way to make a header in Legends
+                    print(f"getting obj names")
                     obj_names = case_tracker.get_obj_names()
+                    print(f"done getting obj names")
                     if len(obj_names) != 1:
                         raise ValueError(f"Plot assumes there is on objective but {len(obj_names)} found")
                     for i, obj_name in enumerate(obj_names):
@@ -219,6 +320,17 @@ class RealTimeOptPlot(object):
                         units = case_tracker.get_units(obj_name)
                         legend_items.append(LegendItem(label=f"{obj_name} ({units})", renderers=[obj_line]))
                         p.yaxis.axis_label = obj_name
+                        # print(f"{i_color=}")
+                        
+                        
+                        hover = HoverTool(renderers=[obj_line], 
+                            tooltips=[('Iteration', '@iteration'), 
+                             (obj_name, '@{%s}' % obj_name)],
+                            mode='vline', visible=False)
+
+                        # Add the hover tools to the plot
+                        p.add_tools(hover)
+
 
 
                     # desvars
@@ -229,13 +341,23 @@ class RealTimeOptPlot(object):
                         i_color += 1
                         desvar_line = p.line(x="iteration", y=desvar_name, line_width=3, 
                                 y_range_name=f"extra_y_{desvar_name}",
-                                source=self._source,color=color)
+                                source=self._source,color=color, visible=False)
+                        desvar_line.visible = False
+
+
+                        hover = HoverTool(renderers=[desvar_line], 
+                            tooltips=[('Iteration', '@iteration'), 
+                             (desvar_name, '@{%s}' % desvar_name)],
+                            mode='vline', visible=False)
+
+                        # Add the hover tools to the plot
+                        p.add_tools(hover)
+
                         units = case_tracker.get_units(desvar_name)
                         legend_items.append(LegendItem(label=f"{desvar_name} ({units})", renderers=[desvar_line]))
-
-                        extra_y_axis = LinearAxis(y_range_name=f"extra_y_{desvar_name}",
-                                                axis_label=f"{desvar_name}",
-                                                axis_label_text_color=color)
+                        # extra_y_axis = LinearAxis(y_range_name=f"extra_y_{desvar_name}",
+                        #                         axis_label=f"{desvar_name}",
+                        #                         axis_label_text_color=color)
                         
                         # set the range
                         y_min = -20
@@ -248,8 +370,9 @@ class RealTimeOptPlot(object):
                         p.extra_y_ranges[f"extra_y_{desvar_name}"] = Range1d(
                             y_min, y_max)
 
-                        p.add_layout(extra_y_axis, 'right')
+                        # p.add_layout(extra_y_axis, 'right')
 
+                    print("make cons legend items, line")
 
                     # cons
                     legend_items.append(LegendItem(label="CONSTRAINTS"))  # the only way to make a header in Legends
@@ -259,14 +382,17 @@ class RealTimeOptPlot(object):
                         i_color += 1
                         cons_line = p.line(x="iteration", y=cons_name, line_width=3, 
                             y_range_name=f"extra_y_{cons_name}",
-                            source=self._source,color=color)
-                        units = case_tracker.get_units(cons_name)
-                        legend_items.append(LegendItem(label=f"{cons_name} ({units})", renderers=[cons_line]))
+                            source=self._source,color=color, visible=False)
+                        # units = case_tracker.get_units(cons_name)
+                        # legend_items.append(LegendItem(label=f"{cons_name} ({units})", renderers=[cons_line]))
 
 
-                        extra_y_axis = LinearAxis(y_range_name=f"extra_y_{cons_name}",
-                                                axis_label=f"{cons_name}",
-                                                axis_label_text_color=color)
+                        # extra_y_axis = LinearAxis(y_range_name=f"extra_y_{cons_name}",
+                        #                         axis_label=f"{cons_name}",
+                        #                         axis_label_text_color=color)
+
+
+
                         
                         # set the range
                         y_min = -100
@@ -279,26 +405,47 @@ class RealTimeOptPlot(object):
                         p.extra_y_ranges[f"extra_y_{cons_name}"] = Range1d(
                             y_min, y_max)
 
-                        p.add_layout(extra_y_axis, 'right')
+                        # p.add_layout(extra_y_axis, 'right')
 
 
-
+                    print("create actual Legend")
                     legend = Legend(items=legend_items, title="Variables")
-                    p.add_layout(legend, "right")
+                    
+                    
+                    
+                    # Wrap the legend in a ScrollBox
 
+
+
+                    p.add_layout(legend, "right")
+                    
+                    p.legend.click_policy="hide"
+
+                    print("end of source is none and new data")
+                    
             if new_data is None:
+                print("getting new cases")
                 new_data = case_tracker.get_new_cases()
+                print("done getting new cases")
             if new_data:
+                print("new_data at the end")
                 counter = new_data["counter"]
                 source_stream_dict = {"iteration": [counter]}
                 
                 for obj_name, obj_value in new_data["objs"].items():
-                    source_stream_dict[obj_name] = obj_value
-                for desvar_name, desvar_value in new_data["desvars"].items():
-                    source_stream_dict[desvar_name] = desvar_value
 
-                    self.y_min[desvar_name] = min(self.y_min[desvar_name], float(desvar_value))
-                    self.y_max[desvar_name] = max(self.y_max[desvar_name], float(desvar_value))
+                    float_obj_value = 0. if obj_value is None or obj_value.size == 0 else np.linalg.norm(obj_value)
+
+                    source_stream_dict[obj_name] = [float_obj_value]
+                for desvar_name, desvar_value in new_data["desvars"].items():
+
+                    float_desvar_value = 0. if desvar_value is None or desvar_value.size == 0 else np.linalg.norm(desvar_value)
+
+                    source_stream_dict[desvar_name] = [float_desvar_value]
+
+                    
+                    self.y_min[desvar_name] = min(self.y_min[desvar_name], float_desvar_value)
+                    self.y_max[desvar_name] = max(self.y_max[desvar_name], float_desvar_value)
                     if self.y_min[desvar_name] == self.y_max[desvar_name]:
                         self.y_min[desvar_name]  = self.y_min[desvar_name] - 1
                         self.y_max[desvar_name]  = self.y_max[desvar_name]  + 1
@@ -306,16 +453,62 @@ class RealTimeOptPlot(object):
                             self.y_min[desvar_name], self.y_max[desvar_name])
 
                 for cons_name, cons_value in new_data["cons"].items():
-                    source_stream_dict[cons_name] = cons_value
-                    self.y_min[cons_name] = min(self.y_min[cons_name], float(cons_value))
-                    self.y_max[cons_name] = max(self.y_max[cons_name], float(cons_value))
+
+                    float_cons_value = 0. if cons_value is None or cons_value.size == 0 else np.linalg.norm(cons_value)
+
+                    source_stream_dict[cons_name] = [float_cons_value]
+
+
+                    self.y_min[cons_name] = min(self.y_min[cons_name], float_cons_value)
+                    self.y_max[cons_name] = max(self.y_max[cons_name], float_cons_value)
                     if self.y_min[cons_name] == self.y_max[cons_name]:
                         self.y_min[cons_name]  = self.y_min[cons_name] - 1
                         self.y_max[cons_name]  = self.y_max[cons_name]  + 1
                     p.extra_y_ranges[f"extra_y_{cons_name}"] = Range1d(
                             self.y_min[cons_name], self.y_max[cons_name])
                 self._source.stream(source_stream_dict)
+                print("done new_data at the end")
 
+        print("adding root")
+        
+        
+        
+        # Add custom CSS to make the legend scrollable
+        custom_css = """
+        <style>
+        .bk-legend {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid black;
+        }
+        </style>
+        """
+
+        from bokeh.resources import INLINE
+        # Inject the custom CSS into the Bokeh document
+        curdoc().template = f"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="utf-8">
+            <title>Scrollable Legend</title>
+            {custom_css}
+            {{ bokeh_css }}
+            {{ bokeh_js }}
+        </head>
+        <body>
+            {{ plot_div | safe }}
+            {{ plot_script | safe }}
+        </body>
+        </html>
+        """
+        
+        
+        
+        
+        
+        
+        
         doc.add_root(p)
         doc.add_periodic_callback(update, 50)
         doc.title = "OpenMDAO Optimization"
@@ -339,7 +532,21 @@ def realtime_opt_plot(case_recorder_filename):
     port_number = get_free_port()
 
     try:
-        server = Server({'/': Application(FunctionHandler(_make_realtime_opt_plot_doc))}, port=port_number)
+        # import bokeh.settings.settings
+        # settings.log_level = 'debug'
+        # from bokeh.util.info import print_info
+        # print_info()
+        # from bokeh.util.logconfig import bokeh_logger as log
+        # import logging
+        # from bokeh.util.logconfig import basicConfig
+        # basicConfig(level=logging.TRACE)
+
+        # log.info(" -- info INIT TEXT")
+        # log.error(" -- error INIT TEXT")
+
+        server = Server({'/': Application(FunctionHandler(_make_realtime_opt_plot_doc))}, port=port_number, 
+                        unused_session_lifetime_milliseconds=1000*60*10,
+                        )
         server.start()
         server.io_loop.add_callback(server.show, "/")
         
@@ -351,4 +558,5 @@ def realtime_opt_plot(case_recorder_filename):
         print(f"Error starting Bokeh server: {e}")
     finally:
         print("Stopping server")
-        server.stop()
+        if 'server' in globals():
+            server.stop()
