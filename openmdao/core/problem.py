@@ -48,7 +48,7 @@ from openmdao.utils.name_maps import abs_key2rel_key
 from openmdao.utils.logger_utils import get_logger, TestLogger
 from openmdao.utils.hooks import _setup_hooks, _reset_all_hooks
 from openmdao.utils.record_util import create_local_meta
-from openmdao.utils.array_utils import scatter_dist_to_local
+from openmdao.utils.array_utils import scatter_dist_to_local, safe_norm
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
     clear_reports, _load_report_plugins
@@ -1464,7 +1464,8 @@ class Problem(object, metaclass=ProblemMetaclass):
                                             mhat = derivs
                                             dhat = deriv['J_fwd'][:, idx]
 
-                                            deriv['directional_fwd_rev'] = mhat.dot(m) - dhat.dot(d)
+                                            deriv['directional_fwd_rev'] = (mhat.dot(m),
+                                                                            dhat.dot(d))
                                         else:
                                             meta = abs2meta_in[out_abs] if out_abs in abs2meta_in \
                                                 else abs2meta_out[out_abs]
@@ -1646,7 +1647,7 @@ class Problem(object, metaclass=ProblemMetaclass):
 
                             if 'directional_fd_rev' not in deriv:
                                 deriv['directional_fd_rev'] = []
-                            deriv['directional_fd_rev'].append(dhat.dot(d) - mhat.dot(m))
+                            deriv['directional_fd_rev'].append((dhat.dot(d), mhat.dot(m)))
 
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(data) for comp_name, data in partials_data.items()}
@@ -1918,11 +1919,9 @@ class Problem(object, metaclass=ProblemMetaclass):
                             meta['directional_fd_fwd'] = []
                         _, wrt = key
                         # check directional fwd against fd (one must have negative seed)
-                        directional_fd_fwd = total_info.J[:, Jcalc_slices['wrt'][wrt].start] - \
-                            Jfd[:, Jcalc_slices['wrt'][wrt].start]
-                        meta['directional_fd_fwd'].append(directional_fd_fwd)
                         meta['J_fwd'] = total_info.J[:, Jcalc_slices['wrt'][wrt].start]
                         meta['J_fd'].append(Jfd[:, Jcalc_slices['wrt'][wrt].start])
+                        meta['directional_fd_fwd'].append((meta['J_fwd'], meta['J_fd'][-1]))
                     else:  # rev
                         if 'directional_fd_rev' not in meta:
                             meta['directional_fd_rev'] = []
@@ -1937,7 +1936,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                         mhat_dot_m = mhat.dot(m)
 
                         # Dot product test for adjoint validity.
-                        meta['directional_fd_rev'].append(dhat_dot_d - mhat_dot_m)
+                        meta['directional_fd_rev'].append((dhat_dot_d, mhat_dot_m))
                         meta['J_rev'] = dhat_dot_d
                         meta['J_fd'].append(mhat_dot_m)
                 else:
@@ -2914,9 +2913,6 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
     """
     nan = float('nan')
 
-    def safe_norm(arr):
-        return 0. if arr is None or arr.size == 0 else np.linalg.norm(arr)
-
     Jforward = derivative_info.get('J_fwd')
     Jreverse = derivative_info.get('J_rev')
     forward = Jforward is not None
@@ -2938,9 +2934,11 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
         steps = (None,)
 
     if matrix_free:
+        derivative_info['matrix_free'] = True
         if directional:
             if forward and reverse:
-                fwd_rev_error = safe_norm(derivative_info['directional_fwd_rev'])
+                mhatdotm, dhatdotd = derivative_info['directional_fwd_rev']
+                fwd_rev_error = safe_norm(mhatdotm - dhatdotd)
             else:
                 fwd_rev_error = None
         elif not totals:
@@ -2967,11 +2965,13 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
 
         if directional:
             if reverse:
-                rev_error = safe_norm(derivative_info['directional_fd_rev'][i])
+                mhatdotm, dhatdotd = derivative_info['directional_fd_rev'][i]
+                rev_error = safe_norm(mhatdotm - dhatdotd)
                 if not totals:
                     rev_norm = None
             if forward and totals:
-                fwd_error = safe_norm(derivative_info['directional_fd_fwd'][i])
+                mhatdotm, dhatdotd = derivative_info['directional_fd_fwd'][i]
+                fwd_error = safe_norm(mhatdotm - dhatdotd)
 
         derivative_info['abs error'].append(_ErrorTuple(fwd_error, rev_error, fwd_rev_error))
         derivative_info['magnitude'].append(_MagnitudeTuple(fwd_norm, rev_norm, fd_norm))

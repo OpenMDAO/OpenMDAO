@@ -1425,7 +1425,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 1)
         self.assertTrue('Relative Error (Jfor - Jfd) / Jfd : ' in content)
         self.assertTrue('Absolute Error (Jfor - Jfd) : ' in content)
-        assert_near_equal(data[(('comp.out',), 'comp.in')]['directional_fd_fwd'], 0., tolerance=2e-15)
+        mhatdotm, dhatdotd =  data[(('comp.out',), 'comp.in')]['directional_fd_fwd']
+        assert_near_equal(mhatdotm, dhatdotd, tolerance=2e-15)
 
     def test_directional_vectorized_matrix_free_rev_index_0(self):
 
@@ -1449,7 +1450,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 1)
         self.assertTrue('Relative Error ([rev, fd] Dot Product Test) / Jfd : ' in content)
         self.assertTrue('Absolute Error ([rev, fd] Dot Product Test) : ' in content)
-        assert_near_equal(data[('comp.out', ('comp.in',))]['directional_fd_rev'], 0., tolerance=2e-15)
+        dJrev, dJfd =  data[('comp.out', ('comp.in',))]['directional_fd_rev']
+        assert_near_equal(dJrev - dJfd, 0., tolerance=2e-15)
 
     def test_directional_vectorized_matrix_free_rev(self):
 
@@ -1473,7 +1475,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 1)
         self.assertTrue('Relative Error ([rev, fd] Dot Product Test) / Jfd : ' in content)
         self.assertTrue('Absolute Error ([rev, fd] Dot Product Test) : ' in content)
-        assert_near_equal(data[('comp.out', ('comp.in',))]['directional_fd_rev'], 0., tolerance=2e-15)
+        dJrev, dJfd =  data[('comp.out', ('comp.in',))]['directional_fd_rev']
+        assert_near_equal(dJrev - dJfd, 0., tolerance=2e-15)
 
     def test_directional_vectorized_matrix_free_rev_2in2out(self):
 
@@ -1500,8 +1503,10 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 2)
         self.assertTrue(content.count('Relative Error ([rev, fd] Dot Product Test) / Jfd :'), 2)
         self.assertTrue(content.count('Absolute Error ([rev, fd] Dot Product Test) :'), 2)
-        assert_near_equal(data[('comp.out1', ('comp.in1', 'comp.in2'))]['directional_fd_rev'], 0., tolerance=2e-15)
-        assert_near_equal(data[('comp.out2', ('comp.in1', 'comp.in2'))]['directional_fd_rev'], 0., tolerance=2e-15)
+        dJrev, dJfd = data[('comp.out1', ('comp.in1', 'comp.in2'))]['directional_fd_rev']
+        assert_near_equal(dJrev - dJfd, 0., tolerance=2e-15)
+        dJrev, dJfd = data[('comp.out2', ('comp.in1', 'comp.in2'))]['directional_fd_rev']
+        assert_near_equal(dJrev - dJfd, 0., tolerance=2e-15)
 
     def test_directional_vectorized_matrix_free_rev_2in2out_compact(self):
 
@@ -1519,8 +1524,10 @@ class TestProblemCheckTotals(unittest.TestCase):
         data = prob.check_totals(method='cs', out_stream=stream, compact_print=True, directional=True)
         content = stream.getvalue().strip()
         self.assertEqual(content.count("('comp.in1', 'comp.in2')"), 2)
-        assert_near_equal(data[('comp.out1', ('comp.in1', 'comp.in2'))]['directional_fd_rev'], 0., tolerance=2e-15)
-        assert_near_equal(data[('comp.out2', ('comp.in1', 'comp.in2'))]['directional_fd_rev'], 0., tolerance=2e-15)
+        dJrev, dJfd =  data[('comp.out1', ('comp.in1', 'comp.in2'))]['directional_fd_rev']
+        assert_near_equal(dJrev - dJfd, 0., tolerance=2e-15)
+        dJrev, dJfd =  data[('comp.out2', ('comp.in1', 'comp.in2'))]['directional_fd_rev']
+        assert_near_equal(dJrev - dJfd, 0., tolerance=2e-15)
 
     def test_directional_vectorized_matrix_free_fwd_2in2out(self):
 
@@ -1548,9 +1555,11 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 2)
         self.assertEqual(content.count('Relative Error ([rev, fd] Dot Product Test) / Jfd :'), 0)
         self.assertEqual(content.count('Absolute Error ([rev, fd] Dot Product Test) :'), 0)
-        assert_near_equal(np.linalg.norm(data[(('comp.out1', 'comp.out2'), 'comp.in1')]['directional_fd_fwd']), 0., tolerance=2e-15)
-        assert_near_equal(np.linalg.norm(data[(('comp.out1', 'comp.out2'), 'comp.in2')]['directional_fd_fwd']), 0., tolerance=2e-15)
-
+        dJfwd, dJfd =  data[(('comp.out1', 'comp.out2'), 'comp.in1')]['directional_fd_fwd']
+        assert_near_equal(np.linalg.norm(dJfwd - dJfd), 0., tolerance=2e-15)
+        dJfwd, dJfd =  data[(('comp.out1', 'comp.out2'), 'comp.in2')]['directional_fd_fwd']
+        assert_near_equal(np.linalg.norm(dJfwd - dJfd), 0., tolerance=2e-15)
+        
     def test_directional_vectorized_matrix_free_fwd_2in2out_compact(self):
 
         prob = om.Problem()
@@ -1567,8 +1576,10 @@ class TestProblemCheckTotals(unittest.TestCase):
         data = prob.check_totals(method='cs', out_stream=stream, compact_print=True, directional=True)
         content = stream.getvalue().strip()
         self.assertEqual(content.count("('comp.out1', 'comp.out2')"), 2)
-        assert_near_equal(np.linalg.norm(data[(('comp.out1', 'comp.out2'), 'comp.in1')]['directional_fd_fwd']), 0., tolerance=2e-15)
-        assert_near_equal(np.linalg.norm(data[(('comp.out1', 'comp.out2'), 'comp.in2')]['directional_fd_fwd']), 0., tolerance=2e-15)
+        dJfwd, dJfd =  data[(('comp.out1', 'comp.out2'), 'comp.in1')]['directional_fd_fwd']
+        assert_near_equal(np.linalg.norm(dJfwd - dJfd), 0., tolerance=2e-15)
+        dJfwd, dJfd =  data[(('comp.out1', 'comp.out2'), 'comp.in2')]['directional_fd_fwd']
+        assert_near_equal(np.linalg.norm(dJfwd - dJfd), 0., tolerance=2e-15)
 
     def test_directional_dymosish(self):
         class CollocationComp(om.ExplicitComponent):

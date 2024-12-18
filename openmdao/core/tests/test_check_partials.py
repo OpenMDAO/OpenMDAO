@@ -16,9 +16,10 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 from openmdao.test_suite.components.array_comp import ArrayComp
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_no_warning, \
-     assert_check_partials
+     assert_check_partials, assert_check_partials_old
 from openmdao.utils.om_warnings import DerivativesWarning, OMInvalidCheckDerivativesOptionsWarning
 from openmdao.utils.testing_utils import set_env_vars_context
+from openmdao.utils.array_utils import safe_norm
 
 from openmdao.utils.mpi import MPI
 
@@ -1773,14 +1774,18 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
         partials = prob.check_partials(method='cs')#, out_stream=None)
 
-        self.assertGreater(np.abs(partials['comp']['out2', 'in']['directional_fwd_rev']),
+        mhatdotm, dhatdotd = partials['comp']['out2', 'in']['directional_fwd_rev']
+        self.assertGreater(np.abs(safe_norm(mhatdotm - dhatdotd)),
                            1e-3, msg='Reverse deriv is supposed to be wrong.')
-        assert_near_equal(np.abs(partials['comp']['out', 'in']['directional_fwd_rev']),
-                          0.0, 1e-12)
-        assert_near_equal(np.abs(partials['comp']['out', 'in2']['directional_fwd_rev']),
-                          0.0, 1e-12)
-        assert_near_equal(np.abs(partials['comp']['out2', 'in2']['directional_fwd_rev']),
-                          0.0, 1e-12)
+
+        mhatdotm, dhatdotd = partials['comp']['out', 'in']['directional_fwd_rev']
+        assert_near_equal(np.abs(safe_norm(mhatdotm - dhatdotd)), 0.0, 1e-12)
+
+        mhatdotm, dhatdotd = partials['comp']['out', 'in2']['directional_fwd_rev']
+        assert_near_equal(np.abs(safe_norm(mhatdotm - dhatdotd)), 0.0, 1e-12)
+
+        mhatdotm, dhatdotd = partials['comp']['out2', 'in2']['directional_fwd_rev']
+        assert_near_equal(np.abs(safe_norm(mhatdotm - dhatdotd)), 0.0, 1e-12)
 
     def test_bug_local_method(self):
         # This fixes a bug setting the check method on a component overrode the requested method for
@@ -1885,6 +1890,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
         partials = prob.check_partials(method='cs', out_stream=None)
 
+        assert_check_partials_old(partials)
         assert_check_partials(partials)
 
     def test_no_linsolve_during_check(self):

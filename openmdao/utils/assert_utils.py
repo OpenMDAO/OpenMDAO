@@ -18,8 +18,8 @@ except ImportError:
 from openmdao.core.component import Component
 from openmdao.core.group import Group
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.utils.general_utils import pad_name
-from openmdao.utils.om_warnings import reset_warning_registry
+from openmdao.utils.general_utils import add_border, pad_name
+from openmdao.utils.om_warnings import reset_warning_registry, issue_warning
 from openmdao.utils.mpi import MPI
 from openmdao.utils.testing_utils import snum_equal
 
@@ -151,7 +151,154 @@ def assert_no_warning(category, msg=None, contains=False):
                 raise AssertionError(f"Found warning: {category} {msg}")
 
 
-def assert_check_partials(data, atol=1e-6, rtol=1e-6):
+def _filter_np_err(msg):
+    # remove extraneous lines from numpy error message
+    lines = []
+    for line in msg.split('\n'):
+        if not line.startswith('Not equal to tolerance'):
+            line = line.strip()
+            if line:
+                lines.append(line)
+    return '\n'.join(lines)
+
+
+def assert_check_partials(data, atol=1e-6, rtol=1e-6, max_display_shape=(20, 20)):
+    """
+    Raise assertion if any entry from the return from check_partials is above a tolerance.
+
+    Parameters
+    ----------
+    data : dict of dicts of dicts
+            First key:
+                is the component name;
+            Second key:
+                is the (output, input) tuple of strings;
+            Third key:
+                is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev',
+                           'directional_fd_fwd', 'directional_fd_rev', 'directional_fwd_rev',
+                           'rank_inconsistent', 'steps', 'matrix_free', 'directional']
+
+            For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
+                forward - fd, adjoint - fd, forward - adjoint.
+            For 'J_fd', 'J_fwd', 'J_rev' the value is: A numpy array representing the computed
+                Jacobian for the three different methods of computation.
+    atol : float
+        Absolute error. Default is 1e-6.
+    rtol : float
+        Relative error. Default is 1e-6.
+    max_display_shape : tuple of int
+        Maximum shape of the jacobians to display directly in the error message.
+        Default is (20, 20).
+    """
+    error_strings = []
+
+    for comp in data:
+        bad_derivs = []
+        inconsistent_derivs = set()
+
+        # Find all derivatives whose errors exceed tolerance.
+        # Also, size the output to precompute column extents.
+        for key, pair_data in data[comp].items():
+            if pair_data.get('rank_inconsistent'):
+                inconsistent_derivs.add(key)
+
+            J_fds = pair_data['J_fd']
+            J_fwd = pair_data.get('J_fwd')
+            J_rev = pair_data.get('J_rev')
+            dir_fd_fwds = pair_data.get('directional_fd_fwd')
+            dir_fd_revs = pair_data.get('directional_fd_rev')
+            dir_fwd_rev = pair_data.get('directional_fwd_rev')
+            directional = pair_data.get('directional')
+
+            if not isinstance(J_fds, list):
+                J_fds = [J_fds]
+                dir_fd_fwds = [dir_fd_fwds]
+                dir_fd_revs = [dir_fd_revs]
+
+            dirstr = ' directional' if directional else ''
+            jacs = [(f'J_fwd{dirstr}', J_fwd, f'Forward{dirstr}'),
+                    (f'J_rev{dirstr}', J_rev, f'Reverse{dirstr}')]
+
+            steps = pair_data.get('steps', [None])
+
+            nrows, ncols = J_fds[0].shape
+            if isinstance(max_display_shape, int):
+                maxrows = maxcols = max_display_shape
+            else:
+                try:
+                    maxrows, maxcols = max_display_shape
+                except ValueError:
+                    issue_warning("max_display_shape must be an int or a tuple of two ints, but "
+                                  f"got {max_display_shape}. Defaulting to (20, 20).")
+
+            for J_fd, step, dfwd, drev in zip(J_fds, steps, dir_fd_fwds, dir_fd_revs):
+                if step is not None:
+                    stepstr = f" (step={step})"
+                else:
+                    stepstr = ""
+
+                for Jname, J, direction in jacs:
+                    fwd = direction.startswith('Forward')
+                    if J is not None:
+                        try:
+                            if fwd and dfwd is not None:
+                                dJfwd, dJfd = dfwd
+                                np.testing.assert_allclose(dJfwd, dJfd, atol=atol, rtol=rtol,
+                                                           verbose=False, equal_nan=False)
+                            elif not fwd and drev is not None:
+                                dJrev, dJfd = drev
+                                np.testing.assert_allclose(dJrev, dJfd, atol=atol, rtol=rtol,
+                                                           verbose=False, equal_nan=False)
+                            else:
+                                np.testing.assert_allclose(J, J_fd, atol=atol, rtol=rtol,
+                                                           verbose=False, equal_nan=False)
+                        except Exception as err:
+                            bad_derivs.append(f"\n{direction} derivatives of '{key[0]}' w.r.t "
+                                              f"'{key[1]}' do not match finite "
+                                              f"difference{stepstr}.\n")
+                            bad_derivs[-1] += _filter_np_err(err.args[0])
+                            if nrows <= maxrows and ncols <= maxcols:
+                                with np.printoptions(linewidth=10000):
+                                    bad_derivs[-1] += f'\n{Jname}:\n' + np.array2string(J)
+                                    bad_derivs[-1] += '\nJ_fd:\n' + np.array2string(J_fd)
+
+        if pair_data.get('matrix_free') is not None and J_fwd is not None and J_rev is not None:
+            try:
+                if dir_fwd_rev is not None:
+                    dJfwd, dJrev = dir_fwd_rev
+                    np.testing.assert_allclose(dJfwd, dJrev, atol=atol, rtol=rtol,
+                                               verbose=False, equal_nan=False)
+                else:
+                    np.testing.assert_allclose(J_fwd, J_rev, atol=atol, rtol=rtol,
+                                               verbose=False, equal_nan=False)
+            except Exception as err:
+                bad_derivs.append(f"\nForward and Reverse derivatives of '{key[0]}' w.r.t "
+                                  f"'{key[1]}' do not match.\n")
+                bad_derivs[-1] += _filter_np_err(err.args[0])
+                if nrows <= maxrows and ncols <= maxcols:
+                    with np.printoptions(linewidth=10000):
+                        bad_derivs[-1] += '\nJ_fwd:\n' + np.array2string(J_fwd)
+                        bad_derivs[-1] += '\nJ_rev:\n' + np.array2string(J_rev)
+
+        if bad_derivs or inconsistent_derivs:
+            error_strings.append(add_border(f'Component: {comp}', '-'))
+            if bad_derivs:
+                error_strings[-1] += '\n'.join(bad_derivs)
+
+            if inconsistent_derivs:
+                error_strings[-1] += (
+                    "\nInconsistent derivs across processes for keys: "
+                    f"{sorted(inconsistent_derivs)}.\nCheck that distributed outputs are properly "
+                    "reduced when computing\nderivatives of serial inputs.")
+
+    if error_strings:
+        header = add_border('assert_check_partials failed for the following Components\n'
+                            f'with absolute tolerance = {atol} and relative tolerance = {rtol}')
+        err_string = '\n'.join(error_strings)
+        raise ValueError(f"\n{header}\n{err_string}")
+
+
+def assert_check_partials_old(data, atol=1e-6, rtol=1e-6):
     """
     Raise assertion if any entry from the return from check_partials is above a tolerance.
 
@@ -282,7 +429,7 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
         raise ValueError(error_string)
 
 
-def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6):
+def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6, max_display_shape=(20, 20)):
     """
     Raise assertion if any entry from the return from check_totals is above a tolerance.
 
@@ -300,6 +447,9 @@ def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6):
         Absolute error. Default is 1e-6.
     rtol : float
         Relative error. Default is 1e-6.
+    max_display_shape : tuple of int
+        Maximum shape of the jacobians to display directly in the error message.
+        Default is (20, 20).
     """
     fails = []
     incon_keys = set()
@@ -313,45 +463,30 @@ def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6):
             nrows = J_fd.shape
             ncols = 1
 
-        if 'J_fwd' in dct:
-            J_fwd = dct['J_fwd']
-            try:
-                np.testing.assert_allclose(
-                    J_fwd,
-                    J_fd,
-                    atol=atol,
-                    rtol=rtol,
-                    verbose=False,
-                    equal_nan=False,
-                    err_msg=(f"Forward derivatives of {key[0]} w.r.t {key[1]} do not match finite "
-                             "difference.")
-                )
-            except Exception as err:
-                fails.append(err.args[0])
-                if nrows < 20 and ncols < 20:
-                    with np.printoptions(linewidth=10000):
-                        fails[-1] += '\nJ_fwd:\n' + np.array2string(J_fwd)
-                        fails[-1] += '\nJ_fd:\n' + np.array2string(J_fd)
+    if isinstance(max_display_shape, int):
+        maxrows = maxcols = max_display_shape
+    else:
+        try:
+            maxrows, maxcols = max_display_shape
+        except ValueError:
+            issue_warning("max_display_shape must be an int or a tuple of two ints, but "
+                          f"got {max_display_shape}. Defaulting to (20, 20).")
 
-        if 'J_rev' in dct:
-            J_rev = dct['J_rev']
-            try:
-                np.testing.assert_allclose(
-                    J_rev,
-                    J_fd,
-                    atol=atol,
-                    rtol=rtol,
-                    verbose=False,
-                    equal_nan=False,
-                    err_msg=(f"Reverse derivatives of {key[0]} w.r.t {key[1]} do not match finite "
-                             "difference.")
-                )
-            except Exception as err:
-                fails.append(err.args[0])
-                if nrows < 20 and ncols < 20:
-                    with np.printoptions(linewidth=10000):
-                        fails[-1] += '\nJ_rev:\n' + np.array2string(J_rev)
-                        fails[-1] += '\nJ_fd:\n' + np.array2string(J_fd)
+        jacs = [('J_fwd', dct.get('J_fwd'), 'Forward'), ('J_rev', dct.get('J_rev'), 'Reverse')]
+
+        for Jname, J, direction in jacs:
+            if J is not None:
+                try:
+                    np.testing.assert_allclose(J, J_fd, atol=atol, rtol=rtol, verbose=False,
+                                               equal_nan=False)
+                except Exception as err:
+                    fails.append(f"\n{direction} derivatives of '{key[0]}' w.r.t '{key[1]}' "
+                                 "do not match finite difference.\n")
+                    fails[-1] += _filter_np_err(err.args[0])
+                    if nrows <= maxrows and ncols <= maxcols:
+                        with np.printoptions(linewidth=10000):
+                            fails[-1] += f'\n{Jname}:\n' + np.array2string(J)
+                            fails[-1] += '\nJ_fd:\n' + np.array2string(J_fd)
 
     if incon_keys:
         ders = [f"{sof} wrt {swrt}" for sof, swrt in sorted(incon_keys)]
