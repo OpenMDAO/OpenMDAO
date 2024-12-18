@@ -1259,7 +1259,6 @@ class Problem(object, metaclass=ProblemMetaclass):
         # output_cache = model._outputs.asarray(copy=True)
 
         # Analytic Jacobians
-        print_reverse = False
 
         # OPENMDAO_CHECK_ALL_PARTIALS overrides _no_check_partials (used for testing)
         force_check_partials = env_truthy('OPENMDAO_CHECK_ALL_PARTIALS')
@@ -1310,8 +1309,6 @@ class Problem(object, metaclass=ProblemMetaclass):
                     # Matrix-free components need to calculate their Jacobian by matrix-vector
                     # product.
                     if comp.matrix_free:
-                        print_reverse = True
-
                         dstate = comp._doutputs
                         if mode == 'fwd':
                             dinputs = comp._dinputs
@@ -1601,8 +1598,7 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
                                   compact_print, comps, all_fd_options, self.comm,
-                                  zero_derivs=zero_derivs, print_reverse=print_reverse,
-                                  show_only_incorrect=show_only_incorrect)
+                                  zero_derivs=zero_derivs, show_only_incorrect=show_only_incorrect)
 
         if not do_steps:
             _fix_check_data(partials_data)
@@ -3078,8 +3074,7 @@ def _fix_check_data(data):
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
                               compact_print, system_list, global_options, comm, totals=False,
-                              zero_derivs=None, print_reverse=False,
-                              show_only_incorrect=False, lcons=None, sort=False):
+                              zero_derivs=None, show_only_incorrect=False, lcons=None, sort=False):
     """
     Compute the relative and absolute errors in the given derivatives and print to the out_stream.
 
@@ -3106,8 +3101,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         Set to _TotalJacInfo if we are doing check_totals to skip a bunch of stuff.
     zero_derivs : dict of sets, optional
         Keyed by component name, contains the of/wrt keys that are declared not dependent.
-    print_reverse : bool, optional
-        Set to True if compact_print results need to include columns for reverse mode.
     show_only_incorrect : bool, optional
         Set to True if output should print only the subjacs found to be incorrect.
     lcons : list or None
@@ -3128,6 +3121,14 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
     worst_subjac = None
     incon_keys = ()
+
+    # see if we need to print reverse
+    print_reverse = False
+    if not totals:
+        for system in system_list:
+            if system.matrix_free:
+                print_reverse = True
+                break
 
     for system in system_list:
         # Match header to appropriate type.
