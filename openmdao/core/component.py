@@ -24,8 +24,10 @@ from openmdao.utils.general_utils import format_as_float_or_array, ensure_compat
 from openmdao.utils.indexer import Indexer, indexer
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
-    DerivativesWarning, warn_deprecation
+    DerivativesWarning, warn_deprecation, OMInvalidCheckDerivativesOptionsWarning
 from openmdao.utils.code_utils import is_lambda, LambdaPickleWrapper, get_partials_deps
+from openmdao.approximation_schemes.complex_step import ComplexStep
+from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
 
 _forbidden_chars = {'.', '*', '?', '!', '[', ']'}
@@ -1942,6 +1944,68 @@ class Component(System):
                               f"{wrt[prefix_len:]} was not declared but is nonzero.\n"
                               f"rows = {sjrows}\ncols = {sjcols}\n")
 
+    def _check_fds_differ(self, method, step, form, step_calc, minimum_step):
+        # Check to make sure the method and settings used for checking
+        #   is different from the method used to calc the derivatives
+        # Could do this later in this method but at that point some computations could have been
+        #   made and it would just waste time before the user is told there is an error and the
+        #   program errs out
+        requested_method = method
+        alloc_complex = self._outputs._alloc_complex
+
+        local_opts = self._get_check_partial_options()
+
+        for keypats, meta in self._declared_partials_patterns.items():
+
+            # Get the complete set of options, including defaults
+            #    for the computing of the derivs for this component
+            if 'method' not in meta:
+                meta_with_defaults = {}
+                meta_with_defaults['method'] = 'exact'
+            elif meta['method'] == 'cs':
+                meta_with_defaults = ComplexStep.DEFAULT_OPTIONS.copy()
+            else:
+                meta_with_defaults = FiniteDifference.DEFAULT_OPTIONS.copy()
+            meta_with_defaults.update(meta)
+
+            _, wrtpats = keypats
+            # For each of the partials, check to see if the
+            #   check partials options are different than the options used to compute
+            #   the partials
+            for _, wrtvars in self._find_wrt_matches(wrtpats):
+                for var in wrtvars:
+                    # we now have individual vars like 'x'
+                    # get the options for checking partials
+                    fd_options, _ = _get_fd_options(var, requested_method, local_opts, step,
+                                                    form, step_calc, alloc_complex,
+                                                    minimum_step)
+                    # compare the compute options to the check options
+                    if fd_options['method'] != meta_with_defaults['method']:
+                        all_same = False
+                    else:
+                        all_same = True
+                        if fd_options['method'] == 'fd':
+                            option_names = ['form', 'step', 'step_calc', 'minimum_step',
+                                            'directional']
+                        else:
+                            option_names = ['step', 'directional']
+                        for name in option_names:
+                            if fd_options[name] != meta_with_defaults[name]:
+                                all_same = False
+                                break
+                    if all_same:
+                        msg = (f"Checking partials with respect to variable '{var}' in component "
+                               f"'{self.pathname}' using the same method and options as are used "
+                               "to compute the component's derivatives will not provide any "
+                               "relevant information on the accuracy.\n"
+                               "To correct this, change the options to do the\n"
+                               "check_partials using either:\n"
+                               "     - arguments to Problem.check_partials.\n"
+                               "     - arguments to Component.set_check_partial_options")
+
+                        issue_warning(msg, prefix=self.msginfo,
+                                      category=OMInvalidCheckDerivativesOptionsWarning)
+
 
 class _DictValues(object):
     """
@@ -1981,3 +2045,55 @@ class _DictValues(object):
     def set_vals(self, vals):
         for key, val in zip(self._dict, vals):
             self[key] = val
+
+
+def _get_fd_options(var, global_method, local_opts, global_step, global_form, global_step_calc,
+                    alloc_complex, global_minimum_step):
+    local_wrt = var
+
+    # Determine if fd or cs.
+    method = global_method
+    if local_wrt in local_opts:
+        local_method = local_opts[local_wrt]['method']
+        if local_method:
+            method = local_method
+
+    # We can't use CS if we haven't allocated a complex vector, so we fall back on fd.
+    if method == 'cs' and not alloc_complex:
+        method = 'fd'
+        could_not_cs = True
+    else:
+        could_not_cs = False
+
+    fd_options = {'order': None,
+                  'method': method}
+
+    if method == 'cs':
+        fd_options = ComplexStep.DEFAULT_OPTIONS.copy()
+        fd_options['method'] = 'cs'
+
+        fd_options['form'] = None
+        fd_options['step_calc'] = None
+        fd_options['minimum_step'] = None
+
+    elif method == 'fd':
+        fd_options = FiniteDifference.DEFAULT_OPTIONS.copy()
+        fd_options['method'] = 'fd'
+
+        fd_options['form'] = global_form
+        fd_options['step_calc'] = global_step_calc
+        fd_options['minimum_step'] = global_minimum_step
+
+    if global_step and global_method == method:
+        fd_options['step'] = global_step
+
+    fd_options['directional'] = False
+
+    # Precedence: component options > global options > defaults
+    if local_wrt in local_opts:
+        for name in ['form', 'step', 'step_calc', 'minimum_step', 'directional']:
+            value = local_opts[local_wrt][name]
+            if value is not None:
+                fd_options[name] = value
+
+    return fd_options, could_not_cs

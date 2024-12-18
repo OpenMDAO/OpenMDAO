@@ -1988,7 +1988,7 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
             prob.setup(force_alloc_complex=force_alloc_complex)
             return prob, parab
 
-        expected_check_partials_error = "Problem {prob._name}: Checking partials " \
+        expected_check_partials_error = "'parab' <class Paraboloid>: Checking partials " \
               "with respect to variable '{var}' in component '{comp.pathname}' using the " \
               "same method and options as are used to compute the component's derivatives " \
               "will not provide any relevant information on the accuracy.\n" \

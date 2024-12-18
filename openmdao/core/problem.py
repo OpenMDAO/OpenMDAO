@@ -22,7 +22,7 @@ import numpy as np
 import scipy.sparse as sparse
 
 from openmdao.core.constants import _SetupStatus
-from openmdao.core.component import Component
+from openmdao.core.component import Component, _get_fd_options
 from openmdao.core.driver import Driver, record_iteration
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.system import System
@@ -1235,6 +1235,11 @@ class Problem(object, metaclass=ProblemMetaclass):
         includes = [includes] if isinstance(includes, str) else includes
         excludes = [excludes] if isinstance(excludes, str) else excludes
 
+        alloc_complex = model._outputs._alloc_complex
+        abs2meta_in = model._var_allprocs_abs2meta['input']
+        abs2meta_out = model._var_allprocs_abs2meta['output']
+        requested_method = method
+
         comps = []
 
         # OPENMDAO_CHECK_ALL_PARTIALS overrides _no_check_partials (used for testing)
@@ -1256,74 +1261,9 @@ class Problem(object, metaclass=ProblemMetaclass):
             if not match_includes_excludes(comp.pathname, includes, excludes):
                 continue
 
+            comp._check_fds_differ(method, step, form, step_calc, minimum_step)
+
             comps.append(comp)
-
-        # Check to make sure the method and settings used for checking
-        #   is different from the method used to calc the derivatives
-        # Could do this later in this method but at that point some computations could have been
-        #   made and it would just waste time before the user is told there is an error and the
-        #   program errs out
-        requested_method = method
-        alloc_complex = model._outputs._alloc_complex
-        abs2meta_in = model._var_allprocs_abs2meta['input']
-        abs2meta_out = model._var_allprocs_abs2meta['output']
-
-        for comp in comps:
-            local_opts = comp._get_check_partial_options()
-
-            for keypats, meta in comp._declared_partials_patterns.items():
-
-                # Get the complete set of options, including defaults
-                #    for the computing of the derivs for this component
-                if 'method' not in meta:
-                    meta_with_defaults = {}
-                    meta_with_defaults['method'] = 'exact'
-                elif meta['method'] == 'cs':
-                    meta_with_defaults = ComplexStep.DEFAULT_OPTIONS.copy()
-                else:
-                    meta_with_defaults = FiniteDifference.DEFAULT_OPTIONS.copy()
-                meta_with_defaults.update(meta)
-
-                _, wrtpats = keypats
-                # For each of the partials, check to see if the
-                #   check partials options are different than the options used to compute
-                #   the partials
-                for _, wrtvars in comp._find_wrt_matches(wrtpats):
-                    for var in wrtvars:
-                        # we now have individual vars like 'x'
-                        # get the options for checking partials
-                        fd_options, _ = _get_fd_options(var, requested_method, local_opts, step,
-                                                        form, step_calc, alloc_complex,
-                                                        minimum_step)
-                        # compare the compute options to the check options
-                        if fd_options['method'] != meta_with_defaults['method']:
-                            all_same = False
-                        else:
-                            all_same = True
-                            if fd_options['method'] == 'fd':
-                                option_names = ['form', 'step', 'step_calc', 'minimum_step',
-                                                'directional']
-                            else:
-                                option_names = ['step', 'directional']
-                            for name in option_names:
-                                if fd_options[name] != meta_with_defaults[name]:
-                                    all_same = False
-                                    break
-                        if all_same:
-                            msg = f"Checking partials with respect " \
-                                  f"to variable '{var}' in component " \
-                                  f"'{comp.pathname}' using the same " \
-                                  "method and options as are used to compute the " \
-                                  "component's derivatives " \
-                                  "will not provide any relevant information on the " \
-                                  "accuracy.\n" \
-                                  "To correct this, change the options to do the \n" \
-                                  "check_partials using either:\n" \
-                                  "     - arguments to Problem.check_partials. \n" \
-                                  "     - arguments to Component.set_check_partial_options"
-
-                            issue_warning(msg, prefix=self.msginfo,
-                                          category=OMInvalidCheckDerivativesOptionsWarning)
 
         self.set_solver_print(level=0)
 
@@ -1336,7 +1276,7 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         # Keep track of derivative keys that are declared dependent so that we don't print them
         # unless they are in error.
-        indep_key = {}
+        zero_derivs = {}
 
         # Directional derivative directions for matrix free comps.
         mfree_directions = {}
@@ -1360,7 +1300,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                 matrix_free = comp.matrix_free
                 c_name = comp.pathname
                 if mode == 'fwd':
-                    indep_key[c_name] = set()
+                    zero_derivs[c_name] = set()
 
                 with comp._unscaled_context():
 
@@ -1507,9 +1447,9 @@ class Problem(object, metaclass=ProblemMetaclass):
                             # undeclared partials, which is the default behavior now.
                             try:
                                 if not subjacs[abs_key]['dependent']:
-                                    indep_key[c_name].add(rel_key)
+                                    zero_derivs[c_name].add(rel_key)
                             except KeyError:
-                                indep_key[c_name].add(rel_key)
+                                zero_derivs[c_name].add(rel_key)
 
                             if wrt in comp._var_abs2meta['input']:
                                 wrt_meta = comp._var_abs2meta['input'][wrt]
@@ -1665,7 +1605,7 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
                                   compact_print, comps, all_fd_options, self.comm,
-                                  indep_key=indep_key, print_reverse=print_reverse,
+                                  zero_derivs=zero_derivs, print_reverse=print_reverse,
                                   show_only_incorrect=show_only_incorrect)
 
         if not do_steps:
@@ -3142,7 +3082,7 @@ def _fix_check_data(data):
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
                               compact_print, system_list, global_options, comm, totals=False,
-                              indep_key=None, print_reverse=False,
+                              zero_derivs=None, print_reverse=False,
                               show_only_incorrect=False, lcons=None, sort=False):
     """
     Compute the relative and absolute errors in the given derivatives and print to the out_stream.
@@ -3168,7 +3108,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         The MPI communicator.
     totals : bool or _TotalJacInfo
         Set to _TotalJacInfo if we are doing check_totals to skip a bunch of stuff.
-    indep_key : dict of sets, optional
+    zero_derivs : dict of sets, optional
         Keyed by component name, contains the of/wrt keys that are declared not dependent.
     print_reverse : bool, optional
         Set to True if compact_print results need to include columns for reverse mode.
@@ -3245,7 +3185,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
             # Skip printing the non-dependent keys if the derivatives are fine.
             if not compact_print:
-                if indep_key and key in indep_key[sys_name] and fd_norm < abs_error_tol:
+                if zero_derivs and key in zero_derivs[sys_name] and fd_norm < abs_error_tol:
                     del derivatives[key]
                     continue
 
@@ -3607,55 +3547,3 @@ def _format_error(error, tol):
     if np.isnan(error) or error < tol:
         return f'{error:.6e}'
     return f'{error:.6e} *'
-
-
-def _get_fd_options(var, global_method, local_opts, global_step, global_form, global_step_calc,
-                    alloc_complex, global_minimum_step):
-    local_wrt = var
-
-    # Determine if fd or cs.
-    method = global_method
-    if local_wrt in local_opts:
-        local_method = local_opts[local_wrt]['method']
-        if local_method:
-            method = local_method
-
-    # We can't use CS if we haven't allocated a complex vector, so we fall back on fd.
-    if method == 'cs' and not alloc_complex:
-        method = 'fd'
-        could_not_cs = True
-    else:
-        could_not_cs = False
-
-    fd_options = {'order': None,
-                  'method': method}
-
-    if method == 'cs':
-        fd_options = ComplexStep.DEFAULT_OPTIONS.copy()
-        fd_options['method'] = 'cs'
-
-        fd_options['form'] = None
-        fd_options['step_calc'] = None
-        fd_options['minimum_step'] = None
-
-    elif method == 'fd':
-        fd_options = FiniteDifference.DEFAULT_OPTIONS.copy()
-        fd_options['method'] = 'fd'
-
-        fd_options['form'] = global_form
-        fd_options['step_calc'] = global_step_calc
-        fd_options['minimum_step'] = global_minimum_step
-
-    if global_step and global_method == method:
-        fd_options['step'] = global_step
-
-    fd_options['directional'] = False
-
-    # Precedence: component options > global options > defaults
-    if local_wrt in local_opts:
-        for name in ['form', 'step', 'step_calc', 'minimum_step', 'directional']:
-            value = local_opts[local_wrt][name]
-            if value is not None:
-                fd_options[name] = value
-
-    return fd_options, could_not_cs
