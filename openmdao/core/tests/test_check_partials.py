@@ -440,10 +440,10 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.assertAlmostEqual(abs_error.forward, 0.)
 
         # Make sure we only FD this twice.
-        # The count is 5 because in check_partials, there are two calls to apply_nonlinear
+        # The count is 4 because in check_partials, there is one call to apply_nonlinear
         # when compute the fwd and rev analytic derivatives, then one call to apply_nonlinear
         # to compute the reference point for FD, then two additional calls for the two inputs.
-        self.assertEqual(units.run_count, 5)
+        self.assertEqual(units.run_count, 4)
 
     def test_scalar_val(self):
         class PassThrough(om.ExplicitComponent):
@@ -1446,14 +1446,14 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         data = prob.check_partials(out_stream=None)
 
-        # Note on why we run 10 times:
+        # Note on why we run 9 times:
         # 1    - Initial execution
-        # 2~3  - Called apply_nonlinear at the start of fwd and rev analytic deriv calculations
-        # 4    - Called apply_nonlinear to clean up before starting FD
-        # 5~8  - FD wrt bb, non-directional
-        # 9    - FD wrt x1, directional
-        # 10   - FD wrt x2, directional
-        self.assertEqual(mycomp.exec_count, 10)
+        # 2    - Called apply_nonlinear at the start of analytic deriv calculations
+        # 3    - Called apply_nonlinear to clean up before starting FD
+        # 4-7  - FD wrt bb, non-directional
+        # 8    - FD wrt x1, directional
+        # 9    - FD wrt x2, directional
+        self.assertEqual(mycomp.exec_count, 9)
 
         assert_check_partials(data, atol=1.0E-8, rtol=1.0E-8)
 
@@ -1481,14 +1481,14 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         data = prob.check_partials(method='cs', out_stream=None)
 
-        # Note on why we run 10 times:
+        # Note on why we run 9 times:
         # 1    - Initial execution
-        # 2~3  - Called apply_nonlinear at the start of fwd and rev analytic deriv calculations
-        # 4    - Called apply_nonlinear to clean up before starting FD
-        # 5~8  - FD wrt bb, non-directional
-        # 9    - FD wrt x1, directional
-        # 10   - FD wrt x2, directional
-        self.assertEqual(mycomp.exec_count, 10)
+        # 2    - Called apply_nonlinear at the start of analytic deriv calculations
+        # 3    - Called apply_nonlinear to clean up before starting FD
+        # 4-7  - FD wrt bb, non-directional
+        # 8    - FD wrt x1, directional
+        # 9   - FD wrt x2, directional
+        self.assertEqual(mycomp.exec_count, 9)
 
         assert_check_partials(data, atol=1.0E-8, rtol=1.0E-8)
 
@@ -1988,14 +1988,16 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
             prob.setup(force_alloc_complex=force_alloc_complex)
             return prob, parab
 
-        expected_check_partials_error = "'parab' <class Paraboloid>: Checking partials " \
-              "with respect to variable '{var}' in component '{comp.pathname}' using the " \
-              "same method and options as are used to compute the component's derivatives " \
-              "will not provide any relevant information on the accuracy.\n" \
-              "To correct this, change the options to do the \n" \
-              "check_partials using either:\n" \
-              "     - arguments to Problem.check_partials. \n" \
-              "     - arguments to Component.set_check_partial_options"
+        expected_check_partials_error = (
+            "'parab' <class Paraboloid>: Checking partials with respect to variable '{var}' in component "
+            "'{comp.pathname}' using the same method and options as are used "
+            "to compute the component's derivatives will not provide any "
+            "relevant information on the accuracy.\n"
+            "To correct this, change the options to do the "
+            "check_partials using either:\n"
+            "     - arguments to Problem.check_partials.\n"
+            "     - arguments to Component.set_check_partial_options"
+        )
 
         # Scenario 1:
         #    Compute partials: exact
@@ -2012,6 +2014,7 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         parab.declare_partials(of='*', wrt='*', method='fd')
         with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as cm:
             prob.check_partials(method='fd')
+            
         self.assertEqual(str(cm.exception),
                          expected_check_partials_error.format(prob=prob, var='x', comp=parab))
 

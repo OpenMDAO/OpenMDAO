@@ -1998,7 +1998,7 @@ class Component(System):
                                f"'{self.pathname}' using the same method and options as are used "
                                "to compute the component's derivatives will not provide any "
                                "relevant information on the accuracy.\n"
-                               "To correct this, change the options to do the\n"
+                               "To correct this, change the options to do the "
                                "check_partials using either:\n"
                                "     - arguments to Problem.check_partials.\n"
                                "     - arguments to Component.set_check_partial_options")

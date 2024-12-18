@@ -1240,7 +1240,26 @@ class Problem(object, metaclass=ProblemMetaclass):
         abs2meta_out = model._var_allprocs_abs2meta['output']
         requested_method = method
 
+        self.set_solver_print(level=0)
+
+        # This is a defaultdict of (defaultdict of dicts).
+        partials_data = defaultdict(lambda: defaultdict(dict))
+
+        # Keep track of derivative keys that are declared dependent so that we don't print them
+        # unless they are in error.
+        zero_derivs = {}
+
+        # Directional derivative directions for matrix free comps.
+        mfree_directions = {}
+
         comps = []
+
+        # Caching current point to restore after setups.
+        # input_cache = model._inputs.asarray(copy=True)
+        # output_cache = model._outputs.asarray(copy=True)
+
+        # Analytic Jacobians
+        print_reverse = False
 
         # OPENMDAO_CHECK_ALL_PARTIALS overrides _no_check_partials (used for testing)
         force_check_partials = env_truthy('OPENMDAO_CHECK_ALL_PARTIALS')
@@ -1261,57 +1280,37 @@ class Problem(object, metaclass=ProblemMetaclass):
             if not match_includes_excludes(comp.pathname, includes, excludes):
                 continue
 
+            comps.append(comp)
+            c_name = comp.pathname
+
             comp._check_fds_differ(method, step, form, step_calc, minimum_step)
 
-            comps.append(comp)
-
-        self.set_solver_print(level=0)
-
-        # This is a defaultdict of (defaultdict of dicts).
-        partials_data = defaultdict(lambda: defaultdict(dict))
-
-        # Caching current point to restore after setups.
-        input_cache = model._inputs.asarray(copy=True)
-        output_cache = model._outputs.asarray(copy=True)
-
-        # Keep track of derivative keys that are declared dependent so that we don't print them
-        # unless they are in error.
-        zero_derivs = {}
-
-        # Directional derivative directions for matrix free comps.
-        mfree_directions = {}
-
-        # Analytic Jacobians
-        print_reverse = False
-        for mode in ('fwd', 'rev'):
-            model._inputs.set_val(input_cache)
-            model._outputs.set_val(output_cache)
             # Make sure we're in a valid state
-            model.run_apply_nonlinear()
+            comp.run_apply_nonlinear()
 
-            jac_key = 'J_' + mode
+            input_cache = comp._inputs.asarray(copy=True)
+            output_cache = comp._outputs.asarray(copy=True)
 
-            for comp in comps:
+            if comp.matrix_free:
+                directions = ('fwd', 'rev')
+                local_opts = comp._get_check_partial_options()
+            else:
+                directions = ('fwd',)  # rev same as fwd for analytic jacobians
+                comp.run_linearize(sub_do_ln=False)
 
-                # Only really need to linearize once.
-                if mode == 'fwd':
-                    comp.run_linearize(sub_do_ln=False)
+            zero_derivs[c_name] = set()
+            of_list = comp._get_partials_ofs()
+            wrt_list = comp._get_partials_wrts()
 
-                matrix_free = comp.matrix_free
-                c_name = comp.pathname
-                if mode == 'fwd':
-                    zero_derivs[c_name] = set()
+            for mode in directions:
+                jac_key = 'J_' + mode
 
                 with comp._unscaled_context():
 
-                    of_list = comp._get_partials_ofs()
-                    wrt_list = comp._get_partials_wrts()
-
                     # Matrix-free components need to calculate their Jacobian by matrix-vector
                     # product.
-                    if matrix_free:
+                    if comp.matrix_free:
                         print_reverse = True
-                        local_opts = comp._get_check_partial_options()
 
                         dstate = comp._doutputs
                         if mode == 'fwd':
@@ -1425,10 +1424,6 @@ class Problem(object, metaclass=ProblemMetaclass):
                     # These components already have a Jacobian with calculated derivatives.
                     else:
 
-                        if mode == 'rev':
-                            # Skip reverse mode because it is not different than forward.
-                            continue
-
                         subjacs = comp._jacobian._subjacs_info
 
                         for rel_key in product(of_list, wrt_list):
@@ -1484,8 +1479,9 @@ class Problem(object, metaclass=ProblemMetaclass):
 
                             partials_data[c_name][rel_key][jac_key] = deriv_value.copy()
 
-        model._inputs.set_val(input_cache)
-        model._outputs.set_val(output_cache)
+                comp._inputs.set_val(input_cache)
+                comp._outputs.set_val(output_cache)
+
         model.run_apply_nonlinear()
 
         # Finite Difference to calculate Jacobian
