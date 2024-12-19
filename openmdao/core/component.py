@@ -13,14 +13,15 @@ from scipy.sparse import issparse, coo_matrix
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
     global_meta_names, collect_errors
-from openmdao.core.constants import INT_DTYPE
-from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
+from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian, _CheckingJacobian
 from openmdao.utils.array_utils import shape_to_len, submat_sparsity_iter
 from openmdao.utils.units import simplify_unit
-from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key
-from openmdao.utils.mpi import MPI
+from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_name2abs_name, \
+    rel_key2abs_key
+from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    find_matches, make_set, inconsistent_across_procs
+    find_matches, make_set, inconsistent_across_procs, LocalRangeIterable
 from openmdao.utils.indexer import Indexer, indexer
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
@@ -2005,6 +2006,404 @@ class Component(System):
 
                         issue_warning(msg, prefix=self.msginfo,
                                       category=OMInvalidCheckDerivativesOptionsWarning)
+
+    def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, includes=None, excludes=None,
+                       compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
+                       method='fd', step=None, form='forward', step_calc='abs',
+                       minimum_step=1e-12, force_dense=True, show_only_incorrect=False):
+        """
+        Check partial derivatives comprehensively for all components in your model.
+
+        Parameters
+        ----------
+        out_stream : file-like object
+            Where to send human readable output. By default it goes to stdout.
+            Set to None to suppress.
+        includes : None or list_like
+            List of glob patterns for pathnames to include in the check. Default is None, which
+            includes all components in the model.
+        excludes : None or list_like
+            List of glob patterns for pathnames to exclude from the check. Default is None, which
+            excludes nothing.
+        compact_print : bool
+            Set to True to just print the essentials, one line per input-output pair.
+        abs_err_tol : float
+            Threshold value for absolute error.  Errors about this value will have a '*' displayed
+            next to them in output, making them easy to search for. Default is 1.0E-6.
+        rel_err_tol : float
+            Threshold value for relative error.  Errors about this value will have a '*' displayed
+            next to them in output, making them easy to search for. Note at times there may be a
+            significant relative error due to a minor absolute error.  Default is 1.0E-6.
+        method : str
+            Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'.
+        step : None, float, or list/tuple of float
+            Step size(s) for approximation. Default is None, which means 1e-6 for 'fd' and 1e-40 for
+            'cs'.
+        form : str
+            Form for finite difference, can be 'forward', 'backward', or 'central'. Default
+            'forward'.
+        step_calc : str
+            Step type for computing the size of the finite difference step. It can be 'abs' for
+            absolute, 'rel_avg' for a size relative to the absolute value of the vector input, or
+            'rel_element' for a size relative to each value in the vector input. In addition, it
+            can be 'rel_legacy' for a size relative to the norm of the vector.  For backwards
+            compatibilty, it can be 'rel', which is now equivalent to 'rel_avg'. Defaults to None,
+            in which case the approximation method provides its default value.
+        minimum_step : float
+            Minimum step size allowed when using one of the relative step_calc options.
+        force_dense : bool
+            If True, analytic derivatives will be coerced into arrays. Default is True.
+        show_only_incorrect : bool, optional
+            Set to True if output should print only the subjacs found to be incorrect.
+
+        Returns
+        -------
+        dict of dicts of dicts
+            First key is the component name.
+            Second key is the (output, input) tuple of strings.
+            Third key is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev',
+            'rank_inconsistent'].
+            For 'rel error', 'abs error', and 'magnitude' the value is a tuple containing norms for
+            forward - fd, adjoint - fd, forward - adjoint.
+            For 'J_fd', 'J_fwd', 'J_rev' the value is a numpy array representing the computed
+            Jacobian for the three different methods of computation.
+            The boolean 'rank_inconsistent' indicates if the derivative wrt a serial variable is
+            inconsistent across MPI ranks.
+        """
+        self._check_fds_differ(method, step, form, step_calc, minimum_step)
+
+        # Make sure we're in a valid state
+        self.run_apply_nonlinear()
+
+        input_cache = self._inputs.asarray(copy=True)
+        output_cache = self._outputs.asarray(copy=True)
+
+        local_opts = self._get_check_partial_options()
+
+        if self.matrix_free:
+            directions = ('fwd', 'rev')
+        else:
+            directions = ('fwd',)  # rev same as fwd for analytic jacobians
+            self.run_linearize(sub_do_ln=False)
+
+        zero_derivs = set()
+        of_list = self._get_partials_ofs()
+        wrt_list = self._get_partials_wrts()
+        axis = {'fwd': 1, 'rev': 0}
+        mfree_directions = {}
+        abs2meta_in = self._var_allprocs_abs2meta['input']
+        abs2meta_out = self._var_allprocs_abs2meta['output']
+        partials_data = defaultdict(dict)
+        requested_method = method
+        probmeta = self._problem_meta
+
+        for mode in directions:
+            jac_key = 'J_' + mode
+
+            with self._unscaled_context():
+
+                # Matrix-free components need to calculate Jacobian by matrix-vector product.
+                if self.matrix_free:
+                    dstate = self._doutputs
+                    if mode == 'fwd':
+                        dinputs = self._dinputs
+                        doutputs = self._dresiduals
+                        in_list = wrt_list
+                        out_list = of_list
+                    else:
+                        dinputs = self._dresiduals
+                        doutputs = self._dinputs
+                        in_list = of_list
+                        out_list = wrt_list
+
+                    for inp in in_list:
+                        inp_abs = rel_name2abs_name(self, inp)
+                        if mode == 'fwd':
+                            directional = inp in local_opts and local_opts[inp]['directional']
+                        else:
+                            directional = len(mfree_directions) > 0
+
+                        try:
+                            flat_view = dinputs._abs_get_val(inp_abs)
+                        except KeyError:
+                            # Implicit state
+                            flat_view = dstate._abs_get_val(inp_abs)
+
+                        if directional:
+                            n_in = 1
+                            idxs = range(1)
+                            if inp in mfree_directions:
+                                perturb = mfree_directions[inp]
+                            else:
+                                perturb = 2.0 * np.random.random(len(flat_view)) - 1.0
+                                mfree_directions[inp] = perturb
+
+                        else:
+                            n_in = len(flat_view)
+                            idxs = LocalRangeIterable(self, inp_abs, use_vec_offset=False)
+                            perturb = 1.0
+
+                        for idx in idxs:
+
+                            dinputs.set_val(0.0)
+                            dstate.set_val(0.0)
+
+                            if directional:
+                                flat_view[:] = perturb
+                            elif idx is not None:
+                                flat_view[idx] = perturb
+
+                            # Matrix Vector Product
+                            probmeta['checking'] = True
+                            try:
+                                self.run_apply_linear(mode)
+                            finally:
+                                probmeta['checking'] = False
+
+                            for out in out_list:
+                                out_abs = rel_name2abs_name(self, out)
+
+                                try:
+                                    derivs = doutputs._abs_get_val(out_abs)
+                                except KeyError:
+                                    # Implicit state
+                                    derivs = dstate._abs_get_val(out_abs)
+
+                                if mode == 'fwd':
+                                    key = out, inp
+                                    deriv = partials_data[key]
+
+                                    # Allocate first time
+                                    if jac_key not in deriv:
+                                        shape = (len(derivs), n_in)
+                                        deriv[jac_key] = np.zeros(shape)
+
+                                    if idx is not None:
+                                        deriv[jac_key][:, idx] = derivs
+
+                                else:  # rev
+                                    key = inp, out
+                                    deriv = partials_data[key]
+
+                                    if directional:
+                                        # Dot product test for adjoint validity.
+                                        m = mfree_directions[out]
+                                        d = mfree_directions[inp]
+                                        mhat = derivs
+                                        dhat = deriv['J_fwd'][:, idx]
+
+                                        deriv['directional_fwd_rev'] = (mhat.dot(m),
+                                                                        dhat.dot(d))
+                                    else:
+                                        meta = abs2meta_in[out_abs] if out_abs in abs2meta_in \
+                                            else abs2meta_out[out_abs]
+                                        if not meta['distributed']:  # serial input or state
+                                            if inconsistent_across_procs(self.comm, derivs,
+                                                                         return_array=False):
+                                                deriv['rank_inconsistent'] = True
+
+                                    # Allocate first time
+                                    if jac_key not in deriv:
+                                        shape = (n_in, len(derivs))
+                                        deriv[jac_key] = np.zeros(shape)
+
+                                    if idx is not None:
+                                        deriv[jac_key][idx, :] = derivs
+
+                # These components already have a Jacobian with calculated derivatives.
+                else:
+
+                    subjacs = self._jacobian._subjacs_info
+
+                    for rel_key in product(of_list, wrt_list):
+                        abs_key = rel_key2abs_key(self, rel_key)
+                        of, wrt = abs_key
+
+                        if mode == 'fwd':
+                            inp = rel_key[1]
+                            directional = inp in local_opts and local_opts[inp]['directional']
+                        else:
+                            directional = len(mfree_directions) > 0
+
+                        if wrt in self._var_abs2meta['input']:
+                            wrt_meta = self._var_abs2meta['input'][wrt]
+                        else:
+                            wrt_meta = self._var_abs2meta['output'][wrt]
+
+                        copy = True
+
+                        # No need to calculate partials; they are already stored
+                        try:
+                            deriv_value = subjacs[abs_key]['val']
+                            rows = subjacs[abs_key]['rows']
+                        except KeyError:
+                            rows = None
+                            # Missing derivatives are assumed 0.
+                            in_size = 1 if directional else wrt_meta['size']
+                            out_size = self._var_abs2meta['output'][of]['size']
+                            deriv_value = np.zeros((out_size, in_size))
+                            copy = False
+
+                        # Testing for pairs that are not dependent so that we suppress printing
+                        # them unless the fd is non zero. Note: subjacs_info is empty for
+                        # undeclared partials, which is the default behavior now.
+                        try:
+                            if not subjacs[abs_key]['dependent']:
+                                zero_derivs.add(rel_key)
+                        except KeyError:
+                            zero_derivs.add(rel_key)
+
+                        if force_dense:
+                            if rows is not None:
+                                in_size = wrt_meta['size']
+                                out_size = self._var_abs2meta['output'][of]['size']
+                                # if a scalar value is provided (in declare_partials),
+                                # expand to the correct size array value for zipping
+                                if deriv_value.size == 1:
+                                    deriv_value *= np.ones(rows.size)
+                                deriv_value = \
+                                    coo_matrix((deriv_value, (rows, subjacs[abs_key]['cols'])),
+                                               shape=(out_size, in_size))
+                                if directional:
+                                    deriv_value = \
+                                        np.atleast_2d(deriv_value.sum(axis=axis[mode]))
+                                    if deriv_value.shape[0] < deriv_value.shape[1]:
+                                        deriv_value = deriv_value.T
+                                else:
+                                    deriv_value = deriv_value.toarray()
+                                copy = False
+
+                            elif issparse(deriv_value):
+                                if directional:
+                                    deriv_value = \
+                                        np.atleast_2d(deriv_value.sum(axis=axis[mode])).T
+                                    if deriv_value.shape[0] < deriv_value.shape[1]:
+                                        deriv_value = deriv_value.T
+                                else:
+                                    deriv_value = deriv_value.toarray()
+                                copy = False
+                            elif directional:
+                                deriv_value = \
+                                    np.atleast_2d(np.sum(deriv_value, axis=axis[mode])).T
+
+                        if copy:
+                            deriv_value = deriv_value.copy()
+
+                        partials_data[rel_key][jac_key] = deriv_value
+
+            self._inputs.set_val(input_cache)
+            self._outputs.set_val(output_cache)
+
+            self.run_apply_nonlinear()
+
+        all_fd_options = {}
+
+        of = self._get_partials_ofs()
+        wrt = self._get_partials_wrts()
+
+        if step is None or isinstance(step, (float, int)):
+            steps = [step]
+        else:
+            steps = step
+
+        # do_steps = len(steps) > 1
+
+        actual_steps = defaultdict(list)
+        alloc_complex = self._outputs._alloc_complex
+
+        for step in steps:
+            approximations = {'fd': FiniteDifference(), 'cs': ComplexStep()}
+
+            added_wrts = set()
+
+            # Load up approximation objects with the requested settings.
+
+            for rel_key in product(of, wrt):
+                abs_key = rel_key2abs_key(self, rel_key)
+                local_wrt = rel_key[1]
+
+                fd_options, could_not_cs = _get_fd_options(local_wrt, requested_method,
+                                                           local_opts, step, form, step_calc,
+                                                           alloc_complex, minimum_step)
+
+                actual_steps[rel_key].append(fd_options['step'])
+
+                # Determine if fd or cs.
+                method = requested_method
+
+                all_fd_options[local_wrt] = fd_options
+                if local_wrt in mfree_directions:
+                    vector = mfree_directions.get(local_wrt)
+                else:
+                    vector = None
+
+                # prevent adding multiple approxs with same wrt (and confusing users with
+                # warnings)
+                if abs_key[1] not in added_wrts:
+                    approximations[fd_options['method']].add_approximation(abs_key, self,
+                                                                           fd_options,
+                                                                           vector=vector)
+                    added_wrts.add(abs_key[1])
+
+            approx_jac = _CheckingJacobian(self)
+            for approximation in approximations.values():
+                # Perform the FD here.
+                approximation.compute_approximations(self, jac=approx_jac)
+
+            with multi_proc_exception_check(self.comm):
+                if approx_jac._errors:
+                    raise RuntimeError('\n'.join(approx_jac._errors))
+
+            for abs_key, partial in approx_jac.items():
+                rel_key = abs_key2rel_key(self, abs_key)
+                deriv = partials_data[rel_key]
+                _of, _wrt = rel_key
+
+                if 'J_fd' not in deriv:
+                    deriv['J_fd'] = []
+                    deriv['steps'] = []
+                deriv['J_fd'].append(partial)
+                deriv['steps'] = actual_steps[rel_key]
+
+                if _wrt in local_opts and local_opts[_wrt]['directional']:
+                    if self.matrix_free:
+                        # Dot product test for adjoint validity.
+                        m = mfree_directions[_of].flatten()
+                        d = mfree_directions[_wrt].flatten()
+                        mhat = partial.flatten()
+                        dhat = deriv['J_rev'].flatten()
+
+                        if 'directional_fd_rev' not in deriv:
+                            deriv['directional_fd_rev'] = []
+                        deriv['directional_fd_rev'].append((dhat.dot(d), mhat.dot(m)))
+
+        # if not do_steps:
+        #     _fix_check_data(partials_data)
+
+        # convert to regular dict from defaultdict
+        partials_data = {key: dict(d) for key, d in partials_data.items()}
+
+        return partials_data, zero_derivs, all_fd_options, could_not_cs
+
+
+# def _fix_check_data(data):
+#     """
+#     Modify the data dict to match the old format if there is only one fd step size.
+
+#     Parameters
+#     ----------
+#     data : dict
+#         Dictionary containing derivative information keyed by system name.
+#     """
+#     names = ['J_fd', 'abs error', 'rel error', 'magnitude', 'directional_fd_fwd',
+#              'directional_fd_rev']
+
+#     for dct in data.values():
+#         for name in names:
+#             if name in dct:
+#                 dct[name] = dct[name][0]
+#         if 'steps' in dct:
+#             del dct['steps']
 
 
 class _DictValues(object):
