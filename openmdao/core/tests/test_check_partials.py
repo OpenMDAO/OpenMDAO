@@ -16,7 +16,7 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 from openmdao.test_suite.components.array_comp import ArrayComp
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_no_warning, \
-     assert_check_partials, assert_check_partials_old
+     assert_check_partials
 from openmdao.utils.om_warnings import DerivativesWarning, OMInvalidCheckDerivativesOptionsWarning
 from openmdao.utils.testing_utils import set_env_vars_context
 from openmdao.utils.array_utils import safe_norm
@@ -783,10 +783,10 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        msg = "The following components requested complex step, but force_alloc_complex " + \
-              "has not been set to True, so finite difference was used: ['comp']\n" + \
+        msg = "Component 'comp' requested complex step, but force_alloc_complex " + \
+              "has not been set to True, so finite difference was used.\n" + \
               "To enable complex step, specify 'force_alloc_complex=True' when calling " + \
-              "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
+              "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'."
 
         with assert_warning(UserWarning, msg):
             data = prob.check_partials(out_stream=None)
@@ -1890,7 +1890,6 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
         partials = prob.check_partials(method='cs', out_stream=None)
 
-        assert_check_partials_old(partials)
         assert_check_partials(partials)
 
     def test_no_linsolve_during_check(self):
@@ -2014,7 +2013,7 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         parab.declare_partials(of='*', wrt='*', method='fd')
         with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as cm:
             prob.check_partials(method='fd')
-            
+
         self.assertEqual(str(cm.exception),
                          expected_check_partials_error.format(prob=prob, var='x', comp=parab))
 

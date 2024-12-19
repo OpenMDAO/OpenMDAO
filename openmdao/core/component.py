@@ -2306,7 +2306,7 @@ class Component(System):
         else:
             steps = step
 
-        # do_steps = len(steps) > 1
+        could_not_cs = False
 
         actual_steps = defaultdict(list)
         alloc_complex = self._outputs._alloc_complex
@@ -2322,9 +2322,11 @@ class Component(System):
                 abs_key = rel_key2abs_key(self, rel_key)
                 local_wrt = rel_key[1]
 
-                fd_options, could_not_cs = _get_fd_options(local_wrt, requested_method,
-                                                           local_opts, step, form, step_calc,
-                                                           alloc_complex, minimum_step)
+                fd_options, no_cs = _get_fd_options(local_wrt, requested_method,
+                                                    local_opts, step, form, step_calc,
+                                                    alloc_complex, minimum_step)
+                if no_cs:
+                    could_not_cs = True
 
                 actual_steps[rel_key].append(fd_options['step'])
 
@@ -2377,33 +2379,18 @@ class Component(System):
                             deriv['directional_fd_rev'] = []
                         deriv['directional_fd_rev'].append((dhat.dot(d), mhat.dot(m)))
 
-        # if not do_steps:
-        #     _fix_check_data(partials_data)
-
         # convert to regular dict from defaultdict
         partials_data = {key: dict(d) for key, d in partials_data.items()}
 
-        return partials_data, zero_derivs, all_fd_options, could_not_cs
+        if could_not_cs:
+            issue_warning(f"Component '{self.pathname}' requested complex step, but "
+                          "force_alloc_complex has not been set to True, so finite difference was "
+                          "used.\nTo enable complex step, specify 'force_alloc_complex=True' when "
+                          "calling setup on the problem, e.g. "
+                          "'problem.setup(force_alloc_complex=True)'.",
+                          category=DerivativesWarning)
 
-
-# def _fix_check_data(data):
-#     """
-#     Modify the data dict to match the old format if there is only one fd step size.
-
-#     Parameters
-#     ----------
-#     data : dict
-#         Dictionary containing derivative information keyed by system name.
-#     """
-#     names = ['J_fd', 'abs error', 'rel error', 'magnitude', 'directional_fd_fwd',
-#              'directional_fd_rev']
-
-#     for dct in data.values():
-#         for name in names:
-#             if name in dct:
-#                 dct[name] = dct[name][0]
-#         if 'steps' in dct:
-#             del dct['steps']
+        return partials_data, zero_derivs, all_fd_options
 
 
 class _DictValues(object):

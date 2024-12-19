@@ -18,7 +18,7 @@ except ImportError:
 from openmdao.core.component import Component
 from openmdao.core.group import Group
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.utils.general_utils import add_border, pad_name
+from openmdao.utils.general_utils import add_border
 from openmdao.utils.om_warnings import reset_warning_registry, issue_warning
 from openmdao.utils.mpi import MPI
 from openmdao.utils.testing_utils import snum_equal
@@ -197,7 +197,6 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6, max_display_shape=(20, 20)
         inconsistent_derivs = set()
 
         # Find all derivatives whose errors exceed tolerance.
-        # Also, size the output to precompute column extents.
         for key, pair_data in data[comp].items():
             if pair_data.get('rank_inconsistent'):
                 inconsistent_derivs.add(key)
@@ -296,137 +295,6 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6, max_display_shape=(20, 20)
                             f'with absolute tolerance = {atol} and relative tolerance = {rtol}')
         err_string = '\n'.join(error_strings)
         raise ValueError(f"\n{header}\n{err_string}")
-
-
-def assert_check_partials_old(data, atol=1e-6, rtol=1e-6):
-    """
-    Raise assertion if any entry from the return from check_partials is above a tolerance.
-
-    Parameters
-    ----------
-    data : dict of dicts of dicts
-            First key:
-                is the component name;
-            Second key:
-                is the (output, input) tuple of strings;
-            Third key:
-                is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev'];
-
-            For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
-                forward - fd, adjoint - fd, forward - adjoint.
-            For 'J_fd', 'J_fwd', 'J_rev' the value is: A numpy array representing the computed
-                Jacobian for the three different methods of computation.
-    atol : float
-        Absolute error. Default is 1e-6.
-    rtol : float
-        Relative error. Default is 1e-6.
-    """
-    error_string = ''
-    absrel_header = 'abs/rel'
-    wrt_header = '< output > wrt < variable >'
-    norm_value_header = 'norm value'
-    len_absrel_width = len(absrel_header)
-    norm_types = ['fwd-fd', 'rev-fd', 'fd-rev']
-    len_norm_type_width = max(len(s) for s in norm_types)
-
-    for comp in data:
-        len_wrt_width = len(wrt_header)
-        len_norm_width = len(norm_value_header)
-        bad_derivs = []
-        inconsistent_derivs = set()
-
-        # Find all derivatives whose errors exceed tolerance.
-        # Also, size the output to precompute column extents.
-        for key, pair_data in data[comp].items():
-            var, wrt = key
-            for error_type, tolerance in [('abs error', atol), ('rel error', rtol), ]:
-                actuals = pair_data[error_type]
-                if not isinstance(actuals, list):
-                    actuals = [actuals]
-                incon = pair_data.get('rank_inconsistent')
-                if incon:
-                    inconsistent_derivs.add(key)
-
-                for actual in actuals:
-                    for error_val, mode in zip(actual, norm_types):
-                        in_error = False
-
-                        if error_val is None:
-                            # Reverse derivatives only computed on matrix free comps.
-                            continue
-
-                        if not np.isnan(error_val):
-                            if not np.allclose(error_val, 0.0, atol=tolerance):
-
-                                if error_type == 'rel error' and mode == 'fwd-fd' and \
-                                        np.allclose(pair_data['J_fwd'], 0.0, atol=atol) and \
-                                        np.allclose(pair_data['J_fd'], 0.0, atol=atol):
-                                    # Special case: both fd and fwd are really tiny, so we want to
-                                    # ignore the rather large relative errors.
-                                    in_error = False
-                                else:
-                                    # This is a bona-fide error.
-                                    in_error = True
-
-                        elif error_type == 'abs error' and mode == 'fwd-fd':
-                            # Either analytic or approximated derivatives contain a NaN.
-                            in_error = True
-
-                        if in_error:
-                            wrt_string = f'{var} wrt {wrt}'
-                            norm_string = str(error_val)
-                            bad_derivs.append((wrt_string, norm_string, error_type, mode))
-                            len_wrt_width = max(len_wrt_width, len(wrt_string))
-                            len_norm_width = max(len_norm_width, len(norm_string))
-
-        if bad_derivs or inconsistent_derivs:
-            comp_error_string = ''
-            if bad_derivs:
-                for wrt_string, norm_string, error_type, mode in bad_derivs:
-                    err_msg = '{0} | {1} | {2} | {3}'.format(
-                        pad_name(wrt_string, len_wrt_width),
-                        pad_name(error_type.split()[0], len_absrel_width),
-                        pad_name(mode, len_norm_type_width),
-                        pad_name(norm_string, len_norm_width)) + '\n'
-                    comp_error_string += err_msg
-
-            if inconsistent_derivs:
-                comp_error_string += (
-                    "\nInconsistent derivs across processes for keys: "
-                    f"{sorted(inconsistent_derivs)}.\nCheck that distributed outputs are properly "
-                    "reduced when computing\nderivatives of serial inputs.")
-
-            name_header = 'Component: {}\n'.format(comp)
-            len_name_header = len(name_header)
-            header = len_name_header * '-' + '\n'
-            header += name_header
-            header += len_name_header * '-' + '\n'
-            header += '{0} | {1} | {2} | {3}'.format(
-                pad_name(wrt_header, len_wrt_width),
-                pad_name(absrel_header, len_absrel_width),
-                pad_name('norm', len_norm_type_width),
-                pad_name(norm_value_header, len_norm_width),
-            ) + '\n'
-            header += '{0} | {1} | {2} | {3}'.format(
-                len_wrt_width * '-',
-                len_absrel_width * '-',
-                len_norm_type_width * '-',
-                len_norm_width * '-',
-            ) + '\n'
-            comp_error_string = header + comp_error_string
-            error_string += comp_error_string
-
-    # if error string then raise error with that string
-    if error_string:
-        header_line1 = 'Assert Check Partials failed for the following Components'
-        header_line2 = f'with absolute tolerance = {atol} and relative tolerance = {rtol}'
-        header_width = max(len(header_line1), len(header_line2))
-        header = '\n' + header_width * '=' + '\n'
-        header += header_line1 + '\n'
-        header += header_line2 + '\n'
-        header += header_width * '=' + '\n'
-        error_string = header + error_string
-        raise ValueError(error_string)
 
 
 def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6, max_display_shape=(20, 20)):
