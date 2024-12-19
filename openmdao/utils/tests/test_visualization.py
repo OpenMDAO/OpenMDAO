@@ -72,10 +72,10 @@ class TestVisualization(unittest.TestCase):
                                    [ 0.,  1.,  0.,  1.]])
         actual_array = ax[1].images[0]._A.data
         assert_near_equal(expected_array, actual_array, 1e-8)
-        expected_array = np.array([[  9.31322575e-10,   0.0,   0.0, 1.0e-07],
+        expected_array = np.array([[  0.0,   0.0,   0.0, 1.0e-07],
                                    [  0.0,   0.0,  -2.0e-07, 0.0],
-                                   [  0.0,   0.0,   9.31322575e-10, 0.0],
-                                   [  0.0,   0.0,   0.0, 1.86264515e-09]])
+                                   [  0.0,   0.0,   0.0, 0.0],
+                                   [  0.0,   0.0,   0.0, 0.0]])
         actual_array = ax[2].images[0]._A.data
         assert_near_equal(expected_array, actual_array, 1e-8)
 
@@ -94,10 +94,10 @@ class TestVisualization(unittest.TestCase):
                                    [ 0.,  1.,  0.,  1.]])
         actual_array = ax[1].images[0]._A.data
         assert_near_equal(expected_array, actual_array, 1e-8)
-        expected_array = np.array([[  9.31322575e-10,   0.0,   0.0, 1.0e-07],
+        expected_array = np.array([[  0.0,   0.0,   0.0, 1.0e-07],
                                    [  0.0,   0.0,  -2.0e-07, 0.0],
-                                   [  0.0,   0.0,   9.31322575e-10, 0.0],
-                                   [  0.0,   0.0,   0.0, 1.86264515e-09]])
+                                   [  0.0,   0.0,   0.0, 0.0],
+                                   [  0.0,   0.0,   0.0, 0.0]])
         actual_array = ax[2].images[0]._A.data
         assert_near_equal(expected_array, actual_array, 1e-8)
 
@@ -116,10 +116,10 @@ class TestVisualization(unittest.TestCase):
                                    [  0.0,   4.0e+00,   0.0, 6.0e+00]])
         actual_array = ax[1].images[0]._A.data
         assert_near_equal(expected_array, actual_array, 1e-8)
-        expected_array = np.array([[  9.31322575e-10,   0.0,   0.0, 1.0e-07],
+        expected_array = np.array([[  0.0,   0.0,   0.0, 1.0e-07],
                                    [  0.0,   0.0,  -2.0e-07, 0.0],
-                                   [  0.0,   0.0,   9.31322575e-10, 0.0],
-                                   [  0.0,   0.0,   0.0, 1.86264515e-09]])
+                                   [  0.0,   0.0,   0.0, 0.0],
+                                   [  0.0,   0.0,   0.0, 0.0]])
         actual_array = ax[2].images[0]._A.data
         assert_near_equal(expected_array, actual_array, 1e-8)
 

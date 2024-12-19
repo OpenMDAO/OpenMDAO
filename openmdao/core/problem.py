@@ -1263,6 +1263,18 @@ class Problem(object, metaclass=ProblemMetaclass):
         # OPENMDAO_CHECK_ALL_PARTIALS overrides _no_check_partials (used for testing)
         force_check_partials = env_truthy('OPENMDAO_CHECK_ALL_PARTIALS')
 
+        # Finite Difference to calculate Jacobian
+        if step is None or isinstance(step, (float, int)):
+            steps = [step]
+        else:
+            steps = step
+
+        do_steps = len(steps) > 1
+
+        alloc_complex = model._outputs._alloc_complex
+        all_fd_options = {}
+        comps_could_not_cs = set()
+
         for comp in model.system_iter(typ=Component, include_self=True):
             if comp._no_check_partials and not force_check_partials:
                 continue
@@ -1290,9 +1302,10 @@ class Problem(object, metaclass=ProblemMetaclass):
             input_cache = comp._inputs.asarray(copy=True)
             output_cache = comp._outputs.asarray(copy=True)
 
+            local_opts = comp._get_check_partial_options()
+
             if comp.matrix_free:
                 directions = ('fwd', 'rev')
-                local_opts = comp._get_check_partial_options()
             else:
                 directions = ('fwd',)  # rev same as fwd for analytic jacobians
                 comp.run_linearize(sub_do_ln=False)
@@ -1300,6 +1313,7 @@ class Problem(object, metaclass=ProblemMetaclass):
             zero_derivs[c_name] = set()
             of_list = comp._get_partials_ofs()
             wrt_list = comp._get_partials_wrts()
+            axis = {'fwd': 1, 'rev': 0}
 
             for mode in directions:
                 jac_key = 'J_' + mode
@@ -1427,12 +1441,30 @@ class Problem(object, metaclass=ProblemMetaclass):
                             abs_key = rel_key2abs_key(comp, rel_key)
                             of, wrt = abs_key
 
+                            if mode == 'fwd':
+                                inp = rel_key[1]
+                                directional = inp in local_opts and local_opts[inp]['directional']
+                            else:
+                                directional = c_name in mfree_directions
+
+                            if wrt in comp._var_abs2meta['input']:
+                                wrt_meta = comp._var_abs2meta['input'][wrt]
+                            else:
+                                wrt_meta = comp._var_abs2meta['output'][wrt]
+
+                            copy = True
+
                             # No need to calculate partials; they are already stored
                             try:
                                 deriv_value = subjacs[abs_key]['val']
                                 rows = subjacs[abs_key]['rows']
                             except KeyError:
-                                deriv_value = rows = None
+                                rows = None
+                                # Missing derivatives are assumed 0.
+                                in_size = 1 if directional else wrt_meta['size']
+                                out_size = comp._var_abs2meta['output'][of]['size']
+                                deriv_value = np.zeros((out_size, in_size))
+                                copy = False
 
                             # Testing for pairs that are not dependent so that we suppress printing
                             # them unless the fd is non zero. Note: subjacs_info is empty for
@@ -1443,59 +1475,67 @@ class Problem(object, metaclass=ProblemMetaclass):
                             except KeyError:
                                 zero_derivs[c_name].add(rel_key)
 
-                            if wrt in comp._var_abs2meta['input']:
-                                wrt_meta = comp._var_abs2meta['input'][wrt]
-                            else:
-                                wrt_meta = comp._var_abs2meta['output'][wrt]
-
-                            if deriv_value is None:
-                                # Missing derivatives are assumed 0.
-                                in_size = wrt_meta['size']
-                                out_size = comp._var_abs2meta['output'][of]['size']
-                                deriv_value = np.zeros((out_size, in_size))
-
                             if force_dense:
                                 if rows is not None:
-                                    try:
-                                        in_size = wrt_meta['size']
-                                    except KeyError:
-                                        in_size = wrt_meta['size']
+                                    in_size = wrt_meta['size']
                                     out_size = comp._var_abs2meta['output'][of]['size']
-                                    tmp_value = np.zeros((out_size, in_size))
                                     # if a scalar value is provided (in declare_partials),
                                     # expand to the correct size array value for zipping
                                     if deriv_value.size == 1:
                                         deriv_value *= np.ones(rows.size)
-                                    for i, j, val in zip(rows, subjacs[abs_key]['cols'],
-                                                         deriv_value):
-                                        tmp_value[i, j] += val
-                                    deriv_value = tmp_value
+                                    deriv_value = \
+                                        sparse.coo_matrix((deriv_value,
+                                                           (rows, subjacs[abs_key]['cols'])),
+                                                          shape=(out_size, in_size))
+                                    if directional:
+                                        deriv_value = \
+                                            np.atleast_2d(deriv_value.sum(axis=axis[mode]))
+                                        if deriv_value.shape[0] < deriv_value.shape[1]:
+                                            deriv_value = deriv_value.T
+                                    else:
+                                        deriv_value = deriv_value.toarray()
+                                    copy = False
 
                                 elif sparse.issparse(deriv_value):
-                                    deriv_value = deriv_value.todense()
+                                    if directional:
+                                        deriv_value = \
+                                            np.atleast_2d(deriv_value.sum(axis=axis[mode])).T
+                                        if deriv_value.shape[0] < deriv_value.shape[1]:
+                                            deriv_value = deriv_value.T
+                                    else:
+                                        deriv_value = deriv_value.toarray()
+                                    copy = False
+                                elif directional:
+                                    deriv_value = \
+                                        np.atleast_2d(np.sum(deriv_value, axis=axis[mode])).T
 
-                            partials_data[c_name][rel_key][jac_key] = deriv_value.copy()
+                            if copy:
+                                deriv_value = deriv_value.copy()
+
+                            partials_data[c_name][rel_key][jac_key] = deriv_value
 
                 comp._inputs.set_val(input_cache)
                 comp._outputs.set_val(output_cache)
 
-        model.run_apply_nonlinear()
+                comp.run_apply_nonlinear()
 
-        # Finite Difference to calculate Jacobian
-        if step is None or isinstance(step, (float, int)):
-            steps = [step]
-        else:
-            steps = step
+        # model.run_apply_nonlinear()
 
-        do_steps = len(steps) > 1
+        # # Finite Difference to calculate Jacobian
+        # if step is None or isinstance(step, (float, int)):
+        #     steps = [step]
+        # else:
+        #     steps = step
 
-        alloc_complex = model._outputs._alloc_complex
-        all_fd_options = {}
-        comps_could_not_cs = set()
-        requested_method = method
-        for comp in comps:
+        # do_steps = len(steps) > 1
 
-            c_name = comp.pathname
+        # alloc_complex = model._outputs._alloc_complex
+        # all_fd_options = {}
+        # comps_could_not_cs = set()
+        # requested_method = method
+        # for comp in comps:
+
+            # c_name = comp.pathname
             all_fd_options[c_name] = {}
 
             of = comp._get_partials_ofs()
@@ -1511,7 +1551,6 @@ class Problem(object, metaclass=ProblemMetaclass):
 
                 # Load up approximation objects with the requested settings.
 
-                local_opts = comp._get_check_partial_options()
                 for rel_key in product(of, wrt):
                     abs_key = rel_key2abs_key(comp, rel_key)
                     local_wrt = rel_key[1]
@@ -1565,12 +1604,12 @@ class Problem(object, metaclass=ProblemMetaclass):
                     # If this is a directional derivative, convert the analytic to a directional
                     # one.
                     if _wrt in local_opts and local_opts[_wrt]['directional']:
-                        if i == 0:  # only do this on the first iteration
-                            deriv['J_fwd'] = np.atleast_2d(np.sum(deriv['J_fwd'], axis=1)).T
+                        # if i == 0:  # only do this on the first iteration
+                        #     deriv['J_fwd'] = np.atleast_2d(np.sum(deriv['J_fwd'], axis=1)).T
 
                         if comp.matrix_free:
-                            if i == 0:  # only do this on the first iteration
-                                deriv['J_rev'] = np.atleast_2d(np.sum(deriv['J_rev'], axis=0)).T
+                            # if i == 0:  # only do this on the first iteration
+                            #     deriv['J_rev'] = np.atleast_2d(np.sum(deriv['J_rev'], axis=0)).T
 
                             # Dot product test for adjoint validity.
                             m = mfree_directions[c_name][_of].flatten()
