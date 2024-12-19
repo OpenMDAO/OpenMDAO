@@ -1519,23 +1519,6 @@ class Problem(object, metaclass=ProblemMetaclass):
 
                 comp.run_apply_nonlinear()
 
-        # model.run_apply_nonlinear()
-
-        # # Finite Difference to calculate Jacobian
-        # if step is None or isinstance(step, (float, int)):
-        #     steps = [step]
-        # else:
-        #     steps = step
-
-        # do_steps = len(steps) > 1
-
-        # alloc_complex = model._outputs._alloc_complex
-        # all_fd_options = {}
-        # comps_could_not_cs = set()
-        # requested_method = method
-        # for comp in comps:
-
-            # c_name = comp.pathname
             all_fd_options[c_name] = {}
 
             of = comp._get_partials_ofs()
@@ -1601,16 +1584,8 @@ class Problem(object, metaclass=ProblemMetaclass):
                     deriv['J_fd'].append(partial)
                     deriv['steps'] = actual_steps[rel_key]
 
-                    # If this is a directional derivative, convert the analytic to a directional
-                    # one.
                     if _wrt in local_opts and local_opts[_wrt]['directional']:
-                        # if i == 0:  # only do this on the first iteration
-                        #     deriv['J_fwd'] = np.atleast_2d(np.sum(deriv['J_fwd'], axis=1)).T
-
                         if comp.matrix_free:
-                            # if i == 0:  # only do this on the first iteration
-                            #     deriv['J_rev'] = np.atleast_2d(np.sum(deriv['J_rev'], axis=0)).T
-
                             # Dot product test for adjoint validity.
                             m = mfree_directions[c_name][_of].flatten()
                             d = mfree_directions[c_name][_wrt].flatten()
