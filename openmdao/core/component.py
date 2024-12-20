@@ -2288,7 +2288,7 @@ class Component(System):
             self._inputs.set_val(input_cache)
             self._outputs.set_val(output_cache)
 
-            self.run_apply_nonlinear()
+            # self.run_apply_nonlinear()
 
         all_fd_options = {}
 
@@ -2306,6 +2306,7 @@ class Component(System):
         alloc_complex = self._outputs._alloc_complex
 
         for step in steps:
+            self.run_apply_nonlinear()
             approximations = {'fd': FiniteDifference(), 'cs': ComplexStep()}
 
             added_wrts = set()

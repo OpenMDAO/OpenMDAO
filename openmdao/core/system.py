@@ -7480,6 +7480,10 @@ def _iter_derivs(derivatives, show_only_incorrect, all_fd_opts, totals, nondep_d
 
         fd_norm = _compute_deriv_errors(derivative_info, matrix_free, directional, totals)
 
+        print('abs error', derivative_info['abs error'])
+        print('rel error', derivative_info['rel error'])
+        print('magnitude', derivative_info['magnitude'])
+
         # Skip printing the non-dependent keys if the derivatives are fine.
         if key in nondep_derivs and fd_norm < abs_error_tol:
             del derivatives[key]
