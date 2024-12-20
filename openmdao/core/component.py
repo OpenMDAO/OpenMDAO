@@ -12,7 +12,7 @@ from numpy import ndarray, isscalar, ndim, atleast_1d, atleast_2d, promote_types
 from scipy.sparse import issparse, coo_matrix
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
-    global_meta_names, collect_errors
+    global_meta_names, collect_errors, _iter_derivs
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian, _CheckingJacobian
 from openmdao.utils.array_utils import shape_to_len, submat_sparsity_iter
@@ -2007,7 +2007,7 @@ class Component(System):
                         issue_warning(msg, prefix=self.msginfo,
                                       category=OMInvalidCheckDerivativesOptionsWarning)
 
-    def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, includes=None, excludes=None,
+    def check_partials(self, out_stream=_DEFAULT_OUT_STREAM,
                        compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
                        method='fd', step=None, form='forward', step_calc='abs',
                        minimum_step=1e-12, force_dense=True, show_only_incorrect=False):
@@ -2019,12 +2019,6 @@ class Component(System):
         out_stream : file-like object
             Where to send human readable output. By default it goes to stdout.
             Set to None to suppress.
-        includes : None or list_like
-            List of glob patterns for pathnames to include in the check. Default is None, which
-            includes all components in the model.
-        excludes : None or list_like
-            List of glob patterns for pathnames to exclude from the check. Default is None, which
-            excludes nothing.
         compact_print : bool
             Set to True to just print the essentials, one line per input-output pair.
         abs_err_tol : float
@@ -2086,7 +2080,7 @@ class Component(System):
             directions = ('fwd',)  # rev same as fwd for analytic jacobians
             self.run_linearize(sub_do_ln=False)
 
-        zero_derivs = set()
+        nondep_derivs = set()
         of_list = self._get_partials_ofs()
         wrt_list = self._get_partials_wrts()
         axis = {'fwd': 1, 'rev': 0}
@@ -2249,9 +2243,9 @@ class Component(System):
                         # undeclared partials, which is the default behavior now.
                         try:
                             if not subjacs[abs_key]['dependent']:
-                                zero_derivs.add(rel_key)
+                                nondep_derivs.add(rel_key)
                         except KeyError:
-                            zero_derivs.add(rel_key)
+                            nondep_derivs.add(rel_key)
 
                         if force_dense:
                             if rows is not None:
@@ -2390,7 +2384,23 @@ class Component(System):
                           "'problem.setup(force_alloc_complex=True)'.",
                           category=DerivativesWarning)
 
-        return partials_data, zero_derivs, all_fd_options
+        incon_keys = self._get_inconsistent_keys()
+        # force iterator to run so that error info will be added to partials_data
+        err_iter = list(_iter_derivs(partials_data, show_only_incorrect, all_fd_options, False,
+                                     nondep_derivs, self.matrix_free, abs_err_tol, rel_err_tol,
+                                     incon_keys))
+
+        worst = None
+        if out_stream is not None:
+            if compact_print:
+                worst = self._deriv_display_compact(err_iter, partials_data, rel_err_tol,
+                                                    abs_err_tol, out_stream,
+                                                    all_fd_options, False, show_only_incorrect)
+            else:
+                self._deriv_display(err_iter, partials_data, rel_err_tol, abs_err_tol, out_stream,
+                       all_fd_options, False, show_only_incorrect)
+
+        return partials_data, worst
 
 
 class _DictValues(object):

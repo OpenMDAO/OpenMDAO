@@ -1444,7 +1444,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        data = prob.check_partials(out_stream=None)
+        data = prob.check_partials()#out_stream=None)
 
         # Note on why we run 9 times:
         # 1    - Initial execution
@@ -2842,9 +2842,9 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         contents = stream.getvalue()
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count("Sub Jacobian with Largest Relative Error: CompBadPartials 'bad'"), 1)
         self.assertEqual(contents.count(">ABS_TOL >REL_TOL"), 4)
         self.assertEqual(contents.count("step"), 3)
+        self.assertEqual(contents.count("Sub Jacobian with Largest Relative Error: CompBadPartials 'bad'"), 1)
         tables = self.get_tables(contents)
         self.assertEqual(len(tables), 3)
         self.assertEqual(len(tables[0]), 11)
