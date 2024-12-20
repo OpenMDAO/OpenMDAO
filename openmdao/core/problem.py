@@ -1223,7 +1223,6 @@ class Problem(object, metaclass=ProblemMetaclass):
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP or model.iter_count == 0:
             self.run_model()
 
-
         if not model._use_derivatives:
             raise RuntimeError(self.msginfo +
                                ": Can't check partials.  Derivative support has been turned off.")
@@ -1241,6 +1240,8 @@ class Problem(object, metaclass=ProblemMetaclass):
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
+        worst = None
+
         for comp in model.system_iter(typ=Component, include_self=True):
             if comp._no_check_partials and not force_check_partials:
                 continue
@@ -1256,8 +1257,6 @@ class Problem(object, metaclass=ProblemMetaclass):
 
             if not match_includes_excludes(comp.pathname, includes, excludes):
                 continue
-
-            worst = None
 
             data, maxrelinfo = \
                 comp.check_partials(out_stream=out_stream, compact_print=compact_print,
@@ -1562,18 +1561,19 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         incon_keys = model._get_inconsistent_keys()
         # force iterator to run so that error info will be added to partials_data
-        err_iter = list(_iter_derivs(data[''], show_only_incorrect, fd_args, total_info,
+        err_iter = list(_iter_derivs(data[''], show_only_incorrect, fd_args, True,
                                      set(), model.matrix_free, abs_err_tol, rel_err_tol,
                                      incon_keys))
 
-        if compact_print:
-            model._deriv_display_compact(err_iter, data[''], rel_err_tol, abs_err_tol, out_stream,
-                                         fd_args, totals=total_info, lcons=lcons,
-                                         show_only_incorrect=show_only_incorrect, sort=sort)
-        else:
-            model._deriv_display(err_iter, data[''], rel_err_tol, abs_err_tol, out_stream,
-                                 fd_args, totals=total_info, lcons=lcons,
-                                 show_only_incorrect=show_only_incorrect, sort=sort)
+        if out_stream is not None:
+            if compact_print:
+                model._deriv_display_compact(err_iter, data[''], rel_err_tol, abs_err_tol,
+                                             out_stream, fd_args, totals=True, lcons=lcons,
+                                             show_only_incorrect=show_only_incorrect, sort=sort)
+            else:
+                model._deriv_display(err_iter, data[''], rel_err_tol, abs_err_tol, out_stream,
+                                     fd_args, totals=True, lcons=lcons,
+                                     show_only_incorrect=show_only_incorrect, sort=sort)
 
         if not do_steps:
             _fix_check_data(data)
@@ -2527,114 +2527,3 @@ def _fix_check_data(data):
                     dct[name] = dct[name][0]
             if 'steps' in dct:
                 del dct['steps']
-
-
-# def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
-#                               compact_print, system_list, global_options, comm, totals=False,
-#                               nondep_derivs=None, show_only_incorrect=False, lcons=None, sort=False):
-#     """
-#     Compute the relative and absolute errors in the given derivatives and print to the out_stream.
-
-#     Parameters
-#     ----------
-#     derivative_data : dict
-#         Dictionary containing derivative information keyed by system name.
-#     rel_error_tol : float
-#         Relative error tolerance.
-#     abs_error_tol : float
-#         Absolute error tolerance.
-#     out_stream : file-like object
-#             Where to send human readable output.
-#             Set to None to suppress.
-#     compact_print : bool
-#         If results should be printed verbosely or in a table.
-#     system_list : iterable
-#         The systems (in the proper order) that were checked.
-#     global_options : dict
-#         Dictionary containing the options for the approximation.
-#     comm : MPI.Comm or FakeComm
-#         The MPI communicator.
-#     totals : bool or _TotalJacInfo
-#         Set to _TotalJacInfo if we are doing check_totals to skip a bunch of stuff.
-#     nondep_derivs : dict of sets, optional
-#         Keyed by component name, contains the of/wrt keys that are declared not dependent.
-#     show_only_incorrect : bool, optional
-#         Set to True if output should print only the subjacs found to be incorrect.
-#     lcons : list or None
-#         For total derivatives only, list of outputs that are actually linear constraints.
-#     sort : bool
-#         If True, sort subjacobian keys alphabetically.
-#     """
-#     str_buffer = StringIO()
-#     # Keep track of the worst subjac in terms of relative error for fwd and rev
-#     if out_stream is not None and show_only_incorrect:
-#         if totals:
-#             str_buffer.write('\n** Only writing information about incorrect total derivatives **'
-#                              '\n\n')
-#         else:
-#             str_buffer.write('\n** Only writing information about components with '
-#                              'incorrect Jacobians **\n\n')
-
-#     worst_subjac = None
-#     show = False
-#     incon_keys = ()
-
-#     for system in system_list:
-#         system._get_deriv_display_info(derivative_data, rel_error_tol, abs_error_tol,
-#                                        str_buffer if out_stream else None, compact_print, totals,
-#                                        nondep_derivs, show_only_incorrect, lcons, sort)
-
-#     if out_stream is not None:
-#         if compact_print and not totals and worst_subjac:
-#             class_name, name, _, worst_row = worst_subjac
-
-#             worst_header = f"Sub Jacobian with Largest Relative Error: {class_name} '{name}'"
-#             worst_table = generate_table([worst_row[:-1]], headers=headers[:-1],
-#                                          tablefmt='grid', column_meta=column_meta[:-1],
-#                                          missing_val='n/a')
-#             print(f"\n{add_border(worst_header, '#')}\n{worst_table}", file=str_buffer)
-
-#         if show or not show_only_incorrect:
-#             out_stream.write(str_buffer.getvalue())
-
-#         if incon_keys:
-#             # stick incon_keys into the first key's dict in order to avoid breaking existing code
-#             for key, dct in derivative_data['' if totals else sys_name].items():
-#                 dct['inconsistent_keys'] = incon_keys
-#                 break
-#             if out_stream is not None:
-#                 if totals:
-#                     msgstart = "During computation of totals, the "
-#                 else:
-#                     msgstart = "The "
-#                 ders = [f"{sof} wrt {swrt}" for sof, swrt in sorted(incon_keys)]
-#                 print(f"\n{msgstart}following partial derivatives resulted in\n"
-#                       "inconsistent values across processes for certain serial inputs:\n"
-#                       f"{ders}.\nThis can happen if a component 'compute_jacvec_product' "
-#                       "or 'apply_linear'\nmethod does not properly reduce the value of a "
-#                       "distributed output when computing the\nderivative of that output with "
-#                       "respect to a serial input.\nOpenMDAO 3.25 changed the convention used "
-#                       "when transferring data between distributed and non-distributed \nvariables "
-#                       "within a matrix free component. See POEM 75 for details.", file=out_stream)
-
-
-# def _format_cell(val):
-#     """
-#     Return string to represent deriv check value in compact display.
-
-#     Parameters
-#     ----------
-#     val : float or None
-#         The deriv check value.
-
-#     Returns
-#     -------
-#     str
-#         String which is the actual value or 'n/a' if val is None.
-#     """
-#     if val is None:
-#         return pad_name('n/a')
-
-#     if np.isnan(val):
-#         return pad_name('nan')
-#     return f'{val:.4e}'

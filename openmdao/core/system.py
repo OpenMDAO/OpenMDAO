@@ -6811,8 +6811,8 @@ class System(object, metaclass=SystemMetaclass):
         out_stream : file-like object
                 Where to send human readable output.
                 Set to None to suppress.
-        totals : bool or _TotalJacInfo
-            Set to _TotalJacInfo if we are doing check_totals to skip a bunch of stuff.
+        totals : bool
+            True if derivatives are totals.
         show_only_incorrect : bool, optional
             Set to True if output should print only the subjacs found to be incorrect.
         lcons : list or None
@@ -6821,6 +6821,9 @@ class System(object, metaclass=SystemMetaclass):
             If True, sort subjacobian keys alphabetically.
         """
         from openmdao.core.component import Component
+
+        if out_stream is None:
+            return
 
         # Match header to appropriate type.
         if isinstance(self, Component):
@@ -6841,21 +6844,17 @@ class System(object, metaclass=SystemMetaclass):
         # worst subjac. That info is printed at the bottom of all the output
         sys_buffer = StringIO()
 
-        if out_stream is not None:
-            if totals:
-                title = "Total Derivatives"
-            else:
-                title = f"{sys_type}: {sys_class_name} '{sys_name}'"
+        if totals:
+            title = "Total Derivatives"
+        else:
+            title = f"{sys_type}: {sys_class_name} '{sys_name}'"
 
-            print(f"{add_border(title, '-')}\n", file=sys_buffer)
+        print(f"{add_border(title, '-')}\n", file=sys_buffer)
 
         for key, fd_norm, fd_opts, directional, above_abs, above_rel, inconsistent in err_iter:
 
             if above_abs or above_rel or inconsistent:
                 num_bad_jacs += 1
-
-            if out_stream is None:
-                continue
 
             of, wrt = key
             derivative_info = derivatives[key]
@@ -6895,95 +6894,87 @@ class System(object, metaclass=SystemMetaclass):
             else:
                 divname = 'Jfd'
 
-            if out_stream:
-                # Magnitudes
-                sys_buffer.write(f"  {sys_name}: {of} wrt {wrt}")
-                if not isinstance(of, tuple) and lcons and of.strip("'") in lcons:
-                    sys_buffer.write(" (Linear constraint)")
+            # Magnitudes
+            sys_buffer.write(f"  {sys_name}: {of} wrt {wrt}")
+            if not isinstance(of, tuple) and lcons and of.strip("'") in lcons:
+                sys_buffer.write(" (Linear constraint)")
 
-                sys_buffer.write('\n')
-                if magnitudes[0].forward is not None:
-                    sys_buffer.write(f'     Forward Magnitude: {magnitudes[0].forward:.6e}\n')
+            sys_buffer.write('\n')
+            if magnitudes[0].forward is not None:
+                sys_buffer.write(f'     Forward Magnitude: {magnitudes[0].forward:.6e}\n')
 
-                if magnitudes[0].reverse is not None:
-                    sys_buffer.write(f'     Reverse Magnitude: {magnitudes[0].reverse:.6e}\n')
+            if magnitudes[0].reverse is not None:
+                sys_buffer.write(f'     Reverse Magnitude: {magnitudes[0].reverse:.6e}\n')
 
-                fd_desc = f"{fd_opts['method']}:{fd_opts['form']}"
-                for i in range(len(magnitudes)):
-                    sys_buffer.write(f'          Fd Magnitude: '
-                                        f'{magnitudes[i].fd:.6e} ({fd_desc}{stepstrs[i]})\n')
-                sys_buffer.write('\n')
+            fd_desc = f"{fd_opts['method']}:{fd_opts['form']}"
+            for i in range(len(magnitudes)):
+                sys_buffer.write(f'          Fd Magnitude: '
+                                 f'{magnitudes[i].fd:.6e} ({fd_desc}{stepstrs[i]})\n')
+            sys_buffer.write('\n')
 
-                for i in range(len(magnitudes)):
-                    # Absolute Errors
-                    if directional:
-                        if totals and abs_errs[i].forward is not None:
-                            err = _format_error(abs_errs[i].forward, abs_error_tol)
-                            sys_buffer.write(f'    Absolute Error (Jfor - Jfd){stepstrs[i]} : '
-                                                f'{err}\n')
-
-                        if abs_errs[i].reverse is not None:
-                            err = _format_error(abs_errs[i].reverse, abs_error_tol)
-                            sys_buffer.write(f'    Absolute Error ([rev, fd] Dot Product Test)'
-                                                f'{stepstrs[i]} : {err}\n')
-                    else:
-                        if abs_errs[i].forward is not None:
-                            err = _format_error(abs_errs[i].forward, abs_error_tol)
-                            sys_buffer.write(f'    Absolute Error (Jfor - Jfd){stepstrs[i]} : '
-                                                f'{err}\n')
-
-                        if abs_errs[i].reverse is not None:
-                            err = _format_error(abs_errs[i].reverse, abs_error_tol)
-                            sys_buffer.write(f'    Absolute Error (Jrev - Jfd){stepstrs[i]} : '
-                                                f'{err}\n')
-
+            for i in range(len(magnitudes)):
+                # Absolute Errors
                 if directional:
-                    if abs_errs[0].forward_reverse is not None:
-                        err = _format_error(abs_errs[0].forward_reverse, abs_error_tol)
-                        sys_buffer.write('    Absolute Error ([rev, for] Dot Product Test) : '
-                                            f'{err}\n')
+                    if totals and abs_errs[i].forward is not None:
+                        err = _format_error(abs_errs[i].forward, abs_error_tol)
+                        sys_buffer.write(f'    Absolute Error (Jfor - Jfd){stepstrs[i]} : {err}\n')
+
+                    if abs_errs[i].reverse is not None:
+                        err = _format_error(abs_errs[i].reverse, abs_error_tol)
+                        sys_buffer.write(f'    Absolute Error ([rev, fd] Dot Product Test)'
+                                         f'{stepstrs[i]} : {err}\n')
                 else:
-                    if abs_errs[0].forward_reverse is not None:
-                        err = _format_error(abs_errs[0].forward_reverse, abs_error_tol)
-                        sys_buffer.write(f'    Absolute Error (Jrev - Jfor) : {err}\n')
+                    if abs_errs[i].forward is not None:
+                        err = _format_error(abs_errs[i].forward, abs_error_tol)
+                        sys_buffer.write(f'    Absolute Error (Jfor - Jfd){stepstrs[i]} : {err}\n')
+
+                    if abs_errs[i].reverse is not None:
+                        err = _format_error(abs_errs[i].reverse, abs_error_tol)
+                        sys_buffer.write(f'    Absolute Error (Jrev - Jfd){stepstrs[i]} : {err}\n')
+
+            if directional:
+                if abs_errs[0].forward_reverse is not None:
+                    err = _format_error(abs_errs[0].forward_reverse, abs_error_tol)
+                    sys_buffer.write('    Absolute Error ([rev, for] Dot Product Test) : {err}\n')
+            else:
+                if abs_errs[0].forward_reverse is not None:
+                    err = _format_error(abs_errs[0].forward_reverse, abs_error_tol)
+                    sys_buffer.write(f'    Absolute Error (Jrev - Jfor) : {err}\n')
 
             sys_buffer.write('\n')
 
             for i in range(len(magnitudes)):
                 # Relative Errors
-                if out_stream:
-                    if directional:
-                        if totals and rel_errs[i].forward is not None:
-                            err = _format_error(rel_errs[i].forward, rel_error_tol)
-                            sys_buffer.write(f'    Relative Error (Jfor - Jfd) / {divname}'
-                                                f'{stepstrs[i]} : {err}\n')
-
-                        if rel_errs[i].reverse is not None:
-                            err = _format_error(rel_errs[i].reverse, rel_error_tol)
-                            sys_buffer.write(f'    Relative Error ([rev, fd] Dot Product Test) '
-                                                f'/ {divname}{stepstrs[i]} : {err}\n')
-                    else:
-                        if rel_errs[i].forward is not None:
-                            err = _format_error(rel_errs[i].forward, rel_error_tol)
-                            sys_buffer.write(f'    Relative Error (Jfor - Jfd) / {divname}'
-                                                f'{stepstrs[i]} : {err}\n')
-
-                        if rel_errs[i].reverse is not None:
-                            err = _format_error(rel_errs[i].reverse, rel_error_tol)
-                            sys_buffer.write(f'    Relative Error (Jrev - Jfd) / {divname}'
-                                                f'{stepstrs[i]} : {err}\n')
-
-            if out_stream:
                 if directional:
-                    if rel_errs[0].forward_reverse is not None:
-                        err = _format_error(rel_errs[0].forward_reverse, rel_error_tol)
-                        sys_buffer.write(f'    Relative Error ([rev, for] Dot Product Test) / '
-                                            f'{divname} : {err}\n')
+                    if totals and rel_errs[i].forward is not None:
+                        err = _format_error(rel_errs[i].forward, rel_error_tol)
+                        sys_buffer.write(f'    Relative Error (Jfor - Jfd) / {divname}'
+                                         f'{stepstrs[i]} : {err}\n')
+
+                    if rel_errs[i].reverse is not None:
+                        err = _format_error(rel_errs[i].reverse, rel_error_tol)
+                        sys_buffer.write(f'    Relative Error ([rev, fd] Dot Product Test) '
+                                         f'/ {divname}{stepstrs[i]} : {err}\n')
                 else:
-                    if rel_errs[0].forward_reverse is not None:
-                        err = _format_error(rel_errs[0].forward_reverse, rel_error_tol)
-                        sys_buffer.write(f'    Relative Error (Jrev - Jfor) / {divname} : '
-                                            f'{err}\n')
+                    if rel_errs[i].forward is not None:
+                        err = _format_error(rel_errs[i].forward, rel_error_tol)
+                        sys_buffer.write(f'    Relative Error (Jfor - Jfd) / {divname}'
+                                         f'{stepstrs[i]} : {err}\n')
+
+                    if rel_errs[i].reverse is not None:
+                        err = _format_error(rel_errs[i].reverse, rel_error_tol)
+                        sys_buffer.write(f'    Relative Error (Jrev - Jfd) / {divname}'
+                                         f'{stepstrs[i]} : {err}\n')
+
+            if directional:
+                if rel_errs[0].forward_reverse is not None:
+                    err = _format_error(rel_errs[0].forward_reverse, rel_error_tol)
+                    sys_buffer.write(f'    Relative Error ([rev, for] Dot Product Test) / '
+                                     f'{divname} : {err}\n')
+            else:
+                if rel_errs[0].forward_reverse is not None:
+                    err = _format_error(rel_errs[0].forward_reverse, rel_error_tol)
+                    sys_buffer.write(f'    Relative Error (Jrev - Jfor) / {divname} : {err}\n')
 
             if inconsistent:
                 sys_buffer.write('\n    * Inconsistent value across ranks *\n')
@@ -7038,9 +7029,7 @@ class System(object, metaclass=SystemMetaclass):
 
             sys_buffer.write(' -' * 30 + '\n')
 
-        # End of for of, wrt in sorted_keys
-
-        if out_stream is not None and (not show_only_incorrect or num_bad_jacs > 0):
+        if not show_only_incorrect or num_bad_jacs > 0:
             out_stream.write(sys_buffer.getvalue())
 
     def _deriv_display_compact(self, err_iter, derivatives, rel_error_tol, abs_error_tol,
@@ -7067,8 +7056,8 @@ class System(object, metaclass=SystemMetaclass):
                 Set to None to suppress.
         fd_opts : dict
             Dictionary containing the options for the approximation.
-        totals : bool or _TotalJacInfo
-            Set to _TotalJacInfo if we are doing check_totals to skip a bunch of stuff.
+        totals : bool
+            True if derivatives are totals.
         show_only_incorrect : bool, optional
             Set to True if output should print only the subjacs found to be incorrect.
         lcons : list or None
@@ -7076,6 +7065,9 @@ class System(object, metaclass=SystemMetaclass):
         sort : bool
             If True, sort subjacobian keys alphabetically.
         """
+        if out_stream is None:
+            return
+
         from openmdao.core.component import Component
 
         # Match header to appropriate type.
@@ -7098,24 +7090,20 @@ class System(object, metaclass=SystemMetaclass):
         # worst subjac. That info is printed at the bottom of all the output
         sys_buffer = StringIO()
 
-        if out_stream is not None:
-            if totals:
-                title = "Total Derivatives"
-            else:
-                title = f"{sys_type}: {sys_class_name} '{sys_name}'"
+        if totals:
+            title = "Total Derivatives"
+        else:
+            title = f"{sys_type}: {sys_class_name} '{sys_name}'"
 
-            print(f"{add_border(title, '-')}\n", file=sys_buffer)
+        print(f"{add_border(title, '-')}\n", file=sys_buffer)
 
-            table_data = []
-            worst_subjac = None
+        table_data = []
+        worst_subjac = None
 
         for key, fd_norm, fd_opts, directional, above_abs, above_rel, inconsistent in err_iter:
 
             if above_abs or above_rel or inconsistent:
                 num_bad_jacs += 1
-
-            if out_stream is None:
-                continue
 
             of, wrt = key
             derivative_info = derivatives[key]
@@ -7207,29 +7195,28 @@ class System(object, metaclass=SystemMetaclass):
                             worst_subjac = (err, table_data[-1])
 
         headers = []
-        if out_stream is not None:
-            if table_data:
-                headers = ["of '<variable>'", "wrt '<variable>'"]
-                if len(steps) > 1:
-                    headers.append('step')
+        if table_data:
+            headers = ["of '<variable>'", "wrt '<variable>'"]
+            if len(steps) > 1:
+                headers.append('step')
 
-                if matrix_free:
-                    headers.extend(['fwd mag.', 'rev mag.', 'check mag.', 'a(fwd-chk)',
-                                    'a(rev-chk)', 'a(fwd-rev)', 'r(fwd-chk)', 'r(rev-chk)',
-                                    'r(fwd-rev)', 'error desc'])
-                else:
-                    headers.extend(['calc mag.', 'check mag.', 'a(cal-chk)', 'r(cal-chk)',
-                                    'error desc'])
+            if matrix_free:
+                headers.extend(['fwd mag.', 'rev mag.', 'check mag.', 'a(fwd-chk)',
+                                'a(rev-chk)', 'a(fwd-rev)', 'r(fwd-chk)', 'r(rev-chk)',
+                                'r(fwd-rev)', 'error desc'])
+            else:
+                headers.extend(['calc mag.', 'check mag.', 'a(cal-chk)', 'r(cal-chk)',
+                                'error desc'])
 
-                _print_deriv_table(table_data, headers, sys_buffer)
+            _print_deriv_table(table_data, headers, sys_buffer)
 
-            if not show_only_incorrect or num_bad_jacs > 0:
-                out_stream.write(sys_buffer.getvalue())
+        if not show_only_incorrect or num_bad_jacs > 0:
+            out_stream.write(sys_buffer.getvalue())
 
         if worst_subjac is None:
             return None
 
-        return worst_subjac + (headers,) if out_stream is not None else None
+        return worst_subjac + (headers,)
 
 
 _ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
@@ -7428,8 +7415,8 @@ def _iter_derivs(derivatives, show_only_incorrect, all_fd_opts, totals, nondep_d
         If True, yield only derivatives with errors outside of tolerance.
     all_fd_opts : dict
         Dictionary containing the options for the approximation.
-    totals : bool or _TotalJacInfo
-        Set to _TotalJacInfo if we are doing check_totals to skip a bunch of stuff.
+    totals : bool
+        True if derivatives are totals.
     nondep_derivs : set
         Contains the of/wrt keys that are declared not dependent or not declared at all.
     matrix_free : bool
@@ -7478,10 +7465,6 @@ def _iter_derivs(derivatives, show_only_incorrect, all_fd_opts, totals, nondep_d
         directional = bool(fd_opts) and fd_opts.get('directional')
 
         fd_norm = _compute_deriv_errors(derivative_info, matrix_free, directional, totals)
-
-        print('abs error', derivative_info['abs error'])
-        print('rel error', derivative_info['rel error'])
-        print('magnitude', derivative_info['magnitude'])
 
         # Skip printing the non-dependent keys if the derivatives are fine.
         if key in nondep_derivs and fd_norm < abs_error_tol:

@@ -2238,14 +2238,16 @@ class Component(System):
                             deriv_value = np.zeros((out_size, in_size))
                             copy = False
 
-                        # Testing for pairs that are not dependent so that we suppress printing
-                        # them unless the fd is non zero. Note: subjacs_info is empty for
-                        # undeclared partials, which is the default behavior now.
-                        try:
-                            if not subjacs[abs_key]['dependent']:
+                        # If not compact printing, testing for pairs that are not dependent so
+                        # that we suppress printing them unless the fd is non zero.
+                        # Note: subjacs_info is empty for undeclared partials, which is the default
+                        # behavior now.
+                        if not compact_print:
+                            try:
+                                if not subjacs[abs_key]['dependent']:
+                                    nondep_derivs.add(rel_key)
+                            except KeyError:
                                 nondep_derivs.add(rel_key)
-                        except KeyError:
-                            nondep_derivs.add(rel_key)
 
                         if force_dense:
                             if rows is not None:

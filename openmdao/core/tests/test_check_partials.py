@@ -434,16 +434,16 @@ class TestProblemCheckPartials(unittest.TestCase):
         p.setup()
         data = p.check_partials(out_stream=None)
 
-        for comp_name, comp in data.items():
-            for partial_name, partial in comp.items():
+        for comp in data.values():
+            for partial in comp.values():
                 abs_error = partial['abs error']
                 self.assertAlmostEqual(abs_error.forward, 0.)
 
         # Make sure we only FD this twice.
-        # The count is 4 because in check_partials, there is one call to apply_nonlinear
+        # The count is 5 because in check_partials, there are two calls to apply_nonlinear
         # when compute the fwd and rev analytic derivatives, then one call to apply_nonlinear
         # to compute the reference point for FD, then two additional calls for the two inputs.
-        self.assertEqual(units.run_count, 4)
+        self.assertEqual(units.run_count, 5)
 
     def test_scalar_val(self):
         class PassThrough(om.ExplicitComponent):
@@ -1318,8 +1318,8 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
-        self.assertEqual(stream.getvalue().count('n/a'), 10)
-        self.assertEqual(stream.getvalue().count('rev'), 15)
+        self.assertEqual(stream.getvalue().count('n/a'), 0)
+        self.assertEqual(stream.getvalue().count('rev'), 10)
         self.assertEqual(stream.getvalue().count('Component'), 2)
         self.assertEqual(len([ln for ln in stream.getvalue().splitlines() if ln.startswith('| ')]), 8)
 
@@ -1444,7 +1444,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        data = prob.check_partials()#out_stream=None)
+        data = prob.check_partials(out_stream=None)
 
         # Note on why we run 9 times:
         # 1    - Initial execution
