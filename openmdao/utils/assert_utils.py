@@ -330,6 +330,7 @@ def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6, max_display_shape=(20
         except ValueError:
             nrows = J_fd.shape
             ncols = 1
+        break
 
     if isinstance(max_display_shape, int):
         maxrows = maxcols = max_display_shape

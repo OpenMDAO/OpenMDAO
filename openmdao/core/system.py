@@ -6795,7 +6795,7 @@ class System(object, metaclass=SystemMetaclass):
     def _deriv_display(self, err_iter, derivatives, rel_error_tol, abs_error_tol, out_stream,
                        fd_opts, totals=False, show_only_incorrect=False, lcons=None, sort=False):
         """
-        Compute the relative and absolute errors in the given derivatives and print to the out_stream.
+        Compute the relative and absolute errors in the given derivatives and print to out_stream.
 
         Parameters
         ----------
@@ -6811,6 +6811,8 @@ class System(object, metaclass=SystemMetaclass):
         out_stream : file-like object
                 Where to send human readable output.
                 Set to None to suppress.
+        fd_opts : dict
+            Dictionary containing options for the finite difference.
         totals : bool
             True if derivatives are totals.
         show_only_incorrect : bool, optional
@@ -7018,14 +7020,14 @@ class System(object, metaclass=SystemMetaclass):
                     if directional:
                         if totals and magnitudes[i].reverse is not None:
                             sys_buffer.write(f'    Directional {fdtype} Derivative (Jfd) '
-                                                f'Dot Product{stepstrs[i]}\n    {fd}\n\n')
+                                             f'Dot Product{stepstrs[i]}\n    {fd}\n\n')
                         else:
                             sys_buffer.write(f"    Directional {fdtype} Derivative (Jfd)"
-                                                f"{stepstrs[i]}\n    {fd}\n\n")
+                                             f"{stepstrs[i]}\n    {fd}\n\n")
                     else:
                         Jstr = textwrap.indent(str(fd), '    ')
                         sys_buffer.write(f"    Raw {fdtype} Derivative (Jfd){stepstrs[i]}"
-                                            f"\n{Jstr}\n\n")
+                                         f"\n{Jstr}\n\n")
 
             sys_buffer.write(' -' * 30 + '\n')
 
@@ -7078,7 +7080,7 @@ class System(object, metaclass=SystemMetaclass):
 
         sys_name = self.pathname
         sys_class_name = type(self).__name__
-        matrix_free = self.matrix_free
+        matrix_free = self.matrix_free and not totals
 
         if totals:
             sys_name = 'Full Model'
@@ -7124,12 +7126,12 @@ class System(object, metaclass=SystemMetaclass):
 
             err_desc = []
             if above_abs:
-                err_desc.append('>ABS_TOL')
+                err_desc.append(' >ABS_TOL')
             if above_rel:
-                err_desc.append('>REL_TOL')
+                err_desc.append(' >REL_TOL')
             if inconsistent:
-                err_desc.append('<RANK INCONSISTENT>')
-            err_desc = ' '.join(err_desc)
+                err_desc.append(' <RANK INCONSISTENT>')
+            err_desc = ''.join(err_desc)
 
             abs_errs = derivative_info['abs error']
             rel_errs = derivative_info['rel error']
@@ -7151,35 +7153,35 @@ class System(object, metaclass=SystemMetaclass):
                 if totals:
                     if len(steps) > 1:
                         table_data.append([of, wrt, step, calc_mag, magnitude.fd,
-                                            calc_abs, calc_rel, err_desc])
+                                           calc_abs, calc_rel, err_desc])
                     else:
                         table_data.append([of, wrt, calc_mag, magnitude.fd,
-                                            calc_abs, calc_rel, err_desc])
+                                           calc_abs, calc_rel, err_desc])
                 else:
                     if matrix_free:
                         if len(steps) > 1:
                             table_data.append([of, wrt, step, magnitude.forward,
-                                                magnitude.reverse, magnitude.fd,
-                                                abs_err.forward, abs_err.reverse,
-                                                abs_err.forward_reverse, rel_err.forward,
-                                                rel_err.reverse, rel_err.forward_reverse,
-                                                err_desc])
+                                               magnitude.reverse, magnitude.fd,
+                                               abs_err.forward, abs_err.reverse,
+                                               abs_err.forward_reverse, rel_err.forward,
+                                               rel_err.reverse, rel_err.forward_reverse,
+                                               err_desc])
                         else:
                             table_data.append([of, wrt, magnitude.forward,
-                                                magnitude.reverse, magnitude.fd,
-                                                abs_err.forward, abs_err.reverse,
-                                                abs_err.forward_reverse, rel_err.forward,
-                                                rel_err.reverse, rel_err.forward_reverse,
-                                                err_desc])
+                                               magnitude.reverse, magnitude.fd,
+                                               abs_err.forward, abs_err.reverse,
+                                               abs_err.forward_reverse, rel_err.forward,
+                                               rel_err.reverse, rel_err.forward_reverse,
+                                               err_desc])
                     else:
                         if len(steps) > 1:
                             table_data.append([of, wrt, step, magnitude.forward,
-                                                magnitude.fd, abs_err.forward,
-                                                rel_err.forward, err_desc])
+                                               magnitude.fd, abs_err.forward,
+                                               rel_err.forward, err_desc])
                         else:
                             table_data.append([of, wrt, magnitude.forward, magnitude.fd,
-                                                abs_err.forward, rel_err.forward,
-                                                err_desc])
+                                               abs_err.forward, rel_err.forward,
+                                               err_desc])
                         assert abs_err.forward_reverse is None
                         assert rel_err.forward_reverse is None
                         assert abs_err.reverse is None
@@ -7459,8 +7461,9 @@ def _iter_derivs(derivatives, show_only_incorrect, all_fd_opts, totals, nondep_d
             fd_opts = all_fd_opts
         else:
             fd_opts = all_fd_opts[wrt]
-            if key in incon_keys:
-                inconsistent = True
+
+        if key in incon_keys:
+            inconsistent = True
 
         directional = bool(fd_opts) and fd_opts.get('directional')
 

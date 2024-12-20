@@ -1269,10 +1269,10 @@ class Problem(object, metaclass=ProblemMetaclass):
 
             if maxrelinfo is not None:
                 if worst is None or maxrelinfo[0] > worst[0]:
-                    worst = (maxrelinfo, type(comp).__name__, comp.pathname)
+                    worst = maxrelinfo + (type(comp).__name__, comp.pathname)
 
         if worst is not None:
-            (err, table_data, headers), ctype, cpath = worst
+            err, table_data, headers, ctype, cpath = worst
             print(file=out_stream)
             print(add_border(f"Sub Jacobian with Largest Relative Error: {ctype} '{cpath}'", '#'),
                   file=out_stream)
@@ -1560,6 +1560,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                     data[''][key]['indices'] = resp[of]['indices'].indexed_src_size
 
         incon_keys = model._get_inconsistent_keys()
+
         # force iterator to run so that error info will be added to partials_data
         err_iter = list(_iter_derivs(data[''], show_only_incorrect, fd_args, True,
                                      set(), model.matrix_free, abs_err_tol, rel_err_tol,
@@ -1577,6 +1578,13 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         if not do_steps:
             _fix_check_data(data)
+
+        if incon_keys:
+            # insert inconsistent key info into first (of, wrt) entry in data to avoid
+            # having to change the format of the data dict.
+            for key, meta in data[''].items():
+                meta['inconsistent_keys'] = incon_keys
+                break
 
         return data['']
 

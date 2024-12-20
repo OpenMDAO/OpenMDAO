@@ -2401,7 +2401,7 @@ class Component(System):
                                                     all_fd_options, False, show_only_incorrect)
             else:
                 self._deriv_display(err_iter, partials_data, rel_err_tol, abs_err_tol, out_stream,
-                       all_fd_options, False, show_only_incorrect)
+                                    all_fd_options, False, show_only_incorrect)
 
         return partials_data, worst
 
