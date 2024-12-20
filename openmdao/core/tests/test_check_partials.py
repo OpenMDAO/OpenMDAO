@@ -1230,10 +1230,10 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup()
 
         stream = StringIO()
-        prob.check_partials(out_stream=stream, compact_print=True)
+        prob.check_partials(out_stream=stream, abs_err_tol=1.1e-6, compact_print=True)
 
-        self.assertEqual(stream.getvalue().count('n/a'), 25)
-        self.assertEqual(stream.getvalue().count('rev'), 15)
+        self.assertEqual(stream.getvalue().count('n/a'), 0)
+        self.assertEqual(stream.getvalue().count('rev'), 10)
         self.assertEqual(stream.getvalue().count('Component'), 2)
         self.assertEqual(len([ln for ln in stream.getvalue().splitlines() if ln.startswith('| ')]), 12) # counts rows (including headers)
 

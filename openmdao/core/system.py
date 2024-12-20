@@ -6880,8 +6880,7 @@ class System(object, metaclass=SystemMetaclass):
             steps = derivative_info['steps']
 
             Jfor = derivative_info.get('J_fwd')
-            if Jfor is None:
-                Jrev = derivative_info['J_rev']
+            Jrev = derivative_info.get('J_rev')
 
             if len(steps) > 1:
                 stepstrs = [f", step={step}" for step in steps]

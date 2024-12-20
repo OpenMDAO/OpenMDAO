@@ -1212,8 +1212,17 @@ class Problem(object, metaclass=ProblemMetaclass):
             inconsistent across MPI ranks.
         """
         model = self.model
-        if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP or model.iter_count < 1:
+
+        # on master, we were doing this:
+        # if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
+        #     self.final_setup()
+
+        # model.run_apply_nonlinear()
+
+        # but it seems more correct to run the model first if it hasn't been run yet, correct?
+        if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP or model.iter_count == 0:
             self.run_model()
+
 
         if not model._use_derivatives:
             raise RuntimeError(self.msginfo +
