@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.utils.testing_utils import force_check_partials
 
 
@@ -172,10 +172,7 @@ class TestLinearSystemComp(unittest.TestCase):
         assert_near_equal(J['lin.x', 'p2.b'], dx_db, .0001)
 
         data = force_check_partials(prob, out_stream=None)
-
-        abs_errors = data['lingrp.lin'][('x', 'x')]['abs error']
-        self.assertTrue(len(abs_errors) > 0)
-        self.assertTrue(abs_errors[0] < 1.e-6)
+        assert_check_partials(data)
 
     def test_solve_linear_vectorized(self):
         """Check against solve_linear."""
@@ -233,10 +230,7 @@ class TestLinearSystemComp(unittest.TestCase):
         assert_near_equal(J['lin.x', 'p2.b'], dx_db, .0001)
 
         data = force_check_partials(prob, out_stream=None)
-
-        abs_errors = data['lingrp.lin'][('x', 'x')]['abs error']
-        self.assertTrue(len(abs_errors) > 0)
-        self.assertTrue(abs_errors[0] < 1.e-6)
+        assert_check_partials(data)
 
     def test_solve_linear_vectorized_A(self):
         """Check against solve_linear."""
@@ -303,10 +297,7 @@ class TestLinearSystemComp(unittest.TestCase):
         assert_near_equal(J['lin.x', 'p2.b'], dx_db, .0001)
 
         data = force_check_partials(prob, out_stream=None)
-
-        abs_errors = data['lingrp.lin'][('x', 'x')]['abs error']
-        self.assertTrue(len(abs_errors) > 0)
-        self.assertTrue(abs_errors[0] < 1.e-6)
+        assert_check_partials(data)
 
     def test_feature_basic(self):
 

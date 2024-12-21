@@ -1959,11 +1959,7 @@ class TestExecCompParameterized(unittest.TestCase):
 
         if 'check_val' not in test_data:
             cpd = force_check_partials(prob, out_stream=None)
-
-            for comp in cpd:
-                for (var, wrt) in cpd[comp]:
-                    np.testing.assert_almost_equal(cpd[comp][var, wrt]['abs error'][0], 0, decimal=4,
-                                                   verbose=True, err_msg=f"{test_data['args']=}")
+            assert_check_partials(cpd, atol=3e-5, rtol=4e-6)
 
 
 if __name__ == "__main__":

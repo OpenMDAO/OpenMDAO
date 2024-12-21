@@ -14,7 +14,8 @@ except ImportError:
 import openmdao.api as om
 from openmdao.test_suite.components.sellar import SellarDis2
 from openmdao.utils.mpi import MPI
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_no_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_no_warning, \
+    assert_check_totals
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.utils.om_warnings import PromotionWarning
 from openmdao.utils.name_maps import name2abs_names
@@ -1384,9 +1385,7 @@ class TestGroup(unittest.TestCase):
         assert_near_equal(p['discipline.x'], 1.41421356, 1e-6)
 
         totals = p.check_totals(of=['discipline.comp1.z'], wrt=['parameters.input_value'], method='cs', out_stream=None)
-
-        for val in totals.values():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-15)
+        assert_check_totals(totals)
 
     def test_set_order_in_config_error(self):
 

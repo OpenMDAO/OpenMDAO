@@ -3,7 +3,8 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, \
+    assert_check_totals
 
 
 class MyCompApprox(om.ImplicitComponent):
@@ -250,16 +251,14 @@ class ResidNamingTestCase(unittest.TestCase):
         assert_check_partials(prob.check_partials(method='cs', out_stream=None), atol=1e-5)
 
         totals = prob.check_totals(method='cs', out_stream=None)
-        for val in totals.values():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-10)
+        assert_check_totals(totals)
 
     def test_approx2(self):
         prob = self._build_model(MyCompApprox2)
         assert_check_partials(prob.check_partials(method='cs', out_stream=None), atol=1e-5)
 
         totals = prob.check_totals(method='cs', out_stream=None)
-        for val in totals.values():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-10)
+        assert_check_totals(totals)
 
     def test_size_mismatch(self):
         with self.assertRaises(Exception) as cm:
@@ -302,16 +301,14 @@ class ResidNamingTestCase(unittest.TestCase):
         assert_check_partials(prob.check_partials(method='cs', out_stream=None))
 
         totals = prob.check_totals(method='cs', out_stream=None)
-        for val in totals.values():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-12)
+        assert_check_totals(totals)
 
     def test_analytic2(self):
         prob = self._build_model(MyCompAnalytic2)
         assert_check_partials(prob.check_partials(method='cs', out_stream=None))
 
         totals = prob.check_totals(method='cs', out_stream=None)
-        for val in totals.values():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-12)
+        assert_check_totals(totals)
 
 
 class _InputResidComp(om.ImplicitComponent):

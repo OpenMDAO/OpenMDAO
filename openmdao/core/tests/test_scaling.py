@@ -10,7 +10,9 @@ from openmdao.core.driver import Driver
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayDense
 from openmdao.utils.testing_utils import force_check_partials
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, \
+    assert_check_totals
+
 from openmdao.test_suite.components.unit_conv import SrcComp, TgtCompF
 
 
@@ -1076,8 +1078,7 @@ class TestScaling(unittest.TestCase):
         problem.run_model()
 
         totals = problem.check_totals(out_stream=None)
-        assert_near_equal(totals['c', 'a1']['abs error'].reverse, 0.0, tolerance=1e-7)
-        assert_near_equal(totals['c', 'a2']['abs error'].reverse, 0.0, tolerance=1e-7)
+        assert_check_totals(totals)
 
         # Now, include unit conversion
 
@@ -1104,8 +1105,7 @@ class TestScaling(unittest.TestCase):
         problem.run_model()
 
         totals = problem.check_totals(out_stream=None)
-        assert_near_equal(totals['c', 'a1']['abs error'].reverse, 0.0, tolerance=1e-7)
-        assert_near_equal(totals['c', 'a2']['abs error'].reverse, 0.0, tolerance=1e-7)
+        assert_check_totals(totals)
 
     def test_totals_with_solver_scaling_part2(self):
         # Covers the part that the previous test missed, namely when the ref is in a different
@@ -1202,8 +1202,7 @@ class TestScaling(unittest.TestCase):
         problem.run_model()
 
         totals = problem.check_totals(compact_print=True)
-        assert_near_equal(totals['c', 'a1']['abs error'].reverse, 0.0, tolerance=3e-7)
-        assert_near_equal(totals['c', 'a2']['abs error'].reverse, 0.0, tolerance=3e-7)
+        assert_check_totals(totals)
 
 
 class MyComp(om.ExplicitComponent):
@@ -1405,9 +1404,7 @@ class TestScalingOverhaul(unittest.TestCase):
         assert_near_equal(driver.sens_dict['comp.x3_s_s']['p.x1_s_s'][0][0], J[3, 3] / 17.0 * 7.0)
 
         totals = prob.check_totals(compact_print=True, out_stream=None)
-
-        for (of, wrt) in totals:
-            assert_near_equal(totals[of, wrt]['abs error'][0], 0.0, 1e-7)
+        assert_check_totals(totals)
 
     def test_iimplicit(self):
         # Testing that our scale/unscale contexts leave the output vector in the correct state when
@@ -1437,9 +1434,7 @@ class TestScalingOverhaul(unittest.TestCase):
         prob.run_model()
 
         totals = prob.check_totals(compact_print=True, out_stream=None)
-
-        for (of, wrt) in totals:
-            assert_near_equal(totals[of, wrt]['abs error'][0], 0.0, 1e-7)
+        assert_check_totals(totals)
 
 
 class TestResidualScaling(unittest.TestCase):

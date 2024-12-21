@@ -6793,7 +6793,7 @@ class System(object, metaclass=SystemMetaclass):
                 yield path
 
     def _deriv_display(self, err_iter, derivatives, rel_error_tol, abs_error_tol, out_stream,
-                       fd_opts, totals=False, show_only_incorrect=False, lcons=None, sort=False):
+                       fd_opts, totals=False, show_only_incorrect=False, lcons=None):
         """
         Compute the relative and absolute errors in the given derivatives and print to out_stream.
 
@@ -7034,9 +7034,8 @@ class System(object, metaclass=SystemMetaclass):
         if not show_only_incorrect or num_bad_jacs > 0:
             out_stream.write(sys_buffer.getvalue())
 
-    def _deriv_display_compact(self, err_iter, derivatives, rel_error_tol, abs_error_tol,
-                               out_stream, fd_opts, totals=False,
-                               show_only_incorrect=False, lcons=None, sort=False):
+    def _deriv_display_compact(self, err_iter, derivatives, out_stream, totals=False,
+                               show_only_incorrect=False):
         """
         Compute relative and absolute errors in the given derivatives and print to out_stream.
 
@@ -7049,23 +7048,13 @@ class System(object, metaclass=SystemMetaclass):
             above_rel, inconsistent) for each subjac.
         derivatives : dict
             Dictionary containing derivative information keyed by (of, wrt).
-        rel_error_tol : float
-            Relative error tolerance.
-        abs_error_tol : float
-            Absolute error tolerance.
         out_stream : file-like object
                 Where to send human readable output.
                 Set to None to suppress.
-        fd_opts : dict
-            Dictionary containing the options for the approximation.
         totals : bool
             True if derivatives are totals.
         show_only_incorrect : bool, optional
             Set to True if output should print only the subjacs found to be incorrect.
-        lcons : list or None
-            For total derivatives only, list of outputs that are actually linear constraints.
-        sort : bool
-            If True, sort subjacobian keys alphabetically.
         """
         if out_stream is None:
             return
@@ -7187,8 +7176,8 @@ class System(object, metaclass=SystemMetaclass):
                         assert abs_err.reverse is None
                         assert rel_err.reverse is None
 
-                    # See if this component has the greater error in the derivative computation
-                    # compared to the other components so far
+                    # See if this subjacobian has the greater error in the derivative computation
+                    # compared to the other subjacobians so far
                     for err in rel_err[:2]:
                         if err is None or np.isnan(err):
                             continue
@@ -7401,7 +7390,8 @@ def _errors_above_tol(deriv_info, abs_error_tol, rel_error_tol):
 
 
 def _iter_derivs(derivatives, show_only_incorrect, all_fd_opts, totals, nondep_derivs,
-                 matrix_free, abs_error_tol=1e-6, rel_error_tol=1e-6, incon_keys=()):
+                 matrix_free, abs_error_tol=1e-6, rel_error_tol=1e-6, incon_keys=(),
+                 sort=True):
     """
     Iterate over all of the derivatives.
 
@@ -7429,6 +7419,8 @@ def _iter_derivs(derivatives, show_only_incorrect, all_fd_opts, totals, nondep_d
         Relative error tolerance.
     incon_keys : set or tuple
         Keys where there are serial d_inputs variables that are inconsistent across processes.
+    sort : bool
+        If True, sort the derivatives alphabetically.
 
     Yields
     ------
@@ -7448,10 +7440,9 @@ def _iter_derivs(derivatives, show_only_incorrect, all_fd_opts, totals, nondep_d
         True if the current derivative was computed where some serial d_inputs variables were not
         consistent across processes.
     """
-    # Sorted keys ensures deterministic ordering
-    sorted_keys = sorted(derivatives)
+    keys = sorted(derivatives) if sort else derivatives
 
-    for key in sorted_keys:
+    for key in keys:
         _, wrt = key
 
         inconsistent = False

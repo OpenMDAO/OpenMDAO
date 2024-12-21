@@ -4,7 +4,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
 from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, \
      SellarDis2withDerivatives
@@ -1048,6 +1048,7 @@ class TestObjectiveOnModel(unittest.TestCase):
         p.run_model()
         # Formerly a KeyError
         derivs = p.check_totals(compact_print=True, out_stream=None)
+        assert_check_totals(derivs)
         assert_near_equal(0.0, derivs['y', 'x']['abs error'][1])
 
 

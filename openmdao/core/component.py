@@ -2052,17 +2052,21 @@ class Component(System):
 
         Returns
         -------
-        dict of dicts of dicts
-            First key is the component name.
-            Second key is the (output, input) tuple of strings.
-            Third key is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev',
-            'rank_inconsistent'].
+        dict of dicts
+            Top keys are 'partials' and 'worst'.  Under 'partials', the subkeys are the (of, wrt)
+            keys of the subjacs.
+            Within the (of, wrt) entries are the following keys: 'rel error', 'abs error',
+            'magnitude', 'J_fd', 'J_fwd', 'J_rev', and 'rank_inconsistent'.
             For 'rel error', 'abs error', and 'magnitude' the value is a tuple containing norms for
             forward - fd, adjoint - fd, forward - adjoint.
             For 'J_fd', 'J_fwd', 'J_rev' the value is a numpy array representing the computed
             Jacobian for the three different methods of computation.
             The boolean 'rank_inconsistent' indicates if the derivative wrt a serial variable is
             inconsistent across MPI ranks.
+            Under the 'worst' key is either None or tuple of the form (error, table_row, header)
+            where error is the max relative error found, table_row is the formatted table row
+            containing the max relative error, and header is the formatted table header.  'worst'
+            is not None only if compact_print is True.
         """
         self._check_fds_differ(method, step, form, step_calc, minimum_step)
 
@@ -2290,8 +2294,6 @@ class Component(System):
             self._inputs.set_val(input_cache)
             self._outputs.set_val(output_cache)
 
-            # self.run_apply_nonlinear()
-
         all_fd_options = {}
 
         of = self._get_partials_ofs()
@@ -2396,14 +2398,16 @@ class Component(System):
         worst = None
         if out_stream is not None:
             if compact_print:
-                worst = self._deriv_display_compact(err_iter, partials_data, rel_err_tol,
-                                                    abs_err_tol, out_stream,
-                                                    all_fd_options, False, show_only_incorrect)
+                worst = self._deriv_display_compact(err_iter, partials_data, out_stream,
+                                                    totals=False,
+                                                    show_only_incorrect=show_only_incorrect)
             else:
                 self._deriv_display(err_iter, partials_data, rel_err_tol, abs_err_tol, out_stream,
                                     all_fd_options, False, show_only_incorrect)
 
-        return partials_data, worst
+        data = {'partials': partials_data, 'worst': worst}
+
+        return data
 
 
 class _DictValues(object):

@@ -325,6 +325,8 @@ def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6, max_display_shape=(20
         if 'inconsistent_keys' in dct:
             incon_keys = dct['inconsistent_keys']
         J_fd = dct['J_fd']
+        if isinstance(J_fd, list):
+            J_fd = J_fd[0]
         try:
             nrows, ncols = J_fd.shape
         except ValueError:

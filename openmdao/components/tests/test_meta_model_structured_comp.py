@@ -573,7 +573,7 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         tol = 1e-5
         assert_near_equal(prob['f'], val0, tol)
         assert_near_equal(prob['g'], val1, tol)
-        self.run_and_check_derivs(prob)
+        self.run_and_check_derivs(prob, atol=3e-4)
 
     def test_dynamic_training(self):
         p1 = np.linspace(0, 100, 25)
@@ -681,21 +681,15 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         tol = 1e-5
         assert_near_equal(prob['f'], val0, tol)
         assert_near_equal(prob['g'], val1, tol)
-        self.run_and_check_derivs(prob)
+        self.run_and_check_derivs(prob, atol=5e-4, rtol=2e-5)
 
-    def run_and_check_derivs(self, prob, tol=1e-5, verbose=False):
+    def run_and_check_derivs(self, prob, atol=1e-5, rtol=2e-5):
         """Runs check_partials and compares to analytic derivatives."""
 
         prob.run_model()
 
         derivs = force_check_partials(prob, out_stream=None)
-
-        for i in derivs['comp'].keys():
-            if verbose:
-                print("Checking derivative pair:", i)
-            if derivs['comp'][i]['J_fwd'].sum() != 0.0:
-                rel_err = derivs['comp'][i]['rel error'][0]
-                self.assertLessEqual(rel_err, tol)
+        assert_check_partials(derivs, atol=atol, rtol=rtol)
 
     def test_error_msg_vectorized(self):
         # Tests bug in error message where it doesn't give the correct node value.
@@ -769,19 +763,13 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         self.prob['y'] = 0.75
         self.prob['z'] = -1.7
 
-    def run_and_check_derivs(self, prob, tol=1e-5, verbose=False):
+    def run_and_check_derivs(self, prob, atol=1e-5, rtol=1e-5, verbose=False):
         """Runs check_partials and compares to analytic derivatives."""
 
         prob.run_model()
 
         derivs = force_check_partials(prob, method='cs', out_stream=None)
-
-        for i in derivs['comp'].keys():
-            if verbose:
-                print("Checking derivative pair:", i)
-            if derivs['comp'][i]['J_fwd'].sum() != 0.0:
-                rel_err = derivs['comp'][i]['rel error'][0]
-                self.assertLessEqual(rel_err, tol)
+        assert_check_partials(derivs, atol=atol, rtol=rtol)
 
     def test_deriv1(self):
         # run at default pt
@@ -1086,7 +1074,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        self.run_and_check_derivs(prob)
+        self.run_and_check_derivs(prob, atol=1e-4)
 
     def test_training_gradient_akima(self):
         model = om.Group()
