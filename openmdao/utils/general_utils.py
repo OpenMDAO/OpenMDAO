@@ -1083,6 +1083,7 @@ def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shap
     else:
         return parent_src_inds.shaped_array(flat=False).reshape(my_src_shape)[my_src_inds()]
 
+
 def is_undefined(obj):
     """
     Returns True if the object is _UNDEFINED.
@@ -1104,6 +1105,7 @@ def is_undefined(obj):
     if isinstance(obj, Iterable):
         return False
     return obj == _UNDEFINED
+
 
 def shape2tuple(shape):
     """
