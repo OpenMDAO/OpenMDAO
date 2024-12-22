@@ -81,7 +81,7 @@ class ExplicitComponent(Component):
         """
         Configure this system to assign children settings and detect if matrix_free.
         """
-        if self.matrix_free is _UNDEFINED:
+        if self.matrix_free == _UNDEFINED:
             self.matrix_free = overrides_method('compute_jacvec_product', self, ExplicitComponent)
 
     def _jac_wrt_iter(self, wrt_matches=None):

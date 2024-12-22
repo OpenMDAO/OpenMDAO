@@ -11,9 +11,9 @@ class Foo(object):
 class ConstantsTestCase(unittest.TestCase):
     def test_repr_copy(self):
         cp = copy.copy(_UNDEFINED)
-        self.assertTrue(cp is _UNDEFINED, "Constants don't match!")
+        self.assertTrue(cp == _UNDEFINED, "Constants don't match!")
 
     def test_repr_deepcopy(self):
         f = Foo()
         cpf = copy.deepcopy(f)
-        self.assertTrue(cpf.bar is _UNDEFINED, "Constants don't match!")
+        self.assertTrue(cpf.bar == _UNDEFINED, "Constants don't match!")

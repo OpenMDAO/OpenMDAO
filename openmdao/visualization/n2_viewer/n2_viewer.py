@@ -153,7 +153,7 @@ def _serialize_single_option(option):
 
     val = option['val']
 
-    if val is _UNDEFINED:
+    if val == _UNDEFINED:
         return str(val)
 
     if sys.getsizeof(val) > _MAX_OPTION_SIZE:
@@ -360,7 +360,7 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
             driver_opt_settings = None
 
         # set default behavior for values flag
-        if values is _UNDEFINED:
+        if values == _UNDEFINED:
             values = (data_source._metadata is not None and
                       data_source._metadata['setup_status'] >= _SetupStatus.POST_FINAL_SETUP)
 
@@ -377,7 +377,7 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
             raise TypeError(msg)
 
         # set default behavio r for values flag
-        if values is _UNDEFINED:
+        if values == _UNDEFINED:
             values = (data_source._problem_meta is not None and
                       data_source._problem_meta['setup_status'] >= _SetupStatus.POST_FINAL_SETUP)
 
@@ -391,7 +391,7 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
         data_dict = cr.problem_metadata
 
         # set default behavior for values flag
-        if values is _UNDEFINED:
+        if values == _UNDEFINED:
             values = True
 
         def set_values(children, stack, case):

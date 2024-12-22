@@ -315,7 +315,7 @@ class Group(System):
             Assumed shape of any connected source or higher level promoted input.
         """
         meta = {'prom': name, 'auto': False}
-        if val is _UNDEFINED:
+        if val == _UNDEFINED:
             src_shape = shape2tuple(src_shape)
         else:
             if src_shape is not None:
@@ -1886,7 +1886,7 @@ class Group(System):
                     if submeta['auto']:
                         continue
                     if key in submeta:
-                        if fullmeta[key] is _UNDEFINED:
+                        if fullmeta[key] == _UNDEFINED:
                             origin = submeta['path']
                             origin_prom = submeta['prom']
                             val = fullmeta[key] = submeta[key]

@@ -96,16 +96,16 @@ class ImplicitComponent(Component):
         """
         self._has_guess = overrides_method('guess_nonlinear', self, ImplicitComponent)
 
-        if self._has_linearize is _UNDEFINED:
+        if self._has_linearize == _UNDEFINED:
             self._has_linearize = overrides_method('linearize', self, ImplicitComponent)
 
-        if self._has_solve_nl is _UNDEFINED:
+        if self._has_solve_nl == _UNDEFINED:
             self._has_solve_nl = overrides_method('solve_nonlinear', self, ImplicitComponent)
 
-        if self._has_solve_linear is _UNDEFINED:
+        if self._has_solve_linear == _UNDEFINED:
             self._has_solve_linear = overrides_method('solve_linear', self, ImplicitComponent)
 
-        if self.matrix_free is _UNDEFINED:
+        if self.matrix_free == _UNDEFINED:
             self.matrix_free = overrides_method('apply_linear', self, ImplicitComponent)
 
     def _apply_nonlinear(self):

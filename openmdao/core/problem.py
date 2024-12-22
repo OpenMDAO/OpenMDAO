@@ -554,7 +554,7 @@ class Problem(object, metaclass=ProblemMetaclass):
             val = self.model.get_val(name, units=units, indices=indices, get_remote=get_remote,
                                      from_src=True)
 
-        if val is _UNDEFINED:
+        if val == _UNDEFINED:
             if get_remote:
                 raise KeyError(f'{self.msginfo}: Variable name "{name}" not found.')
             else:

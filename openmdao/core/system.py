@@ -1025,9 +1025,9 @@ class System(object, metaclass=SystemMetaclass):
         #   method and what were the existing bounds
         if are_new_bounds:
             # wipe out all the bounds and only use what is set by the arguments to this call
-            if lower is _UNDEFINED:
+            if lower == _UNDEFINED:
                 lower = None
-            if upper is _UNDEFINED:
+            if upper == _UNDEFINED:
                 upper = None
         else:
             lower = existing_dv_meta['lower']
@@ -1043,13 +1043,13 @@ class System(object, metaclass=SystemMetaclass):
 
         # Now figure out scaling
         if are_new_scaling:
-            if scaler is _UNDEFINED:
+            if scaler == _UNDEFINED:
                 scaler = None
-            if adder is _UNDEFINED:
+            if adder == _UNDEFINED:
                 adder = None
-            if ref is _UNDEFINED:
+            if ref == _UNDEFINED:
                 ref = None
-            if ref0 is _UNDEFINED:
+            if ref0 == _UNDEFINED:
                 ref0 = None
         else:
             scaler = existing_dv_meta['scaler']
@@ -1193,11 +1193,11 @@ class System(object, metaclass=SystemMetaclass):
         #   method and what were the existing bounds
         if are_new_bounds:
             # wipe the slate clean and only use what is set by the arguments to this call
-            if equals is _UNDEFINED:
+            if equals == _UNDEFINED:
                 equals = None
-            if lower is _UNDEFINED:
+            if lower == _UNDEFINED:
                 lower = None
-            if upper is _UNDEFINED:
+            if upper == _UNDEFINED:
                 upper = None
         else:
             equals = existing_cons_meta['equals']
@@ -1216,13 +1216,13 @@ class System(object, metaclass=SystemMetaclass):
 
         # Now figure out scaling
         if are_new_scaling:
-            if scaler is _UNDEFINED:
+            if scaler == _UNDEFINED:
                 scaler = None
-            if adder is _UNDEFINED:
+            if adder == _UNDEFINED:
                 adder = None
-            if ref is _UNDEFINED:
+            if ref == _UNDEFINED:
                 ref = None
-            if ref0 is _UNDEFINED:
+            if ref0 == _UNDEFINED:
                 ref0 = None
         else:
             scaler = existing_cons_meta['scaler']
@@ -1340,7 +1340,7 @@ class System(object, metaclass=SystemMetaclass):
             name = alias
 
         # At least one of the scaling parameters must be set or function does nothing
-        if scaler is _UNDEFINED and adder is _UNDEFINED and ref is _UNDEFINED and ref0 == \
+        if scaler == _UNDEFINED and adder == _UNDEFINED and ref == _UNDEFINED and ref0 == \
                 _UNDEFINED:
             raise RuntimeError(
                 'Must set a value for at least one argument in call to set_objective_options.')
@@ -1360,13 +1360,13 @@ class System(object, metaclass=SystemMetaclass):
 
         # Since one or more of these are being set by the incoming arguments, the
         #   ones that are not being set should be set to None since they will be re-computed below
-        if scaler is _UNDEFINED:
+        if scaler == _UNDEFINED:
             scaler = None
-        if adder is _UNDEFINED:
+        if adder == _UNDEFINED:
             adder = None
-        if ref is _UNDEFINED:
+        if ref == _UNDEFINED:
             ref = None
-        if ref0 is _UNDEFINED:
+        if ref0 == _UNDEFINED:
             ref0 = None
 
         # Convert ref/ref0 to ndarray/float as necessary
@@ -5326,7 +5326,7 @@ class System(object, metaclass=SystemMetaclass):
                 # TODO: could cache these offsets
                 offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
                 offsets[1:] = np.cumsum(sizes[:-1])
-                if val is _UNDEFINED:
+                if val == _UNDEFINED:
                     loc_val = np.zeros(sizes[myrank])
                 else:
                     loc_val = np.ascontiguousarray(val)

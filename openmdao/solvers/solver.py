@@ -1231,7 +1231,7 @@ class BlockLinearSolver(LinearSolver):
         """
         if sys_vars is None or slv_vars is None:
             return None
-        if slv_vars is _UNDEFINED or not slv_vars:
+        if slv_vars == _UNDEFINED or not slv_vars:
             return sys_vars
         if not sys_vars:
             return slv_vars
@@ -1306,12 +1306,12 @@ class BlockLinearSolver(LinearSolver):
         scope_in : set, None, or _UNDEFINED
             Inputs relevant to possible lower level calls to _apply_linear on Components.
         """
-        if scope_out is _UNDEFINED or scope_out is None:
+        if scope_out == _UNDEFINED or scope_out is None:
             self._scope_out = scope_out
         else:
             self._scope_out = scope_out.intersection(self._system()._var_abs2meta['output'])
 
-        if scope_in is _UNDEFINED or scope_in is None:
+        if scope_in == _UNDEFINED or scope_in is None:
             self._scope_in = scope_in
         else:
             self._scope_in = scope_in.intersection(self._system()._var_abs2meta['input'])
