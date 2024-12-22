@@ -2068,6 +2068,9 @@ class Component(System):
             containing the max relative error, and header is the formatted table header.  'worst'
             is not None only if compact_print is True.
         """
+        if out_stream == _DEFAULT_OUT_STREAM:
+            out_stream = sys.stdout
+
         self._check_fds_differ(method, step, form, step_calc, minimum_step)
 
         # Make sure we're in a valid state
