@@ -1086,7 +1086,7 @@ def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shap
 
 def is_undefined(obj):
     """
-    Returns True if the object is _UNDEFINED.
+    Return True if the object is _UNDEFINED.
 
     This function should be used instead of `{obj} is _UNDEFINED`, which
     is not reliable across processes. The use of `{obj} == _UNDEFINED` will

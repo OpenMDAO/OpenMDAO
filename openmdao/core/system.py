@@ -1340,8 +1340,11 @@ class System(object, metaclass=SystemMetaclass):
             name = alias
 
         # At least one of the scaling parameters must be set or function does nothing
-        if (is_undefined(scaler) and is_undefined(adder)
-            and is_undefined(ref) and is_undefined(ref0)
+        if (
+            is_undefined(scaler)
+            and is_undefined(adder)
+            and is_undefined(ref)
+            and is_undefined(ref0)
         ):
             raise RuntimeError(
                 'Must set a value for at least one argument '
