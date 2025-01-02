@@ -18,7 +18,7 @@ from openmdao.test_suite.components.array_comp import ArrayComp
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_no_warning, \
      assert_check_partials, assert_check_totals
 from openmdao.utils.om_warnings import DerivativesWarning, OMInvalidCheckDerivativesOptionsWarning
-from openmdao.utils.testing_utils import set_env_vars_context
+from openmdao.utils.testing_utils import set_env_vars_context, compare_prob_vs_comp_check_partials
 from openmdao.utils.array_utils import safe_norm
 
 from openmdao.utils.mpi import MPI
@@ -410,7 +410,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         indep.add_output('T', val=100., units='degK')
         indep.add_output('P', val=1., units='bar')
 
-        units = model.add_subsystem('units', UnitCompBase(), promotes=['*'])
+        unitscomp = model.add_subsystem('units', UnitCompBase(), promotes=['*'])
 
         model.nonlinear_solver = om.NonlinearRunOnce()
 
@@ -422,7 +422,11 @@ class TestProblemCheckPartials(unittest.TestCase):
         # The count is 5 because in check_partials, there are two calls to apply_nonlinear
         # when compute the fwd and rev analytic derivatives, then one call to apply_nonlinear
         # to compute the reference point for FD, then two additional calls for the two inputs.
-        self.assertEqual(units.run_count, 5)
+        self.assertEqual(unitscomp.run_count, 5)
+
+        compdata, _ = unitscomp.check_partials(out_stream=None)
+
+        compare_prob_vs_comp_check_partials(data, compdata, unitscomp)
 
     def test_scalar_val(self):
         class PassThrough(om.ExplicitComponent):
@@ -469,8 +473,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         indeps.add_output('foo', val=np.ones(4))
         indeps.add_output('foo2', val=np.ones(4))
 
-        p.model.add_subsystem('pt', PassThrough("foo", "bar", val=np.ones(4)), promotes=['*'])
-        p.model.add_subsystem('pt2', PassThrough("foo2", "bar2", val=np.ones(4)), promotes=['*'])
+        pt = p.model.add_subsystem('pt', PassThrough("foo", "bar", val=np.ones(4)), promotes=['*'])
+        pt2 = p.model.add_subsystem('pt2', PassThrough("foo2", "bar2", val=np.ones(4)), promotes=['*'])
 
         p.set_solver_print(level=0)
 
@@ -479,6 +483,11 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         data = p.check_partials(out_stream=None)
         assert_check_partials(data)
+
+        compdata, _ = pt.check_partials(out_stream=None)
+        compare_prob_vs_comp_check_partials(data, compdata, pt)
+        compdata, _ = pt2.check_partials(out_stream=None)
+        compare_prob_vs_comp_check_partials(data, compdata, pt2)
 
     def test_matrix_free_explicit(self):
         prob = om.Problem()
@@ -764,12 +773,15 @@ class TestProblemCheckPartials(unittest.TestCase):
         data = prob.check_partials(out_stream=None, compact_print=True)
         assert_check_partials(data)
 
+        compdata, _ = comp.check_partials(out_stream=None, compact_print=True)
+        assert_check_partials(compdata)
+
     def test_set_method_global(self):
         prob = om.Problem()
 
         prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
         prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
-        prob.model.add_subsystem('comp', ParaboloidTricky())
+        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
 
         prob.model.connect('p1.x', 'comp.x')
         prob.model.connect('p2.y', 'comp.y')
@@ -781,6 +793,9 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         data = prob.check_partials(out_stream=None, method='cs')
         assert_check_partials(data)
+
+        compdata, _ = comp.check_partials(out_stream=None, method='cs')
+        assert_check_partials(compdata)
 
     def test_set_form_on_comp(self):
         prob = om.Problem()

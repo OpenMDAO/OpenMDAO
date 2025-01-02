@@ -2010,7 +2010,8 @@ class Component(System):
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM,
                        compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
                        method='fd', step=None, form='forward', step_calc='abs',
-                       minimum_step=1e-12, force_dense=True, show_only_incorrect=False):
+                       minimum_step=1e-12, force_dense=True, show_only_incorrect=False,
+                       show_worst=True):
         """
         Check partial derivatives comprehensively for all components in your model.
 
@@ -2049,21 +2050,25 @@ class Component(System):
             If True, analytic derivatives will be coerced into arrays. Default is True.
         show_only_incorrect : bool, optional
             Set to True if output should print only the subjacs found to be incorrect.
+        show_worst : bool, optional
+            Set to False to suppress the display of the worst subjac.
 
         Returns
         -------
-        dict of dicts
-            Top keys are 'partials' and 'worst'.  Under 'partials', the subkeys are the (of, wrt)
-            keys of the subjacs.
-            Within the (of, wrt) entries are the following keys: 'rel error', 'abs error',
-            'magnitude', 'J_fd', 'J_fwd', 'J_rev', and 'rank_inconsistent'.
-            For 'rel error', 'abs error', and 'magnitude' the value is a tuple containing norms for
-            forward - fd, adjoint - fd, forward - adjoint.
+        tuple of the form (derivs_dict, worst)
+            Where derivs_dict is a dict, where the top key is the component pathname.
+            Under the top key, the subkeys are the (of, wrt) keys of the subjacs.
+            Within the (of, wrt) entries are the following keys:
+            'rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev', and
+            'rank_inconsistent'.
+            For 'rel error', 'abs error', and 'magnitude' the value is a tuple containing norms
+            for forward - fd, adjoint - fd, forward - adjoint.
             For 'J_fd', 'J_fwd', 'J_rev' the value is a numpy array representing the computed
             Jacobian for the three different methods of computation.
             The boolean 'rank_inconsistent' indicates if the derivative wrt a serial variable is
             inconsistent across MPI ranks.
-            Under the 'worst' key is either None or tuple of the form (error, table_row, header)
+
+            worst is either None or a tuple of the form (error, table_row, header)
             where error is the max relative error found, table_row is the formatted table row
             containing the max relative error, and header is the formatted table header.  'worst'
             is not None only if compact_print is True.
@@ -2242,7 +2247,7 @@ class Component(System):
                             # Missing derivatives are assumed 0.
                             in_size = 1 if directional else wrt_meta['size']
                             out_size = self._var_abs2meta['output'][of]['size']
-                            deriv_value = np.zeros((out_size, in_size))
+                            deriv_value = None  # np.zeros((out_size, in_size))
                             copy = False
 
                         # If not compact printing, testing for pairs that are not dependent so
@@ -2292,7 +2297,8 @@ class Component(System):
                         if copy:
                             deriv_value = deriv_value.copy()
 
-                        partials_data[rel_key][jac_key] = deriv_value
+                        if deriv_value is not None:
+                            partials_data[rel_key][jac_key] = deriv_value
 
             self._inputs.set_val(input_cache)
             self._outputs.set_val(output_cache)
@@ -2403,12 +2409,13 @@ class Component(System):
             if compact_print:
                 worst = self._deriv_display_compact(err_iter, partials_data, out_stream,
                                                     totals=False,
-                                                    show_only_incorrect=show_only_incorrect)
+                                                    show_only_incorrect=show_only_incorrect,
+                                                    show_worst=show_worst)
             else:
                 self._deriv_display(err_iter, partials_data, rel_err_tol, abs_err_tol, out_stream,
                                     all_fd_options, False, show_only_incorrect)
 
-        data = {'partials': partials_data, 'worst': worst}
+        data = {self.pathname: partials_data}, worst
 
         return data
 

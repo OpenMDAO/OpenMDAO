@@ -213,6 +213,11 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6, max_display_shape=(20, 20)
                 J_fds = [J_fds]
                 dir_fd_fwds = [dir_fd_fwds]
                 dir_fd_revs = [dir_fd_revs]
+            else:
+                if dir_fd_fwds is None:
+                    dir_fd_fwds = [dir_fd_fwds]
+                if dir_fd_revs is None:
+                    dir_fd_revs = [dir_fd_revs]
 
             dirstr = ' directional' if directional else ''
             jacs = [(f'J_fwd{dirstr}', J_fwd, f'Forward{dirstr}'),

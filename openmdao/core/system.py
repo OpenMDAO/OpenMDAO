@@ -7035,7 +7035,7 @@ class System(object, metaclass=SystemMetaclass):
             out_stream.write(sys_buffer.getvalue())
 
     def _deriv_display_compact(self, err_iter, derivatives, out_stream, totals=False,
-                               show_only_incorrect=False):
+                               show_only_incorrect=False, show_worst=False):
         """
         Compute relative and absolute errors in the given derivatives and print to out_stream.
 
@@ -7055,6 +7055,8 @@ class System(object, metaclass=SystemMetaclass):
             True if derivatives are totals.
         show_only_incorrect : bool, optional
             Set to True if output should print only the subjacs found to be incorrect.
+        show_worst : bool
+            Set to True to show the worst subjac.
         """
         if out_stream is None:
             return
@@ -7200,6 +7202,10 @@ class System(object, metaclass=SystemMetaclass):
                                 'error desc'])
 
             _print_deriv_table(table_data, headers, sys_buffer)
+
+            if show_worst and worst_subjac is not None:
+                print(f"\nWorst Sub-Jacobian (rel. error): {worst_subjac[0]}\n", file=sys_buffer)
+                _print_deriv_table([worst_subjac[1]], headers, sys_buffer)
 
         if not show_only_incorrect or num_bad_jacs > 0:
             out_stream.write(sys_buffer.getvalue())

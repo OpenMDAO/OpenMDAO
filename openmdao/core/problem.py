@@ -1258,21 +1258,24 @@ class Problem(object, metaclass=ProblemMetaclass):
             if not match_includes_excludes(comp.pathname, includes, excludes):
                 continue
 
-            data = comp.check_partials(out_stream=out_stream, compact_print=compact_print,
-                                       abs_err_tol=abs_err_tol, rel_err_tol=rel_err_tol,
-                                       method=method, step=step, form=form, step_calc=step_calc,
-                                       minimum_step=minimum_step, force_dense=force_dense,
-                                       show_only_incorrect=show_only_incorrect)
+            partials, wrst = comp.check_partials(out_stream=out_stream,
+                                                 compact_print=compact_print,
+                                                 abs_err_tol=abs_err_tol, rel_err_tol=rel_err_tol,
+                                                 method=method, step=step, form=form,
+                                                 step_calc=step_calc,
+                                                 minimum_step=minimum_step,
+                                                 force_dense=force_dense,
+                                                 show_only_incorrect=show_only_incorrect,
+                                                 show_worst=False)
 
-            partials = data['partials']
-            partials_data[comp.pathname] = partials
+            partials_data.update(partials)
 
-            if data['worst'] is not None:
-                if worst is None or data['worst'][0] > worst[0]:
-                    worst = data['worst'] + (type(comp).__name__, comp.pathname)
+            if wrst is not None:
+                if worst is None or wrst[0] > worst[0]:
+                    worst = wrst + (type(comp).__name__, comp.pathname)
 
         if worst is not None:
-            err, table_data, headers, ctype, cpath = worst
+            _, table_data, headers, ctype, cpath = worst
             print(file=out_stream)
             print(add_border(f"Sub Jacobian with Largest Relative Error: {ctype} '{cpath}'", '#'),
                   file=out_stream)
@@ -1569,8 +1572,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         if out_stream is not None:
             if compact_print:
                 model._deriv_display_compact(err_iter, data[''], out_stream,
-                                             totals=True,
-                                             show_only_incorrect=show_only_incorrect)
+                                             totals=True, show_only_incorrect=show_only_incorrect)
             else:
                 model._deriv_display(err_iter, data[''], rel_err_tol, abs_err_tol, out_stream,
                                      fd_args, totals=True, lcons=lcons,
