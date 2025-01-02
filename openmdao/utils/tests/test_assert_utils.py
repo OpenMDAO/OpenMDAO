@@ -57,7 +57,7 @@ class TestAssertUtils(unittest.TestCase):
         prob.run_model()
 
         data = prob.check_partials(out_stream=None)
-        
+
         expected = """
 ==============================================================
 assert_check_partials failed for the following Components
@@ -246,7 +246,7 @@ J_fd:
         prob.run_model()
 
         data = prob.check_partials(out_stream=None)
-        
+
         expected = """
 ==============================================================
 assert_check_partials failed for the following Components
@@ -263,7 +263,7 @@ J_fwd:
 [[nan]]
 J_fd:
 [[3.]]""".strip()
-        
+
 
         try:
             assert_check_partials(data, atol=1.e-6, rtol=1.e-6)
