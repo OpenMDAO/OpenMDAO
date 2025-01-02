@@ -7,6 +7,7 @@ import warnings
 import unittest
 from contextlib import contextmanager
 from functools import wraps
+from itertools import chain
 
 import numpy as np
 
@@ -18,7 +19,7 @@ except ImportError:
 from openmdao.core.component import Component
 from openmdao.core.group import Group
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.utils.general_utils import add_border
+from openmdao.utils.general_utils import add_border, get_max_widths, strs2row_iter
 from openmdao.utils.om_warnings import reset_warning_registry, issue_warning
 from openmdao.utils.mpi import MPI
 from openmdao.utils.testing_utils import snum_equal
@@ -162,7 +163,33 @@ def _filter_np_err(msg):
     return '\n'.join(lines)
 
 
-def assert_check_partials(data, atol=1e-6, rtol=1e-6, max_display_shape=(20, 20)):
+def _parse_assert_allclose_error(msg):
+    """
+    Parse the error message from an assert_allclose failure.
+
+    Parameters
+    ----------
+    msg : str
+        The error message.
+
+    Returns
+    -------
+    (float, float)
+        The max absolute error and the max relative error.
+    """
+    for line in msg.split('\n'):
+        line = line.strip()
+        if not line.startswith('Max'):
+            continue
+        parts = line.split()
+        if parts[1] == 'absolute':
+            abs_err = float(parts[3])
+        elif parts[1] == 'relative':
+            rel_err = float(parts[3])
+    return abs_err, rel_err
+
+
+def assert_check_partials(data, atol=1e-6, rtol=1e-6, verbose=False, max_display_shape=(20, 20)):
     """
     Raise assertion if any entry from the return from check_partials is above a tolerance.
 
@@ -186,9 +213,11 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6, max_display_shape=(20, 20)
         Absolute error. Default is 1e-6.
     rtol : float
         Relative error. Default is 1e-6.
+    verbose : bool
+        When True, display more jacobian information.
     max_display_shape : tuple of int
         Maximum shape of the jacobians to display directly in the error message.
-        Default is (20, 20).
+        Default is (20, 20).  Only active if verbose is True.
     """
     error_strings = []
 
@@ -241,9 +270,11 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6, max_display_shape=(20, 20)
                 else:
                     stepstr = ""
 
+                analytic_found = False
                 for Jname, J, direction in jacs:
                     fwd = direction.startswith('Forward')
                     if J is not None:
+                        analytic_found = True
                         try:
                             if fwd and dfwd is not None:
                                 dJfwd, dJfd = dfwd
@@ -257,37 +288,72 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6, max_display_shape=(20, 20)
                                 np.testing.assert_allclose(J, J_fd, atol=atol, rtol=rtol,
                                                            verbose=False, equal_nan=False)
                         except Exception as err:
-                            bad_derivs.append(f"\n{direction} derivatives of '{key[0]}' w.r.t "
-                                              f"'{key[1]}' do not match finite "
-                                              f"difference{stepstr}.\n")
-                            bad_derivs[-1] += _filter_np_err(err.args[0])
+                            if verbose:
+                                bad_derivs.append(f"\n{direction} derivatives of '{key[0]}' wrt "
+                                                  f"'{key[1]}' do not match finite "
+                                                  f"difference{stepstr}.\n")
+                                bad_derivs[-1] += _filter_np_err(err.args[0])
+                                if nrows <= maxrows and ncols <= maxcols:
+                                    with np.printoptions(linewidth=10000):
+                                        bad_derivs[-1] += f'\nJ_fd - {Jname}:\n' + \
+                                            np.array2string(J_fd - J)
+                            else:
+                                abserr, relerr = _parse_assert_allclose_error(err.args[0])
+                                bad_derivs.append([f"{key[0]} wrt {key[1]}", "abs",
+                                                   f"fd-{Jname[2:]}", f"{abserr}"])
+                                bad_derivs.append([f"{key[0]} wrt {key[1]}", "rel",
+                                                   f"fd-{Jname[2:]}", f"{relerr}"])
+
+                if not analytic_found:
+                    # check if J_fd is all zeros.  If not, then we have a problem.
+                    if np.linalg.norm(J_fd) > 1e-15:
+                        if verbose:
+                            bad_derivs.append(f"\nAnalytic deriv for '{key[0]}' wrt '{key[1]}' "
+                                              f"is assumed zero, but finite difference{stepstr} "
+                                              "is nonzero.\n")
                             if nrows <= maxrows and ncols <= maxcols:
                                 with np.printoptions(linewidth=10000):
-                                    bad_derivs[-1] += f'\n{Jname}:\n' + np.array2string(J)
-                                    bad_derivs[-1] += '\nJ_fd:\n' + np.array2string(J_fd)
+                                    bad_derivs[-1] += '\nJ_fd - J_analytic:\n' + \
+                                        np.array2string(J_fd)
+                        else:
+                            abserr = np.max(np.abs(J_fd))
+                            bad_derivs.append([f"{key[0]} wrt {key[1]}", "abs", "fd-fwd",
+                                               f"{abserr}"])
 
-        if pair_data.get('matrix_free') is not None and J_fwd is not None and J_rev is not None:
-            try:
-                if dir_fwd_rev is not None:
-                    dJfwd, dJrev = dir_fwd_rev
-                    np.testing.assert_allclose(dJfwd, dJrev, atol=atol, rtol=rtol,
-                                               verbose=False, equal_nan=False)
-                else:
-                    np.testing.assert_allclose(J_fwd, J_rev, atol=atol, rtol=rtol,
-                                               verbose=False, equal_nan=False)
-            except Exception as err:
-                bad_derivs.append(f"\nForward and Reverse derivatives of '{key[0]}' w.r.t "
-                                  f"'{key[1]}' do not match.\n")
-                bad_derivs[-1] += _filter_np_err(err.args[0])
-                if nrows <= maxrows and ncols <= maxcols:
-                    with np.printoptions(linewidth=10000):
-                        bad_derivs[-1] += '\nJ_fwd:\n' + np.array2string(J_fwd)
-                        bad_derivs[-1] += '\nJ_rev:\n' + np.array2string(J_rev)
+            if pair_data.get('matrix_free') is not None and J_fwd is not None and J_rev is not None:
+                try:
+                    if dir_fwd_rev is not None:
+                        dJfwd, dJrev = dir_fwd_rev
+                        np.testing.assert_allclose(dJfwd, dJrev, atol=atol, rtol=rtol,
+                                                   verbose=False, equal_nan=False)
+                    else:
+                        np.testing.assert_allclose(J_fwd, J_rev, atol=atol, rtol=rtol,
+                                                   verbose=False, equal_nan=False)
+                except Exception as err:
+                    if verbose:
+                        bad_derivs.append(f"\nForward and Reverse derivatives of '{key[0]}' wrt "
+                                          f"'{key[1]}' do not match.\n")
+                        bad_derivs[-1] += _filter_np_err(err.args[0])
+                        if nrows <= maxrows and ncols <= maxcols:
+                            with np.printoptions(linewidth=10000):
+                                bad_derivs[-1] += '\nJ_fwd - J_rev:\n' + \
+                                    np.array2string(J_fwd - J_rev)
+                    else:
+                        abserr, relerr = _parse_assert_allclose_error(err.args[0])
+                        bad_derivs.append([f"{key[0]} wrt {key[1]}", "abs", "fwd-rev", f"{abserr}"])
+                        bad_derivs.append([f"{key[0]} wrt {key[1]}", "rel", "fwd-rev", f"{relerr}"])
 
         if bad_derivs or inconsistent_derivs:
-            error_strings.append(add_border(f'Component: {comp}', '-'))
+            error_strings.extend(['', add_border(f'Component: {comp}', '-')])
             if bad_derivs:
-                error_strings[-1] += '\n'.join(bad_derivs)
+                if verbose:
+                    error_strings[-1] += '\n'.join(bad_derivs)
+                else:
+                    header = ['< output > wrt < variable >', 'max abs/rel', 'diff', 'value']
+                    widths = get_max_widths(chain([header], bad_derivs))
+                    header_str = list(strs2row_iter([header], widths, delim=' | '))[0]
+                    error_strings.append(add_border(header_str, '-', above=False))
+                    error_strings.extend(strs2row_iter(bad_derivs, widths, delim=' | '))
 
             if inconsistent_derivs:
                 error_strings[-1] += (
@@ -361,8 +427,7 @@ def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6, max_display_shape=(20
                     fails[-1] += _filter_np_err(err.args[0])
                     if nrows <= maxrows and ncols <= maxcols:
                         with np.printoptions(linewidth=10000):
-                            fails[-1] += f'\n{Jname}:\n' + np.array2string(J)
-                            fails[-1] += '\nJ_fd:\n' + np.array2string(J_fd)
+                            fails[-1] += f'\n{Jname} - J_fd:\n' + np.array2string(J - J_fd)
 
     if incon_keys:
         ders = [f"{sof} wrt {swrt}" for sof, swrt in sorted(incon_keys)]

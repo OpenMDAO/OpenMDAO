@@ -63,30 +63,27 @@ class TestAssertUtils(unittest.TestCase):
 assert_check_partials failed for the following Components
 with absolute tolerance = 1e-06 and relative tolerance = 1e-06
 ==============================================================
+
 ---------------
 Component: comp
 ---------------
-Forward derivatives of 'y' w.r.t 'x1' do not match finite difference.
+Forward derivatives of 'y' wrt 'x1' do not match finite difference.
 Mismatched elements: 1 / 1 (100%)
 Max absolute difference: 1.
 Max relative difference: 0.33333333
-J_fwd:
-[[4.]]
-J_fd:
-[[3.]]
+J_fd - J_fwd:
+[[-1.]]
 
-Forward derivatives of 'y' w.r.t 'x2' do not match finite difference.
+Forward derivatives of 'y' wrt 'x2' do not match finite difference.
 Mismatched elements: 1 / 1 (100%)
 Max absolute difference: 36.
 Max relative difference: 9.
-J_fwd:
-[[40.]]
-J_fd:
-[[4.]]
+J_fd - J_fwd:
+[[-36.]]
 """.strip()
 
         try:
-            assert_check_partials(data, atol=1.e-6, rtol=1.e-6)
+            assert_check_partials(data, atol=1.e-6, rtol=1.e-6, verbose=True)
         except Exception as err:
             if not snum_equal(err.args[0].strip(), expected):
                 # just show normal string diff
@@ -252,21 +249,21 @@ J_fd:
 assert_check_partials failed for the following Components
 with absolute tolerance = 1e-06 and relative tolerance = 1e-06
 ==============================================================
+
 ---------------
 Component: comp
 ---------------
-Forward derivatives of 'y' w.r.t 'x' do not match finite difference.
+Forward derivatives of 'y' wrt 'x' do not match finite difference.
 Mismatched elements: 1 / 1 (100%)
 Max absolute difference: nan
 Max relative difference: nan
-J_fwd:
+J_fd - J_fwd:
 [[nan]]
-J_fd:
-[[3.]]""".strip()
+""".strip()
 
 
         try:
-            assert_check_partials(data, atol=1.e-6, rtol=1.e-6)
+            assert_check_partials(data, atol=1.e-6, rtol=1.e-6, verbose=True)
         except ValueError as err:
             if not snum_equal(err.args[0].strip(), expected):
                 self.assertEqual(err.args[0].strip(), expected)
