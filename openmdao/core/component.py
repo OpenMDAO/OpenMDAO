@@ -2247,7 +2247,7 @@ class Component(System):
                             # Missing derivatives are assumed 0.
                             in_size = 1 if directional else wrt_meta['size']
                             out_size = self._var_abs2meta['output'][of]['size']
-                            deriv_value = None  # np.zeros((out_size, in_size))
+                            deriv_value = None
                             copy = False
 
                         # If not compact printing, testing for pairs that are not dependent so
@@ -2415,6 +2415,8 @@ class Component(System):
                 self._deriv_display(err_iter, partials_data, rel_err_tol, abs_err_tol, out_stream,
                                     all_fd_options, False, show_only_incorrect)
 
+        # add pathname to the partials dict to make it compatible with the return value
+        # from Problem.check_partials and passable to assert_check_partials.
         data = {self.pathname: partials_data}, worst
 
         return data
