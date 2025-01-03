@@ -1272,10 +1272,14 @@ class Problem(object, metaclass=ProblemMetaclass):
                                                  show_worst=False)
 
             if out_stream is not None:
-                if show_only_incorrect and partials[comp.pathname] and incorrect_msg:
-                    print(incorrect_msg, file=out_stream)
-                    incorrect_msg = ''
-                print(comp_stream.getvalue(), file=out_stream, end='')
+                comp_content = comp_stream.getvalue()
+                if comp_content:
+                    if show_only_incorrect:
+                        if incorrect_msg:
+                            print(incorrect_msg, file=out_stream, end='')
+                            incorrect_msg = ''
+
+                    print(comp_content, file=out_stream)
 
             partials_data.update(partials)
 

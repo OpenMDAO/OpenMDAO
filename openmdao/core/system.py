@@ -7233,12 +7233,13 @@ def _print_deriv_table(table_data, headers, out_stream):
     out_stream : file-like object
         Where to send human readable output.
     """
-    num_col_meta = {'format': '{: 1.4e}'}
-    column_meta = [{}, {}]
-    column_meta.extend([num_col_meta.copy() for _ in range(len(headers) - 3)])
-    column_meta.append({})
-    print(generate_table(table_data, headers=headers, tablefmt='grid',
-                         column_meta=column_meta, missing_val='n/a'), file=out_stream)
+    if table_data:
+        num_col_meta = {'format': '{: 1.4e}'}
+        column_meta = [{}, {}]
+        column_meta.extend([num_col_meta.copy() for _ in range(len(headers) - 3)])
+        column_meta.append({})
+        print(generate_table(table_data, headers=headers, tablefmt='grid',
+                             column_meta=column_meta, missing_val='n/a'), file=out_stream)
 
 
 def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):

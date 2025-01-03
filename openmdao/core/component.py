@@ -2417,9 +2417,7 @@ class Component(System):
 
         # add pathname to the partials dict to make it compatible with the return value
         # from Problem.check_partials and passable to assert_check_partials.
-        data = {self.pathname: partials_data}, worst
-
-        return data
+        return {self.pathname: partials_data}, worst
 
 
 class _DictValues(object):
