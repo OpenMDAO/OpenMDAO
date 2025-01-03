@@ -15,7 +15,7 @@ import atexit
 
 from itertools import chain
 
-from io import TextIOBase
+from io import TextIOBase, StringIO
 
 import numpy as np
 
@@ -1241,6 +1241,7 @@ class Problem(object, metaclass=ProblemMetaclass):
             out_stream = sys.stdout
 
         worst = None
+        incorrect_msg = "\n** The following partial Jacobians are incorrect **\n"
 
         for comp in model.system_iter(typ=Component, include_self=True):
             if comp._no_check_partials and not force_check_partials:
@@ -1258,7 +1259,9 @@ class Problem(object, metaclass=ProblemMetaclass):
             if not match_includes_excludes(comp.pathname, includes, excludes):
                 continue
 
-            partials, wrst = comp.check_partials(out_stream=out_stream,
+            comp_stream = None if out_stream is None else StringIO()
+
+            partials, wrst = comp.check_partials(out_stream=comp_stream,
                                                  compact_print=compact_print,
                                                  abs_err_tol=abs_err_tol, rel_err_tol=rel_err_tol,
                                                  method=method, step=step, form=form,
@@ -1267,6 +1270,12 @@ class Problem(object, metaclass=ProblemMetaclass):
                                                  force_dense=force_dense,
                                                  show_only_incorrect=show_only_incorrect,
                                                  show_worst=False)
+
+            if out_stream is not None:
+                if show_only_incorrect and partials[comp.pathname] and incorrect_msg:
+                    print(incorrect_msg, file=out_stream)
+                    incorrect_msg = ''
+                print(comp_stream.getvalue(), file=out_stream, end='')
 
             partials_data.update(partials)
 
