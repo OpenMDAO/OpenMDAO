@@ -11,7 +11,8 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.array_utils import shape_to_len
-from openmdao.utils.general_utils import format_as_float_or_array, _subjac_meta2value
+from openmdao.utils.general_utils import format_as_float_or_array, _subjac_meta2value, \
+    is_undefined
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.utils.om_warnings import issue_warning
@@ -96,16 +97,16 @@ class ImplicitComponent(Component):
         """
         self._has_guess = overrides_method('guess_nonlinear', self, ImplicitComponent)
 
-        if self._has_linearize is _UNDEFINED:
+        if is_undefined(self._has_linearize):
             self._has_linearize = overrides_method('linearize', self, ImplicitComponent)
 
-        if self._has_solve_nl is _UNDEFINED:
+        if is_undefined(self._has_solve_nl):
             self._has_solve_nl = overrides_method('solve_nonlinear', self, ImplicitComponent)
 
-        if self._has_solve_linear is _UNDEFINED:
+        if is_undefined(self._has_solve_linear):
             self._has_solve_linear = overrides_method('solve_linear', self, ImplicitComponent)
 
-        if self.matrix_free is _UNDEFINED:
+        if is_undefined(self.matrix_free):
             self.matrix_free = overrides_method('apply_linear', self, ImplicitComponent)
 
     def _apply_nonlinear(self):

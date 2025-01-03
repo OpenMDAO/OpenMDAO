@@ -528,7 +528,7 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         #   happen with f or g first. The order those are evaluated comes from the keys of
         #   dict so no guarantee on the order except for Python 3.6 !
         msg = "'comp' <class MetaModelStructuredComp>: Error interpolating output '[f|g]' because input 'comp.z' was " \
-              "out of bounds \('.*', '.*'\) with value '9.0'"
+              r"out of bounds \('.*', '.*'\) with value '9.0'"
         with self.assertRaisesRegex(om.AnalysisError, msg):
             self.run_and_check_derivs(self.prob)
 

@@ -11,6 +11,7 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE, _UNDEFINED
+from openmdao.utils.general_utils import is_undefined
 from openmdao.utils.jax_utils import jax, jit, ExplicitCompJaxify, \
     compute_partials as _jax_compute_partials, \
     compute_jacvec_product as _jax_compute_jacvec_product, ReturnChecker, _jax_register_pytree_class
@@ -81,7 +82,7 @@ class ExplicitComponent(Component):
         """
         Configure this system to assign children settings and detect if matrix_free.
         """
-        if self.matrix_free is _UNDEFINED:
+        if is_undefined(self.matrix_free):
             self.matrix_free = overrides_method('compute_jacvec_product', self, ExplicitComponent)
 
     def _jac_wrt_iter(self, wrt_matches=None):

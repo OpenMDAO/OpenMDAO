@@ -1163,8 +1163,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        msg = "\nProblem .*: To enable complex step, specify 'force_alloc_complex=True' when calling " + \
-                "setup on the problem, e\.g\. 'problem\.setup\(force_alloc_complex=True\)'"
+        msg = r"\nProblem .*: To enable complex step, specify 'force_alloc_complex=True' when calling " + \
+                r"setup on the problem, e\.g\. 'problem\.setup\(force_alloc_complex=True\)'"
         with self.assertRaisesRegex(RuntimeError, msg):
             prob.check_totals(method='cs')
 

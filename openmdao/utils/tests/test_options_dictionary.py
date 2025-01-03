@@ -276,8 +276,8 @@ test       **Required**  ['a', 'b']         N/A                    Test integer 
         with self.assertRaises(ValueError) as context:
             self.dict['test'] = object()
 
-        expected_msg = ("Value \(<object object at 0x[0-9A-Fa-f]+>\) of option 'test' is not one of \[<object object at 0x[0-9A-Fa-f]+>,"
-                        " <object object at 0x[0-9A-Fa-f]+>\].")
+        expected_msg = (r"Value \(<object object at 0x[0-9A-Fa-f]+>\) of option 'test' is not one of \[<object object at 0x[0-9A-Fa-f]+>,"
+                        r" <object object at 0x[0-9A-Fa-f]+>\].")
         self.assertRegex(str(context.exception), expected_msg)
 
     def test_read_only(self):

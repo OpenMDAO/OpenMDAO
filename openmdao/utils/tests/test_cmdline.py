@@ -56,7 +56,7 @@ counter = 0
 
 def _test_func_name(func, num, param):
     # test name is the command with spaces, colons and backslashes replaced by underscore
-    return func.__name__ + '_' + re.sub('[ \\:\\\]', '_', param.args[0])
+    return func.__name__ + '_' + re.sub(r'[ \:\\]', '_', param.args[0])
 
 cmd_tests = [
     # tuple of (command line, dict of dependencies that might not be installed)

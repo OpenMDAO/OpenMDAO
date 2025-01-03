@@ -14,7 +14,7 @@ from collections.abc import Iterable
 
 import numpy as np
 
-from openmdao.core.constants import INF_BOUND
+from openmdao.core.constants import INF_BOUND, _UNDEFINED
 from openmdao.utils.array_utils import shape_to_len
 
 
@@ -1082,6 +1082,29 @@ def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shap
         return parent_src_inds.shaped_array(flat=True)[my_src_inds.flat()]
     else:
         return parent_src_inds.shaped_array(flat=False).reshape(my_src_shape)[my_src_inds()]
+
+
+def is_undefined(obj):
+    """
+    Return True if the object is _UNDEFINED.
+
+    This function should be used instead of `{obj} is _UNDEFINED`, which
+    is not reliable across processes. The use of `{obj} == _UNDEFINED` will
+    fail if `obj` is an array.
+
+    Parameters
+    ----------
+    obj : any
+        Any python object.
+
+    Returns
+    -------
+    bool
+        True if the obj is not an array, and obj == _UNDEFINED.
+    """
+    if isinstance(obj, Iterable):
+        return False
+    return obj == _UNDEFINED
 
 
 def shape2tuple(shape):
