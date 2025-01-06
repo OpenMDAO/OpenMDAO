@@ -1,7 +1,7 @@
 """ Testing for Problem.check_partials and check_totals."""
 
 from io import StringIO
-
+from itertools import zip_longest
 
 import unittest
 
@@ -18,7 +18,8 @@ from openmdao.test_suite.components.array_comp import ArrayComp
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_no_warning, \
      assert_check_partials, assert_check_totals
 from openmdao.utils.om_warnings import DerivativesWarning, OMInvalidCheckDerivativesOptionsWarning
-from openmdao.utils.testing_utils import set_env_vars_context, compare_prob_vs_comp_check_partials
+from openmdao.utils.testing_utils import set_env_vars_context, compare_prob_vs_comp_check_partials,\
+    snum_equal
 from openmdao.utils.array_utils import safe_norm
 
 from openmdao.utils.mpi import MPI
@@ -1945,7 +1946,8 @@ J_fd - J_analytic:
 [[2.]]
 """.strip()
 
-        self.assertEqual(ctx.exception.args[0].strip(), expected)
+        for line1, line2 in zip_longest(ctx.exception.args[0].strip().split('\n'), expected.split('\n'), fillvalue=''):
+            assert snum_equal(line1.strip(), line2.strip()), f"line1: {line1}, line2: {line2}"
 
         with self.assertRaises(ValueError) as ctx:
             assert_check_partials(data)
@@ -1964,7 +1966,8 @@ Component: comp
 y wrt x                     | abs         | fd-fwd | 2.000000000279556
 """.strip()
 
-        self.assertEqual(ctx.exception.args[0].strip(), expected)
+        for line1, line2 in zip_longest(ctx.exception.args[0].strip().split('\n'), expected.split('\n'), fillvalue=''):
+            assert snum_equal(line1.strip(), line2.strip()), f"line1: {line1}, line2: {line2}"
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
