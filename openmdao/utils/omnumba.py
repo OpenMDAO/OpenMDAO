@@ -4,6 +4,7 @@ Optionally import numba and provide a dummy jit decorator if it is not available
 If numba is not available, this module provides a dummy jit decorator that simply returns the
 original function.
 """
+
 try:
     import numba         # noqa: F401
     from numba import *  # noqa: F403

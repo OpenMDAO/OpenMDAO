@@ -15,7 +15,6 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
 
-
 if MPI:
     try:
         from openmdao.vectors.petsc_vector import PETScVector
@@ -890,8 +889,148 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         prob.setup(mode='rev')
         with self.assertRaises(Exception) as ctx:
             prob.final_setup()
-        self.assertEqual(str(ctx.exception),
+        self.assertEqual(str(ctx.exception.args[0]),
            "Parallel derivative color 'a' has responses ['pg.dc2.y', 'pg.dc2.y2'] with overlapping dependencies on the same rank.")
+
+
+def tim_test_problem(psize):
+    class SumComp(om.ExplicitComponent):
+        def __init__(self, size):
+            super().__init__()
+            self.size = size
+
+        def setup(self):
+            self.add_input('x', val=np.zeros(self.size))
+            self.add_output('y', val=0.0)
+
+            self.declare_partials(of='*', wrt='*')
+
+        def compute(self, inputs, outputs):
+            outputs['y'] = np.sum(inputs['x'])
+
+        def compute_partials(self, inputs, partials):
+            partials['y', 'x'] = np.ones(inputs['x'].size)
+
+    class SlowComp(om.ExplicitComponent):
+        """
+        Component with a delay that multiplies the input by a multiplier.
+        """
+
+        def __init__(self, delay=1.0, size=3, mult=2.0):
+            super().__init__()
+            self.delay = delay
+            self.size = size
+            self.mult = mult
+
+        def setup(self):
+            self.add_input('x', val=0.0)
+            self.add_input('c', val=1.0)
+            self.add_output('y', val=np.zeros(self.size))
+
+            self.declare_partials(of='*', wrt='*')
+
+        def compute(self, inputs, outputs):
+            outputs['y'] = self.mult * inputs['x'] + inputs['c']
+
+        def compute_partials(self, inputs, partials):
+            partials['y', 'x'] = self.mult
+            partials['y', 'c'] = 1.0
+
+        def _apply_linear(self, *args, **kwargs):
+            super()._apply_linear(*args, **kwargs)
+
+    class PartialDependGroup(om.Group):
+        def setup(self):
+            size = psize
+
+            self.add_subsystem('Comp1', SumComp(size))
+            pargroup = self.add_subsystem('ParallelGroup1', om.ParallelGroup())
+
+            self.set_input_defaults('Comp1.x', val=np.arange(size, dtype=float)+1.0)
+
+            self.linear_solver = om.LinearBlockGS()
+            self.linear_solver.options['iprint'] = -1
+            pargroup.linear_solver = om.LinearBlockGS()
+            pargroup.linear_solver.options['iprint'] = -1
+
+            delay = .1
+            pargroup.add_subsystem('Con1', SlowComp(delay=delay, size=2, mult=2.0))
+            pargroup.add_subsystem('Con2', SlowComp(delay=delay, size=2, mult=-3.0))
+            pargroup.add_subsystem('Con3', SlowComp(delay=delay, size=2, mult=np.pi))
+
+            self.connect('Comp1.y', 'ParallelGroup1.Con1.x')
+            self.connect('Comp1.y', 'ParallelGroup1.Con2.x')
+            self.connect('Comp1.y', 'ParallelGroup1.Con3.x')
+
+            color = 'parcon'
+            self.add_design_var('Comp1.x')
+            self.add_design_var('ParallelGroup1.Con1.c')
+            self.add_design_var('ParallelGroup1.Con2.c')
+            self.add_design_var('ParallelGroup1.Con3.c')
+            self.add_constraint('ParallelGroup1.Con1.y', lower=0.0, parallel_deriv_color=color)
+            self.add_constraint('ParallelGroup1.Con2.y', upper=0.0, parallel_deriv_color=color)
+            self.add_constraint('ParallelGroup1.Con3.y', equals=0.0, parallel_deriv_color=color)
+
+    return om.Problem(model=PartialDependGroup())
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class CheckParallel2DerivColoringErrors(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_parallel_deriv_coloring_overlap_err2(self):
+        p = om.Problem()
+        model = p.model
+        model.add_subsystem('C0', om.ExecComp('y = x * .4', shape=3))
+
+        par = model.add_subsystem('par', om.ParallelGroup())
+        par.add_subsystem('C1', om.ExecComp('y = x * 2.0', shape=3))
+        par.add_subsystem('C2', om.ExecComp('y = x * 3.0', shape=3))
+        par.add_subsystem('C3', om.ExecComp('y = x * .5', shape=3))
+        par.add_subsystem('C4', om.ExecComp('y = x * .2', shape=3))
+
+        model.add_subsystem('C5', om.ExecComp('y = x * 4.0', shape=3))
+
+        model.connect('C0.y', ['par.C1.x', 'par.C2.x', 'par.C3.x', 'par.C4.x'])
+        model.connect('par.C3.y', 'C5.x')
+
+        pdc = 'a'
+        model.add_constraint('par.C1.y', lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
+        model.add_constraint('par.C2.y', lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
+        model.add_constraint('par.C3.y', lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
+        model.add_constraint('par.C4.y', lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
+        model.add_design_var('C0.x', lower=-50, upper=50)
+        model.add_objective('C5.y', index=2)
+
+        prob = om.Problem(model=model, name='parallel_deriv_coloring_overlap_err2')
+        prob.setup(mode='rev')
+        with self.assertRaises(Exception) as ctx:
+            prob.run_model()
+        # prob.check_totals(show_only_incorrect=True)
+        self.assertEqual(str(ctx.exception),
+           "Parallel derivative color 'a' has responses ['par.C1.y', 'par.C2.y', 'par.C3.y', 'par.C4.y'] with overlapping dependencies on the same rank.")
+
+    def test_par_deriv_coloring_not_enough_procs_rev(self):
+        p = tim_test_problem(psize=4)
+        p.setup(mode='rev')
+
+        with self.assertRaises(Exception) as ctx:
+            p.run_model()
+        self.assertEqual(str(ctx.exception),
+           "Parallel derivative color 'parcon' has responses ['ParallelGroup1.Con1.y', 'ParallelGroup1.Con3.y'] with overlapping dependencies on the same rank.")
+
+        # assert_check_totals(p.check_totals(show_only_incorrect=True))
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class CheckParallel3DerivColoringErrors(unittest.TestCase):
+    N_PROCS = 3
+
+    def test_par_deriv_coloring_enough_procs_rev(self):
+        p = tim_test_problem(psize=4)
+        p.setup(mode='rev')
+        p.run_model()
+
+        Jdata = p.check_totals(show_only_incorrect=True)
+        assert_check_totals(Jdata)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

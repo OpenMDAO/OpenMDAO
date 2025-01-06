@@ -288,7 +288,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         prob.run_model()
         model.run_linearize(driver=prob.driver)
 
-        Jfd = model._jacobian
+        Jfd = model._jacobian.J_dict
         assert_near_equal(Jfd['comp.y1', 'p1.x1'], comp.JJ[0:2, 0:2], 1e-6)
         assert_near_equal(Jfd['comp.y1', 'p2.x2'], comp.JJ[0:2, 2:4], 1e-6)
         assert_near_equal(Jfd['comp.y2', 'p1.x1'], comp.JJ[2:4, 0:2], 1e-6)
@@ -1092,7 +1092,7 @@ class TestGroupComplexStep(unittest.TestCase):
         prob.run_model()
         model.run_linearize(driver=prob.driver)
 
-        Jfd = model._jacobian
+        Jfd = model._jacobian.J_dict
         assert_near_equal(Jfd['comp.y1', 'p1.x1'], comp.JJ[0:2, 0:2], 1e-6)
         assert_near_equal(Jfd['comp.y1', 'p2.x2'], comp.JJ[0:2, 2:4], 1e-6)
         assert_near_equal(Jfd['comp.y2', 'p1.x1'], comp.JJ[2:4, 0:2], 1e-6)
@@ -2526,6 +2526,7 @@ class ParallelFDParametricTestCase(unittest.TestCase):
             totals = param_instance.compute_totals('rev')
             assert_near_equal(totals, expected_totals, 1e-4)
 
+
 class CheckTotalsParallelGroup(unittest.TestCase):
 
     N_PROCS = 3
@@ -2988,8 +2989,6 @@ class TestFDWithParallelSubGroups(unittest.TestCase):
         prob.setup(mode='fwd', force_alloc_complex=True)
         prob.run_model()
         prob.compute_totals()
-        import pprint
-        pprint.pprint({n: m['val'] for n,m in prob.model.sub._jacobian._subjacs_info.items()})
         assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
 
     def test_2ivcs_fdgroupwithcrisscrosspars_1sink_rev(self):

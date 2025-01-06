@@ -192,6 +192,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_near_equal(total_derivs['comp1.x', 'a'], [[-4.5]])
         assert_near_equal(total_derivs['comp1.x', 'b'], [[-1.5]])
         assert_near_equal(total_derivs['comp1.x', 'c'], [[-0.5]])
+
         assert_near_equal(total_derivs['comp2.x', 'a'], [[-4.5]])
         assert_near_equal(total_derivs['comp2.x', 'b'], [[-1.5]])
         assert_near_equal(total_derivs['comp2.x', 'c'], [[-0.5]])

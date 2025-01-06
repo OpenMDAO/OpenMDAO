@@ -8,6 +8,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.core.driver import Driver
+from openmdao.devtools.debug import config_summary
 from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
 from openmdao.test_suite.components.sellar import StateConnection, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
@@ -380,8 +381,8 @@ class DiscreteTestCase(unittest.TestCase):
             "varname  val    prom_name",
             "-------  -----  ---------",
             "_auto_ivc",
-            "  v0    [10.]  _auto_ivc.v0",
-            "  v1    11     _auto_ivc.v1",
+            "  v0    [10.]  expl.a",
+            "  v1    11     x",
             "expl",
             "  b    [20.]  expl.b",
             "  y    2      expl.y",
@@ -1076,6 +1077,8 @@ class DiscreteFeatureTestCase(unittest.TestCase):
         prob.run_model()
 
         assert_near_equal(prob.get_val('comp.x'), 3., 1e-4)
+
+        config_summary(prob)
 
 
 if __name__ == "__main__":

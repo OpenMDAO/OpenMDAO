@@ -591,6 +591,17 @@ class TestScaling(unittest.TestCase):
             assert_near_equal(val[1, 0], 2.0/17)
             assert_near_equal(val[1, 1], 2.0/19)
 
+    def test_scale_array_with_array_and_slice_connection(self):
+        # this used to raise an AttributeError because it called .shape on an indexer
+        model = om.Group()
+        model.add_subsystem('C1', om.ExecComp('x = z', shape=(3, 3), x={'ref': np.ones((3, 3)) * 2.0}))
+        model.add_subsystem('C2', om.ExecComp('y = x', shape=3))
+        model.connect('C1.x', 'C2.x', src_indices=om.slicer[:, 1])
+
+        prob = om.Problem(model=model)
+        prob.setup()
+        prob.final_setup()
+
     def test_scale_and_add_array_with_array(self):
 
         class ExpCompArrayScale(TestExplCompArrayDense):

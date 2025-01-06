@@ -1044,7 +1044,7 @@ class TestJax(unittest.TestCase):
 
         f = omf.wrap(func).defaults(shape=shape).declare_partials(of='*', wrt='*', method='jax')
         p = om.Problem()
-        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True, use_jit=use_jit))
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, derivs_method='jax', use_jit=use_jit))
         p.setup(mode=mode)
         p.run_model()
         J = p.compute_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'])
@@ -1101,7 +1101,7 @@ class TestJaxMixedShapes1output(unittest.TestCase):
         }
 
         p = om.Problem()
-        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True))
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, derivs_method='jax'))
         p.setup(mode=mode)
 
         for n in ('a', 'b', 'c'):
@@ -1164,7 +1164,7 @@ class TestJaxMixedShapes2outputs(unittest.TestCase):
         }
 
         p = om.Problem()
-        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True))
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, derivs_method='jax'))
         p.setup(mode=mode)
 
         for n in ('a', 'b', 'c'):
@@ -1215,7 +1215,7 @@ class TestJaxNumpy(unittest.TestCase):
 
         f = omf.wrap(func).defaults(shape=shape).declare_partials(of='*', wrt='*', method='jax')
         p = om.Problem()
-        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True, use_jit=use_jit))
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, derivs_method='jax', use_jit=use_jit))
         p.setup(mode=mode)
         p['comp.a'] = 1.0
         p['comp.b'] = 2.0
@@ -1266,7 +1266,7 @@ class TestJax2retvals(unittest.TestCase):
 
         f = omf.wrap(func).defaults(shape=shape).declare_partials(of='*', wrt='*', method='jax')
         p = om.Problem()
-        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True, use_jit=use_jit))
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, derivs_method='jax', use_jit=use_jit))
         p.setup(mode=mode)
         p.run_model()
         J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
@@ -1369,7 +1369,7 @@ class TestJax2retvalsColoring(unittest.TestCase):
                 .declare_coloring(wrt='*', method='jax')
         )
         p = om.Problem()
-        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True, use_jit=use_jit))
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, derivs_method='jax', use_jit=use_jit))
         p.setup(mode=mode)
         p.run_model()
         J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])

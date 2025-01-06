@@ -49,6 +49,8 @@ jobs:
         with:
           python-version: 3.12
           miniforge-version: latest
+          conda-remove-defaults: true
+          channels: conda-forge
 
       - name: Install lxml
         if: matrix.OS == 'windows-latest'
@@ -116,7 +118,8 @@ jobs:
           echo "Scan environment for packages with known vulnerabilities"
           echo "found in the Open Source Vulnerability database"
           echo "======================================================================="
-          python -m pip_audit -s osv
+          echo "Ignoring GHSA-g4r7-86gm-pgqc for now as it has been addressed in code"
+          python -m pip_audit -s osv --ignore-vuln GHSA-g4r7-86gm-pgqc
 
       - name: Notify slack
         uses: act10ns/slack@v2.0.0

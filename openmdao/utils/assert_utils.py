@@ -306,42 +306,60 @@ def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6):
     for key, dct in totals_data.items():
         if 'inconsistent_keys' in dct:
             incon_keys = dct['inconsistent_keys']
-
-        Jname = 'J_fwd' if 'J_fwd' in dct else 'J_rev'
+        J_fd = dct['J_fd']
         try:
-            dct[Jname]
-            dct['J_fd']
-        except Exception as err:
-            raise err.__class__(f"For key {key}: {err}")
-        try:
-            for i in range(3):
-                erel, eabs = dct['rel error'][i], dct['abs error'][i]
-                if erel is not None and not np.isnan(erel):
-                    if erel > rtol:
-                        raise ValueError(f"rel tolerance of {erel} > allowed rel tolerance "
-                                         f"of {rtol}.")
-                if eabs is not None:
-                    if eabs > atol:
-                        raise ValueError(f"abs tolerance of {eabs} > allowed abs tolerance "
-                                         f"of {atol}.")
-        except ValueError as err:
-            fails.append((key, dct, err, Jname))
+            nrows, ncols = J_fd.shape
+        except ValueError:
+            nrows = J_fd.shape
+            ncols = 1
 
-    fail_list = []
+        if 'J_fwd' in dct:
+            J_fwd = dct['J_fwd']
+            try:
+                np.testing.assert_allclose(
+                    J_fwd,
+                    J_fd,
+                    atol=atol,
+                    rtol=rtol,
+                    verbose=False,
+                    equal_nan=False,
+                    err_msg=(f"Forward derivatives of {key[0]} w.r.t {key[1]} do not match finite "
+                             "difference.")
+                )
+            except Exception as err:
+                fails.append(err.args[0])
+                if nrows < 20 and ncols < 20:
+                    with np.printoptions(linewidth=10000):
+                        fails[-1] += '\nJ_fwd:\n' + np.array2string(J_fwd)
+                        fails[-1] += '\nJ_fd:\n' + np.array2string(J_fd)
 
-    if fails:
-        fail_list.extend(
-            [f"Totals differ for {key}:\nAnalytic:\n{dct[Jname]}\nFD:\n{dct['J_fd']}\n{err}"
-             for key, dct, err, Jname in fails])
+        if 'J_rev' in dct:
+            J_rev = dct['J_rev']
+            try:
+                np.testing.assert_allclose(
+                    J_rev,
+                    J_fd,
+                    atol=atol,
+                    rtol=rtol,
+                    verbose=False,
+                    equal_nan=False,
+                    err_msg=(f"Reverse derivatives of {key[0]} w.r.t {key[1]} do not match finite "
+                             "difference.")
+                )
+            except Exception as err:
+                fails.append(err.args[0])
+                if nrows < 20 and ncols < 20:
+                    with np.printoptions(linewidth=10000):
+                        fails[-1] += '\nJ_rev:\n' + np.array2string(J_rev)
+                        fails[-1] += '\nJ_fd:\n' + np.array2string(J_fd)
 
     if incon_keys:
         ders = [f"{sof} wrt {swrt}" for sof, swrt in sorted(incon_keys)]
-        fail_list.append(f"During total derivative computation, the following partial derivatives "
-                         "resulted in serial inputs that were inconsistent across processes: "
-                         f"{ders}.")
+        fails.append(f"During total derivative computation, the following partial derivatives "
+                     f"resulted in serial inputs that were inconsistent across processes: {ders}.")
 
-    if fails or incon_keys:
-        raise ValueError('\n\n'.join(fail_list))
+    if fails:
+        raise ValueError('\n\n'.join(fails))
 
 
 def assert_no_approx_partials(system, include_self=True, recurse=True, method='any', excludes=None):

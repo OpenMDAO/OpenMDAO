@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 from openmdao.utils.array_utils import array_connection_compatible, abs_complex, dv_abs_complex, \
-    convert_neg
+    convert_neg, submat_sparsity_iter, idxs2minmax_tuples
 from openmdao.utils.assert_utils import assert_near_equal
 
 
@@ -78,6 +78,112 @@ class TestArrayUtils(unittest.TestCase):
         inds = np.where(a != b)
         self.assertTrue(np.all(inds[0] == np.array([0,2])))
         self.assertTrue(np.all(inds[1] == np.array([1,3])))
+
+
+class TestSubmatSparsityIter(unittest.TestCase):
+
+    def _check_results(self, expected, result):
+        expected = list(expected)
+        result = list(result)
+        self.assertEqual(len(expected), len(result))
+
+        for extup, tup in zip(expected, result):
+            exof, exwrt, exrows, excols, exshape = extup
+            of, wrt, rows, cols, shape = tup
+            self.assertEqual(of, exof)
+            self.assertEqual(wrt, exwrt)
+            if exrows is None:
+                self.assertEqual(exrows, rows)
+                self.assertEqual(excols, cols)
+            else:
+                self.assertTrue(np.all(rows == exrows))
+                self.assertTrue(np.all(cols == excols))
+            self.assertEqual(shape, exshape)
+
+    def test_empty_matrix(self):
+        row_var_size_iter = iter([])
+        col_var_size_iter = iter([])
+        nzrows = np.array([])
+        nzcols = np.array([])
+        shape = (0, 0)
+        result = list(submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, shape))
+        self.assertEqual(result, [])
+
+    def test_single_element_matrix(self):
+        row_var_size_iter = iter([('a', 1)])
+        col_var_size_iter = iter([('b', 1)])
+        nzrows = np.array([0])
+        nzcols = np.array([0])
+        shape = (1, 1)
+        result = list(submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, shape))
+        expected =  [('a', 'b', np.array([0]), np.array([0]), (1, 1))]
+        self._check_results(expected, result)
+
+    def test_multiple_elements_matrix(self):
+        row_var_size_iter = iter([('a', 2), ('b', 2)])
+        col_var_size_iter = iter([('c', 2), ('d', 2)])
+        nzrows = np.array([0, 1, 2, 3])
+        nzcols = np.array([0, 1, 2, 3])
+        shape = (4, 4)
+        result = list(submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, shape))
+        expected = [
+            ('a', 'c', np.array([0, 1]), np.array([0, 1]), (2, 2)),
+            ('b', 'd', np.array([0, 1]), np.array([0, 1]), (2, 2)),
+        ]
+        self._check_results(expected, result)
+
+    def test_sparse_matrix(self):
+        row_var_size_iter = iter([('a', 2), ('b', 2)])
+        col_var_size_iter = iter([('c', 2), ('d', 2)])
+        nzrows = np.array([0, 3])
+        nzcols = np.array([0, 3])
+        shape = (4, 4)
+        result = list(submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, shape))
+        expected = [
+            ('a', 'c', np.array([0]), np.array([0]), (2, 2)),
+            ('b', 'd', np.array([1]), np.array([1]), (2, 2))
+        ]
+        self._check_results(expected, result)
+
+
+class TestIdxs2Ranges(unittest.TestCase):
+
+    def test_single_range(self):
+        idxs = np.array([1, 2, 3, 4, 5])
+        self.assertEqual(idxs2minmax_tuples(idxs), [(1, 5)])
+
+    def test_multiple_ranges(self):
+        idxs = np.array([1, 2, 3, 7, 8, 9, 15, 16])
+        self.assertEqual(idxs2minmax_tuples(idxs), [(1, 3), (7, 9), (15, 16)])
+
+    def test_single_element(self):
+        idxs = np.array([5])
+        self.assertEqual(idxs2minmax_tuples(idxs), [(5, 5)])
+
+    def test_empty_array(self):
+        idxs = np.array([])
+        self.assertEqual(idxs2minmax_tuples(idxs), [])
+
+    def test_unsorted_array(self):
+        idxs = np.array([5, 1, 3, 2, 4])
+        self.assertEqual(idxs2minmax_tuples(idxs), [(1, 5)])
+
+    def test_non_contiguous_ranges(self):
+        idxs = np.array([1, 3, 5, 7, 9])
+        self.assertEqual(idxs2minmax_tuples(idxs), [(1, 1), (3, 3), (5, 5), (7, 7), (9, 9)])
+
+    def test_large_array(self):
+        idxs = np.arange(1000)
+        expected = [(0, 999)]
+        self.assertEqual(idxs2minmax_tuples(idxs), expected)
+
+    def test_negative_indices(self):
+        idxs = np.array([-5, -4, -3, 0, 1, 2])
+        self.assertEqual(idxs2minmax_tuples(idxs), [(0, 3)])
+
+    def test_last_element(self):
+        idxs = np.array([0, 1, 2, 3, 4, 6])
+        self.assertEqual(idxs2minmax_tuples(idxs), [(0, 4), (6, 6)])
 
 
 if __name__ == "__main__":
