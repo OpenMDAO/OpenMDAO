@@ -6795,7 +6795,7 @@ class System(object, metaclass=SystemMetaclass):
     def _deriv_display(self, err_iter, derivatives, rel_error_tol, abs_error_tol, out_stream,
                        fd_opts, totals=False, show_only_incorrect=False, lcons=None):
         """
-        Compute the relative and absolute errors in the given derivatives and print to out_stream.
+        Print derivative error info to out_stream.
 
         Parameters
         ----------
@@ -7037,9 +7037,7 @@ class System(object, metaclass=SystemMetaclass):
     def _deriv_display_compact(self, err_iter, derivatives, out_stream, totals=False,
                                show_only_incorrect=False, show_worst=False):
         """
-        Compute relative and absolute errors in the given derivatives and print to out_stream.
-
-        Display is in a compact tabular format.
+        Print derivative error info to out_stream in a compact tabular format.
 
         Parameters
         ----------
@@ -7057,6 +7055,11 @@ class System(object, metaclass=SystemMetaclass):
             Set to True if output should print only the subjacs found to be incorrect.
         show_worst : bool
             Set to True to show the worst subjac.
+
+        Returns
+        -------
+        tuple or None
+            Tuple contains the worst relative error, corresponding table row, and table header.
         """
         if out_stream is None:
             return
@@ -7220,7 +7223,7 @@ _ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse']
 _MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
 
 
-def _print_deriv_table(table_data, headers, out_stream):
+def _print_deriv_table(table_data, headers, out_stream, tablefmt='grid'):
     """
     Print a table of derivatives.
 
@@ -7232,13 +7235,16 @@ def _print_deriv_table(table_data, headers, out_stream):
         List of column headers.
     out_stream : file-like object
         Where to send human readable output.
+        Set to None to suppress.
+    tablefmt : str
+        The table format to use.
     """
-    if table_data:
+    if table_data and out_stream is not None:
         num_col_meta = {'format': '{: 1.4e}'}
         column_meta = [{}, {}]
         column_meta.extend([num_col_meta.copy() for _ in range(len(headers) - 3)])
         column_meta.append({})
-        print(generate_table(table_data, headers=headers, tablefmt='grid',
+        print(generate_table(table_data, headers=headers, tablefmt=tablefmt,
                              column_meta=column_meta, missing_val='n/a'), file=out_stream)
 
 

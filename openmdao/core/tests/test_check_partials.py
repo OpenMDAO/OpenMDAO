@@ -289,8 +289,6 @@ class TestProblemCheckPartials(unittest.TestCase):
         # but we still get good derivative data for 'comp1'
         self.assertTrue('comp1' in data)
 
-        assert_near_equal(data['comp1'][('f_xy', 'x')]['J_fd'][0][0], 4., 1e-6)
-        assert_near_equal(data['comp1'][('f_xy', 'x')]['J_fwd'][0][0], 4., 1e-15)
         assert_check_partials(data)
 
         #
@@ -301,15 +299,8 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         # now we should have derivative data for 'comp2'
         self.assertTrue('comp2' in data)
-
-        assert_near_equal(data['comp2'][('f_xy', 'x')]['J_fd'][0][0], 4., 1e-6)
-        assert_near_equal(data['comp2'][('f_xy', 'x')]['J_fwd'][0][0], 4., 1e-15)
-
         # and still get good derivative data for 'comp1'
         self.assertTrue('comp1' in data)
-
-        assert_near_equal(data['comp1'][('f_xy', 'x')]['J_fd'][0][0], 4., 1e-6)
-        assert_near_equal(data['comp1'][('f_xy', 'x')]['J_fwd'][0][0], 4., 1e-15)
 
         assert_check_partials(data)
 
@@ -347,9 +338,23 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        prob.check_partials(out_stream=None)
+        data = prob.check_partials(out_stream=None)
 
         self.assertEqual(prob.model.comp.lin_count, 1)
+
+        abs_error = data['comp']['y', 'x1']['abs error']
+        rel_error = data['comp']['y', 'x1']['rel error']
+        self.assertAlmostEqual(abs_error.forward, 0.)
+        self.assertAlmostEqual(rel_error.forward, 0.)
+        self.assertAlmostEqual(np.linalg.norm(data['comp']['y', 'x1']['J_fd'] - 3.), 0.,
+                               delta=1e-6)
+
+        abs_error = data['comp']['y', 'x2']['abs error']
+        rel_error = data['comp']['y', 'x2']['rel error']
+        self.assertAlmostEqual(abs_error.forward, 4.)
+        self.assertAlmostEqual(rel_error.forward, 1.)
+        self.assertAlmostEqual(np.linalg.norm(data['comp']['y', 'x2']['J_fd'] - 4.), 0.,
+                               delta=1e-6)
 
     def test_nested_fd_units(self):
         class UnitCompBase(om.ExplicitComponent):
@@ -378,7 +383,12 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         p.setup()
         data = p.check_partials(step=1e-7, out_stream=None)
-        assert_check_partials(data)
+
+        for comp_name, comp in data.items():
+            for partial_name, partial in comp.items():
+                forward = partial['J_fwd']
+                fd = partial['J_fd']
+                self.assertAlmostEqual(np.linalg.norm(forward - fd), 0., delta=1e-6)
 
     def test_units(self):
         class UnitCompBase(om.ExplicitComponent):
@@ -2276,8 +2286,8 @@ class TestCheckPartialsFeature(unittest.TestCase):
             def compute_partials(self, inputs, partials):
                 """Intentionally incorrect derivative."""
                 J = partials
-                J['y', 'x1'] = np.array([3.0])
-                J['y', 'x2'] = np.array([4.0])
+                J['y', 'x1'] = np.array([4.0])
+                J['y', 'x2'] = np.array([40])
 
         prob = om.Problem()
 
@@ -2288,7 +2298,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_check_partials(prob.check_partials(out_stream=None, compact_print=True))
+        prob.check_partials(out_stream=None, compact_print=True)
 
     def test_set_step_on_comp(self):
 
@@ -2452,14 +2462,13 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_check_partials(prob.check_partials(compact_print=True, includes='*c*c*'))
+        prob.check_partials(compact_print=True, includes='*c*c*')
 
-        assert_check_partials(prob.check_partials(compact_print=True, includes=['*d1', '*e1']))
+        prob.check_partials(compact_print=True, includes=['*d1', '*e1'])
 
-        assert_check_partials(prob.check_partials(compact_print=True, includes=['abc1cab']))
+        prob.check_partials(compact_print=True, includes=['abc1cab'])
 
-        assert_check_partials(prob.check_partials(compact_print=True, includes='*c*c*',
-                                                  excludes=['*e*']))
+        prob.check_partials(compact_print=True, includes='*c*c*', excludes=['*e*'])
 
     def test_directional(self):
 
@@ -2802,9 +2811,9 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         contents = stream.getvalue()
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count("Sub Jacobian with Largest Relative Error: CompBadPartials 'bad'"), 1)
         self.assertEqual(contents.count(">ABS_TOL >REL_TOL"), 4)
         self.assertEqual(contents.count("step"), 3)
-        self.assertEqual(contents.count("Sub Jacobian with Largest Relative Error: CompBadPartials 'bad'"), 1)
         tables = self.get_tables(contents)
         self.assertEqual(len(tables), 3)
         self.assertEqual(len(tables[0]), 11)

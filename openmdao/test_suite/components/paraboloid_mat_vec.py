@@ -7,9 +7,9 @@ class ParaboloidMatVec(Paraboloid):
     def setup_partials(self):
         pass
 
-    #def compute_partials(self, inputs, partials):
-        #"""Analytical derivatives."""
-        #pass
+    def compute_partials(self, inputs, partials):
+        """Analytical derivatives."""
+        pass
 
     def compute_jacvec_product(self, inputs, dinputs, doutputs, mode):
         """Returns the product of the incoming vector with the Jacobian."""
@@ -28,4 +28,3 @@ class ParaboloidMatVec(Paraboloid):
                 dinputs['x'] += (2.0*x - 6.0 + y)*doutputs['f_xy']
             if 'y' in dinputs:
                 dinputs['y'] += (2.0*y + 8.0 + x)*doutputs['f_xy']
- 
