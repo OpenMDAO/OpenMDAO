@@ -1937,7 +1937,7 @@ class Component(System):
                                   f"rows = {sjrows}\ncols = {sjcols}\n")
                 elif not np.all(np.asarray(meta['rows']) == sjrows):
                     issue_warning(f"Sparsity pattern for {of} wrt {wrt} was declared with "
-                                  f"rows={meta['rows']} and col={meta['cols']}, but a different "
+                                  f"rows={meta['rows']} and cols={meta['cols']}, but a different "
                                   "sparsity pattern has been computed:\n"
                                   f"rows = {sjrows}\ncols = {sjcols}\n")
             else:
