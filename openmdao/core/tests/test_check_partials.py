@@ -1900,6 +1900,72 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         p.check_partials(out_stream=None)
 
+    def test_zero_analytic_nonzero_fd(self):
+        # Test that we can check a component that has a zero analytic derivative.
+
+        class ZeroAnalyticComp(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', val=3.0)
+                self.add_output('y', val=4.0)
+
+                # no partials are declared
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 2.0 * inputs['x']
+
+            def compute_partials(self, inputs, partials):
+                pass
+
+        prob = om.Problem()
+
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.5))
+        prob.model.add_subsystem('comp', ZeroAnalyticComp())
+        prob.model.connect('p1.x', 'comp.x')
+
+        prob.setup()
+
+        stream = StringIO()
+        data = prob.check_partials(out_stream=stream)
+        with self.assertRaises(ValueError) as ctx:
+            assert_check_partials(data, verbose=True)
+
+        expected = """
+==============================================================
+assert_check_partials failed for the following Components
+with absolute tolerance = 1e-06 and relative tolerance = 1e-06
+==============================================================
+
+---------------
+Component: comp
+---------------
+Analytic deriv for 'y' wrt 'x' is assumed zero, but finite difference is nonzero.
+
+J_fd - J_analytic:
+[[2.]]
+""".strip()
+
+        self.assertEqual(ctx.exception.args[0].strip(), expected)
+
+        with self.assertRaises(ValueError) as ctx:
+            assert_check_partials(data)
+
+        expected = """
+==============================================================
+assert_check_partials failed for the following Components
+with absolute tolerance = 1e-06 and relative tolerance = 1e-06
+==============================================================
+
+---------------
+Component: comp
+---------------
+< output > wrt < variable > | max abs/rel | diff   | value
+----------------------------------------------------------------------
+y wrt x                     | abs         | fd-fwd | 2.000000000279556
+""".strip()
+
+        self.assertEqual(ctx.exception.args[0].strip(), expected)
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestCheckPartialsDistribDirectional(unittest.TestCase):
