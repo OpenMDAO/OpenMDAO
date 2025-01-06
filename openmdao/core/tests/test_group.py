@@ -503,7 +503,7 @@ class TestGroup(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = 2 * inputs['x']
 
-        p = om.Problem()
+        p = om.Problem(name='test_required_connection_input_unconnected')
         p.model.add_subsystem('comp', RequiredConnComp())
         p.setup()
 
@@ -511,7 +511,8 @@ class TestGroup(unittest.TestCase):
             p.final_setup()
 
         self.assertEqual(str(cm.exception),
-                         '\nCollected errors for problem \'problem\':\n   <model> <class Group>: Input "comp.x" requires a connection but is not connected.')
+                         '\nCollected errors for problem \'test_required_connection_input_unconnected\':\n'
+                            '   <model> <class Group>: Input "comp.x" requires a connection but is not connected.')
 
     def test_required_connection_promoted_input_unconnected(self):
         class RequiredConnComp(om.ExplicitComponent):
@@ -522,7 +523,7 @@ class TestGroup(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = 2 * inputs['x']
 
-        p = om.Problem()
+        p = om.Problem(name='test_required_connection_promoted_input_unconnected')
         p.model.add_subsystem('comp', RequiredConnComp(), promotes=['*'])
         p.setup()
 
@@ -530,7 +531,8 @@ class TestGroup(unittest.TestCase):
             p.final_setup()
 
         self.assertEqual(str(cm.exception),
-                         '\nCollected errors for problem \'problem\':\n   <model> <class Group>: Input "comp.x", promoted as "x", requires a connection but is not connected.')
+                         '\nCollected errors for problem \'test_required_connection_promoted_input_unconnected\':\n'
+                         '   <model> <class Group>: Input "comp.x", promoted as "x", requires a connection but is not connected.')
 
     def test_required_connection_desvar(self):
         class RequiredConnComp(om.ExplicitComponent):
