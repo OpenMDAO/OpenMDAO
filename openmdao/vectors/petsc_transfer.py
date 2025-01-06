@@ -176,6 +176,7 @@ else:
             mypathlen = len(group.pathname) + 1 if group.pathname else 0
 
             has_par_coloring = group._problem_meta['has_par_deriv_color']
+            has_nocolor_xfers = 0
 
             xfer_in = defaultdict(list)
             xfer_out = defaultdict(list)
@@ -250,6 +251,7 @@ else:
                                     oidxlist_nc.append(oarr)
                                     iidxlist_nc.append(input_inds)
                                     size_nc += len(input_inds)
+                                    has_nocolor_xfers = 1
                                 else:
                                     oidxlist.append(oarr)
                                     iidxlist.append(input_inds)
@@ -312,21 +314,23 @@ else:
                                                  vectors['output']['nonlinear'],
                                                  xfer_in[sname], inds, group._comm)
 
-            if xfer_in_nocolor:
-                full_xfer_in, full_xfer_out = _setup_index_views(total_size_nocolor,
-                                                                 xfer_in_nocolor,
-                                                                 xfer_out_nocolor)
+            if has_par_coloring:
+                has_nocolor_xfers = group._comm.allreduce(has_nocolor_xfers)
+                if has_nocolor_xfers:
+                    full_xfer_in, full_xfer_out = _setup_index_views(total_size_nocolor,
+                                                                     xfer_in_nocolor,
+                                                                     xfer_out_nocolor)
 
-                transfers[(None, '@nocolor')] = PETScTransfer(vectors['input']['nonlinear'],
-                                                              vectors['output']['nonlinear'],
-                                                              full_xfer_in, full_xfer_out,
-                                                              group._comm)
+                    transfers[(None, '@nocolor')] = PETScTransfer(vectors['input']['nonlinear'],
+                                                                  vectors['output']['nonlinear'],
+                                                                  full_xfer_in, full_xfer_out,
+                                                                  group._comm)
 
-                for sname, inds in xfer_out_nocolor.items():
-                    transfers[(sname, '@nocolor')] = PETScTransfer(vectors['input']['nonlinear'],
-                                                                   vectors['output']['nonlinear'],
-                                                                   xfer_in_nocolor[sname], inds,
-                                                                   group._comm)
+                    for sname, inds in xfer_out_nocolor.items():
+                        transfers[(sname, '@nocolor')] = \
+                            PETScTransfer(vectors['input']['nonlinear'],
+                                          vectors['output']['nonlinear'],
+                                          xfer_in_nocolor[sname], inds, group._comm)
 
             return transfers
 

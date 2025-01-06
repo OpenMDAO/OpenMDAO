@@ -801,8 +801,8 @@ class TestSqliteRecorder(unittest.TestCase):
                 'con_cmp2.y2': 'y2'
             },
             'output': {
-                '_auto_ivc.v0': '_auto_ivc.v0',
-                '_auto_ivc.v1': '_auto_ivc.v1',
+                '_auto_ivc.v0': 'z',
+                '_auto_ivc.v1': 'x',
                 'd1.y1': 'y1',
                 'd2.y2': 'y2',
                 'obj_cmp.obj': 'obj',
@@ -1323,7 +1323,7 @@ class TestSqliteRecorder(unittest.TestCase):
         # Test values from cases
         last_case = cr.get_case(solver_cases[-1])
 
-        self.assertEqual(sorted(last_case.inputs.keys()), ['d1.x', 'd1.y2'])
+        self.assertEqual(sorted(last_case.inputs.keys()), ['cycle.d1.x', 'cycle.d1.y2'])
         self.assertEqual(sorted(last_case.outputs.keys()), ['d1.y1'])
 
         rec = om.SqliteRecorder(os.path.join(self.tempdir, "gleep.sql"), record_viewer_data=False)
@@ -1374,7 +1374,7 @@ class TestSqliteRecorder(unittest.TestCase):
         last_case = cr.get_case(solver_cases[-1])
 
         self.assertEqual(sorted(last_case.inputs.keys()),
-                         ['d1.x', 'd1.y2', 'd1.z', 'd2.y1', 'd2.z'])
+                         ['cycle.d1.x', 'cycle.d1.y2', 'cycle.d1.z', 'cycle.d2.y1', 'cycle.d2.z'])
         self.assertEqual(sorted(last_case.outputs.keys()), ['d1.y1', 'd2.y2'])
 
     def test_record_line_search_armijo_goldstein(self):
@@ -2302,7 +2302,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         # includes all outputs (default) minus the VOIs, which we have excluded
         self.assertEqual(set(final_case.outputs.keys()), {'con2', 'z', 'con1', 'y1', 'x', 'y2', 'obj'})
-        self.assertEqual(set(final_case.inputs.keys()), {'y1', 'x', 'y2', 'z'})
+        self.assertEqual(set(final_case.inputs.keys()), {'obj_cmp.y2', 'obj_cmp.x', 'd1.z', 'con_cmp1.y1', 'obj_cmp.z', 'd1.y2', 'con_cmp2.y2', 'd1.x', 'd2.z', 'obj_cmp.y1', 'd2.y1'})
         self.assertEqual(set(final_case.residuals.keys()), {'con2', 'z', 'con1', 'y1', 'x', 'y2', 'obj'})
         self.assertAlmostEqual(final_case.inputs['d2.y1'][0], 25.58830236987513)
         self.assertAlmostEqual(final_case.outputs['con2'][0], -11.94151184938868)
@@ -2330,7 +2330,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.record('case2')
         cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         final_case = cr.get_case('case2')
-        self.assertEqual(set(final_case.inputs.keys()), {'y', 'x'})
+        self.assertEqual(set(final_case.inputs.keys()), {'comp.y', 'con.x', 'con.y', 'comp.x'})
         self.assertAlmostEqual(final_case.inputs['comp.y'][0], -7.833333333333334)
 
         # Default is includes = ['*'] and excludes = []
@@ -2342,7 +2342,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.record('case3')
         cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         final_case = cr.get_case('case3')
-        self.assertEqual(set(final_case.inputs.keys()), {'x'})
+        self.assertEqual(set(final_case.inputs.keys()), {'comp.x', 'con.x'})
 
         # Run again with includes.
         prob.recording_options['excludes'] = []
@@ -2352,7 +2352,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.record('case4')
         cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         final_case = cr.get_case('case4')
-        self.assertEqual(set(final_case.inputs.keys()), {'y'})
+        self.assertEqual(set(final_case.inputs.keys()), {'con.y', 'comp.y'})
 
         # run again with record_residuals = False
         prob.recording_options['includes'] = ['*']
@@ -3147,7 +3147,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         case = cr.get_case(system_cases[0])
 
-        self.assertEqual(sorted(case.inputs.keys()), ['y1', 'y2', 'z'])
+        self.assertEqual(sorted(case.inputs.keys()), ['obj_cmp.y1', 'obj_cmp.y2', 'obj_cmp.z'])
 
     def test_feature_basic_case_recording(self):
 
@@ -3661,9 +3661,9 @@ class TestFeatureAdvancedExample(unittest.TestCase):
 
         # Get the keys of all the inputs to the objective function
         case = cr.get_case(system_cases[0])
-        self.assertEqual(list(case.inputs.keys()), ['x', 'y1', 'y2', 'z'])
+        self.assertEqual(list(case.inputs.keys()), ['obj_cmp.x', 'obj_cmp.y1', 'obj_cmp.y2', 'obj_cmp.z'])
 
-        assert_near_equal([case['y1'].item() for case in cr.get_cases('root.obj_cmp')],
+        assert_near_equal([case['obj_cmp.y1'].item() for case in cr.get_cases('root.obj_cmp')],
                           [25.6, 25.6, 8.33, 4.17, 3.30, 3.18, 3.16,
                            3.16, 3.16, 3.16, 3.16, 3.16, 3.16, 3.16],
                           tolerance=1e-1)

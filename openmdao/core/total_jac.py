@@ -603,14 +603,15 @@ class _TotalJacInfo(object):
             else:
                 end += meta['size']
 
-            parallel_deriv_color = meta['parallel_deriv_color']
             cache_lin_sol = meta['cache_linear_solution']
+            if model.comm.size > 1:
+                parallel_deriv_color = meta['parallel_deriv_color']
 
-            if simul_coloring and parallel_deriv_color:
-                raise RuntimeError("Using both simul_coloring and parallel_deriv_color with "
-                                   f"variable '{name}' is not supported.")
+            if parallel_deriv_color:
+                if simul_coloring:
+                    raise RuntimeError("Using both simul_coloring and parallel_deriv_color with "
+                                       f"variable '{name}' is not supported.")
 
-            if parallel_deriv_color is not None:
                 if parallel_deriv_color not in self.par_deriv_printnames:
                     self.par_deriv_printnames[parallel_deriv_color] = []
 
@@ -632,7 +633,7 @@ class _TotalJacInfo(object):
 
             # if we're doing parallel deriv coloring, we only want to set the seed on one proc
             # for each var in a given color
-            if parallel_deriv_color is not None:
+            if parallel_deriv_color:
                 if fwd:
                     with self.relevance.seeds_active(fwd_seeds=(source,)):
                         relev = self.relevance.relevant_vars(source, 'fwd', inputs=False)

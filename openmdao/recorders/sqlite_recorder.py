@@ -7,7 +7,6 @@ from io import BytesIO
 import os.path
 import gc
 import sqlite3
-from itertools import chain
 
 import json
 import numpy as np
@@ -197,10 +196,7 @@ class SqliteRecorder(CaseRecorder):
 
         if MPI and comm and comm.size > 1:
             if self._record_on_proc:
-                if not self._parallel:
-                    # recording only on this proc
-                    filepath = self._filepath
-                else:
+                if self._parallel:
                     # recording on multiple procs, so a separate file for each recording proc
                     # plus a file for the common metadata, written by the lowest recording rank
                     rank = comm.rank
@@ -221,6 +217,9 @@ class SqliteRecorder(CaseRecorder):
                         self.metadata_connection = sqlite3.connect(metadata_filepath)
                     else:
                         self._record_metadata = False
+                else:
+                    # recording only on this proc
+                    filepath = self._filepath
         else:
             # no MPI or comm size == 1
             filepath = self._filepath
@@ -286,13 +285,13 @@ class SqliteRecorder(CaseRecorder):
         if MPI and comm and comm.size > 1:
             comm.barrier()
 
-    def _cleanup_abs2meta(self):
+    def _make_abs2meta_serializable(self):
         """
         Convert all abs2meta variable properties to a form that can be dumped as JSON.
         """
-        for name in self._abs2meta:
-            for prop in self._abs2meta[name]:
-                self._abs2meta[name][prop] = make_serializable(self._abs2meta[name][prop])
+        for meta in self._abs2meta.values():
+            for prop, val in meta.items():
+                meta[prop] = make_serializable(val)
 
     def _make_var_setting_serializable(self, var_settings):
         """
@@ -370,6 +369,9 @@ class SqliteRecorder(CaseRecorder):
                 else:
                     objectives[name] = data
 
+        # _get_vars_exec_order makes a collective MPI call so need to call in all procs
+        var_order = system._get_vars_exec_order(inputs=True, outputs=True, local=False)
+
         if self.connection:
 
             if driver is not None:
@@ -378,11 +380,6 @@ class SqliteRecorder(CaseRecorder):
                 constraints = driver._cons
                 objectives = driver._objs
 
-            inputs = list(system.abs_name_iter('input', local=False, discrete=True))
-            outputs = list(system.abs_name_iter('output', local=False, discrete=True))
-
-            var_order = system._get_vars_exec_order(inputs=True, outputs=True, local=True)
-
             # merge current abs2prom and prom2abs with this system's version
             self._abs2prom['input'].update(system._var_allprocs_abs2prom['input'])
             self._abs2prom['output'].update(system._var_allprocs_abs2prom['output'])
@@ -390,70 +387,38 @@ class SqliteRecorder(CaseRecorder):
                 if v not in self._prom2abs['input']:
                     self._prom2abs['input'][v] = abs_names
                 else:
-                    self._prom2abs['input'][v] = list(set(chain(self._prom2abs['input'][v],
-                                                                abs_names)))
+                    lst = self._prom2abs['input'][v]
+                    old = set(lst)
+                    for name in abs_names:
+                        if name not in old:
+                            lst.append(name)
 
             # for outputs, there can be only one abs name per promoted name
             for v, abs_names in system._var_allprocs_prom2abs_list['output'].items():
                 self._prom2abs['output'][v] = abs_names
 
-            # absolute pathname to metadata mappings for continuous & discrete variables
-            # discrete mapping is sub-keyed on 'output' & 'input'
-            real_meta_in = system._var_allprocs_abs2meta['input']
-            real_meta_out = system._var_allprocs_abs2meta['output']
-            disc_meta_in = system._var_allprocs_discrete['input']
-            disc_meta_out = system._var_allprocs_discrete['output']
+            for name, meta in system.abs_meta_iter('output', local=False, discrete=True):
+                if name not in self._abs2meta:
+                    meta = meta.copy()
+                    self._abs2meta[name] = meta
+                    meta['type'] = ['output']
+                    meta['explicit'] = name not in states
 
-            all_var_info = [(outputs, 'output'),
-                            (desvars, 'desvar'), (responses, 'response'),
-                            (objectives, 'objective'), (constraints, 'constraint')]
+            for name, meta in system.abs_meta_iter('input', local=False, discrete=True):
+                if name not in self._abs2meta:
+                    meta = meta.copy()
+                    self._abs2meta[name] = meta
+                    meta['type'] = ['input']
+                    meta['explicit'] = True
 
-            for varinfo, var_type in all_var_info:
-                if var_type != 'output':
-                    varinfo = varinfo.items()
+            for varinfo, var_type in [(desvars, 'desvar'), (responses, 'response'),
+                                      (objectives, 'objective'), (constraints, 'constraint')]:
+                for name, vmeta in varinfo.items():
+                    srcname = vmeta['source']
+                    self._abs2meta[srcname]['type'].append(var_type)
+                    self._abs2meta[srcname]['explicit'] = srcname not in states
 
-                for data in varinfo:
-
-                    # Design variables, constraints and objectives can be requested by input name.
-                    if var_type != 'output':
-                        name, vmeta = data
-                        srcname = vmeta['source']
-                    else:
-                        srcname = name = data
-
-                    if srcname not in self._abs2meta:
-                        if srcname in real_meta_out:
-                            self._abs2meta[srcname] = real_meta_out[srcname].copy()
-                        elif srcname in disc_meta_out:
-                            self._abs2meta[srcname] = disc_meta_out[srcname].copy()
-                        elif name in system._responses:
-                            for io in self._prom2abs:
-                                if srcname in self._prom2abs[io]:
-                                    abs_in = self._prom2abs[io][srcname][0]
-                                    self._abs2meta[srcname] = real_meta_in[abs_in].copy()
-                                    break
-                        self._abs2meta[srcname]['type'] = []
-                        self._abs2meta[srcname]['explicit'] = srcname not in states
-
-                    if var_type not in self._abs2meta[srcname]['type']:
-                        self._abs2meta[srcname]['type'].append(var_type)
-
-            for name in inputs:
-                try:
-                    self._abs2meta[name] = real_meta_in[name].copy()
-                except KeyError:
-                    self._abs2meta[name] = disc_meta_in[name].copy()
-                self._abs2meta[name]['type'] = ['input']
-                self._abs2meta[name]['explicit'] = True
-
-            # merge current abs2meta with this system's version
-            for name, meta in self._abs2meta.items():
-                for io in ('input', 'output'):
-                    if name in system._var_allprocs_abs2meta[io]:
-                        meta.update(system._var_allprocs_abs2meta[io][name])
-                        break
-
-            self._cleanup_abs2meta()
+            self._make_abs2meta_serializable()
 
             # store the updated abs2prom and prom2abs
             abs2prom = zlib.compress(json.dumps(self._abs2prom).encode('ascii'))
