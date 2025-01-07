@@ -246,6 +246,13 @@ class RealTimeOptPlot(object):
             # tooltips="Data point @x has the value @y",
             # tools="xpan,xwheel_zoom,xbox_zoom,reset",
                    width_policy="max" , height_policy="max",
+                   
+                   
+                   
+                   sizing_mode="stretch_both",
+                   
+                   
+                   
                    title=f"Real-time Optimization Progress Plot for: {case_recorder_filename}",
                    output_backend="webgl",
         )
@@ -575,7 +582,8 @@ class RealTimeOptPlot(object):
                         children=toggles,
                         # width=150,
                         height=400,
-                        sizing_mode="stretch_width",
+                        # sizing_mode="stretch_width",
+                        sizing_mode="fixed",
                         styles={
                             'overflow-y': 'auto', 
                             'border': '1px solid #ddd',
@@ -587,7 +595,7 @@ class RealTimeOptPlot(object):
                     
                     # p.add_layout(toggle_column, "right")
                     
-                    graph = Row(p, toggle_column, sizing_mode='stretch_width')
+                    graph = Row(p, toggle_column, sizing_mode='stretch_both')
                     
                     
             #                     layout="fit_data_stretch",
