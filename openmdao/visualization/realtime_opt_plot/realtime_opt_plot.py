@@ -1,6 +1,6 @@
 """ A real-plot of the optimization process"""
 
-from bokeh.models import ColumnDataSource, Legend, LegendItem, LinearAxis, Range1d, Toggle, Column, Row
+from bokeh.models import ColumnDataSource, Legend, LegendItem, LinearAxis, Range1d, Toggle, Column, Row, CustomJS
 from bokeh.plotting import curdoc, figure
 from bokeh.server.server import Server
 from tornado.ioloop import IOLoop
@@ -49,6 +49,56 @@ def _realtime_opt_plot_cmd(options, user_args):
     realtime_opt_plot(
         options.case_recorder_filename,
     )
+
+
+def _make_legend_item(varname, color):
+    toggle = Toggle(
+    label=varname,
+    active=False,
+    # width=120,
+    height=20,
+    margin=(0, 0, 2, 0)
+    )
+    
+    # Add custom CSS styles for both active and inactive states
+    toggle.stylesheets = [
+        f"""
+            .bk-btn {{
+                color: {color};
+                border-color: {color};
+                background-color: white;
+                font-size: 12pt;
+                display: flex;
+                align-items: center; /* Vertical centering */
+                justify-content: center; /* Horizontal centering */
+                height: 12px; /* Example height, adjust as needed */
+                border-width: 0px; /* Adjust to desired thickness */
+                border-style: solid; /* Ensures a solid border */
+            }}
+
+            .bk-btn.bk-active {{
+                color: white;
+                border-color: {color};
+                background-color: {color};
+                font-size: 12pt;
+                display: flex;
+                align-items: center; /* Vertical centering */
+                justify-content: center; /* Horizontal centering */
+                height: 12px; /* Example height, adjust as needed */
+                border-width: 0px; /* Adjust to desired thickness */
+                border-style: solid; /* Ensures a solid border */
+            }}
+
+            .bk-btn:focus {{
+                outline: none; /* Removes the default focus ring */
+            }}
+        """
+    ]
+    
+
+
+    return toggle
+    
 
 
 class CaseTracker:
@@ -306,6 +356,11 @@ class RealTimeOptPlot(object):
                     i_color = 0  # index of line across all variables: obj, desvars, cons
                     legend_items = []
 
+                    toggles = []
+                    
+                    lines = []
+                    
+                    axes = []
 
                     print("make Objective legend items, line")
                     # Objective
@@ -316,11 +371,21 @@ class RealTimeOptPlot(object):
                     if len(obj_names) != 1:
                         raise ValueError(f"Plot assumes there is on objective but {len(obj_names)} found")
                     for i, obj_name in enumerate(obj_names):
+                        
                         color = palette[i_color % 20]
+                        units = case_tracker.get_units(obj_name)
+
+                        toggle = _make_legend_item(f"{obj_name} ({units})", color)
+                        toggles.append(toggle)
+
+
                         i_color += 1
                         obj_line = p.line(x="iteration", y=obj_name, line_width=3, source=self._source,
                                           color=color)
-                        units = case_tracker.get_units(obj_name)
+                        
+                        lines.append(obj_line)
+                        
+                        
                         legend_items.append(LegendItem(label=f"{obj_name} ({units})", renderers=[obj_line]))
                         p.yaxis.axis_label = obj_name
                         # print(f"{i_color=}")
@@ -341,12 +406,17 @@ class RealTimeOptPlot(object):
                     desvar_names = case_tracker.get_desvar_names()
                     for i, desvar_name in enumerate(desvar_names):
                         color = palette[i_color % 20]
-                        i_color += 1
+                        units = case_tracker.get_units(desvar_name)
+                        
+                        toggle = _make_legend_item(f"{desvar_name} ({units})", color)
+                        toggles.append(toggle)
+
                         desvar_line = p.line(x="iteration", y=desvar_name, line_width=3, 
                                 y_range_name=f"extra_y_{desvar_name}",
                                 source=self._source,color=color, visible=False)
                         desvar_line.visible = False
 
+                        lines.append(desvar_line)
 
                         hover = HoverTool(renderers=[desvar_line], 
                             tooltips=[('Iteration', '@iteration'), 
@@ -356,11 +426,16 @@ class RealTimeOptPlot(object):
                         # Add the hover tools to the plot
                         p.add_tools(hover)
 
-                        units = case_tracker.get_units(desvar_name)
                         legend_items.append(LegendItem(label=f"{desvar_name} ({units})", renderers=[desvar_line]))
-                        # extra_y_axis = LinearAxis(y_range_name=f"extra_y_{desvar_name}",
-                        #                         axis_label=f"{desvar_name}",
-                        #                         axis_label_text_color=color)
+                        extra_y_axis = LinearAxis(y_range_name=f"extra_y_{desvar_name}",
+                                                axis_label=f"{desvar_name}",
+                                                axis_label_text_color=color)
+
+                        axes.append(extra_y_axis)
+
+                        p.add_layout(extra_y_axis, 'right')
+                        p.right[i_color-1].visible = False
+
                         
                         # set the range
                         y_min = -20
@@ -374,6 +449,7 @@ class RealTimeOptPlot(object):
                             y_min, y_max)
 
                         # p.add_layout(extra_y_axis, 'right')
+                        i_color += 1
 
                     print("make cons legend items, line")
 
@@ -382,18 +458,26 @@ class RealTimeOptPlot(object):
                     cons_names = case_tracker.get_cons_names()
                     for i, cons_name in enumerate(cons_names):
                         color = palette[i_color % 20]
-                        i_color += 1
+
+                        units = case_tracker.get_units(cons_name)
+
+                        toggle = _make_legend_item(f"{cons_name} ({units})", color)
+                        toggles.append(toggle)
+
                         cons_line = p.line(x="iteration", y=cons_name, line_width=3, 
                             y_range_name=f"extra_y_{cons_name}",
                             source=self._source,color=color, visible=False)
-                        # units = case_tracker.get_units(cons_name)
                         # legend_items.append(LegendItem(label=f"{cons_name} ({units})", renderers=[cons_line]))
 
+                        lines.append(cons_line)
 
-                        # extra_y_axis = LinearAxis(y_range_name=f"extra_y_{cons_name}",
-                        #                         axis_label=f"{cons_name}",
-                        #                         axis_label_text_color=color)
+                        extra_y_axis = LinearAxis(y_range_name=f"extra_y_{cons_name}",
+                                                axis_label=f"{cons_name}",
+                                                axis_label_text_color=color)
 
+                        axes.append(extra_y_axis)
+                        p.add_layout(extra_y_axis, 'right')
+                        p.right[i_color-1].visible = False
 
 
                         
@@ -409,6 +493,7 @@ class RealTimeOptPlot(object):
                             y_min, y_max)
 
                         # p.add_layout(extra_y_axis, 'right')
+                        i_color += 1
 
 
                     print("create actual Legend")
@@ -416,82 +501,81 @@ class RealTimeOptPlot(object):
                     
                     # p.add_layout(legend, "right")
                     
-                    toggles = []
-                    num_lines = 50
-                    button_colors = [f'#{hash(str(i))& 0xFFFFFF:06x}' for i in range(num_lines)]
+                    # num_lines = 50
+                    # button_colors = [f'#{hash(str(i))& 0xFFFFFF:06x}' for i in range(num_lines)]
 
-                    # Create a toggle button styled with the line color
-                    for i in range(num_lines):
-                        toggle = Toggle(
-                            label=f"Line {i+1}",
-                            active=False,
-                            width=120,
-                            height=15,
-                            margin=(0, 0, 2, 0)
-                        )
+                    # # Create a toggle button styled with the line color
+                    # for i in range(num_lines):
+                    #     toggle = Toggle(
+                    #         label=f"Line {i+1}",
+                    #         active=False,
+                    #         width=120,
+                    #         height=15,
+                    #         margin=(0, 0, 2, 0)
+                    #     )
                         
-                        # Add custom CSS styles for both active and inactive states
-                        toggle.stylesheets = [
-                            f"""
-                                .bk-btn {{
-                                    color: {button_colors[i]};
-                                    border-color: {button_colors[i]};
-                                    background-color: white;
-                                    font-size: 8pt;
-                                    display: flex;
-                                    align-items: center; /* Vertical centering */
-                                    justify-content: center; /* Horizontal centering */
-                                    height: 12px; /* Example height, adjust as needed */
-                                    border-width: 0px; /* Adjust to desired thickness */
-                                    border-style: solid; /* Ensures a solid border */
-                                }}
+                    #     # Add custom CSS styles for both active and inactive states
+                    #     toggle.stylesheets = [
+                    #         f"""
+                    #             .bk-btn {{
+                    #                 color: {button_colors[i]};
+                    #                 border-color: {button_colors[i]};
+                    #                 background-color: white;
+                    #                 font-size: 8pt;
+                    #                 display: flex;
+                    #                 align-items: center; /* Vertical centering */
+                    #                 justify-content: center; /* Horizontal centering */
+                    #                 height: 12px; /* Example height, adjust as needed */
+                    #                 border-width: 0px; /* Adjust to desired thickness */
+                    #                 border-style: solid; /* Ensures a solid border */
+                    #             }}
 
-                                .bk-btn.bk-active {{
-                                    color: white;
-                                    border-color: {button_colors[i]};
-                                    background-color: {button_colors[i]};
-                                    font-size: 8pt;
-                                    display: flex;
-                                    align-items: center; /* Vertical centering */
-                                    justify-content: center; /* Horizontal centering */
-                                    height: 12px; /* Example height, adjust as needed */
-                                    border-width: 0px; /* Adjust to desired thickness */
-                                    border-style: solid; /* Ensures a solid border */
-                                }}
+                    #             .bk-btn.bk-active {{
+                    #                 color: white;
+                    #                 border-color: {button_colors[i]};
+                    #                 background-color: {button_colors[i]};
+                    #                 font-size: 8pt;
+                    #                 display: flex;
+                    #                 align-items: center; /* Vertical centering */
+                    #                 justify-content: center; /* Horizontal centering */
+                    #                 height: 12px; /* Example height, adjust as needed */
+                    #                 border-width: 0px; /* Adjust to desired thickness */
+                    #                 border-style: solid; /* Ensures a solid border */
+                    #             }}
 
-                                .bk-btn:focus {{
-                                    outline: none; /* Removes the default focus ring */
-                                }}
-                            """
-                        ]
+                    #             .bk-btn:focus {{
+                    #                 outline: none; /* Removes the default focus ring */
+                    #             }}
+                    #         """
+                    #     ]
                         
-                        toggles.append(toggle)
+                        # toggles.append(toggle)
 
-                    # # Create CustomJS callback for toggle buttons
-                    # callback = CustomJS(args=dict(lines=lines, axes=axes, toggles=toggles), code="""
-                    #     // Get the toggle that triggered the callback
-                    #     const toggle = cb_obj;
-                    #     const index = toggles.indexOf(toggle);
+                    # Create CustomJS callback for toggle buttons
+                    callback = CustomJS(args=dict(lines=lines, axes=axes, toggles=toggles), code="""
+                        // Get the toggle that triggered the callback
+                        const toggle = cb_obj;
+                        const index = toggles.indexOf(toggle);
                         
-                    #     // Set line visibility
-                    #     lines[index].visible = toggle.active;
+                        // Set line visibility
+                        lines[index].visible = toggle.active;
                         
-                    #     // Set axis visibility if it exists (all except first line)
-                    #     if (index > 0 && index-1 < axes.length) {
-                    #         axes[index-1].visible = toggle.active;
-                    #     }
-                    # """)
+                        // Set axis visibility if it exists (all except first line)
+                        if (index > 0 && index-1 < axes.length) {
+                            axes[index-1].visible = toggle.active;
+                        }
+                    """)
 
-                    # # Add callback to all toggles
-                    # for toggle in toggles:
-                    #     toggle.js_on_change('active', callback)
+                    # Add callback to all toggles
+                    for toggle in toggles:
+                        toggle.js_on_change('active', callback)
 
                     # Create a column of toggles with scrolling
                     toggle_column = Column(
                         children=toggles,
-                        width=150,
+                        # width=150,
                         height=400,
-                        sizing_mode="fixed",
+                        sizing_mode="stretch_width",
                         styles={
                             'overflow-y': 'auto', 
                             'border': '1px solid #ddd',
