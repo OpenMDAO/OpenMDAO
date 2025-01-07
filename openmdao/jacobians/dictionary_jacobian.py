@@ -4,7 +4,6 @@ import scipy.sparse as sp
 
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.core.constants import INT_DTYPE
-from openmdao.utils.array_utils import vecmult
 
 
 class DictionaryJacobian(Jacobian):
@@ -185,16 +184,16 @@ class DictionaryJacobian(Jacobian):
                         linds, rinds = rows, subjac_info['cols']
                         if not fwd:
                             linds, rinds = rinds, linds
-                        prod = vecmult(right_vec, subjac, rinds)  # right_vec[rinds] * subjac
                         if self._under_complex_step:
                             # bincount only works with float, so split into parts
-                            # prod = vecmult(right_vec, subjac, rinds)  # right_vec[rinds] * subjac
+                            prod = right_vec[rinds] * subjac
                             left_vec[:].real += np.bincount(linds, prod.real,
                                                             minlength=left_vec.size)
                             left_vec[:].imag += np.bincount(linds, prod.imag,
                                                             minlength=left_vec.size)
                         else:
-                            left_vec[:] += np.bincount(linds, prod, minlength=left_vec.size)
+                            left_vec[:] += np.bincount(linds, right_vec[rinds] * subjac,
+                                                       minlength=left_vec.size)
 
                     else:
                         if fwd:

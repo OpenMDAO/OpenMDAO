@@ -330,48 +330,6 @@ class Jacobian(object):
 
         return self._rand_subjacs[key]
 
-    # def _randomize_subjac(self, key):
-    #     """
-    #     Return a subjac that is the given subjac filled with random values.
-
-    #     Parameters
-    #     ----------
-    #     key : tuple (of, wrt)
-    #         Key for subjac within the jacobian.
-
-    #     Returns
-    #     -------
-    #     ndarray or csc_matrix
-    #         Randomized version of the subjac.
-    #     """
-    #     subjac = self._subjacs_info[key]['val']
-
-    #     if isinstance(subjac, sparse_types):  # sparse
-    #         sparse = subjac.copy()
-    #         sparse.data = self._randgen.random(sparse.data.size)
-    #         sparse.data += 1.0
-    #         return sparse
-
-    #     # if a subsystem has computed a dynamic partial or semi-total coloring,
-    #     # we use that sparsity information to set the sparsity of the randomized
-    #     # subjac.  Otherwise all subjacs that didn't have sparsity declared by the
-    #     # user will appear completely dense, which will lead to a total jacobian that
-    #     # is more dense than it should be, causing any total coloring that we compute
-    #     # to be overly conservative.
-    #     subjac_info = self._subjacs_info[key]
-    #     if 'sparsity' in subjac_info:
-    #         assert subjac_info['rows'] is None
-    #         rows, cols, shape = subjac_info['sparsity']
-    #         r = np.zeros(shape)
-    #         val = self._randgen.random(len(rows))
-    #         val += 1.0
-    #         r[rows, cols] = val
-    #     else:
-    #         r = self._randgen.random(subjac.shape)
-    #         r += 1.0
-
-    #     return r
-
     def set_complex_step_mode(self, active):
         """
         Turn on or off complex stepping mode.

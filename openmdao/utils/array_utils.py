@@ -837,37 +837,6 @@ if numba is None:
         """
         return not np.any(a)
 
-    def vecmult(a, b, a_inds=None, b_inds=None):
-        """
-        Perform elementwise multiplication of two arrays.
-
-        Parameters
-        ----------
-        a : ndarray
-            First array to be multiplied.
-        b : ndarray
-            Second array to be multiplied.
-        a_inds : ndarray or None
-            Indices into the first array.
-        b_inds : ndarray or None
-            Indices into the second array.
-
-        Returns
-        -------
-        ndarray
-            The elementwise product of a and b.
-        """
-        if a_inds is None:
-            if b_inds is None:
-                return a * b
-            else:
-                return a * b[b_inds]
-        else:
-            if b_inds is None:
-                return a[a_inds] * b
-            else:
-                return a[a_inds] * b[b_inds]
-
 else:
 
     @numba.jit(nopython=True, nogil=True)
@@ -943,47 +912,6 @@ else:
             if a[i] != 0.:
                 return False
         return True
-
-    @numba.jit(nopython=True, nogil=True)
-    def vecmult(a, b, a_inds=None, b_inds=None):
-        """
-        Perform elementwise multiplication of two arrays.
-
-        Parameters
-        ----------
-        a : ndarray
-            First array to be multiplied.
-        b : ndarray
-            Second array to be multiplied.
-        a_inds : ndarray or None
-            Indices into the first array.
-        b_inds : ndarray or None
-            Indices into the second array.
-
-        Returns
-        -------
-        ndarray
-            The elementwise product of a and b.
-        """
-        if a_inds is None:
-            if b_inds is None:
-                return a * b
-            else:
-                ret = np.empty_like(a)
-                for i, b_ind in enumerate(b_inds):
-                    ret[i] = a[i] * b[b_ind]
-                return ret
-        else:  # a_inds is not None
-            if b_inds is None:
-                ret = np.empty_like(b)
-                for i, a_ind in enumerate(a_inds):
-                    ret[i] = a[a_ind] * b[i]
-                return ret
-            else:  # both a_inds and b_inds are not None
-                ret = np.empty(len(b_inds), dtype=a.dtype)
-                for i, (a_ind, b_ind) in enumerate(zip(a_inds, b_inds)):
-                    ret[i] = a[a_ind] * b[b_ind]
-                return ret
 
 
 def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, shape):
