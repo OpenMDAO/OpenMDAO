@@ -50,7 +50,7 @@ jobs:
           # test latest versions on ubuntu
           # Include pyOptSparse, which requires NumPy<2
           - NAME: Ubuntu Latest, NumPy<2
-            OS: ubuntu-latest
+            OS: ubuntu-22.04
             PY: '3.12'
             NUMPY: '<2'
             PETSc: true
@@ -63,7 +63,7 @@ jobs:
           # Exclude pyOptSparse, which requires NumPy<2
           # NumPy>=2.1 is required with Python 3.13
           - NAME: Ubuntu Latest, NumPy 2 (No pyOptSparse)
-            OS: ubuntu-latest
+            OS: ubuntu-22.04
             PY: '3.13'
             NUMPY: '>=2.1'
             PETSc: true
