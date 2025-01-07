@@ -16,7 +16,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.om_warnings import issue_warning, SolverWarning
-from openmdao.utils.general_utils import SolverMetaclass
+from openmdao.utils.general_utils import SolverMetaclass, is_undefined
 
 
 class SolverInfo(object):
@@ -1231,7 +1231,7 @@ class BlockLinearSolver(LinearSolver):
         """
         if sys_vars is None or slv_vars is None:
             return None
-        if slv_vars is _UNDEFINED or not slv_vars:
+        if is_undefined(slv_vars) or not slv_vars:
             return sys_vars
         if not sys_vars:
             return slv_vars
@@ -1306,12 +1306,12 @@ class BlockLinearSolver(LinearSolver):
         scope_in : set, None, or _UNDEFINED
             Inputs relevant to possible lower level calls to _apply_linear on Components.
         """
-        if scope_out is _UNDEFINED or scope_out is None:
+        if is_undefined(scope_out) or scope_out is None:
             self._scope_out = scope_out
         else:
             self._scope_out = scope_out.intersection(self._system()._var_abs2meta['output'])
 
-        if scope_in is _UNDEFINED or scope_in is None:
+        if is_undefined(scope_in) or scope_in is None:
             self._scope_in = scope_in
         else:
             self._scope_in = scope_in.intersection(self._system()._var_abs2meta['input'])

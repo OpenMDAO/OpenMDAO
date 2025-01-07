@@ -1714,8 +1714,8 @@ class TestFunctionRegistration(unittest.TestCase):
             # compute runs and just report as an error during expression evaluation.
 
             # have to use regex to handle differences in numpy print formats for shape
-            msg = "'comp' <class ExecComp>: Error occurred evaluating 'y = double\(x\) \* 3\.':\n" \
-                  "could not broadcast input array from shape \(10.*\) into shape \(8.*\)"
+            msg = r"'comp' <class ExecComp>: Error occurred evaluating 'y = double\(x\) \* 3\.':\n" \
+                  r"could not broadcast input array from shape \(10.*\) into shape \(8.*\)"
             with self.assertRaisesRegex(Exception, msg):
                 p.run_model()
 
