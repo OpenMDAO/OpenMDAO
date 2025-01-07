@@ -1,6 +1,6 @@
 """ A real-plot of the optimization process"""
 
-from bokeh.models import ColumnDataSource, Legend, LegendItem, LinearAxis, Range1d, ScrollBox
+from bokeh.models import ColumnDataSource, Legend, LegendItem, LinearAxis, Range1d, Toggle, Column, Row
 from bokeh.plotting import curdoc, figure
 from bokeh.server.server import Server
 from tornado.ioloop import IOLoop
@@ -196,7 +196,8 @@ class RealTimeOptPlot(object):
             # tooltips="Data point @x has the value @y",
             # tools="xpan,xwheel_zoom,xbox_zoom,reset",
                    width_policy="max" , height_policy="max",
-                   title="Real-time Optimization Progress Plot",
+                   title=f"Real-time Optimization Progress Plot for: {case_recorder_filename}",
+                   output_backend="webgl",
         )
         p.add_tools(PanTool(dimensions="width"))
         # tooltips=[("Value", "@y")]
@@ -256,6 +257,8 @@ class RealTimeOptPlot(object):
         from collections import defaultdict
         self.y_min = defaultdict(lambda: float("inf"))  # update this as new data comes in
         self.y_max = defaultdict(lambda: float("-inf"))  # update this as new data comes in
+        
+        
 
         def update():
             # See if source is defined yet. If not, see if we have any data
@@ -411,13 +414,105 @@ class RealTimeOptPlot(object):
                     print("create actual Legend")
                     legend = Legend(items=legend_items, title="Variables")
                     
+                    # p.add_layout(legend, "right")
+                    
+                    toggles = []
+                    num_lines = 50
+                    button_colors = [f'#{hash(str(i))& 0xFFFFFF:06x}' for i in range(num_lines)]
+
+                    # Create a toggle button styled with the line color
+                    for i in range(num_lines):
+                        toggle = Toggle(
+                            label=f"Line {i+1}",
+                            active=False,
+                            width=120,
+                            height=15,
+                            margin=(0, 0, 2, 0)
+                        )
+                        
+                        # Add custom CSS styles for both active and inactive states
+                        toggle.stylesheets = [
+                            f"""
+                                .bk-btn {{
+                                    color: {button_colors[i]};
+                                    border-color: {button_colors[i]};
+                                    background-color: white;
+                                    font-size: 8pt;
+                                    display: flex;
+                                    align-items: center; /* Vertical centering */
+                                    justify-content: center; /* Horizontal centering */
+                                    height: 12px; /* Example height, adjust as needed */
+                                    border-width: 0px; /* Adjust to desired thickness */
+                                    border-style: solid; /* Ensures a solid border */
+                                }}
+
+                                .bk-btn.bk-active {{
+                                    color: white;
+                                    border-color: {button_colors[i]};
+                                    background-color: {button_colors[i]};
+                                    font-size: 8pt;
+                                    display: flex;
+                                    align-items: center; /* Vertical centering */
+                                    justify-content: center; /* Horizontal centering */
+                                    height: 12px; /* Example height, adjust as needed */
+                                    border-width: 0px; /* Adjust to desired thickness */
+                                    border-style: solid; /* Ensures a solid border */
+                                }}
+
+                                .bk-btn:focus {{
+                                    outline: none; /* Removes the default focus ring */
+                                }}
+                            """
+                        ]
+                        
+                        toggles.append(toggle)
+
+                    # # Create CustomJS callback for toggle buttons
+                    # callback = CustomJS(args=dict(lines=lines, axes=axes, toggles=toggles), code="""
+                    #     // Get the toggle that triggered the callback
+                    #     const toggle = cb_obj;
+                    #     const index = toggles.indexOf(toggle);
+                        
+                    #     // Set line visibility
+                    #     lines[index].visible = toggle.active;
+                        
+                    #     // Set axis visibility if it exists (all except first line)
+                    #     if (index > 0 && index-1 < axes.length) {
+                    #         axes[index-1].visible = toggle.active;
+                    #     }
+                    # """)
+
+                    # # Add callback to all toggles
+                    # for toggle in toggles:
+                    #     toggle.js_on_change('active', callback)
+
+                    # Create a column of toggles with scrolling
+                    toggle_column = Column(
+                        children=toggles,
+                        width=150,
+                        height=400,
+                        sizing_mode="fixed",
+                        styles={
+                            'overflow-y': 'auto', 
+                            'border': '1px solid #ddd',
+                            'padding': '8px',
+                            'background-color': '#f8f9fa'
+                        }
+                    )
+
+                    
+                    # p.add_layout(toggle_column, "right")
+                    
+                    graph = Row(p, toggle_column, sizing_mode='stretch_width')
                     
                     
-                    # Wrap the legend in a ScrollBox
+            #                     layout="fit_data_stretch",
+            # max_height=600,
+            # sizing_mode='scale_both',
 
+                    
+                    doc.add_root(graph)
 
-
-                    p.add_layout(legend, "right")
                     
                     p.legend.click_policy="hide"
 
@@ -509,7 +604,8 @@ class RealTimeOptPlot(object):
         
         
         
-        doc.add_root(p)
+        # doc.add_root(p)
+        # doc.add_root(graph)
         doc.add_periodic_callback(update, 50)
         doc.title = "OpenMDAO Optimization"
 
