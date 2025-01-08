@@ -1,10 +1,10 @@
 """ A real-plot of the optimization process"""
 
-from bokeh.models import ColumnDataSource, Legend, LegendItem, LinearAxis, Range1d, Toggle, Column, Row, CustomJS
+from bokeh.models import ColumnDataSource, Legend, LegendItem, LinearAxis, Range1d, Toggle, Column, Row, CustomJS, Div
 from bokeh.plotting import curdoc, figure
 from bokeh.server.server import Server
 from tornado.ioloop import IOLoop
-from bokeh.palettes import Category10, Category20, d3
+from bokeh.palettes import Category10, Category20, d3, Viridis256, Category20b, Category20c
 from bokeh.layouts import row, column, Spacer
 
 import numpy as np
@@ -123,9 +123,9 @@ class CaseTracker:
             # just get the first one
             case_id = new_case_ids[0]
             driver_case = self._cr.get_case(case_id)
-            objs = driver_case.get_objectives()
-            design_vars = driver_case.get_design_vars()
-            constraints = driver_case.get_constraints()
+            objs = driver_case.get_objectives(scaled=False)
+            design_vars = driver_case.get_design_vars(scaled=False)
+            constraints = driver_case.get_constraints(scaled=False)
             
             new_data = {
                 "counter": int(driver_case.counter),
@@ -135,6 +135,7 @@ class CaseTracker:
             objectives = {}
             for name, value in objs.items():
                 objectives[name] = value
+                
             new_data["objs"] = objectives
 
             # get des vars
@@ -147,6 +148,7 @@ class CaseTracker:
             cons = {}
             for name, value in constraints.items():
                 cons[name] = value
+                    
             new_data["cons"] = cons
 
             self._case_ids_read.append(case_id)  # remember that this one has been plotted
@@ -238,58 +240,26 @@ class RealTimeOptPlot(object):
         case_tracker = CaseTracker(case_recorder_filename)
        
        
-        from bokeh.models.tools import BoxZoomTool, ResetTool, HoverTool, PanTool
+        from bokeh.models.tools import BoxZoomTool, ResetTool, HoverTool, PanTool, WheelZoomTool, SaveTool, ZoomInTool, ZoomOutTool
 
         # Make the figure and all the settings for it
         p = figure(
-            tools=[BoxZoomTool(),ResetTool()],
-            # tooltips="Data point @x has the value @y",
-            # tools="xpan,xwheel_zoom,xbox_zoom,reset",
+            tools=[ PanTool(dimensions="width"), WheelZoomTool(), ZoomInTool(), 
+                   ZoomOutTool(), BoxZoomTool(), ResetTool(), SaveTool() ],
                    width_policy="max" , height_policy="max",
-                   
-                   
-                   
                    sizing_mode="stretch_both",
-                   
-                   
-                   
                    title=f"Real-time Optimization Progress Plot for: {case_recorder_filename}",
+                   active_drag=None,
+                   active_scroll="auto",
+                   active_tap=None,
+                #    active_inspect=None,
                    output_backend="webgl",
         )
-        p.add_tools(PanTool(dimensions="width"))
-        # tooltips=[("Value", "@y")]
+       
+        # uncomment these for debugging Bokeh
+        # from bokeh.models.tools import
+        # p.add_tools( ExamineTool())
         
-        
-        # tooltips = [
-        #     ("index", "$index"),
-        #     ("(x,y)", "($x, $y)"),
-        # #     ("radius", "@radius"),
-        # #     ("fill color", "$color[hex, swatch]:fill_color"),
-        # #     ("fill color", "$color[hex]:fill_color"),
-        # #     ("fill color", "$color:fill_color"),
-        # #     ("fill color", "$swatch:fill_color"),
-        # #     ("foo", "@foo"),
-        # #     ("bar", "@bar"),
-        # ]
-        
-        
-        
-        # Create tooltips dynamically for all variables
-        # tooltips = [("index", "$index")]
-        # for name in  list(case_tracker.get_obj_names()) + list(case_tracker.get_cons_names()) + list(case_tracker.get_desvar_names()) :
-        #     tooltips.append((f'{name}', f'@{name}{{0.2f}}'))
-
-
-        # hover = HoverTool(
-        #     # tooltips=tooltips,
-        #     # formatters={
-        #     #     '@date': 'datetime',  # use 'datetime' formatter for '@date' field
-        #     # },
-        #     # mode='vline'  # display tooltips for all points on a vertical line
-        # )
-        # p.add_tools(hover)
-
-
         # Add an invisible line renderer. To avoid this warning message
         #     (MISSING_RENDERERS): Plot has no renderers
         p.line([], [], line_alpha=0)
@@ -299,9 +269,10 @@ class RealTimeOptPlot(object):
         p.title.text_color = "black"
         p.title.text_font = "arial"
         p.title.align = "center"
-        p.title.background_fill_color = "#cccccc"
+        p.title.standoff = 40  # Adds 40 pixels of space below the title
+
+        p.title.background_fill_color = "#eeeeee"
         p.xaxis.axis_label = "Driver iterations"
-        p.yaxis.axis_label = "Model variables"
         p.xaxis.minor_tick_line_color = None
         p.axis.axis_label_text_font_style = 'bold'
         p.axis.axis_label_text_font_size = '20pt'
@@ -328,7 +299,6 @@ class RealTimeOptPlot(object):
                 new_data = case_tracker.get_new_cases()
                 if new_data:
                     
-                    # print("source is none and new data")
                     ####  make the source dict
                     source_dict = { 'iteration': []}
                     
@@ -347,76 +317,76 @@ class RealTimeOptPlot(object):
                     for con_name in con_names:
                         source_dict[con_name] = []
                         
-                        
-                    # print(f"{len(obj_names)=}")
-                    # print(f"{len(desvar_names)=}")
-                    # print(f"{len(con_names)=}")
-                        
                     self._source = ColumnDataSource(source_dict)
 
-                    # print(f"{self=}")
-                    # print(f"{id(self)=}")
-                    # print(f"set {self._source=}")
-
                     #### make the lines and legends
-                    palette = Category20[20]
+                    palette = Category20[20] + Category20b[20] + Category20c[20]
                     i_color = 0  # index of line across all variables: obj, desvars, cons
                     legend_items = []
 
                     toggles = []
-                    
+                    column_items = []
                     lines = []
-                    
                     axes = []
 
-                    print("make Objective legend items, line")
                     # Objective
                     legend_items.append(LegendItem(label="OBJECTIVE"))  # the only way to make a header in Legends
-                    print(f"getting obj names")
                     obj_names = case_tracker.get_obj_names()
-                    print(f"done getting obj names")
+
+                    obj_label = Div(text="<b>OBJECTIVE</b>", width=200,
+                        styles={"font-size": "12"},  # Set font size using CSS
+
+                    )  # Fixed-width text label
+
+                    column_items.append(obj_label)
+
                     if len(obj_names) != 1:
                         raise ValueError(f"Plot assumes there is on objective but {len(obj_names)} found")
                     for i, obj_name in enumerate(obj_names):
-                        
-                        color = palette[i_color % 20]
                         units = case_tracker.get_units(obj_name)
 
+                        color = "black"
                         toggle = _make_legend_item(f"{obj_name} ({units})", color)
+                        toggle.active = True
                         toggles.append(toggle)
 
-
-                        i_color += 1
-                        obj_line = p.line(x="iteration", y=obj_name, line_width=3, source=self._source,
-                                          color=color)
+                        column_items.append(toggle)
                         
+                        obj_line = p.line(x="iteration", y=obj_name, line_width=3, source=self._source,
+                                          color="black")  # make the objective black
+                        p.yaxis.axis_label = f"Objective: {obj_name} ({units})"
+
                         lines.append(obj_line)
                         
                         
                         legend_items.append(LegendItem(label=f"{obj_name} ({units})", renderers=[obj_line]))
-                        p.yaxis.axis_label = obj_name
-                        # print(f"{i_color=}")
-                        
                         
                         hover = HoverTool(renderers=[obj_line], 
                             tooltips=[('Iteration', '@iteration'), 
-                             (obj_name, '@{%s}' % obj_name)],
+                             (obj_name, '@{%s}' % obj_name + '{0.00}')],
                             mode='vline', visible=False)
 
                         # Add the hover tools to the plot
                         p.add_tools(hover)
 
-
-
                     # desvars
                     legend_items.append(LegendItem(label="DESIGN VARS"))  # the only way to make a header in Legends
+                    
+                    desvars_label = Div(text="<b>DESIGN VARS</b>", width=200,
+                        styles={"font-size": "12"},  # Set font size using CSS
+
+                    )  # Fixed-width text label
+
+                    column_items.append(desvars_label)
+
                     desvar_names = case_tracker.get_desvar_names()
                     for i, desvar_name in enumerate(desvar_names):
-                        color = palette[i_color % 20]
+                        color = palette[i_color % 60]
                         units = case_tracker.get_units(desvar_name)
                         
                         toggle = _make_legend_item(f"{desvar_name} ({units})", color)
                         toggles.append(toggle)
+                        column_items.append(toggle)
 
                         desvar_line = p.line(x="iteration", y=desvar_name, line_width=3, 
                                 y_range_name=f"extra_y_{desvar_name}",
@@ -427,7 +397,7 @@ class RealTimeOptPlot(object):
 
                         hover = HoverTool(renderers=[desvar_line], 
                             tooltips=[('Iteration', '@iteration'), 
-                             (desvar_name, '@{%s}' % desvar_name)],
+                             (desvar_name, '@{%s}' % desvar_name + '{0.00}')],
                             mode='vline', visible=False)
 
                         # Add the hover tools to the plot
@@ -435,8 +405,10 @@ class RealTimeOptPlot(object):
 
                         legend_items.append(LegendItem(label=f"{desvar_name} ({units})", renderers=[desvar_line]))
                         extra_y_axis = LinearAxis(y_range_name=f"extra_y_{desvar_name}",
-                                                axis_label=f"{desvar_name}",
-                                                axis_label_text_color=color)
+                                                axis_label=f"{desvar_name} ({units})",
+                                                axis_label_text_color=color,
+                                                axis_label_text_font_size = '20px'
+                        )
 
                         axes.append(extra_y_axis)
 
@@ -458,35 +430,48 @@ class RealTimeOptPlot(object):
                         # p.add_layout(extra_y_axis, 'right')
                         i_color += 1
 
-                    print("make cons legend items, line")
-
                     # cons
                     legend_items.append(LegendItem(label="CONSTRAINTS"))  # the only way to make a header in Legends
+                    cons_label = Div(text="<b>CONSTRAINTS</b>", width=200,
+                        styles={"font-size": "12"},  # Set font size using CSS
+
+                    )  # Fixed-width text label
+
+                    column_items.append(cons_label)
+                    
                     cons_names = case_tracker.get_cons_names()
                     for i, cons_name in enumerate(cons_names):
-                        color = palette[i_color % 20]
+                        color = palette[i_color % 60]
 
                         units = case_tracker.get_units(cons_name)
 
                         toggle = _make_legend_item(f"{cons_name} ({units})", color)
                         toggles.append(toggle)
+                        column_items.append(toggle)
 
-                        cons_line = p.line(x="iteration", y=cons_name, line_width=3, 
+                        cons_line = p.line(x="iteration", y=cons_name, line_width=3, line_dash="dashed",
                             y_range_name=f"extra_y_{cons_name}",
                             source=self._source,color=color, visible=False)
-                        # legend_items.append(LegendItem(label=f"{cons_name} ({units})", renderers=[cons_line]))
 
                         lines.append(cons_line)
 
+                        hover = HoverTool(renderers=[cons_line], 
+                            tooltips=[('Iteration', '@iteration'), 
+                             (cons_name, '@{%s}' % cons_name + '{0.00}') ],
+                            mode='vline', visible=False)
+
+                        # Add the hover tools to the plot
+                        p.add_tools(hover)
+
                         extra_y_axis = LinearAxis(y_range_name=f"extra_y_{cons_name}",
-                                                axis_label=f"{cons_name}",
-                                                axis_label_text_color=color)
+                                                axis_label=f"{cons_name} ({units})",
+                                                axis_label_text_color=color,
+                                                axis_label_text_font_size = '20px'
+)
 
                         axes.append(extra_y_axis)
                         p.add_layout(extra_y_axis, 'right')
                         p.right[i_color-1].visible = False
-
-
                         
                         # set the range
                         y_min = -100
@@ -499,65 +484,11 @@ class RealTimeOptPlot(object):
                         p.extra_y_ranges[f"extra_y_{cons_name}"] = Range1d(
                             y_min, y_max)
 
-                        # p.add_layout(extra_y_axis, 'right')
                         i_color += 1
 
 
-                    print("create actual Legend")
                     legend = Legend(items=legend_items, title="Variables")
                     
-                    # p.add_layout(legend, "right")
-                    
-                    # num_lines = 50
-                    # button_colors = [f'#{hash(str(i))& 0xFFFFFF:06x}' for i in range(num_lines)]
-
-                    # # Create a toggle button styled with the line color
-                    # for i in range(num_lines):
-                    #     toggle = Toggle(
-                    #         label=f"Line {i+1}",
-                    #         active=False,
-                    #         width=120,
-                    #         height=15,
-                    #         margin=(0, 0, 2, 0)
-                    #     )
-                        
-                    #     # Add custom CSS styles for both active and inactive states
-                    #     toggle.stylesheets = [
-                    #         f"""
-                    #             .bk-btn {{
-                    #                 color: {button_colors[i]};
-                    #                 border-color: {button_colors[i]};
-                    #                 background-color: white;
-                    #                 font-size: 8pt;
-                    #                 display: flex;
-                    #                 align-items: center; /* Vertical centering */
-                    #                 justify-content: center; /* Horizontal centering */
-                    #                 height: 12px; /* Example height, adjust as needed */
-                    #                 border-width: 0px; /* Adjust to desired thickness */
-                    #                 border-style: solid; /* Ensures a solid border */
-                    #             }}
-
-                    #             .bk-btn.bk-active {{
-                    #                 color: white;
-                    #                 border-color: {button_colors[i]};
-                    #                 background-color: {button_colors[i]};
-                    #                 font-size: 8pt;
-                    #                 display: flex;
-                    #                 align-items: center; /* Vertical centering */
-                    #                 justify-content: center; /* Horizontal centering */
-                    #                 height: 12px; /* Example height, adjust as needed */
-                    #                 border-width: 0px; /* Adjust to desired thickness */
-                    #                 border-style: solid; /* Ensures a solid border */
-                    #             }}
-
-                    #             .bk-btn:focus {{
-                    #                 outline: none; /* Removes the default focus ring */
-                    #             }}
-                    #         """
-                    #     ]
-                        
-                        # toggles.append(toggle)
-
                     # Create CustomJS callback for toggle buttons
                     callback = CustomJS(args=dict(lines=lines, axes=axes, toggles=toggles), code="""
                         // Get the toggle that triggered the callback
@@ -579,7 +510,7 @@ class RealTimeOptPlot(object):
 
                     # Create a column of toggles with scrolling
                     toggle_column = Column(
-                        children=toggles,
+                        children=column_items,
                         # width=150,
                         height=400,
                         # sizing_mode="stretch_width",
@@ -591,31 +522,24 @@ class RealTimeOptPlot(object):
                             'background-color': '#f8f9fa'
                         }
                     )
+                    
+                    label = Div(text="<b>Variables</b>", width=200,
+                                    styles={"font-size": "20px"},  # Set font size using CSS
 
-                    
-                    # p.add_layout(toggle_column, "right")
-                    
-                    graph = Row(p, toggle_column, sizing_mode='stretch_both')
-                    
-                    
-            #                     layout="fit_data_stretch",
-            # max_height=600,
-            # sizing_mode='scale_both',
+                                )  # Fixed-width text label
+                    label_and_toggle_column = Column(label, toggle_column)
 
-                    
+                    graph = Row(p, label_and_toggle_column, sizing_mode='stretch_both')
+                                       
                     doc.add_root(graph)
 
-                    
-                    p.legend.click_policy="hide"
+                    # p.legend.click_policy="hide"
 
                     print("end of source is none and new data")
                     
             if new_data is None:
-                print("getting new cases")
                 new_data = case_tracker.get_new_cases()
-                print("done getting new cases")
             if new_data:
-                print("new_data at the end")
                 counter = new_data["counter"]
                 source_stream_dict = {"iteration": [counter]}
                 
@@ -624,12 +548,19 @@ class RealTimeOptPlot(object):
                     float_obj_value = 0. if obj_value is None or obj_value.size == 0 else np.linalg.norm(obj_value)
 
                     source_stream_dict[obj_name] = [float_obj_value]
+                    self.y_min[obj_name] = min(self.y_min[obj_name], float_obj_value)
+                    self.y_max[obj_name] = max(self.y_max[obj_name], float_obj_value)
+                    if self.y_min[obj_name] == self.y_max[obj_name]:
+                        self.y_min[obj_name]  = self.y_min[obj_name] - 1
+                        self.y_max[obj_name]  = self.y_max[obj_name]  + 1
+                    p.y_range.start = self.y_min[obj_name]
+                    p.y_range.end = self.y_max[obj_name]
+                    
                 for desvar_name, desvar_value in new_data["desvars"].items():
 
                     float_desvar_value = 0. if desvar_value is None or desvar_value.size == 0 else np.linalg.norm(desvar_value)
 
                     source_stream_dict[desvar_name] = [float_desvar_value]
-
                     
                     self.y_min[desvar_name] = min(self.y_min[desvar_name], float_desvar_value)
                     self.y_max[desvar_name] = max(self.y_max[desvar_name], float_desvar_value)
@@ -645,7 +576,6 @@ class RealTimeOptPlot(object):
 
                     source_stream_dict[cons_name] = [float_cons_value]
 
-
                     self.y_min[cons_name] = min(self.y_min[cons_name], float_cons_value)
                     self.y_max[cons_name] = max(self.y_max[cons_name], float_cons_value)
                     if self.y_min[cons_name] == self.y_max[cons_name]:
@@ -656,9 +586,6 @@ class RealTimeOptPlot(object):
                 self._source.stream(source_stream_dict)
                 print("done new_data at the end")
 
-        print("adding root")
-        
-        
         
         # Add custom CSS to make the legend scrollable
         custom_css = """
@@ -689,15 +616,6 @@ class RealTimeOptPlot(object):
         </body>
         </html>
         """
-        
-        
-        
-        
-        
-        
-        
-        # doc.add_root(p)
-        # doc.add_root(graph)
         doc.add_periodic_callback(update, 50)
         doc.title = "OpenMDAO Optimization"
 
@@ -720,18 +638,6 @@ def realtime_opt_plot(case_recorder_filename):
     port_number = get_free_port()
 
     try:
-        # import bokeh.settings.settings
-        # settings.log_level = 'debug'
-        # from bokeh.util.info import print_info
-        # print_info()
-        # from bokeh.util.logconfig import bokeh_logger as log
-        # import logging
-        # from bokeh.util.logconfig import basicConfig
-        # basicConfig(level=logging.TRACE)
-
-        # log.info(" -- info INIT TEXT")
-        # log.error(" -- error INIT TEXT")
-
         server = Server({'/': Application(FunctionHandler(_make_realtime_opt_plot_doc))}, port=port_number, 
                         unused_session_lifetime_milliseconds=1000*60*10,
                         )
