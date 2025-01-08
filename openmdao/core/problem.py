@@ -48,9 +48,8 @@ from openmdao.utils.array_utils import scatter_dist_to_local
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
     clear_reports, _load_report_plugins
-from openmdao.utils.general_utils import pad_name, \
-    _find_dict_meta, env_truthy, add_border, match_includes_excludes, \
-    ProblemMetaclass
+from openmdao.utils.general_utils import pad_name, _find_dict_meta, env_truthy, add_border, \
+    match_includes_excludes, ProblemMetaclass, is_undefined
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
@@ -533,7 +532,7 @@ class Problem(object, metaclass=ProblemMetaclass):
             abs_names = name2abs_names(self.model, name)
             if abs_names:
                 val = self.model._get_cached_val(name, abs_names, get_remote=get_remote)
-                if val is not _UNDEFINED:
+                if not is_undefined(val):
                     if indices is not None:
                         val = val[indices]
                     if units is not None:
@@ -544,7 +543,7 @@ class Problem(object, metaclass=ProblemMetaclass):
             val = self.model.get_val(name, units=units, indices=indices, get_remote=get_remote,
                                      from_src=True)
 
-        if val is _UNDEFINED:
+        if is_undefined(val):
             if get_remote:
                 raise KeyError(f'{self.msginfo}: Variable name "{name}" not found.')
             else:
