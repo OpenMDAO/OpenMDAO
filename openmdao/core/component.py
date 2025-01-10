@@ -1965,12 +1965,7 @@ class Component(System):
 
         # Perform the FD here.
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
-            old = self.under_complex_step
-            self._set_complex_step_mode(method=='cs')
-            try:
-                approximation.compute_approximations(self, jac=jac)
-            finally:
-                self._set_complex_step_mode(old)
+            approximation.compute_approximations(self, jac=jac)
 
     def compute_fd_sparsity(self, method='fd', num_full_jacs=2, perturb_size=1e-9):
         """

@@ -1750,6 +1750,8 @@ class System(object, metaclass=SystemMetaclass):
                 if not use_jax:
                     for scheme in self._approx_schemes.values():
                         scheme._reset()  # force a re-initialization of approx
+            elif is_explicit and not is_total:
+                self._apply_nonlinear()  # need this to get the output values into the resids
 
             yield i
 

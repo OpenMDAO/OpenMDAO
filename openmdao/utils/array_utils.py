@@ -186,6 +186,7 @@ def take_nth(rank, size, seq):
                 except StopIteration:
                     return
 
+
 def csr_array_viz(arr, val_map=None, stream=sys.stdout):
     """
     Display the structure of a boolean array in a compact form.
@@ -237,7 +238,7 @@ def get_sparsity_diff_array(sparsity1, sparsity2):
         0: zero val in both
         1: non-zero val in sparsity1
         3: non-zero val in sparsity2
-        4: non-zero val in both
+        4: non-zero val in both.
     """
     assert not (sparsity1 is None and sparsity2 is None), \
         'At least one sparsity pattern must be provided.'
@@ -269,6 +270,20 @@ def get_sparsity_diff_array(sparsity1, sparsity2):
 
 
 def sparsity_diff_viz(arr1, arr2, val_map=None, stream=sys.stdout):
+    """
+    Display the difference between two sparsity patterns in a compact form.
+
+    Parameters
+    ----------
+    arr1 : ndarray
+        First sparsity pattern.
+    arr2 : ndarray
+        Second sparsity pattern.
+    val_map : dict or None
+        Mapping of array values to characters.
+    stream : file-like
+        Stream where output will be written.
+    """
     if val_map is None:
         val_map = {0: '.', 1: '1', 3: '2', 4: 'x'}
     spdiff = get_sparsity_diff_array(arr1, arr2)
