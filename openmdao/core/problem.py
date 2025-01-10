@@ -3609,10 +3609,8 @@ def _format_error(error, tol):
     return f'{error:.6e} *'
 
 
-def _get_fd_options(var, global_method, local_opts, global_step, global_form, global_step_calc,
-                    alloc_complex, global_minimum_step):
-    local_wrt = var
-
+def _get_fd_options(local_wrt, global_method, local_opts, global_step, global_form,
+                    global_step_calc, alloc_complex, global_minimum_step):
     # Determine if fd or cs.
     method = global_method
     if local_wrt in local_opts:

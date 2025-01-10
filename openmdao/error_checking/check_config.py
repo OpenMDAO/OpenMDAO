@@ -637,6 +637,41 @@ def _check_explicitly_connected_promoted_inputs(problem, logger):
                            "promoted up from %s." % (inp, man_group, man_prom, s))
 
 
+def _check_bad_sparsity(problem, logger):
+    """
+    Check for any declared sparsity patterns that don't match the computed sparsity pattern.
+
+    Parameters
+    ----------
+    problem : <Problem>
+        The problem being checked.
+    logger : object
+        The object that manages logging output.
+    """
+    seen = set()
+    for comp in problem.model.system_iter(include_self=True, recurse=True, typ=Component):
+        lst = comp.check_sparsity(out_stream=None)
+        if lst:
+            plen = len(comp.pathname) + 1
+            for of, wrt, computed_rows, computed_cols, rows, cols, shape, pct_nonzero in lst:
+                # don't repeat same class over if diffs are the same
+                chk = (type(comp).__name__, of[plen:], wrt[plen:], tuple(rows), tuple(cols))
+                if chk not in seen:
+                    seen.add(chk)
+                    if not rows:
+                        rows = None
+                    if not cols:
+                        cols = None
+                    logger.warning(f"Component '{comp.pathname}' <class {type(comp).__name__}>: "
+                                   f"Declared sparsity pattern != computed sparsity pattern for "
+                                   f"sub-jacobian ({of[plen:]}, {wrt[plen:]}) with shape {shape} "
+                                   f"and {pct_nonzero:.2f}% nonzeros:\n"
+                                   f"  declared rows: {rows}\n"
+                                   f"  computed rows: {computed_rows}\n"
+                                   f"  declared cols: {cols}\n"
+                                   f"  computed cols: {computed_cols}\n")
+
+
 # Dict of all checks by name, mapped to the corresponding function that performs the check
 # Each function must be of the form  f(problem, logger).
 _default_checks = {
@@ -656,6 +691,7 @@ _all_checks.update({
     'unconnected_inputs': _check_hanging_inputs,
     'promotions': _check_explicitly_connected_promoted_inputs,
     'all_unserializable_options': _check_all_unserializable_options,
+    'sparsity': _check_bad_sparsity,
 })
 
 _all_non_redundant_checks = _all_checks.copy()
