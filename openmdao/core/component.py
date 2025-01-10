@@ -1964,7 +1964,13 @@ class Component(System):
                 added_wrts.add(abs_key[1])
 
         # Perform the FD here.
-        approximation.compute_approximations(self, jac=jac)
+        with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
+            old = self.under_complex_step
+            self._set_complex_step_mode(method=='cs')
+            try:
+                approximation.compute_approximations(self, jac=jac)
+            finally:
+                self._set_complex_step_mode(old)
 
     def compute_fd_sparsity(self, method='fd', num_full_jacs=2, perturb_size=1e-9):
         """
