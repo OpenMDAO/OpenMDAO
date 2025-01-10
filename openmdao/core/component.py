@@ -5,17 +5,18 @@ import types
 from collections import defaultdict
 from collections.abc import Iterable
 from itertools import product
+from io import StringIO
 
 from numbers import Integral
 import numpy as np
 from numpy import ndarray, isscalar, ndim, atleast_1d, atleast_2d, promote_types
-from scipy.sparse import issparse, coo_matrix
+from scipy.sparse import issparse, coo_matrix, csr_matrix
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
     global_meta_names, collect_errors
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.utils.array_utils import shape_to_len, submat_sparsity_iter
+from openmdao.utils.array_utils import shape_to_len, submat_sparsity_iter, sparsity_diff_viz
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_key2abs_key
 from openmdao.utils.mpi import MPI
@@ -2052,15 +2053,24 @@ class Component(System):
                     pct_nonzero = 100. * len(nzrows) / (shape[0] * shape[1])
                     if pct_nonzero > max_nz:
                         continue
-                    ret.append((of, wrt, nzrows, nzcols, rows, cols, shape, pct_nonzero))
+                    if shape[0] > 200 or shape[1] > 200:
+                        mstr = "Sparsity matrix too large to show."
+                    else:
+                        stream = StringIO()
+                        val_map = {0: '.', 1: 'C', 3: 'D', 4: 'x'}
+                        sparsity_diff_viz(csr_matrix((np.ones(len(nzrows)), (nzrows, nzcols)),
+                                                     shape=shape, dtype=bool),
+                                          csr_matrix((np.ones(len(rows)), (rows, cols)),
+                                                     shape=shape, dtype=bool),
+                                          val_map=val_map,
+                                          stream=stream)
+                        mstr = stream.getvalue()
+                    wrn = (f"{self.msginfo}:\n(D)eclared sparsity pattern != (c)omputed sparsity "
+                           f"pattern for sub-jacobian ({of[plen:]}, {wrt[plen:]}) with shape "
+                           f"{shape} and {pct_nonzero:.2f}% nonzeros:\n{mstr}\n")
+                    ret.append((of, wrt, nzrows, nzcols, rows, cols, shape, pct_nonzero, wrn))
                     if out_stream is not None:
-                        print(f"WARNING {self.msginfo}: sparsity for subjacobian "
-                              f"{(of[plen:], wrt[plen:])} of shape {shape}\nwith "
-                              f"{pct_nonzero:.2f}% nonzeros does not match the declared sparsity.\n"
-                              f"  computed rows: {nzrows}\n"
-                              f"  declared rows: {rows}\n"
-                              f"  computed columns: {nzcols}\n"
-                              f"  declared columns: {cols}\n")
+                        print(wrn, file=out_stream)
 
         return ret
 

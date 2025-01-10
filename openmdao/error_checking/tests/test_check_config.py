@@ -559,6 +559,17 @@ class TestCheckConfig(unittest.TestCase):
         testlogger.find_in('warning', msg4)
         testlogger.find_in('warning', msg5)
 
+    def test_sparsity(self):
+        p = om.Problem()
+        root = p.model
+
+        root.add_subsystem("C1", om.ExecComp("y = 2.*x", shape=10))
+        root.add_subsystem("C2", om.ExecComp("y = 3.*x", shape=10, has_diag_partials=True))
+
+        root.connect("C1.y", "C2.x")
+
+        p.setup(check=['sparsity'])
+        p.run_model()
 
 @use_tempdirs
 class TestRecorderCheckConfig(unittest.TestCase):

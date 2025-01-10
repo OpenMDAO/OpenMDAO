@@ -650,26 +650,14 @@ def _check_bad_sparsity(problem, logger):
     """
     seen = set()
     for comp in problem.model.system_iter(include_self=True, recurse=True, typ=Component):
-        lst = comp.check_sparsity(out_stream=None)
-        if lst:
-            plen = len(comp.pathname) + 1
-            for of, wrt, computed_rows, computed_cols, rows, cols, shape, pct_nonzero in lst:
-                # don't repeat same class over if diffs are the same
-                chk = (type(comp).__name__, of[plen:], wrt[plen:], tuple(rows), tuple(cols))
-                if chk not in seen:
-                    seen.add(chk)
-                    if not rows:
-                        rows = None
-                    if not cols:
-                        cols = None
-                    logger.warning(f"Component '{comp.pathname}' <class {type(comp).__name__}>: "
-                                   f"Declared sparsity pattern != computed sparsity pattern for "
-                                   f"sub-jacobian ({of[plen:]}, {wrt[plen:]}) with shape {shape} "
-                                   f"and {pct_nonzero:.2f}% nonzeros:\n"
-                                   f"  declared rows: {rows}\n"
-                                   f"  computed rows: {computed_rows}\n"
-                                   f"  declared cols: {cols}\n"
-                                   f"  computed cols: {computed_cols}\n")
+        plen = len(comp.pathname) + 1
+        for of, wrt, computed_rows, computed_cols, rows, cols, shape, pct_nonzero, wrn in \
+                comp.check_sparsity(out_stream=None):
+            # don't repeat same class over if diffs are the same
+            chk = (type(comp).__name__, of[plen:], wrt[plen:], tuple(rows), tuple(cols))
+            if chk not in seen:
+                seen.add(chk)
+                logger.warning(wrn)
 
 
 # Dict of all checks by name, mapped to the corresponding function that performs the check
