@@ -177,7 +177,7 @@ class ComplexStep(ApproximationScheme):
         """
         return array.imag
 
-    def _run_point(self, system, idx_info, delta, result_array, total, idx_range=range(0)):
+    def _run_point(self, system, idx_info, delta, result_array, total, idx_range=range(1)):
         """
         Perturb the system inputs with a complex step, run, and return the results.
 

@@ -291,7 +291,7 @@ class FiniteDifference(ApproximationScheme):
         """
         return array.real
 
-    def _run_point(self, system, idx_info, data, results_array, total, idx_range=range(0)):
+    def _run_point(self, system, idx_info, data, results_array, total, idx_range=range(1)):
         """
         Alter the specified inputs by the given deltas, run the system, and return the results.
 
