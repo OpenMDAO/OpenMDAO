@@ -2013,9 +2013,8 @@ class Component(System):
         -------
         list
             A list of tuples, one for each subjacobian that has a mismatch between the computed
-            sparsity and the declared sparsity.  Each tuple contains the following items:
-               of, wrt, computed_rows, computed_cols, declared_rows, declared_cols, shape,
-               pct_nonzero
+            sparsity and the declared sparsity.  Each tuple has the form (of, wrt, computed_rows,
+            computed_cols, declared_rows, declared_cols, shape, pct_nonzero)
         """
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
