@@ -1167,7 +1167,7 @@ class Coloring(object):
         if good_tol is not None:
             print(f"Sparsity computed using tolerance: {meta['good_tol']}.", file=out_stream)
             if meta['n_tested'] > 1:
-                jsize = np.product(self._shape)
+                jsize = np.prod(self._shape)
                 print(f"Most common number of nonzero entries ({meta['nz_entries']} of {jsize}) "
                       f"repeated {meta['nz_matches']} times out of {meta['n_tested']} tolerances "
                       "tested.\n", file=out_stream)
