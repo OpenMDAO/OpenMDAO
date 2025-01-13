@@ -215,8 +215,7 @@ def csr_array_viz(arr, val_map=None, stream=sys.stdout):
         rowinds = row.indices
         rowarr[:] = 0
         rowarr[rowinds] = row.data
-        for c in rowarr:
-            stream.write(val_map[c])
+        stream.write(''.join(val_map[c] for c in rowarr))
         stream.write(f'  {r}\n')
 
 

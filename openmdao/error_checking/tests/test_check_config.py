@@ -568,8 +568,26 @@ class TestCheckConfig(unittest.TestCase):
 
         root.connect("C1.y", "C2.x")
 
-        p.setup(check=['sparsity'])
+        testlogger = TestLogger()
+        p.setup(check=['sparsity'], logger=testlogger)
         p.run_model()
+        full = ''.join(testlogger.get('warning'))
+        self.assertTrue("'C1' <class ExecComp>:" in full)
+        self.assertTrue("(D)eclared sparsity pattern != (c)omputed sparsity pattern for sub-jacobian (y, x) with shape (10, 10) and 10.00% nonzeros:" in full)
+        arraystr = """
+C.........  0
+.C........  1
+..C.......  2
+...C......  3
+....C.....  4
+.....C....  5
+......C...  6
+.......C..  7
+........C.  8
+.........C  9
+""".strip()
+        self.assertTrue(arraystr in full)
+        self.assertFalse("'C2'" in full)
 
 @use_tempdirs
 class TestRecorderCheckConfig(unittest.TestCase):
