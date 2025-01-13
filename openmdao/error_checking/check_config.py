@@ -11,6 +11,7 @@ import pickle
 from openmdao.core.group import Group
 from openmdao.core.component import Component
 from openmdao.core.implicitcomponent import ImplicitComponent
+from openmdao.utils.array_utils import array_hash
 from openmdao.utils.graph_utils import get_sccs_topo
 from openmdao.utils.logger_utils import get_logger, TestLogger
 from openmdao.utils.mpi import MPI
@@ -651,10 +652,12 @@ def _check_bad_sparsity(problem, logger):
     seen = set()
     for comp in problem.model.system_iter(include_self=True, recurse=True, typ=Component):
         plen = len(comp.pathname) + 1
-        for of, wrt, computed_rows, computed_cols, rows, cols, shape, pct_nonzero, wrn in \
+        for of, wrt, computed_rows, computed_cols, rows, cols, _, _, wrn in \
                 comp.check_sparsity(out_stream=None):
             # don't repeat same class over if diffs are the same
-            chk = (type(comp).__name__, of[plen:], wrt[plen:], tuple(rows), tuple(cols))
+            chk = (type(comp).__name__, of[plen:], wrt[plen:],
+                   array_hash(np.asarray(rows)), array_hash(np.asarray(cols)),
+                   array_hash(np.asarray(computed_rows)), array_hash(np.asarray(computed_cols)))
             if chk not in seen:
                 seen.add(chk)
                 logger.warning(wrn)
