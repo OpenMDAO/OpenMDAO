@@ -954,8 +954,7 @@ def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, s
             submat = csc[:, col_start:col_end].tocoo()
             col_start = col_end
 
-            if True:  # submat.row.size > 0:  # only yield if nonzero
-                yield (of, wrt, submat.row, submat.col, submat.shape)
+            yield (of, wrt, submat.row, submat.col, submat.shape)
 
 
 def idxs2minmax_tuples(idxs):
