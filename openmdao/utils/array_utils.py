@@ -954,7 +954,7 @@ def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, s
             submat = csc[:, col_start:col_end].tocoo()
             col_start = col_end
 
-            if submat.row.size > 0:  # only yield if nonzero
+            if True:  # submat.row.size > 0:  # only yield if nonzero
                 yield (of, wrt, submat.row, submat.col, submat.shape)
 
 
