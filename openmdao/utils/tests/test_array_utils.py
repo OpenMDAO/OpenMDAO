@@ -128,6 +128,8 @@ class TestSubmatSparsityIter(unittest.TestCase):
         result = list(submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, shape))
         expected = [
             ('a', 'c', np.array([0, 1]), np.array([0, 1]), (2, 2)),
+            ('a', 'd', np.array([]), np.array([]), (2, 2)),
+            ('b', 'c', np.array([]), np.array([]), (2, 2)),
             ('b', 'd', np.array([0, 1]), np.array([0, 1]), (2, 2)),
         ]
         self._check_results(expected, result)
@@ -141,6 +143,8 @@ class TestSubmatSparsityIter(unittest.TestCase):
         result = list(submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, shape))
         expected = [
             ('a', 'c', np.array([0]), np.array([0]), (2, 2)),
+            ('a', 'd', np.array([]), np.array([]), (2, 2)),
+            ('b', 'c', np.array([]), np.array([]), (2, 2)),
             ('b', 'd', np.array([1]), np.array([1]), (2, 2))
         ]
         self._check_results(expected, result)
