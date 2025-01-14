@@ -345,15 +345,15 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         abs_error = data['comp']['y', 'x1']['abs error']
         rel_error = data['comp']['y', 'x1']['rel error']
-        self.assertAlmostEqual(abs_error.forward, 0.)
-        self.assertAlmostEqual(rel_error.forward, 0.)
+        self.assertAlmostEqual(abs_error.fwd, 0.)
+        self.assertAlmostEqual(rel_error.fwd, 0.)
         self.assertAlmostEqual(np.linalg.norm(data['comp']['y', 'x1']['J_fd'] - 3.), 0.,
                                delta=1e-6)
 
         abs_error = data['comp']['y', 'x2']['abs error']
         rel_error = data['comp']['y', 'x2']['rel error']
-        self.assertAlmostEqual(abs_error.forward, 4.)
-        self.assertAlmostEqual(rel_error.forward, 1.)
+        self.assertAlmostEqual(abs_error.fwd, 4.)
+        self.assertAlmostEqual(rel_error.fwd, 1.)
         self.assertAlmostEqual(np.linalg.norm(data['comp']['y', 'x2']['J_fd'] - 4.), 0.,
                                delta=1e-6)
 
@@ -2332,11 +2332,11 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         x1_error = data['comp']['y', 'x1']['abs error']
 
-        assert_near_equal(x1_error.forward, 1., 1e-8)
+        assert_near_equal(x1_error.fwd, 1., 1e-8)
 
         x2_error = data['comp']['y', 'x2']['rel error']
 
-        assert_near_equal(x2_error.forward, 9., 1e-8)
+        assert_near_equal(x2_error.fwd, 9., 1e-8)
 
     def test_feature_check_partials_suppress(self):
 

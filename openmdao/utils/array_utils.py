@@ -1011,3 +1011,61 @@ def safe_norm(arr):
         Norm of the array or 0 if the array is None or empty.
     """
     return 0. if arr is None or arr.size == 0 else np.linalg.norm(arr)
+
+
+def flat_to_2d_idx(flat_idx, shape):
+    """
+    Convert a flat index into a 2D index.
+
+    Parameters
+    ----------
+    flat_idx : int
+        Flat index to be converted.
+
+    Returns
+    -------
+    tuple
+        Index into a 2D array.
+    """
+    nrows, ncols = shape
+    return flat_idx // nrows, flat_idx % ncols
+
+
+def get_errors_and_mags(x, y):
+    """
+    Compute the max absolute and relative errors and the magnitudes of the difference in x and y.
+
+    Parameters
+    ----------
+    x : ndarray
+        The first array.
+    y : ndarray
+        The second array.
+
+    Returns
+    -------
+    tuple
+        Tuple of (max_abs_error, abs_mag_x, abs_mag_y, max_rel_error, rel_mag_x, rel_mag_y).
+    """
+    abs_error = abs(x - y)
+    max_abs_error_idx = np.argmax(abs_error)
+    max_abs_error = abs_error.flat[max_abs_error_idx]
+    abs_mag_x =np.abs(x.flat[max_abs_error_idx])
+    abs_mag_y = np.abs(y.flat[max_abs_error_idx])
+
+    # note: this definition of relative error matches that one
+    # used by assert_allclose (found in np.isclose)
+    # Filter values where the divisor would be zero
+    nonzero = y != 0
+    if not nonzero.any():
+        max_rel_error = float('nan')
+        rel_mag_x = 0.0
+        rel_mag_y = 0.0
+    else:
+        max_rel_error_nz = abs_error[nonzero] / np.abs(y[nonzero])
+        max_rel_error_idx = np.argmax(max_rel_error_nz)
+        max_rel_error = max_rel_error_nz.flat[max_rel_error_idx]
+        rel_mag_x = np.abs(x[nonzero].flat[max_rel_error_idx])
+        rel_mag_y = np.abs(y[nonzero].flat[max_rel_error_idx])
+
+    return max_abs_error, abs_mag_x, abs_mag_y, max_rel_error, rel_mag_x, rel_mag_y
