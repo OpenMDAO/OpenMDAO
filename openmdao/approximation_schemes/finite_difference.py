@@ -337,7 +337,7 @@ class FiniteDifference(ApproximationScheme):
             else:
                 results_array[:] = 0.
 
-        elif current_coeff:
+        elif not isinstance(current_coeff, np.ndarray) and current_coeff:
             current_vec = system._outputs if total else system._residuals
             # copy data from outputs (if doing total derivs) or residuals (if doing partials)
             results_array[:] = current_vec.asarray()
