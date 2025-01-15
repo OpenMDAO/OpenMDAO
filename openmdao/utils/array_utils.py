@@ -1056,13 +1056,13 @@ def get_errors_and_mags(x, y):
     # note: this definition of relative error matches that one
     # used by assert_allclose (found in np.isclose)
     # Filter values where the divisor would be zero
-    nonzero = y != 0
+    nonzero = x != 0
     if not nonzero.any():
         max_rel_error = float('nan')
         rel_mag_x = 0.0
         rel_mag_y = 0.0
     else:
-        max_rel_error_nz = abs_error[nonzero] / np.abs(y[nonzero])
+        max_rel_error_nz = abs_error[nonzero] / np.abs(x[nonzero])
         max_rel_error_idx = np.argmax(max_rel_error_nz)
         max_rel_error = max_rel_error_nz.flat[max_rel_error_idx]
         rel_mag_x = np.abs(x[nonzero].flat[max_rel_error_idx])

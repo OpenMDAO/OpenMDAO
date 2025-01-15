@@ -308,8 +308,8 @@ def _fix_comp_check_data(data):
     data : dict
         Dictionary containing derivative information keyed by subjac.
     """
-    names = ['J_fd', 'abs error', 'rel error', 'magnitude', 'directional_fd_fwd',
-             'directional_fd_rev']
+    names = ['J_fd', 'abs error', 'rel error', 'magnitude', 'magnitude_rel',
+             'directional_fd_fwd', 'directional_fd_rev']
 
     for name in names:
         if name in data:

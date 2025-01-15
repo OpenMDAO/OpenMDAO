@@ -7184,8 +7184,6 @@ class System(object, metaclass=SystemMetaclass):
                                                err_desc])
                         assert abs_err.fwd_rev is None
                         assert rel_err.fwd_rev is None
-                        assert abs_err.rev is None
-                        assert rel_err.rev is None
 
                     # See if this subjacobian has the greater error in the derivative computation
                     # compared to the other subjacobians so far
@@ -7326,7 +7324,7 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
         steps = derivative_info['steps']
     except KeyError:
         # this can happen when a partial is not declared, which means it should be zero
-        fdinfo = (np.zeros(1),)
+        fdinfo = (None,)
         steps = (None,)
 
     derivative_info['abs error'] = []
@@ -7378,6 +7376,10 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
             if Jreverse is not None:
                 (abs_errs.rev, abs_mags.fd, abs_mags.rev,
                  rel_errs.rev, rel_mags.fd, rel_mags.rev) = get_errors_and_mags(fd, Jreverse)
+
+        if fd is not None and Jforward is None and Jreverse is None:
+            (abs_errs.rev, abs_mags.fd, abs_mags.rev,
+             rel_errs.rev, rel_mags.fd, rel_mags.rev) = get_errors_and_mags(fd, np.zeros_like(fd))
 
         derivative_info['abs error'].append(abs_errs)
         derivative_info['rel error'].append(rel_errs)

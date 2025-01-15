@@ -54,6 +54,7 @@ from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_d
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.file_utils import _get_outputs_dir, text2html, get_work_dir
+from openmdao.utils.testing_utils import _fix_comp_check_data
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -2539,13 +2540,6 @@ def _fix_check_data(data):
     data : dict
         Dictionary containing derivative information keyed by system name.
     """
-    names = ['J_fd', 'abs error', 'rel error', 'magnitude', 'directional_fd_fwd',
-             'directional_fd_rev']
-
     for sdata in data.values():
         for dct in sdata.values():
-            for name in names:
-                if name in dct:
-                    dct[name] = dct[name][0]
-            if 'steps' in dct:
-                del dct['steps']
+            _fix_comp_check_data(dct)
