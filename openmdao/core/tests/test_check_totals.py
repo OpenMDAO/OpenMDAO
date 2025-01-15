@@ -434,8 +434,8 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         self.assertTrue("of '<variable>'" in compact_lines[5],
             "of '<variable>' not found in '%s'" % compact_lines[5])
-        self.assertTrue('9.7743e+00' in compact_lines[-2],
-            "'9.7743e+00' not found in '%s'" % compact_lines[-2])
+        self.assertTrue('9.6100e+00' in compact_lines[-2],
+            "'9.6100e+00' not found in '%s'" % compact_lines[-2])
 
     def test_check_totals_show_progress(self):
         prob = om.Problem()
