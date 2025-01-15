@@ -713,7 +713,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         # This will fail unless you set the check_step.
         x_error = data['comp']['f_xy', 'x']['rel error']
-        self.assertLess(x_error.forward, 1e-5)
+        self.assertLess(x_error.fwd, 1e-5)
 
     def test_set_step_global(self):
         prob = om.Problem()
@@ -734,7 +734,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         # This will fail unless you set the global step.
         x_error = data['comp']['f_xy', 'x']['rel error']
-        self.assertLess(x_error.forward, 1e-5)
+        self.assertLess(x_error.fwd, 1e-5)
 
     def test_complex_step_not_allocated(self):
         prob = om.Problem()
@@ -829,7 +829,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         # This will fail unless you set the check_step.
         x_error = data['comp']['f_xy', 'x']['rel error']
-        self.assertLess(x_error.forward, 1e-3)
+        self.assertLess(x_error.fwd, 1e-3)
 
     def test_set_form_global(self):
         prob = om.Problem()
@@ -850,7 +850,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         # This will fail unless you set the check_step.
         x_error = data['comp']['f_xy', 'x']['rel error']
-        self.assertLess(x_error.forward, 1e-3)
+        self.assertLess(x_error.fwd, 1e-3)
 
     def test_set_step_calc_on_comp(self):
         prob = om.Problem()
@@ -873,7 +873,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         # This will fail unless you set the check_step.
         x_error = data['comp']['f_xy', 'x']['rel error']
-        self.assertLess(x_error.forward, 3e-3)
+        self.assertLess(x_error.fwd, 3e-3)
 
     def test_set_step_calc_global(self):
         prob = om.Problem()
@@ -894,7 +894,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         # This will fail unless you set the global step.
         x_error = data['comp']['f_xy', 'x']['rel error']
-        self.assertLess(x_error.forward, 3e-3)
+        self.assertLess(x_error.fwd, 3e-3)
 
     def test_set_check_option_precedence(self):
         # Test that we omit derivs declared with dependent=False

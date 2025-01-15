@@ -2136,7 +2136,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 nsubjacs = 18
                 self.assertEqual(contents.count("step"), 1)
                 # check number of rows/cols
-                self.assertEqual(contents.count("+-------------------------------+------------------+-------------+-------------+-------------+-------------+-------------+--------------------+"), (nsubjacs*2) + 1)
+                self.assertEqual(contents.count("+-------------------------------+------------------+-------------+-------------+-------------+-------------+-------------+------------+"), (nsubjacs*2) + 1)
 
     def test_multi_cs_steps_compact(self):
         for mode in ('fwd', 'rev'):

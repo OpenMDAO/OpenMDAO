@@ -6859,7 +6859,7 @@ class System(object, metaclass=SystemMetaclass):
 
         print(f"{add_border(title, '-')}\n", file=sys_buffer)
 
-        for key, fd_norm, fd_opts, directional, above_abs, above_rel, inconsistent in err_iter:
+        for key, max_mag, fd_opts, directional, above_abs, above_rel, inconsistent in err_iter:
 
             if above_abs or above_rel or inconsistent:
                 num_bad_jacs += 1
@@ -6884,6 +6884,7 @@ class System(object, metaclass=SystemMetaclass):
             abs_errs = derivative_info['abs error']
             rel_errs = derivative_info['rel error']
             magnitudes = derivative_info['magnitude']
+            denom_idxs = derivative_info['denom_idx']
             steps = derivative_info['steps']
 
             Jfor = derivative_info.get('J_fwd')
@@ -6893,14 +6894,6 @@ class System(object, metaclass=SystemMetaclass):
                 stepstrs = [f", step={step}" for step in steps]
             else:
                 stepstrs = [""]
-
-            if fd_norm == 0.:
-                if magnitudes[0].fwd is None:
-                    divname = 'Jrev'
-                else:
-                    divname = 'Jfor'
-            else:
-                divname = 'Jfd'
 
             # Magnitudes
             sys_buffer.write(f"  {sys_name}: {of} wrt {wrt}")
@@ -6952,6 +6945,14 @@ class System(object, metaclass=SystemMetaclass):
             sys_buffer.write('\n')
 
             for i in range(len(magnitudes)):
+                if denom_idxs[i] > 0:
+                    if magnitudes[i].fwd is None:
+                        divname = 'Jrev'
+                    else:
+                        divname = 'Jfor'
+                else:
+                    divname = 'Jfd'
+
                 # Relative Errors
                 if directional:
                     if totals and rel_errs[i].fwd is not None:
@@ -7136,9 +7137,11 @@ class System(object, metaclass=SystemMetaclass):
             abs_errs = derivative_info['abs error']
             rel_errs = derivative_info['rel error']
             magnitudes = derivative_info['magnitude']
+            rel_magnitudes = derivative_info['magnitude_rel']
             steps = derivative_info['steps']
 
-            for magnitude, abs_err, rel_err, step in zip(magnitudes, abs_errs, rel_errs, steps):
+            for magnitude, magnitude_rel, abs_err, rel_err, step in zip(magnitudes, rel_magnitudes,
+                                                                        abs_errs, rel_errs, steps):
                 if magnitude.rev is not None:
                     calc_mag = magnitude.rev
                     calc_abs = abs_err.rev
@@ -7221,6 +7224,7 @@ class System(object, metaclass=SystemMetaclass):
 
 class _ErrorData(object):
     __slots__ = ['fwd', 'rev', 'fwd_rev']
+
     def __init__(self, fwd=None, rev=None, fwd_rev=None):
         self.fwd = fwd
         self.rev = rev
@@ -7246,6 +7250,7 @@ class _ErrorData(object):
 
 class _MagnitudeData(object):
     __slots__ = ['fwd', 'rev', 'fd']
+
     def __init__(self, fwd=None, rev=None, fd=None):
         self.fwd = fwd
         self.rev = rev
@@ -7331,6 +7336,7 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
     derivative_info['rel error'] = []
     derivative_info['magnitude'] = []
     derivative_info['magnitude_rel'] = []
+    derivative_info['denom_idx'] = []
     derivative_info['steps'] = []
 
     abs_errs = _ErrorData()
@@ -7344,11 +7350,12 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
             if Jforward is not None and Jreverse is not None:
                 mhatdotm, dhatdotd = derivative_info['directional_fwd_rev']
                 (abs_errs.fwd_rev, abs_mags.rev, abs_mags.fwd,
-                 rel_errs.fwd_rev, rel_mags.rev, rel_mags.fwd) = get_errors_and_mags(mhatdotm,
-                                                                                     dhatdotd)
+                 rel_errs.fwd_rev, rel_mags.rev, rel_mags.fwd, didx) = get_errors_and_mags(mhatdotm,
+                                                                                           dhatdotd)
         elif not totals:
             (abs_errs.fwd_rev, abs_mags.fwd, abs_mags.rev,
-             rel_errs.fwd_rev, rel_mags.fwd, rel_mags.rev) = get_errors_and_mags(Jforward, Jreverse)
+             rel_errs.fwd_rev, rel_mags.fwd, rel_mags.rev, didx) = get_errors_and_mags(Jforward,
+                                                                                       Jreverse)
 
     for i, fd in enumerate(fdinfo):
         step = steps[i]
@@ -7358,34 +7365,42 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
                 if totals:
                     mhatdotm, dhatdotd = derivative_info['directional_fd_fwd'][i]
                     (abs_errs.fwd, abs_mags.fwd, abs_mags.fd,
-                     rel_errs.fwd, rel_mags.fwd, rel_mags.fd) = get_errors_and_mags(mhatdotm,
-                                                                                    dhatdotd)
+                     rel_errs.fwd, rel_mags.fwd, rel_mags.fd, didx) = get_errors_and_mags(mhatdotm,
+                                                                                          dhatdotd)
                 else:
                     (abs_errs.fwd, abs_mags.fd, abs_mags.fwd,
-                     rel_errs.fwd, rel_mags.fd, rel_mags.fwd) = get_errors_and_mags(fd, Jforward)
+                     rel_errs.fwd, rel_mags.fd, rel_mags.fwd, didx) = get_errors_and_mags(fd,
+                                                                                          Jforward)
 
             if Jreverse is not None:
                 mhatdotm, dhatdotd = derivative_info['directional_fd_rev'][i]
                 (abs_errs.rev, abs_mags.fd, abs_mags.rev,
-                 rel_errs.rev, rel_mags.fd, rel_mags.rev) = get_errors_and_mags(mhatdotm, dhatdotd)
+                 rel_errs.rev, rel_mags.fd, rel_mags.rev, didx) = get_errors_and_mags(mhatdotm,
+                                                                                      dhatdotd)
+                if not totals:
+                    # FIXME: for agreement with old code but not sure why we do this
+                    rel_mags.rev = None
+                    abs_mags.rev = None
         else:
             if Jforward is not None:
                 (abs_errs.fwd, abs_mags.fd, abs_mags.fwd,
-                 rel_errs.fwd, rel_mags.fd, rel_mags.fwd) = get_errors_and_mags(fd, Jforward)
+                 rel_errs.fwd, rel_mags.fd, rel_mags.fwd, didx) = get_errors_and_mags(fd, Jforward)
 
             if Jreverse is not None:
                 (abs_errs.rev, abs_mags.fd, abs_mags.rev,
-                 rel_errs.rev, rel_mags.fd, rel_mags.rev) = get_errors_and_mags(fd, Jreverse)
+                 rel_errs.rev, rel_mags.fd, rel_mags.rev, didx) = get_errors_and_mags(fd, Jreverse)
 
         if fd is not None and Jforward is None and Jreverse is None:
             (abs_errs.rev, abs_mags.fd, abs_mags.rev,
-             rel_errs.rev, rel_mags.fd, rel_mags.rev) = get_errors_and_mags(fd, np.zeros_like(fd))
+             rel_errs.rev, rel_mags.fd, rel_mags.rev, didx) = get_errors_and_mags(fd,
+                                                                                  np.zeros_like(fd))
 
         derivative_info['abs error'].append(abs_errs)
         derivative_info['rel error'].append(rel_errs)
 
         derivative_info['magnitude'].append(abs_mags)
         derivative_info['magnitude_rel'].append(rel_mags)
+        derivative_info['denom_idx'].append(didx)
         derivative_info['steps'].append(step)
 
     return max([mag.max() for mag in derivative_info['magnitude']])

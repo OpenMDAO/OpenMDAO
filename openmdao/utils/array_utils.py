@@ -1021,6 +1021,8 @@ def flat_to_2d_idx(flat_idx, shape):
     ----------
     flat_idx : int
         Flat index to be converted.
+    shape : tuple
+        Shape of the 2D array.
 
     Returns
     -------
@@ -1045,27 +1047,38 @@ def get_errors_and_mags(x, y):
     Returns
     -------
     tuple
-        Tuple of (max_abs_error, abs_mag_x, abs_mag_y, max_rel_error, rel_mag_x, rel_mag_y).
+        Tuple of (max_abs_error, abs_mag_x, abs_mag_y, max_rel_error, rel_mag_x, rel_mag_y,
+        denom_idx), where denom_idx is the index specifying which argument was used as the
+        denominator in the relative error.
     """
+    args = (x, y)
     abs_error = abs(x - y)
+    if abs_error.size == 0:
+        return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0
+
     max_abs_error_idx = np.argmax(abs_error)
     max_abs_error = abs_error.flat[max_abs_error_idx]
-    abs_mag_x =np.abs(x.flat[max_abs_error_idx])
+    abs_mag_x = np.abs(x.flat[max_abs_error_idx])
     abs_mag_y = np.abs(y.flat[max_abs_error_idx])
 
-    # note: this definition of relative error matches that one
-    # used by assert_allclose (found in np.isclose)
     # Filter values where the divisor would be zero
+    denom_idx = 0
     nonzero = x != 0
     if not nonzero.any():
-        max_rel_error = float('nan')
-        rel_mag_x = 0.0
-        rel_mag_y = 0.0
-    else:
-        max_rel_error_nz = abs_error[nonzero] / np.abs(x[nonzero])
-        max_rel_error_idx = np.argmax(max_rel_error_nz)
-        max_rel_error = max_rel_error_nz.flat[max_rel_error_idx]
-        rel_mag_x = np.abs(x[nonzero].flat[max_rel_error_idx])
-        rel_mag_y = np.abs(y[nonzero].flat[max_rel_error_idx])
+        nonzero = y != 0
+        if not nonzero.any():
+            max_rel_error = float('nan')
+            rel_mag_x = 0.0
+            rel_mag_y = 0.0
+            return max_abs_error, abs_mag_x, abs_mag_y, max_rel_error, rel_mag_x, rel_mag_y, \
+                denom_idx
+        else:
+            denom_idx = 1
 
-    return max_abs_error, abs_mag_x, abs_mag_y, max_rel_error, rel_mag_x, rel_mag_y
+    max_rel_error_nz = abs_error[nonzero] / np.abs(args[denom_idx][nonzero])
+    max_rel_error_idx = np.argmax(max_rel_error_nz)
+    max_rel_error = max_rel_error_nz.flat[max_rel_error_idx]
+    rel_mag_x = np.abs(x[nonzero].flat[max_rel_error_idx])
+    rel_mag_y = np.abs(y[nonzero].flat[max_rel_error_idx])
+
+    return max_abs_error, abs_mag_x, abs_mag_y, max_rel_error, rel_mag_x, rel_mag_y, denom_idx
