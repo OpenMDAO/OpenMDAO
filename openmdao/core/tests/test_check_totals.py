@@ -428,7 +428,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         # Test compact_print output
         compact_stream = StringIO()
-        assert_check_totals(prob.check_totals(method='fd', out_stream=compact_stream, compact_print=True))
+        assert_check_totals(prob.check_totals(method='cs', out_stream=compact_stream, compact_print=True))
 
         compact_lines = compact_stream.getvalue().splitlines()
 

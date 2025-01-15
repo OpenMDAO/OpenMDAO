@@ -6859,7 +6859,7 @@ class System(object, metaclass=SystemMetaclass):
 
         print(f"{add_border(title, '-')}\n", file=sys_buffer)
 
-        for key, max_mag, fd_opts, directional, above_abs, above_rel, inconsistent in err_iter:
+        for key, _, fd_opts, directional, above_abs, above_rel, inconsistent in err_iter:
 
             if above_abs or above_rel or inconsistent:
                 num_bad_jacs += 1
