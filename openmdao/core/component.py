@@ -5,19 +5,20 @@ import types
 from collections import defaultdict
 from collections.abc import Iterable
 from itertools import product
+from io import StringIO
 
 from numbers import Integral
 import numpy as np
 from numpy import ndarray, isscalar, ndim, atleast_1d, atleast_2d, promote_types
-from scipy.sparse import issparse, coo_matrix
+from scipy.sparse import issparse, coo_matrix, csr_matrix
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
     global_meta_names, collect_errors
-from openmdao.core.constants import INT_DTYPE
+from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.utils.array_utils import shape_to_len, submat_sparsity_iter
+from openmdao.utils.array_utils import shape_to_len, submat_sparsity_iter, sparsity_diff_viz
 from openmdao.utils.units import simplify_unit
-from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key
+from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_key2abs_key
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     find_matches, make_set, inconsistent_across_procs
@@ -1454,6 +1455,23 @@ class Component(System):
 
         return opts
 
+    def _get_approx_partial_options(self, key, method='fd', checkopts=None):
+        # TODO: extend this to Groups
+        approx = self._get_approx_scheme(method)
+        options = approx.DEFAULT_OPTIONS.copy()
+        if checkopts is None:
+            options.update(approx._wrt_meta)
+        else:
+            options.update(checkopts)
+            options.update(approx._wrt_meta)
+
+        abs_key = rel_key2abs_key(self, key)
+        if abs_key in self._subjacs_info:
+            meta = self._subjacs_info[abs_key]
+            options.update({k: v for k, v in meta.items() if v is not None and k in options})
+
+        return options
+
     def _resolve_partials_patterns(self, of, wrt, pattern_meta):
         """
         Store subjacobian metadata for specific of, wrt pairs after resolving glob patterns.
@@ -1528,6 +1546,10 @@ class Component(System):
             if abs_key in self._subjacs_info:
                 meta = self._subjacs_info[abs_key]
                 meta.update(patmeta_not_none)
+                if 'rows' in meta and meta['rows'] is not None:
+                    rows = meta['rows']
+                if 'cols' in meta and meta['cols'] is not None:
+                    cols = meta['cols']
             else:
                 meta = patmeta.copy()
 
@@ -1650,11 +1672,9 @@ class Component(System):
             of_pattern, of_matches = of_bundle
             wrt_pattern, wrt_matches = wrt_bundle
             if not of_matches:
-                raise ValueError('{}: No matches were found for of="{}"'.format(self.msginfo,
-                                                                                of_pattern))
+                raise ValueError(f'{self.msginfo}: No matches were found for of="{of_pattern}"')
             if not wrt_matches:
-                raise ValueError('{}: No matches were found for wrt="{}"'.format(self.msginfo,
-                                                                                 wrt_pattern))
+                raise ValueError(f'{self.msginfo}: No matches were found for wrt="{wrt_pattern}"')
             yield from abs_key_iter(self, of_matches, wrt_matches)
 
     def _find_of_matches(self, pattern, use_resname=False):
@@ -1905,42 +1925,154 @@ class Component(System):
         meta['base'] = 'ExplicitComponent' if self.is_explicit() else 'ImplicitComponent'
         return meta
 
-    def check_subjac_sparsity(self):
+    def compute_fd_jac(self, jac, method='fd'):
         """
-        Check the declared sparsity of the sub-jacobians vs. the computed sparsity.
-        """
-        sparsity, _ = self.compute_sparsity()
-        full_nzrows = sparsity.row
-        full_nzcols = sparsity.col
+        Force the use of finite difference to compute a jacobian.
 
-        def row_size_iter():
+        This can be used to compute sparsity for a component that computes derivatives analytically
+        in order to check the accuracy of the declared sparsity.
+
+        Parameters
+        ----------
+        jac : Jacobian
+            The Jacobian object that will contain the computed jacobian.
+        method : str
+            The type of finite difference to perform. Valid options are 'fd' for forward difference,
+            or 'cs' for complex step.
+        """
+        fd_methods = {'fd': _supported_methods['fd'], 'cs': _supported_methods['cs']}
+        try:
+            approximation = fd_methods[method]()
+        except KeyError:
+            raise ValueError(f"Method '{method}' is not a recognized finite difference method.")
+
+        # these are relative names
+        of = self._get_partials_ofs()
+        wrt = self._get_partials_wrts()
+
+        local_opts = self._get_check_partial_options()
+        added_wrts = set()
+
+        for rel_key in product(of, wrt):
+            fd_options = self._get_approx_partial_options(rel_key, method=method,
+                                                          checkopts=local_opts)
+            abs_key = rel_key2abs_key(self, rel_key)
+
+            # prevent adding multiple approxs with same wrt (and confusing users with warnings)
+            if abs_key[1] not in added_wrts:
+                approximation.add_approximation(abs_key, self, fd_options)
+                added_wrts.add(abs_key[1])
+
+        # Perform the FD here.
+        with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
+            approximation.compute_approximations(self, jac=jac)
+
+    def compute_fd_sparsity(self, method='fd', num_full_jacs=2, perturb_size=1e-9):
+        """
+        Use finite difference to compute a sparsity matrix.
+
+        Parameters
+        ----------
+        method : str
+            The type of finite difference to perform. Valid options are 'fd' for forward difference,
+            or 'cs' for complex step.
+        num_full_jacs : int
+            Number of times to repeat jacobian computation using random perturbations.
+        perturb_size : float
+            Size of the random perturbation.
+
+        Returns
+        -------
+        coo_matrix
+            The sparsity matrix.
+        """
+        jac = coloring_mod._ColSparsityJac(self)
+        for _ in self._perturbation_iter(num_full_jacs, perturb_size):
+            self.compute_fd_jac(jac=jac, method=method)
+        return jac.get_sparsity()
+
+    def check_sparsity(self, method='fd', max_nz=90., out_stream=_DEFAULT_OUT_STREAM):
+        """
+        Check the sparsity of the computed jacobian against the declared sparsity.
+
+        Check is skipped if one of the dimensions of the jacobian is 1 or if the percentage of
+        nonzeros in the computed jacobian is greater than max_nz%.
+
+        Parameters
+        ----------
+        method : str
+            The type of finite difference to perform. Valid options are 'fd' for forward difference,
+            or 'cs' for complex step.
+        max_nz : float
+            If the percentage of nonzeros in a sub-jacobian exceeds this, no warning is issued if
+            the computed sparsity does not match the declared sparsity.
+        out_stream : file-like object
+            Where to send the output.  If None, output will be suppressed.
+
+        Returns
+        -------
+        list
+            A list of tuples, one for each subjacobian that has a mismatch between the computed
+            sparsity and the declared sparsity.  Each tuple has the form (of, wrt, computed_rows,
+            computed_cols, declared_rows, declared_cols, shape, pct_nonzero).
+        """
+        if out_stream == _DEFAULT_OUT_STREAM:
+            out_stream = sys.stdout
+
+        def rowsizeiter():
             for of, start, end, _, _ in self._jac_of_iter():
                 yield of, end - start
 
-        def col_size_iter():
+        def colsizeiter():
             for wrt, start, end, _, _, _ in self._jac_wrt_iter():
                 yield wrt, end - start
 
-        prefix_len = len(self.pathname) + 1
-        for of, wrt, sjrows, sjcols, _ in submat_sparsity_iter(row_size_iter(), col_size_iter(),
-                                                               full_nzrows, full_nzcols,
-                                                               (len(self._outputs),
-                                                                len(self._inputs))):
-            if (of, wrt) in self._subjacs_info:
-                meta = self._subjacs_info[of, wrt]
-                if meta['rows'] is None and sjrows is not None:
-                    issue_warning(f"Sparsity pattern for {of} wrt {wrt} was declared with "
-                                  "rows=None, but a sparsity pattern has been computed.\n"
-                                  f"rows = {sjrows}\ncols = {sjcols}\n")
-                elif not np.all(np.asarray(meta['rows']) == sjrows):
-                    issue_warning(f"Sparsity pattern for {of} wrt {wrt} was declared with "
-                                  f"rows={meta['rows']} and col={meta['cols']}, but a different "
-                                  "sparsity pattern has been computed:\n"
-                                  f"rows = {sjrows}\ncols = {sjcols}\n")
-            else:
-                issue_warning(f"{self.msginfo}: Partial for {of[prefix_len:]} wrt "
-                              f"{wrt[prefix_len:]} was not declared but is nonzero.\n"
-                              f"rows = {sjrows}\ncols = {sjcols}\n")
+        sparsity, _ = self.compute_fd_sparsity(method=method)
+
+        prefix = self.pathname + '.'
+        plen = len(prefix)
+        ret = []
+        for of, wrt, nzrows, nzcols, shape in submat_sparsity_iter(rowsizeiter(), colsizeiter(),
+                                                                   sparsity.row, sparsity.col,
+                                                                   sparsity.shape):
+            if 1 in shape:
+                continue
+            key = (of, wrt)
+            if key in self._subjacs_info:
+                meta = self._subjacs_info[key]
+                computed = sorted(zip(nzrows, nzcols))
+                if meta['rows'] is None:
+                    rows = []
+                    cols = []
+                    declared = []
+                else:
+                    rows = meta['rows']
+                    cols = meta['cols']
+                    declared = sorted(zip(rows, cols))
+                if declared != computed:
+                    pct_nonzero = 100. * len(nzrows) / (shape[0] * shape[1])
+                    if pct_nonzero > max_nz:
+                        continue
+                    if shape[0] > 200 or shape[1] > 200:
+                        mstr = "Sparsity matrix too large to show."
+                    else:
+                        stream = StringIO()
+                        val_map = {0: '.', 1: 'C', 3: 'D', 4: 'x'}
+                        sparsity_diff_viz(csr_matrix((np.ones(len(nzrows)), (nzrows, nzcols)),
+                                                     shape=shape, dtype=bool),
+                                          csr_matrix((np.ones(len(rows)), (rows, cols)),
+                                                     shape=shape, dtype=bool),
+                                          val_map=val_map,
+                                          stream=stream)
+                        mstr = stream.getvalue()
+                    wrn = (f"{self.msginfo}:\n(D)eclared sparsity pattern != (c)omputed sparsity "
+                           f"pattern for sub-jacobian ({of[plen:]}, {wrt[plen:]}) with shape "
+                           f"{shape} and {pct_nonzero:.2f}% nonzeros:\n{mstr}\n")
+                    ret.append((of, wrt, nzrows, nzcols, rows, cols, shape, pct_nonzero, wrn))
+                    if out_stream is not None:
+                        print(wrn, file=out_stream)
+
+        return ret
 
 
 class _DictValues(object):
