@@ -11,6 +11,7 @@ import sys
 import tempfile
 import traceback
 import webbrowser
+import inspect
 from itertools import combinations, groupby
 from contextlib import contextmanager
 from pprint import pprint
@@ -600,8 +601,8 @@ class Coloring(object):
 
     Parameters
     ----------
-    sparsity : ndarray
-        Full jacobian sparsity matrix (dense bool form).
+    sparsity : ndarray or coo_matrix or csc_matrix or csr_matrix
+        Jacobian sparsity matrix, dtype=bool.
     row_vars : list of str or None
         Names of variables corresponding to rows.
     row_var_sizes : ndarray or None
@@ -1139,8 +1140,8 @@ class Coloring(object):
         out_stream : file-like or _DEFAULT_OUT_STREAM
             The destination stream to which the text representation of coloring is to be written.
         """
-        nrows = self._shape[0] if self._shape else -1
-        ncols = self._shape[1] if self._shape else -1
+        nrows = self._shape[0]
+        ncols = self._shape[1]
 
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
@@ -1164,16 +1165,17 @@ class Coloring(object):
         print('', file=out_stream)
         good_tol = meta.get('good_tol')
         if good_tol is not None:
-            print("Sparsity computed using tolerance: %g" % meta['good_tol'], file=out_stream)
+            print(f"Sparsity computed using tolerance: {meta['good_tol']}.", file=out_stream)
             if meta['n_tested'] > 1:
-                print("Most common number of nonzero entries (%d of %d) repeated %d times out "
-                      "of %d tolerances tested.\n" % (meta['J_size'] - meta['zero_entries'],
-                                                      meta['J_size'],
-                                                      meta['nz_matches'], meta['n_tested']),
-                      file=out_stream)
+                jsize = np.prod(self._shape)
+                print(f"Most common number of nonzero entries ({meta['nz_entries']} of {jsize}) "
+                      f"repeated {meta['nz_matches']} times out of {meta['n_tested']} tolerances "
+                      "tested.\n", file=out_stream)
 
         sparsity_time = meta.get('sparsity_time', None)
         if sparsity_time is not None:
+            print(f"Dense {meta['type']} jacobian for {meta['class']} '{meta['pathname']}' was "
+                  f"computed {meta['num_full_jacs']} times.", file=out_stream)
             print(f"Time to compute sparsity: {sparsity_time:8.4f} sec", file=out_stream)
 
         coloring_time = meta.get('coloring_time', None)
@@ -2707,8 +2709,6 @@ def _tol_sweep(arr, tol=_DEF_COMP_SPARSITY_ARGS['tol'], orders=_DEF_COMP_SPARSIT
         'good_tol': good_tol,
         'nz_matches': nz_matches,
         'n_tested': n_tested,
-        'zero_entries': arr[arr <= good_tol].size,
-        'J_size': arr.size,
     }
 
     return info
@@ -2813,8 +2813,9 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
     else:
         colorinfo = None
 
+    start_time = time.perf_counter()
+
     with _compute_total_coloring_context(prob, colorinfo):
-        start_time = time.perf_counter()
         fullJ = None
         for _ in range(num_full_jacs):
             if needs_scaling:
@@ -2828,7 +2829,6 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
                 fullJ += np.abs(Jabs)
 
         Jabs = None
-        elapsed = time.perf_counter() - start_time
 
     if driver:
         # force driver to recreate total jacobian using coloring
@@ -2837,13 +2837,13 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
     fullJ *= (1.0 / np.max(fullJ))
 
     spmeta = _tol_sweep(fullJ, tol, orders)
+    spmeta['J_shape'] = fullJ.shape
+    spmeta['class'] = type(prob).__name__
+    spmeta['pathname'] = prob._metadata['pathname']
+    spmeta['nz_entries'] = np.count_nonzero(fullJ)
     spmeta['num_full_jacs'] = num_full_jacs
-    spmeta['sparsity_time'] = elapsed
+    spmeta['sparsity_time'] = time.perf_counter() - start_time
     spmeta['type'] = 'total'
-
-    print(f"Full total jacobian for problem '{prob._metadata['pathname']}' was computed "
-          f"{num_full_jacs} times, taking {elapsed} seconds.")
-    print("Total jacobian shape:", fullJ.shape, "\n")
 
     nzrows, nzcols = np.nonzero(fullJ > spmeta['good_tol'])
     shape = fullJ.shape
@@ -3260,7 +3260,7 @@ def _get_partial_coloring_kwargs(system, options):
         if getattr(options, name) is not None:
             kwargs[name] = getattr(options, name)
 
-    kwargs['recurse'] = not options.norecurse and not system._subsystems_allprocs
+    kwargs['recurse'] = not options.norecurse and system._subsystems_allprocs
 
     per_instance = getattr(options, 'per_instance')
     kwargs['per_instance'] = (per_instance is None or
@@ -3299,7 +3299,7 @@ def _partial_coloring_cmd(options, user_args):
             coloring.display_bokeh(show=True)
             print('\n')
 
-        if not coloring._meta.get('show_summary'):
+        if not coloring._meta.get('show_summary'):  # avoids double printing of summary
             print("\nApprox coloring for '%s' (class %s)" % (system.pathname,
                                                              type(system).__name__))
             coloring.summary()
@@ -3319,7 +3319,8 @@ def _partial_coloring_cmd(options, user_args):
             with profiling('coloring_profile.out') if options.profile else do_nothing_context():
                 if options.system == '':
                     system = prob.model
-                    _initialize_model_approx(system, prob.driver)
+                    if not options.classes:
+                        _initialize_model_approx(system, prob.driver)
                 else:
                     system = prob.model._get_subsystem(options.system)
                 if system is None:
@@ -3333,22 +3334,30 @@ def _partial_coloring_cmd(options, user_args):
                     kwargs['recurse'] = False
                     for s in system.system_iter(include_self=True, recurse=True):
                         for c in options.classes:
-                            klass = s.__class__.__name__
-                            mod = s.__class__.__module__
-                            if c == klass or c == '.'.join([mod, klass]):
-                                if c in to_find:
+                            klasses = [m.__name__ for m in inspect.getmro(s.__class__)][:-1]
+                            mods = [m.__module__ for m in inspect.getmro(s.__class__)][:-1]
+                            for klass, mod in zip(klasses, mods):
+                                mod = s.__class__.__module__
+                                if c == klass or c == '.'.join([mod, klass]):
                                     found.add(c)
-                                try:
-                                    coloring = s._compute_coloring(**kwargs)[0]
-                                except Exception:
-                                    tb = traceback.format_exc()
-                                    print("The following error occurred while attempting to "
-                                          "compute coloring for %s:\n %s" % (s.pathname, tb))
-                                else:
-                                    if coloring is not None:
-                                        _show(s, options, coloring)
-                                if options.norecurse:
-                                    break
+                                    if len(s._var_allprocs_abs2meta['input']) == 0 or \
+                                            len(s._var_allprocs_abs2meta['output']) == 0:
+                                        print(f"Skipping {s.pathname} <class {klass}> because it "
+                                              "has either no inputs or no outputs.")
+                                        continue
+                                    try:
+                                        coloring = s._compute_coloring(**kwargs)[0]
+                                    except Exception:
+                                        tb = traceback.format_exc()
+                                        print("The following error occurred while attempting to "
+                                              f"compute coloring for {s.pathname}:\n {tb}")
+                                    else:
+                                        if coloring is not None:
+                                            _show(s, options, coloring)
+                                    if options.norecurse:
+                                        break
+                            if c in found:
+                                break
                     else:
                         if to_find - found:
                             raise RuntimeError("Failed to find any instance of classes %s" %
@@ -3453,15 +3462,17 @@ class _ColSparsityJac(object):
     A class to manage the assembly of a sparsity matrix by columns without allocating a dense jac.
     """
 
-    def __init__(self, system, coloring_info):
-        self._coloring_info = coloring_info
+    def __init__(self, system):
+        self._coloring_info = system._coloring_info
 
         nrows = sum([end - start for _, start, end, _, _ in system._jac_of_iter()])
-        for _, _, end, _, _, _ in system._jac_wrt_iter(coloring_info.wrt_matches):
+        end = 0
+        for _, _, end, _, _, _ in system._jac_wrt_iter(self._coloring_info.wrt_matches):
             pass
 
         self._nrows = nrows
         self._ncols = end
+        self.shape = (nrows, end)
         self._col_list = [None] * self._ncols
 
     def set_col(self, system, i, column):
@@ -3500,14 +3511,9 @@ class _ColSparsityJac(object):
         # ignore any setting of subjacs based on analytic derivs
         pass
 
-    def get_sparsity(self, system):
+    def get_sparsity(self):
         """
         Assemble the sparsity matrix (COO) based on data collected earlier via set_col.
-
-        Parameters
-        ----------
-        system : System
-            The system that owns this jacobian.
 
         Returns
         -------
@@ -3537,6 +3543,8 @@ class _ColSparsityJac(object):
             data *= (1. / np.max(data))
 
             info = _tol_sweep(data, coloring_info.tol, coloring_info.orders)
+            info['J_shape'] = self.shape
+            info['nz_entries'] = np.count_nonzero(data)
             data = data > info['good_tol']  # data is now a bool
             rows = rows[data]
             cols = cols[data]
@@ -3551,8 +3559,8 @@ class _ColSparsityJac(object):
                 'good_tol': coloring_info.tol,
                 'nz_matches': 0,
                 'n_tested': 0,
-                'zero_entries': 0,
-                'J_size': 0,
+                'nz_entries': 0,
+                'J_shape': (0, 0),
             }
 
         return coo_matrix((data, (rows, cols)), shape=(self._nrows, self._ncols)), info

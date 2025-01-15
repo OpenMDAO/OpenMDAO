@@ -1,6 +1,5 @@
 
 import os
-import sys
 import pathlib
 import itertools
 import pickle
@@ -1060,13 +1059,9 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
     def test_summary(self):
         p_color = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
         coloring = p_color.driver._coloring_info.coloring
-        save_out = sys.stdout
-        sys.stdout = StringIO()
-        try:
-            coloring.summary()
-            summary = sys.stdout.getvalue()
-        finally:
-            sys.stdout = save_out
+        out = StringIO()
+        coloring.summary(out_stream=out)
+        summary = out.getvalue()
 
         self.assertTrue('Jacobian shape: (22, 21)  (13.42% nonzero)' in summary)
         self.assertTrue('FWD solves: 3   REV solves: 1' in summary)
@@ -1076,12 +1071,9 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
 
         dense_J = np.ones((50, 50), dtype=bool)
         coloring = _compute_coloring(dense_J, 'auto')
-        sys.stdout = StringIO()
-        try:
-            coloring.summary()
-            summary = sys.stdout.getvalue()
-        finally:
-            sys.stdout = save_out
+        out = StringIO()
+        coloring.summary(out_stream=out)
+        summary = out.getvalue()
 
         self.assertTrue('Jacobian shape: (50, 50)  (100.00% nonzero)' in summary)
         self.assertTrue('FWD solves: 50   REV solves: 0' in summary)
