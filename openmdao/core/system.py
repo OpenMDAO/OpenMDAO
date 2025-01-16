@@ -7116,14 +7116,14 @@ class System(object, metaclass=SystemMetaclass):
             if indices is not None:
                 of = f'{of} (index size: {indices})'
 
-            # need this check because if directional may be list
-            if isinstance(wrt, str):
-                wrt = f"'{wrt}'"
-            if isinstance(of, str):
-                of = f"'{of}'"
+            # # need this check because if directional may be list
+            # if isinstance(wrt, str):
+            #     wrt = f"'{wrt}'"
+            # if isinstance(of, str):
+            #     of = f"'{of}'"
 
             if directional:
-                wrt = f"(d){wrt}"
+                wrt = "(directional)"
 
             err_desc = []
             if above_abs:
@@ -7140,50 +7140,62 @@ class System(object, metaclass=SystemMetaclass):
             rel_magnitudes = derivative_info['magnitude_rel']
             steps = derivative_info['steps']
 
-            for magnitude, magnitude_rel, abs_err, rel_err, step in zip(magnitudes, rel_magnitudes,
+            for mag, mag_rel, abs_err, rel_err, step in zip(magnitudes, rel_magnitudes,
                                                                         abs_errs, rel_errs, steps):
-                if magnitude.rev is not None:
-                    calc_mag = magnitude.rev
+                if mag.rev is not None:
+                    calc_mag = mag.rev
+                    calc_mag_rel = mag_rel.rev
                     calc_abs = abs_err.rev
                     calc_rel = rel_err.rev
 
                 # use forward even if both fwd and rev are defined
-                if magnitude.fwd is not None:
-                    calc_mag = magnitude.fwd
+                if mag.fwd is not None:
+                    calc_mag = mag.fwd
+                    calc_mag_rel = mag_rel.fwd
                     calc_abs = abs_err.fwd
                     calc_rel = rel_err.fwd
 
+                # skip if all jacs are zero
+                if calc_mag == 0. and calc_mag_rel == 0. and mag.fd == 0.:
+                    continue
+
                 if totals:
                     if len(steps) > 1:
-                        table_data.append([of, wrt, step, calc_mag, magnitude.fd,
-                                           calc_abs, calc_rel, err_desc])
+                        table_data.append([of, wrt, step,
+                                           calc_mag, mag.fd, calc_abs,
+                                           calc_mag_rel, mag_rel.fd, calc_rel,
+                                           err_desc])
                     else:
-                        table_data.append([of, wrt, calc_mag, magnitude.fd,
-                                           calc_abs, calc_rel, err_desc])
+                        table_data.append([of, wrt,
+                                           calc_mag, mag.fd, calc_abs,
+                                           calc_mag_rel, mag_rel.fd, calc_rel,
+                                           err_desc])
                 else:
                     if matrix_free:
                         if len(steps) > 1:
-                            table_data.append([of, wrt, step, magnitude.fwd,
-                                               magnitude.rev, magnitude.fd,
-                                               abs_err.fwd, abs_err.rev,
-                                               abs_err.fwd_rev, rel_err.fwd,
-                                               rel_err.rev, rel_err.fwd_rev,
+                            table_data.append([of, wrt, step,
+                                               mag.fwd, mag.rev, mag.fd,
+                                               abs_err.fwd, abs_err.rev, abs_err.fwd_rev,
+                                               mag_rel.fwd, mag_rel.rev, mag_rel.fd,
+                                               rel_err.fwd, rel_err.rev, rel_err.fwd_rev,
                                                err_desc])
                         else:
-                            table_data.append([of, wrt, magnitude.fwd,
-                                               magnitude.rev, magnitude.fd,
-                                               abs_err.fwd, abs_err.rev,
-                                               abs_err.fwd_rev, rel_err.fwd,
-                                               rel_err.rev, rel_err.fwd_rev,
+                            table_data.append([of, wrt,
+                                               mag.fwd, mag.rev, mag.fd,
+                                               abs_err.fwd, abs_err.rev, abs_err.fwd_rev,
+                                               mag_rel.fwd, mag_rel.rev, mag_rel.fd,
+                                               rel_err.fwd, rel_err.rev, rel_err.fwd_rev,
                                                err_desc])
                     else:
                         if len(steps) > 1:
-                            table_data.append([of, wrt, step, magnitude.fwd,
-                                               magnitude.fd, abs_err.fwd,
-                                               rel_err.fwd, err_desc])
+                            table_data.append([of, wrt, step,
+                                               mag.fwd, mag.fd, abs_err.fwd,
+                                               mag_rel.fwd, mag_rel.fd, rel_err.fwd,
+                                               err_desc])
                         else:
-                            table_data.append([of, wrt, magnitude.fwd, magnitude.fd,
-                                               abs_err.fwd, rel_err.fwd,
+                            table_data.append([of, wrt,
+                                               mag.fwd, mag.fd, abs_err.fwd,
+                                               mag_rel.fwd, mag_rel.fd, rel_err.fwd,
                                                err_desc])
                         assert abs_err.fwd_rev is None
                         assert rel_err.fwd_rev is None
@@ -7195,16 +7207,19 @@ class System(object, metaclass=SystemMetaclass):
 
         headers = []
         if table_data:
-            headers = ["of '<variable>'", "wrt '<variable>'"]
+            headers = ["'of' variable(s)", "'wrt' variable(s)"]
             if len(steps) > 1:
                 headers.append('step')
 
             if matrix_free:
-                headers.extend(['fwd mag.', 'rev mag.', 'check mag.', 'a(fwd-chk)',
-                                'a(rev-chk)', 'a(fwd-rev)', 'r(fwd-chk)', 'r(rev-chk)',
-                                'r(fwd-rev)', 'error desc'])
+                headers.extend(['a(fwd mag)', 'a(rev mag)', 'a(check mag)',
+                                'a(fwd-chk)', 'a(rev-chk)', 'a(fwd-rev)',
+                                'r(fwd mag)', 'r(rev mag)', 'r(check mag)',
+                                'r(fwd-chk)', 'r(rev-chk)', 'r(fwd-rev)',
+                                'error desc'])
             else:
-                headers.extend(['calc mag.', 'check mag.', 'a(cal-chk)', 'r(cal-chk)',
+                headers.extend(['a(calc mag)', 'a(check mag)', 'a(calc-chk)',
+                                'r(calc mag)', 'r(check mag)', 'r(calc-chk)',
                                 'error desc'])
 
             _print_deriv_table(table_data, headers, sys_buffer)
