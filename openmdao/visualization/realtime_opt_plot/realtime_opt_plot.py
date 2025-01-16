@@ -357,6 +357,10 @@ class CaseTracker:
                 return None
         case_ids = self._initial_cr_with_one_case.list_cases("driver", out_stream=None)
         driver_case = self._initial_cr_with_one_case.get_case(case_ids[0])
+
+        # meta = driver_case.get_io_metadata(includes=name)
+        # shape = meta[name]['shape']
+
         try:
             units = driver_case._get_units(name)
         except RuntimeError as err:
@@ -426,6 +430,8 @@ class RealTimeOptPlot(object):
         )  # update this as new data comes in
 
         def update():
+
+            print("--- update called ----")
             # See if source is defined yet. If not, see if we have any data
             #   in the case file yet. If there is data, create the
             #   source object and add the lines to the figure
@@ -436,6 +442,9 @@ class RealTimeOptPlot(object):
                 # new_data = case_tracker.get_new_cases()
                 new_data = case_tracker.get_new_case()
                 if new_data:
+
+                    print("start of if self._source is None")
+
 
                     ####  make the source dict
                     source_dict = {"iteration": []}
@@ -448,7 +457,9 @@ class RealTimeOptPlot(object):
                     # Desvars
                     desvar_names = case_tracker.get_desvar_names()
                     for desvar_name in desvar_names:
-                        source_dict[desvar_name] = []
+                        # source_dict[desvar_name] = []
+                        source_dict[f"{desvar_name}_min"] = []
+                        source_dict[f"{desvar_name}_max"] = []
 
                     # Cons
                     con_names = case_tracker.get_cons_names()
@@ -534,17 +545,54 @@ class RealTimeOptPlot(object):
                         toggles.append(toggle)
                         column_items.append(toggle)
 
-                        desvar_line = p.line(
-                            x="iteration",
-                            y=desvar_name,
-                            line_width=3,
-                            y_range_name=f"extra_y_{desvar_name}",
-                            source=self._source,
-                            # color=color,
-                            color="black",
-                            visible=False,
-                        )
+                        # desvar_line = p.line(
+                        #     x="iteration",
+                        #     y=desvar_name,
+                        #     line_width=3,
+                        #     y_range_name=f"extra_y_{desvar_name}",
+                        #     source=self._source,
+                        #     # color=color,
+                        #     color="black",
+                        #     visible=False,
+                        # )
+                        # desvar_line.visible = False
+
+
+
+                        value = new_data["desvars"][desvar_name]
+
+                        size = value.size
+
+                        if size == 1:
+                            desvar_line = p.line(
+                                x="iteration",
+                                y=f"{desvar_name}_min",
+                                line_width=3,
+                                y_range_name=f"extra_y_{desvar_name}",
+                                source=self._source,
+                                # color=color,
+                                color="black",
+                                visible=False,
+                            )
+                        else:
+                            desvar_line = p.varea(
+                                x="iteration",
+                                y1=f"{desvar_name}_min",
+                                y2=f"{desvar_name}_max",
+                                # line_width=3,
+                                y_range_name=f"extra_y_{desvar_name}",
+                                source=self._source,
+                                # color=color,
+                                color="black",
+                                # visible=False,
+                                visible=True,
+                                alpha=0.3,
+                            )
                         desvar_line.visible = False
+
+
+
+
 
                         lines.append(desvar_line)
 
@@ -778,6 +826,7 @@ class RealTimeOptPlot(object):
                                 console.log("before toggle.active lines[index].glyph.line_color)", lines[index].glyph.line_color);
                                 axes[index-1].axis_label_text_color = color
                                 lines[index].glyph.line_color = color;
+                                lines[index].glyph.fill_color = color;
                                 console.log("after toggle.active axes[index-1].axis_line_color", axes[index-1].axis_line_color);
                                 console.log("after toggle.active lines[index].glyph.line_color)", lines[index].glyph.line_color);
                                 toggle.stylesheets = [`
@@ -878,14 +927,16 @@ class RealTimeOptPlot(object):
                         sizing_mode="stretch_height",
                     )
 
-
                     graph = Row(p, label_and_toggle_column, sizing_mode="stretch_both")
                     doc.add_root(graph)
 
             if new_data is None:
+                print("before case_tracker.get_new_case ")
                 # new_data = case_tracker.get_new_cases()
                 new_data = case_tracker.get_new_case()
+                print("after case_tracker.get_new_case ")
             if new_data:
+                print("start of if new_data")
                 num_driver_iterations = case_tracker._get_num_driver_iterations()
                 print(f"number of driver iterations = {num_driver_iterations}")
 
@@ -893,6 +944,7 @@ class RealTimeOptPlot(object):
                 source_stream_dict = {"iteration": [counter]}
 
                 for obj_name, obj_value in new_data["objs"].items():
+                    # print(f"{obj_name=} {obj_value.size} objs")
                     float_obj_value = _get_value_for_plotting(obj_value, "objs")
 
                     source_stream_dict[obj_name] = [float_obj_value]
@@ -901,16 +953,26 @@ class RealTimeOptPlot(object):
                     p.y_range.end = self.y_max[obj_name]
 
                 for desvar_name, desvar_value in new_data["desvars"].items():
+                    # print(f"{desvar_name=} {desvar_value.size} desvars")
                     float_desvar_value = _get_value_for_plotting(desvar_value, "desvars")
 
-                    source_stream_dict[desvar_name] = [float_desvar_value]
+                    if desvar_name == 'traj.rotation.states:distance':
+                        print(f"traj.rotation.states:distance values are {np.min(desvar_value)} {np.max(desvar_value)}")
 
-                    _update_y_min_max(desvar_name, float_desvar_value, self.y_min, self.y_max)
+                    # source_stream_dict[desvar_name] = [float_desvar_value]
+
+                    source_stream_dict[f"{desvar_name}_min"] = [np.min(desvar_value)]
+                    source_stream_dict[f"{desvar_name}_max"] = [np.max(desvar_value)]
+
+                    # _update_y_min_max(desvar_name, float_desvar_value, self.y_min, self.y_max)
+                    _update_y_min_max(desvar_name, np.min(desvar_value), self.y_min, self.y_max)
+                    _update_y_min_max(desvar_name, np.max(desvar_value), self.y_min, self.y_max)
                     p.extra_y_ranges[f"extra_y_{desvar_name}"] = Range1d(
                         self.y_min[desvar_name], self.y_max[desvar_name]
                     )
 
                 for cons_name, cons_value in new_data["cons"].items():
+                    # print(f"{cons_name=} {cons_value.size} cons")
                     float_cons_value = _get_value_for_plotting(cons_value, "cons")
                     source_stream_dict[cons_name] = [float_cons_value]
 
@@ -919,7 +981,7 @@ class RealTimeOptPlot(object):
                         self.y_min[cons_name], self.y_max[cons_name]
                     )
                 self._source.stream(source_stream_dict)
-                print("done new_data at the end")
+                print("done if new_data at the end")
 
         doc.add_periodic_callback(update, self._callback_period)
         doc.title = "OpenMDAO Optimization"
