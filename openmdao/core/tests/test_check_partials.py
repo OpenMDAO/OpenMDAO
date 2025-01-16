@@ -649,9 +649,9 @@ class TestProblemCheckPartials(unittest.TestCase):
         data = prob.check_partials(out_stream=stream, compact_print=True)
         txt = stream.getvalue()
 
-        self.assertTrue("'g'             | 'z'" in txt)
+        self.assertTrue("g             | z" in txt)
         self.assertTrue(('g', 'z') in data['comp'])
-        self.assertTrue("'g'             | 'x'" in txt)
+        self.assertTrue("g             | x" in txt)
         self.assertTrue(('g', 'x') in data['comp'])
 
     def test_dependent_false_show(self):
@@ -1203,7 +1203,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.check_partials(out_stream=stream, abs_err_tol=1.1e-6, compact_print=True)
 
         self.assertEqual(stream.getvalue().count('n/a'), 0)
-        self.assertEqual(stream.getvalue().count('rev'), 5)
+        self.assertEqual(stream.getvalue().count('rev'), 6)
         self.assertEqual(stream.getvalue().count('Component'), 2)
         self.assertEqual(len([ln for ln in stream.getvalue().splitlines() if ln.startswith('| ')]), 12) # counts rows (including headers)
 
@@ -1264,7 +1264,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
-        self.assertEqual(stream.getvalue().count('rev'), 10)
+        self.assertEqual(stream.getvalue().count('rev'), 12)
 
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=False)
@@ -1289,7 +1289,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
         self.assertEqual(stream.getvalue().count('n/a'), 0)
-        self.assertEqual(stream.getvalue().count('rev'), 10)
+        self.assertEqual(stream.getvalue().count('rev'), 12)
         self.assertEqual(stream.getvalue().count('Component'), 2)
         self.assertEqual(len([ln for ln in stream.getvalue().splitlines() if ln.startswith('| ')]), 8)
 
@@ -1330,7 +1330,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
-        self.assertEqual(stream.getvalue().count("'z'             | 'y1'"), 2)
+        self.assertEqual(stream.getvalue().count("z             | y1"), 2)
 
     def test_check_partials_show_only_incorrect(self):
         # The second is adding an option to show only the incorrect subjacs
@@ -1356,7 +1356,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True, show_only_incorrect=True)
         self.assertEqual(stream.getvalue().count("MyCompBadPartials"), 2)
-        self.assertEqual(stream.getvalue().count("'z'             | 'y1'"), 2)
+        self.assertEqual(stream.getvalue().count("z             | y1"), 2)
         self.assertEqual(stream.getvalue().count("MyCompGoodPartials"), 0)
 
         stream = StringIO()
@@ -1430,8 +1430,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
         output = stream.getvalue()
-        self.assertTrue("(d)'x1'" in output)
-        self.assertTrue("(d)'x2'" in output)
+        self.assertTrue("(d) x1" in output)
+        self.assertTrue("(d) x2" in output)
 
     def test_directional_derivative_option_complex_step(self):
 
@@ -1485,7 +1485,9 @@ class TestProblemCheckPartials(unittest.TestCase):
         J = prob.check_partials(method='cs', out_stream=stream, compact_print=True)
         lines = stream.getvalue().splitlines()
 
-        self.assertEqual(lines[7][53:56], 'n/a')
+        entries = [s.strip() for s in lines[7].split('|') if s.strip()]
+        self.assertEqual(entries[3], 'n/a')
+        self.assertEqual(entries[9], 'n/a')
         assert_near_equal(float(lines[7][121:131]), 0.0, 1e-15)
 
     def test_directional_mixed_matrix_free(self):
@@ -1968,6 +1970,36 @@ y wrt x                     | abs         | fd-fwd | 2.000000000279556
 
         for line1, line2 in zip_longest(ctx.exception.args[0].strip().split('\n'), expected.split('\n'), fillvalue=''):
             assert snum_equal(line1.strip(), line2.strip()), f"line1: {line1}, line2: {line2}"
+
+    # def test_zero_analytic_zero_fd(self):
+    #     # Test that we can check a component that has a zero analytic and fd derivative.
+
+    #     class ZeroAnalyticComp(om.ExplicitComponent):
+
+    #         def setup(self):
+    #             self.add_input('x', val=3.0)
+    #             self.add_output('y', val=4.0)
+
+    #             self.declare_partials('*', '*')
+
+    #         def compute(self, inputs, outputs):
+    #             pass
+
+    #         def compute_partials(self, inputs, partials):
+    #             pass
+
+    #     prob = om.Problem()
+
+    #     prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.5))
+    #     prob.model.add_subsystem('comp', ZeroAnalyticComp())
+    #     prob.model.connect('p1.x', 'comp.x')
+
+    #     prob.setup()
+
+    #     stream = StringIO()
+    #     data = prob.check_partials(out_stream=stream)
+    #     content = stream.getvalue()
+    #     raise RuntimeError("FOO")
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -2815,9 +2847,9 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         self.assertEqual(len(tables[1]), 7)
         self.assertEqual(len(tables[2]), 5)
         # check cols
-        self.assertEqual(tables[0][0].count('+'), 8)
-        self.assertEqual(tables[1][0].count('+'), 8)
-        self.assertEqual(tables[2][0].count('+'), 7)
+        self.assertEqual(tables[0][0].count('+'), 10)
+        self.assertEqual(tables[1][0].count('+'), 10)
+        self.assertEqual(tables[2][0].count('+'), 9)
 
     def test_single_cs_step_compact(self):
         p = self.setup_model()
@@ -2835,9 +2867,9 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         self.assertEqual(len(tables[1]), 7)
         self.assertEqual(len(tables[2]), 5)
         # check cols
-        self.assertEqual(tables[0][0].count('+'), 8)
-        self.assertEqual(tables[1][0].count('+'), 8)
-        self.assertEqual(tables[2][0].count('+'), 7)
+        self.assertEqual(tables[0][0].count('+'), 10)
+        self.assertEqual(tables[1][0].count('+'), 10)
+        self.assertEqual(tables[2][0].count('+'), 9)
 
     def test_multi_fd_steps(self):
         p = self.setup_model()
@@ -2869,9 +2901,9 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         self.assertEqual(len(tables[1]), 11)
         self.assertEqual(len(tables[2]), 5)
         # check cols
-        self.assertEqual(tables[0][0].count('+'), 9)
-        self.assertEqual(tables[1][0].count('+'), 9)
-        self.assertEqual(tables[2][0].count('+'), 8)
+        self.assertEqual(tables[0][0].count('+'), 11)
+        self.assertEqual(tables[1][0].count('+'), 11)
+        self.assertEqual(tables[2][0].count('+'), 10)
 
     def test_multi_cs_steps_compact(self):
         p = self.setup_model()
@@ -2889,9 +2921,9 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         self.assertEqual(len(tables[1]), 11)
         self.assertEqual(len(tables[2]), 5)
         # check cols
-        self.assertEqual(tables[0][0].count('+'), 9)
-        self.assertEqual(tables[1][0].count('+'), 9)
-        self.assertEqual(tables[2][0].count('+'), 8)
+        self.assertEqual(tables[0][0].count('+'), 11)
+        self.assertEqual(tables[1][0].count('+'), 11)
+        self.assertEqual(tables[2][0].count('+'), 10)
 
     def test_multi_fd_steps_compact_directional(self):
         p = self.setup_model(directional=True)
@@ -2909,9 +2941,9 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         self.assertEqual(len(tables[1]), 11)
         self.assertEqual(len(tables[2]), 5)
         # check cols
-        self.assertEqual(tables[0][0].count('+'), 9)
-        self.assertEqual(tables[1][0].count('+'), 9)
-        self.assertEqual(tables[2][0].count('+'), 8)
+        self.assertEqual(tables[0][0].count('+'), 11)
+        self.assertEqual(tables[1][0].count('+'), 11)
+        self.assertEqual(tables[2][0].count('+'), 10)
 
 
 if __name__ == "__main__":

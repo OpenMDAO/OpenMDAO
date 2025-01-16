@@ -1067,11 +1067,7 @@ def get_errors_and_mags(x, y):
     if not nonzero.any():
         nonzero = y != 0
         if not nonzero.any():
-            max_rel_error = float('nan')
-            rel_mag_x = 0.0
-            rel_mag_y = 0.0
-            return max_abs_error, abs_mag_x, abs_mag_y, max_rel_error, rel_mag_x, rel_mag_y, \
-                denom_idx
+            return max_abs_error, abs_mag_x, abs_mag_y, float('nan'), 0.0, 0.0, denom_idx
         else:
             denom_idx = 1
 

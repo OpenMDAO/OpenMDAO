@@ -2147,7 +2147,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 stream = StringIO()
                 p.check_totals(method='cs', step=[1e-20, 1e-30], compact_print=True, out_stream=stream)
                 contents = stream.getvalue()
-                nsubjacs = 18
+                nsubjacs = 10
                 self.assertEqual(contents.count("step"), 1)
                 # check number of rows/cols
                 self.assertEqual(contents.count("+-----------------------------+-------------------+-------------+-------------+--------------+-------------+-------------+--------------+-------------+------------+"), (nsubjacs*2) + 1)

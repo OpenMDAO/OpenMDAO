@@ -6859,7 +6859,7 @@ class System(object, metaclass=SystemMetaclass):
 
         print(f"{add_border(title, '-')}\n", file=sys_buffer)
 
-        for key, _, fd_opts, directional, above_abs, above_rel, inconsistent in err_iter:
+        for key, fd_opts, directional, above_abs, above_rel, inconsistent in err_iter:
 
             if above_abs or above_rel or inconsistent:
                 num_bad_jacs += 1
@@ -6896,7 +6896,7 @@ class System(object, metaclass=SystemMetaclass):
                 stepstrs = [""]
 
             # Magnitudes
-            sys_buffer.write(f"  {sys_name}: {of} wrt {wrt}")
+            sys_buffer.write(f"  {self.name}: {of} wrt {wrt}")
             if not isinstance(of, tuple) and lcons and of.strip("'") in lcons:
                 sys_buffer.write(" (Linear constraint)")
 
@@ -7103,7 +7103,7 @@ class System(object, metaclass=SystemMetaclass):
         table_data = []
         worst_subjac = None
 
-        for key, fd_norm, fd_opts, directional, above_abs, above_rel, inconsistent in err_iter:
+        for key, _, directional, above_abs, above_rel, inconsistent in err_iter:
 
             if above_abs or above_rel or inconsistent:
                 num_bad_jacs += 1
@@ -7116,14 +7116,8 @@ class System(object, metaclass=SystemMetaclass):
             if indices is not None:
                 of = f'{of} (index size: {indices})'
 
-            # # need this check because if directional may be list
-            # if isinstance(wrt, str):
-            #     wrt = f"'{wrt}'"
-            # if isinstance(of, str):
-            #     of = f"'{of}'"
-
             if directional:
-                wrt = "(directional)"
+                wrt = f"(d) {wrt}"
 
             err_desc = []
             if above_abs:
@@ -7140,13 +7134,9 @@ class System(object, metaclass=SystemMetaclass):
             rel_magnitudes = derivative_info['magnitude_rel']
             steps = derivative_info['steps']
 
+            # loop over different fd step sizes
             for mag, mag_rel, abs_err, rel_err, step in zip(magnitudes, rel_magnitudes,
-                                                                        abs_errs, rel_errs, steps):
-                if mag.rev is not None:
-                    calc_mag = mag.rev
-                    calc_mag_rel = mag_rel.rev
-                    calc_abs = abs_err.rev
-                    calc_rel = rel_err.rev
+                                                            abs_errs, rel_errs, steps):
 
                 # use forward even if both fwd and rev are defined
                 if mag.fwd is not None:
@@ -7154,49 +7144,32 @@ class System(object, metaclass=SystemMetaclass):
                     calc_mag_rel = mag_rel.fwd
                     calc_abs = abs_err.fwd
                     calc_rel = rel_err.fwd
+                elif mag.rev is not None:
+                    calc_mag = mag.rev
+                    calc_mag_rel = mag_rel.rev
+                    calc_abs = abs_err.rev
+                    calc_rel = rel_err.rev
 
-                # skip if all jacs are zero
-                if calc_mag == 0. and calc_mag_rel == 0. and mag.fd == 0.:
-                    continue
+                start = [of, wrt, step] if len(steps) > 1 else [of, wrt]
 
                 if totals:
-                    if len(steps) > 1:
-                        table_data.append([of, wrt, step,
-                                           calc_mag, mag.fd, calc_abs,
-                                           calc_mag_rel, mag_rel.fd, calc_rel,
-                                           err_desc])
-                    else:
-                        table_data.append([of, wrt,
-                                           calc_mag, mag.fd, calc_abs,
-                                           calc_mag_rel, mag_rel.fd, calc_rel,
-                                           err_desc])
-                else:
+                    table_data.append(start +
+                                      [calc_mag, mag.fd, calc_abs,
+                                       calc_mag_rel, mag_rel.fd, calc_rel,
+                                       err_desc])
+                else:  # partials
                     if matrix_free:
-                        if len(steps) > 1:
-                            table_data.append([of, wrt, step,
-                                               mag.fwd, mag.rev, mag.fd,
-                                               abs_err.fwd, abs_err.rev, abs_err.fwd_rev,
-                                               mag_rel.fwd, mag_rel.rev, mag_rel.fd,
-                                               rel_err.fwd, rel_err.rev, rel_err.fwd_rev,
-                                               err_desc])
-                        else:
-                            table_data.append([of, wrt,
-                                               mag.fwd, mag.rev, mag.fd,
-                                               abs_err.fwd, abs_err.rev, abs_err.fwd_rev,
-                                               mag_rel.fwd, mag_rel.rev, mag_rel.fd,
-                                               rel_err.fwd, rel_err.rev, rel_err.fwd_rev,
-                                               err_desc])
+                        table_data.append(start +
+                                          [mag.fwd, mag.rev, mag.fd,
+                                           abs_err.fwd, abs_err.rev, abs_err.fwd_rev,
+                                           mag_rel.fwd, mag_rel.rev, mag_rel.fd,
+                                           rel_err.fwd, rel_err.rev, rel_err.fwd_rev,
+                                           err_desc])
                     else:
-                        if len(steps) > 1:
-                            table_data.append([of, wrt, step,
-                                               mag.fwd, mag.fd, abs_err.fwd,
-                                               mag_rel.fwd, mag_rel.fd, rel_err.fwd,
-                                               err_desc])
-                        else:
-                            table_data.append([of, wrt,
-                                               mag.fwd, mag.fd, abs_err.fwd,
-                                               mag_rel.fwd, mag_rel.fd, rel_err.fwd,
-                                               err_desc])
+                        table_data.append(start +
+                                          [mag.fwd, mag.fd, abs_err.fwd,
+                                           mag_rel.fwd, mag_rel.fd, rel_err.fwd,
+                                           err_desc])
                         assert abs_err.fwd_rev is None
                         assert rel_err.fwd_rev is None
 
@@ -7207,7 +7180,7 @@ class System(object, metaclass=SystemMetaclass):
 
         headers = []
         if table_data:
-            headers = ["'of' variable(s)", "'wrt' variable(s)"]
+            headers = ["'of' variable", "'wrt' variable"]
             if len(steps) > 1:
                 headers.append('step')
 
@@ -7225,7 +7198,8 @@ class System(object, metaclass=SystemMetaclass):
             _print_deriv_table(table_data, headers, sys_buffer)
 
             if show_worst and worst_subjac is not None:
-                print(f"\nWorst Sub-Jacobian (rel. error): {worst_subjac[0]}\n", file=sys_buffer)
+                print(f"\nWorst Sub-Jacobian (relative error): {worst_subjac[0]}\n",
+                      file=sys_buffer)
                 _print_deriv_table([worst_subjac[1]], headers, sys_buffer)
 
         if not show_only_incorrect or num_bad_jacs > 0:
@@ -7251,13 +7225,14 @@ class _ErrorData(object):
         yield self.fwd_rev
 
     def __repr__(self):
-        return f"ErrorData(fwd={self.fwd}, rev={self.rev}, fwd_rev={self.fwd_rev})"
+        return f"{self.__class__.__name__}(fwd={self.fwd}, rev={self.rev}, fwd_rev={self.fwd_rev})"
 
     def max(self):
-        errs = [err for err in self if err is not None]
-        if errs:
-            return max(errs)
-        return 0.
+        ret = 0.0
+        for err in self:
+            if err is not None and err > ret:
+                ret = err
+        return ret
 
     def __getitem__(self, idx):
         return tuple(self)[idx]
@@ -7277,13 +7252,14 @@ class _MagnitudeData(object):
         yield self.fd
 
     def __repr__(self):
-        return f"MagnitudeData(fwd={self.fwd}, rev={self.rev}, fd={self.fd})"
+        return f"_MagnitudeData(fwd={self.fwd}, rev={self.rev}, fd={self.fd})"
 
     def max(self):
-        mags = [mag for mag in self if mag is not None]
-        if mags:
-            return max(mags)
-        return 0.
+        ret = 0.0
+        for mag in self:
+            if mag is not None and mag > ret:
+                ret = mag
+        return ret
 
     def __getitem__(self, idx):
         return tuple(self)[idx]
@@ -7393,7 +7369,6 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
                  rel_errs.rev, rel_mags.fd, rel_mags.rev, didx) = get_errors_and_mags(mhatdotm,
                                                                                       dhatdotd)
                 if not totals:
-                    # FIXME: for agreement with old code but not sure why we do this
                     rel_mags.rev = None
                     abs_mags.rev = None
         else:
@@ -7502,8 +7477,6 @@ def _iter_derivs(derivatives, show_only_incorrect, all_fd_opts, totals, nondep_d
     ------
     tuple
         The (of, wrt) pair for the current derivatives being compared.
-    float
-        The FD norm.
     dict
         The FD options.
     bool
@@ -7519,7 +7492,6 @@ def _iter_derivs(derivatives, show_only_incorrect, all_fd_opts, totals, nondep_d
     keys = sorted(derivatives) if sort else derivatives
 
     for key in keys:
-        _, wrt = key
 
         inconsistent = False
         derivative_info = derivatives[key]
@@ -7527,6 +7499,7 @@ def _iter_derivs(derivatives, show_only_incorrect, all_fd_opts, totals, nondep_d
         if totals:
             fd_opts = all_fd_opts
         else:
+            _, wrt = key
             fd_opts = all_fd_opts[wrt]
 
         if key in incon_keys:
@@ -7546,7 +7519,7 @@ def _iter_derivs(derivatives, show_only_incorrect, all_fd_opts, totals, nondep_d
         if show_only_incorrect and not (above_abs or above_rel or inconsistent):
             continue
 
-        yield key, max_mag, fd_opts, directional, above_abs, above_rel, inconsistent
+        yield key, fd_opts, directional, above_abs, above_rel, inconsistent
 
 
 def _format_error(error, tol):

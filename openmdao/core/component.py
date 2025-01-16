@@ -12,7 +12,7 @@ from numpy import ndarray, isscalar, ndim, atleast_1d, atleast_2d, promote_types
 from scipy.sparse import issparse, coo_matrix
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
-    global_meta_names, collect_errors, _iter_derivs
+    global_meta_names, collect_errors, _iter_derivs, _MagnitudeData
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian, _CheckingJacobian
 from openmdao.utils.array_utils import shape_to_len, submat_sparsity_iter
@@ -26,7 +26,7 @@ from openmdao.utils.indexer import Indexer, indexer
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
     DerivativesWarning, warn_deprecation, OMInvalidCheckDerivativesOptionsWarning
-from openmdao.utils.code_utils import is_lambda, LambdaPickleWrapper, get_partials_deps
+from openmdao.utils.code_utils import is_lambda, LambdaPickleWrapper, get_function_deps
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -400,7 +400,7 @@ class Component(System):
                     raise RuntimeError(f"{self.msginfo}: compute_primal must be defined if using "
                                        "a derivs_method option of 'cs' or 'fd'")
                 # declare all partials as 'cs' or 'fd'
-                for of, wrt in get_partials_deps(self.compute_primal,
+                for of, wrt in get_function_deps(self.compute_primal,
                                                  self._var_rel_names['output']):
                     self.declare_partials(of, wrt, method=method)
             else:
@@ -2250,11 +2250,11 @@ class Component(System):
                             deriv_value = None
                             copy = False
 
-                        # If not compact printing, testing for pairs that are not dependent so
-                        # that we suppress printing them unless the fd is non zero.
+                        # Testing for pairs that are not dependent so that we suppress printing them
+                        # unless the fd is non zero.
                         # Note: subjacs_info is empty for undeclared partials, which is the default
                         # behavior now.
-                        if not compact_print:
+                        if not compact_print: # show everything if using compact print
                             try:
                                 if not subjacs[abs_key]['dependent']:
                                     nondep_derivs.add(rel_key)
@@ -2414,6 +2414,24 @@ class Component(System):
             else:
                 self._deriv_display(err_iter, partials_data, rel_err_tol, abs_err_tol, out_stream,
                                     all_fd_options, False, show_only_incorrect)
+
+            # check for zero subjacs
+            zero_keys = set()
+            for key, meta in partials_data.items():
+                abs_key = rel_key2abs_key(self, key)
+                if abs_key in self._subjacs_info:
+                    mags = meta['magnitude']
+                    if isinstance(mags, _MagnitudeData):
+                        mags = [mags]
+                    maxmag = max([mag.max() for mag in mags])
+                    if maxmag == 0.0:
+                        zero_keys.add(key)
+
+            if zero_keys:
+                issue_warning(f"Component '{self.pathname}' has zero derivatives for the "
+                              "following variable pairs that were declared as 'dependent': "
+                              f"{sorted(zero_keys)}",
+                              category=DerivativesWarning)
 
         # add pathname to the partials dict to make it compatible with the return value
         # from Problem.check_partials and passable to assert_check_partials.

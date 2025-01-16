@@ -12,6 +12,7 @@ import importlib
 from types import LambdaType
 from collections import defaultdict, OrderedDict
 from tokenize import NAME, tokenize, untokenize
+from openmdao.utils.om_warnings import issue_warning
 
 import networkx as nx
 
@@ -468,6 +469,9 @@ def get_return_names(func):
 class _FuncGrapher(ast.NodeVisitor):
     """
     An ast.NodeVisitor that builds a graph between a function's inputs and outputs.
+
+    Note that this class assumes that all outputs of a called function are dependent on all inputs
+    to that function, which may introduce dependencies that don't actually exist.
     """
 
     def __init__(self, node):
@@ -550,11 +554,18 @@ def get_func_graph(func, outnames=None, display=False):
 
     Returns
     -------
-    networkx.DiGraph
-        A graph containing edges from inputs to outputs.
+    networkx.DiGraph or None
+        A graph containing edges from inputs to outputs.  Returns None if the function graph
+        couldn't be determined.
     """
     node = ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec')
-    visitor = _FuncGrapher(node)
+    try:
+        visitor = _FuncGrapher(node)
+    except RuntimeError as err:
+        issue_warning(f"Can't determine function graph for function '{func.__name__}' "
+                      f"due to: {err}")
+        return
+
     retnames = _get_return_names(visitor.outs)
     inputs = set(inspect.signature(func).parameters)
 
@@ -592,22 +603,21 @@ def get_func_graph(func, outnames=None, display=False):
     return visitor.graph
 
 
-def get_partials_deps(func, outputs=None):
+def get_function_deps(func, outputs=None):
     """
     Generate tuples of the form (output, input) for the given function.
 
-    Only tuples where the output depends on the input are yielded. This can be used to
-    determine which partials need to be declared.
+    Only tuples where the output depends on the input are yielded.
 
     Note that currently the function grapher doesn't recurse into functions and assumes that all
-    outputs of a sub-function are dependent on all inputs to that function. This may lead to
-    a conservative estimate of partials that need to be declared.
+    outputs of a called function are dependent on all inputs to that function. This may lead to
+    some dependencies being reported that don't actually exist.
 
     Parameters
     ----------
-    func : Callable
+    func : function or method with source available
         The function to be analyzed.
-    outputs : list or None
+    outputs : list of str or None
         The list of output variable names.
 
     Yields
@@ -616,6 +626,16 @@ def get_partials_deps(func, outputs=None):
         A tuple of the form (output, input).
     """
     graph = get_func_graph(func, outputs)
+    if graph is None:
+        if outputs is None:
+            return None
+
+        # assume full dependency
+        for inp in inspect.signature(func).parameters:
+            for out in outputs:
+                yield out, inp
+        return
+
     outs = graph.graph['outputs']
     successors = graph.successors
 
