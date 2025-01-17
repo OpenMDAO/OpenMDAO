@@ -432,8 +432,8 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         compact_lines = compact_stream.getvalue().splitlines()
 
-        self.assertTrue("of '<variable>'" in compact_lines[5],
-            "of '<variable>' not found in '%s'" % compact_lines[5])
+        self.assertTrue("'of' variable" in compact_lines[5],
+            "'of' variable not found in '%s'" % compact_lines[5])
         self.assertTrue('9.6100e+00' in compact_lines[-2],
             "'9.6100e+00' not found in '%s'" % compact_lines[-2])
 
@@ -2054,7 +2054,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 nsubjacs = 18
                 self.assertEqual(contents.count("step"), 0)
                 # check number of rows/cols
-                self.assertEqual(contents.count("+-------------------------------+------------------+-------------+-------------+-------------+-------------+--------------------+"), nsubjacs + 1)
+                self.assertEqual(contents.count("+-----------------------------+----------------+-------------+--------------+-------------+-------------+--------------+-------------+--------------------+"), nsubjacs + 1)
 
     def test_single_cs_step_compact(self):
         for mode in ('fwd', 'rev'):
@@ -2068,7 +2068,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 nsubjacs = 18
                 self.assertEqual(contents.count("step"), 0)
                 # check number of rows/cols
-                self.assertEqual(contents.count("+-------------------------------+------------------+-------------+-------------+-------------+-------------+------------+"), nsubjacs + 1)
+                self.assertEqual(contents.count("+-----------------------------+----------------+-------------+--------------+-------------+-------------+--------------+-------------+------------+"), nsubjacs + 1)
 
     def test_multi_fd_steps_fwd(self):
         p = om.Problem(model=CircleOpt(), driver=om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False))
@@ -2136,7 +2136,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 nsubjacs = 18
                 self.assertEqual(contents.count("step"), 1)
                 # check number of rows/cols
-                self.assertEqual(contents.count("+-------------------------------+------------------+-------------+-------------+-------------+-------------+-------------+------------+"), (nsubjacs*2) + 1)
+                self.assertEqual(contents.count("+-----------------------------+----------------+-------------+-------------+--------------+-------------+-------------+--------------+-------------+------------+"), (nsubjacs*2) + 1)
 
     def test_multi_cs_steps_compact(self):
         for mode in ('fwd', 'rev'):
@@ -2147,10 +2147,10 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 stream = StringIO()
                 p.check_totals(method='cs', step=[1e-20, 1e-30], compact_print=True, out_stream=stream)
                 contents = stream.getvalue()
-                nsubjacs = 10
+                nsubjacs = 18
                 self.assertEqual(contents.count("step"), 1)
                 # check number of rows/cols
-                self.assertEqual(contents.count("+-----------------------------+-------------------+-------------+-------------+--------------+-------------+-------------+--------------+-------------+------------+"), (nsubjacs*2) + 1)
+                self.assertEqual(contents.count("+-----------------------------+----------------+-------------+-------------+--------------+-------------+-------------+--------------+-------------+------------+"), (nsubjacs*2) + 1)
 
     def test_multi_fd_steps_compact_directional(self):
         expected_divs = {

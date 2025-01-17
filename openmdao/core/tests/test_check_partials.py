@@ -1488,7 +1488,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         entries = [s.strip() for s in lines[7].split('|') if s.strip()]
         self.assertEqual(entries[3], 'n/a')
         self.assertEqual(entries[9], 'n/a')
-        assert_near_equal(float(lines[7][121:131]), 0.0, 1e-15)
+        assert_near_equal(float(entries[11]), 0.0, 1e-15)
 
     def test_directional_mixed_matrix_free(self):
 
