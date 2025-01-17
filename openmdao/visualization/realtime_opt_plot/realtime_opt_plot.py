@@ -83,50 +83,54 @@ def _realtime_opt_plot_cmd(options, user_args):
     results.dump_stats("realtime_opt_plot.prof")
 
 def _make_legend_item(varname, color):
+
+    from bokeh.models import Button, CustomJS, InlineStyleSheet
+    stylesheet = InlineStyleSheet(css=".bk-btn { font-size: 20pt; }")
+
     toggle = Toggle(
         label=varname,
         active=False,
-        # width=120,
-        height=20,
-        margin=(0, 0, 2, 0),
+        # styles={"font-size": "16px"},  # Set font size using CSS
+        # css_classes=["toggle-font-size"],
+        # height=20,
+        margin=(0, 0, 5, 0),
+        stylesheets=[stylesheet],
     )
 
     # TODO what should we do with colors?
     color = 'black'
     # Add custom CSS styles for both active and inactive states
-    toggle.stylesheets = [
-        f"""
-            .bk-btn {{
-                color: {color};
-                border-color: {color};
-                background-color: white;
-                font-size: 12pt;
-                display: flex;
-                align-items: center; /* Vertical centering */
-                justify-content: center; /* Horizontal centering */
-                height: 12px; /* Example height, adjust as needed */
-                border-width: 0px; /* Adjust to desired thickness */
-                border-style: solid; /* Ensures a solid border */
-            }}
+    # toggle.stylesheets = [
+    #     f"""
+    #         .bk-btn {{
+    #             color: {color};
+    #             border-color: {color};
+    #             background-color: white;
+    #             display: flex;
+    #             align-items: center; /* Vertical centering */
+    #             justify-content: center; /* Horizontal centering */
+    #             height: 16px; /* Example height, adjust as needed */
+    #             border-width: 0px; /* Adjust to desired thickness */
+    #             border-style: solid; /* Ensures a solid border */
+    #         }}
 
-            .bk-btn.bk-active {{
-                color: white;
-                border-color: {color};
-                background-color: {color};
-                font-size: 12pt;
-                display: flex;
-                align-items: center; /* Vertical centering */
-                justify-content: center; /* Horizontal centering */
-                height: 12px; /* Example height, adjust as needed */
-                border-width: 0px; /* Adjust to desired thickness */
-                border-style: solid; /* Ensures a solid border */
-            }}
+    #         .bk-btn.bk-active {{
+    #             color: white;
+    #             border-color: {color};
+    #             background-color: {color};
+    #             display: flex;
+    #             align-items: center; /* Vertical centering */
+    #             justify-content: center; /* Horizontal centering */
+    #             height: 16px; /* Example height, adjust as needed */
+    #             border-width: 0px; /* Adjust to desired thickness */
+    #             border-style: solid; /* Ensures a solid border */
+    #         }}
 
-            .bk-btn:focus {{
-                outline: none; /* Removes the default focus ring */
-            }}
-        """
-    ]
+    #         .bk-btn:focus {{
+    #             outline: none; /* Removes the default focus ring */
+    #         }}
+    #     """
+#    ]
 
     return toggle
 
@@ -834,11 +838,10 @@ class RealTimeOptPlot(object):
                                         color: ${color}
                                         border-color: ${color}
                                         background-color: white
-                                        font-size: 12pt;
                                         display: flex;
                                         align-items: center; /* Vertical centering */
                                         justify-content: center; /* Horizontal centering */
-                                        height: 12px; /* Example height, adjust as needed */
+                                        height: 16px; /* Example height, adjust as needed */
                                         border-width: 0px; /* Adjust to desired thickness */
                                         border-style: solid; /* Ensures a solid border */
                                     }
@@ -846,11 +849,10 @@ class RealTimeOptPlot(object):
                                         color: white;
                                         border-color: ${color};
                                         background-color: ${color};
-                                        font-size: 12pt;
                                         display: flex;
                                         align-items: center; /* Vertical centering */
                                         justify-content: center; /* Horizontal centering */
-                                        height: 12px; /* Example height, adjust as needed */
+                                        height: 16px; /* Example height, adjust as needed */
                                         border-width: 0px; /* Adjust to desired thickness */
                                         border-style: solid; /* Ensures a solid border */
                                     }
@@ -870,11 +872,10 @@ class RealTimeOptPlot(object):
                                         color: black
                                         border-color: black
                                         background-color: white
-                                        font-size: 12pt;
                                         display: flex;
                                         align-items: center; /* Vertical centering */
                                         justify-content: center; /* Horizontal centering */
-                                        height: 12px; /* Example height, adjust as needed */
+                                        height: 16px; /* Example height, adjust as needed */
                                         border-width: 0px; /* Adjust to desired thickness */
                                         border-style: solid; /* Ensures a solid border */
                                     }
@@ -882,11 +883,10 @@ class RealTimeOptPlot(object):
                                         color: white;
                                         border-color: black;
                                         background-color: black;
-                                        font-size: 12pt;
                                         display: flex;
                                         align-items: center; /* Vertical centering */
                                         justify-content: center; /* Horizontal centering */
-                                        height: 12px; /* Example height, adjust as needed */
+                                        height: 16px; /* Example height, adjust as needed */
                                         border-width: 0px; /* Adjust to desired thickness */
                                         border-style: solid; /* Ensures a solid border */
                                     }
@@ -927,8 +927,21 @@ class RealTimeOptPlot(object):
                         sizing_mode="stretch_height",
                     )
 
+
+                    # Create a Div with embedded CSS
+                    css_div = Div(text="""
+                    <style>
+                    .toggle-font-size .bk-btn {
+                        font-size: 16px;
+                    }
+                    </style>
+                    """)
+
+
                     graph = Row(p, label_and_toggle_column, sizing_mode="stretch_both")
                     doc.add_root(graph)
+
+
 
             if new_data is None:
                 print("before case_tracker.get_new_case ")
