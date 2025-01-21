@@ -1485,7 +1485,6 @@ def _default_predicate(name, obj):
     bool
         True if the method should be traced.
     """
-    # TODO: fix this to use a set of specific names to avoid O(n) behavior
     for n in ['solve', 'apply', 'compute', 'setup', 'coloring', 'linearize', 'get_outputs_dir',
               'approx', 'static', 'get_vars', 'abs_get']:
         if n in name:
