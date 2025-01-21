@@ -1,10 +1,9 @@
 
 import time
-import os
 
 from openmdao.components.exec_comp import ExecComp
 from openmdao.core.analysis_error import AnalysisError
-from openmdao.utils.mpi import MPI
+
 
 class ExecComp4Test(ExecComp):
     """

@@ -1,14 +1,9 @@
 
-import sys
 import unittest
 
 import numpy as np
 
 import openmdao.api as om
-from openmdao.core.driver import Driver
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
-from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.test_suite.components.sellar import SellarDerivatives
 
 
 def get_comp(size):
@@ -140,9 +135,9 @@ class TestPComputeJacvecProd(unittest.TestCase):
         comp = model.add_subsystem('comp', om.IndepVarComp('x', val=np.zeros(size - 1)))
         comp.add_output('inp', val=0.0)
 
-        C1 = model.add_subsystem('C1', get_comp(size))
-        C2 = model.add_subsystem('C2', get_comp(size))
-        C3 = model.add_subsystem('C3', get_comp(size))
+        model.add_subsystem('C1', get_comp(size))
+        model.add_subsystem('C2', get_comp(size))
+        model.add_subsystem('C3', get_comp(size))
 
         model.connect('comp.x', ['C1.x', 'C2.x', 'C3.x'])
         model.connect('comp.inp', 'C1.inp')
@@ -154,7 +149,7 @@ class TestPComputeJacvecProd(unittest.TestCase):
     def _build_cjv_model(self, size, mode):
         p = om.Problem()
 
-        comp = p.model.add_subsystem('comp', SubProbComp(input_size=size, num_nodes=3, mode=mode))
+        p.model.add_subsystem('comp', SubProbComp(input_size=size, num_nodes=3, mode=mode))
 
         p.setup(mode=mode)
 

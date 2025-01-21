@@ -74,7 +74,7 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         prob.setup()
 
         with self.assertRaises(Exception) as context:
-            viz = MetaModelVisualization(interp)
+            MetaModelVisualization(interp)
 
         msg = "No training data present for one or more parameters"
         self.assertTrue(msg in str(context.exception))
@@ -102,7 +102,7 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         prob.setup()
 
         with self.assertRaises(Exception) as context:
-            viz = MetaModelVisualization(interp)
+            MetaModelVisualization(interp)
 
         msg = 'Must have more than one input value'
         self.assertTrue(msg in str(context.exception))
@@ -288,12 +288,12 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
                                         1.28254220e-01, 1.05787985e-01, 1.01550282e-01, 8.44650788e-02,
                                         6.39578812e-02, 3.34477398e-02, 1.97405267e-02, 6.40957590e-04])
 
-        right_points = adjusted_points._unstructured_training_points(compute_distance=True, source='right')
-        right_plot = adjusted_points._right_plot()
+        right_points = adjusted_points._unstructured_training_points(compute_distance=True, source='right')  # noqa (unused)
+        right_plot = adjusted_points._right_plot()  # noqa (unused)
         right_transparency = adjusted_points.right_alphas
 
-        bottom_points = adjusted_points._unstructured_training_points(compute_distance=True, source='bottom')
-        bottom_plot = adjusted_points._bottom_plot()
+        bottom_points = adjusted_points._unstructured_training_points(compute_distance=True, source='bottom')  # noqa (unused)
+        bottom_plot = adjusted_points._bottom_plot()  # noqa (unused)
         bottom_transparency = adjusted_points.bottom_alphas
 
         assert_near_equal(right_transparency, known_points_right, 1.1e-02)

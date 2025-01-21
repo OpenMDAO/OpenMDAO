@@ -1,6 +1,5 @@
 """Define the CSCmatrix class."""
 
-import numpy as np
 from scipy.sparse import csc_matrix
 
 from openmdao.matrices.coo_matrix import COOMatrix

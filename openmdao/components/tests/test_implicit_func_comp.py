@@ -1,8 +1,6 @@
 import unittest
-import math
 
 import numpy as np
-from scipy.optimize import newton
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
@@ -11,7 +9,6 @@ from openmdao.core.tests.test_partial_color import _check_partial_matrix
 
 try:
     import jax
-    import jax.numpy as jnp
 except ImportError:
     jax = None
 
@@ -216,7 +213,10 @@ class TestImplicitFuncComp(unittest.TestCase):
         p.set_val('comp.a', 2.)
         p.set_val('comp.b', -8.)
         p.set_val('comp.c', 6.)
+        p.set_val('comp.x', -5.)  # just to make value != 1.0
         p.run_model()
+
+        assert_near_equal(p.get_val('comp.x'), 1.0)
 
         assert_check_partials(p.check_partials(includes=['comp'], out_stream=None), atol=1e-5)
         assert_check_totals(p.check_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'], out_stream=None))

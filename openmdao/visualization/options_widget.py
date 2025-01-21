@@ -4,13 +4,11 @@ A widget-based representation of OptionsDictionary for use in Jupyter notebooks.
 
 try:
     import ipywidgets as widgets
-    from ipywidgets import DOMWidget, register
-    from ipywidgets import interact, Layout
+    from ipywidgets import Layout
     from IPython.display import display
 except Exception:
     widgets = None
 
-from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.om_warnings import issue_warning
 
 
@@ -154,7 +152,7 @@ class OptionsWidget(object):
 
             types = option['types']
 
-            if types == list:
+            if isinstance(types, list):
                 _widgets.append(widgets.Textarea(
                     description=name,
                     tooltip=desc,

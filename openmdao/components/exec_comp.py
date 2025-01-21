@@ -3,10 +3,9 @@ import re
 import time
 from itertools import product
 from contextlib import contextmanager
-from collections import defaultdict
 
 import numpy as np
-from numpy import ndarray, imag, complex128 as npcomplex
+from numpy import ndarray, imag
 
 from openmdao.core.system import _DEFAULT_COLORING_META
 from openmdao.utils.coloring import _ColSparsityJac, _compute_coloring
@@ -933,7 +932,7 @@ class ExecComp(ExplicitComponent):
         """
         if self._manual_decl_partials:
             # use framework approx coloring
-            return super()._compute_coloring(recurse=recurse, **overrides)
+            return super()._compute_coloring(**overrides)
 
         info = self._coloring_info
         info.update(overrides)
@@ -970,7 +969,7 @@ class ExecComp(ExplicitComponent):
         in_offsets *= info['perturb_size']
 
         # use special sparse jacobian to collect sparsity info
-        jac = _ColSparsityJac(self, info)
+        jac = _ColSparsityJac(self)
 
         for i in range(info['num_full_jacs']):
             inarr[:] = starting_inputs + in_offsets * get_random_arr(in_offsets.size, self.comm)
@@ -984,7 +983,7 @@ class ExecComp(ExplicitComponent):
         if not self._relcopy:
             self._inputs.set_val(starting_inputs)
 
-        sparsity, sp_info = jac.get_sparsity(self)
+        sparsity, sp_info = jac.get_sparsity()
         sparsity_time = time.perf_counter() - sparsity_start_time
 
         coloring = _compute_coloring(sparsity, 'fwd')

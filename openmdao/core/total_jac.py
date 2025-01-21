@@ -16,6 +16,7 @@ from openmdao.utils.mpi import MPI, check_mpi_env
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.relevance import get_relevance
+from openmdao.utils.array_utils import get_random_arr
 
 
 use_mpi = check_mpi_env()
@@ -87,6 +88,8 @@ class _TotalJacInfo(object):
         If True, perform a single directional derivative.
     relevance : dict
         Dict of relevance dictionaries for each var of interest.
+    add_coloring_noise : bool
+        If True, add noise to the seed during coloring (sparsity) generation.
     """
 
     def __init__(self, problem, of, wrt, return_format, approx=False,
@@ -120,6 +123,8 @@ class _TotalJacInfo(object):
         coloring_info : ColoringMeta, None, or False
             If None, use driver coloring if it exists.  If False, do no coloring. Otherwise, either
             use or generate a new coloring based on the state of the coloring_info object.
+        nsolves : int
+            Number of linear solves that have been performed.
         driver : <Driver>, None, or False
             The driver that owns the total jacobian.  If None, use the driver from the problem.
             If False, this total jacobian will be computed directly by the problem.
@@ -140,6 +145,9 @@ class _TotalJacInfo(object):
         self.initialize = True
         self.approx = approx
         self.coloring_info = coloring_info
+        self.nsolves = 0
+        self.add_coloring_noise = problem._metadata['randomize_seeds']
+
         try:
             self._linear_only_dvs = set(driver._lin_dvs).difference(driver._nl_dvs)
         except AttributeError:
@@ -365,7 +373,7 @@ class _TotalJacInfo(object):
     def _check_discrete_dependence(self):
         model = self.model
         # raise an exception if we depend on any discrete outputs
-        if model._var_allprocs_discrete['output']:
+        if model._var_allprocs_discrete['output'] and not model._relevance.empty:
             # discrete_outs at the model level are absolute names
             relevance = model._relevance
             discrete_outs = model._var_allprocs_discrete['output']
@@ -480,8 +488,8 @@ class _TotalJacInfo(object):
                     start = end
 
             if full_j_srcs:
-                full_src_inds = np.hstack(full_j_srcs)
-                full_tgt_inds = np.hstack(full_j_tgts)
+                full_src_inds = np.hstack(full_j_srcs, dtype=INT_DTYPE)
+                full_tgt_inds = np.hstack(full_j_tgts, dtype=INT_DTYPE)
             else:
                 full_src_inds = np.zeros(0, dtype=INT_DTYPE)
                 full_tgt_inds = np.zeros(0, dtype=INT_DTYPE)
@@ -595,14 +603,15 @@ class _TotalJacInfo(object):
             else:
                 end += meta['size']
 
-            parallel_deriv_color = meta['parallel_deriv_color']
             cache_lin_sol = meta['cache_linear_solution']
+            if model.comm.size > 1:
+                parallel_deriv_color = meta['parallel_deriv_color']
 
-            if simul_coloring and parallel_deriv_color:
-                raise RuntimeError("Using both simul_coloring and parallel_deriv_color with "
-                                   f"variable '{name}' is not supported.")
+            if parallel_deriv_color:
+                if simul_coloring:
+                    raise RuntimeError("Using both simul_coloring and parallel_deriv_color with "
+                                       f"variable '{name}' is not supported.")
 
-            if parallel_deriv_color is not None:
                 if parallel_deriv_color not in self.par_deriv_printnames:
                     self.par_deriv_printnames[parallel_deriv_color] = []
 
@@ -624,7 +633,7 @@ class _TotalJacInfo(object):
 
             # if we're doing parallel deriv coloring, we only want to set the seed on one proc
             # for each var in a given color
-            if parallel_deriv_color is not None:
+            if parallel_deriv_color:
                 if fwd:
                     with self.relevance.seeds_active(fwd_seeds=(source,)):
                         relev = self.relevance.relevant_vars(source, 'fwd', inputs=False)
@@ -724,6 +733,9 @@ class _TotalJacInfo(object):
             seed[:] = _directional_rng.random(seed.size)
             seed *= 2.0
             seed -= 1.0
+        elif self.add_coloring_noise:
+            seed[:] = -(get_random_arr(seed.size, self.model.comm,
+                                       self.model._problem_meta['coloring_randgen']) + 0.5)
         elif simul_coloring and simul_color_mode is not None:
             imeta = defaultdict(bool)
             imeta['coloring'] = simul_coloring
@@ -734,7 +746,7 @@ class _TotalJacInfo(object):
                 all_vois = set()
 
                 for i in ilist:
-                    cache_lin_sol, voiname, voisrc = idx_map[i]
+                    cache_lin_sol, _, voisrc = idx_map[i]
                     cache |= cache_lin_sol
                     all_vois.add(voisrc)
 
@@ -1294,12 +1306,15 @@ class _TotalJacInfo(object):
 
         if fwd:
             for i in inds:
-                J[row_col_map[i], i] = reduced_derivs[row_col_map[i]]
+                row = row_col_map[i]
+                J[row, i] = reduced_derivs[row]
+
                 if dist:
                     self._jac_setter_dist(i, mode)
         else:  # rev
             for i in inds:
-                J[i, row_col_map[i]] = reduced_derivs[row_col_map[i]]
+                col = row_col_map[i]
+                J[i, col] = reduced_derivs[col]
                 if dist:
                     self._jac_setter_dist(i, mode)
 
@@ -1365,6 +1380,11 @@ class _TotalJacInfo(object):
         if self.approx:
             try:
                 return self._compute_totals_approx(progress_out_stream=progress_out_stream)
+            finally:
+                self.model._recording_iter.pop()
+        elif self.model.options['derivs_method'] == 'jax':
+            try:
+                return self._compute_totals_jax(progress_out_stream=progress_out_stream)
             finally:
                 self.model._recording_iter.pop()
 
@@ -1449,6 +1469,8 @@ class _TotalJacInfo(object):
                                     else:
                                         model._solve_linear(mode)
 
+                            self.nsolves += 1
+
                             if debug_print:
                                 print(f'Elapsed Time: {time.perf_counter() - t0} secs\n',
                                       flush=True)
@@ -1476,6 +1498,9 @@ class _TotalJacInfo(object):
                     self._print_derivatives()
         finally:
             self.model._recording_iter.pop()
+
+        if self.simul_coloring is not None and self.simul_coloring._subtractions:
+            self.simul_coloring._apply_subtractions(self.J)
 
         return self.J_final
 
@@ -1546,6 +1571,64 @@ class _TotalJacInfo(object):
                         scheme._totals_directions = {}
                         scheme._totals_directional_mode = None
 
+                # Linearize Model
+                model._linearize(model._assembled_jac,
+                                 sub_do_ln=model._linear_solver._linearize_children())
+
+            finally:
+                model._tot_jac = None
+
+            totals = self.J_dict
+            if debug_print:
+                print(f'Elapsed time to approx totals: {time.perf_counter() - t0} secs\n',
+                      flush=True)
+
+            # Driver scaling.
+            if self.has_scaling:
+                self._do_driver_scaling(totals)
+
+            if return_format == 'array':
+                totals = self.J  # change back to array version
+
+            if debug_print:
+                # Debug outputs scaled derivatives.
+                self._print_derivatives()
+
+        return totals
+
+    def _compute_totals_jax(self, progress_out_stream=None):
+        """
+        Compute derivatives of desired quantities with respect to desired inputs.
+
+        Uses jax to calculate the derivatives.
+
+        Parameters
+        ----------
+        progress_out_stream : None or file-like object
+            Where to send human readable output. None by default which suppresses the output.
+
+        Returns
+        -------
+        derivs : object
+            Derivatives in form requested by 'return_format'.
+        """
+        model = self.model
+        return_format = self.return_format
+        debug_print = self.debug_print
+
+        # Prepare model for calculation by cleaning out the derivatives vectors.
+        model._dinputs.set_val(0.0)
+        model._doutputs.set_val(0.0)
+        model._dresiduals.set_val(0.0)
+
+        # Solve for derivs using jax
+        # This cuts out the middleman by grabbing the Jacobian directly after linearization.
+
+        t0 = time.perf_counter()
+
+        with self._totjac_context():
+            model._tot_jac = self
+            try:
                 # Linearize Model
                 model._linearize(model._assembled_jac,
                                  sub_do_ln=model._linear_solver._linearize_children())
@@ -1805,6 +1888,47 @@ class _TotalJacInfo(object):
             Array to be copied into the jacobian column.
         """
         self.J[:, icol] = column
+
+    def __setitem__(self, key, val):
+        """
+        Set a sub-jacobian.
+
+        Parameters
+        ----------
+        key : tuple
+            Tuple of the form (of, wrt).
+        val : ndarray
+            Array to be copied into the jacobian sub-matrix.
+        """
+        try:
+            self.J_dict[key][:] = val
+        except KeyError:
+            of, wrt = key
+            self.J_dict[of][wrt][:] = val
+
+    def __contains__(self, key):
+        """
+        Check if the given key is in the jacobian.
+
+        Parameters
+        ----------
+        key : tuple
+            Tuple of the form (of, wrt).
+
+        Returns
+        -------
+        bool
+            True or False.
+        """
+        try:
+            self.J_dict[key]
+        except KeyError:
+            of, wrt = key
+            try:
+                self.J_dict[of][wrt]
+            except KeyError:
+                return False
+        return True
 
     def _get_as_directional(self, mode=None):
         """

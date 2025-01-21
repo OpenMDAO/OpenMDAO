@@ -33,6 +33,8 @@ from openmdao.components.multifi_meta_model_unstructured_comp import MultiFiMeta
 from openmdao.components.mux_comp import MuxComp
 from openmdao.components.vector_magnitude_comp import VectorMagnitudeComp
 from openmdao.components.submodel_comp import SubmodelComp
+from openmdao.components.jax_explicit_comp import JaxExplicitComponent
+from openmdao.components.jax_implicit_comp import JaxImplicitComponent
 
 
 # Solvers
@@ -60,8 +62,9 @@ from openmdao.surrogate_models.nearest_neighbor import NearestNeighbor
 from openmdao.surrogate_models.response_surface import ResponseSurface
 from openmdao.surrogate_models.surrogate_model import SurrogateModel, MultiFiSurrogateModel
 
-from openmdao.utils.coloring import display_coloring
+from openmdao.utils.coloring import display_coloring, InvalidColoringError
 from openmdao.utils.indexer import slicer, indexer
+from openmdao.utils.file_utils import clean_outputs
 from openmdao.utils.find_cite import print_citations
 from openmdao.utils.spline_distributions import cell_centered
 from openmdao.utils.spline_distributions import sine_distribution
@@ -136,7 +139,7 @@ from openmdao.utils.om_warnings import (
 )
 
 # Utils
-from openmdao.utils.general_utils import wing_dbg, env_truthy
+from openmdao.utils.general_utils import wing_dbg, env_truthy, om_dump, is_undefined
 from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.jax_utils import register_jax_component
 

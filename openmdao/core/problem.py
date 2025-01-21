@@ -10,9 +10,11 @@ import weakref
 import pathlib
 import textwrap
 import traceback
+import time
+import atexit
 
 from collections import defaultdict, namedtuple
-from itertools import product
+from itertools import product, chain
 
 from io import StringIO, TextIOBase
 
@@ -21,12 +23,13 @@ import scipy.sparse as sparse
 
 from openmdao.core.constants import _SetupStatus
 from openmdao.core.component import Component
-from openmdao.core.driver import Driver, record_iteration, SaveOptResult
+from openmdao.core.driver import Driver, record_iteration
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.core.system import System, _OptStatus
+from openmdao.core.system import System
 from openmdao.core.group import Group
 from openmdao.core.total_jac import _TotalJacInfo
-from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
+from openmdao.core.constants import _DEFAULT_COLORING_DIR, _DEFAULT_OUT_STREAM, \
+    _UNDEFINED
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -50,11 +53,12 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
     clear_reports, _load_report_plugins
 from openmdao.utils.general_utils import pad_name, LocalRangeIterable, \
-    _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs
+    _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs, \
+    ProblemMetaclass, is_undefined
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.file_utils import _get_outputs_dir
+from openmdao.utils.file_utils import _get_outputs_dir, text2html, get_work_dir
 from openmdao.visualization.tables.table_builder import generate_table
 
 try:
@@ -129,7 +133,7 @@ def _default_prob_name():
     return name.stem
 
 
-class Problem(object):
+class Problem(object, metaclass=ProblemMetaclass):
     """
     Top-level container for the systems and drivers.
 
@@ -225,27 +229,6 @@ class Problem(object):
         self._warned = False
         self._computing_coloring = False
 
-        # Set the Problem name so that it can be referenced from command line tools (e.g. check)
-        # that accept a Problem argument, and to name the corresponding outputs subdirectory.
-        if name:  # if name hasn't been used yet, use it. Otherwise, error
-            if name not in _problem_names:
-                self._name = name
-            else:
-                raise ValueError(f"The problem name '{name}' already exists")
-        else:  # No name given: look for a name, of the form, 'problemN', that hasn't been used
-            problem_counter = len(_problem_names) + 1 if _problem_names else ''
-            base = _default_prob_name()
-            _name = f"{base}{problem_counter}"
-            if _name in _problem_names:  # need to make it unique so append string of form '.N'
-                i = 1
-                while True:
-                    _name = f"{base}{problem_counter}.{i}"
-                    if _name not in _problem_names:
-                        break
-                    i += 1
-            self._name = _name
-        _problem_names.append(self._name)
-
         if comm is None:
             use_mpi = check_mpi_env()
             if use_mpi is False:
@@ -256,6 +239,10 @@ class Problem(object):
                     comm = MPI.COMM_WORLD
                 except ImportError:
                     comm = FakeComm()
+
+        self.comm = comm
+
+        self._set_name(name)
 
         if model is None:
             self.model = Group()
@@ -280,8 +267,6 @@ class Problem(object):
         # can't use driver property here without causing a lint error, so just do it manually
         self._driver = driver
 
-        self.comm = comm
-
         self._metadata = {'setup_status': _SetupStatus.PRE_SETUP}
         self._run_counter = -1
         self._rec_mgr = RecordingManager()
@@ -289,7 +274,7 @@ class Problem(object):
         # General options
         self.options = OptionsDictionary(parent_name=type(self).__name__)
         self.options.declare('coloring_dir', types=str,
-                             default=os.path.join(os.getcwd(), 'coloring_files'),
+                             default=os.path.join(get_work_dir(), 'coloring_files'),
                              desc='Directory containing coloring files (if any) for this Problem.')
         self.options.declare('group_by_pre_opt_post', types=bool,
                              default=False,
@@ -356,6 +341,37 @@ class Problem(object):
 
         # So Problem and driver can have hooks attached to their methods
         _setup_hooks(self)
+
+        # call cleanup at system exit, if requested
+        if 'cleanup' in os.environ.get('OPENMDAO_ATEXIT', '').split(','):
+            atexit.register(self.cleanup)
+
+    def _set_name(self, name):
+        if not MPI or self.comm.rank == 0:
+            # Set the Problem name so that it can be referenced from command line tools (e.g. check)
+            # that accept a Problem argument, and to name the corresponding outputs subdirectory.
+            if name:  # if name hasn't been used yet, use it. Otherwise, error
+                if name in _problem_names:
+                    issue_warning(f"The problem name '{name}' already exists")
+                self._name = name
+            else:  # No name given: look for a name, of the form, 'problemN', that hasn't been used
+                problem_counter = len(_problem_names) + 1 if _problem_names else ''
+                base = _default_prob_name()
+                _name = f"{base}{problem_counter}"
+                if _name in _problem_names:  # need to make it unique so append string of form '.N'
+                    i = 1
+                    while True:
+                        _name = f"{base}{problem_counter}.{i}"
+                        if _name not in _problem_names:
+                            break
+                        i += 1
+                self._name = _name
+            if self.comm.size > 1:
+                self._name = self.comm.bcast(self._name, root=0)
+        else:
+            self._name = self.comm.bcast(None, root=0)
+
+        _problem_names.append(self._name)
 
     def _has_active_report(self, name):
         """
@@ -527,7 +543,7 @@ class Problem(object):
             abs_names = name2abs_names(self.model, name)
             if abs_names:
                 val = self.model._get_cached_val(name, abs_names, get_remote=get_remote)
-                if val is not _UNDEFINED:
+                if not is_undefined(val):
                     if indices is not None:
                         val = val[indices]
                     if units is not None:
@@ -538,7 +554,7 @@ class Problem(object):
             val = self.model.get_val(name, units=units, indices=indices, get_remote=get_remote,
                                      from_src=True)
 
-        if val is _UNDEFINED:
+        if is_undefined(val):
             if get_remote:
                 raise KeyError(f'{self.msginfo}: Variable name "{name}" not found.')
             else:
@@ -874,7 +890,7 @@ class Problem(object):
         """
         return create_local_meta(case_name)
 
-    def setup(self, check=False, logger=None, mode='auto', force_alloc_complex=False,
+    def setup(self, check=None, logger=None, mode='auto', force_alloc_complex=False,
               distributed_vector_class=PETScVector, local_vector_class=DefaultVector,
               derivatives=True, parent=None):
         """
@@ -889,7 +905,9 @@ class Problem(object):
         ----------
         check : None, bool, list of str, or the strs ‘all’
             Determines what config checks, if any, are run after setup is complete.
-            If None or False, no checks are run
+            If None: no checks are run unless the 'checks' report is active, in which case the
+            default reports will be run.
+            If False, no checks are run
             If True, the default checks ('out_of_order', 'system', 'solvers', 'dup_inputs',
             'missing_recorders', 'unserializable_options', 'comp_has_no_outputs',
             'auto_ivc_warnings') are run
@@ -948,14 +966,12 @@ class Problem(object):
 
         self._orig_mode = mode
 
-        model_comm = self.driver._setup_comm(comm)
-
         # this metadata will be shared by all Systems/Solvers in the system tree
         self._metadata = {
             'name': self._name,  # the name of this Problem
             'pathname': None,  # the pathname of this Problem in the current tree of Problems
             'comm': comm,
-            'coloring_dir': self.options['coloring_dir'],  # directory for coloring files
+            'coloring_dir': _DEFAULT_COLORING_DIR,  # directory for input coloring files
             'recording_iter': _RecIteration(comm.rank),  # manager of recorder iterations
             'local_vector_class': local_vector_class,
             'distributed_vector_class': distributed_vector_class,
@@ -999,11 +1015,17 @@ class Problem(object):
                                 # current derivative solve.
             'coloring_randgen': None,  # If total coloring is being computed, will contain a random
                                        # number generator, else None.
+            'randomize_subjacs': True,  # If True, randomize subjacs before computing total sparsity
+            'randomize_seeds': False,  # If True, randomize seed vectors when computing total
+                                       # sparsity
             'group_by_pre_opt_post': self.options['group_by_pre_opt_post'],  # see option
             'relevance_cache': {},  # cache of relevance objects
             'rel_array_cache': {},  # cache of relevance arrays
             'ncompute_totals': 0,  # number of times compute_totals has been called
+            'jax_group': None,  # not None if a Group is currently performing a jax operation
         }
+
+        model_comm = self.driver._setup_comm(comm)
 
         if parent:
             if isinstance(parent, Problem):
@@ -1025,7 +1047,7 @@ class Problem(object):
         # Start setup by deleting any existing reports so that the files
         # that are in that directory are all from this run and not a previous run
         reports_dirpath = self.get_reports_dir(force=False)
-        if self.comm.rank == 0:
+        if not MPI or (self.comm is not None and self.comm.rank == 0):
             if os.path.isdir(reports_dirpath):
                 try:
                     shutil.rmtree(reports_dirpath)
@@ -1062,14 +1084,17 @@ class Problem(object):
         started, and the rest of the framework is prepared for execution.
         """
         driver = self.driver
+        model = self.model
 
-        responses = self.model.get_responses(recurse=True, use_prom_ivc=True)
-        designvars = self.model.get_design_vars(recurse=True, use_prom_ivc=True)
+        responses = model.get_responses(recurse=True, use_prom_ivc=True)
+        designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
 
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-            self.model._final_setup()
+            model._final_setup()
 
-        response_size, desvar_size = driver._update_voi_meta(self.model, responses, designvars)
+        model._check_required_connections()
+
+        response_size, desvar_size = driver._update_voi_meta(model, responses, designvars)
 
         # update mode if it's been set to 'auto'
         if self._orig_mode == 'auto':
@@ -1083,7 +1108,7 @@ class Problem(object):
         #  this part of _final_setup still needs to happen so that change takes effect
         #  in subsequent runs
         if self._metadata['setup_status'] >= _SetupStatus.POST_FINAL_SETUP:
-            self.model._setup_solver_print()
+            model._setup_solver_print()
 
         driver._setup_driver(self)
 
@@ -1111,6 +1136,8 @@ class Problem(object):
             raise RuntimeError(f"{self.msginfo}: Cannot call set_order without calling setup after")
 
         # set up recording, including any new recorders since last setup
+        # TODO: We should be smarter and only setup the recording when new recorders have
+        # been added.
         if self._metadata['setup_status'] >= _SetupStatus.POST_SETUP:
             driver._setup_recording()
             self._setup_recording()
@@ -1605,7 +1632,7 @@ class Problem(object):
                     # one.
                     if _wrt in local_opts and local_opts[_wrt]['directional']:
                         if i == 0:  # only do this on the first iteration
-                            deriv[f'J_fwd'] = np.atleast_2d(np.sum(deriv['J_fwd'], axis=1)).T
+                            deriv['J_fwd'] = np.atleast_2d(np.sum(deriv['J_fwd'], axis=1)).T
 
                         if comp.matrix_free:
                             if i == 0:  # only do this on the first iteration
@@ -1636,8 +1663,8 @@ class Problem(object):
             issue_warning(msg, category=DerivativesWarning)
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
-                                  compact_print, comps, all_fd_options, indep_key=indep_key,
-                                  print_reverse=print_reverse,
+                                  compact_print, comps, all_fd_options, self.comm,
+                                  indep_key=indep_key, print_reverse=print_reverse,
                                   show_only_incorrect=show_only_incorrect)
 
         if not do_steps:
@@ -1923,7 +1950,7 @@ class Problem(object):
                     data[''][key]['indices'] = resp[of]['indices'].indexed_src_size
 
         _assemble_derivative_data(data, rel_err_tol, abs_err_tol, out_stream, compact_print,
-                                  [model], {'': fd_args}, totals=total_info, lcons=lcons,
+                                  [model], {'': fd_args}, self.comm, totals=total_info, lcons=lcons,
                                   show_only_incorrect=show_only_incorrect, sort=sort)
 
         if not do_steps:
@@ -2122,6 +2149,15 @@ class Problem(object):
         # Design vars
         desvars = self.driver._designvars
         vals = self.driver.get_design_var_values(get_remote=True, driver_scaling=driver_scaling)
+        if not driver_scaling:
+            desvars = desvars.copy()
+            for meta in desvars.values():
+                scaler = meta['scaler'] if meta.get('scaler') is not None else 1.
+                adder = meta['adder'] if meta.get('adder') is not None else 0.
+                if 'lower' in meta:
+                    meta['lower'] = meta['lower'] / scaler - adder
+                if 'upper' in meta:
+                    meta['upper'] = meta['upper'] / scaler - adder
         header = "Design Variables"
         def_desvar_opts = [opt for opt in ('indices',) if opt not in desvar_opts and
                            _find_dict_meta(desvars, opt)]
@@ -2141,6 +2177,15 @@ class Problem(object):
         # Constraints
         cons = self.driver._cons
         vals = self.driver.get_constraint_values(driver_scaling=driver_scaling)
+        if not driver_scaling:
+            cons = cons.copy()
+            for meta in cons.values():
+                scaler = meta['scaler'] if meta.get('scaler') is not None else 1.
+                adder = meta['adder'] if meta.get('adder') is not None else 0.
+                if 'lower' in meta:
+                    meta['lower'] = meta['lower'] / scaler - adder
+                if 'upper' in meta:
+                    meta['upper'] = meta['upper'] / scaler - adder
         header = "Constraints"
         # detect any cons that use aliases
         def_cons_opts = [opt for opt in ('indices', 'alias') if opt not in cons_opts and
@@ -2370,32 +2415,23 @@ class Problem(object):
                 if set_later(name):
                     continue
 
-                if name in prom2abs_in:
-                    for abs_name in prom2abs_in[name]:
-                        if set_later(abs_name):
-                            continue
+                if name in abs2meta_in or name in abs2meta_disc_in:
+                    abs_name = name
 
-                        if isinstance(case, dict):
-                            val = inputs[name]['val']
-                        else:
-                            # need a unique abs_name to get value from a case
-                            # if there is a matching abs_name in the case, use that value
-                            # otherwise use the value of the first matching abs_name
-                            case_abs_names = case._prom2abs['input'][name]
-                            if abs_name in case_abs_names:
-                                val = case.inputs[abs_name]
-                            else:
-                                val = case.inputs[case_abs_names[0]]
-                        try:
-                            varmeta = abs2meta_in[abs_name]
-                        except KeyError:
-                            # Var may be discrete
-                            varmeta = abs2meta_disc_in[abs_name]
-                        if varmeta.get('distributed') and model.comm.size > 1:
-                            sizes = model._var_sizes['input'][:, abs2idx[abs_name]]
-                            model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
-                        else:
-                            model.set_val(abs_name, val)
+                    if isinstance(case, dict):
+                        val = inputs[name]['val']
+                    else:
+                        val = case.inputs[abs_name]
+                    try:
+                        varmeta = abs2meta_in[abs_name]
+                    except KeyError:
+                        # Var may be discrete
+                        varmeta = abs2meta_disc_in[abs_name]
+                    if varmeta.get('distributed') and model.comm.size > 1:
+                        sizes = model._var_sizes['input'][:, abs2idx[abs_name]]
+                        model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
+                    else:
+                        model.set_val(abs_name, val)
                 else:
                     issue_warning(f"{model.msginfo}: Input variable, '{name}', recorded "
                                   "in the case is not found in the model.")
@@ -2468,20 +2504,43 @@ class Problem(object):
         if checks is None:
             return
 
+        reports_dir_exists = os.path.isdir(self.get_reports_dir())
+        check_file_path = None
         if logger is None:
-            check_file_path = None if out_file is None else str(self.get_outputs_dir() / out_file)
+            if out_file is not None:
+                if reports_dir_exists:
+                    check_file_path = str(self.get_reports_dir() / out_file)
+                else:
+                    check_file_path = out_file
             logger = get_logger('check_config', out_file=check_file_path, use_format=True)
 
         if checks == 'all':
             checks = sorted(_all_non_redundant_checks)
+
+        if logger is None and checks:
+            check_file_path = None if out_file is None else str(self.get_outputs_dir() / out_file)
+            logger = get_logger('check_config', out_file=check_file_path, use_format=True)
 
         for c in checks:
             if c not in _all_checks:
                 print(f"WARNING: '{c}' is not a recognized check.  Available checks are: "
                       f"{sorted(_all_checks)}")
                 continue
-            logger.info(f'checking {c}')
+            logger.info(f'checking {c}...')
+            beg = time.perf_counter()
             _all_checks[c](self, logger)
+            end = time.perf_counter()
+            logger.info(f"    {c} check complete ({(end - beg):.6f} sec).")
+
+        if checks and check_file_path is not None and reports_dir_exists:
+            # turn text file written to reports dir into an html file to be viewable from the
+            # 'openmdao view_reports' command
+            with open(check_file_path, 'r') as f:
+                txt = f.read()
+
+            path = self.get_reports_dir() / 'checks.html'
+            with open(path, 'w') as f:
+                f.write(text2html(txt))
 
     def set_complex_step_mode(self, active):
         """
@@ -2522,7 +2581,7 @@ class Problem(object):
         pathlib.Path
             The path to the directory where reports should be written.
         """
-        return self.get_outputs_dir('reports', mkdir=force or self._reports)
+        return self.get_outputs_dir('reports', mkdir=force or len(self._reports) > 0)
 
     def get_outputs_dir(self, *subdirs, mkdir=True):
         """
@@ -2542,6 +2601,33 @@ class Problem(object):
            The path of the outputs directory for the problem.
         """
         return _get_outputs_dir(self, *subdirs, mkdir=mkdir)
+
+    def get_coloring_dir(self, mode, mkdir=False):
+        """
+        Get the path to the directory for the coloring files.
+
+        Parameters
+        ----------
+        mode : str
+            Must be one of 'input' or 'output'. A problem will always write its coloring files to
+            its standard output directory in `{prob_name}_out/coloring_files`, but input coloring
+            files to be loaded may be read from a different directory specifed by the problem's
+            `coloring_dir` option.
+        mkdir : bool
+            If True, attempt to create this directory if it does not exist.
+
+        Returns
+        -------
+        pathlib.Path
+            The path to the directory where reports should be written.
+        """
+        if mode == 'input':
+            return pathlib.Path(self.options['coloring_dir'])
+        elif mode == 'output':
+            return self.get_outputs_dir('coloring_files', mkdir=mkdir)
+        else:
+            raise ValueError(f"{self.msginfo}: get_coloring_dir requires mode"
+                             "to be one of 'input' or 'output'.")
 
     def list_indep_vars(self, include_design_vars=True, options=None,
                         print_arrays=False, out_stream=_DEFAULT_OUT_STREAM):
@@ -2594,30 +2680,24 @@ class Problem(object):
                                             get_sizes=False)
 
         problem_indep_vars = []
-        indep_var_names = set()
 
         col_names = ['name', 'units', 'val']
         if options is not None:
             col_names.extend(options)
 
         abs2meta = model._var_allprocs_abs2meta['output']
+        abs2prom = model._var_allprocs_abs2prom['output']
+        abs2disc = model._var_allprocs_discrete['output']
 
-        prom2src = {}
-        for prom in self.model._var_allprocs_prom2abs_list['input']:
-            src = model.get_source(prom)
-            if 'openmdao:indep_var' in abs2meta[src]['tags']:
-                prom2src[prom] = src
-
-        for prom, src in prom2src.items():
-            name = prom if src.startswith('_auto_ivc.') else src
-
-            if (include_design_vars or name not in design_vars) \
-                    and name not in indep_var_names:
-                meta = abs2meta[src]
-                meta = {key: meta[key] for key in col_names if key in meta}
-                meta['val'] = self.get_val(prom)
-                problem_indep_vars.append((name, meta))
-                indep_var_names.add(name)
+        seen = set()
+        for absname, meta in chain(abs2meta.items(), abs2disc.items()):
+            if 'openmdao:indep_var' in meta['tags']:
+                name = abs2prom[absname]
+                if (include_design_vars or name not in design_vars) and name not in seen:
+                    meta = {key: meta[key] for key in col_names if key in meta}
+                    meta['val'] = self.get_val(name)
+                    problem_indep_vars.append((name, meta))
+                    seen.add(name)
 
         if out_stream is not None:
             header = f'Problem {self._name} Independent Variables'
@@ -2632,7 +2712,7 @@ class Problem(object):
                     out_stream = sys.stdout
                 hr = '-' * len(header)
                 print(f'{hr}\n{header}\n{hr}', file=out_stream)
-                print(f'None found', file=out_stream)
+                print('None found', file=out_stream)
 
         return problem_indep_vars
 
@@ -2798,7 +2878,8 @@ class Problem(object):
                     coloring = \
                         coloring_mod.dynamic_total_coloring(
                             self.driver, run_model=do_run,
-                            fname=self.driver._get_total_coloring_fname(), of=of, wrt=wrt)
+                            fname=self.driver._get_total_coloring_fname(mode='output'),
+                            of=of, wrt=wrt)
             else:
                 return coloring_info.coloring
 
@@ -3060,7 +3141,7 @@ def _fix_check_data(data):
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
-                              compact_print, system_list, global_options, totals=False,
+                              compact_print, system_list, global_options, comm, totals=False,
                               indep_key=None, print_reverse=False,
                               show_only_incorrect=False, lcons=None, sort=False):
     """
@@ -3083,6 +3164,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         The systems (in the proper order) that were checked.
     global_options : dict
         Dictionary containing the options for the approximation.
+    comm : MPI.Comm or FakeComm
+        The MPI communicator.
     totals : bool or _TotalJacInfo
         Set to _TotalJacInfo if we are doing check_totals to skip a bunch of stuff.
     indep_key : dict of sets, optional
@@ -3147,7 +3230,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             num_col_meta = {'format': num_format}
 
             if totals:
-                title = f"Total Derivatives"
+                title = "Total Derivatives"
             else:
                 title = f"{sys_type}: {sys_class_name} '{sys_name}'"
 
@@ -3375,8 +3458,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 if inconsistent:
                     out_buffer.write('\n    * Inconsistent value across ranks *\n')
 
-                if MPI and MPI.COMM_WORLD.size > 1:
-                    out_buffer.write(f'\n    MPI Rank {MPI.COMM_WORLD.rank}\n')
+                if MPI and comm.size > 1:
+                    out_buffer.write(f'\n    MPI Rank {comm.rank}\n')
                 out_buffer.write('\n')
 
                 with np.printoptions(linewidth=240):
@@ -3526,10 +3609,8 @@ def _format_error(error, tol):
     return f'{error:.6e} *'
 
 
-def _get_fd_options(var, global_method, local_opts, global_step, global_form, global_step_calc,
-                    alloc_complex, global_minimum_step):
-    local_wrt = var
-
+def _get_fd_options(local_wrt, global_method, local_opts, global_step, global_form,
+                    global_step_calc, alloc_complex, global_minimum_step):
     # Determine if fd or cs.
     method = global_method
     if local_wrt in local_opts:

@@ -276,8 +276,8 @@ test       **Required**  ['a', 'b']         N/A                    Test integer 
         with self.assertRaises(ValueError) as context:
             self.dict['test'] = object()
 
-        expected_msg = ("Value \(<object object at 0x[0-9A-Fa-f]+>\) of option 'test' is not one of \[<object object at 0x[0-9A-Fa-f]+>,"
-                        " <object object at 0x[0-9A-Fa-f]+>\].")
+        expected_msg = (r"Value \(<object object at 0x[0-9A-Fa-f]+>\) of option 'test' is not one of \[<object object at 0x[0-9A-Fa-f]+>,"
+                        r" <object object at 0x[0-9A-Fa-f]+>\].")
         self.assertRegex(str(context.exception), expected_msg)
 
     def test_read_only(self):
@@ -342,7 +342,7 @@ test       **Required**  ['a', 'b']         N/A                    Test integer 
             self.dict['test2'] = None
         # Should only generate warning first time
         with assert_no_warning(OMDeprecationWarning, msg):
-            option = self.dict['test2']
+            self.dict['test2']
 
     def test_deprecated_tuple_option(self):
         msg = 'Option "test1" is deprecated. Use "foo" instead.'
@@ -386,11 +386,11 @@ test       **Required**  ['a', 'b']         N/A                    Test integer 
         expected_msg = "Can't find aliased option 'foo3' for deprecated option 'test3'."
         self.assertEqual(context.exception.args[0], expected_msg)
 
-    def test_bad_option_name(self):
+    def test_supported_option_name(self):
         opt = OptionsDictionary()
-        msg = "'foo:bar' is not a valid python name and will become an invalid option name in a future release. You can prevent this warning (and future exceptions) by declaring this option using a valid python name."
 
-        with assert_warning(OMDeprecationWarning, msg):
+        # We will continue to support ":" in option names.
+        with assert_no_warning(OMDeprecationWarning):
             opt.declare('foo:bar', 1.0)
 
     def test_context_manager(self):

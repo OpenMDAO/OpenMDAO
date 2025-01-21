@@ -1,6 +1,5 @@
 """Define the EQConstraintComp class."""
 
-from numbers import Number
 
 import numpy as np
 

@@ -1,8 +1,8 @@
 """Code for generating N2 diagram."""
 import inspect
 import os
-import sys
 import pathlib
+import sys
 from operator import itemgetter
 
 import networkx as nx
@@ -24,7 +24,7 @@ from openmdao.recorders.case_reader import CaseReader
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.utils.array_utils import convert_ndarray_to_support_nans_in_json
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import default_noraise
+from openmdao.utils.general_utils import default_noraise, is_undefined
 from openmdao.utils.mpi import MPI
 from openmdao.utils.notebook_utils import notebook, display, HTML, IFrame, colab
 from openmdao.utils.om_warnings import issue_warning
@@ -153,7 +153,7 @@ def _serialize_single_option(option):
 
     val = option['val']
 
-    if val is _UNDEFINED:
+    if is_undefined(val):
         return str(val)
 
     if sys.getsizeof(val) > _MAX_OPTION_SIZE:
@@ -322,7 +322,7 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
 
     Parameters
     ----------
-    data_source : <Problem> or <Group> or str
+    data_source : <Problem> or <Group> or str or pathlib.Path
         A Problem or Group or case recorder filename containing the model or model data.
         If the case recorder file from a parallel run has separate metadata, the
         filenames can be specified with a comma, e.g.: case.sql_0,case.sql_meta
@@ -360,7 +360,7 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
             driver_opt_settings = None
 
         # set default behavior for values flag
-        if values is _UNDEFINED:
+        if is_undefined(values):
             values = (data_source._metadata is not None and
                       data_source._metadata['setup_status'] >= _SetupStatus.POST_FINAL_SETUP)
 
@@ -376,13 +376,13 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
             msg = f"Viewer data is not available for sub-Group '{data_source.pathname}'."
             raise TypeError(msg)
 
-        # set default behavior for values flag
-        if values is _UNDEFINED:
+        # set default behavio r for values flag
+        if is_undefined(values):
             values = (data_source._problem_meta is not None and
                       data_source._problem_meta['setup_status'] >= _SetupStatus.POST_FINAL_SETUP)
 
-    elif isinstance(data_source, str):
-        if ',' in data_source:
+    elif isinstance(data_source, str) or isinstance(data_source, pathlib.Path):
+        if isinstance(data_source, str) and ',' in data_source:
             filenames = data_source.split(',')
             cr = CaseReader(filenames[0], metadata_filename=filenames[1])
         else:
@@ -391,7 +391,7 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
         data_dict = cr.problem_metadata
 
         # set default behavior for values flag
-        if values is _UNDEFINED:
+        if is_undefined(values):
             values = True
 
         def set_values(children, stack, case):

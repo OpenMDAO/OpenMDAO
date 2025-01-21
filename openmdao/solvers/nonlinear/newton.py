@@ -1,12 +1,8 @@
 """Define the NewtonSolver class."""
 
-
-import numpy as np
-
 from openmdao.solvers.linesearch.backtracking import BoundsEnforceLS
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import Recording
-from openmdao.utils.mpi import MPI
 
 
 class NewtonSolver(NonlinearSolver):
@@ -37,11 +33,7 @@ class NewtonSolver(NonlinearSolver):
         """
         super().__init__(**kwargs)
 
-        # Slot for linear solver
         self.linear_solver = None
-
-        # Slot for linesearch
-        self.supports['linesearch'] = True
         self._linesearch = BoundsEnforceLS()
 
     def _declare_options(self):
@@ -62,6 +54,7 @@ class NewtonSolver(NonlinearSolver):
                              'AnalysisError that arises during subsolve; when false, it will '
                              'continue solving.')
 
+        self.supports['linesearch'] = True
         self.supports['gradients'] = True
         self.supports['implicit_components'] = True
 
@@ -150,7 +143,7 @@ class NewtonSolver(NonlinearSolver):
         bool
             Flag for indicating child linerization
         """
-        return (self.options['solve_subsystems'] and not system.under_complex_step
+        return (self.options['solve_subsystems'] and not self._system().under_complex_step
                 and self._iter_count <= self.options['max_sub_solves'])
 
     def _linearize(self):

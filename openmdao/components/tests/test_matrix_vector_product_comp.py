@@ -565,7 +565,7 @@ class TestMultipleErrors(unittest.TestCase):
                          "Conflicting vec_size=10 specified for vector 'x', "
                          "which has already been defined with vec_size=1.")
 
-    def test_x_vec_size_mismatch(self):
+    def test_x_vec_shape_mismatch(self):
         mvp = om.MatrixVectorProductComp()
 
         with self.assertRaises(ValueError) as ctx:

@@ -15,7 +15,7 @@ from openmdao.core.constants import INT_DTYPE, _SetupStatus
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path, has_match
-from openmdao.utils.general_utils import _src_name_iter
+from openmdao.utils.general_utils import _src_name_iter, DriverMetaclass
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
@@ -189,7 +189,7 @@ class DriverResult():
         return _track_time
 
 
-class Driver(object):
+class Driver(object, metaclass=DriverMetaclass):
     """
     Top-level container for the systems and drivers.
 
@@ -257,6 +257,8 @@ class Driver(object):
         DriverResult object containing information for use in the optimization report.
     _has_scaling : bool
         If True, scaling has been set for this driver.
+    _filtered_vars_to_record : dict or None
+        Variables to record based on recording options.
     """
 
     def __init__(self, **kwargs):
@@ -354,6 +356,7 @@ class Driver(object):
         self.options.update(kwargs)
         self.result = DriverResult(self)
         self._has_scaling = False
+        self._filtered_vars_to_record = None
 
     def _get_inst_id(self):
         if self._problem is None:
@@ -450,10 +453,10 @@ class Driver(object):
 
         self._split_dvs(model)
 
-        self._remote_dvs = remote_dv_dict = {}
-        self._remote_cons = remote_con_dict = {}
-        self._dist_driver_vars = dist_dict = {}
-        self._remote_objs = remote_obj_dict = {}
+        self._remote_dvs = {}
+        self._remote_cons = {}
+        self._dist_driver_vars = {}
+        self._remote_objs = {}
 
         # Only allow distributed design variables on drivers that support it.
         if self.supports['distributed_design_vars'] is False:
@@ -511,6 +514,8 @@ class Driver(object):
             rank = model.comm.rank
             nprocs = model.comm.size
 
+            dist_dict = self._dist_driver_vars
+
             # Loop over all VOIs.
             for vname, voimeta in chain(self._responses.items(), self._designvars.items()):
                 # vname may be a promoted name or an alias
@@ -552,11 +557,11 @@ class Driver(object):
                     sz = sizes[owner, i]
 
                     if vsrc in dv_set:
-                        remote_dv_dict[vname] = (owner, sz)
+                        self._remote_dvs[vname] = (owner, sz)
                     if vsrc in con_set:
-                        remote_con_dict[vname] = (owner, sz)
+                        self._remote_cons[vname] = (owner, sz)
                     if vsrc in obj_set:
-                        remote_obj_dict[vname] = (owner, sz)
+                        self._remote_objs[vname] = (owner, sz)
 
         self._remote_responses = self._remote_cons.copy()
         self._remote_responses.update(self._remote_objs)
@@ -609,6 +614,34 @@ class Driver(object):
         else:
             self._lin_dvs = {}
             self._nl_dvs = self._designvars
+
+    def _get_lin_dvs(self):
+        """
+        Get the design variables relevant to linear constraints.
+
+        If the driver does not support linear-only design variables, this will return all design
+        variables.
+
+        Returns
+        -------
+        dict
+            Dictionary containing design variables relevant to linear constraints.
+        """
+        return self._lin_dvs if self.supports['linear_only_designvars'] else self._designvars
+
+    def _get_nl_dvs(self):
+        """
+        Get the design variables relevant to nonlinear constraints.
+
+        If the driver does not support linear-only design variables, this will return all design
+        variables.
+
+        Returns
+        -------
+        dict
+            Dictionary containing design variables relevant to nonlinear constraints.
+        """
+        return self._nl_dvs if self.supports['linear_only_designvars'] else self._designvars
 
     def _check_for_missing_objective(self):
         """
@@ -699,27 +732,19 @@ class Driver(object):
 
         # includes and excludes for outputs are specified using _promoted_ names
         # vectors are keyed on absolute name, discretes on relative/promoted name
-        myinputs = myoutputs = myresiduals = []
+        myinputs = set()
+        myoutputs = set()
+        myresiduals = set()
 
         if recording_options['record_outputs']:
-            match_names = match_names | set(abs2prom_output.values())
-            myoutputs = [n for n, prom in abs2prom_output.items() if check_path(prom, incl, excl)]
+            match_names.update(abs2prom_output.values())
+            myoutputs = {n for n, prom in abs2prom_output.items() if check_path(prom, incl, excl)}
 
-            model_outs = model._outputs
-
-            if model._var_discrete['output']:
-                # if we have discrete outputs then residual name set doesn't match output one
-                if recording_options['record_residuals']:
-                    myresiduals = [n for n in myoutputs if model_outs._contains_abs(n)]
-            elif recording_options['record_residuals']:
-                myresiduals = myoutputs
-
-        elif recording_options['record_residuals']:
-            match_names = match_names | set(model._residuals.keys())
+        if recording_options['record_residuals']:
+            match_names.update(model._residuals)
             myresiduals = [n for n in model._residuals._abs_iter()
                            if check_path(abs2prom_output[n], incl, excl)]
 
-        myoutputs = set(myoutputs)
         if recording_options['record_desvars']:
             myoutputs.update(_src_name_iter(self._designvars))
         if recording_options['record_objectives'] or recording_options['record_responses']:
@@ -730,8 +755,13 @@ class Driver(object):
         # inputs (if in options). inputs use _absolute_ names for includes/excludes
         if 'record_inputs' in recording_options:
             if recording_options['record_inputs']:
-                match_names = match_names | set(abs2prom_inputs.keys())
-                myinputs = [n for n in abs2prom_inputs if check_path(n, incl, excl)]
+                match_names.update(abs2prom_inputs)
+                myinputs = {n for n in abs2prom_inputs if check_path(n, incl, excl)}
+
+                match_names.update(model._var_allprocs_prom2abs_list['input'])
+                for p in model._var_allprocs_prom2abs_list['input']:
+                    if check_path(p, incl, excl):
+                        myoutputs.add(model.get_source(p))
 
         # check that all exclude/include globs have at least one matching output or input name
         for pattern in excl:
@@ -739,7 +769,7 @@ class Driver(object):
                 issue_warning(f"{obj.msginfo}: No matches for pattern '{pattern}' in "
                               "recording_options['excludes'].")
         for pattern in incl:
-            if not has_match(pattern, match_names):
+            if pattern != '*' and not has_match(pattern, match_names):
                 issue_warning(f"{obj.msginfo}: No matches for pattern '{pattern}' in "
                               "recording_options['includes'].")
 
@@ -756,8 +786,9 @@ class Driver(object):
         """
         Set up case recording.
         """
-        self._filtered_vars_to_record = self._get_vars_to_record()
-        self._rec_mgr.startup(self, self._problem().comm)
+        if self._rec_mgr.has_recorders():
+            self._filtered_vars_to_record = self._get_vars_to_record()
+            self._rec_mgr.startup(self, self._problem().comm)
 
     def _run(self):
         """
@@ -1348,7 +1379,8 @@ class Driver(object):
                          min_improve_pct=coloring_mod._DEF_COMP_SPARSITY_ARGS['min_improve_pct'],
                          show_summary=coloring_mod._DEF_COMP_SPARSITY_ARGS['show_summary'],
                          show_sparsity=coloring_mod._DEF_COMP_SPARSITY_ARGS['show_sparsity'],
-                         use_scaling=coloring_mod._DEF_COMP_SPARSITY_ARGS['use_scaling']):
+                         use_scaling=coloring_mod._DEF_COMP_SPARSITY_ARGS['use_scaling'],
+                         randomize_subjacs=True, randomize_seeds=False, direct=True):
         """
         Set options for total deriv coloring.
 
@@ -1371,6 +1403,13 @@ class Driver(object):
             If True, display sparsity with coloring info after generating coloring.
         use_scaling : bool
             If True, use driver scaling when generating the sparsity.
+        randomize_subjacs : bool
+            If True, use random subjacobians corresponding to their declared sparsity patterns.
+        randomize_seeds : bool
+            If True, use random seeds when computing the sparsity.
+        direct : bool
+            If using bidirectional coloring, use the direct method when computing the column
+            adjacency matrix instead of the substitution method.
         """
         self._coloring_info.coloring = None
         self._coloring_info.num_full_jacs = num_full_jacs
@@ -1385,6 +1424,9 @@ class Driver(object):
         self._coloring_info.show_summary = show_summary
         self._coloring_info.show_sparsity = show_sparsity
         self._coloring_info.use_scaling = use_scaling
+        self._coloring_info.randomize_subjacs = randomize_subjacs
+        self._coloring_info.randomize_seeds = randomize_seeds
+        self._coloring_info.direct = direct
 
     def use_fixed_coloring(self, coloring=coloring_mod._STD_COLORING_FNAME):
         """
@@ -1437,6 +1479,7 @@ class Driver(object):
         coloring = None
         info = self._coloring_info
         static = info.static
+        model = self._problem().model
 
         if isinstance(static, coloring_mod.Coloring):
             coloring = static
@@ -1447,13 +1490,18 @@ class Driver(object):
             if coloring is None and (static is coloring_mod._STD_COLORING_FNAME or
                                      isinstance(static, str)):
                 if static is coloring_mod._STD_COLORING_FNAME:
-                    fname = self._get_total_coloring_fname()
+                    fname = self._get_total_coloring_fname(mode='input')
                 else:
                     fname = static
 
-                print("loading total coloring from file %s" % fname)
+                print(f"loading total coloring from file {fname}")
                 coloring = info.coloring = coloring_mod.Coloring.load(fname)
                 info.update(coloring._meta)
+
+                ofname = self._get_total_coloring_fname(mode='output')
+                if ((model._full_comm is not None and model._full_comm.rank == 0) or
+                        (model._full_comm is None and model.comm.rank == 0)):
+                    coloring.save(ofname)
 
         if coloring is not None and info.static is not None:
             problem = self._problem()
@@ -1470,8 +1518,8 @@ class Driver(object):
 
         return coloring
 
-    def _get_total_coloring_fname(self):
-        return os.path.join(self._problem().options['coloring_dir'], 'total_coloring.pkl')
+    def _get_total_coloring_fname(self, mode='output'):
+        return self._problem().get_coloring_dir(mode='output') / 'total_coloring.pkl'
 
     def scaling_report(self, outfile='driver_scaling_report.html', title=None, show_browser=True,
                        jac=True):
@@ -1611,10 +1659,13 @@ class Driver(object):
             if run_model and self._coloring_info.coloring is not None:
                 issue_warning("The 'run_model' argument is ignored because the coloring has "
                               "already been computed.")
+
             if self._coloring_info.dynamic and self._coloring_info.do_compute_coloring():
+                ofname = self._get_total_coloring_fname(mode='output')
                 self._coloring_info.coloring = \
-                    coloring_mod.dynamic_total_coloring(self, run_model=run_model,
-                                                        fname=self._get_total_coloring_fname())
+                    coloring_mod.dynamic_total_coloring(self,
+                                                        run_model=run_model,
+                                                        fname=ofname)
 
             return self._coloring_info.coloring
 
@@ -1748,6 +1799,8 @@ def record_iteration(requester, prob, case_name):
     # Get the data to record (collective calls that get across all ranks)
     model = prob.model
     parallel = rec_mgr._check_parallel() if model.comm.size > 1 else False
+    do_gather = rec_mgr._check_gather()
+    local = parallel and not do_gather
 
     inputs, outputs, residuals = model.get_nonlinear_vectors()
     discrete_inputs = model._discrete_inputs
@@ -1756,15 +1809,19 @@ def record_iteration(requester, prob, case_name):
     opts = requester.recording_options
     data = {'input': {}, 'output': {}, 'residual': {}}
     filt = requester._filtered_vars_to_record
+    if filt is None:  # recorder is not initialized
+        # this will raise the proper exception
+        rec_mgr.record_iteration(requester, data, requester._get_recorder_metadata(case_name))
+        return
 
     if opts['record_inputs'] and (inputs._names or len(discrete_inputs) > 0):
-        data['input'] = model._retrieve_data_of_kind(filt, 'input', 'nonlinear', parallel)
+        data['input'] = model._retrieve_data_of_kind(filt, 'input', 'nonlinear', local)
 
     if opts['record_outputs'] and (outputs._names or len(discrete_outputs) > 0):
-        data['output'] = model._retrieve_data_of_kind(filt, 'output', 'nonlinear', parallel)
+        data['output'] = model._retrieve_data_of_kind(filt, 'output', 'nonlinear', local)
 
     if opts['record_residuals'] and residuals._names:
-        data['residual'] = model._retrieve_data_of_kind(filt, 'residual', 'nonlinear', parallel)
+        data['residual'] = model._retrieve_data_of_kind(filt, 'residual', 'nonlinear', local)
 
     from openmdao.core.problem import Problem
     if isinstance(requester, Problem):

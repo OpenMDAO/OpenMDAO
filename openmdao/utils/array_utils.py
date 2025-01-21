@@ -4,15 +4,12 @@ Utils for dealing with arrays.
 import sys
 from itertools import product
 import hashlib
-from math import isclose
 
 import numpy as np
-from numpy.linalg import norm
 
-from scipy.sparse import coo_matrix
-
+from scipy.sparse import coo_matrix, csr_matrix, issparse
 from openmdao.core.constants import INT_DTYPE
-from openmdao.utils.numba import numba
+from openmdao.utils.omnumba import numba
 
 
 if sys.version_info >= (3, 8):
@@ -190,6 +187,108 @@ def take_nth(rank, size, seq):
                     return
 
 
+def csr_array_viz(arr, val_map=None, stream=sys.stdout):
+    """
+    Display the structure of a boolean array in a compact form.
+
+    Parameters
+    ----------
+    arr : ndarray
+        Array being visualized.
+    val_map : dict or None
+        Mapping of array values to characters.
+    stream : file-like
+        Stream where output will be written.
+    """
+    if len(arr.shape) != 2:
+        raise RuntimeError("simple_array_viz only works for 2d arrays.")
+
+    if val_map is None:
+        val_map = {1: 'x', 0: '.'}
+
+    final = arr.tocsr() if issparse(arr) else csr_matrix(arr, dtype=np.int8)
+    final = final.astype(np.int8, copy=final.dtype is not np.int8)
+    rowarr = np.zeros(final.shape[1], dtype=np.int8)
+
+    for r in range(final.shape[0]):
+        row = final.getrow(r)
+        rowinds = row.indices
+        rowarr[:] = 0
+        rowarr[rowinds] = row.data
+        stream.write(''.join(val_map[c] for c in rowarr))
+        stream.write(f'  {r}\n')
+
+
+def get_sparsity_diff_array(sparsity1, sparsity2):
+    """
+    Return an array showing the difference between two sparsity patterns.
+
+    Parameters
+    ----------
+    sparsity1 : bool ndarray or sparse array or None
+        First sparsity pattern.
+    sparsity2 : bool ndarray or sparse array or None
+        Second sparsity pattern.
+
+    Returns
+    -------
+    csr_array
+        Sparse array of dtype int8 where:
+        0: zero val in both
+        1: non-zero val in sparsity1
+        3: non-zero val in sparsity2
+        4: non-zero val in both.
+    """
+    assert not (sparsity1 is None and sparsity2 is None), \
+        'At least one sparsity pattern must be provided.'
+    if ((sparsity1 is not None and sparsity1.dtype != bool) or
+            (sparsity2 is not None and sparsity2.dtype != bool)):
+        raise ValueError('Sparsity patterns must be boolean.')
+
+    if issparse(sparsity1):
+        sp1 = sparsity1.tocsr().astype(np.int8)
+    elif sparsity1 is None:
+        sp1 = csr_matrix(([], ([], [])), shape=sparsity2.shape, dtype=np.int8)
+    else:
+        sp1 = csr_matrix(sparsity1, dtype=np.int8)
+
+    if issparse(sparsity2):
+        sp2 = sparsity2.tocsr().astype(np.int8)
+    elif sparsity2 is None:  # build empty sparse matrix of same shape as sp1
+        sp2 = csr_matrix(([], ([], [])), shape=sp1.shape, dtype=np.int8)
+    else:
+        sp2 = csr_matrix(sparsity2, dtype=np.int8)
+
+    assert sp1.shape == sp2.shape, 'Sparsity patterns must have the same shape.'
+
+    # set so that we get unique values for their sum:
+    sp1.data[:] = 1
+    sp2.data[:] = 3
+
+    return sp1 + sp2
+
+
+def sparsity_diff_viz(arr1, arr2, val_map=None, stream=sys.stdout):
+    """
+    Display the difference between two sparsity patterns in a compact form.
+
+    Parameters
+    ----------
+    arr1 : ndarray
+        First sparsity pattern.
+    arr2 : ndarray
+        Second sparsity pattern.
+    val_map : dict or None
+        Mapping of array values to characters.
+    stream : file-like
+        Stream where output will be written.
+    """
+    if val_map is None:
+        val_map = {0: '.', 1: '1', 3: '2', 4: 'x'}
+    spdiff = get_sparsity_diff_array(arr1, arr2)
+    csr_array_viz(spdiff, val_map=val_map, stream=stream)
+
+
 def array_viz(arr, prob=None, of=None, wrt=None, stream=sys.stdout):
     """
     Display the structure of a boolean array in a compact form.
@@ -221,15 +320,8 @@ def array_viz(arr, prob=None, of=None, wrt=None, stream=sys.stdout):
             wrt = list(prob.driver._designvars)
 
     if prob is None or of is None or wrt is None:
-        for r in range(arr.shape[0]):
-            for c in range(arr.shape[1]):
-                if arr[r, c]:
-                    stream.write('x')
-                else:
-                    stream.write('.')
-            stream.write(' %d\n' % r)
+        csr_array_viz(arr, stream=stream)
     else:
-
         row = 0
         for res in of:
             for r in range(row, row + prob.driver._responses[res]['size']):
@@ -532,7 +624,7 @@ def dv_abs_complex(x, x_deriv):
 
 def rand_sparsity(shape, density_ratio, dtype=bool):
     """
-    Return a random boolean COO matrix of the given shape with given percent density.
+    Return a random COO matrix of the given shape with given percent density.
 
     Row and column indices are generated using random integers so some duplication
     is possible, resulting in a matrix with somewhat lower density than specified.
@@ -565,6 +657,8 @@ def rand_sparsity(shape, density_ratio, dtype=bool):
 
     # get rid of dup rows/cols
     coo.sum_duplicates()
+
+    coo.data[:] = 1  # set all nonzero values to 1. For bool won't matter, but need for other dtypes
 
     return coo
 
@@ -912,3 +1006,84 @@ else:
             if a[i] != 0.:
                 return False
         return True
+
+
+def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, shape):
+    """
+    Yield the sparsity of each submatrix, based on variable names and sizes.
+
+    Parameters
+    ----------
+    row_var_size_iter : iterator of (name, size)
+        Iterator of row variable names and sizes.
+    col_var_size_iter : iterator of (name, size)
+        Iterator of column variable names and sizes.
+    nzrows : ndarray
+        Row indices of nonzero entries in the full matrix.
+    nzcols : ndarray
+        Column indices of nonzero entries in the full matrix.
+    shape : tuple
+        Shape of the full matrix.
+
+    Yields
+    ------
+    tuple
+        (row_varname, col_varname, nonzero rows, nonzero cols, shape)
+    """
+    row_start = row_end = 0
+
+    data = np.ones(nzrows.size, dtype=np.int8)
+    csr = csr_matrix((data, (nzrows, nzcols)), shape=shape)
+    col_iter = list(col_var_size_iter)  # need to iterate over multiple times
+
+    for of, of_size in row_var_size_iter:
+        row_end += of_size
+        rowslice = csr[row_start:row_end, :]
+        row_start = row_end
+
+        csc = rowslice.tocsc()
+        col_start = col_end = 0
+        for wrt, wrt_size in col_iter:
+            col_end += wrt_size
+            submat = csc[:, col_start:col_end].tocoo()
+            col_start = col_end
+
+            yield (of, wrt, submat.row, submat.col, submat.shape)
+
+
+def idxs2minmax_tuples(idxs):
+    """
+    Convert a flat array of indices into a list of contiguous (min, max) tuples.
+
+    Note that to convert these tuples to slices or ranges, you would use slice(min, max+1)
+    or range(min, max+1).
+
+    Parameters
+    ----------
+    idxs : ndarray
+        Array of indices.
+
+    Returns
+    -------
+    list
+        List of contiguous ranges.
+    """
+    # TODO: make a fast version of this using numba or cython
+    ranges = []
+    if idxs.size > 0:
+        # handle negative indices
+        if np.min(idxs) < 0:
+            idxs = idxs.copy()
+            idxs[idxs < 0] += idxs.size
+        idxs = np.sort(idxs)
+        diff = np.empty(idxs.size, dtype=int)
+        diff[0] = 1
+        diff[1:] = np.diff(idxs)
+        range_bounds = np.nonzero(diff > 1)[0]
+        start = 0
+        for end in range_bounds:
+            ranges.append((idxs[start], idxs[end - 1]))
+            start = end
+        ranges.append((idxs[start], idxs[-1]))
+
+    return ranges

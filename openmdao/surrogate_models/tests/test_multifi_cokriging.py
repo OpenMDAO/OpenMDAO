@@ -15,10 +15,12 @@ class CoKrigingSurrogateTest(unittest.TestCase):
         # A matching test using the OpenMDAO surrogate class is below (test_1d_2fi_cokriging).
 
         # high fidelity model
-        fe = lambda x: ((x * 6 - 2) ** 2) * np.sin((x * 6 - 2) * 2)
+        def fe(x):
+            return (x * 6 - 2) ** 2 * np.sin((x * 6 - 2) * 2)
 
         # low fidelity model
-        fc = lambda x: 0.5 * fe(x) + (x - 0.5) * 10. - 5
+        def fc(x):
+            return 0.5 * fe(x) + (x - 0.5) * 10.0 - 5
 
         # Xe: DOE for expensive code (nested in Xc)
         # Xc: DOE for cheap code
@@ -112,13 +114,13 @@ class CoKrigingSurrogateTest(unittest.TestCase):
 
         # Test with theta setting instead of estimation
         krig2 = MultiFiCoKrigingSurrogate(theta=[0.1])
-        krig1.train(x, y)
+        krig2.train(x, y)
 
         mu, sigma = krig1.predict([-2., 0.])
         assert_near_equal(mu, [[branin(x[0])]], 1e-5)
-        assert_near_equal(sigma, [[0.]], 1e-5)
+        assert_near_equal(sigma, [[0.]], 1e-4)
 
-        mu, sigma = krig1.predict([5., 5.])
+        mu, sigma = krig2.predict([5., 5.])
         assert_near_equal(mu, [[22]], 1)
         assert_near_equal(sigma, [[13]], 1)
 

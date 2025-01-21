@@ -1,7 +1,6 @@
 
 """Define a function to view connections."""
 import os
-import pathlib
 import json
 from itertools import chain
 from collections import defaultdict
@@ -14,9 +13,7 @@ except ImportError:
     IFrame = display = None
 
 from openmdao.core.problem import Problem
-from openmdao.utils.units import convert_units
 from openmdao.utils.mpi import MPI
-from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.notebook_utils import notebook, colab
 from openmdao.utils.om_warnings import issue_warning
@@ -87,8 +84,8 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     prefix = system.pathname + '.' if system.pathname else ''
     all_vars = {}
     for io in ('input', 'output'):
-        all_vars[io] = chain(system._var_abs2meta[io].items(),
-                             [(prefix + n, m) for n, m in system._var_discrete[io].items()])
+        all_vars[io] = chain(system._var_abs2meta[io],
+                             [prefix + n for n in system._var_discrete[io]])
 
     if show_values and system._outputs is None:
         issue_warning("Values will not be shown because final_setup has not been called yet.",
@@ -96,12 +93,11 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     with printoptions(precision=precision, suppress=True, threshold=10000):
 
-        for t, meta in all_vars['input']:
+        for t in all_vars['input']:
             s = connections[t]
             if show_values and system._outputs is not None:
                 if s.startswith('_auto_ivc.'):
-                    val = system.get_val(t, flat=True, get_remote=True,
-                                         from_src=False)
+                    val = system.get_val(t, flat=True, get_remote=True, from_src=False)
                 else:
                     val = system.get_val(t, flat=True, get_remote=True)
 

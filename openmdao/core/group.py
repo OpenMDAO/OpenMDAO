@@ -14,6 +14,7 @@ import networkx as nx
 from openmdao.core.configinfo import _ConfigInfo
 from openmdao.core.system import System, collect_errors
 from openmdao.core.component import Component, _DictValues
+from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.constants import _UNDEFINED, INT_DTYPE, _SetupStatus
 from openmdao.vectors.vector import _full_slice
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
@@ -25,12 +26,12 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len, ValueRepeater
-from openmdao.utils.general_utils import common_subpath, all_ancestors, \
+from openmdao.utils.general_utils import common_subpath, \
     convert_src_inds, shape2tuple, get_connection_owner, ensure_compatible, \
-    meta2src_iter, get_rev_conns, _contains_all
+    meta2src_iter, get_rev_conns, is_undefined
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
-from openmdao.utils.graph_utils import get_out_of_order_nodes
+from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
@@ -38,6 +39,7 @@ from openmdao.utils.relevance import get_relevance
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     PromotionWarning, MPIWarning, DerivativesWarning
 from openmdao.utils.class_util import overrides_method
+from openmdao.utils.jax_utils import jax
 from openmdao.core.total_jac import _TotalJacInfo
 
 # regex to check for valid names.
@@ -200,6 +202,14 @@ class Group(System):
         within this group, keyed by active response.  These determine if contributions
         from all ranks will be added together to get the correct input values when derivatives
         in the larger model are being solved using reverse mode.
+    _is_explicit : bool or None
+        True if neither this Group nor any of its descendants contains implicit systems or cycles.
+    _ivcs : dict
+        Dict containing metadata for each independent variable.
+    _bad_conn_vars : set
+        Set of variables involved in invalid connections.
+    _sys_graph_cache : dict
+        Cache for the system graph.
     """
 
     def __init__(self, **kwargs):
@@ -229,6 +239,10 @@ class Group(System):
         self._post_components = None
         self._iterated_components = None
         self._fd_rev_xfer_correction_dist = {}
+        self._is_explicit = None
+        self._ivcs = {}
+        self._bad_conn_vars = None
+        self._sys_graph_cache = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -301,7 +315,7 @@ class Group(System):
             Assumed shape of any connected source or higher level promoted input.
         """
         meta = {'prom': name, 'auto': False}
-        if val is _UNDEFINED:
+        if is_undefined(val):
             src_shape = shape2tuple(src_shape)
         else:
             if src_shape is not None:
@@ -444,12 +458,19 @@ class Group(System):
                                                "not supported yet.".format(self.msginfo))
 
                         if not src_indices._flat_src:
-                            src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
+                            src_indices = _flatten_src_indices(src_indices.as_array(),
+                                                               meta_in['shape'],
                                                                meta_out['global_shape'],
                                                                meta_out['global_size'])
 
-                        ref = ref[src_indices]
-                        ref0 = ref0[src_indices]
+                        if np.ndim(ref) > 0:
+                            ref = ref[src_indices]
+                        else:  # ref is scalar so ref0 must be an array
+                            ref = np.full(ref0.shape, ref)
+                        if np.ndim(ref0) > 0:
+                            ref0 = ref0[src_indices]
+                        else:  # ref0 is scalar so ref must be an array
+                            ref0 = np.full(ref.shape, ref0)
 
                 # Compute scaling arrays for inputs using a0 and a1
                 # Example:
@@ -660,6 +681,28 @@ class Group(System):
 
         self._setup_procs_finished = True
 
+    def is_explicit(self):
+        """
+        Return True if this Group contains only explicit systems and has no cycles.
+
+        Returns
+        -------
+        bool
+            True if this is an explicit component.
+        """
+        if self._is_explicit is None:
+            self._is_explicit = True
+            for subsys in self._subsystems_myproc:
+                if not subsys.is_explicit():
+                    self._is_explicit = False
+                    break
+
+            # check for cycles
+            if self._is_explicit:
+                self._is_explicit = nx.is_directed_acyclic_graph(self.compute_sys_graph())
+
+        return self._is_explicit
+
     def _configure_check(self):
         """
         Do any error checking on i/o and connections.
@@ -682,7 +725,7 @@ class Group(System):
         for subsys in self._sorted_sys_iter():
             states.extend(subsys._list_states())
 
-        return sorted(states)
+        return states
 
     def _list_states_allprocs(self):
         """
@@ -698,7 +741,7 @@ class Group(System):
             byproc = self.comm.allgather(self._list_states())
             for proc_states in byproc:
                 all_states.update(proc_states)
-            return sorted(all_states)
+            return all_states
         else:
             return self._list_states()
 
@@ -718,6 +761,7 @@ class Group(System):
         # save a ref to the problem level options.
         self._problem_meta = prob_meta
         self._initial_condition_cache = {}
+        self._sys_graph_cache = None
 
         # reset any coloring if a Coloring object was not set explicitly
         if self._coloring_info.dynamic or self._coloring_info.static is not None:
@@ -765,6 +809,7 @@ class Group(System):
         # the connections.
         self._setup_global_connections()
         self._setup_dynamic_shapes()
+        self._setup_jax()
 
         self._top_level_post_connections()
 
@@ -774,6 +819,27 @@ class Group(System):
 
         # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
+
+    def _check_required_connections(self):
+        conns = self._conn_global_abs_in2out
+        abs2prom = self._var_allprocs_abs2prom['input']
+        abs2meta_in = self._var_allprocs_abs2meta['input']
+        discrete_in = self._var_allprocs_discrete['input']
+        desvar = self.get_design_vars()
+
+        for abs_tgt, src in conns.items():
+            if src.startswith('_auto_ivc.'):
+                prom_tgt = abs2prom[abs_tgt]
+
+                # Ignore inputs that are declared as design vars.
+                if abs_tgt in discrete_in or (desvar and prom_tgt in desvar):
+                    continue
+
+                if abs2meta_in[abs_tgt]['require_connection']:
+                    promoted_as = f', promoted as "{prom_tgt}",' if prom_tgt != abs_tgt else ''
+                    self._collect_error(f'{self.msginfo}: Input "{abs_tgt}"{promoted_as} '
+                                        'requires a connection but is not connected.',
+                                        ident=(prom_tgt, abs_tgt))
 
     def _get_dataflow_graph(self):
         """
@@ -1026,8 +1092,9 @@ class Group(System):
         self._setup_residuals()
 
         if self._use_derivatives:
-            # must call this before vector setup because it determines if we need to alloc commplex
             self._setup_partials()
+
+        self._setup_vectors(self._get_root_vectors())
 
         self._fd_rev_xfer_correction_dist = {}
 
@@ -1046,8 +1113,6 @@ class Group(System):
                 self._update_dataflow_graph(responses)
 
         self._problem_meta['relevance'] = get_relevance(self, responses, desvars)
-
-        self._setup_vectors(self._get_root_vectors())
 
         # Transfers do not require recursion, but they have to be set up after the vector setup.
         self._setup_transfers()
@@ -1385,7 +1450,7 @@ class Group(System):
 
         self._resolve_src_indices()
 
-        if self.comm.size > 1:
+        if self.comm.size > 1 and not self._bad_conn_vars:
             abs2idx = self._var_allprocs_abs2idx
             all_abs2meta = self._var_allprocs_abs2meta
             all_abs2meta_in = all_abs2meta['input']
@@ -1608,6 +1673,7 @@ class Group(System):
         abs2prom = self._var_abs2prom
 
         allprocs_abs2meta = {'input': {}, 'output': {}}
+        self._ivcs = {}
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
 
@@ -1775,9 +1841,12 @@ class Group(System):
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
             self._discrete_outputs = _DictValues(self._var_discrete['output'])
         else:
-            self._discrete_inputs = self._discrete_outputs = ()
+            self._discrete_inputs = self._discrete_outputs = {}
 
         self._vars_to_gather = self._find_vars_to_gather()
+
+        # create mapping of indep var names to their metadata
+        self._ivcs = self.get_indep_vars(local=False)
 
     def _resolve_group_input_defaults(self, show_warnings=False):
         """
@@ -1817,7 +1886,7 @@ class Group(System):
                     if submeta['auto']:
                         continue
                     if key in submeta:
-                        if fullmeta[key] is _UNDEFINED:
+                        if is_undefined(fullmeta[key]):
                             origin = submeta['path']
                             origin_prom = submeta['prom']
                             val = fullmeta[key] = submeta[key]
@@ -1905,6 +1974,17 @@ class Group(System):
                                 abs_in2prom_info[tgt][tree_level] = \
                                     _PromotesInfo(src_shape=src_shape, prom=prom,
                                                   promoted_from=self.pathname)
+                else:
+                    # check for discrete targets
+                    for tgt in prom2abs_in[prom]:
+                        if tgt in self._discrete_inputs:
+                            for key, val in meta.items():
+                                # for discretes we can only set the value (not units/src_shape)
+                                if key == 'val':
+                                    self._discrete_inputs[tgt] = val
+                                elif key in ('units', 'src_shape'):
+                                    self._collect_error(f"{self.msginfo}: Cannot set '{key}={val}'"
+                                                        f" for discrete variable '{tgt}'.")
 
                 meta.update(fullmeta)
 
@@ -2050,7 +2130,7 @@ class Group(System):
         parent_conns : dict
             Dictionary of connections passed down from parent group.
         """
-        global_abs_in2out = self._conn_global_abs_in2out = {}
+        global_abs_in2out = defaultdict(set)
 
         allprocs_prom2abs_list_in = self._var_allprocs_prom2abs_list['input']
         allprocs_prom2abs_list_out = self._var_allprocs_prom2abs_list['output']
@@ -2071,7 +2151,7 @@ class Group(System):
         if parent_conns is not None:
             for abs_in, abs_out in parent_conns.items():
                 if abs_in.startswith(prefix) and abs_out.startswith(prefix):
-                    global_abs_in2out[abs_in] = abs_out
+                    global_abs_in2out[abs_in].add(abs_out)
 
                     in_subsys, _, _ = abs_in[path_len:].partition('.')
                     out_subsys, _, _ = abs_out[path_len:].partition('.')
@@ -2091,7 +2171,7 @@ class Group(System):
                 out_subsys, _, _ = abs_out[path_len:].partition('.')
                 for abs_in in allprocs_prom2abs_list_in[prom_name]:
                     in_subsys, _, _ = abs_in[path_len:].partition('.')
-                    global_abs_in2out[abs_in] = abs_out
+                    global_abs_in2out[abs_in].add(abs_out)
                     if out_subsys == in_subsys:
                         in_subsys, _, _ = abs_in[path_len:].partition('.')
                         out_subsys, _, _ = abs_out[path_len:].partition('.')
@@ -2109,6 +2189,8 @@ class Group(System):
         abs2meta = self._var_abs2meta['input']
         allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
 
+        self._bad_conn_vars = set()
+
         # Add explicit connections (only ones declared by this group)
         for prom_in, (prom_out, src_indices, flat) in self._manual_connections.items():
 
@@ -2125,6 +2207,8 @@ class Group(System):
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_out}' doesn't exist. Perhaps you meant " + \
                           f"to connect to one of the following outputs: {guesses}."
+
+                self._bad_conn_vars.update((prom_in, prom_out))
                 self._collect_error(msg)
                 continue
 
@@ -2139,6 +2223,8 @@ class Group(System):
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_in}' doesn't exist. Perhaps you meant " + \
                           f"to connect to one of the following inputs: {guesses}."
+
+                self._bad_conn_vars.update((prom_in, prom_out))
                 self._collect_error(msg)
                 continue
 
@@ -2155,6 +2241,7 @@ class Group(System):
                     self._collect_error(
                         f"{self.msginfo}: Output and input are in the same System for connection "
                         f"from '{prom_out}' to '{prom_in}'.")
+                    self._bad_conn_vars.update((prom_in, prom_out))
                     continue
 
                 if src_indices is not None:
@@ -2164,6 +2251,7 @@ class Group(System):
                             f"{self.msginfo}: Setting of 'src_indices' along with 'shape_by_conn', "
                             f"'copy_shape', or 'compute_shape' for variable '{abs_in}' "
                             "is unsupported.")
+                        self._bad_conn_vars.update((prom_in, prom_out))
                         continue
 
                     if abs_in in abs2meta:
@@ -2179,6 +2267,7 @@ class Group(System):
                                 self._collect_error(
                                     f"When connecting from '{prom_out}' to '{prom_in}': {exc}",
                                     exc_type=type_exc, tback=tb, ident=(abs_out, abs_in))
+                                self._bad_conn_vars.update((prom_in, prom_out))
                                 continue
 
                         meta = abs2meta[abs_in]
@@ -2193,6 +2282,7 @@ class Group(System):
                         f"{self.msginfo}: Input '{abs_in}' cannot be connected to '{abs_out}' "
                         f"because it's already connected to '{abs_in2out[abs_in]}'.",
                         ident=(abs_out, abs_in))
+                    self._bad_conn_vars.update((prom_in, prom_out))
                     continue
 
                 abs_in2out[abs_in] = abs_out
@@ -2206,31 +2296,23 @@ class Group(System):
 
         # Compute global_abs_in2out by first adding this group's contributions,
         # then adding contributions from systems above/below, then allgathering.
-        conn_list = list(global_abs_in2out.items())
-        conn_list.extend(abs_in2out.items())
-        global_abs_in2out.update(abs_in2out)
+        for tgt, src in abs_in2out.items():
+            global_abs_in2out[tgt].add(src)
 
         for subgroup in self._subgroups_myproc:
             if subgroup.name in new_conns:
                 subgroup._setup_global_connections(parent_conns=new_conns[subgroup.name])
             else:
                 subgroup._setup_global_connections()
-            global_abs_in2out.update(subgroup._conn_global_abs_in2out)
-            conn_list.extend(subgroup._conn_global_abs_in2out.items())
+            for tgt, src in subgroup._conn_global_abs_in2out.items():
+                global_abs_in2out[tgt].add(src)
 
-        if len(conn_list) > len(global_abs_in2out):
-            dupes = [n for n, val in Counter(tgt for tgt, _ in conn_list).items() if val > 1]
-            dup_info = defaultdict(set)
-            for tgt, src in conn_list:
-                for dup in dupes:
-                    if tgt == dup:
-                        dup_info[tgt].add(src)
-            dup_info = [(n, srcs) for n, srcs in dup_info.items() if len(srcs) > 1]
-            if dup_info:
-                dup = ["%s from %s" % (tgt, sorted(srcs)) for tgt, srcs in dup_info]
-                dupstr = ', '.join(dup)
-                self._collect_error(f"{self.msginfo}: The following inputs have multiple "
-                                    f"connections: {dupstr}.", ident=dupstr)
+        dup_info = [(n, srcs) for n, srcs in global_abs_in2out.items() if len(srcs) > 1]
+        if dup_info:
+            dup = ["%s from %s" % (tgt, sorted(srcs)) for tgt, srcs in dup_info]
+            dupstr = ', '.join(dup)
+            self._collect_error(f"{self.msginfo}: The following inputs have multiple "
+                                f"connections: {dupstr}.", ident=dupstr)
 
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             # If running in parallel, allgather
@@ -2242,12 +2324,65 @@ class Group(System):
 
             all_src_ind_ins = set()
             for myproc_global_abs_in2out, src_ind_ins in gathered:
-                global_abs_in2out.update(myproc_global_abs_in2out)
+                for tgt, srcs in myproc_global_abs_in2out.items():
+                    global_abs_in2out[tgt].update(srcs)
                 all_src_ind_ins.update(src_ind_ins)
             src_ind_inputs = all_src_ind_ins
 
         for inp in src_ind_inputs:
             allprocs_abs2meta_in[inp]['has_src_indices'] = True
+
+        self._conn_global_abs_in2out = {name: srcs.pop()
+                                        for name, srcs in global_abs_in2out.items()}
+
+    def get_indep_vars(self, local):
+        """
+        Return a dict of independant variables contained in this group or any of its subgroups.
+
+        Parameters
+        ----------
+        local : bool
+            If True, return only the variables local to the current process.
+
+        Returns
+        -------
+        dict
+            Dict of all independant variables in this group and their corresponding metadata.
+        """
+        abs2meta = self._var_abs2meta['output'] if local else self._var_allprocs_abs2meta['output']
+        return {n: meta for n, meta in abs2meta.items() if 'openmdao:indep_var' in meta['tags']}
+
+    def get_boundary_vars(self, io, local):
+        """
+        Return a set of inputs or outputs connected to variables outside of this Group.
+
+        Parameters
+        ----------
+        io : str
+            Either 'input' or 'output'.
+        local : bool
+            If True, return only the variables local to the current process.
+
+        Returns
+        -------
+        set
+            Set of absolute inputs or outputs connected to variables outside of this Group.
+        """
+        assert io in ('input', 'output'), \
+            f"io must be either 'input' or 'output', but '{io}' was given."
+        # _var_*_abs2prom contains both continuous and discrete variables
+        vnames = self._var_abs2prom[io] if local else self._var_allprocs_abs2prom[io]
+        return set(vnames).difference(self._conn_global_abs_in2out)
+
+    def _setup_jax(self, from_group=False):
+        if jax is None:
+            return
+
+        # recurse down the tree and setup
+        # jax anywhere below where it's active, then return.
+        for subsys in self._subsystems_myproc:
+            if isinstance(subsys, Group) or subsys.options['derivs_method'] == 'jax':
+                subsys._setup_jax(from_group)
 
     def _setup_dynamic_shapes(self):
         """
@@ -2573,7 +2708,7 @@ class Group(System):
                                                                **meta2node_data(all_abs2meta_in[n]))
                                                 graph.add_edge(n, name, multi=False)
                                                 break
-                            if fail:
+                            if fail and name not in self._bad_conn_vars:
                                 self._collect_error(
                                     f"{self.msginfo}: 'shape_by_conn' was set for "
                                     f"unconnected variable '{name}'.")
@@ -2641,7 +2776,6 @@ class Group(System):
 
         knowns = {n for n, d in graph.nodes(data=True) if d['shape'] is not None}
         all_knowns = knowns.copy()
-        all_resolved = set()
 
         nodes = graph.nodes
         edges = graph.edges
@@ -2872,11 +3006,12 @@ class Group(System):
                     # out_shape != in_shape is allowed if there's no ambiguity in storage order
                     if (in_shape is None or out_shape is None or
                             not array_connection_compatible(in_shape, out_shape)):
-                        self._collect_error(
-                            f"{self.msginfo}: The source and target shapes do not match or "
-                            f"are ambiguous for the connection '{abs_out}' to '{abs_in}'. "
-                            f"The source shape is {out_shape} "
-                            f"but the target shape is {in_shape}.", ident=(abs_out, abs_in))
+                        with np.printoptions(legacy='1.21'):
+                            self._collect_error(
+                                f"{self.msginfo}: The source and target shapes do not match or "
+                                f"are ambiguous for the connection '{abs_out}' to '{abs_in}'. "
+                                f"The source shape is {out_shape} "
+                                f"but the target shape is {in_shape}.", ident=(abs_out, abs_in))
                         continue
 
                 elif src_indices is not None:
@@ -3100,7 +3235,7 @@ class Group(System):
         if src_indices is None:
             prominfo = None
             if flat_src_indices is not None or src_shape is not None:
-                issue_warning(f"ignored flat_src_indices and/or src_shape because"
+                issue_warning("ignored flat_src_indices and/or src_shape because"
                               " src_indices was not specified.", prefix=self.msginfo,
                               category=UnusedOptionWarning)
 
@@ -3696,8 +3831,9 @@ class Group(System):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        if self._tot_jac is not None and self._owns_approx_jac:
-            self._jacobian = self._tot_jac.J_dict
+        if (self._tot_jac is not None and self._owns_approx_jac and
+                not isinstance(self._jacobian, coloring_mod._ColSparsityJac)):
+            self._jacobian = self._tot_jac
         elif self._jacobian is None:
             self._jacobian = DictionaryJacobian(self)
 
@@ -3850,40 +3986,39 @@ class Group(System):
             subsys._get_missing_partials(missing)
 
     def _approx_subjac_keys_iter(self):
+        yield from self._subjac_keys_iter()
+
+    def _subjac_keys_iter(self):
         # yields absolute keys (no aliases)
         totals = self.pathname == ''
 
         wrt = set()
-        ivc = set()
+        ivc = set(self.get_indep_vars(local=False))
         pro2abs = self._var_allprocs_prom2abs_list
 
         if totals:
             # When computing totals, weed out inputs connected to anything inside our system unless
             # the source is an indepvarcomp.
-            all_abs2meta_out = self._var_allprocs_abs2meta['output']
             if self._owns_approx_wrt:
-                for meta in self._owns_approx_wrt.values():
-                    src = meta['source']
-                    if 'openmdao:indep_var' in all_abs2meta_out[src]['tags']:
-                        wrt.add(src)
+                wrt = {m['source'] for m in self._owns_approx_wrt.values()}
+                diff = wrt.difference(ivc)
+                if diff:
+                    bad = [n for n, m in self._owns_approx_wrt.items() if m['source'] in diff]
+                    raise RuntimeError("When computing total derivatives for the model, the "
+                                       "following wrt variables are not independent variables or "
+                                       "do not have an independant variable as a source: "
+                                       f"{sorted(bad)}")
+                wrt = wrt.intersection(ivc)
             else:
-                for abs_inps in pro2abs['input'].values():
-                    for inp in abs_inps:
-                        src = self._conn_global_abs_in2out[inp]
-                        if 'openmdao:indep_var' in all_abs2meta_out[src]['tags']:
-                            wrt.add(src)
-                            ivc.add(src)
-                        break
+                wrt = ivc
 
         else:
             for abs_inps in pro2abs['input'].values():
-                for inp in abs_inps:
+                if abs_inps[0] not in self._conn_abs_in2out:
                     # If connection is inside of this Group, perturbation of all implicitly
-                    # connected inputs will be handled properly via internal transfers. Otherwise,
-                    # we need to add all implicitly connected inputs separately.
-                    if inp in self._conn_abs_in2out:
-                        break
-                    wrt.add(inp)
+                    # connected inputs will be handled properly via internal transfers.
+                    # Otherwise, we need to add all implicitly connected inputs separately.
+                    wrt.update(abs_inps)
 
             # get rid of any old stuff in here
             self._owns_approx_of = self._owns_approx_wrt = None
@@ -3902,7 +4037,7 @@ class Group(System):
                 # Create approximations for the ones we need.
 
                 _of, _wrt = key
-                # Skip explicit res wrt outputs
+                # Skip res wrt outputs
                 if _wrt in of and _wrt not in ivc:
 
                     # Support for specifying a desvar as an obj/con.
@@ -4231,39 +4366,39 @@ class Group(System):
         graph = nx.DiGraph()
 
         if comps_only:
-            # add all compoenents as nodes in the graph so they'll be there even if unconnected.
+            # add all components as nodes in the graph so they'll be there even if unconnected.
             comps = set(v.rpartition('.')[0] for v in chain(self._var_allprocs_abs2prom['output'],
                                                             self._var_allprocs_abs2prom['input']))
             graph.add_nodes_from(comps)
 
-            edge_data = defaultdict(lambda: defaultdict(list))
-            for in_abs, src_abs in self._conn_global_abs_in2out.items():
-                src_sys = src_abs.rpartition('.')[0]
-                tgt_sys = in_abs.rpartition('.')[0]
-
-                # store var connection data in each system to system edge.
-                if add_edge_info:
-                    edge_data[(src_sys, tgt_sys)][src_abs].append(in_abs)
-                else:
-                    graph.add_edge(src_sys, tgt_sys)
-
             if add_edge_info:
+                edge_data = defaultdict(lambda: defaultdict(list))
+                for in_abs, src_abs in self._conn_global_abs_in2out.items():
+                    src_sys = src_abs.rpartition('.')[0]
+                    tgt_sys = in_abs.rpartition('.')[0]
+
+                    # store var connection data in each system to system edge.
+                    edge_data[(src_sys, tgt_sys)][src_abs].append(in_abs)
+
                 for (src_sys, tgt_sys), data in edge_data.items():
                     graph.add_edge(src_sys, tgt_sys, conns=data)
+            else:
+                for in_abs, src_abs in self._conn_global_abs_in2out.items():
+                    graph.add_edge(src_abs.rpartition('.')[0], in_abs.rpartition('.')[0])
         else:
-            glen = self.pathname.count('.') + 1 if self.pathname else 0
-            var2sys = {v: v.split('.', glen + 1)[glen]
-                       for v in chain(self._var_allprocs_abs2prom['output'],
-                                      self._var_allprocs_abs2prom['input'])}
+            if self._sys_graph_cache is None:
+                # add all systems as nodes in the graph so they'll be there even if unconnected.
+                graph.add_nodes_from(self._subsystems_allprocs)
 
-            # add all systems as nodes in the graph so they'll be there even if unconnected.
-            graph.add_nodes_from(var2sys.values())
-
-            for in_abs, src_abs in self._conn_global_abs_in2out.items():
-                src_sys = var2sys[src_abs]
-                tgt_sys = var2sys[in_abs]
-                if src_sys != tgt_sys:
-                    graph.add_edge(src_sys, tgt_sys)
+                glen = self.pathname.count('.') + 1 if self.pathname else 0
+                for in_abs, src_abs in self._conn_global_abs_in2out.items():
+                    src_sys = src_abs.split('.', glen + 1)[glen]
+                    tgt_sys = in_abs.split('.', glen + 1)[glen]
+                    if src_sys != tgt_sys:
+                        graph.add_edge(src_sys, tgt_sys)
+                self._sys_graph_cache = graph
+            else:
+                graph = self._sys_graph_cache
 
         return graph
 
@@ -4366,7 +4501,9 @@ class Group(System):
                             if src_indices._flat_src:
                                 val.ravel()[src_indices.flat()] = value.flat
                             else:
-                                val[src_indices()] = value
+                                # Squeeze out singleton dimensions so that we can assign
+                                # values of different shapes when the storage order is unambiguous.
+                                np.squeeze(val[src_indices()])[...] = np.squeeze(value)
                         except Exception as err:
                             src = self._conn_global_abs_in2out[tgt]
                             msg = f"{self.msginfo}: The source indices " + \
@@ -4394,7 +4531,7 @@ class Group(System):
 
                     if val is not value:
                         if val.shape:
-                            val = np.reshape(value, newshape=val.shape)
+                            val = np.reshape(value, val.shape)
                         else:
                             val = value
 
@@ -4450,14 +4587,18 @@ class Group(System):
         auto_conns = {}
 
         for tgt in all_abs2meta:
-            if tgt in conns:
+            if tgt in conns or tgt in self._bad_conn_vars:
                 continue
 
             all_meta = all_abs2meta[tgt]
             if all_meta['distributed']:
                 # OpenMDAO currently can't create an automatic IndepVarComp for inputs on
                 # distributed components.
-                raise RuntimeError(f'Distributed component input "{tgt}" requires an IndepVarComp.')
+                if tgt not in self._bad_conn_vars:
+                    prom_name = abs2prom[tgt]
+                    promoted_as = f', promoted as "{prom_name}",' if prom_name != tgt else ''
+                    raise RuntimeError(f'Distributed component input "{tgt}"'
+                                       f'{promoted_as} is not connected.')
 
             prom = abs2prom[tgt]
             if prom in prom2auto:
@@ -4559,10 +4700,10 @@ class Group(System):
                     auto_ivc.add_discrete_output(loc_out_name, val=val)
 
                 src = conns[abs_in]
-                if src in auto_ivc.auto2tgt:
-                    auto_ivc.auto2tgt[src].append(abs_in)
+                if src in auto2tgt:
+                    auto2tgt[src].append(abs_in)
                 else:
-                    auto_ivc.auto2tgt[src] = [abs_in]
+                    auto2tgt[src] = [abs_in]
 
         if not prom2auto:
             return auto_ivc
@@ -4590,10 +4731,16 @@ class Group(System):
         p2abs.update(old)
         self._var_allprocs_prom2abs_list[io] = p2abs
 
-        # auto_ivc never promotes anything
-        self._var_abs2prom[io].update({n: n for n in auto_ivc._var_abs2prom[io]})
-        self._var_allprocs_abs2prom[io].update({n: n for n in
-                                                auto_ivc._var_allprocs_abs2prom[io]})
+        # set up auto_ivc abs2prom such that promoted name of the auto_ivc output is the same
+        # as the promoted name of the input that it is connected to
+        abs2prom = self._var_abs2prom[io]
+        abs2prom_in = self._var_allprocs_abs2prom['input']
+        for n in auto_ivc._var_abs2prom[io]:
+            abs2prom[n] = abs2prom_in[auto2tgt[n][0]]
+
+        all_abs2prom = self._var_allprocs_abs2prom[io]
+        for n in auto_ivc._var_allprocs_abs2prom[io]:
+            all_abs2prom[n] = abs2prom_in[auto2tgt[n][0]]
 
         self._var_discrete[io].update({'_auto_ivc.' + k: v for k, v in
                                        auto_ivc._var_discrete[io].items()})
@@ -4608,6 +4755,9 @@ class Group(System):
         self._var_allprocs_abs2meta[io] = {}
         self._var_allprocs_abs2meta[io].update(auto_ivc._var_allprocs_abs2meta[io])
         self._var_allprocs_abs2meta[io].update(old)
+
+        # add all auto_ivc vars to our _loc_ivcs
+        self._ivcs.update(auto_ivc._var_abs2meta[io])
 
         self._approx_subjac_keys = None  # this will force re-initialization
         self._setup_procs_finished = True
@@ -5101,29 +5251,24 @@ class Group(System):
 
         has_custom_derivs = False
         list_wrt = list(wrt) if wrt is not None else []
+        list_of = list(of) if of is not None else []
+
+        lincons = [d for d, meta in driver._cons.items() if meta['linear']]
+        if lincons and list_of == lincons:  # this is for a linear jacobian
+            driver_wrt = list(driver._get_lin_dvs())
+        else:
+            driver_wrt = list(driver._get_nl_dvs())
 
         if wrt is None:
-            lincons = [d for d, meta in driver._cons.items() if meta['linear']]
-            if lincons:
-                if len(lincons) == len(driver._responses):  # all 'ofs' are linear
-                    driver_wrt = list(driver._lin_dvs if driver.supports['linear_only_designvars']
-                                      else driver._designvars)
-                else:  # mixed linear and nonlinear constraints
-                    driver_wrt = list(driver._nl_dvs if driver.supports['linear_only_designvars']
-                                      else driver._designvars)
-            else:
-                driver_wrt = list(driver._nl_dvs if driver.supports['linear_only_designvars']
-                                  else driver._designvars)
-
             wrt = driver_wrt
             if not wrt:
                 raise RuntimeError("No design variables were passed to compute_totals and "
                                    "the driver is not providing any.")
         else:
-            driver_wrt = list(driver._designvars)
-            wrt_src_names = [m['source'] for m in driver._designvars.values()]
-            if list_wrt != driver_wrt and list_wrt != wrt_src_names:
-                has_custom_derivs = True
+            if list_wrt != driver_wrt:
+                wrt_src_names = [driver._designvars[n]['source'] for n in driver_wrt]
+                if list_wrt != wrt_src_names:
+                    has_custom_derivs = True
 
         driver_ordered_nl_resp_names = driver._get_ordered_nl_responses()
         if of is None:
@@ -5265,3 +5410,91 @@ class Group(System):
         # inside of the group or its children.
         meta['base'] = 'Group'
         return meta
+
+
+def iter_solver_info(system):
+    """
+    Return solver information for this System.
+
+    Parameters
+    ----------
+    system : System
+        Return solver information for this System.
+
+    Returns
+    -------
+    str
+        System pathname.
+    str
+        Class name.
+    list of sets of str
+        Strongly connected components in this Group's subsystem graph.  If not a Group, this will
+        be an empty list.
+    str
+        Linear solver class name.
+    str
+        Nonlinear solver class name.
+    int
+        Linear solver max iterations.
+    int
+        Nonlinear solver max iterations.
+    int
+        Number of subsystems that are not part of any strongly connected component. If this
+        number is greater than 0 and strongly connected components exist in this group, it
+        indicates that this group contains subcycles and that it may be more efficient to
+        separate those subcyles into their own groups and apply iterative solvers to them.
+    bool
+        True if this is a Group, False if it is an ImplicitComponent.
+    bool
+        True if the linear solver found for this System can solve a cycle or implicit component.
+    bool
+        True if the nonlinear solver found for this System can solve a cycle or implicit component.
+    """
+    sccs = []
+    missing = 0
+    lnmaxiter = nlmaxiter = 1
+    nl_can_solve = lin_can_solve = False
+    nlslvname = lnslvname = None
+
+    if isinstance(system, Group):
+        isgrp = True
+        for s in get_sccs_topo(system.compute_sys_graph()):
+            if len(s) > 1:
+                sccs.append(s)
+            else:
+                missing += 1
+    elif isinstance(system, ImplicitComponent):
+        isgrp = False
+    else:
+        return (system.pathname, system.__class__.__name__, sccs, None, None, 0, 0, 0, False,
+                False, False)
+
+    if system.nonlinear_solver:
+        if isgrp:
+            nl_can_solve = system.nonlinear_solver.can_solve_cycle()
+        else:
+            nl_can_solve = system.nonlinear_solver.supports['implicit_components']
+        nlslvname = system.nonlinear_solver.__class__.__name__
+        if 'maxiter' in system.nonlinear_solver.options:
+            nlmaxiter = system.nonlinear_solver.options['maxiter']
+
+    if system.linear_solver:
+        if isgrp:
+            lin_can_solve = system.linear_solver.can_solve_cycle()
+        else:
+            lin_can_solve = system.linear_solver.supports['implicit_components']
+        lnslvname = system.linear_solver.__class__.__name__
+
+    if lnslvname and 'maxiter' in system.linear_solver.options:
+        lnmaxiter = system.linear_solver.options['maxiter']
+
+    if not isgrp:
+        if lnslvname is None and system._has_solve_linear:
+            lnslvname = 'solve_linear'
+            lin_can_solve = True
+        if nlslvname is None and system._has_solve_nl:
+            nlslvname = 'solve_nonlinear'
+            nl_can_solve = True
+
+    return (system.pathname, system.__class__.__name__, sccs, lnslvname, nlslvname, lnmaxiter,
+            nlmaxiter, missing, isgrp, nl_can_solve, lin_can_solve)

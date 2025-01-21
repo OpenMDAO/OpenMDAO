@@ -44,7 +44,7 @@ class TestLoadCase(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         system_cases = cr.list_cases('root', out_stream=None)
         case = cr.get_case(system_cases[0])
@@ -75,7 +75,7 @@ class TestLoadCase(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         system_cases = cr.list_cases('root', out_stream=None)
         case = cr.get_case(system_cases[0])
@@ -85,9 +85,16 @@ class TestLoadCase(unittest.TestCase):
         prob.setup()
 
         expected_warnings = [
-            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'y1', recorded in the case is not found in the model."),
-            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'y2', recorded in the case is not found in the model."),
-            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'z', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'con_cmp1.y1', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'mda.d2.y1', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'obj_cmp.y1', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'con_cmp2.y2', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'mda.d1.y2', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'obj_cmp.y2', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'mda.d1.z', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'mda.d2.z', recorded in the case is not found in the model."),
+            (OpenMDAOWarning, "<model> <class Group>: Input variable, 'obj_cmp.z', recorded in the case is not found in the model."),
+
             (OpenMDAOWarning, "<model> <class Group>: Output variable, 'z', recorded in the case is not found in the model."),
             (OpenMDAOWarning, "<model> <class Group>: Output variable, 'con1', recorded in the case is not found in the model."),
             (OpenMDAOWarning, "<model> <class Group>: Output variable, 'con2', recorded in the case is not found in the model."),
@@ -98,29 +105,67 @@ class TestLoadCase(unittest.TestCase):
         with assert_warnings(expected_warnings):
             prob.load_case(case)
 
-    def test_load_equivalent_model(self):
+    def test_load_equivalent_model_driver(self):
         prob = SellarProblem(SellarDerivativesGrouped)
-
-        prob.model.add_recorder(self.recorder)
 
         driver = prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
         driver.recording_options['record_desvars'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
 
+        prob.driver.add_recorder(self.recorder)
+
         prob.setup()
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
-        system_cases = cr.list_cases('root', out_stream=None)
-        case = cr.get_case(system_cases[0])
+        cases = cr.list_cases('driver', out_stream=None)
+        case = cr.get_case(cases[0])
 
         # try to load it into a different version of the Sellar model
         # this should succeed with no warnings due to the two models
-        # having the same promoted inputs/outputs, even though the
-        # underlying model heierarchy has changed
+        # having the same promoted outputs, even though the
+        # underlying model heierarchy has changed.  Note that this only
+        # works for outputs.  If inputs are loaded, the model being loaded
+        # into must match the model saved in the recorder.
+        prob = SellarProblem()
+        prob.setup()
+
+        with assert_no_warning(UserWarning):
+            prob.load_case(case)
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+    def test_load_equivalent_model_system(self):
+        prob = SellarProblem(SellarDerivativesGrouped)
+
+        driver = prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
+        driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = True
+
+        prob.model.recording_options['record_inputs'] = False
+        prob.model.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
+
+        cases = cr.list_cases('root', out_stream=None)
+        case = cr.get_case(cases[0])
+
+        # try to load it into a different version of the Sellar model
+        # this should succeed with no warnings due to the two models
+        # having the same promoted outputs, even though the
+        # underlying model heierarchy has changed.  Note that this only
+        # works for outputs.  If inputs are loaded, the model being loaded
+        # into must match the model saved in the recorder.
         prob = SellarProblem()
         prob.setup()
 
@@ -146,7 +191,7 @@ class TestLoadCase(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         system_cases = cr.list_cases('root.d2', out_stream=None)
         case = cr.get_case(system_cases[0])
@@ -182,7 +227,7 @@ class TestLoadCase(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         system_cases = cr.list_cases('root', out_stream=None)
         case = cr.get_case(system_cases[0])
@@ -236,11 +281,11 @@ class TestLoadCase(unittest.TestCase):
                 super().compute_partials(inputs, outputs)
 
 
-        # Setup the optimization 
-        prob = om.Problem() 
+        # Setup the optimization
+        prob = om.Problem()
         prob.model.add_subsystem(
             'paraboloid', ParaboloidWithDiscreteOutput())
-        prob.driver = om.ScipyOptimizeDriver() 
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
 
         # Setup Recorder
@@ -259,7 +304,7 @@ class TestLoadCase(unittest.TestCase):
         prob.set_val('paraboloid.disc_out', 'INCORRECT_VAL')
 
         # Load the Case from the recorder
-        cr = om.CaseReader("cases.sql")
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         case = cr.get_case('after_run_driver')
         prob.load_case(case)
 
@@ -286,7 +331,7 @@ class TestLoadCase(unittest.TestCase):
         inputs_before = prob.model.list_inputs(val=True, units=True, out_stream=None)
         outputs_before = prob.model.list_outputs(val=True, units=True, out_stream=None)
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         # get third case
         system_cases = cr.list_cases('root', out_stream=None)
@@ -335,7 +380,7 @@ class TestLoadCase(unittest.TestCase):
 
         self.assertFalse(fail, 'Problem failed to converge')
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         solver_cases = cr.list_cases('root.nonlinear_solver', out_stream=None)
         case = cr.get_case(solver_cases[0])
@@ -378,7 +423,7 @@ class TestLoadCase(unittest.TestCase):
 
         self.assertFalse(fail, 'Problem failed to converge')
 
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         driver_cases = cr.list_cases('driver', out_stream=None)
         case = cr.get_case(driver_cases[0])
@@ -469,7 +514,7 @@ class TestLoadCase(unittest.TestCase):
         prob.cleanup()
 
         # get the case we recorded
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         case = cr.get_case(0)
 
         # check 'use_indices' option, default is to use indices
@@ -525,7 +570,7 @@ class TestLoadCase(unittest.TestCase):
             model._outputs[name] += 1.0
 
         # Now load in the case we recorded
-        cr = om.CaseReader(self.filename)
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
         driver_cases = cr.list_cases('driver', out_stream=None)
         case = cr.get_case(driver_cases[0])
@@ -574,7 +619,7 @@ class TestLoadCaseMPI(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        reader = om.CaseReader(recorder_file)
+        reader = om.CaseReader(prob.get_outputs_dir() / recorder_file)
         prob.load_case(reader.get_case(-1))
 
         with multi_proc_exception_check(prob.comm):

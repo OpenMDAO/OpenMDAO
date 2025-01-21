@@ -3,7 +3,6 @@ Unit tests for Group.
 """
 import itertools
 import unittest
-from collections import defaultdict
 
 import numpy as np
 
@@ -17,7 +16,7 @@ from openmdao.test_suite.components.sellar import SellarDis2
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_no_warning
 from openmdao.utils.logger_utils import TestLogger
-from openmdao.utils.om_warnings import PromotionWarning, OMDeprecationWarning
+from openmdao.utils.om_warnings import PromotionWarning
 from openmdao.utils.name_maps import name2abs_names
 from openmdao.utils.testing_utils import set_env_vars_context
 
@@ -207,10 +206,10 @@ class TestGroup(unittest.TestCase):
         g1 = p.model.add_subsystem('g1', om.Group())
         g2 = g1.add_subsystem('g2', om.Group(), promotes=['g3.c1.x'])  # make g2 disappear using promotes
         g3 = g2.add_subsystem('g3', om.Group())
-        c1 = g3.add_subsystem('c1', om.ExecComp('y=2.*x', x=2.))
+        g3.add_subsystem('c1', om.ExecComp('y=2.*x', x=2.))
 
         g3_ = g1.add_subsystem('g3', om.Group(), promotes=['x'])  # second g3, but directly under g1
-        c1_ = g3_.add_subsystem('c1', om.ExecComp('y=3.*x', x=3.), promotes=['x'])
+        g3_.add_subsystem('c1', om.ExecComp('y=3.*x', x=3.), promotes=['x'])
 
         with self.assertRaises(Exception) as cm:
             p.setup()
@@ -225,10 +224,10 @@ class TestGroup(unittest.TestCase):
         g1 = p.model.add_subsystem('g1', om.Group())
         g2 = g1.add_subsystem('g2', om.Group(), promotes=['g3.c1.y'])  # make g2 disappear using promotes
         g3 = g2.add_subsystem('g3', om.Group())
-        c1 = g3.add_subsystem('c1', om.ExecComp('y=2.*x', x=2.))
+        g3.add_subsystem('c1', om.ExecComp('y=2.*x', x=2.))
 
         g3_ = g1.add_subsystem('g3', om.Group(), promotes=['y'])  # second g3, but directly under g1
-        c1_ = g3_.add_subsystem('c1', om.ExecComp('y=3.*x', x=3.), promotes=['y'])
+        g3_.add_subsystem('c1', om.ExecComp('y=3.*x', x=3.), promotes=['y'])
 
         with self.assertRaises(Exception) as cm:
             p.setup()
@@ -489,6 +488,84 @@ class TestGroup(unittest.TestCase):
         msg = r"Output name 'y' refers to multiple outputs: \['G1.C1.y', 'G1.C2.y'\]."
         with self.assertRaisesRegex(Exception, msg):
             prob.setup()
+
+    def test_required_connection_input_unconnected(self):
+        class RequiredConnComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', require_connection=True)
+                self.add_output('y')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 2 * inputs['x']
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', RequiredConnComp())
+        p.setup()
+
+        with self.assertRaises(Exception) as cm:
+            p.final_setup()
+
+        self.assertEqual(str(cm.exception),
+                         '<model> <class Group>: Input "comp.x" requires a connection but is not connected.')
+
+    def test_required_connection_promoted_input_unconnected(self):
+        class RequiredConnComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', require_connection=True)
+                self.add_output('y')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 2 * inputs['x']
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', RequiredConnComp(), promotes=['*'])
+        p.setup()
+
+        with self.assertRaises(Exception) as cm:
+            p.final_setup()
+
+        self.assertEqual(str(cm.exception),
+                         '<model> <class Group>: Input "comp.x", promoted as "x", requires a connection but is not connected.')
+
+    def test_required_connection_desvar(self):
+        class RequiredConnComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', require_connection=True)
+                self.add_output('y')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 2 * inputs['x']
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', RequiredConnComp(), promotes=['*'])
+        p.model.add_design_var('x')
+        p.setup()
+        p.run_model()
+
+        # no Exception should be raised due to 'require_connection=True' since x is a desvar
+
+    def test_required_connection_connected_in_configure(self):
+        class RequiredConnComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', require_connection=True)
+                self.add_output('y')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 2 * inputs['x']
+
+        class RequiredConnGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('indep', om.IndepVarComp('x'))
+                self.add_subsystem('comp', RequiredConnComp())
+
+            def configure(self):
+                self.connect('indep.x', 'comp.x')
+
+        p = om.Problem(RequiredConnGroup())
+        p.setup()
+        p.run_model()
+
+        # no Exception should be raised due to 'require_connection=True' since x is connected in configure()
 
     def test_unconnected_input_units_no_mismatch(self):
         p = om.Problem()
@@ -1087,7 +1164,7 @@ class TestGroup(unittest.TestCase):
 
     def test_empty_group(self):
         p = om.Problem()
-        g1 = p.model.add_subsystem('G1', om.Group(), promotes=['*'])
+        p.model.add_subsystem('G1', om.Group(), promotes=['*'])
 
         p.setup()
 
@@ -2753,7 +2830,8 @@ class TestGroupAddInput(unittest.TestCase):
                                             promotes_inputs=['x'])
 
         g3 = g1.add_subsystem("G3", om.Group(), promotes_inputs=['x'])
-        if diff_vals: val = 2.0
+        if diff_vals:
+            val = 2.0
         g3.add_subsystem("C3", om.ExecComp("y = 4. * x",
                                             x={'val': val, 'units': units1},
                                             y={'val': 1.0, 'units': units1}),
@@ -2766,7 +2844,8 @@ class TestGroupAddInput(unittest.TestCase):
         par = model.add_subsystem("par", om.ParallelGroup(), promotes_inputs=['x'])
 
         g4 = par.add_subsystem("G4", om.Group(), promotes_inputs=['x'])
-        if diff_vals: val = 3.0
+        if diff_vals:
+            val = 3.0
         g4.add_subsystem("C5", om.ExecComp("y = 6. * x",
                                             x={'val': val, 'units': units2},
                                             y={'val': 1.0, 'units': units2}),
@@ -2777,7 +2856,8 @@ class TestGroupAddInput(unittest.TestCase):
                                             promotes_inputs=['x'])
 
         g5 = par.add_subsystem("G5", om.Group(), promotes_inputs=['x'])
-        if diff_vals: val = 4.0
+        if diff_vals:
+            val = 4.0
         g5.add_subsystem("C7", om.ExecComp("y = 8. * x",
                                             x={'val': val, 'units': units1},
                                             y={'val': 1.0, 'units': units1}),
@@ -3081,6 +3161,109 @@ class TestGroupAddInput(unittest.TestCase):
            "promoted input 'x' with conflicting values for 'val'. Call <group>.set_input_defaults('x', val=?), "
            "where <group> is the model to remove the ambiguity.")
 
+    def test_set_input_defaults_discrete(self):
+        import math
+        import openmdao.api as om
+
+        density = {
+            'steel': 7.85,  # g/cm^3
+            'aluminum': 2.7  # g/cm^3
+        }
+
+        class SquarePlate(om.ExplicitComponent):
+            """
+            Calculate the weight of a square plate.
+
+            material is a discrete input (default: steel)
+            """
+
+            def setup(self):
+                self.add_discrete_input('material', 'steel')
+
+                self.add_input('length', 1.0, units='cm')
+                self.add_input('width', 1.0, units='cm')
+                self.add_input('thickness', 1.0, units='cm')
+
+                self.add_output('weight', 1.0, units='g')
+
+            def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+                length = inputs['length']
+                width = inputs['width']
+                thickness = inputs['thickness']
+                material = discrete_inputs['material']
+
+                outputs['weight'] = length * width * thickness * density[material]
+
+        class CirclePlate(om.ExplicitComponent):
+            """
+            Calculate the weight of a circular plate.
+
+            material is a discrete input (default: aluminum)
+            """
+
+            def setup(self):
+                self.add_discrete_input('material', 'aluminum')
+
+                self.add_input('radius', 1.0, units='cm')
+                self.add_input('thickness', 1.0, units='g')
+
+                self.add_output('weight', 1.0, units='g')
+
+            def compute(self, inputs, outputs, discrete_inputs, discrete_output):
+                radius = inputs['radius']
+                thickness = inputs['thickness']
+                material = discrete_inputs['material']
+
+                outputs['weight'] =  math.pi * radius**2 * thickness * density[material]
+
+        #
+        # first check that we get errors when using invalid args to set defaults on a discrete
+        #
+        p = om.Problem()
+        model = p.model
+
+        model.add_subsystem('square', SquarePlate(), promotes_inputs=['material'])
+        model.add_subsystem('circle', CirclePlate(), promotes_inputs=['material'])
+
+        # setting input defaults for units/src_shape is not valid for a discrete and will generate errors
+        model.set_input_defaults('material', 'steel', units='kg', src_shape=(1,))
+        expect_errors = [
+            f"Collected errors for problem '{p._get_inst_id()}':",
+            "   <model> <class Group>: Cannot set 'units=kg' for discrete variable 'circle.material'.",
+            "   <model> <class Group>: Cannot set 'src_shape=(1,)' for discrete variable 'circle.material'.",
+            "   <model> <class Group>: Cannot set 'units=kg' for discrete variable 'square.material'.",
+            "   <model> <class Group>: Cannot set 'src_shape=(1,)' for discrete variable 'square.material'.",
+        ]
+
+        with self.assertRaises(Exception) as cm:
+            p.setup()
+
+        err_msgs = cm.exception.args[0].split('\n')
+        for err_msg in expect_errors:
+            self.assertTrue(err_msg in err_msgs,
+                            err_msg + ' not found in:\n' + cm.exception.args[0])
+
+        #
+        # now make sure that setting just the default value for a discrete works as expected
+        #
+        p = om.Problem()
+        model = p.model
+
+        model.add_subsystem('square', SquarePlate(), promotes_inputs=['material'])
+        model.add_subsystem('circle', CirclePlate(), promotes_inputs=['material'])
+
+        model.set_input_defaults('material', 'steel')
+
+        p.setup()
+        p.run_model()
+
+        inputs = model.list_inputs(return_format='dict', out_stream=None)
+        self.assertEqual(inputs['square.material']['val'], 'steel')
+        self.assertEqual(inputs['circle.material']['val'], 'steel')
+
+        assert_near_equal(p['square.weight'], 7.85)
+        assert_near_equal(p['circle.weight'], 24.66150233, 1e-6)
+
 
 class MultComp(om.ExplicitComponent):
     """
@@ -3111,7 +3294,7 @@ class MultComp(om.ExplicitComponent):
 
         out_list = [o for _, _, o in self.mults]
         if len(all_outs) < len(out_list):
-            raise RuntimeError(f"Some outputs appear more than once.")
+            raise RuntimeError("Some outputs appear more than once.")
 
         for inp, _, out in self.mults:
             self.add_input(inp, val=self.inits.get(inp, 1.))
@@ -3899,8 +4082,8 @@ class TestFeatureConfigure(unittest.TestCase):
                 self.set_input_defaults('x', val=99.)
 
         p = om.Problem(model=ConfigGroup())
-        C1 = p.model.add_subsystem('C1', om.ExecComp('y=2*x'), promotes_inputs=['x'])
-        C2 = p.model.add_subsystem('C2', om.ExecComp('y=3*x'), promotes_inputs=['x'])
+        p.model.add_subsystem('C1', om.ExecComp('y=2*x'), promotes_inputs=['x'])
+        p.model.add_subsystem('C2', om.ExecComp('y=3*x'), promotes_inputs=['x'])
 
         p.setup()
         self.assertEqual(p['x'], 99.)
@@ -4045,7 +4228,7 @@ class TestFeatureConfigure(unittest.TestCase):
                 self.add_subsystem('comp', MyComp())
 
             def configure(self):
-                meta = self.comp.get_io_metadata('output', includes='y')
+                self.comp.get_io_metadata('output', includes='y')
 
         p = om.Problem()
         p.model.add_subsystem("G", MyGroup())
@@ -4167,7 +4350,7 @@ class TestNaturalNaming(unittest.TestCase):
         g2 = g1.add_subsystem('g2', om.Group(), promotes=['*'])
         g3 = g2.add_subsystem('g3', om.Group())
         g4 = g3.add_subsystem('g4', om.Group(), promotes=['*'])
-        c1 = g4.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
+        g4.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
         p.setup()
 
         full_in = 'g1.g2.g3.g4.c1.x'
@@ -4244,13 +4427,13 @@ class TestNaturalNamingMPI(unittest.TestCase):
         g2 = g1.add_subsystem('g2', om.Group(), promotes=['*'])
         g3 = g2.add_subsystem('g3', om.Group())
         g4 = g3.add_subsystem('g4', om.Group(), promotes=['*'])
-        c1 = g4.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
+        g4.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
 
         g1a = par.add_subsystem('g1a', om.Group())
         g2a = g1a.add_subsystem('g2', om.Group(), promotes=['*'])
         g3a = g2a.add_subsystem('g3', om.Group())
         g4a = g3a.add_subsystem('g4', om.Group(), promotes=['*'])
-        c1 = g4a.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
+        g4a.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
 
         p.setup()
 

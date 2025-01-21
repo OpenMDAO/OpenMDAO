@@ -7,11 +7,9 @@ import sys
 import traceback
 import unittest
 import functools
-from types import FunctionType, MethodType, BuiltinMethodType
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.utils.notebook_utils import notebook
-from openmdao.utils.general_utils import env_truthy
 
 
 def _redirect_streams(to_fd):
@@ -31,14 +29,14 @@ def _redirect_streams(to_fd):
     try:
         original_stdout_fd = sys.stdout.fileno()
         sys.stdout.close()
-    except (AttributeError, io.UnsupportedOperation) as err:
+    except (AttributeError, io.UnsupportedOperation):
         with open(os.devnull) as devnull:
             original_stdout_fd = devnull.fileno()
 
     try:
         original_stderr_fd = sys.stderr.fileno()
         sys.stderr.close()
-    except (AttributeError, io.UnsupportedOperation) as err:
+    except (AttributeError, io.UnsupportedOperation):
         with open(os.devnull) as devnull:
             original_stderr_fd = devnull.fileno()
 
@@ -161,56 +159,6 @@ class FakeComm(object):
         self.size = 1
 
 
-# _debug_decorator, _DebugComm, _get_om_comm, and _get_true_comm are currently not being used
-# anywhere, but can be useful when debugging certain MPI issues so I'm leaving them here.
-
-_om_mpi_debug = env_truthy('OM_MPI_DEBUG')
-
-
-def _debug_decorator(fn, scope):  # pragma no cover
-    def _wrap(*args, **kwargs):
-        sc = '' if scope is None else f"{scope}."
-        print(f"calling {sc}{fn.__name__}", flush=True)
-        ret = fn(*args, **kwargs)
-        print(f"returning from {sc}{fn.__name__}", flush=True)
-        return ret
-    return _wrap
-
-
-class _DebugComm(object):  # pragma no cover
-    """
-    Debugging wrapper for an MPI communicator.
-    """
-
-    def __init__(self, comm, scope):
-        if isinstance(comm, _DebugComm):
-            self.__dict__['_comm'] = comm._comm
-        else:
-            self.__dict__['_comm'] = comm
-        self.__dict__['_scope'] = scope
-
-    def __getattr__(self, name):
-        obj = getattr(self._comm, name)
-        if isinstance(obj, (BuiltinMethodType, FunctionType, MethodType)):
-            return _debug_decorator(obj, self._scope)
-        return obj
-
-    def __setattr__(self, name, val):
-        setattr(self._comm, name, val)
-
-
-def _get_om_comm(comm, scope=None):  # pragma no cover
-    if _om_mpi_debug:
-        return _DebugComm(comm, scope)
-    return comm
-
-
-def _get_true_comm(comm):  # pragma no cover
-    if isinstance(comm, _DebugComm):
-        return comm._comm
-    return comm
-
-
 @contextmanager
 def multi_proc_fail_check(comm):  # pragma no cover
     """
@@ -273,7 +221,7 @@ def multi_proc_exception_check(comm):  # pragma no cover
         try:
             yield
         except Exception:
-            exc = sys.exc_info()
+            exc_type, exc, tb = sys.exc_info()
             fail = 1
         else:
             fail = 0
@@ -281,17 +229,19 @@ def multi_proc_exception_check(comm):  # pragma no cover
         failed = comm.allreduce(fail)
         if failed:
             if fail:
-                msg = (f"{exc[1]}", exc[0])
+                info = (MPI.COMM_WORLD.rank, exc_type, ''.join(traceback.format_tb(tb)),
+                        exc)
             else:
-                msg = None
-            for i, tup in enumerate(comm.allgather(msg)):
-                if tup is not None:
-                    if i == comm.rank:
-                        msg = f"Exception raised on rank {i}: {exc[1]}"
-                        raise exc[0](msg).with_traceback(exc[2])
-                    else:
-                        m, exc = tup
-                        raise exc(f"Exception raised on rank {i}: {m}")
+                info = None
+
+            gathered = [tup for tup in comm.allgather(info) if tup is not None]
+            ranks = sorted(set([tup[0] for tup in gathered]))
+            _, exc_type, tbtext, exc = gathered[0]
+
+            if comm.rank == 0:
+                raise exc_type(f"Exception raised on ranks {ranks}: first traceback:\n{tbtext}")
+            else:
+                raise exc_type(f"Exception raised on ranks {ranks}: {exc}")
 
 
 if MPI:

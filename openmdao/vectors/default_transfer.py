@@ -7,7 +7,6 @@ import numpy as np
 from openmdao.core.constants import INT_DTYPE
 from openmdao.vectors.transfer import Transfer
 from openmdao.utils.array_utils import _global2local_offsets
-from openmdao.utils.mpi import MPI
 
 
 def _fill(arr, indices_iter):

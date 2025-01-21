@@ -47,7 +47,7 @@ def _test_func_name(func, num, param):
         for item in p:
             try:
                 arg = item.__name__
-            except:
+            except Exception:
                 arg = str(item)
             args.append(arg)
     return func.__name__ + '_' + '_'.join(args)
@@ -60,9 +60,6 @@ class TestParallelGroups(unittest.TestCase):
                           name_func=_test_func_name)
     def test_fan_out_grouped(self, solv_tup, nlsolver):
         prob = om.Problem(FanOutGrouped())
-
-        of=['c2.y', "c3.y"]
-        wrt=['iv.x']
 
         solver, jactype = solv_tup
 
@@ -270,7 +267,7 @@ class TestParallelGroupsMPI2(TestParallelGroups):
 
     def test_zero_shape(self):
         raise unittest.SkipTest("zero shapes not fully supported yet")
-        class MultComp(ExplicitComponent):
+        class MultComp(om.ExplicitComponent):
             def __init__(self, mult):
                 self.mult = mult
                 super().__init__()
@@ -310,9 +307,6 @@ class TestParallelGroupsMPI2(TestParallelGroups):
         model.connect('sub.c2.y', 'c2.x')
         model.connect('sub.c3.y', 'c3.x')
 
-        of=['c2.y', "c3.y"]
-        wrt=['iv.x']
-
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
@@ -344,7 +338,7 @@ class TestParallelGroupsMPI2(TestParallelGroups):
         if MPI:
             msg = ("Problem .*: The `distributed_vector_class` argument must be a distributed vector "
                    "class like `PETScVector` when running in parallel under MPI but 'DefaultVector' "
-                   "was specified which is not distributed\.")
+                   r"was specified which is not distributed\.")
             with self.assertRaisesRegex(ValueError, msg):
                 prob.setup(check=False, mode='fwd', distributed_vector_class=om.DefaultVector)
         else:
@@ -367,7 +361,7 @@ class TestParallelGroupsMPI2(TestParallelGroups):
             self.assertEqual(len(testlogger.get('error')), 1)
             self.assertTrue(testlogger.contains('warning',
                                                 "Only want to see this on rank 0"))
-            self.assertEqual(len(testlogger.get('info')), len(_default_checks) + 1)
+            self.assertEqual(len(testlogger.get('info')), 2*len(_default_checks) + 1)
             self.assertTrue(msg in testlogger.get('error')[0])
             for info in testlogger.get('info'):
                 if msg in info:
@@ -462,7 +456,8 @@ class TestParallelListStates(unittest.TestCase):
 
         p.setup()
         p.final_setup()
-        self.assertEqual(sorted(p.model._list_states_allprocs()), ['par.C1.x', 'par.C2.x', 'par.C4.x'])
+        self.assertEqual(sorted(p.model._list_states_allprocs()),
+                         ['par.C1.x', 'par.C2.x', 'par.C4.x'])
 
 
 class ExComp(om.ExplicitComponent):
@@ -843,8 +838,8 @@ class TestSingleRankRunWithBcast(unittest.TestCase):
         par.add_subsystem('C1', BcastComp())
         par.add_subsystem('C2', BcastComp())
 
-        model.connect('indep.x', f'par.C1.x')
-        model.connect('indep.x', f'par.C2.x')
+        model.connect('indep.x', 'par.C1.x')
+        model.connect('indep.x', 'par.C2.x')
 
         # add component that uses outputs from parallel components
         model.add_subsystem('dummy_comp', DoubleComp())

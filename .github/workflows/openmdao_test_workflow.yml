@@ -84,10 +84,10 @@ jobs:
         include:
           # test baseline versions on Ubuntu
           - NAME: Ubuntu Baseline
-            OS: ubuntu-latest
+            OS: ubuntu-22.04
             PY: '3.12'
             NUMPY: '1.26'
-            SCIPY: '1.13'
+            SCIPY: '1.14'
             PETSc: '3.20'
             PYOPTSPARSE: 'v2.11.0'
             # PAROPT: true
@@ -117,7 +117,7 @@ jobs:
             OS: macos-14
             PY: '3.12'
             NUMPY: '1.26'
-            SCIPY: '1.13'
+            SCIPY: '1.14'
             PETSc: '3.20'
             # PYOPTSPARSE: 'v2.11.0'
             # PAROPT: true
@@ -131,21 +131,21 @@ jobs:
             OS: ubuntu-latest
             PY: '3.12'
             NUMPY: '1.26'
-            SCIPY: '1.13'
+            SCIPY: '1.14'
             OPTIONAL: '[test]'
             TESTS: true
             EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Minimal }}
 
           # test oldest supported versions
           - NAME: Ubuntu Oldest
-            OS: ubuntu-latest
-            PY: '3.8'
-            NUMPY: '1.22'
-            SCIPY: '1.7'
+            OS: ubuntu-22.04
+            PY: '3.9'
+            NUMPY: '1.24'
+            SCIPY: '1.9'
             OPENMPI: '4.0'
             MPI4PY: '3.0'
             PETSc: '3.13'
-            PYOPTSPARSE: 'v1.2'
+            PYOPTSPARSE: 'v2.10.2'
             SNOPT: '7.2'
             OPTIONAL: '[all]'
             TESTS: true
@@ -201,13 +201,13 @@ jobs:
           echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: ${{ matrix.PY }}
-          conda-version: "*"
+          conda-remove-defaults: true
           channels: conda-forge
 
       - name: Install OpenMDAO
@@ -330,7 +330,7 @@ jobs:
               echo "SNOPT version ${{ matrix.SNOPT }} was requested but source is not available"
             fi
 
-            build_pyoptsparse $BRANCH $PAROPT $SNOPT
+            build_pyoptsparse -v $BRANCH $PAROPT $SNOPT
           fi
 
       - name: Install optional dependencies
@@ -341,6 +341,9 @@ jobs:
           echo "============================================================="
           conda install graphviz
           python -m pip install pyparsing psutil objgraph pyxdsm pydot
+
+          echo "Pre-install playwright dependencies to avoid 'Playwright Host validation warning'"
+          playwright install --with-deps
 
       - name: Display environment info
         id: env_info
@@ -517,6 +520,15 @@ jobs:
           python -m pip install ruff
           ruff check . --select NPY201
 
+      - name: Perform linting with Ruff
+        if: ${{ matrix.NAME == 'Ubuntu Baseline' }}
+        run: |
+          echo "============================================================="
+          echo "Lint OpenMDAO code per settings in pyproject.toml"
+          echo "============================================================="
+          python -m pip install ruff
+          ruff check . --config pyproject.toml
+
       - name: Slack env change
         if: steps.env_info.outputs.errors != ''
         uses: act10ns/slack@v2.0.0
@@ -618,14 +630,14 @@ jobs:
           script: core.setFailed('The ${{ matrix.NAME }} job was excluded from the run, exiting...');
 
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: ${{ matrix.PY }}
-          conda-version: "*"
           channels: conda-forge
+          conda-remove-defaults: true
 
       - name: Install OpenDMAO
         run: |
@@ -634,9 +646,9 @@ jobs:
           python -m pip install --upgrade pip
 
           echo "============================================================="
-          echo "Install lxml for Windows (No Python 3.11 version on pypi)"
+          echo "Install mkl 2024.1.0 (test failure with 2024.2.2)"
           echo "============================================================="
-          conda install lxml
+          conda install mkl=2024.1.0
 
           echo "============================================================="
           echo "Install OpenMDAO"
@@ -739,6 +751,7 @@ jobs:
     name: Finish coverage
     needs: [tests, windows_tests]
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
     - uses: coverallsapp/github-action@master
       with:
@@ -746,14 +759,35 @@ jobs:
         parallel-finished: true
 
 
-  dymos_tests:
-    name: Run Dymos Tests
+  related_tests:
+    name: Run Dymos & pyCycle Tests
     needs: [tests, windows_tests]
     runs-on: ubuntu-latest
+
     steps:
     - uses: benc-uk/workflow-dispatch@v1
       with:
         workflow: Dymos Tests
         repo: ${{ github.repository_owner }}/dymos
+        inputs: >
+          {
+            "run_name": "Test Latest OpenMDAO Development Version",
+            "latest": true
+           }
+        token: ${{ secrets.ACCESS_TOKEN }}
+      if: github.event_name == 'push'
+
+    - uses: benc-uk/workflow-dispatch@v1
+      with:
+        workflow: pyCycle Tests
+        repo: ${{ github.repository_owner }}/pycycle
+        inputs: >
+          {
+            "run_name": "Test Latest OpenMDAO Development Version",
+            "Ubuntu_Baseline": false,
+            "MacOS_Baseline": false,
+            "Windows_Baseline": false,
+            "OpenMDAO_Dev": true
+           }
         token: ${{ secrets.ACCESS_TOKEN }}
       if: github.event_name == 'push'

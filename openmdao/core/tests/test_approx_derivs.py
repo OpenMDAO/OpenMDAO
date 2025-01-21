@@ -7,8 +7,6 @@ from packaging.version import Version
 import numpy as np
 from scipy import __version__ as scipy_version
 
-ScipyVersion = Version(scipy_version)
-
 import openmdao.api as om
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, TestImplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -31,6 +29,8 @@ try:
 except ImportError:
     vector_class = om.DefaultVector
     PETScVector = None
+
+ScipyVersion = Version(scipy_version)
 
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
@@ -108,8 +108,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         prob.setup()
         prob.run_model()
-        J = prob.compute_totals(of=['parab.f_xy'], wrt=['px.x', 'py.y'])
-        # print(J)
+        prob.compute_totals(of=['parab.f_xy'], wrt=['px.x', 'py.y'])
 
         # 1. run_model; 2. step x; 3. step y
         self.assertEqual(model.parab.count, 3)
@@ -289,7 +288,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         prob.run_model()
         model.run_linearize(driver=prob.driver)
 
-        Jfd = model._jacobian
+        Jfd = model._jacobian.J_dict
         assert_near_equal(Jfd['comp.y1', 'p1.x1'], comp.JJ[0:2, 0:2], 1e-6)
         assert_near_equal(Jfd['comp.y1', 'p2.x2'], comp.JJ[0:2, 2:4], 1e-6)
         assert_near_equal(Jfd['comp.y2', 'p1.x1'], comp.JJ[2:4, 0:2], 1e-6)
@@ -1093,7 +1092,7 @@ class TestGroupComplexStep(unittest.TestCase):
         prob.run_model()
         model.run_linearize(driver=prob.driver)
 
-        Jfd = model._jacobian
+        Jfd = model._jacobian.J_dict
         assert_near_equal(Jfd['comp.y1', 'p1.x1'], comp.JJ[0:2, 0:2], 1e-6)
         assert_near_equal(Jfd['comp.y1', 'p2.x2'], comp.JJ[0:2, 2:4], 1e-6)
         assert_near_equal(Jfd['comp.y2', 'p1.x1'], comp.JJ[2:4, 0:2], 1e-6)
@@ -1977,7 +1976,7 @@ class TestComponentComplexStep(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        comp = model.add_subsystem('comp', BadSparsityComp())
+        model.add_subsystem('comp', BadSparsityComp())
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -2361,7 +2360,6 @@ class TestFDRelative(unittest.TestCase):
                 self.add_output('y', np.ones((nn, )))
 
             def setup_partials(self):
-                nn = self.options['vec_size']
                 self.set_check_partial_options('x_element', method='fd', step_calc='rel_element', directional=True)
 
             def compute(self, inputs, outputs):
@@ -2528,6 +2526,7 @@ class ParallelFDParametricTestCase(unittest.TestCase):
             totals = param_instance.compute_totals('rev')
             assert_near_equal(totals, expected_totals, 1e-4)
 
+
 class CheckTotalsParallelGroup(unittest.TestCase):
 
     N_PROCS = 3
@@ -2620,7 +2619,7 @@ class CheckTotalsIndices(unittest.TestCase):
         prob.setup()
 
         prob.run_model()
-        check = prob.check_totals(compact_print=True)
+        prob.check_totals(compact_print=True)
 
 
 def _setup_1ivc_fdgroupwithpar_1sink(size=7):
@@ -2990,8 +2989,6 @@ class TestFDWithParallelSubGroups(unittest.TestCase):
         prob.setup(mode='fwd', force_alloc_complex=True)
         prob.run_model()
         prob.compute_totals()
-        import pprint
-        pprint.pprint({n: m['val'] for n,m in prob.model.sub._jacobian._subjacs_info.items()})
         assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
 
     def test_2ivcs_fdgroupwithcrisscrosspars_1sink_rev(self):

@@ -1,11 +1,10 @@
 """
 Definition of the SqliteCaseReader.
 """
-import importlib
+import pathlib
 import sqlite3
 from collections import OrderedDict
 
-import os
 import sys
 import numpy as np
 import io
@@ -35,9 +34,41 @@ class UnknownType:
 
     Used to indicate the unpickler can't generate an instance of a class
     whose class definition is not available
+
+    Parameters
+    ----------
+    *args : list
+        Positional args.
+    **kwargs : dict
+        Keyword args.
     """
 
-    pass
+    def __init__(*args, **kwargs):
+        """
+        Construct an object representing an unknown type.
+
+        Parameters
+        ----------
+        *args : list
+            Positional args.
+        **kwargs : dict
+            Keyword args.
+
+        Returns
+        -------
+        object
+            The returned UnknownType object
+        """
+        pass
+
+
+# don't allow these functions when unpickling
+_unsafe = (
+    ('builtins', 'eval'),
+    ('builtins', 'exec'),
+    ('posix', 'system'),
+    ('nt', 'system'),
+)
 
 
 class _RestrictedUnpicklerForCaseReader(pickle.Unpickler):
@@ -49,6 +80,13 @@ class _RestrictedUnpicklerForCaseReader(pickle.Unpickler):
         self.error_strings = ''  # Used to document which classes are not available
 
     def find_class(self, module, name):
+        # Disallow some unsafe function calls during unpickling.
+        if (module, name) in _unsafe:
+            if self.error_strings:
+                self.error_strings += ', '
+            self.error_strings += f"Error unpickling global, '{module}.{name}' is forbidden"
+            return UnknownType
+
         try:
             return super().find_class(module, name)
         except ModuleNotFoundError as e:
@@ -56,9 +94,8 @@ class _RestrictedUnpicklerForCaseReader(pickle.Unpickler):
                 self.error_strings += ', '
             self.error_strings += str(e)
 
-        # Returning this acts as a kind of flag to indicate that
-        # the unpickler can't generate instances of classes whose class definition
-        # is not available
+        # Returning this acts as a kind of flag to indicate that the unpickler can't
+        # generate instances of classes whose class definition is not available
         return UnknownType
 
     def loads_and_return_errors(self):
@@ -66,18 +103,24 @@ class _RestrictedUnpicklerForCaseReader(pickle.Unpickler):
         return unpickled_contents, self.error_strings
 
 
-def _loads_and_return_errors(s):
+def _safer_unpickle(s, desc, compressed=False):
     """
-    Unpickle input and also note errors. Analogous to pickle.loads().
-
-    But handles unpickling objects with no class definition available.
+    Unpickle input and issue a warning for any errors. Analogous to pickle.loads().
     """
-    i = io.BytesIO(s)
+    if compressed:
+        i = io.BytesIO(zlib.decompress(s))
+    else:
+        i = io.BytesIO(s)
 
     # returns a tuple of the value and also error strings
-    dictionary, error_string = _RestrictedUnpicklerForCaseReader(i).loads_and_return_errors()
+    data, errs = _RestrictedUnpicklerForCaseReader(i).loads_and_return_errors()
 
-    return dictionary, error_string
+    if errs:
+        issue_warning(f"While reading {desc} from case recorder, the "
+                      f"following errors occurred: {errs}",
+                      category=RuntimeWarning)
+
+    return data
 
 
 class SqliteCaseReader(BaseCaseReader):
@@ -86,7 +129,7 @@ class SqliteCaseReader(BaseCaseReader):
 
     Parameters
     ----------
-    filename : str
+    filename : str or pathlib.Path
         The path to the filename containing the recorded data.
     pre_load : bool
         If True, load all the data into memory during initialization.
@@ -113,9 +156,6 @@ class SqliteCaseReader(BaseCaseReader):
         Dictionary mapping promoted names to absolute names.
     _conns : dict
         Dictionary of all model connections.
-    _auto_ivc_map : dict
-        Dictionary that maps all auto_ivc sources to either an absolute input name for single
-        connections or a promoted input name for multiple connections. This is for output display.
     _driver_cases : DriverCases
         Helper object for accessing cases from the driver_iterations table.
     _system_cases : SystemCases
@@ -138,13 +178,14 @@ class SqliteCaseReader(BaseCaseReader):
             check_valid_sqlite3_db(metadata_filename)
 
         # initialize private attributes
-        self._filename = filename
+        self._filename = pathlib.Path(filename)
         self._abs2prom = None
         self._prom2abs = None
         self._abs2meta = None
         self._conns = None
-        self._auto_ivc_map = {}
         self._global_iterations = None
+
+        filename = str(filename)
 
         with sqlite3.connect(filename) as con:
             con.row_factory = sqlite3.Row
@@ -200,19 +241,19 @@ class SqliteCaseReader(BaseCaseReader):
         var_info = self.problem_metadata['variables']
         self._driver_cases = DriverCases(filename, self._format_version, self._global_iterations,
                                          self._prom2abs, self._abs2prom, self._abs2meta,
-                                         self._conns, self._auto_ivc_map, var_info)
+                                         self._conns, var_info)
         self._system_cases = SystemCases(filename, self._format_version, self._global_iterations,
                                          self._prom2abs, self._abs2prom, self._abs2meta,
-                                         self._conns, self._auto_ivc_map, var_info)
+                                         self._conns, var_info)
         self._solver_cases = SolverCases(filename, self._format_version, self._global_iterations,
                                          self._prom2abs, self._abs2prom, self._abs2meta,
-                                         self._conns, self._auto_ivc_map, var_info)
+                                         self._conns, var_info)
         if self._format_version >= 2:
             self._problem_cases = ProblemCases(filename,
                                                self._format_version,
                                                self._global_iterations,
                                                self._prom2abs, self._abs2prom, self._abs2meta,
-                                               self._conns, self._auto_ivc_map, var_info)
+                                               self._conns, var_info)
 
         # if requested, load all the iteration data into memory
         if pre_load:
@@ -279,40 +320,20 @@ class SqliteCaseReader(BaseCaseReader):
                 if 'upper' in meta and meta['upper'] is not None:
                     meta['upper'] = np.resize(np.array(meta['upper']), meta['shape'])
 
-            # Map source names to input display text.
-            if version >= 11:
-                self._auto_ivc_map = auto_ivc_map = {}
-                abs2prom_in = self._abs2prom['input']
-                for target, src in self._conns.items():
-                    if src.startswith('_auto_ivc.'):
-                        if src not in auto_ivc_map:
-                            auto_ivc_map[src] = []
-                        auto_ivc_map[src].append(target)
-                for output, input_list in auto_ivc_map.items():
-                    if len(input_list) > 1:
-                        for input_name in input_list:
-                            # If this recorder is on a component, we might have only a subset of
-                            # the metadata dictionary, but one of them will be in there.
-                            if input_name in abs2prom_in:
-                                auto_ivc_map[output] = abs2prom_in[input_name]
-                                break
-                    else:
-                        auto_ivc_map[output] = abs2prom_in[input_list[0]]
-
         elif version in (1, 2):
             abs2prom = row['abs2prom']
             prom2abs = row['prom2abs']
             abs2meta = row['abs2meta']
 
             try:
-                self._abs2prom = pickle.loads(abs2prom)
-                self._prom2abs = pickle.loads(prom2abs)
-                self._abs2meta = pickle.loads(abs2meta)
+                self._abs2prom = _safer_unpickle(abs2prom, 'abs2prom dictionary')
+                self._prom2abs = _safer_unpickle(prom2abs, 'prom2abs dictionary')
+                self._abs2meta = _safer_unpickle(abs2meta, 'abs2meta dictionary')
             except TypeError:
                 # Reading in a python 2 pickle recorded pre-OpenMDAO 2.4.
-                self._abs2prom = pickle.loads(abs2prom.encode())
-                self._prom2abs = pickle.loads(prom2abs.encode())
-                self._abs2meta = pickle.loads(abs2meta.encode())
+                self._abs2prom = _safer_unpickle(abs2prom.encode(), 'abs2prom dictionary')
+                self._prom2abs = _safer_unpickle(prom2abs.encode(), 'prom2abs dictionary')
+                self._abs2meta = _safer_unpickle(abs2meta.encode(), 'abs2meta dictionary')
 
         self.problem_metadata['abs2prom'] = self._abs2prom
 
@@ -334,7 +355,7 @@ class SqliteCaseReader(BaseCaseReader):
             if self._format_version >= 3:
                 driver_metadata = json_loads(row[0])
             elif self._format_version in (1, 2):
-                driver_metadata = pickle.loads(row[0])
+                driver_metadata = _safer_unpickle(row[0], 'driver metadata')
 
             self.problem_metadata.update(driver_metadata)
 
@@ -352,24 +373,12 @@ class SqliteCaseReader(BaseCaseReader):
         cur.execute("SELECT id, scaling_factors, component_metadata FROM system_metadata")
         for row in cur:
             id = row[0]
-            self._system_options[id] = {}
 
-            if self._format_version >= 14:
-                self._system_options[id]['scaling_factors'] = \
-                    pickle.loads(zlib.decompress(row[1]))
-                # First step is to decompress
-                pickled_component_options = zlib.decompress(row[2])
-                # Second, unpickle
-                unpickled_component_options, error_string = \
-                    _loads_and_return_errors(pickled_component_options)
-                if error_string:
-                    issue_warning(f"While reading system options from case recorder, the "
-                                  f"following errors occurred: {error_string}",
-                                  category=RuntimeWarning)
-                self._system_options[id]['component_options'] = unpickled_component_options
-            else:
-                self._system_options[id]['scaling_factors'] = pickle.loads(row[1])
-                self._system_options[id]['component_options'] = pickle.loads(row[2])
+            opt = self._system_options[id] = {}
+            cmp = self._format_version >= 14
+
+            opt['scaling_factors'] = _safer_unpickle(row[1], f'{id} scaling factors', cmp)
+            opt['component_options'] = _safer_unpickle(row[2], f'{id} component options', cmp)
 
     def _collect_solver_metadata(self, cur):
         """
@@ -385,14 +394,10 @@ class SqliteCaseReader(BaseCaseReader):
         cur.execute("SELECT id, solver_options, solver_class FROM solver_metadata")
         for row in cur:
             id = row[0]
-            if self._format_version >= 14:
-                solver_options = pickle.loads(zlib.decompress(row[1]))
-            else:
-                solver_options = pickle.loads(row[1])
-            solver_class = row[2]
+            cmp = self._format_version >= 14
             self.solver_metadata[id] = {
-                'solver_options': solver_options,
-                'solver_class': solver_class,
+                'solver_options': _safer_unpickle(row[1], f'{id} solver options', cmp),
+                'solver_class': row[2]
             }
 
     def _get_global_iterations(self, cur):
@@ -1033,10 +1038,6 @@ class CaseTable(object):
         Dictionary mapping absolute variable names to variable metadata.
     conns : dict
         Dictionary of all model connections.
-    auto_ivc_map : dict
-        Dictionary that maps all auto_ivc sources to either an absolute input name for single
-        connections or a promoted input name for multiple connections. This is for output
-        display.
     var_info : dict
         Dictionary with information about variables (scaling, indices, execution order).
 
@@ -1068,15 +1069,12 @@ class CaseTable(object):
         List of keys of cases in the table.
     _cases : dict
         Dictionary mapping keys to cases that have already been loaded.
-    _auto_ivc_map : dict
-        Dictionary that maps all auto_ivc sources to either an absolute input name for single
-        connections or a promoted input name for multiple connections. This is for output display.
     _global_iterations : list
         List of iteration cases and the table and row in which they are found.
     """
 
     def __init__(self, fname, ver, table, index, giter, prom2abs, abs2prom, abs2meta, conns,
-                 auto_ivc_map, var_info):
+                 var_info):
         """
         Initialize.
         """
@@ -1089,7 +1087,6 @@ class CaseTable(object):
         self._abs2prom = abs2prom
         self._abs2meta = abs2meta
         self._conns = conns
-        self._auto_ivc_map = auto_ivc_map
         self._var_info = var_info
 
         # cached keys/cases
@@ -1255,7 +1252,7 @@ class CaseTable(object):
                 source = self._get_source(row[self._index_name])
 
             case = Case(source, row, self._prom2abs, self._abs2prom, self._abs2meta,
-                        self._conns, self._auto_ivc_map, self._var_info, self._format_version)
+                        self._conns, self._var_info, self._format_version)
 
             # cache it if requested
             if cache:
@@ -1307,7 +1304,7 @@ class CaseTable(object):
                 case_id = row[self._index_name]
                 source = self._get_source(case_id)
                 case = Case(source, row, self._prom2abs, self._abs2prom, self._abs2meta,
-                            self._conns, self._auto_ivc_map, self._var_info, self._format_version)
+                            self._conns, self._var_info, self._format_version)
                 if cache:
                     self._cases[case_id] = case
                 yield case
@@ -1377,7 +1374,7 @@ class CaseTable(object):
         str
             The source of the case.
         """
-        table = self._table_name.split('_')[0]  # remove "_iterations" from table name
+        table = self._table_name.partition('_')[0]  # remove "_iterations" from table name
 
         for global_iter in self._global_iterations:
             record_type, row, source = global_iter[1], global_iter[2], global_iter[3]
@@ -1427,24 +1424,18 @@ class DriverCases(CaseTable):
         Dictionary mapping absolute variable names to variable metadata.
     conns : dict
         Dictionary of all model connections.
-    auto_ivc_map : dict
-        Dictionary that maps all auto_ivc sources to either an absolute input name for single
-        connections or a promoted input name for multiple connections. This is for output
-        display.
     var_info : dict
         Dictionary with information about variables (scaling, indices, execution order).
     """
 
     def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, conns,
-                 auto_ivc_map, var_info):
+                 var_info):
         """
         Initialize.
         """
         super().__init__(filename, format_version,
                          'driver_iterations', 'iteration_coordinate', giter,
-                         prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
-                         var_info)
-        self._var_info = var_info
+                         prom2abs, abs2prom, abs2meta, conns, var_info)
 
     def cases(self, cache=False):
         """
@@ -1480,7 +1471,7 @@ class DriverCases(CaseTable):
                         row['jacobian'] = derivs_row['derivatives']
 
                 case = Case('driver', row, self._prom2abs, self._abs2prom, self._abs2meta,
-                            self._conns, self._auto_ivc_map, self._var_info, self._format_version)
+                            self._conns, self._var_info, self._format_version)
 
                 if cache:
                     self._cases[case.name] = case
@@ -1540,7 +1531,7 @@ class DriverCases(CaseTable):
         # if found, create Case object (and cache it if requested) else return None
         if row:
             case = Case('driver', row, self._prom2abs, self._abs2prom, self._abs2meta,
-                        self._conns, self._auto_ivc_map, self._var_info, self._format_version)
+                        self._conns, self._var_info, self._format_version)
             if cache:
                 self._cases[case_id] = case
             return case
@@ -1611,23 +1602,18 @@ class SystemCases(CaseTable):
         Dictionary mapping absolute variable names to variable metadata.
     conns : dict
         Dictionary of all model connections.
-    auto_ivc_map : dict
-        Dictionary that maps all auto_ivc sources to either an absolute input name for single
-        connections or a promoted input name for multiple connections. This is for output
-        display.
     var_info : dict
         Dictionary with information about variables (scaling, indices, execution order).
     """
 
     def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, conns,
-                 auto_ivc_map, var_info):
+                 var_info):
         """
         Initialize.
         """
         super().__init__(filename, format_version,
                          'system_iterations', 'iteration_coordinate', giter,
-                         prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
-                         var_info)
+                         prom2abs, abs2prom, abs2meta, conns, var_info)
 
 
 class SolverCases(CaseTable):
@@ -1650,23 +1636,18 @@ class SolverCases(CaseTable):
         Dictionary mapping absolute variable names to variable metadata.
     conns : dict
         Dictionary of all model connections.
-    auto_ivc_map : dict
-        Dictionary that maps all auto_ivc sources to either an absolute input name for single
-        connections or a promoted input name for multiple connections. This is for output
-        display.
     var_info : dict
         Dictionary with information about variables (scaling, indices, execution order).
     """
 
     def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, conns,
-                 auto_ivc_map, var_info):
+                 var_info):
         """
         Initialize.
         """
         super().__init__(filename, format_version,
                          'solver_iterations', 'iteration_coordinate', giter,
-                         prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
-                         var_info)
+                         prom2abs, abs2prom, abs2meta, conns, var_info)
 
     def _get_source(self, iteration_coordinate):
         """
@@ -1687,11 +1668,11 @@ class SolverCases(CaseTable):
         system_solve = source_system.split('.')[-1] + '._solve_nonlinear'
         system_coord_len = iteration_coordinate.index(system_solve) + len(system_solve)
         system_coord_nodes = len(iteration_coordinate[:system_coord_len].split('|')) + 1
-        iter_coord_nodes = len(iteration_coordinate.split('|'))
+        num_coord_nodes = iteration_coordinate.count('|') + 1
 
-        if iter_coord_nodes == system_coord_nodes + 2:
+        if num_coord_nodes == system_coord_nodes + 2:
             return source_system + '.nonlinear_solver'
-        elif iter_coord_nodes == system_coord_nodes + 4:
+        elif num_coord_nodes == system_coord_nodes + 4:
             return source_system + '.nonlinear_solver.linesearch'
         else:
             raise RuntimeError("Can't parse solver iteration coordinate: %s" % iteration_coordinate)
@@ -1717,23 +1698,18 @@ class ProblemCases(CaseTable):
         Dictionary mapping absolute variable names to variable metadata.
     conns : dict
         Dictionary of all model connections.
-    auto_ivc_map : dict
-        Dictionary that maps all auto_ivc sources to either an absolute input name for single
-        connections or a promoted input name for multiple connections. This is for output
-        display.
     var_info : dict
         Dictionary with information about variables (scaling, indices, execution order).
     """
 
     def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, conns,
-                 auto_ivc_map, var_info):
+                 var_info):
         """
         Initialize.
         """
         super().__init__(filename, format_version,
                          'problem_cases', 'case_name', giter,
-                         prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
-                         var_info)
+                         prom2abs, abs2prom, abs2meta, conns, var_info)
 
     def list_sources(self):
         """

@@ -1,6 +1,6 @@
 """Define the SubmodelComp class for evaluating OpenMDAO systems within components."""
 
-import numpy as np
+from itertools import chain
 
 from openmdao.core.constants import _SetupStatus
 from openmdao.core.explicitcomponent import ExplicitComponent
@@ -277,9 +277,9 @@ class SubmodelComp(ExplicitComponent):
 
         abs2meta_out = p.model._var_allprocs_abs2meta['output']
         abs2meta_local = p.model._var_abs2meta['output']
-        prom2abs_in = p.model._var_allprocs_prom2abs_list['input']
         prom2abs_out = p.model._var_allprocs_prom2abs_list['output']
         abs2prom_out = p.model._var_allprocs_abs2prom['output']
+        abs2discrete_out = p.model._var_allprocs_discrete['output']
 
         # indep vars is a dict containing promoted names of all indep vars belonging to
         # IndepVarComps in the submodel, along with all inputs connected to _auto_ivc vars.
@@ -287,24 +287,11 @@ class SubmodelComp(ExplicitComponent):
         # in the submodel are dependent on other outputs and would be overwritten when the
         # submodel runs, erasing any values set by the SubmodelComp.
         self.indep_vars = indep_vars = {}
-        for src, meta in abs2meta_out.items():
-            if src.startswith('_auto_ivc.'):
-                continue
+        for src, meta in chain(abs2meta_out.items(), abs2discrete_out.items()):
             prom = abs2prom_out[src]
             if prom not in indep_vars and 'openmdao:indep_var' in meta['tags']:
                 if src in abs2meta_local:
                     meta = abs2meta_local[src]  # get local metadata if we have it
-                indep_vars[prom] = (src, meta)
-
-        # add any inputs connected to auto_ivc vars as indep vars.  Their name will be the
-        # promoted name of the input that connects to the actual indep var.
-        for prom in prom2abs_in:
-            src = p.model.get_source(prom)
-            if src.startswith('_auto_ivc.'):
-                if src in abs2meta_local:
-                    meta = abs2meta_local[src]  # get local metadata if we have it
-                else:
-                    meta = abs2meta_out[src]
                 indep_vars[prom] = (src, meta)
 
         submodel_inputs = {}
@@ -491,7 +478,7 @@ class SubmodelComp(ExplicitComponent):
             # prevent config check that will fail due to name changes
             self._coloring_info.dynamic = True
 
-            for of, wrt, nzrows, nzcols, _, _, _, _ in coloring._subjac_sparsity_iter():
+            for of, wrt, nzrows, nzcols, _ in coloring._subjac_sparsity_iter():
                 self.declare_partials(of=self._to_outer_output(of),
                                       wrt=self._to_outer_input(wrt),
                                       rows=nzrows, cols=nzcols)
@@ -576,7 +563,7 @@ class SubmodelComp(ExplicitComponent):
                 if key not in self._zero_partials:
                     partials[key] = tot
         else:
-            for of, wrt, nzrows, nzcols, _, _, _, _ in coloring._subjac_sparsity_iter():
+            for of, wrt, nzrows, nzcols, _ in coloring._subjac_sparsity_iter():
                 partials[(self._to_outer_output(of), self._to_outer_input(wrt))] = \
                     tots[of, wrt][nzrows, nzcols].ravel()
 

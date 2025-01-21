@@ -3,13 +3,11 @@
 import os
 import json
 import functools
-import pathlib
 
 import numpy as np
 
 from openmdao.core.constants import _SetupStatus, INF_BOUND
 import openmdao.utils.hooks as hooks
-from openmdao.utils.mpi import MPI
 from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import default_noraise
 from openmdao.utils.file_utils import _load_and_exec
@@ -389,8 +387,8 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
         # save old totals
         coloring = driver._get_coloring()
 
-        nldvs = driver._nl_dvs if driver.supports['linear_only_designvars'] else driver._designvars
-        ldvs = driver._lin_dvs if driver.supports['linear_only_designvars'] else driver._designvars
+        nldvs = driver._get_nl_dvs()
+        ldvs = driver._get_lin_dvs()
         lin_dv_vals = {n: dv_vals[n] for n in ldvs}
 
         # assemble data for jacobian visualization

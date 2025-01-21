@@ -7,6 +7,7 @@ import numpy as np
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_warnings
 from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.utils.file_utils import get_work_dir
 
 
 @use_tempdirs
@@ -209,7 +210,7 @@ class TestSystem(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             prob.model.list_inputs(return_format=dict)
 
-        msg = f"Invalid value (<class 'dict'>) for return_format, " \
+        msg = "Invalid value (<class 'dict'>) for return_format, " \
               "must be a string value of 'list' or 'dict'"
 
         self.assertEqual(str(cm.exception), msg)
@@ -217,7 +218,7 @@ class TestSystem(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             prob.model.list_outputs(return_format='dct')
 
-        msg = f"Invalid value ('dct') for return_format, " \
+        msg = "Invalid value ('dct') for return_format, " \
               "must be a string value of 'list' or 'dict'"
 
         self.assertEqual(str(cm.exception), msg)
@@ -434,6 +435,7 @@ class TestSystem(unittest.TestCase):
                                          'global_size': 1,
                                          'has_src_indices': False,
                                          'prom_name': 'x',
+                                         'require_connection': False,
                                          'shape': (1,),
                                          'shape_by_conn': False,
                                          'size': 1,
@@ -448,6 +450,7 @@ class TestSystem(unittest.TestCase):
                                          'global_size': 1,
                                          'has_src_indices': False,
                                          'prom_name': 'x',
+                                         'require_connection': False,
                                          'shape': (1,),
                                          'shape_by_conn': False,
                                          'size': 1,
@@ -691,7 +694,7 @@ class TestSystem(unittest.TestCase):
         prob.setup()
 
         d = prob.get_outputs_dir('subdir')
-        self.assertEqual(str(pathlib.Path('test_prob_name_out', 'subdir')), str(d))
+        self.assertEqual(str(pathlib.Path(get_work_dir(), 'test_prob_name_out', 'subdir')), str(d))
 
 
 if __name__ == "__main__":

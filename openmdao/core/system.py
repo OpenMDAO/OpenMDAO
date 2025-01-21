@@ -2,6 +2,7 @@
 import sys
 import os
 import hashlib
+import pathlib
 import time
 import functools
 
@@ -16,8 +17,8 @@ from numbers import Integral
 
 import numpy as np
 
-from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE, INF_BOUND, \
-    _SetupStatus
+from openmdao.core.constants import _DEFAULT_COLORING_DIR, _DEFAULT_OUT_STREAM, \
+    _UNDEFINED, INT_DTYPE, INF_BOUND, _SetupStatus
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
@@ -35,9 +36,10 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, \
     DerivativesWarning, PromotionWarning, UnusedOptionWarning, UnitsWarning, warn_deprecation
-from openmdao.utils.general_utils import determine_adder_scaler, \
+from openmdao.utils.general_utils import determine_adder_scaler, is_undefined, \
     format_as_float_or_array, all_ancestors, match_prom_or_abs, \
-    ensure_compatible, env_truthy, make_traceback, _is_slicer_op
+    ensure_compatible, env_truthy, make_traceback, _is_slicer_op, _wrap_comm, _unwrap_comm, \
+    _om_dump, SystemMetaclass
 from openmdao.utils.file_utils import _get_outputs_dir
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -65,7 +67,7 @@ _DEFAULT_COLORING_META = {
     'coloring': None,  # this will contain the actual Coloring object
     'dynamic': False,  # True if dynamic coloring is being used
     'static': None,  # either _STD_COLORING_FNAME, a filename, or a Coloring object
-    # if use_fixed_coloring was called
+                     # if use_fixed_coloring was called
 }
 
 _DEFAULT_COLORING_META.update(_DEF_COMP_SPARSITY_ARGS)
@@ -75,11 +77,11 @@ _recordable_funcs = frozenset(['_apply_linear', '_apply_nonlinear', '_solve_line
 
 # the following are local metadata that will also be accessible for vars on all procs
 global_meta_names = {
-    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc', 'shape_by_conn',
-              'compute_shape', 'copy_shape'),
+    'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc',
+              'shape_by_conn', 'compute_shape', 'copy_shape', 'require_connection'),
     'output': ('units', 'shape', 'size', 'desc',
-               'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags', 'shape_by_conn',
-               'compute_shape', 'copy_shape'),
+               'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags',
+               'shape_by_conn', 'compute_shape', 'copy_shape'),
 }
 
 allowed_meta_names = {
@@ -171,7 +173,7 @@ def collect_errors(method):
     return wrapper
 
 
-class System(object):
+class System(object, metaclass=SystemMetaclass):
     """
     Base class for all systems in OpenMDAO.
 
@@ -195,7 +197,7 @@ class System(object):
         Name of the system, must be different from siblings.
     pathname : str
         Global name of the system, including the path.
-    comm : MPI.Comm or <FakeComm>
+    _comm : MPI.Comm or <FakeComm>
         MPI communicator object.
     options : OptionsDictionary
         options dictionary
@@ -394,6 +396,10 @@ class System(object):
     _during_sparsity : bool
         If True, we're doing a sparsity computation and uncolored approxs need to be restricted
         to only colored columns.
+    compute_primal : function or None
+        Function that computes the primal for the given system.
+    _jac_func_ : function or None
+        Function that computes the jacobian using AD (jax).  Not used if jax is not active.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -402,7 +408,7 @@ class System(object):
         """
         self.name = ''
         self.pathname = None
-        self.comm = None
+        self._comm = None
         self._is_local = False
 
         # System options
@@ -411,6 +417,8 @@ class System(object):
         self.options.declare('assembled_jac_type', values=['csc', 'dense'], default='csc',
                              desc='Linear solver(s) in this group or implicit component, '
                                   'if using an assembled jacobian, will use this type.')
+        self.options.declare('derivs_method', default=None, values=['jax', 'cs', 'fd', None],
+                             desc='The method to use for computing derivatives')
 
         # Case recording options
         self.recording_options = OptionsDictionary(parent_name=type(self).__name__)
@@ -538,6 +546,60 @@ class System(object):
 
         self._during_sparsity = False
 
+        if not hasattr(self, 'compute_primal'):
+            self.compute_primal = None
+
+        self._jac_func_ = None  # for computing jacobian using AD (jax)
+
+    if _om_dump:
+        @property
+        def comm(self):
+            """
+            Return the wrapped MPI communicator object for the system.
+
+            Returns
+            -------
+            DebugComm
+                Wrapped MPI communicator object.
+            """
+            return _wrap_comm(self._comm, self.msginfo)
+
+        @comm.setter
+        def comm(self, comm):
+            """
+            Set the MPI communicator object for the system.
+
+            Parameters
+            ----------
+            comm : MPI.Comm or DebugComm
+                Wrapped or unwrapped MPI communicator object.
+            """
+            self._comm = _unwrap_comm(comm)
+    else:
+        @property
+        def comm(self):
+            """
+            Return the MPI communicator object for the system.
+
+            Returns
+            -------
+            MPI.Comm
+                MPI communicator object.
+            """
+            return self._comm
+
+        @comm.setter
+        def comm(self, comm):
+            """
+            Set the MPI communicator object for the system.
+
+            Parameters
+            ----------
+            comm : MPI.Comm
+                MPI communicator object.
+            """
+            self._comm = comm
+
     @property
     def under_approx(self):
         """
@@ -607,12 +669,45 @@ class System(object):
             else:
                 yield from self._var_allprocs_discrete[iotype]
 
+    def abs_meta_iter(self, iotype, local=True, cont=True, discrete=False):
+        """
+        Iterate over absolute variable names and their metadata for this System.
+
+        By setting appropriate values for 'cont' and 'discrete', yielded variable
+        names can be continuous only, discrete only, or both.
+
+        Parameters
+        ----------
+        iotype : str
+            Either 'input' or 'output'.
+        local : bool
+            If True, include only names of local variables. Default is True.
+        cont : bool
+            If True, include names of continuous variables.  Default is True.
+        discrete : bool
+            If True, include names of discrete variables.  Default is False.
+
+        Yields
+        ------
+        str, dict
+        """
+        if cont:
+            if local:
+                yield from self._var_abs2meta[iotype].items()
+            else:
+                yield from self._var_allprocs_abs2meta[iotype].items()
+
+        if discrete:
+            if local:
+                prefix = self.pathname + '.' if self.pathname else ''
+                for name, meta in self._var_discrete[iotype].items():
+                    yield prefix + name, meta
+            else:
+                yield from self._var_allprocs_discrete[iotype].items()
+
     def _jac_of_iter(self):
         """
         Iterate over (name, offset, end, slice, dist_sizes) for each 'of' (row) var in the jacobian.
-
-        The slice is internal to the given variable in the result, and this is always a full
-        slice except when indices are defined for the 'of' variable.
 
         Yields
         ------
@@ -623,7 +718,7 @@ class System(object):
         int
             Ending index.
         slice or ndarray
-            A full slice or indices for the 'of' variable.
+            A full slice.
         ndarray or None
             Distributed sizes if var is distributed else None
         """
@@ -927,9 +1022,9 @@ class System(object):
         #   method and what were the existing bounds
         if are_new_bounds:
             # wipe out all the bounds and only use what is set by the arguments to this call
-            if lower is _UNDEFINED:
+            if is_undefined(lower):
                 lower = None
-            if upper is _UNDEFINED:
+            if is_undefined(upper):
                 upper = None
         else:
             lower = existing_dv_meta['lower']
@@ -945,13 +1040,13 @@ class System(object):
 
         # Now figure out scaling
         if are_new_scaling:
-            if scaler is _UNDEFINED:
+            if is_undefined(scaler):
                 scaler = None
-            if adder is _UNDEFINED:
+            if is_undefined(adder):
                 adder = None
-            if ref is _UNDEFINED:
+            if is_undefined(ref):
                 ref = None
-            if ref0 is _UNDEFINED:
+            if is_undefined(ref0):
                 ref0 = None
         else:
             scaler = existing_dv_meta['scaler']
@@ -1095,11 +1190,11 @@ class System(object):
         #   method and what were the existing bounds
         if are_new_bounds:
             # wipe the slate clean and only use what is set by the arguments to this call
-            if equals is _UNDEFINED:
+            if is_undefined(equals):
                 equals = None
-            if lower is _UNDEFINED:
+            if is_undefined(lower):
                 lower = None
-            if upper is _UNDEFINED:
+            if is_undefined(upper):
                 upper = None
         else:
             equals = existing_cons_meta['equals']
@@ -1118,13 +1213,13 @@ class System(object):
 
         # Now figure out scaling
         if are_new_scaling:
-            if scaler is _UNDEFINED:
+            if is_undefined(scaler):
                 scaler = None
-            if adder is _UNDEFINED:
+            if is_undefined(adder):
                 adder = None
-            if ref is _UNDEFINED:
+            if is_undefined(ref):
                 ref = None
-            if ref0 is _UNDEFINED:
+            if is_undefined(ref0):
                 ref0 = None
         else:
             scaler = existing_cons_meta['scaler']
@@ -1242,10 +1337,16 @@ class System(object):
             name = alias
 
         # At least one of the scaling parameters must be set or function does nothing
-        if scaler is _UNDEFINED and adder is _UNDEFINED and ref is _UNDEFINED and ref0 == \
-                _UNDEFINED:
+        if (
+            is_undefined(scaler)
+            and is_undefined(adder)
+            and is_undefined(ref)
+            and is_undefined(ref0)
+        ):
             raise RuntimeError(
-                'Must set a value for at least one argument in call to set_objective_options.')
+                'Must set a value for at least one argument '
+                'in call to set_objective_options.'
+            )
 
         if self._static_mode and self._static_responses:
             responses = self._static_responses
@@ -1262,13 +1363,13 @@ class System(object):
 
         # Since one or more of these are being set by the incoming arguments, the
         #   ones that are not being set should be set to None since they will be re-computed below
-        if scaler is _UNDEFINED:
+        if is_undefined(scaler):
             scaler = None
-        if adder is _UNDEFINED:
+        if is_undefined(adder):
             adder = None
-        if ref is _UNDEFINED:
+        if is_undefined(ref):
             ref = None
-        if ref0 is _UNDEFINED:
+        if is_undefined(ref0):
             ref0 = None
 
         # Convert ref/ref0 to ndarray/float as necessary
@@ -1549,9 +1650,10 @@ class System(object):
         info.set_coloring(coloring, msginfo=self.msginfo)
         if info._failed:
             if not info.per_instance:
-                # save the class coloring for so resources won't be wasted computing
+                # save the class coloring so resources won't be wasted computing
                 # a bad coloring
-                coloring_mod._CLASS_COLORINGS[self.get_coloring_fname()] = None
+                fname = self.get_coloring_fname(mode='output')
+                coloring_mod._CLASS_COLORINGS[fname] = None
             return False
 
         sp_info['sparsity_time'] = sparsity_time
@@ -1583,9 +1685,143 @@ class System(object):
 
         if not info.per_instance:
             # save the class coloring for other instances of this class to use
-            coloring_mod._CLASS_COLORINGS[self.get_coloring_fname()] = coloring
+            ofname = self.get_coloring_fname(mode='output')
+            coloring_mod._CLASS_COLORINGS[ofname] = coloring
 
         return True
+
+    def _perturbation_iter(self, num_full_jacs, perturb_size):
+        """
+        Iterate over random perturbations of the inputs array.
+
+        For implicit components, we also randomize the outputs.  The perturbation is relative
+        to the starting value of the input or output, unless that value is 0.0, in which case
+        the perturbation is absolute.  The final value of the input or output is the perturbation
+        multiplied by a random number between 0 and 1 added to the starting value.
+
+        Inputs, outputs, and residuals are all restored to their starting values at the end of
+        the iterations.
+
+        Parameters
+        ----------
+        num_full_jacs : int
+            Number of full jacobians to compute.
+        perturb_size : float
+            Size of relative perturbation.  If base value is 0.0, perturbation is absolute.
+
+        Yields
+        ------
+        int
+            The current iteration number.
+        """
+        from openmdao.core.group import Group
+        is_total = isinstance(self, Group)
+        use_jax = self.options['derivs_method'] == 'jax'
+        is_explicit = self.is_explicit()
+
+        starting_inputs = self._inputs.asarray(copy=True)
+        starting_outputs = self._outputs.asarray(copy=True)
+        starting_resids = self._residuals.asarray(copy=True)
+
+        # compute perturbations
+        in_offsets = starting_inputs.copy()
+        in_offsets[in_offsets == 0.0] = 1.0
+        in_offsets *= perturb_size
+
+        if not is_explicit:
+            out_offsets = starting_outputs.copy()
+            out_offsets[out_offsets == 0.0] = 1.0
+            out_offsets *= perturb_size
+
+        for i in range(num_full_jacs):
+            # randomize inputs (and outputs if implicit)
+            if i > 0:
+                self._inputs.set_val(starting_inputs +
+                                     in_offsets * np.random.random(in_offsets.size))
+                if not is_explicit:
+                    self._outputs.set_val(starting_outputs +
+                                          out_offsets * np.random.random(out_offsets.size))
+                if is_total:
+                    with self._relevance.nonlinear_active('iter'):
+                        self._solve_nonlinear()
+                else:
+                    self._apply_nonlinear()
+
+                if not use_jax:
+                    for scheme in self._approx_schemes.values():
+                        scheme._reset()  # force a re-initialization of approx
+            elif is_explicit and not is_total:
+                self._apply_nonlinear()  # need this to get the output values into the resids
+
+            yield i
+
+        if not use_jax:
+            # revert uncolored approx back to normal
+            for scheme in self._approx_schemes.values():
+                scheme._reset()
+
+        # restore original inputs/outputs/resids
+        self._inputs.set_val(starting_inputs)
+        self._outputs.set_val(starting_outputs)
+        self._residuals.set_val(starting_resids)
+
+    def compute_sparsity(self):
+        """
+        Compute the sparsity of the partial jacobian.
+
+        Returns
+        -------
+        coo_matrix
+            The sparsity matrix.
+        dict
+            Metadata about the sparsity computation.
+        """
+        use_jax = self.options['derivs_method'] == 'jax'
+        if not use_jax:
+            approx_scheme = self._get_approx_scheme(self._coloring_info['method'])
+
+        save_first_call = self._first_call_to_linearize
+        self._first_call_to_linearize = False
+
+        # for groups, this does some setup of approximations
+        self._setup_approx_coloring()
+
+        # tell approx scheme to limit itself to only colored columns
+        if not use_jax:
+            approx_scheme._reset()
+            self._during_sparsity = True
+
+        self._coloring_info._update_wrt_matches(self)
+
+        save_jac = self._jacobian
+
+        # use special sparse jacobian to collect sparsity info
+        self._jacobian = _ColSparsityJac(self)
+
+        from openmdao.core.group import Group
+        is_total = isinstance(self, Group)
+
+        for i in self._perturbation_iter(self._coloring_info['num_full_jacs'],
+                                         self._coloring_info['perturb_size']):
+            if use_jax:
+                self._jax_linearize()
+                sparsity, sp_info = self._jacobian.get_sparsity()
+            elif is_total:
+                self.run_linearize(sub_do_ln=False)
+                sparsity, sp_info = self._jacobian.get_sparsity()
+            else:  # for components
+                # this avoids calling any compute_partials/linearize methods which will fail
+                # because _ColSparsityJac only supports set_col and not dict access.
+                sparsity, sp_info = self.compute_fd_sparsity()
+
+        self._jacobian = save_jac
+
+        if not use_jax:
+            self._during_sparsity = False
+
+        self._first_call_to_linearize = save_first_call
+
+        return sparsity, sp_info
 
     def _compute_coloring(self, recurse=False, **overrides):
         """
@@ -1625,13 +1861,7 @@ class System(object):
 
         info = self._coloring_info
 
-        use_jax = False
-        try:
-            if self.options['use_jax']:
-                info['method'] = 'jax'
-                use_jax = True
-        except KeyError:
-            pass
+        use_jax = self.options['derivs_method'] == 'jax'
 
         info.update(overrides)
 
@@ -1643,22 +1873,28 @@ class System(object):
             for meta in self._subjacs_info.values():
                 if 'method' in meta and meta['method']:
                     break
-            else:  # no approx derivs found
-                if not (self._owns_approx_of or self._owns_approx_wrt):
-                    issue_warning("No partials found but coloring was requested.  "
-                                  "Declaring ALL partials as dense "
-                                  "(method='{}')".format(info['method']),
-                                  prefix=self.msginfo, category=DerivativesWarning)
-                    try:
-                        self.declare_partials('*', '*', method=info['method'])
-                    except AttributeError:  # assume system is a group
-                        from openmdao.core.component import Component
-                        from openmdao.core.indepvarcomp import IndepVarComp
-                        from openmdao.components.exec_comp import ExecComp
-                        for s in self.system_iter(recurse=True, typ=Component):
-                            if not isinstance(s, ExecComp) and not isinstance(s, IndepVarComp):
-                                s.declare_partials('*', '*', method=info['method'])
-                    self._setup_partials()
+            else:  # no approx or jax partials found
+                method = info['method']
+                if self._subjacs_info:
+                    for meta in self._subjacs_info.values():
+                        meta['method'] = method
+
+                else:  # declare all derivs as approx
+                    if not (self._owns_approx_of or self._owns_approx_wrt):
+                        issue_warning("No approx or jax partials found but coloring was requested. "
+                                      "Declaring ALL partials as dense "
+                                      "(method='{}')".format(info['method']),
+                                      prefix=self.msginfo, category=DerivativesWarning)
+                        try:
+                            self.declare_partials('*', '*', method=info['method'])
+                        except AttributeError:  # assume system is a group
+                            from openmdao.core.component import Component
+                            from openmdao.core.indepvarcomp import IndepVarComp
+                            from openmdao.components.exec_comp import ExecComp
+                            for s in self.system_iter(recurse=True, typ=Component):
+                                if not isinstance(s, ExecComp) and not isinstance(s, IndepVarComp):
+                                    s.declare_partials('*', '*', method=info['method'])
+                        self._setup_partials()
 
         if not use_jax:
             approx_scheme = self._get_approx_scheme(info['method'])
@@ -1666,7 +1902,7 @@ class System(object):
         if info.coloring is None and info.static is None:
             info.dynamic = True
 
-        coloring_fname = self.get_coloring_fname()
+        coloring_fname = self.get_coloring_fname(mode='output')
 
         # if we find a previously computed class coloring for our class, just use that
         # instead of regenerating a coloring.
@@ -1685,120 +1921,51 @@ class System(object):
                     approx_scheme._reset()
             return [coloring]
 
-        save_first_call = self._first_call_to_linearize
-        self._first_call_to_linearize = False
         sparsity_start_time = time.perf_counter()
-
-        # for groups, this does some setup of approximations
-        self._setup_approx_coloring()
-
-        # tell approx scheme to limit itself to only colored columns
-        if not use_jax:
-            approx_scheme._reset()
-            self._during_sparsity = True
-
-        info._update_wrt_matches(self)
-
-        save_jac = self._jacobian
-
-        # use special sparse jacobian to collect sparsity info
-        self._jacobian = _ColSparsityJac(self, info)
-
-        from openmdao.core.group import Group
-        is_total = isinstance(self, Group)
-        is_explicit = self.is_explicit()
-
-        # compute perturbations
-        starting_inputs = self._inputs.asarray(copy=True)
-        in_offsets = starting_inputs.copy()
-        in_offsets[in_offsets == 0.0] = 1.0
-        in_offsets *= info['perturb_size']
-
-        starting_outputs = self._outputs.asarray(copy=True)
-
-        if not is_explicit:
-            out_offsets = starting_outputs.copy()
-            out_offsets[out_offsets == 0.0] = 1.0
-            out_offsets *= info['perturb_size']
-
-        starting_resids = self._residuals.asarray(copy=True)
-
-        for i in range(info['num_full_jacs']):
-            # randomize inputs (and outputs if implicit)
-            if i > 0:
-                self._inputs.set_val(starting_inputs +
-                                     in_offsets * np.random.random(in_offsets.size))
-                if not is_explicit:
-                    self._outputs.set_val(starting_outputs +
-                                          out_offsets * np.random.random(out_offsets.size))
-                if is_total:
-                    with self._relevance.nonlinear_active('iter'):
-                        self._solve_nonlinear()
-                else:
-                    self._apply_nonlinear()
-
-                if not use_jax:
-                    for scheme in self._approx_schemes.values():
-                        scheme._reset()  # force a re-initialization of approx
-
-            if use_jax:
-                self._jax_linearize()
-            else:
-                self.run_linearize(sub_do_ln=False)
-
-        sparsity, sp_info = self._jacobian.get_sparsity(self)
-
-        self._jacobian = save_jac
-
-        if not use_jax:
-            self._during_sparsity = False
-
-            # revert uncolored approx back to normal
-            for scheme in self._approx_schemes.values():
-                scheme._reset()
+        sparsity, sp_info = self.compute_sparsity()
+        sparsity_time = time.perf_counter() - sparsity_start_time
 
         if use_jax:
             direction = self._mode
         else:
             direction = 'fwd'
 
-        sparsity_time = time.perf_counter() - sparsity_start_time
-
         coloring = _compute_coloring(sparsity, direction)
-
-        # restore original inputs/outputs
-        self._inputs.set_val(starting_inputs)
-        self._outputs.set_val(starting_outputs)
-        self._residuals.set_val(starting_resids)
 
         if not self._finalize_coloring(coloring, info, sp_info, sparsity_time):
             return [None]
-
-        self._first_call_to_linearize = save_first_call
-
-        if not use_jax:
-            approx = self._get_approx_scheme(coloring._meta['method'])
-            # force regen of approx groups during next compute_approximations
-            approx._reset()
 
         return [coloring]
 
     def _setup_approx_coloring(self):
         pass
 
-    def get_coloring_fname(self):
+    def get_coloring_fname(self, mode):
         """
         Return the full pathname to a coloring file.
 
+        Parameters
+        ----------
+        mode : str
+            The type of coloring file desired. Must be either 'input' or 'output'.
+
         Returns
         -------
-        str
+        pathlib.Path
             Full pathname of the coloring file.
         """
-        directory = self._problem_meta['coloring_dir']
+        prob_coloring_dir = self._problem_meta['coloring_dir']
+        if mode == 'output' or prob_coloring_dir is _DEFAULT_COLORING_DIR:
+            directory = self.get_outputs_dir('coloring_files', mkdir=True)
+        elif mode == 'input':
+            directory = pathlib.Path(prob_coloring_dir).absolute()
+        else:
+            raise ValueError(f"{self.msginfo}: get_coloring_fname requires mode"
+                             "to be one of 'input' or 'output'.")
+
         if not self.pathname:
             # total coloring
-            return os.path.join(directory, 'total_coloring.pkl')
+            return directory / 'total_coloring.pkl'
 
         if self._coloring_info.per_instance:
             # base the name on the instance pathname
@@ -1808,7 +1975,7 @@ class System(object):
             fname = 'coloring_' + '_'.join(
                 [self.__class__.__module__.replace('.', '_'), self.__class__.__name__]) + '.pkl'
 
-        return os.path.join(directory, fname)
+        return directory / fname
 
     def _save_coloring(self, coloring):
         """
@@ -1822,7 +1989,7 @@ class System(object):
         # under MPI, only save on proc 0
         if ((self._full_comm is not None and self._full_comm.rank == 0) or
                 (self._full_comm is None and self.comm.rank == 0)):
-            coloring.save(self.get_coloring_fname())
+            coloring.save(self.get_coloring_fname(mode='output'))
 
     def _get_static_coloring(self):
         """
@@ -1842,12 +2009,18 @@ class System(object):
 
         static = info.static
         if static is _STD_COLORING_FNAME or isinstance(static, str):
+            std_fname = self.get_coloring_fname(mode='input')
             if static is _STD_COLORING_FNAME:
-                fname = self.get_coloring_fname()
+                fname = std_fname
             else:
                 fname = static
-            print("%s: loading coloring from file %s" % (self.msginfo, fname))
+            print(f"{self.msginfo}: loading coloring from file {fname}")
             info.coloring = coloring = Coloring.load(fname)
+
+            if fname != std_fname:
+                # save it in the standard location
+                self._save_coloring(coloring)
+
             if info.wrt_patterns != coloring._meta['wrt_patterns']:
                 raise RuntimeError("%s: Loaded coloring has different wrt_patterns (%s) than "
                                    "declared ones (%s)." %
@@ -1931,7 +2104,7 @@ class System(object):
         """
         Set up case recording.
         """
-        if self._rec_mgr._recorders:
+        if self._rec_mgr.has_recorders():
             myinputs = myoutputs = myresiduals = []
 
             options = self.recording_options
@@ -1941,7 +2114,6 @@ class System(object):
             # includes and excludes for outputs are specified using promoted names
             # includes and excludes for inputs are specified using _absolute_ names
             abs2prom_output = self._var_allprocs_abs2prom['output']
-            abs2prom_inputs = self._var_allprocs_abs2prom['input']
 
             # set of promoted output names and absolute input and residual names
             # used for matching includes/excludes
@@ -1950,9 +2122,9 @@ class System(object):
             # includes and excludes for inputs are specified using _absolute_ names
             # vectors are keyed on absolute name, discretes on relative/promoted name
             if options['record_inputs']:
-                match_names.update(abs2prom_inputs.keys())
-                myinputs = sorted([n for n in abs2prom_inputs
-                                   if check_path(n, incl, excl)])
+                abs2prom_inputs = self._var_allprocs_abs2prom['input']
+                match_names.update(abs2prom_inputs)
+                myinputs = sorted([n for n in abs2prom_inputs if check_path(n, incl, excl)])
 
             # includes and excludes for outputs are specified using _promoted_ names
             # vectors are keyed on absolute name, discretes on relative/promoted name
@@ -1970,7 +2142,7 @@ class System(object):
                     myresiduals = myoutputs
 
             elif options['record_residuals']:
-                match_names.update(self._residuals.keys())
+                match_names.update(self._residuals)
                 myresiduals = [n for n in self._residuals._abs_iter()
                                if check_path(abs2prom_output[n], incl, excl)]
 
@@ -2718,6 +2890,10 @@ class System(object):
         """
         Set this system's nonlinear solver.
         """
+        # from openmdao.core.group import Group
+        # if not isinstance(self, Group):
+        #     raise TypeError("nonlinear_solver can only be set on a Group.")
+
         self._nonlinear_solver = solver
 
     @property
@@ -2757,6 +2933,14 @@ class System(object):
     @property
     def _relevance(self):
         return self._problem_meta['relevance']
+
+    @property
+    def _jax_group(self):
+        return self._problem_meta['jax_group']
+
+    @_jax_group.setter
+    def _jax_group(self, val):
+        self._problem_meta['jax_group'] = val
 
     @property
     def _static_mode(self):
@@ -3855,8 +4039,12 @@ class System(object):
             disc2meta = disc_metadict[iotype]
 
             for abs_name, prom in it[iotype].items():
-                if not match_prom_or_abs(abs_name, prom, includes, excludes):
-                    continue
+                if abs_name.startswith('_auto_ivc.'):
+                    if not match_prom_or_abs(abs_name, abs_name, includes, excludes):
+                        continue
+                else:
+                    if not match_prom_or_abs(abs_name, prom, includes, excludes):
+                        continue
 
                 rel_name = abs_name[rel_idx:]
                 if abs_name in all2meta[iotype]:  # continuous
@@ -4090,6 +4278,11 @@ class System(object):
         if scaling:
             keys.extend(('ref', 'ref0', 'res_ref'))
 
+        if all_procs:
+            local = True
+        else:
+            local = False
+
         outputs = self.get_io_metadata(('output',), keys, includes, excludes,
                                        is_indep_var, is_design_var, tags,
                                        get_remote=True,
@@ -4158,10 +4351,6 @@ class System(object):
                     if print_max:
                         meta['max'] = np.round(np.max(meta['val']), np_precision)
 
-        # NOTE: calls to _abs_get_val() above are collective calls and must be done on all procs
-        if not (outputs or inputs) or (not all_procs and self.comm.rank != 0):
-            return {} if return_format == 'dict' else []
-
         # remove metadata we don't want to show/return
         to_remove = ['discrete']
         if not print_tags:
@@ -4180,7 +4369,7 @@ class System(object):
         var_dict = {}
 
         var_list = self._get_vars_exec_order(inputs=True, outputs=True,
-                                             variables=variables, local=True)
+                                             variables=variables, local=local)
         for var_name in var_list:
             if var_name in outputs:
                 var_dict[var_name] = outputs[var_name]
@@ -4189,9 +4378,13 @@ class System(object):
                 var_dict[var_name] = inputs[var_name]
                 var_dict[var_name]['io'] = 'input'
 
-        if all_procs or self.comm.rank == 0:
-            write_var_table(self.pathname, var_list, 'all', var_dict,
-                            True, print_arrays, out_stream)
+        if not (all_procs or self.comm.rank == 0):
+            out_stream = None
+        write_var_table(self.pathname, var_list, 'all', var_dict,
+                        True, print_arrays, out_stream)
+
+        if not (outputs or inputs) or (not all_procs and self.comm.rank != 0):
+            return {} if return_format == 'dict' else []
 
         return var_dict if return_format == 'dict' else list(var_dict.items())
 
@@ -4317,10 +4510,6 @@ class System(object):
                     if print_max:
                         meta['max'] = np.round(np.max(meta['val']), np_precision)
 
-        # NOTE: calls to _abs_get_val() above are collective calls and must be done on all procs
-        if not inputs or (not all_procs and self.comm.rank != 0):
-            return {} if return_format == 'dict' else []
-
         to_remove = ['discrete']
         if not print_tags:
             to_remove.append('tags')
@@ -4333,9 +4522,12 @@ class System(object):
                 except KeyError:
                     pass
 
-        if out_stream:
-            self._write_table('input', inputs, hierarchical, print_arrays, all_procs,
-                              out_stream)
+        if not (all_procs or self.comm.rank == 0):
+            out_stream = None
+        self._write_table('input', inputs, hierarchical, print_arrays, all_procs, out_stream)
+
+        if not inputs or (not all_procs and self.comm.rank != 0):
+            return {} if return_format == 'dict' else []
 
         if self.pathname:
             # convert to relative names
@@ -4509,10 +4701,6 @@ class System(object):
             for name in to_remove:
                 del outputs[name]
 
-        # NOTE: calls to _abs_get_val() above are collective calls and must be done on all procs
-        if not outputs or (not all_procs and self.comm.rank != 0):
-            return {} if return_format == 'dict' else []
-
         # remove metadata we don't want to show/return
         to_remove = ['discrete']
         if not print_tags:
@@ -4527,13 +4715,14 @@ class System(object):
                     pass
 
         rel_idx = len(self.pathname) + 1 if self.pathname else 0
+        if not (all_procs or self.comm.rank == 0):
+            out_stream = None
 
         states = set(self._list_states())
         if explicit:
             expl_outputs = {n: m for n, m in outputs.items() if n not in states}
-            if out_stream:
-                self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
-                                  all_procs, out_stream)
+            self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
+                              all_procs, out_stream)
 
             if self.name:  # convert to relative name
                 expl_outputs = [(n[rel_idx:], meta) for n, meta in expl_outputs.items()]
@@ -4552,13 +4741,17 @@ class System(object):
                             impl_outputs[n] = m
             else:
                 impl_outputs = {n: m for n, m in outputs.items() if n in states}
-            if out_stream:
-                self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
-                                  all_procs, out_stream)
+            if not (all_procs or self.comm.rank == 0):
+                out_stream = None
+            self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
+                              all_procs, out_stream)
             if self.name:  # convert to relative name
                 impl_outputs = [(n[rel_idx:], meta) for n, meta in impl_outputs.items()]
             else:
                 impl_outputs = list(impl_outputs.items())
+
+        if not outputs or (not all_procs and self.comm.rank != 0):
+            return {} if return_format == 'dict' else []
 
         if explicit and implicit:
             outputs = expl_outputs + impl_outputs
@@ -4595,9 +4788,6 @@ class System(object):
             Where to send human readable output.
             Set to None to suppress.
         """
-        if out_stream is None:
-            return
-
         if self._outputs is None:
             var_list = var_data.keys()
         else:
@@ -4605,9 +4795,8 @@ class System(object):
             outputs = not inputs
             var_list = self._get_vars_exec_order(inputs=inputs, outputs=outputs, variables=var_data)
 
-        if all_procs or self.comm.rank == 0:
-            write_var_table(self.pathname, var_list, var_type, var_data,
-                            hierarchical, print_arrays, out_stream)
+        write_var_table(self.pathname, var_list, var_type, var_data,
+                        hierarchical, print_arrays, out_stream)
 
     def _get_vars_exec_order(self, inputs=False, outputs=False, variables=None, local=False):
         """
@@ -4641,23 +4830,23 @@ class System(object):
             var_dicts.append(real_vars['input'])
         if outputs:
             var_dicts.append(real_vars['output'])
-        if inputs:
+        if inputs and disc_vars['input']:
             var_dicts.append(disc_vars['input'])
-        if outputs:
+        if outputs and disc_vars['output']:
             var_dicts.append(disc_vars['output'])
 
-        # For components with no children, self._subsystems_allprocs is empty.
+        # For components, self._subsystems_allprocs is empty.
         if self._subsystems_allprocs:
             if local:
                 from openmdao.core.component import Component
-                it = self.system_iter(recurse=True, typ=Component)
+                it = [s.pathname for s in self.system_iter(recurse=True, typ=Component)]
             else:
-                it = iter(subsys for subsys, _ in self._subsystems_allprocs.values())
+                it = self._allprocs_exec_order()
 
-            for subsys in it:
-                prefix = subsys.pathname + '.'
+            for path in it:
+                prefix = path + '.'
                 for var_name in chain(*var_dicts):
-                    if not variables or var_name in variables:
+                    if variables is None or var_name in variables:
                         if var_name.startswith(prefix):
                             var_list.append(var_name)
         else:
@@ -4869,6 +5058,8 @@ class System(object):
 
         if self._rec_mgr._recorders:
             parallel = self._rec_mgr._check_parallel() if self.comm.size > 1 else False
+            do_gather = self._rec_mgr._check_gather()
+            local = parallel and not do_gather
             options = self.recording_options
             metadata = create_local_meta(self.pathname)
 
@@ -4898,13 +5089,13 @@ class System(object):
 
             data = {'input': {}, 'output': {}, 'residual': {}}
             if options['record_inputs'] and (inputs._names or len(discrete_inputs) > 0):
-                data['input'] = self._retrieve_data_of_kind(filt, 'input', vec_name, parallel)
+                data['input'] = self._retrieve_data_of_kind(filt, 'input', vec_name, local)
 
             if options['record_outputs'] and (outputs._names or len(discrete_outputs) > 0):
-                data['output'] = self._retrieve_data_of_kind(filt, 'output', vec_name, parallel)
+                data['output'] = self._retrieve_data_of_kind(filt, 'output', vec_name, local)
 
             if options['record_residuals'] and residuals._names:
-                data['residual'] = self._retrieve_data_of_kind(filt, 'residual', vec_name, parallel)
+                data['residual'] = self._retrieve_data_of_kind(filt, 'residual', vec_name, local)
 
             self._rec_mgr.record_iteration(self, data, metadata)
 
@@ -5176,18 +5367,19 @@ class System(object):
         if get_remote and (distrib or abs_name in vars_to_gather) and self.comm.size > 1:
             owner = self._owning_rank[abs_name]
             myrank = self.comm.rank
+            if distrib:
+                idx = self._var_allprocs_abs2idx[abs_name]
+                sizes = self._var_sizes[typ][:, idx]
+                # TODO: could cache these offsets
+                offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
+                offsets[1:] = np.cumsum(sizes[:-1])
+                if is_undefined(val):
+                    loc_val = np.zeros(sizes[myrank])
+                else:
+                    loc_val = np.ascontiguousarray(val)
+                val = np.zeros(np.sum(sizes))
             if rank is None:  # bcast
                 if distrib:
-                    idx = self._var_allprocs_abs2idx[abs_name]
-                    sizes = self._var_sizes[typ][:, idx]
-                    # TODO: could cache these offsets
-                    offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
-                    offsets[1:] = np.cumsum(sizes[:-1])
-                    if val is _UNDEFINED:
-                        loc_val = np.zeros(sizes[myrank])
-                    else:
-                        loc_val = np.ascontiguousarray(val)
-                    val = np.zeros(np.sum(sizes))
                     self.comm.Allgatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE])
                     if not flat:
                         val.shape = meta['global_shape'] if get_remote else meta['shape']
@@ -5199,16 +5391,6 @@ class System(object):
                     val = new_val
             else:  # retrieve to rank
                 if distrib:
-                    idx = self._var_allprocs_abs2idx[abs_name]
-                    sizes = self._var_sizes[typ][:, idx]
-                    # TODO: could cache these offsets
-                    offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
-                    offsets[1:] = np.cumsum(sizes[:-1])
-                    if val is _UNDEFINED:
-                        loc_val = np.zeros(sizes[idx])
-                    else:
-                        loc_val = np.ascontiguousarray(val)
-                    val = np.zeros(np.sum(sizes))
                     self.comm.Gatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE], root=rank)
                     if not flat:
                         val.shape = meta['global_shape'] if get_remote else meta['shape']
@@ -5284,7 +5466,7 @@ class System(object):
                 caller = self._problem_meta['model_ref']()
             return caller._get_input_from_src(name, abs_names, conns, units=simp_units,
                                               indices=indices, get_remote=get_remote, rank=rank,
-                                              vec_name='nonlinear', flat=flat, scope_sys=self)
+                                              vec_name=vec_name, flat=flat, scope_sys=self)
         else:
             val = self._abs_get_val(abs_names[0], get_remote, rank, vec_name, kind, flat)
 
@@ -5427,9 +5609,9 @@ class System(object):
                         elif tunits is not None:
                             value = model.convert_from_units(src, value, tunits)
                         else:
-                            msg = f"A value with no units has been specified for input " + \
+                            msg = "A value with no units has been specified for input " + \
                                   f"'{name}', but the source ('{src}') has units '{sunits}'. " + \
-                                  f"No unit checking can be done."
+                                  "No unit checking can be done."
                             issue_warning(msg, prefix=self.msginfo, category=UnitsWarning)
                 else:
                     if gunits is None:
@@ -5790,7 +5972,7 @@ class System(object):
 
         return val
 
-    def _retrieve_data_of_kind(self, filtered_vars, kind, vec_name, parallel=False):
+    def _retrieve_data_of_kind(self, filtered_vars, kind, vec_name, local=False):
         """
         Retrieve variables, either local or remote, in the filtered_vars list.
 
@@ -5802,8 +5984,8 @@ class System(object):
             Either 'input', 'output', or 'residual'.
         vec_name : str
             Either 'nonlinear' or 'linear'.
-        parallel : bool
-            If True, recorders are parallel, so only local values should be saved in each proc.
+        local : bool
+            If True, only local values should be saved in each proc.
 
         Returns
         -------
@@ -5845,7 +6027,7 @@ class System(object):
                         else:
                             ivc_path = conns[prom2abs_in[name][0]]
                             vdict[ivc_path] = srcget(ivc_path, False)
-            elif parallel:
+            elif local:
                 get = self._abs_get_val
                 vdict = {}
                 if discrete_vec:
@@ -5862,25 +6044,14 @@ class System(object):
                         if vec._contains_abs(name):
                             vdict[name] = get(name, get_remote=True, rank=0,
                                               vec_name=vec_name, kind=kind)
-                        else:
+                        elif name in prom2abs_in:
                             ivc_path = conns[prom2abs_in[name][0]]
                             vdict[name] = get(ivc_path, get_remote=True, rank=0,
                                               vec_name=vec_name, kind='output')
             else:
-                io = 'input' if kind == 'input' else 'output'
-                meta = self._var_allprocs_abs2meta[io]
                 for name in variables:
-                    if self._owning_rank[name] == 0 and not meta[name]['distributed']:
-                        # if using a serial recorder and rank 0 owns the variable,
-                        # use local value on rank 0 and do nothing on other ranks.
-                        if rank == 0:
-                            if vec._contains_abs(name):
-                                vdict[name] = vec._abs_get_val(name, flat=False)
-                            elif name[offset:] in discrete_vec:
-                                vdict[name] = discrete_vec[name[offset:]]['val']
-                    else:
-                        vdict[name] = self.get_val(name, get_remote=True, rank=0,
-                                                   vec_name=vec_name, kind=kind, from_src=False)
+                    vdict[name] = self.get_val(name, get_remote=True, rank=0,
+                                               vec_name=vec_name, kind=kind, from_src=False)
 
         return vdict
 
@@ -6266,6 +6437,17 @@ class System(object):
         """
         return False
 
+    def best_partial_deriv_direction(self):
+        """
+        Return the best direction for partial deriv calculations based on input and output sizes.
+
+        Returns
+        -------
+        str
+            The best direction for derivative calculations, 'fwd' or 'rev'.
+        """
+        return 'fwd' if len(self._outputs) > len(self._inputs) else 'rev'
+
     def _get_sys_promotion_tree(self, tree=None):
         """
         Return a dict of all subsystems and their promoted inputs/outputs.
@@ -6379,8 +6561,13 @@ class System(object):
             try:
                 abs_outs = self._var_allprocs_prom2abs_list['output'][outprom]
             except KeyError:
-                raise KeyError(f"{self.msginfo}: Promoted output variable '{outprom}' was not "
-                               "found.")
+                # outprom might be an inprom mapped to an auto_ivc
+                try:
+                    inabs = self._var_allprocs_prom2abs_list['input'][outprom]
+                    abs_outs = [self._conn_global_abs_in2out[inabs[0]]]
+                except KeyError:
+                    raise KeyError(f"{self.msginfo}: Promoted output variable '{outprom}' was not "
+                                   "found.")
 
             plist_outs = self._get_promote_lists(tree, abs_outs, 'out')
 
@@ -6513,7 +6700,17 @@ class System(object):
         tuple
             A tuple of the form (is_duplicated, num_zeros, is_distributed).
         """
-        nz = np.count_nonzero(self._var_sizes[io][:, self._var_allprocs_abs2idx[name]])
+        if io is None:
+            io = 'output' if name in self._var_allprocs_abs2meta['output'] else 'input'
+
+        try:
+            idx = self._var_allprocs_abs2idx[name]
+        except KeyError:
+            if name in self._var_allprocs_discrete[io]:
+                return False, 0, False
+            raise KeyError(f"{self.msginfo}: {io} variable '{name}' not found.")
+
+        nz = np.count_nonzero(self._var_sizes[io][:, idx])
 
         if self._var_allprocs_abs2meta[io][name]['distributed']:
             return False, self._var_sizes[io].shape[0] - nz, True  # distributed vars are never dups
@@ -6537,3 +6734,106 @@ class System(object):
             Array of sizes of the variable on all procs.
         """
         return self._var_sizes[io][:, self._var_allprocs_abs2idx[name]]
+
+    def get_self_statics(self):
+        """
+        Override this in derived classes if compute_primal references static values.
+
+        Do NOT include self._discrete_inputs in the returned tuple.  Include things like
+        self.options['opt_name'], etc., that are used in compute_primal but are assumed to be
+        constant during derivative computation.
+
+        Return value MUST be a tuple. Don't forget the trailing comma if tuple has only one item.
+        Return value MUST be hashable.
+
+        The order of these values doesn't matter.  They are only checked (by computing their hash)
+        to see if they have changed since the last time compute_primal was jitted, and if so,
+        compute_primal will be re-jitted.
+
+        Returns
+        -------
+        tuple
+            Tuple containing all static values required by compute_primal.
+        """
+        return ()
+
+    def _setup_jax(self, from_group=False):
+        pass
+
+    def _sys_tree_visitor(self, func, predicate=None, recurse=True, include_self=True,
+                          yield_none=False, *args, **kwargs):
+        """
+        Yield the result of applying the given function to each System that satisfies the predicate.
+
+        The object yielded must be picklable if any System is running in a different process.
+
+        Parameters
+        ----------
+        func : callable
+            A callable that takes a System and args and kwargs and returns an object.
+        predicate : callable or None
+            A callable that takes a System as its only argument and returns -1, 0, or 1.
+            If it returns 1, apply the function to the system.
+            If it returns 0, don't apply the function, but continue on to the system's subsystems.
+            If it returns -1, don't apply the function and don't continue on to the system's
+            subsystems.
+            If predicate is None, the function is always applied.
+        recurse : bool
+            If True, function is applied to all subsystems of subsystems.
+        include_self : bool
+            If True, apply the function to the Group itself.
+        yield_none : bool
+            If False, don't yield None results.
+        args : tuple
+            Additional positional args to be passed to the function.
+        kwargs : dict
+            Additional keyword args to be passed to the function.
+
+        Yields
+        ------
+        object
+            The result of the function.
+        """
+        if include_self:
+            pred = 1 if predicate is None else predicate(self)
+            if pred == 1:
+                if yield_none:
+                    yield func(self, *args, **kwargs)
+                else:
+                    res = func(self, *args, **kwargs)
+                    if res is not None:
+                        yield res
+            elif pred == -1:
+                return
+
+        if recurse:
+            for s in self._subsystems_myproc:
+                yield from s._sys_tree_visitor(func, predicate, recurse=True, include_self=True,
+                                               *args, **kwargs)
+        else:
+            for s in self._subsystems_myproc:
+                if pred is None or predicate(s) == 1:
+                    if yield_none:
+                        yield func(s, *args, **kwargs)
+                    else:
+                        res = func(s, *args, **kwargs)
+                        if res is not None:
+                            yield res
+
+    def _allprocs_exec_order(self):
+        """
+        Return a list of system pathnames in order of execution across all processes.
+
+        Returns
+        -------
+        list of str
+            List of system pathnames in order of execution
+        """
+        from openmdao.core.component import Component
+
+        seen = set()
+        for path in self._sys_tree_visitor(lambda s: s.pathname,
+                                           predicate=lambda s: isinstance(s, Component)):
+            if path not in seen:
+                seen.add(path)
+                yield path

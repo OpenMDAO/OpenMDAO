@@ -18,7 +18,9 @@ echo "Install latest versions of 'docs' dependencies"
 echo "============================================================="
 python -m pip install --upgrade --pre matplotlib
 python -m pip install --upgrade --pre numpydoc
-python -m pip install --upgrade --pre jupyter-book
+echo "*** ipykernel 7.x seems to be broken at the moment"
+python -m pip install 'ipykernel<7'
+python -m pip install --upgrade --pre 'jupyter-book<2'
 python -m pip install --upgrade --pre sphinx-sitemap
 python -m pip install --upgrade --pre ipyparallel
 
@@ -56,6 +58,8 @@ python -m pip install --upgrade --pre websockets
 python -m pip install --upgrade --pre aiounittest
 python -m pip install --upgrade --pre playwright
 python -m pip install --upgrade --pre num2words
+echo "pre-install playwright dependencies to avoid warning messages"
+playwright install --with-deps || true
 
 echo "============================================================="
 echo "Install latest versions of other optional packages"

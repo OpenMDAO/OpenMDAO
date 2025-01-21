@@ -4,7 +4,7 @@
 name: Update Associated POEM
 
 on:
-  pull_request:
+  pull_request_target:
     types: [ opened, reopened, closed ]
     branches: [ master ]
 
@@ -44,17 +44,18 @@ jobs:
           PR_NUMBER: ${{ github.event.number }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          if python .github/scripts/get_poem_id.py ${GITHUB_REPOSITORY} $PR_NUMBER; then
-            cat POEM_ID.txt >> $GITHUB_OUTPUT
+          python .github/scripts/get_poem_message.py ${GITHUB_REPOSITORY} $PR_NUMBER $GH_TOKEN
+          echo "rc=$?"
+          if [ -f POEM_MESSAGE.txt ]; then
+            echo "POEM_MESSAGE=\"$(<POEM_MESSAGE.txt)\"" >> $GITHUB_OUTPUT
           else
-            echo "POEM_ID=" >> $GITHUB_OUTPUT
+            echo "POEM_MESSAGE=" >> $GITHUB_OUTPUT
           fi
 
       - name: Comment on PR
-        if: (github.event.action == 'opened' || github.event.action == 'reopened') && steps.check_for_poem.outputs.POEM_ID != ''
+        if: (github.event.action == 'opened' || github.event.action == 'reopened') && steps.check_for_poem.outputs.POEM_MESSAGE != ''
         env:
-          POEM_ID: ${{ steps.check_for_poem.outputs.POEM_ID }}
-          POEM_URL: ${{ github.server_url }}/${{ github.repository_owner }}/POEMs/blob/master/POEM_${{ steps.check_for_poem.outputs.POEM_ID }}.md
+          POEM_MESSAGE: ${{ steps.check_for_poem.outputs.POEM_MESSAGE }}
         uses: actions/github-script@v7
         with:
           github-token: ${{secrets.GITHUB_TOKEN}}
@@ -63,7 +64,7 @@ jobs:
               issue_number: ${{ github.event.number }},
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: 'This pull request will transition [POEM_${{ env.POEM_ID }}](${{ env.POEM_URL }}) to `Integrated`'
+              body: ${{ env.POEM_MESSAGE }}
             })
 
       - name: Slack POEM message

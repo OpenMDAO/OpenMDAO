@@ -7,9 +7,7 @@ from scipy.sparse import issparse
 
 from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.name_maps import key2abs_key
-from openmdao.utils.array_utils import sparse_subinds
 from openmdao.matrices.matrix import sparse_types
-from openmdao.vectors.vector import _full_slice
 
 SUBJAC_META_DEFAULTS = {
     'rows': None,
@@ -92,6 +90,27 @@ class Jacobian(object):
         else:
             sz = abs2meta['output'][wrt]['size']
         return (abs2meta['output'][of]['size'], sz)
+
+    def get_metadata(self, key):
+        """
+        Get metadata for the given key.
+
+        Parameters
+        ----------
+        key : (str, str)
+            Promoted or relative name pair of sub-Jacobian.
+
+        Returns
+        -------
+        dict
+            Metadata dict for the given key.
+        """
+        abs_key = self._get_abs_key(key)
+        if abs_key in self._subjacs_info:
+            return self._subjacs_info[abs_key]
+        else:
+            msg = '{}: Variable name pair ("{}", "{}") not found.'
+            raise KeyError(msg.format(self.msginfo, key[0], key[1]))
 
     def __contains__(self, key):
         """
@@ -255,7 +274,7 @@ class Jacobian(object):
         mode : str
             'fwd' or 'rev'.
         """
-        pass
+        raise NotImplementedError(f"Class {type(self).__name__} does not implement _apply.")
 
     def _randomize_subjac(self, subjac, key):
         """
