@@ -13,8 +13,8 @@ from numpy import ndarray, isscalar, ndim, atleast_1d, atleast_2d, promote_types
 from scipy.sparse import issparse, coo_matrix, csr_matrix
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
-    global_meta_names, collect_errors, _iter_derivs, _MagnitudeData
-from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM
+    global_meta_names, collect_errors, _iter_derivs
+from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM, _SetupStatus
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian, _CheckingJacobian
 from openmdao.utils.array_utils import shape_to_len, submat_sparsity_iter, sparsity_diff_viz
 from openmdao.utils.units import simplify_unit
@@ -2208,6 +2208,12 @@ class Component(System):
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
+        if self._problem_meta is None:
+            if self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
+                raise RuntimeError(f"{self.msginfo}: Can't check_partials before final_setup. Also,"
+                                   " make sure to set valid input values before calling "
+                                   "check_partials either manually or by running the model.")
+
         self._check_fds_differ(method, step, form, step_calc, minimum_step)
 
         # Make sure we're in a valid state
@@ -2547,23 +2553,20 @@ class Component(System):
                 self._deriv_display(err_iter, partials_data, rel_err_tol, abs_err_tol, out_stream,
                                     all_fd_options, False, show_only_incorrect)
 
-            # check for zero subjacs
-            zero_keys = set()
-            for key, meta in partials_data.items():
-                abs_key = rel_key2abs_key(self, key)
-                if abs_key in self._subjacs_info:
-                    mags = meta['magnitude']
-                    if isinstance(mags, _MagnitudeData):
-                        mags = [mags]
-                    maxmag = max([mag.max() for mag in mags])
-                    if maxmag == 0.0:
-                        zero_keys.add(key)
+        # check for zero subjacs
+        zero_keys = set()
+        for key, meta in partials_data.items():
+            abs_key = rel_key2abs_key(self, key)
+            if abs_key in self._subjacs_info:
+                maxmag = max([mag.max() for mag in meta['magnitude']])
+                if maxmag == 0.0:
+                    zero_keys.add(key)
 
-            if zero_keys:
-                issue_warning(f"Component '{self.pathname}' has zero derivatives for the "
-                              "following variable pairs that were declared as 'dependent': "
-                              f"{sorted(zero_keys)}",
-                              category=DerivativesWarning)
+        if zero_keys:
+            issue_warning(f"Component '{self.pathname}' has zero derivatives for the "
+                          "following variable pairs that were declared as 'dependent': "
+                          f"{sorted(zero_keys)}.",
+                          category=DerivativesWarning)
 
         # add pathname to the partials dict to make it compatible with the return value
         # from Problem.check_partials and passable to assert_check_partials.

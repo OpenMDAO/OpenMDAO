@@ -1971,35 +1971,36 @@ y wrt x                     | abs         | fd-fwd | 2.000000000279556
         for line1, line2 in zip_longest(ctx.exception.args[0].strip().split('\n'), expected.split('\n'), fillvalue=''):
             assert snum_equal(line1.strip(), line2.strip()), f"line1: {line1}, line2: {line2}"
 
-    # def test_zero_analytic_zero_fd(self):
-    #     # Test that we can check a component that has a zero analytic and fd derivative.
+    def test_zero_analytic_zero_fd(self):
+        # Test that we can check a component that has a zero analytic and fd derivative.
 
-    #     class ZeroAnalyticComp(om.ExplicitComponent):
+        class ZeroAnalyticComp(om.ExplicitComponent):
 
-    #         def setup(self):
-    #             self.add_input('x', val=3.0)
-    #             self.add_output('y', val=4.0)
+            def setup(self):
+                self.add_input('x', val=3.0)
+                self.add_output('y', val=4.0)
 
-    #             self.declare_partials('*', '*')
+                self.declare_partials('*', '*')
 
-    #         def compute(self, inputs, outputs):
-    #             pass
+            def compute(self, inputs, outputs):
+                pass
 
-    #         def compute_partials(self, inputs, partials):
-    #             pass
+            def compute_partials(self, inputs, partials):
+                pass
 
-    #     prob = om.Problem()
+        prob = om.Problem()
 
-    #     prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.5))
-    #     prob.model.add_subsystem('comp', ZeroAnalyticComp())
-    #     prob.model.connect('p1.x', 'comp.x')
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.5))
+        prob.model.add_subsystem('comp', ZeroAnalyticComp())
+        prob.model.connect('p1.x', 'comp.x')
 
-    #     prob.setup()
+        prob.setup()
+        prob.run_model()
 
-    #     stream = StringIO()
-    #     data = prob.check_partials(out_stream=stream)
-    #     content = stream.getvalue()
-    #     raise RuntimeError("FOO")
+        msg = "Component 'comp' has zero derivatives for the following variable pairs that were declared as 'dependent': [('y', 'x')]."
+
+        with assert_warning(UserWarning, msg):
+            prob.check_partials(out_stream=None, compact_print=True)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

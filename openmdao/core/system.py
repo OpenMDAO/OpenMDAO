@@ -6950,7 +6950,7 @@ class System(object, metaclass=SystemMetaclass):
 
             fd_desc = f"{fd_opts['method']}:{fd_opts['form']}"
             for i in range(len(magnitudes)):
-                sys_buffer.write(f'          Fd Magnitude: '
+                sys_buffer.write('          Fd Magnitude: '
                                  f'{magnitudes[i].fd:.6e} ({fd_desc}{stepstrs[i]})\n')
             sys_buffer.write('\n')
 
@@ -6963,7 +6963,7 @@ class System(object, metaclass=SystemMetaclass):
 
                     if abs_errs[i].rev is not None:
                         err = _format_error(abs_errs[i].rev, abs_error_tol)
-                        sys_buffer.write(f'    Absolute Error ([rev, fd] Dot Product Test)'
+                        sys_buffer.write('    Absolute Error ([rev, fd] Dot Product Test)'
                                          f'{stepstrs[i]} : {err}\n')
                 else:
                     if abs_errs[i].fwd is not None:
@@ -6977,7 +6977,7 @@ class System(object, metaclass=SystemMetaclass):
             if directional:
                 if abs_errs[0].fwd_rev is not None:
                     err = _format_error(abs_errs[0].fwd_rev, abs_error_tol)
-                    sys_buffer.write('    Absolute Error ([rev, for] Dot Product Test) : {err}\n')
+                    sys_buffer.write(f'    Absolute Error ([rev, for] Dot Product Test) : {err}\n')
             else:
                 if abs_errs[0].fwd_rev is not None:
                     err = _format_error(abs_errs[0].fwd_rev, abs_error_tol)
@@ -7065,15 +7065,15 @@ class System(object, metaclass=SystemMetaclass):
                 for i in range(len(magnitudes)):
                     fd = fds[i]
 
+                    Jstr = textwrap.indent(str(fd), '    ')
                     if directional:
                         if totals and magnitudes[i].rev is not None:
                             sys_buffer.write(f'    Directional {fdtype} Derivative (Jfd) '
-                                             f'Dot Product{stepstrs[i]}\n    {fd}\n\n')
+                                             f'Dot Product{stepstrs[i]}\n{Jstr}\n\n')
                         else:
                             sys_buffer.write(f"    Directional {fdtype} Derivative (Jfd)"
-                                             f"{stepstrs[i]}\n    {fd}\n\n")
+                                             f"{stepstrs[i]}\n{Jstr}\n\n")
                     else:
-                        Jstr = textwrap.indent(str(fd), '    ')
                         sys_buffer.write(f"    Raw {fdtype} Derivative (Jfd){stepstrs[i]}"
                                          f"\n{Jstr}\n\n")
 
