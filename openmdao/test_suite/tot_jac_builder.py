@@ -2,16 +2,8 @@
 A tool to make it easier to investigate coloring of jacobians with different sparsity structures.
 """
 
-import os
-
 import numpy as np
 from scipy.sparse import coo_matrix
-try:
-    from scipy.sparse import load_npz, coo_matrix
-    from scipy.io import mmread
-except ImportError:
-    load_npz = None
-    mmread = None
 
 import openmdao.api as om
 from openmdao.utils.coloring import _compute_coloring
@@ -288,38 +280,6 @@ def check_sparsity_tot_coloring(sparsity, direct=True, tolerance=1e-15, tol_type
             print("J shape", J.shape, file=sys.stderr)
             print("J diff\n", list(zip(drows, dcols)), file=sys.stderr)
         raise
-
-
-def loadmat(matfile):
-    """
-    Load a matrix from a .mat file.
-
-    Parameters
-    ----------
-    matfile : str
-        Name of the file to load.
-
-    Returns
-    -------
-    coo_matrix
-        The loaded matrix.
-    """
-    if not os.path.exists(matfile):
-        raise IOError("File '%s' does not exist." % matfile)
-
-    ext = os.path.splitext(matfile)[1]
-    exts = ['.mtx', '.npz']
-
-    if ext not in exts:
-        raise IOError("File extension '%s' not recognized." % ext)
-
-    if ext == '.npz':
-        mat = load_npz(matfile).tocoo()
-    elif ext == '.mtx':
-        mat = mmread(matfile)
-        mat = coo_matrix(mat)
-
-    return mat
 
 
 if __name__ == '__main__':
