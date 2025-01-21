@@ -163,7 +163,7 @@ class LinearSchur(LinearSolver):
                 subsys1._apply_linear(None, mode, scope_out, scope_in)
 
                 # amd then, by performing solve_linear we get A^-1 B[:,{ii}]
-                subsys1._solve_linear(mode, ContainsAll())
+                subsys1._solve_linear(mode)
 
                 # do another mat-mult with the solution of this linear system, we want to get the final
                 # jacobian using the schur method here, so we will need to do a bit more math
@@ -211,7 +211,7 @@ class LinearSchur(LinearSolver):
             scope_in = self._vars_union(self._scope_in, scope_in)
             # system._dinputs.set_val(0.0)
             # system._doutputs.set_val(0.0)
-            subsys1._solve_linear(mode, ContainsAll())
+            subsys1._solve_linear(mode)
             # b_vec2.set_val(0.0)
             system._transfer("linear", "fwd", subsys2.name)
 
@@ -276,7 +276,7 @@ class LinearSchur(LinearSolver):
             # else:
             #     b_vec.set_val(subsys1_rhs)
 
-            subsys1._solve_linear(mode, ContainsAll())
+            subsys1._solve_linear(mode)
 
             ################################
             #### End solve for subsys 1 ####

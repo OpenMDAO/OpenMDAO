@@ -57,6 +57,8 @@ class NonlinearSchurSolver(NonlinearSolver):
 
         self.options.declare("solve_subsystems", types=bool, desc="Set to True to turn on sub-solvers (Hybrid Newton).")
         self.options.declare("max_sub_solves", types=int, default=10, desc="Maximum number of subsystem solves.")
+        self.options.declare("lamda", types=float, default=1.0, desc="Constant parameter for inexact schur step. 0 < lamda <=1. That is x(i+1) = x(i) + lamda * dx")
+        self.options.declare("factor_lamda", types=float, default=None, desc="When to use 'lamda'. When the nonlinear solution is too far away, we may want to take smaller steps to reach to the solution. However, when the the nonlinear solution is close to the fianl solution, we may want to allow the solver to take larger steps. This factor limits the allowable ratio of the new step to the current state variable value. For example, setting 1 will let the solver to use 'lamda' only when the ratio of the new step to the current state variable value is greater than equal to 1")
         self.options.declare(
             "cs_reconverge",
             types=bool,
@@ -302,7 +304,7 @@ class NonlinearSchurSolver(NonlinearSolver):
                 subsys1._apply_linear(None,  mode, scope_out, scope_in)
 
                 # amd then, by performing solve_linear we get A^-1 B[:,{ii}]
-                subsys1._solve_linear(mode, ContainsAll())
+                subsys1._solve_linear(mode, scope_out, scope_in)
 
                 # do another mat-mult with the solution of this linear system, we want to get the final
                 # jacobian using the schur method here, so we will need to do a bit more math
@@ -398,7 +400,13 @@ class NonlinearSchurSolver(NonlinearSolver):
 
         # loop over the variables just to be safe with the ordering
         for ii, var in enumerate(vars_to_solve):
-            system._outputs[f"{subsys2.name}.{var}"] += d_subsys2[ii]
+            if self.options["factor_lamda"] is None:
+                system._outputs[f"{subsys2.name}.{var}"] += self.options["lamda"]*d_subsys2[ii]
+            else:
+                if abs(d_subsys2[ii]) >= abs(self.options["factor_lamda"]*system._outputs[f"{subsys2.name}.{var}"]):
+                    system._outputs[f"{subsys2.name}.{var}"] += self.options["lamda"]*d_subsys2[ii]
+                else:
+                    system._outputs[f"{subsys2.name}.{var}"] += d_subsys2[ii]
 
         if self._bounds is not None:
             for key in self._bounds.keys():
