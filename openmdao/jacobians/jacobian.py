@@ -45,8 +45,6 @@ class Jacobian(object):
         List of column var names.
     _col2name_ind : ndarray
         Array that maps jac col index to index of column name.
-    _rand_subjacs : dict
-        Dictionary of subjacs that have been randomized.
     """
 
     def __init__(self, system):
@@ -60,7 +58,6 @@ class Jacobian(object):
         self._col_var_offset = None
         self._col_varnames = None
         self._col2name_ind = None
-        self._rand_subjacs = None
 
     def _get_abs_key(self, key):
         if key in self._abs_keys:
@@ -279,44 +276,14 @@ class Jacobian(object):
         """
         raise NotImplementedError(f"Class {type(self).__name__} does not implement _apply.")
 
-    def _randomize(self):
-        """
-        Fill the subjacs with random values.
-        """
-        self._rand_subjacs = {}
-        for key, meta in self._subjacs_info.items():
-            subjac = meta['val']
-            if isinstance(subjac, sparse_types):  # sparse
-                subjac = subjac.copy()
-                subjac.data = self._randgen.random(subjac.data.size)
-                subjac.data += 1.0
-
-            # if a subsystem has computed a dynamic partial or semi-total coloring,
-            # we use that sparsity information to set the sparsity of the randomized
-            # subjac.  Otherwise all subjacs that didn't have sparsity declared by the
-            # user will appear completely dense, which will lead to a total jacobian that
-            # is more dense than it should be, causing any total coloring that we compute
-            # to be overly conservative.
-            elif 'sparsity' in meta:
-                assert meta['rows'] is None
-                rows, cols, shape = meta['sparsity']
-                subjac = np.zeros(shape)
-                val = self._randgen.random(len(rows))
-                val += 1.0
-                subjac[rows, cols] = val
-
-            else:
-                subjac = self._randgen.random(subjac.shape)
-                subjac += 1.0
-
-            self._rand_subjacs[key] = subjac
-
-    def _rand_subjac(self, key):
+    def _randomize_subjac(self, subjac, key):
         """
         Return a subjac that is the given subjac filled with random values.
 
         Parameters
         ----------
+        subjac : ndarray or csc_matrix
+            Sub-jacobian to be randomized.
         key : tuple (of, wrt)
             Key for subjac within the jacobian.
 
@@ -325,10 +292,31 @@ class Jacobian(object):
         ndarray or csc_matrix
             Randomized version of the subjac.
         """
-        if self._rand_subjacs is None:
-            self._randomize()
+        if isinstance(subjac, sparse_types):  # sparse
+            sparse = subjac.copy()
+            sparse.data = self._randgen.random(sparse.data.size)
+            sparse.data += 1.0
+            return sparse
 
-        return self._rand_subjacs[key]
+        # if a subsystem has computed a dynamic partial or semi-total coloring,
+        # we use that sparsity information to set the sparsity of the randomized
+        # subjac.  Otherwise all subjacs that didn't have sparsity declared by the
+        # user will appear completely dense, which will lead to a total jacobian that
+        # is more dense than it should be, causing any total coloring that we compute
+        # to be overly conservative.
+        subjac_info = self._subjacs_info[key]
+        if 'sparsity' in subjac_info:
+            assert subjac_info['rows'] is None
+            rows, cols, shape = subjac_info['sparsity']
+            r = np.zeros(shape)
+            val = self._randgen.random(len(rows))
+            val += 1.0
+            r[rows, cols] = val
+        else:
+            r = self._randgen.random(subjac.shape)
+            r += 1.0
+
+        return r
 
     def set_complex_step_mode(self, active):
         """

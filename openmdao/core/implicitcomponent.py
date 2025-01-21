@@ -362,9 +362,6 @@ class ImplicitComponent(Component):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        if self._jacobian is not None:
-            self._jacobian._rand_subjacs = None
-
         self._check_first_linearize()
 
         with self._unscaled_context(outputs=[self._outputs]):

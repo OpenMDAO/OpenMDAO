@@ -176,7 +176,7 @@ class DictionaryJacobian(Jacobian):
                 if left_vec is not None and right_vec is not None:
                     subjac_info = subjacs_info[abs_key]
                     if do_randomize:
-                        subjac = self._rand_subjac(abs_key)
+                        subjac = self._randomize_subjac(subjac_info['val'], abs_key)
                     else:
                         subjac = subjac_info['val']
                     rows = subjac_info['rows']
