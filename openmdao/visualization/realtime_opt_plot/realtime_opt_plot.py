@@ -85,52 +85,71 @@ def _realtime_opt_plot_cmd(options, user_args):
 def _make_legend_item(varname, color):
 
     from bokeh.models import Button, CustomJS, InlineStyleSheet
-    stylesheet = InlineStyleSheet(css=".bk-btn { font-size: 20pt; }")
+    stylesheet = InlineStyleSheet(css=".bk-btn.bk-btn-default.bk-active { font-size: 22px; } .bk-btn { font-size: 22px; } .bk-btn:focus {outline: none;}")
+
+    # TODO what should we do with colors?
+    color = 'black'
 
     toggle = Toggle(
         label=varname,
         active=False,
-        # styles={"font-size": "16px"},  # Set font size using CSS
-        # css_classes=["toggle-font-size"],
-        # height=20,
         margin=(0, 0, 5, 0),
         stylesheets=[stylesheet],
     )
 
-    # TODO what should we do with colors?
-    color = 'black'
     # Add custom CSS styles for both active and inactive states
-    # toggle.stylesheets = [
-    #     f"""
-    #         .bk-btn {{
-    #             color: {color};
-    #             border-color: {color};
-    #             background-color: white;
-    #             display: flex;
-    #             align-items: center; /* Vertical centering */
-    #             justify-content: center; /* Horizontal centering */
-    #             height: 16px; /* Example height, adjust as needed */
-    #             border-width: 0px; /* Adjust to desired thickness */
-    #             border-style: solid; /* Ensures a solid border */
-    #         }}
+    toggle.stylesheets = [
+        f"""
+            .bk-btn {{
+                color: {color};
+                border-color: {color};
+                background-color: white;
+                display: flex;
+                align-items: center; /* Vertical centering */
+                justify-content: center; /* Horizontal centering */
+                height: 20px; /* Example height, adjust as needed */
+                border-width: 0px; /* Adjust to desired thickness */
+                border-style: solid; /* Ensures a solid border */
+                font-size: 22px !important; 
+            }}
 
-    #         .bk-btn.bk-active {{
-    #             color: white;
-    #             border-color: {color};
-    #             background-color: {color};
-    #             display: flex;
-    #             align-items: center; /* Vertical centering */
-    #             justify-content: center; /* Horizontal centering */
-    #             height: 16px; /* Example height, adjust as needed */
-    #             border-width: 0px; /* Adjust to desired thickness */
-    #             border-style: solid; /* Ensures a solid border */
-    #         }}
+            .bk-btn.bk-active {{
+                --font-size: 32px;  /* Set the variable */
+                color: white;
+                border-color: {color};
+                background-color: {color};
+                display: flex;
+                align-items: center; /* Vertical centering */
+                justify-content: center; /* Horizontal centering */
+                height: 20px; /* Example height, adjust as needed */
+                border-width: 0px; /* Adjust to desired thickness */
+                border-style: solid; /* Ensures a solid border */
+                font-size: 22px !important;
+            }}
 
-    #         .bk-btn:focus {{
-    #             outline: none; /* Removes the default focus ring */
-    #         }}
-    #     """
-#    ]
+            .button.bk-btn.bk-btn-default {{
+                font-size: 22px !important;  /* Override the variable */
+            /* ... rest of your styles ... */
+            }}
+
+            .button.bk-btn.bk-btn-default.bk-active {{
+                font-size: 22px !important;  /* Override the variable */
+                /* ... rest of your styles ... */
+            }}
+
+
+            .button.bk-btn.bk-btn-default.bk-active {{
+                font-size: 22px !important;
+                }}
+
+            .bk-btn ::file-selector-button {{
+                font-size: 22px !important;
+            }}
+            .bk-btn:focus {{
+                outline: none; /* Removes the default focus ring */
+            }}
+        """
+   ]
 
     return toggle
 
@@ -841,9 +860,10 @@ class RealTimeOptPlot(object):
                                         display: flex;
                                         align-items: center; /* Vertical centering */
                                         justify-content: center; /* Horizontal centering */
-                                        height: 16px; /* Example height, adjust as needed */
+                                        height: 22px; /* Example height, adjust as needed */
                                         border-width: 0px; /* Adjust to desired thickness */
                                         border-style: solid; /* Ensures a solid border */
+                                        font-size: 22px;
                                     }
                                     .bk-btn.bk-active {
                                         color: white;
@@ -852,7 +872,8 @@ class RealTimeOptPlot(object):
                                         display: flex;
                                         align-items: center; /* Vertical centering */
                                         justify-content: center; /* Horizontal centering */
-                                        height: 16px; /* Example height, adjust as needed */
+                                        height: 22px; /* Example height, adjust as needed */
+                                        font-size: 22px;
                                         border-width: 0px; /* Adjust to desired thickness */
                                         border-style: solid; /* Ensures a solid border */
                                     }
@@ -875,8 +896,9 @@ class RealTimeOptPlot(object):
                                         display: flex;
                                         align-items: center; /* Vertical centering */
                                         justify-content: center; /* Horizontal centering */
-                                        height: 16px; /* Example height, adjust as needed */
+                                        height: 22px; /* Example height, adjust as needed */
                                         border-width: 0px; /* Adjust to desired thickness */
+                                        font-size: 22px;
                                         border-style: solid; /* Ensures a solid border */
                                     }
                                     .bk-btn.bk-active {
@@ -886,7 +908,8 @@ class RealTimeOptPlot(object):
                                         display: flex;
                                         align-items: center; /* Vertical centering */
                                         justify-content: center; /* Horizontal centering */
-                                        height: 16px; /* Example height, adjust as needed */
+                                        font-size: 22px;
+                                        height: 22px; /* Example height, adjust as needed */
                                         border-width: 0px; /* Adjust to desired thickness */
                                         border-style: solid; /* Ensures a solid border */
                                     }
