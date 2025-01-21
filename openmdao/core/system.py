@@ -36,7 +36,7 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, \
     DerivativesWarning, PromotionWarning, UnusedOptionWarning, UnitsWarning, warn_deprecation
-from openmdao.utils.general_utils import determine_adder_scaler, \
+from openmdao.utils.general_utils import determine_adder_scaler, is_undefined, \
     format_as_float_or_array, all_ancestors, match_prom_or_abs, \
     ensure_compatible, env_truthy, make_traceback, _is_slicer_op, _wrap_comm, _unwrap_comm, \
     _om_dump, SystemMetaclass
@@ -709,9 +709,6 @@ class System(object, metaclass=SystemMetaclass):
         """
         Iterate over (name, offset, end, slice, dist_sizes) for each 'of' (row) var in the jacobian.
 
-        The slice is internal to the given variable in the result, and this is always a full
-        slice except when indices are defined for the 'of' variable.
-
         Yields
         ------
         str
@@ -721,7 +718,7 @@ class System(object, metaclass=SystemMetaclass):
         int
             Ending index.
         slice or ndarray
-            A full slice or indices for the 'of' variable.
+            A full slice.
         ndarray or None
             Distributed sizes if var is distributed else None
         """
@@ -1025,9 +1022,9 @@ class System(object, metaclass=SystemMetaclass):
         #   method and what were the existing bounds
         if are_new_bounds:
             # wipe out all the bounds and only use what is set by the arguments to this call
-            if lower is _UNDEFINED:
+            if is_undefined(lower):
                 lower = None
-            if upper is _UNDEFINED:
+            if is_undefined(upper):
                 upper = None
         else:
             lower = existing_dv_meta['lower']
@@ -1043,13 +1040,13 @@ class System(object, metaclass=SystemMetaclass):
 
         # Now figure out scaling
         if are_new_scaling:
-            if scaler is _UNDEFINED:
+            if is_undefined(scaler):
                 scaler = None
-            if adder is _UNDEFINED:
+            if is_undefined(adder):
                 adder = None
-            if ref is _UNDEFINED:
+            if is_undefined(ref):
                 ref = None
-            if ref0 is _UNDEFINED:
+            if is_undefined(ref0):
                 ref0 = None
         else:
             scaler = existing_dv_meta['scaler']
@@ -1193,11 +1190,11 @@ class System(object, metaclass=SystemMetaclass):
         #   method and what were the existing bounds
         if are_new_bounds:
             # wipe the slate clean and only use what is set by the arguments to this call
-            if equals is _UNDEFINED:
+            if is_undefined(equals):
                 equals = None
-            if lower is _UNDEFINED:
+            if is_undefined(lower):
                 lower = None
-            if upper is _UNDEFINED:
+            if is_undefined(upper):
                 upper = None
         else:
             equals = existing_cons_meta['equals']
@@ -1216,13 +1213,13 @@ class System(object, metaclass=SystemMetaclass):
 
         # Now figure out scaling
         if are_new_scaling:
-            if scaler is _UNDEFINED:
+            if is_undefined(scaler):
                 scaler = None
-            if adder is _UNDEFINED:
+            if is_undefined(adder):
                 adder = None
-            if ref is _UNDEFINED:
+            if is_undefined(ref):
                 ref = None
-            if ref0 is _UNDEFINED:
+            if is_undefined(ref0):
                 ref0 = None
         else:
             scaler = existing_cons_meta['scaler']
@@ -1340,10 +1337,16 @@ class System(object, metaclass=SystemMetaclass):
             name = alias
 
         # At least one of the scaling parameters must be set or function does nothing
-        if scaler is _UNDEFINED and adder is _UNDEFINED and ref is _UNDEFINED and ref0 == \
-                _UNDEFINED:
+        if (
+            is_undefined(scaler)
+            and is_undefined(adder)
+            and is_undefined(ref)
+            and is_undefined(ref0)
+        ):
             raise RuntimeError(
-                'Must set a value for at least one argument in call to set_objective_options.')
+                'Must set a value for at least one argument '
+                'in call to set_objective_options.'
+            )
 
         if self._static_mode and self._static_responses:
             responses = self._static_responses
@@ -1360,13 +1363,13 @@ class System(object, metaclass=SystemMetaclass):
 
         # Since one or more of these are being set by the incoming arguments, the
         #   ones that are not being set should be set to None since they will be re-computed below
-        if scaler is _UNDEFINED:
+        if is_undefined(scaler):
             scaler = None
-        if adder is _UNDEFINED:
+        if is_undefined(adder):
             adder = None
-        if ref is _UNDEFINED:
+        if is_undefined(ref):
             ref = None
-        if ref0 is _UNDEFINED:
+        if is_undefined(ref0):
             ref0 = None
 
         # Convert ref/ref0 to ndarray/float as necessary
@@ -1647,7 +1650,7 @@ class System(object, metaclass=SystemMetaclass):
         info.set_coloring(coloring, msginfo=self.msginfo)
         if info._failed:
             if not info.per_instance:
-                # save the class coloring for so resources won't be wasted computing
+                # save the class coloring so resources won't be wasted computing
                 # a bad coloring
                 fname = self.get_coloring_fname(mode='output')
                 coloring_mod._CLASS_COLORINGS[fname] = None
@@ -1687,6 +1690,81 @@ class System(object, metaclass=SystemMetaclass):
 
         return True
 
+    def _perturbation_iter(self, num_full_jacs, perturb_size):
+        """
+        Iterate over random perturbations of the inputs array.
+
+        For implicit components, we also randomize the outputs.  The perturbation is relative
+        to the starting value of the input or output, unless that value is 0.0, in which case
+        the perturbation is absolute.  The final value of the input or output is the perturbation
+        multiplied by a random number between 0 and 1 added to the starting value.
+
+        Inputs, outputs, and residuals are all restored to their starting values at the end of
+        the iterations.
+
+        Parameters
+        ----------
+        num_full_jacs : int
+            Number of full jacobians to compute.
+        perturb_size : float
+            Size of relative perturbation.  If base value is 0.0, perturbation is absolute.
+
+        Yields
+        ------
+        int
+            The current iteration number.
+        """
+        from openmdao.core.group import Group
+        is_total = isinstance(self, Group)
+        use_jax = self.options['derivs_method'] == 'jax'
+        is_explicit = self.is_explicit()
+
+        starting_inputs = self._inputs.asarray(copy=True)
+        starting_outputs = self._outputs.asarray(copy=True)
+        starting_resids = self._residuals.asarray(copy=True)
+
+        # compute perturbations
+        in_offsets = starting_inputs.copy()
+        in_offsets[in_offsets == 0.0] = 1.0
+        in_offsets *= perturb_size
+
+        if not is_explicit:
+            out_offsets = starting_outputs.copy()
+            out_offsets[out_offsets == 0.0] = 1.0
+            out_offsets *= perturb_size
+
+        for i in range(num_full_jacs):
+            # randomize inputs (and outputs if implicit)
+            if i > 0:
+                self._inputs.set_val(starting_inputs +
+                                     in_offsets * np.random.random(in_offsets.size))
+                if not is_explicit:
+                    self._outputs.set_val(starting_outputs +
+                                          out_offsets * np.random.random(out_offsets.size))
+                if is_total:
+                    with self._relevance.nonlinear_active('iter'):
+                        self._solve_nonlinear()
+                else:
+                    self._apply_nonlinear()
+
+                if not use_jax:
+                    for scheme in self._approx_schemes.values():
+                        scheme._reset()  # force a re-initialization of approx
+            elif is_explicit and not is_total:
+                self._apply_nonlinear()  # need this to get the output values into the resids
+
+            yield i
+
+        if not use_jax:
+            # revert uncolored approx back to normal
+            for scheme in self._approx_schemes.values():
+                scheme._reset()
+
+        # restore original inputs/outputs/resids
+        self._inputs.set_val(starting_inputs)
+        self._outputs.set_val(starting_outputs)
+        self._residuals.set_val(starting_resids)
+
     def compute_sparsity(self):
         """
         Compute the sparsity of the partial jacobian.
@@ -1718,65 +1796,28 @@ class System(object, metaclass=SystemMetaclass):
         save_jac = self._jacobian
 
         # use special sparse jacobian to collect sparsity info
-        self._jacobian = _ColSparsityJac(self, self._coloring_info)
+        self._jacobian = _ColSparsityJac(self)
 
         from openmdao.core.group import Group
         is_total = isinstance(self, Group)
-        is_explicit = self.is_explicit()
 
-        # compute perturbations
-        starting_inputs = self._inputs.asarray(copy=True)
-        in_offsets = starting_inputs.copy()
-        in_offsets[in_offsets == 0.0] = 1.0
-        in_offsets *= self._coloring_info['perturb_size']
-
-        starting_outputs = self._outputs.asarray(copy=True)
-
-        if not is_explicit:
-            out_offsets = starting_outputs.copy()
-            out_offsets[out_offsets == 0.0] = 1.0
-            out_offsets *= self._coloring_info['perturb_size']
-
-        starting_resids = self._residuals.asarray(copy=True)
-
-        for i in range(self._coloring_info['num_full_jacs']):
-            # randomize inputs (and outputs if implicit)
-            if i > 0:
-                self._inputs.set_val(starting_inputs +
-                                     in_offsets * np.random.random(in_offsets.size))
-                if not is_explicit:
-                    self._outputs.set_val(starting_outputs +
-                                          out_offsets * np.random.random(out_offsets.size))
-                if is_total:
-                    with self._relevance.nonlinear_active('iter'):
-                        self._solve_nonlinear()
-                else:
-                    self._apply_nonlinear()
-
-                if not use_jax:
-                    for scheme in self._approx_schemes.values():
-                        scheme._reset()  # force a re-initialization of approx
-
+        for i in self._perturbation_iter(self._coloring_info['num_full_jacs'],
+                                         self._coloring_info['perturb_size']):
             if use_jax:
                 self._jax_linearize()
-            else:
+                sparsity, sp_info = self._jacobian.get_sparsity()
+            elif is_total:
                 self.run_linearize(sub_do_ln=False)
-
-        sparsity, sp_info = self._jacobian.get_sparsity(self)
+                sparsity, sp_info = self._jacobian.get_sparsity()
+            else:  # for components
+                # this avoids calling any compute_partials/linearize methods which will fail
+                # because _ColSparsityJac only supports set_col and not dict access.
+                sparsity, sp_info = self.compute_fd_sparsity()
 
         self._jacobian = save_jac
 
         if not use_jax:
             self._during_sparsity = False
-
-            # revert uncolored approx back to normal
-            for scheme in self._approx_schemes.values():
-                scheme._reset()
-
-        # restore original inputs/outputs
-        self._inputs.set_val(starting_inputs)
-        self._outputs.set_val(starting_outputs)
-        self._residuals.set_val(starting_resids)
 
         self._first_call_to_linearize = save_first_call
 
@@ -1832,22 +1873,28 @@ class System(object, metaclass=SystemMetaclass):
             for meta in self._subjacs_info.values():
                 if 'method' in meta and meta['method']:
                     break
-            else:  # no approx derivs found
-                if not (self._owns_approx_of or self._owns_approx_wrt):
-                    issue_warning("No partials found but coloring was requested.  "
-                                  "Declaring ALL partials as dense "
-                                  "(method='{}')".format(info['method']),
-                                  prefix=self.msginfo, category=DerivativesWarning)
-                    try:
-                        self.declare_partials('*', '*', method=info['method'])
-                    except AttributeError:  # assume system is a group
-                        from openmdao.core.component import Component
-                        from openmdao.core.indepvarcomp import IndepVarComp
-                        from openmdao.components.exec_comp import ExecComp
-                        for s in self.system_iter(recurse=True, typ=Component):
-                            if not isinstance(s, ExecComp) and not isinstance(s, IndepVarComp):
-                                s.declare_partials('*', '*', method=info['method'])
-                    self._setup_partials()
+            else:  # no approx or jax partials found
+                method = info['method']
+                if self._subjacs_info:
+                    for meta in self._subjacs_info.values():
+                        meta['method'] = method
+
+                else:  # declare all derivs as approx
+                    if not (self._owns_approx_of or self._owns_approx_wrt):
+                        issue_warning("No approx or jax partials found but coloring was requested. "
+                                      "Declaring ALL partials as dense "
+                                      "(method='{}')".format(info['method']),
+                                      prefix=self.msginfo, category=DerivativesWarning)
+                        try:
+                            self.declare_partials('*', '*', method=info['method'])
+                        except AttributeError:  # assume system is a group
+                            from openmdao.core.component import Component
+                            from openmdao.core.indepvarcomp import IndepVarComp
+                            from openmdao.components.exec_comp import ExecComp
+                            for s in self.system_iter(recurse=True, typ=Component):
+                                if not isinstance(s, ExecComp) and not isinstance(s, IndepVarComp):
+                                    s.declare_partials('*', '*', method=info['method'])
+                        self._setup_partials()
 
         if not use_jax:
             approx_scheme = self._get_approx_scheme(info['method'])
@@ -5326,7 +5373,7 @@ class System(object, metaclass=SystemMetaclass):
                 # TODO: could cache these offsets
                 offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
                 offsets[1:] = np.cumsum(sizes[:-1])
-                if val is _UNDEFINED:
+                if is_undefined(val):
                     loc_val = np.zeros(sizes[myrank])
                 else:
                     loc_val = np.ascontiguousarray(val)
