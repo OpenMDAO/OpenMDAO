@@ -231,7 +231,7 @@ class ImplicitComponent(Component):
                     d_inputs.set_val(new_ins)
                     d_outputs.set_val(new_outs)
         else:
-            if self.comm.size > 1 and mode == 'rev' and self._problem_meta['checking']:
+            if self._problem_meta['checking'] and self.comm.size > 1 and mode == 'rev':
                 nzdresids = self._get_dist_nz_dresids()
                 self.apply_linear(inputs, outputs, d_inputs, d_outputs, d_residuals, mode)
                 self._check_consistent_serial_dinputs(nzdresids)

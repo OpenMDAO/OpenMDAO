@@ -11,7 +11,7 @@ from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTw
 from openmdao.test_suite.components.sellar import SellarStateConnection, SellarDerivatives, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.scripts.circuit_analysis import Circuit
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -611,9 +611,7 @@ class TestBryoden(unittest.TestCase):
         prob.run_model()
 
         totals = prob.check_totals(method='cs', out_stream=None)
-
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+        assert_check_totals(totals)
 
     def test_cs_around_broyden_compute_jac(self):
         # Basic sellar test.
@@ -653,9 +651,7 @@ class TestBryoden(unittest.TestCase):
         sub.nonlinear_solver.options['compute_jacobian'] = True
 
         totals = prob.check_totals(method='cs', out_stream=None)
-
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+        assert_check_totals(totals)
 
     def test_cs_around_broyden_compute_jac_dense(self):
         # Basic sellar test.
@@ -695,9 +691,7 @@ class TestBryoden(unittest.TestCase):
         sub.nonlinear_solver.options['compute_jacobian'] = True
 
         totals = prob.check_totals(method='cs', out_stream=None)
-
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+        assert_check_totals(totals)
 
     def test_complex_step(self):
         prob = om.Problem()
@@ -735,9 +729,7 @@ class TestBryoden(unittest.TestCase):
         prob.run_model()
 
         totals = prob.check_totals(method='cs', out_stream=None)
-
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-7)
+        assert_check_totals(totals)
 
 
 # Commented the following test out until we fix the broyden check

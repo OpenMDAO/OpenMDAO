@@ -412,6 +412,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         # check derivatives with complex step and a larger step size.
         stream = StringIO()
         totals = prob.check_totals(method='cs', out_stream=stream)
+        assert_check_totals(totals)
 
         lines = stream.getvalue().splitlines()
 
@@ -427,7 +428,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         # Test compact_print output
         compact_stream = StringIO()
-        prob.check_totals(method='fd', out_stream=compact_stream, compact_print=True)
+        assert_check_totals(prob.check_totals(method='fd', out_stream=compact_stream, compact_print=True))
 
         compact_lines = compact_stream.getvalue().splitlines()
 
@@ -567,6 +568,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_near_equal(J['y1', 'x1'][1][1], Jbase[2, 3], 1e-8)
 
         totals = prob.check_totals()
+        assert_check_totals(totals)
+
         jac = totals[('y1', 'x1')]['J_fd']
         assert_near_equal(jac[0][0], Jbase[0, 1], 1e-8)
         assert_near_equal(jac[0][1], Jbase[0, 3], 1e-8)
@@ -602,6 +605,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_near_equal(J['y1', 'x1'][0][1], Jbase[1, 3], 1e-8)
 
         totals = prob.check_totals()
+        assert_check_totals(totals)
         jac = totals[('y1', 'x1')]['J_fd']
         assert_near_equal(jac[0][0], Jbase[1, 1], 1e-8)
         assert_near_equal(jac[0][1], Jbase[1, 3], 1e-8)
@@ -656,15 +660,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.run_model()
 
         totals = prob.check_totals(method='fd', step=1.0e-1, out_stream=None)
-
-        assert_near_equal(totals['x', 'x']['J_fwd'], [[1.0]], 1e-5)
-        assert_near_equal(totals['x', 'x']['J_fd'], [[1.0]], 1e-5)
-        assert_near_equal(totals['z', 'z']['J_fwd'], np.eye(2), 1e-5)
-        assert_near_equal(totals['z', 'z']['J_fd'], np.eye(2), 1e-5)
-        assert_near_equal(totals['x', 'z']['J_fwd'], [[0.0, 0.0]], 1e-5)
-        assert_near_equal(totals['x', 'z']['J_fd'], [[0.0, 0.0]], 1e-5)
-        assert_near_equal(totals['z', 'x']['J_fwd'], [[0.0], [0.0]], 1e-5)
-        assert_near_equal(totals['z', 'x']['J_fd'], [[0.0], [0.0]], 1e-5)
+        assert_check_totals(totals)
 
     def test_full_con_with_index_desvar(self):
         prob = om.Problem()
@@ -683,9 +679,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.run_model()
 
         totals = prob.check_totals(method='fd', step=1.0e-1, out_stream=None)
-
-        assert_near_equal(totals['z', 'z']['J_fwd'], [[0.0], [1.0]], 1e-5)
-        assert_near_equal(totals['z', 'z']['J_fd'], [[0.0], [1.0]], 1e-5)
+        assert_check_totals(totals)
 
     def test_full_desvar_with_index_con(self):
         prob = om.Problem()
@@ -704,9 +698,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.run_model()
 
         totals = prob.check_totals(method='fd', step=1.0e-1, out_stream=None)
-
-        assert_near_equal(totals['z', 'z']['J_rev'], [[0.0, 1.0]], 1e-5)
-        assert_near_equal(totals['z', 'z']['J_fd'], [[0.0, 1.0]], 1e-5)
+        assert_check_totals(totals)
 
     def test_full_desvar_with_index_obj(self):
         prob = om.Problem()
@@ -725,9 +717,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.run_model()
 
         totals = prob.check_totals(method='fd', step=1.0e-1, out_stream=None)
-
-        assert_near_equal(totals['z', 'z']['J_rev'], [[0.0, 1.0]], 1e-5)
-        assert_near_equal(totals['z', 'z']['J_fd'], [[0.0, 1.0]], 1e-5)
+        assert_check_totals(totals)
 
     def test_bug_fd_with_sparse(self):
         # This bug was found via the x57 model in pointer.
@@ -813,10 +803,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         p.run_model()
 
         # Make sure we don't bomb out with an error.
-        J = p.check_totals(out_stream=None)
-
-        assert_near_equal(J[('time', 't_duration')]['J_fwd'][0], 17.0, 1e-5)
-        assert_near_equal(J[('time', 't_duration')]['J_fd'][0], 17.0, 1e-5)
+        totals = p.check_totals(out_stream=None)
+        assert_check_totals(totals)
 
         # Try again with a direct solver and sparse assembled hierarchy.
 
@@ -832,16 +820,12 @@ class TestProblemCheckTotals(unittest.TestCase):
         p.run_model()
 
         # Make sure we don't bomb out with an error.
-        J = p.check_totals(out_stream=None)
-
-        assert_near_equal(J[('sub.time', 'sub.t_duration')]['J_fwd'][0], 17.0, 1e-5)
-        assert_near_equal(J[('sub.time', 'sub.t_duration')]['J_fd'][0], 17.0, 1e-5)
+        totals = p.check_totals(out_stream=None)
+        assert_check_totals(totals)
 
         # Make sure check_totals cleans up after itself by running it a second time
-        J = p.check_totals(out_stream=None)
-
-        assert_near_equal(J[('sub.time', 'sub.t_duration')]['J_fwd'][0], 17.0, 1e-5)
-        assert_near_equal(J[('sub.time', 'sub.t_duration')]['J_fd'][0], 17.0, 1e-5)
+        totals = p.check_totals(out_stream=None)
+        assert_check_totals(totals)
 
     def test_vector_scaled_derivs(self):
 
@@ -879,7 +863,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_near_equal(J, derivs['comp.y1']['px.x'], 1.0e-3)
 
         cderiv = prob.check_totals(driver_scaling=True, out_stream=None)
-        assert_near_equal(cderiv['comp.y1', 'px.x']['J_fwd'], J, 1.0e-3)
+        assert_check_totals(cderiv)
 
         # cleanup after FD
         prob.run_model()
@@ -892,7 +876,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_near_equal(J, derivs['comp.y1']['px.x'], 1.0e-3)
 
         cderiv = prob.check_totals(out_stream=None)
-        assert_near_equal(cderiv['comp.y1', 'px.x']['J_fwd'], J, 1.0e-3)
+        assert_check_totals(cderiv)
 
     def test_cs_around_newton(self):
         # Basic sellar test.
@@ -932,9 +916,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.run_model()
 
         totals = prob.check_totals(method='cs', out_stream=None)
-
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-10)
+        assert_check_totals(totals)
 
     def test_cs_around_newton_new_method(self):
         # The old method of nudging the Newton and forcing it to reconverge could not achieve the
@@ -1066,9 +1048,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         prob.run_model()
         totals = prob.check_totals(method='cs', out_stream=None)
-
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-12)
+        assert_check_totals(totals)
 
     def test_cs_around_broyden(self):
         # Basic sellar test.
@@ -1108,9 +1088,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.run_model()
 
         totals = prob.check_totals(method='cs', out_stream=None)
-
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+        assert_check_totals(totals)
 
     def test_cs_around_newton_top_sparse(self):
         prob = om.Problem()
@@ -1198,9 +1176,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.run_model()
 
         # This test verifies fix of a TypeError (division by None)
-        J = prob.check_totals(out_stream=None)
-        assert_near_equal(J['comp.y', 'p.x']['J_fwd'], [[14.0]], 1e-6)
-        assert_near_equal(J['comp.y', 'p.x']['J_fd'], [[0.0]], 1e-6)
+        prob.check_totals(out_stream=None)
 
     def test_response_index(self):
         prob = om.Problem()
@@ -1217,7 +1193,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.run_model()
 
         stream = StringIO()
-        prob.check_totals(out_stream=stream)
+        assert_check_totals(prob.check_totals(out_stream=stream))
         lines = stream.getvalue().splitlines()
         self.assertTrue('index size: 1' in lines[4])
 
@@ -1239,15 +1215,12 @@ class TestProblemCheckTotals(unittest.TestCase):
         p.run_model()
 
         stream = StringIO()
-        J_driver = p.check_totals(out_stream=stream)
+        assert_check_totals(p.check_totals(out_stream=stream))
         lines = stream.getvalue().splitlines()
 
         self.assertTrue("Full Model: 'lcy' wrt 'x' (Linear constraint)" in lines[4])
         self.assertTrue("Absolute Error (Jfor - Jfd)" in lines[8])
         self.assertTrue("Relative Error (Jfor - Jfd) / Jfd" in lines[10])
-
-        assert_near_equal(J_driver['y', 'x']['J_fwd'][0, 0], 1.0)
-        assert_near_equal(J_driver['lcy', 'x']['J_fwd'][0, 0], 3.0)
 
     def test_alias_constraints(self):
         prob = om.Problem()
@@ -1273,11 +1246,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.run_driver()
 
         totals = prob.check_totals(out_stream=None)
-
-        assert_near_equal(totals['areas', 'widths']['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(totals['a2', 'widths']['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(totals['a3', 'widths']['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(totals['a4', 'widths']['abs error'][0], 0.0, 1e-6)
+        assert_check_totals(totals)
 
         prob.list_driver_vars(show_promoted_name=True, print_arrays=False,
                               cons_opts=['indices', 'alias'])
@@ -1307,11 +1276,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.run_driver()
 
         totals = prob.check_totals(out_stream=None)
-
-        assert_near_equal(totals['areas', 'widths']['abs error'][1], 0.0, 1e-6)
-        assert_near_equal(totals['a2', 'widths']['abs error'][1], 0.0, 1e-6)
-        assert_near_equal(totals['a3', 'widths']['abs error'][1], 0.0, 1e-6)
-        assert_near_equal(totals['a4', 'widths']['abs error'][1], 0.0, 1e-6)
+        assert_check_totals(totals)
 
     def test_alias_constraints_nested(self):
         # Tests a bug where we need to lookup the constraint alias on a response that is from
@@ -1365,14 +1330,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.compute_totals()
 
         stream = StringIO()
-        prob.check_totals(out_stream=stream, show_only_incorrect=True)
-
-        self.assertEqual(stream.getvalue().count("'C2.y' wrt 'badcomp.y1'"), 1)
-        self.assertEqual(stream.getvalue().count("'C2.y' wrt 'badcomp.y2'"), 1)
-        self.assertEqual(stream.getvalue().count("'C1.y' wrt 'goodcomp.y1'"), 0)
-        self.assertEqual(stream.getvalue().count("'C1.y' wrt 'goodcomp.y2'"), 0)
-        self.assertEqual(stream.getvalue().count("'C2.y' wrt 'goodcomp.y1'"), 0)
-        self.assertEqual(stream.getvalue().count("'C2.y' wrt 'goodcomp.y2'"), 0)
+        totals = prob.check_totals(out_stream=stream, show_only_incorrect=True)
+        assert_check_totals(totals)
 
     def test_compact_print_exceed_tol_show_only_incorrect(self):
 
@@ -1425,7 +1384,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 1)
         self.assertTrue('Relative Error (Jfor - Jfd) / Jfd : ' in content)
         self.assertTrue('Absolute Error (Jfor - Jfd) : ' in content)
-        assert_near_equal(data[(('comp.out',), 'comp.in')]['directional_fd_fwd'], 0., tolerance=2e-15)
+        mhatdotm, dhatdotd =  data[(('comp.out',), 'comp.in')]['directional_fd_fwd']
+        assert_near_equal(mhatdotm, dhatdotd, tolerance=2e-15)
 
     def test_directional_vectorized_matrix_free_rev_index_0(self):
 
@@ -1449,7 +1409,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 1)
         self.assertTrue('Relative Error ([rev, fd] Dot Product Test) / Jfd : ' in content)
         self.assertTrue('Absolute Error ([rev, fd] Dot Product Test) : ' in content)
-        assert_near_equal(data[('comp.out', ('comp.in',))]['directional_fd_rev'], 0., tolerance=2e-15)
+        dJrev, dJfd = data[('comp.out', ('comp.in',))]['directional_fd_rev']
+        assert_near_equal(dJrev - dJfd, 0., tolerance=2e-15)
 
     def test_directional_vectorized_matrix_free_rev(self):
 
@@ -1473,7 +1434,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 1)
         self.assertTrue('Relative Error ([rev, fd] Dot Product Test) / Jfd : ' in content)
         self.assertTrue('Absolute Error ([rev, fd] Dot Product Test) : ' in content)
-        assert_near_equal(data[('comp.out', ('comp.in',))]['directional_fd_rev'], 0., tolerance=2e-15)
+        dJrev, dJfd =  data[('comp.out', ('comp.in',))]['directional_fd_rev']
+        assert_near_equal(dJrev - dJfd, 0., tolerance=2e-15)
 
     def test_directional_vectorized_matrix_free_rev_2in2out(self):
 
@@ -1500,8 +1462,10 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 2)
         self.assertTrue(content.count('Relative Error ([rev, fd] Dot Product Test) / Jfd :'), 2)
         self.assertTrue(content.count('Absolute Error ([rev, fd] Dot Product Test) :'), 2)
-        assert_near_equal(data[('comp.out1', ('comp.in1', 'comp.in2'))]['directional_fd_rev'], 0., tolerance=2e-15)
-        assert_near_equal(data[('comp.out2', ('comp.in1', 'comp.in2'))]['directional_fd_rev'], 0., tolerance=2e-15)
+        dJrev, dJfd = data[('comp.out1', ('comp.in1', 'comp.in2'))]['directional_fd_rev']
+        assert_near_equal(dJrev - dJfd, 0., tolerance=2e-15)
+        dJrev, dJfd = data[('comp.out2', ('comp.in1', 'comp.in2'))]['directional_fd_rev']
+        assert_near_equal(dJrev - dJfd, 0., tolerance=2e-15)
 
     def test_directional_vectorized_matrix_free_rev_2in2out_compact(self):
 
@@ -1519,8 +1483,10 @@ class TestProblemCheckTotals(unittest.TestCase):
         data = prob.check_totals(method='cs', out_stream=stream, compact_print=True, directional=True)
         content = stream.getvalue().strip()
         self.assertEqual(content.count("('comp.in1', 'comp.in2')"), 2)
-        assert_near_equal(data[('comp.out1', ('comp.in1', 'comp.in2'))]['directional_fd_rev'], 0., tolerance=2e-15)
-        assert_near_equal(data[('comp.out2', ('comp.in1', 'comp.in2'))]['directional_fd_rev'], 0., tolerance=2e-15)
+        dJrev, dJfd =  data[('comp.out1', ('comp.in1', 'comp.in2'))]['directional_fd_rev']
+        assert_near_equal(dJrev - dJfd, 0., tolerance=2e-15)
+        dJrev, dJfd =  data[('comp.out2', ('comp.in1', 'comp.in2'))]['directional_fd_rev']
+        assert_near_equal(dJrev - dJfd, 0., tolerance=2e-15)
 
     def test_directional_vectorized_matrix_free_fwd_2in2out(self):
 
@@ -1548,8 +1514,10 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 2)
         self.assertEqual(content.count('Relative Error ([rev, fd] Dot Product Test) / Jfd :'), 0)
         self.assertEqual(content.count('Absolute Error ([rev, fd] Dot Product Test) :'), 0)
-        assert_near_equal(np.linalg.norm(data[(('comp.out1', 'comp.out2'), 'comp.in1')]['directional_fd_fwd']), 0., tolerance=2e-15)
-        assert_near_equal(np.linalg.norm(data[(('comp.out1', 'comp.out2'), 'comp.in2')]['directional_fd_fwd']), 0., tolerance=2e-15)
+        dJfwd, dJfd =  data[(('comp.out1', 'comp.out2'), 'comp.in1')]['directional_fd_fwd']
+        assert_near_equal(np.linalg.norm(dJfwd - dJfd), 0., tolerance=2e-15)
+        dJfwd, dJfd =  data[(('comp.out1', 'comp.out2'), 'comp.in2')]['directional_fd_fwd']
+        assert_near_equal(np.linalg.norm(dJfwd - dJfd), 0., tolerance=2e-15)
 
     def test_directional_vectorized_matrix_free_fwd_2in2out_compact(self):
 
@@ -1567,8 +1535,10 @@ class TestProblemCheckTotals(unittest.TestCase):
         data = prob.check_totals(method='cs', out_stream=stream, compact_print=True, directional=True)
         content = stream.getvalue().strip()
         self.assertEqual(content.count("('comp.out1', 'comp.out2')"), 2)
-        assert_near_equal(np.linalg.norm(data[(('comp.out1', 'comp.out2'), 'comp.in1')]['directional_fd_fwd']), 0., tolerance=2e-15)
-        assert_near_equal(np.linalg.norm(data[(('comp.out1', 'comp.out2'), 'comp.in2')]['directional_fd_fwd']), 0., tolerance=2e-15)
+        dJfwd, dJfd =  data[(('comp.out1', 'comp.out2'), 'comp.in1')]['directional_fd_fwd']
+        assert_near_equal(np.linalg.norm(dJfwd - dJfd), 0., tolerance=2e-15)
+        dJfwd, dJfd =  data[(('comp.out1', 'comp.out2'), 'comp.in2')]['directional_fd_fwd']
+        assert_near_equal(np.linalg.norm(dJfwd - dJfd), 0., tolerance=2e-15)
 
     def test_directional_dymosish(self):
         class CollocationComp(om.ExplicitComponent):
@@ -2036,11 +2006,7 @@ class TestProblemCheckTotalsMPI(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        J = prob.check_totals(out_stream=None)
-        assert_near_equal(J['sum.y', 'sub.sub1.p1.x']['J_rev'], [[2.0]], 1.0e-6)
-        assert_near_equal(J['sum.y', 'sub.sub2.p2.x']['J_rev'], [[4.0]], 1.0e-6)
-        assert_near_equal(J['sum.y', 'sub.sub1.p1.x']['J_fd'], [[2.0]], 1.0e-6)
-        assert_near_equal(J['sum.y', 'sub.sub2.p2.x']['J_fd'], [[4.0]], 1.0e-6)
+        assert_check_totals(prob.check_totals(out_stream=None))
 
 
 class TestCheckTotalsMultipleSteps(unittest.TestCase):

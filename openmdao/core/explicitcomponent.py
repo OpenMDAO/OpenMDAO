@@ -343,7 +343,7 @@ class ExplicitComponent(Component):
                 else:  # rev
                     d_inputs.set_val(new_vals)
         else:
-            dochk = mode == 'rev' and self._problem_meta['checking'] and self.comm.size > 1
+            dochk = self._problem_meta['checking'] and mode == 'rev' and self.comm.size > 1
 
             if dochk:
                 nzdresids = self._get_dist_nz_dresids()

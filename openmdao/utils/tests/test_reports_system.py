@@ -205,7 +205,7 @@ class TestReportsSystem(unittest.TestCase):
         driver.declare_coloring()
 
         driver.opt_settings['max_iter'] = 1000
-        driver.opt_settings['print_level'] = 5
+        driver.opt_settings['print_level'] = 0
         driver.opt_settings['mu_strategy'] = 'monotone'
         driver.opt_settings['alpha_for_y'] = 'safer-min-dual-infeas'
         driver.opt_settings['tol'] = 1.0E-4

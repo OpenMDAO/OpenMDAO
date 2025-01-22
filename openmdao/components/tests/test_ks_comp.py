@@ -60,9 +60,7 @@ class TestKSFunction(unittest.TestCase):
         assert_near_equal(prob.get_val('ks.KS', indices=2), 51.0)
 
         partials = force_check_partials(prob, includes=['ks'], out_stream=None)
-
-        for (of, wrt) in partials['ks']:
-            assert_near_equal(partials['ks'][of, wrt]['abs error'][0], 0.0, 1e-6)
+        assert_check_partials(partials)
 
     def test_partials_no_compute(self):
         prob = om.Problem()

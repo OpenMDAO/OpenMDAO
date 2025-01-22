@@ -465,11 +465,57 @@ def pad_name(name, width=10, quotes=False):
         return f"{name}"
 
 
-def add_border(msg, borderstr='=', vpad=0):
+def get_max_widths(rows):
     """
-    Add border lines before and after a message.
+    Determine the maximum width of each column.
 
-    The message is assumed not to span multiple lines.
+    Parameters
+    ----------
+    rows : list of list of str
+        List of rows, where each row is a list of strings.
+
+    Returns
+    -------
+    list of int
+        List of maximum widths for each column.
+    """
+    if not rows:
+        return []
+
+    for irow, row in enumerate(rows):
+        if irow == 0:
+            widths = [len(val) for val in row]
+        else:
+            for i, val in enumerate(row):
+                widths[i] = max(widths[i], len(val))
+    return widths
+
+
+def strs2row_iter(strs, colwidths, delim=' '):
+    """
+    Yield rows of strings formatted into columns.
+
+    Parameters
+    ----------
+    strs : list of str
+        List of strings to be formatted into columns.
+    colwidths : list of int
+        List of column widths.
+    delim : str
+        Delimiter to use between columns.
+
+    Yields
+    ------
+    str
+        Formatted row of strings.
+    """
+    for row in strs:
+        yield delim.join(f"{val:<{width}}" for val, width in zip(row, colwidths))
+
+
+def add_border(msg, borderstr='=', vpad=0, above=True, below=True):
+    """
+    Add border lines before and/or after a message.
 
     Parameters
     ----------
@@ -478,18 +524,26 @@ def add_border(msg, borderstr='=', vpad=0):
     borderstr : str
         The repeating string to be used in the border.
     vpad : int
-        The number of blank lines between the border and the message (before and after).
+        The number of blank lines between the border(s) and the message.
+    above : bool
+        If True, add a border above the message.
+    below : bool
+        If True, add a border below the message.
 
     Returns
     -------
     str
-        A string containing the original message enclosed in a border.
+        A string containing the original message and border(s) before and/or after.
     """
-    border = len(msg) * borderstr
+    width = max(len(line) for line in msg.split('\n'))
+    border = width * borderstr
     # handle borderstr of more than 1 char
-    border = border[:len(msg)]
-    padding = '\n' * (vpad + 1)
-    return f"{border}{padding}{msg}{padding}{border}"
+    border = border[:width]
+    uborder = border if above else ''
+    lborder = border if below else ''
+    upadding = '\n' * (vpad + 1) if uborder else '\n' * vpad
+    lpadding = '\n' * vpad if vpad else '\n'
+    return f"{uborder}{upadding}{msg}{lpadding}{lborder}"
 
 
 def run_model(prob, ignore_exception=False):
