@@ -199,8 +199,7 @@ class DictionaryJacobian(Jacobian):
                         if fwd:
                             left_vec += subjac.dot(right_vec)
                         else:  # rev
-                            subjac = subjac.transpose()
-                            left_vec += subjac.dot(right_vec)
+                            left_vec += subjac.T.dot(right_vec)
 
                 if abs_key in self._key_owner:
                     owner = self._key_owner[abs_key]
