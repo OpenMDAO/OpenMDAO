@@ -225,17 +225,6 @@ class LinearSchur(LinearSolver):
             ################################
             #### Beg solve for subsys 2 ####
             ################################
-            # b_vec2.set_val(0.0)
-            # system._dinputs.set_val(inpu_cache)
-            # system._doutputs.set_val(outp_cache)
-            # system._dresiduals.set_val(resd_cache)
-            # subsys2._vectors["input"]["linear"].set_val(0.0)
-            # system._transfer("linear", mode, subsys2.name)
-
-            # add the rhs vector with the resultant negative part
-            # schur_rhs = subsys2_rhs - schur_rhs
-
-            # d_subsys2 = scipy.linalg.solve(schur_jac, schur_rhs)
 
             schur_rhs = subsys2_rhs - schur_rhs
             iD_schur = np.eye(n_vars, dtype=system._vectors["residual"]["linear"].asarray(copy=True).dtype) * 1e-16
@@ -254,11 +243,6 @@ class LinearSchur(LinearSolver):
             ################################
             #### Beg solve for subsys 1 ####
             ################################
-            # subsys2._doutputs.set_val(0)
-            # subsys1._dinputs.set_val(0.0)
-            # if self._rel_systems is not None and subsys1.pathname not in self._rel_systems:
-            #     return
-            # must always do the transfer on all procs even if subsys not local
 
             system._transfer("linear", mode, subsys1.name)
 
@@ -354,54 +338,23 @@ class LinearSchur(LinearSolver):
             scope_in = self._vars_union(self._scope_in, scope_in)
             subsys1._solve_linear(mode, scope_out, scope_in)
 
-            # scope_out, scope_in = system._get_matvec_scope()
-            # print("R", subsys1._dresiduals.asarray(), subsys1_rhs)
-            # system._doutputs.set_val(0.0)
-            # system._apply_linear(None, None, mode, scope_out, scope_in)
 
             subsys1._apply_linear(None, mode, scope_out, scope_in)
-            # print(system._dinputs.asarray())
-            # print(system._doutputs.asarray())
-            # subsys2_output = subsys2._vectors["output"]["linear"].asarray(copy=True)
+
             b_vec2.set_val(0.0)
             system._transfer("linear", mode, subsys2.name)
 
             # the same solve requires in the rhs too, so we save them
             schur_rhs = subsys2._vectors["output"]["linear"].asarray(copy=True)
-            # rvec.set_val(np.zeros(len(rvec)))
-            # ovec.set_val(np.zeros(len(ovec)))
-            # ivec.set_val(np.zeros(len(ivec)))
-            # # put back the vectors
-            # rvec.set_val(r_data)
-            # ovec.set_val(o_data)
-            # ivec.set_val(i_data)
-
+            
             # ################################
             # #### Beg solve for subsys 2 ####
             # ################################
-            # system._dinputs.set_val(inpu_cache)
-            # system._doutputs.set_val(outp_cache)
-            # system._dresiduals.set_val(resd_cache)
 
             b_vec2.set_val(0.0)
 
             system._transfer("linear", mode, subsys2.name)
 
-            # b_vec2 *= -1.0
-            # # b_vec += subsys1_rhs
-
-            # b_vec2 += subsys2_rhs
-
-            # b_vec.set_val(b_vec_cache1)
-            # if self._rel_systems is None and subsys2.pathname in self._rel_systems:
-
-            #     if subsys2._is_local:
-            # b_vec2.set_val(b_vec_cache2)
-
-            # b_vec2.set_val(0.0)
-            # system._transfer("linear", mode, subsys2.name)
-            # b_vec2 *= -1.0
-            # b_vec2 += subsys2_rhs
             schur_rhs = subsys2_rhs - schur_rhs
             iD_schur = np.eye(n_vars, dtype=system._vectors["residual"]["linear"].asarray(copy=True).dtype) * 1e-16
             schur_jac = schur_jac + iD_schur
@@ -416,28 +369,9 @@ class LinearSchur(LinearSolver):
             for ii, var in enumerate(resd_to_solve):
                 system._dresiduals[f"{subsys2.name}.{var}"] = d_subsys2[ii]
 
-            # scope_out, scope_in = system._get_matvec_scope()
-            # scope_out = self._vars_union(self._scope_out, scope_out)
-            # scope_in = self._vars_union(self._scope_in, scope_in)
-            # subsys1._dresiduals.set_val(0.0)
-            # system._apply_linear(None, None, mode, scope_out, scope_in)
-
-            # if subsys2._iter_call_apply_linear():
-            # b_vec2.set_val(0.0)
-
-            # print(system._doutputs.asarray())
-            # print(system._dresiduals.asarray())
-            # if subsys2._iter_call_apply_linear():
+           
             subsys2._apply_linear(None, mode, scope_out, scope_in)
-            # else:
-            #     b_vec2.set_val(0.0)
-            # print(subsys2._dinputs.asarray())
-            # print(subsys2._doutputs.asarray())
-            # print(system._dresiduals.asarray())
-            # else:
-            #     b_vec2.set_val(0.0)
-            # else:
-            #     system._transfer('linear', mode, subsys2.name)
+           
             ################################
             #### End solve for subsys 2 ####
             ################################
