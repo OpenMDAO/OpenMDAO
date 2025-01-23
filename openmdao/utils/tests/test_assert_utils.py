@@ -82,7 +82,7 @@ J_fd - J_fwd:
 [[-36.]]
 """.strip()
 
-        if np.__version__.split()[0] > '1':
+        if np.__version__.split('.')[0] > '1':
             expected = expected.replace('difference:', 'difference among violations:')
 
         try:
@@ -264,7 +264,7 @@ J_fd - J_fwd:
 [[nan]]
 """.strip()
 
-        if np.__version__.split()[0] > '1':
+        if np.__version__.split('.')[0] > '1':
             expected = expected.replace('difference:', 'difference among violations:')
 
         try:
