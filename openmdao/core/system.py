@@ -28,7 +28,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path, has_match
 from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
 from openmdao.utils.variable_table import write_var_table, NA
-from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len, get_errors_and_mags
+from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len, get_errors
 from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
@@ -7384,11 +7384,11 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
                 mhatdotm, dhatdotd = derivative_info['directional_fwd_rev']
                 (abs_errs.fwd_rev, abs_mags.reverse, abs_mags.forward,
                  rel_errs.fwd_rev, rel_mags.reverse, rel_mags.forward, didx) = \
-                    get_errors_and_mags(mhatdotm, dhatdotd)
+                    get_errors(mhatdotm, dhatdotd)
         elif not totals:
             (abs_errs.fwd_rev, abs_mags.forward, abs_mags.reverse,
              rel_errs.fwd_rev, rel_mags.forward, rel_mags.reverse, didx) = \
-                get_errors_and_mags(Jforward, Jreverse)
+                get_errors(Jforward, Jreverse)
 
     for i, fd in enumerate(fdinfo):
         step = steps[i]
@@ -7399,17 +7399,17 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
                     mhatdotm, dhatdotd = derivative_info['directional_fd_fwd'][i]
                     (abs_errs.forward, abs_mags.forward, abs_mags.fd,
                      rel_errs.forward, rel_mags.forward, rel_mags.fd, didx) = \
-                        get_errors_and_mags(mhatdotm, dhatdotd)
+                        get_errors(mhatdotm, dhatdotd)
                 else:
                     (abs_errs.forward, abs_mags.fd, abs_mags.forward,
                      rel_errs.forward, rel_mags.fd, rel_mags.forward, didx) = \
-                        get_errors_and_mags(fd, Jforward)
+                        get_errors(fd, Jforward)
 
             if Jreverse is not None:
                 mhatdotm, dhatdotd = derivative_info['directional_fd_rev'][i]
                 (abs_errs.reverse, abs_mags.fd, abs_mags.reverse,
                  rel_errs.reverse, rel_mags.fd, rel_mags.reverse, didx) = \
-                    get_errors_and_mags(mhatdotm, dhatdotd)
+                    get_errors(mhatdotm, dhatdotd)
                 if not totals:
                     rel_mags.reverse = None
                     abs_mags.reverse = None
@@ -7417,17 +7417,17 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
             if Jforward is not None:
                 (abs_errs.forward, abs_mags.fd, abs_mags.forward,
                  rel_errs.forward, rel_mags.fd, rel_mags.forward, didx) = \
-                    get_errors_and_mags(fd, Jforward)
+                    get_errors(fd, Jforward)
 
             if Jreverse is not None:
                 (abs_errs.reverse, abs_mags.fd, abs_mags.reverse,
                  rel_errs.reverse, rel_mags.fd, rel_mags.reverse, didx) = \
-                    get_errors_and_mags(fd, Jreverse)
+                    get_errors(fd, Jreverse)
 
         if fd is not None and Jforward is None and Jreverse is None:
             (abs_errs.reverse, abs_mags.fd, abs_mags.reverse,
              rel_errs.reverse, rel_mags.fd, rel_mags.reverse, didx) = \
-                get_errors_and_mags(fd, np.zeros_like(fd))
+                get_errors(fd, np.zeros_like(fd))
 
         derivative_info['abs error'].append(abs_errs)
         derivative_info['rel error'].append(rel_errs)
