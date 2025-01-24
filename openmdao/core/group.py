@@ -28,7 +28,7 @@ from openmdao.utils.array_utils import array_connection_compatible, _flatten_src
     shape_to_len, ValueRepeater
 from openmdao.utils.general_utils import common_subpath, \
     convert_src_inds, shape2tuple, get_connection_owner, ensure_compatible, \
-    meta2src_iter, get_rev_conns
+    meta2src_iter, get_rev_conns, is_undefined
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
 from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo
@@ -315,7 +315,7 @@ class Group(System):
             Assumed shape of any connected source or higher level promoted input.
         """
         meta = {'prom': name, 'auto': False}
-        if val is _UNDEFINED:
+        if is_undefined(val):
             src_shape = shape2tuple(src_shape)
         else:
             if src_shape is not None:
@@ -1886,7 +1886,7 @@ class Group(System):
                     if submeta['auto']:
                         continue
                     if key in submeta:
-                        if fullmeta[key] is _UNDEFINED:
+                        if is_undefined(fullmeta[key]):
                             origin = submeta['path']
                             origin_prom = submeta['prom']
                             val = fullmeta[key] = submeta[key]
@@ -4700,10 +4700,10 @@ class Group(System):
                     auto_ivc.add_discrete_output(loc_out_name, val=val)
 
                 src = conns[abs_in]
-                if src in auto_ivc.auto2tgt:
-                    auto_ivc.auto2tgt[src].append(abs_in)
+                if src in auto2tgt:
+                    auto2tgt[src].append(abs_in)
                 else:
-                    auto_ivc.auto2tgt[src] = [abs_in]
+                    auto2tgt[src] = [abs_in]
 
         if not prom2auto:
             return auto_ivc
@@ -4731,10 +4731,16 @@ class Group(System):
         p2abs.update(old)
         self._var_allprocs_prom2abs_list[io] = p2abs
 
-        # auto_ivc never promotes anything
-        self._var_abs2prom[io].update({n: n for n in auto_ivc._var_abs2prom[io]})
-        self._var_allprocs_abs2prom[io].update({n: n for n in
-                                                auto_ivc._var_allprocs_abs2prom[io]})
+        # set up auto_ivc abs2prom such that promoted name of the auto_ivc output is the same
+        # as the promoted name of the input that it is connected to
+        abs2prom = self._var_abs2prom[io]
+        abs2prom_in = self._var_allprocs_abs2prom['input']
+        for n in auto_ivc._var_abs2prom[io]:
+            abs2prom[n] = abs2prom_in[auto2tgt[n][0]]
+
+        all_abs2prom = self._var_allprocs_abs2prom[io]
+        for n in auto_ivc._var_allprocs_abs2prom[io]:
+            all_abs2prom[n] = abs2prom_in[auto2tgt[n][0]]
 
         self._var_discrete[io].update({'_auto_ivc.' + k: v for k, v in
                                        auto_ivc._var_discrete[io].items()})

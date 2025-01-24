@@ -299,6 +299,86 @@ def force_check_partials(prob, *args, **kwargs):
     return prob.check_partials(*args, **kwargs)
 
 
+def _fix_comp_check_data(data):
+    """
+    Modify the data dict to match the problem format if there is only one fd step size.
+
+    Parameters
+    ----------
+    data : dict
+        Dictionary containing derivative information keyed by subjac.
+    """
+    names = ['J_fd', 'abs error', 'rel error', 'magnitude', 'directional_fd_fwd',
+             'directional_fd_rev']
+
+    for name in names:
+        if name in data:
+            data[name] = data[name][0]
+    if 'steps' in data:
+        del data['steps']
+
+
+def compare_prob_vs_comp_check_partials(probdata, compdata, comp):
+    """
+    Compare the check_partials output for a Problem and a Component.
+
+    Parameters
+    ----------
+    probdata : dict
+        Problem check_partials data.
+    compdata : dict
+        Component check_partials data.
+    comp : Component
+        The component being checked.
+
+    Returns
+    -------
+    dict
+        Comparison data.
+    """
+    from openmdao.utils.assert_utils import assert_near_equal
+
+    try:
+        probcompdata = probdata[comp.pathname]
+    except KeyError:
+        raise KeyError(f"Component '{comp.pathname}' not found in Problem check_partials data.")
+
+    compdata = compdata[comp.pathname]
+
+    # check that the keys are the same
+    assert set(probcompdata.keys()) == set(compdata.keys()), \
+        f"Subjac keys don't match for {comp.pathname}"
+
+    # check that the values are the same
+    for key, probval in probcompdata.items():
+        compval = compdata[key]
+
+        if 'steps' not in probval:
+            # if there is only one FD step, 'steps' gets removed from problem data
+            compval = compval.copy()
+            _fix_comp_check_data(compval)
+
+        # check that the keys are the same
+        assert set(probval.keys()) == set(compval.keys()), \
+            f"For subjac key '{key}', inner dict keys don't match: {sorted(probval.keys())} " \
+            f"!= {sorted(compval.keys())}."
+
+        for key2 in probval:
+            probval2 = probval[key2]
+            compval2 = compval[key2]
+
+            if key2 == 'J_fd' or key2 == 'J_fwd':
+                assert_near_equal(probval2, compval2, 1e-6, 1e-6)
+            else:
+                for i in range(3):
+                    p = probval2[i]
+                    c = compval2[i]
+                    if p is None and c is None:
+                        continue
+                    assert_near_equal(p, c, 1e-6, 1e-6), \
+                        f"For key '{key}/{key2}', {probval2} != {compval2}."
+
+
 class _ModelViewerDataTreeEncoder(json.JSONEncoder):
     """Special JSON encoder for writing model viewer data."""
 

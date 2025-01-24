@@ -1,6 +1,7 @@
 """Component unittests."""
-import numpy as np
 import unittest
+
+import numpy as np
 
 from openmdao.api import Problem, ExplicitComponent, IndepVarComp
 from openmdao.core.component import Component
@@ -302,7 +303,7 @@ class TestExplicitComponent(unittest.TestCase):
 
         with assert_warning(OMDeprecationWarning, msg):
             prob.setup()
-    
+
     def test_setup_residuals_error(self):
         class Comp(ExplicitComponent):
             def setup(self):
@@ -324,7 +325,7 @@ class TestExplicitComponent(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as e:
             prob.final_setup()
-        
+
         self.assertEqual(str(e.exception), msg)
 
     def test_add_residual_error(self):
@@ -342,7 +343,7 @@ class TestExplicitComponent(unittest.TestCase):
 
         with self.assertRaises(AttributeError) as e:
             prob.setup()
-        
+
         self.assertEqual(str(e.exception), msg)
 
 class TestImplicitComponent(unittest.TestCase):

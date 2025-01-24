@@ -804,11 +804,7 @@ class TestDriver(unittest.TestCase):
         prob.run_model()
 
         totals=prob.check_totals(out_stream=None)
-
-        assert_near_equal(totals['sub.f_xy', 'sub.x']['J_fwd'], [[1.44e2]], 1e-5)
-        assert_near_equal(totals['sub.f_xy', 'sub.y']['J_fwd'], [[1.58e2]], 1e-5)
-        assert_near_equal(totals['sub.f_xy', 'sub.x']['J_fd'], [[1.44e2]], 1e-5)
-        assert_near_equal(totals['sub.f_xy', 'sub.y']['J_fd'], [[1.58e2]], 1e-5)
+        assert_check_totals(totals)
 
     def test_get_vars_to_record(self):
         recorder = om.SqliteRecorder("cases.sql")

@@ -25,6 +25,9 @@ class TestQuadImplicit(unittest.TestCase):
 
         p.setup()
 
+        # set starting value to avoid negative sqrt
+        p['quad.a'] = -1.
+
         check = p.check_partials(out_stream=None)
 
         for out_name, of in check.items():

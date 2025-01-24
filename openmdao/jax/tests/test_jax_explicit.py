@@ -185,7 +185,7 @@ class TestJaxComp(unittest.TestCase):
         p.run_model()
 
         assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
-        p.check_totals(of=['comp.z'], wrt=['comp.x', 'comp.y'], method='cs', show_only_incorrect=True)
+        assert_check_totals(p.check_totals(of=['comp.z'], wrt=['comp.x', 'comp.y'], method='cs', show_only_incorrect=True))
         assert_check_partials(p.check_partials(method='cs', show_only_incorrect=True))
 
     @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]), name_func=parameterized_name)

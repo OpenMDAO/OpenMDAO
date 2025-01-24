@@ -559,6 +559,35 @@ class TestCheckConfig(unittest.TestCase):
         testlogger.find_in('warning', msg4)
         testlogger.find_in('warning', msg5)
 
+    def test_sparsity(self):
+        p = om.Problem()
+        root = p.model
+
+        root.add_subsystem("C1", om.ExecComp("y = 2.*x", shape=10))
+        root.add_subsystem("C2", om.ExecComp("y = 3.*x", shape=10, has_diag_partials=True))
+
+        root.connect("C1.y", "C2.x")
+
+        testlogger = TestLogger()
+        p.setup(check=['sparsity'], logger=testlogger)
+        p.run_model()
+        full = ''.join(testlogger.get('warning'))
+        self.assertTrue("'C1' <class ExecComp>:" in full)
+        self.assertTrue("(D)eclared sparsity pattern != (c)omputed sparsity pattern for sub-jacobian (y, x) with shape (10, 10) and 10.00% nonzeros:" in full)
+        arraystr = """
+C.........  0
+.C........  1
+..C.......  2
+...C......  3
+....C.....  4
+.....C....  5
+......C...  6
+.......C..  7
+........C.  8
+.........C  9
+""".strip()
+        self.assertTrue(arraystr in full)
+        self.assertFalse("'C2'" in full)
 
 @use_tempdirs
 class TestRecorderCheckConfig(unittest.TestCase):

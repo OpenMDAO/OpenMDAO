@@ -11,6 +11,7 @@ import pickle
 from openmdao.core.group import Group
 from openmdao.core.component import Component
 from openmdao.core.implicitcomponent import ImplicitComponent
+from openmdao.utils.array_utils import array_hash
 from openmdao.utils.graph_utils import get_sccs_topo
 from openmdao.utils.logger_utils import get_logger, TestLogger
 from openmdao.utils.mpi import MPI
@@ -290,19 +291,17 @@ def _check_hanging_inputs(problem, logger):
     if isinstance(model, Component):
         return
 
-    conns = model._conn_global_abs_in2out
-    abs2prom = model._var_allprocs_abs2prom['input']
-    desvar = problem.driver._designvars
+    abs2prom_in = model._var_allprocs_abs2prom['input']
+    desvars = problem.driver._designvars
     unconns = []
-    for abs_tgt, src in conns.items():
-        if src.startswith('_auto_ivc.'):
-            prom_tgt = abs2prom[abs_tgt]
+    for tgts in model._auto_ivc.auto2tgt.values():
+        prom_tgt = abs2prom_in[tgts[0]]
+        # Ignore inputs that are declared as design vars.
+        if desvars and prom_tgt in desvars:
+            continue
 
-            # Ignore inputs that are declared as design vars.
-            if desvar and prom_tgt in desvar:
-                continue
-
-            unconns.append((prom_tgt, abs_tgt))
+        for tgt in tgts:
+            unconns.append((prom_tgt, tgt))
 
     if unconns:
         msg = ["The following inputs are connected to Auto IVC output variables:\n"]
@@ -639,6 +638,31 @@ def _check_explicitly_connected_promoted_inputs(problem, logger):
                            "promoted up from %s." % (inp, man_group, man_prom, s))
 
 
+def _check_bad_sparsity(problem, logger):
+    """
+    Check for any declared sparsity patterns that don't match the computed sparsity pattern.
+
+    Parameters
+    ----------
+    problem : <Problem>
+        The problem being checked.
+    logger : object
+        The object that manages logging output.
+    """
+    seen = set()
+    for comp in problem.model.system_iter(include_self=True, recurse=True, typ=Component):
+        plen = len(comp.pathname) + 1
+        for of, wrt, computed_rows, computed_cols, rows, cols, _, _, wrn in \
+                comp.check_sparsity(out_stream=None):
+            # don't repeat same class over if diffs are the same
+            chk = (type(comp).__name__, of[plen:], wrt[plen:],
+                   array_hash(np.asarray(rows)), array_hash(np.asarray(cols)),
+                   array_hash(np.asarray(computed_rows)), array_hash(np.asarray(computed_cols)))
+            if chk not in seen:
+                seen.add(chk)
+                logger.warning(wrn)
+
+
 # Dict of all checks by name, mapped to the corresponding function that performs the check
 # Each function must be of the form  f(problem, logger).
 _default_checks = {
@@ -658,6 +682,7 @@ _all_checks.update({
     'unconnected_inputs': _check_hanging_inputs,
     'promotions': _check_explicitly_connected_promoted_inputs,
     'all_unserializable_options': _check_all_unserializable_options,
+    'sparsity': _check_bad_sparsity,
 })
 
 _all_non_redundant_checks = _all_checks.copy()

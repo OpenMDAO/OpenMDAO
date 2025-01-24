@@ -94,7 +94,10 @@ class MixedDistrib2(om.ExplicitComponent):  # for double diamond case
 
         f_Id = Id**2 - 2.0*Id + 4.0
         f_Is = Is ** 0.5
-        g_Is = Is**2 + 3.0*Is - 5.0
+        # got rid of -5 here because it resulted in negative sqrt later on.
+        # this wasn't detected earlier due to a bug in assert_check_totals that
+        # didn't handle nans correctly.
+        g_Is = Is**2 + 3.0*Is
         g_Id = Id ** 0.5
 
         # Distributed output
@@ -614,17 +617,8 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        J = prob.check_totals(method='fd', out_stream=None)
-        assert_near_equal(J['f_xy', 'x']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['f_xy', 'y']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['f_sum', 'x']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['f_sum', 'y']['abs error'].forward, 0.0, 1e-5)
-
-        J = prob.check_totals(method='cs', out_stream=None)
-        assert_near_equal(J['f_xy', 'x']['abs error'].forward, 0.0, 1e-14)
-        assert_near_equal(J['f_xy', 'y']['abs error'].forward, 0.0, 1e-14)
-        assert_near_equal(J['f_sum', 'x']['abs error'].forward, 0.0, 1e-14)
-        assert_near_equal(J['f_sum', 'y']['abs error'].forward, 0.0, 1e-14)
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None))
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
 
         # rev mode
 
@@ -640,17 +634,8 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        J = prob.check_totals(method='fd', show_only_incorrect=True)
-        assert_near_equal(J['f_xy', 'x']['abs error'].reverse, 0.0, 1e-5)
-        assert_near_equal(J['f_xy', 'y']['abs error'].reverse, 0.0, 1e-5)
-        assert_near_equal(J['f_sum', 'x']['abs error'].reverse, 0.0, 1e-5)
-        assert_near_equal(J['f_sum', 'y']['abs error'].reverse, 0.0, 1e-5)
-
-        J = prob.check_totals(method='cs', show_only_incorrect=True)
-        assert_near_equal(J['f_xy', 'x']['abs error'].reverse, 0.0, 1e-14)
-        assert_near_equal(J['f_xy', 'y']['abs error'].reverse, 0.0, 1e-14)
-        assert_near_equal(J['f_sum', 'x']['abs error'].reverse, 0.0, 1e-14)
-        assert_near_equal(J['f_sum', 'y']['abs error'].reverse, 0.0, 1e-14)
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None))
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
 
     def test_distrib_voi_sparse(self):
         size = 7
@@ -689,17 +674,8 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        J = prob.check_totals(method='fd', show_only_incorrect=True)
-        assert_near_equal(J['f_xy', 'x']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['f_xy', 'y']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['f_sum', 'x']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['f_sum', 'y']['abs error'].forward, 0.0, 1e-5)
-
-        J = prob.check_totals(method='cs', show_only_incorrect=True)
-        assert_near_equal(J['f_xy', 'x']['abs error'].forward, 0.0, 1e-14)
-        assert_near_equal(J['f_xy', 'y']['abs error'].forward, 0.0, 1e-14)
-        assert_near_equal(J['f_sum', 'x']['abs error'].forward, 0.0, 1e-14)
-        assert_near_equal(J['f_sum', 'y']['abs error'].forward, 0.0, 1e-14)
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None))
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
 
         # rev mode
 
@@ -715,17 +691,8 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        J = prob.check_totals(method='fd', show_only_incorrect=True)
-        assert_near_equal(J['f_xy', 'x']['abs error'].reverse, 0.0, 1e-5)
-        assert_near_equal(J['f_xy', 'y']['abs error'].reverse, 0.0, 1e-5)
-        assert_near_equal(J['f_sum', 'x']['abs error'].reverse, 0.0, 1e-5)
-        assert_near_equal(J['f_sum', 'y']['abs error'].reverse, 0.0, 1e-5)
-
-        J = prob.check_totals(method='cs', show_only_incorrect=True)
-        assert_near_equal(J['f_xy', 'x']['abs error'].reverse, 0.0, 1e-14)
-        assert_near_equal(J['f_xy', 'y']['abs error'].reverse, 0.0, 1e-14)
-        assert_near_equal(J['f_sum', 'x']['abs error'].reverse, 0.0, 1e-14)
-        assert_near_equal(J['f_sum', 'y']['abs error'].reverse, 0.0, 1e-14)
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None))
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
 
     def test_distrib_voi_fd(self):
         size = 7
@@ -764,11 +731,7 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        J = prob.check_totals(out_stream=None, method='cs')
-        assert_near_equal(J['f_xy', 'x']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['f_xy', 'y']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['f_sum', 'x']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['f_sum', 'y']['abs error'].forward, 0.0, 1e-5)
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
 
         # rev mode
 
@@ -784,11 +747,7 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        J = prob.check_totals(method='cs', show_only_incorrect=True)
-        assert_near_equal(J['f_xy', 'x']['abs error'].reverse, 0.0, 1e-5)
-        assert_near_equal(J['f_xy', 'y']['abs error'].reverse, 0.0, 1e-5)
-        assert_near_equal(J['f_sum', 'x']['abs error'].reverse, 0.0, 1e-5)
-        assert_near_equal(J['f_sum', 'y']['abs error'].reverse, 0.0, 1e-5)
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
 
     def _setup_distrib_voi_group_fd(self, mode, size=7):
         # Only supports groups where the inputs to the distributed component whose inputs are
@@ -1317,7 +1276,7 @@ class MPITests2(unittest.TestCase):
         partials = prob.check_partials(show_only_incorrect=True, method='cs')
         assert_check_partials(partials)
 
-    def test_distrib_cascade_rev(self):
+    def build_cascade_problem(self, mode):
         # Tests the derivatives on a complicated model that is the distributed equivalent
         # of a double diamond.
         prob = om.Problem()
@@ -1352,7 +1311,7 @@ class MPITests2(unittest.TestCase):
         model.add_constraint('D4.out_dist', lower=0.0)
         model.add_constraint('D4.out_nd', lower=0.0)
 
-        prob.setup(force_alloc_complex=True, mode='rev')
+        prob.setup(force_alloc_complex=True, mode=mode)
 
         # Set initial values of distributed variable.
         x_dist_init = 3.0 + np.arange(size)[offsets[rank]:offsets[rank] + sizes[rank]]
@@ -1365,7 +1324,15 @@ class MPITests2(unittest.TestCase):
         prob.set_val('indep.x_nd', x_nd_init)
 
         prob.run_model()
+        return prob
 
+    def test_distrib_cascade_rev(self):
+        prob = self.build_cascade_problem(mode='rev')
+        totals = prob.check_totals(show_only_incorrect=True, method='cs')
+        assert_check_totals(totals, rtol=1e-12)
+
+    def test_distrib_cascade_fwd(self):
+        prob = self.build_cascade_problem(mode='fwd')
         totals = prob.check_totals(show_only_incorrect=True, method='cs')
         assert_check_totals(totals, rtol=1e-12)
 
@@ -2152,8 +2119,7 @@ class DeclarePartialsWithoutRowCol(unittest.TestCase):
         prob.run_model()
         assert_near_equal(prob['execcomp.z'], np.ones((size,))*-38.4450, 1e-9)
 
-        data = prob.check_totals(out_stream=None)
-        assert_near_equal(data[('execcomp.z', 'x')]['abs error'].forward, 0.0, 1e-6)
+        assert_check_totals(prob.check_totals(out_stream=None))
 
 
 class TestBugs(unittest.TestCase):
@@ -2183,8 +2149,7 @@ class TestBugs(unittest.TestCase):
 
         prob.setup()
         prob.run_model()
-        totals = prob.check_totals(wrt='dvs.state', show_only_incorrect=True)
-        assert_near_equal(totals['solver.func', 'dvs.state']['abs error'].reverse, 0.0, tolerance=1e-7)
+        assert_check_totals(prob.check_totals(wrt='dvs.state', show_only_incorrect=True))
 
 
 def f_out_dist(Id, Is):
@@ -2451,24 +2416,6 @@ class TestDistribBugs(unittest.TestCase):
 
         return prob
 
-    def _compare_totals(self, totals):
-        fails = []
-        for key, val in totals.items():
-            Jname = 'J_fwd' if 'J_fwd' in val else 'J_rev'
-            idx = 0 if 'J_fwd' in val else 1
-            try:
-                val[Jname]  # analytic
-                val['J_fd']  # FD
-            except Exception as err:
-                self.fail(f"For key {key}: {err}")
-            try:
-                assert_near_equal(val['rel error'][idx], 0.0, 1e-6)
-            except ValueError as err:
-                fails.append((key, val, err, Jname))
-        if fails:
-            msg = '\n\n'.join([f"Totals differ for {key}:\nAnalytic:\n{val[Jname]}\nFD:\n{val['J_fd']}\n{err}" for key, val, err, Jname in fails])
-            self.fail(msg)
-
     def test_get_val(self):
         prob = self.get_problem(Distrib_Derivs_Matfree, stacked=False)
         indep = prob.model.indep
@@ -2494,19 +2441,19 @@ class TestDistribBugs(unittest.TestCase):
         prob = self.get_problem(Distrib_Derivs_Matfree, mode='fwd')
         totals = prob.check_totals(method='cs', out_stream=None, of=['D1.out_nd', 'D1.out_dist'],
                                         wrt=['indep.x_serial', 'indep.x_dist'])
-        self._compare_totals(totals)
+        assert_check_totals(totals)
 
     def test_check_totals_prod_fwd(self):
         prob = self.get_problem(Distrib_Derivs_Prod_Matfree, mode='fwd')
         totals = prob.check_totals(method='cs', out_stream=None, of=['D1.out_nd', 'D1.out_dist'],
                                         wrt=['indep.x_serial', 'indep.x_dist'])
-        self._compare_totals(totals)
+        assert_check_totals(totals)
 
     def test_check_totals_rev(self):
         prob = self.get_problem(Distrib_Derivs_Matfree, mode='rev')
         totals = prob.check_totals(method='cs', out_stream=None, of=['D1.out_nd', 'D1.out_dist'],
                                                    wrt=['indep.x_serial', 'indep.x_dist'])
-        self._compare_totals(totals)
+        assert_check_totals(totals)
 
     def test_check_totals_rev_old(self):
         prob = self.get_problem(Distrib_Derivs_Matfree_Old, mode='rev')
@@ -2532,31 +2479,31 @@ class TestDistribBugs(unittest.TestCase):
         prob = self.get_problem(Distrib_Derivs_Prod_Matfree, mode='rev')
         totals = prob.check_totals(method='cs', out_stream=None, of=['D1.out_nd', 'D1.out_dist'],
                                                    wrt=['indep.x_serial', 'indep.x_dist'])
-        self._compare_totals(totals)
+        assert_check_totals(totals)
 
     def test_check_totals_fwd_stacked(self):
         prob = self.get_problem(Distrib_Derivs_Matfree, mode='fwd', stacked=True)
         totals = prob.check_totals(method='cs', out_stream=None, of=['D2.out_nd', 'D2.out_dist'],
                                         wrt=['indep.x_serial', 'indep.x_dist'])
-        self._compare_totals(totals)
+        assert_check_totals(totals)
 
     def test_check_totals_prod_fwd_stacked(self):
         prob = self.get_problem(Distrib_Derivs_Prod_Matfree, mode='fwd', stacked=True)
         totals = prob.check_totals(method='cs', out_stream=None, of=['D2.out_nd', 'D2.out_dist'],
                                         wrt=['indep.x_serial', 'indep.x_dist'])
-        self._compare_totals(totals)
+        assert_check_totals(totals)
 
     def test_check_totals_rev_stacked(self):
         prob = self.get_problem(Distrib_Derivs_Matfree, mode='rev', stacked=True)
         totals = prob.check_totals(method='cs', out_stream=None, of=['D2.out_nd', 'D2.out_dist'],
                                                    wrt=['indep.x_serial', 'indep.x_dist'])
-        self._compare_totals(totals)
+        assert_check_totals(totals)
 
     def test_check_totals_prod_rev_stacked(self):
         prob = self.get_problem(Distrib_Derivs_Prod_Matfree, mode='rev', stacked=True)
         totals = prob.check_totals(method='cs', out_stream=None, of=['D2.out_nd', 'D2.out_dist'],
                                                    wrt=['indep.x_serial', 'indep.x_dist'])
-        self._compare_totals(totals)
+        assert_check_totals(totals)
 
     def test_check_partials_cs(self):
         prob = self.get_problem(Distrib_Derivs_Matfree)
@@ -2623,7 +2570,7 @@ class TestDistribBugs(unittest.TestCase):
         assert_near_equal(con['a2'], 24.96)
 
         totals = prob.check_totals(method='cs', out_stream=None)
-        self._compare_totals(totals)
+        assert_check_totals(totals)
 
     def test_dist_desvar_dist_input(self):
         class SimpleSum(om.ExplicitComponent):
