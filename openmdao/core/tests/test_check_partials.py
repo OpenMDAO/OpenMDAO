@@ -345,15 +345,15 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         abs_error = data['comp']['y', 'x1']['abs error']
         rel_error = data['comp']['y', 'x1']['rel error']
-        self.assertAlmostEqual(abs_error.fwd, 0.)
-        self.assertAlmostEqual(rel_error.fwd, 0.)
+        self.assertAlmostEqual(abs_error.forward, 0.)
+        self.assertAlmostEqual(rel_error.forward, 0.)
         self.assertAlmostEqual(np.linalg.norm(data['comp']['y', 'x1']['J_fd'] - 3.), 0.,
                                delta=1e-6)
 
         abs_error = data['comp']['y', 'x2']['abs error']
         rel_error = data['comp']['y', 'x2']['rel error']
-        self.assertAlmostEqual(abs_error.fwd, 4.)
-        self.assertAlmostEqual(rel_error.fwd, 1.)
+        self.assertAlmostEqual(abs_error.forward, 4.)
+        self.assertAlmostEqual(rel_error.forward, 1.)
         self.assertAlmostEqual(np.linalg.norm(data['comp']['y', 'x2']['J_fd'] - 4.), 0.,
                                delta=1e-6)
 
@@ -713,7 +713,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         # This will fail unless you set the check_step.
         x_error = data['comp']['f_xy', 'x']['rel error']
-        self.assertLess(x_error.fwd, 1e-5)
+        self.assertLess(x_error.forward, 1e-5)
 
     def test_set_step_global(self):
         prob = om.Problem()
@@ -734,7 +734,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         # This will fail unless you set the global step.
         x_error = data['comp']['f_xy', 'x']['rel error']
-        self.assertLess(x_error.fwd, 1e-5)
+        self.assertLess(x_error.forward, 1e-5)
 
     def test_complex_step_not_allocated(self):
         prob = om.Problem()
@@ -829,7 +829,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         # This will fail unless you set the check_step.
         x_error = data['comp']['f_xy', 'x']['rel error']
-        self.assertLess(x_error.fwd, 1e-3)
+        self.assertLess(x_error.forward, 1e-3)
 
     def test_set_form_global(self):
         prob = om.Problem()
@@ -850,7 +850,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         # This will fail unless you set the check_step.
         x_error = data['comp']['f_xy', 'x']['rel error']
-        self.assertLess(x_error.fwd, 1e-3)
+        self.assertLess(x_error.forward, 1e-3)
 
     def test_set_step_calc_on_comp(self):
         prob = om.Problem()
@@ -873,7 +873,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         # This will fail unless you set the check_step.
         x_error = data['comp']['f_xy', 'x']['rel error']
-        self.assertLess(x_error.fwd, 3e-3)
+        self.assertLess(x_error.forward, 3e-3)
 
     def test_set_step_calc_global(self):
         prob = om.Problem()
@@ -894,7 +894,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         # This will fail unless you set the global step.
         x_error = data['comp']['f_xy', 'x']['rel error']
-        self.assertLess(x_error.fwd, 3e-3)
+        self.assertLess(x_error.forward, 3e-3)
 
     def test_set_check_option_precedence(self):
         # Test that we omit derivs declared with dependent=False
@@ -2365,11 +2365,11 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         x1_error = data['comp']['y', 'x1']['abs error']
 
-        assert_near_equal(x1_error.fwd, 1., 1e-8)
+        assert_near_equal(x1_error.forward, 1., 1e-8)
 
         x2_error = data['comp']['y', 'x2']['rel error']
 
-        assert_near_equal(x2_error.fwd, 9., 1e-8)
+        assert_near_equal(x2_error.forward, 9., 1e-8)
 
     def test_feature_check_partials_suppress(self):
 

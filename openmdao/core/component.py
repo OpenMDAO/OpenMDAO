@@ -16,11 +16,11 @@ from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_M
     global_meta_names, collect_errors, _iter_derivs
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM, _SetupStatus
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian, _CheckingJacobian
-from openmdao.utils.array_utils import shape_to_len, submat_sparsity_iter, sparsity_diff_viz
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_name2abs_name, \
     rel_key2abs_key
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
+from openmdao.utils.array_utils import shape_to_len, submat_sparsity_iter, sparsity_diff_viz
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     find_matches, make_set, inconsistent_across_procs, LocalRangeIterable
 from openmdao.utils.indexer import Indexer, indexer
@@ -2145,7 +2145,7 @@ class Component(System):
                        minimum_step=1e-12, force_dense=True, show_only_incorrect=False,
                        show_worst=True):
         """
-        Check partial derivatives comprehensively for all components in your model.
+        Check partial derivatives comprehensively for this component.
 
         Parameters
         ----------

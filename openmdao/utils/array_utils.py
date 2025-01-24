@@ -1106,26 +1106,6 @@ def safe_norm(arr):
     return 0. if arr is None or arr.size == 0 else np.linalg.norm(arr)
 
 
-def flat_to_2d_idx(flat_idx, shape):
-    """
-    Convert a flat index into a 2D index.
-
-    Parameters
-    ----------
-    flat_idx : int
-        Flat index to be converted.
-    shape : tuple
-        Shape of the 2D array.
-
-    Returns
-    -------
-    tuple
-        Index into a 2D array.
-    """
-    nrows, ncols = shape
-    return flat_idx // nrows, flat_idx % ncols
-
-
 def get_errors_and_mags(x, y):
     """
     Compute the max absolute and relative errors and the magnitudes of the difference in x and y.
