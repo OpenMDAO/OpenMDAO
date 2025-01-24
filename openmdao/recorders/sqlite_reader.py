@@ -191,12 +191,22 @@ class SqliteCaseReader(BaseCaseReader):
 
         filename = str(filename)
 
+        
+        
+        self._filename_for_connect = filename
+        
+        
+        
+        
+        
         with sqlite3.connect(filename) as con:
             con.row_factory = sqlite3.Row
             cur = con.cursor()
 
             # get the global iterations table, and save it as an attribute
             self._global_iterations = self._get_global_iterations(cur)
+            
+            # print(f"when reading the file {len(self._global_iterations)=}")
 
             # If separate metadata not specified, check the current db
             # to make sure it's there
@@ -246,6 +256,7 @@ class SqliteCaseReader(BaseCaseReader):
         self._driver_cases = DriverCases(filename, self._format_version, self._global_iterations,
                                          self._prom2abs, self._abs2prom, self._abs2meta,
                                          self._conns, self._auto_ivc_map, var_info)
+        # print(f"when reading the file {self._driver_cases.count()=}")
         self._system_cases = SystemCases(filename, self._format_version, self._global_iterations,
                                          self._prom2abs, self._abs2prom, self._abs2meta,
                                          self._conns, self._auto_ivc_map, var_info)
@@ -772,7 +783,12 @@ class SqliteCaseReader(BaseCaseReader):
                     # return list of cases from the source plus child cases
                     cases = []
                     source_cases = case_table.get_cases(source)
+                    # print()
+                    # print()
+                    # print('-' * 40)
+                    # print(f"in list cases, {len(source_cases)=}")
                     for case in source_cases:
+                        # print(f"calling _list_cases_recurse_flat for case {case.name}")
                         cases += self._list_cases_recurse_flat(case.name, out_stream=None)
                 else:
                     # return nested dict of cases from the source and child cases
@@ -824,7 +840,30 @@ class SqliteCaseReader(BaseCaseReader):
         driver_cases = self._driver_cases.list_cases()
         if self._format_version >= 2:
             problem_cases = self._problem_cases.list_cases()
+            
+            
+            
+            
+            
+            
+
+        with sqlite3.connect(self._filename_for_connect) as con:
+            con.row_factory = sqlite3.Row
+            cur = con.cursor()
+
+            # get the global iterations table, and save it as an attribute
+            self._global_iterations = self._get_global_iterations(cur)
+
+        con.close()
+
+
+
+
         global_iters = self._global_iterations
+        
+        # print(f"DEBUG_LEN: inside _list_cases_recurse_flat, {len(global_iters)=}")
+        # print(f"DEBUG_LEN: inside _list_cases_recurse_flat, {len(driver_cases)=}")
+        # print(f"DEBUG: inside _list_cases_recurse_flat, {coord in driver_cases=}")
 
         if not coord:
             # will return all cases
@@ -832,6 +871,7 @@ class SqliteCaseReader(BaseCaseReader):
             parent_case_counter = len(global_iters)
         elif coord in driver_cases:
             parent_case_counter = self._driver_cases.get_case(coord).counter
+            # print(f"inside _list_cases_recurse_flat, {parent_case_counter=}")
         elif coord in system_cases:
             parent_case_counter = self._system_cases.get_case(coord).counter
         elif coord in solver_cases:
@@ -851,6 +891,7 @@ class SqliteCaseReader(BaseCaseReader):
         current_table = None
         current_cases = []
 
+        # print(f"inside _list_cases_recurse_flat parent looping over parent_case_counter {parent_case_counter} cases")
         for i in range(0, parent_case_counter):
             global_iter = global_iters[i]
             table, row = global_iter[1], global_iter[2]
