@@ -546,9 +546,9 @@ class TestAnalysisDriver(unittest.TestCase):
         self.assertEqual(len(cases), len(expected))
 
         for case, expected_case in zip(cases, expected):
-            inputs = cr.get_case(case).inputs
-            self.assertEqual(inputs['x'][0], expected_case['x'][0])
-            self.assertEqual(inputs['y'][0], expected_case['y'][0])
+            outputs = cr.get_case(case).outputs
+            self.assertEqual(outputs['x'][0], expected_case['x'][0])
+            self.assertEqual(outputs['y'][0], expected_case['y'][0])
 
 
 
