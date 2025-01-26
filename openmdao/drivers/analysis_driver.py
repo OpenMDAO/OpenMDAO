@@ -19,7 +19,7 @@ class AnalysisDriver(Driver):
     A driver for repeatedly running the model with a list of sampled data.
 
     Samples may be provided as a Sequence of dictionaries, where each entry
-    in the sequence is a dictionary keyed by the variable names to be set 
+    in the sequence is a dictionary keyed by the variable names to be set
     for that specific execution.
 
     For instance, the following sequence of samples provides 3 executions,
@@ -159,14 +159,19 @@ class AnalysisDriver(Driver):
                            parallel_deriv_color=parallel_deriv_color,
                            cache_linear_solution=cache_linear_solution,
                            flat_indices=flat_indices, alias=alias)
-    
+
     def add_responses(self, responses):
         """
         Add multiple responses to be recorded by the AnalysisDriver.
 
         Parameters
         ----------
-        responses : Sequence
+        responses : Sequence or dict or str
+            A sequence of response names to be recorded.  If more
+            metadata needs to be specified, reponses can be provided
+            as a dictionary whose keys are the variables to be recorded,
+            and whose associated values are dictionaries of metadata to
+            be passed on as keyword arguments to add_response.
         """
         if isinstance(responses, str):
             self.add_response(responses)
@@ -177,7 +182,7 @@ class AnalysisDriver(Driver):
             for res in responses:
                 if isinstance(res, str):
                     self.add_response(res)
-                
+
     def _setup_comm(self, comm):
         """
         Perform any driver-specific setup of communicators for the model.
