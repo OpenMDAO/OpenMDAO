@@ -46,7 +46,7 @@ class AnalysisDriver(Driver):
     in which case we can use the add_responses method.
 
     .. code-block:: python
-    
+
         prob.driver.add_responses(['foo', 'bar', 'baz'])
 
     Parameters
