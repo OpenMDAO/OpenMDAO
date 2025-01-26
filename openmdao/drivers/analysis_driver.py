@@ -1,5 +1,5 @@
 """
-Design-of-Experiments Driver.
+AnalysisDriver definition.
 """
 from collections import deque
 from collections.abc import Iterable
