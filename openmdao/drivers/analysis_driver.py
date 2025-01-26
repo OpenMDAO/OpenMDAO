@@ -2,6 +2,7 @@
 Design-of-Experiments Driver.
 """
 from collections import deque
+from collections.abc import Iterable
 import itertools
 import traceback
 
@@ -16,6 +17,37 @@ from openmdao.utils.om_warnings import issue_warning, DriverWarning
 class AnalysisDriver(Driver):
     """
     A driver for repeatedly running the model with a list of sampled data.
+
+    Samples may be provided as a Sequence of dictionaries, where each entry
+    in the sequence is a dictionary keyed by the variable names to be set 
+    for that specific execution.
+
+    For instance, the following sequence of samples provides 3 executions,
+    testing (x=0, y=4), (x=1, y=5), and (x=2, y=6).  Units may be optionally
+    provided.
+
+    ```
+    [{'x': {'val': 0.0, 'units': None}, 'y': {'val': 4.0, 'units': None}},
+     {'x': {'val': 1.0, 'units': None}, 'y': {'val': 5.0, 'units': None}},
+     {'x': {'val': 2.0, 'units': None}, 'y': {'val': 6.0, 'units': None}}]
+    ```
+
+    Alternatively, samples can be provided as an instance of AnalysisGenerator,
+    which will provide each sample in a lazily-evaluated way.
+
+    Responses are the outputs of the model to be recorded. These can be added
+    using the standard driver interface:
+
+    ```
+    prob.driver.add_response('z', units='m')
+    ```
+
+    In systems with a lot of outputs, this would be a very tedious process,
+    in which case we can use the add_responses method.
+
+    ```
+    prob.driver.add_responses(['foo', 'bar', 'baz'])
+    ```
 
     Parameters
     ----------
@@ -127,7 +159,25 @@ class AnalysisDriver(Driver):
                            parallel_deriv_color=parallel_deriv_color,
                            cache_linear_solution=cache_linear_solution,
                            flat_indices=flat_indices, alias=alias)
+    
+    def add_responses(self, responses):
+        """
+        Add multiple responses to be recorded by the AnalysisDriver.
 
+        Parameters
+        ----------
+        responses : Sequence
+        """
+        if isinstance(responses, str):
+            self.add_response(responses)
+        elif isinstance(responses, dict):
+            for var, meta in responses.items():
+                self.add_response(var, **meta)
+        elif isinstance(responses, Iterable):
+            for res in responses:
+                if isinstance(res, str):
+                    self.add_response(res)
+                
     def _setup_comm(self, comm):
         """
         Perform any driver-specific setup of communicators for the model.
