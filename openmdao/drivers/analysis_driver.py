@@ -26,28 +26,25 @@ class AnalysisDriver(Driver):
     testing (x=0, y=4), (x=1, y=5), and (x=2, y=6).  Units may be optionally
     provided.
 
-    ```
-    [{'x': {'val': 0.0, 'units': None}, 'y': {'val': 4.0, 'units': None}},
-     {'x': {'val': 1.0, 'units': None}, 'y': {'val': 5.0, 'units': None}},
-     {'x': {'val': 2.0, 'units': None}, 'y': {'val': 6.0, 'units': None}}]
-    ```
+    .. code-block:: python
+        [{'x': {'val': 0.0, 'units': None}, 'y': {'val': 4.0, 'units': None}},
+        {'x': {'val': 1.0, 'units': None}, 'y': {'val': 5.0, 'units': None}},
+        {'x': {'val': 2.0, 'units': None}, 'y': {'val': 6.0, 'units': None}}]
 
     Alternatively, samples can be provided as an instance of AnalysisGenerator,
     which will provide each sample in a lazily-evaluated way.
 
     Responses are the outputs of the model to be recorded. These can be added
-    using the standard driver interface:
+    using the standard driver interface.
 
-    ```
-    prob.driver.add_response('z', units='m')
-    ```
+    .. code-block:: python
+        prob.driver.add_response('z', units='m')
 
     In systems with a lot of outputs, this would be a very tedious process,
     in which case we can use the add_responses method.
 
-    ```
-    prob.driver.add_responses(['foo', 'bar', 'baz'])
-    ```
+    .. code-block:: python
+        prob.driver.add_responses(['foo', 'bar', 'baz'])
 
     Parameters
     ----------
