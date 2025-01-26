@@ -27,6 +27,7 @@ class AnalysisDriver(Driver):
     provided.
 
     .. code-block:: python
+
         [{'x': {'val': 0.0, 'units': None}, 'y': {'val': 4.0, 'units': None}},
         {'x': {'val': 1.0, 'units': None}, 'y': {'val': 5.0, 'units': None}},
         {'x': {'val': 2.0, 'units': None}, 'y': {'val': 6.0, 'units': None}}]
@@ -38,12 +39,14 @@ class AnalysisDriver(Driver):
     using the standard driver interface.
 
     .. code-block:: python
+
         prob.driver.add_response('z', units='m')
 
     In systems with a lot of outputs, this would be a very tedious process,
     in which case we can use the add_responses method.
 
     .. code-block:: python
+    
         prob.driver.add_responses(['foo', 'bar', 'baz'])
 
     Parameters
