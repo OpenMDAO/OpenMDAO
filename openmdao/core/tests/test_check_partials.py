@@ -1995,7 +1995,7 @@ y wrt x                     | abs         | fd-fwd | 2.000000000279556
         prob.setup()
         prob.run_model()
 
-        msg = "Component 'comp' has zero derivatives for the following variable pairs that were declared as 'dependent': [('y', 'x')]."
+        msg = "\nComponent 'comp' has zero derivatives for the following variable pairs that were declared as 'dependent': [('y', 'x')].\n"
 
         with assert_warning(UserWarning, msg):
             prob.check_partials(out_stream=None, compact_print=True)

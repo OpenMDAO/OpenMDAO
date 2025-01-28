@@ -2392,12 +2392,11 @@ class Component(System):
                         # unless the fd is non zero.
                         # Note: subjacs_info is empty for undeclared partials, which is the default
                         # behavior now.
-                        if not compact_print:  # show everything if using compact print
-                            try:
-                                if not subjacs[abs_key]['dependent']:
-                                    nondep_derivs.add(rel_key)
-                            except KeyError:
+                        try:
+                            if not subjacs[abs_key]['dependent']:
                                 nondep_derivs.add(rel_key)
+                        except KeyError:
+                            nondep_derivs.add(rel_key)
 
                         if force_dense:
                             if rows is not None:
@@ -2537,9 +2536,12 @@ class Component(System):
                           category=DerivativesWarning)
 
         incon_keys = self._get_inconsistent_keys()
+
+        # if compact_print is True, we'll show all derivatives, even non-dependent ones
+        nondeps = set() if compact_print else nondep_derivs
         # force iterator to run so that error info will be added to partials_data
         err_iter = list(_iter_derivs(partials_data, show_only_incorrect, all_fd_options, False,
-                                     nondep_derivs, self.matrix_free, abs_err_tol, rel_err_tol,
+                                     nondeps, self.matrix_free, abs_err_tol, rel_err_tol,
                                      incon_keys))
 
         worst = None
@@ -2553,9 +2555,11 @@ class Component(System):
                 self._deriv_display(err_iter, partials_data, rel_err_tol, abs_err_tol, out_stream,
                                     all_fd_options, False, show_only_incorrect)
 
-        # check for zero subjacs
+        # check for zero subjacs that are declared as dependent
         zero_keys = set()
         for key, meta in partials_data.items():
+            if key in nondep_derivs:
+                continue
             abs_key = rel_key2abs_key(self, key)
             if abs_key in self._subjacs_info:
                 maxmag = max([mag.max() for mag in meta['magnitude']])
@@ -2563,9 +2567,9 @@ class Component(System):
                     zero_keys.add(key)
 
         if zero_keys:
-            issue_warning(f"Component '{self.pathname}' has zero derivatives for the "
+            issue_warning(f"\nComponent '{self.pathname}' has zero derivatives for the "
                           "following variable pairs that were declared as 'dependent': "
-                          f"{sorted(zero_keys)}.",
+                          f"{sorted(zero_keys)}.\n",
                           category=DerivativesWarning)
 
         # add pathname to the partials dict to make it compatible with the return value
