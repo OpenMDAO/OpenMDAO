@@ -1151,9 +1151,9 @@ def get_errors(x, y):
     rel_max_x = x[nonzero].flat[max_rel_error_idx]
     rel_max_y = y[nonzero].flat[max_rel_error_idx]
 
-    # if one value is zero and the other is very small at the max relative error location,
-    # just use the absolute error.
+    # if one value is zero the relative error doesn't really make sense, so just defer to whatever
+    # the absolute error check says.
     if rel_max_x == 0.0 or rel_max_y == 0.0:
-        max_rel_error = np.abs(rel_max_x - rel_max_y)
+        max_rel_error = float('nan')
 
     return max_abs_error, (abs_max_x, abs_max_y), max_rel_error, (rel_max_x, rel_max_y), denom_idx

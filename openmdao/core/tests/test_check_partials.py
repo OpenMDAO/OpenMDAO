@@ -353,7 +353,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         abs_error = data['comp']['y', 'x2']['abs error']
         rel_error = data['comp']['y', 'x2']['rel error']
         self.assertAlmostEqual(abs_error.forward, 4.)
-        self.assertAlmostEqual(rel_error.forward, 4.)
+        self.assertTrue(np.isnan(rel_error.forward))
         self.assertAlmostEqual(np.linalg.norm(data['comp']['y', 'x2']['J_fd'] - 4.), 0.,
                                delta=1e-6)
 
@@ -1813,7 +1813,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.check_partials(out_stream=stream)
         lines = stream.getvalue().splitlines()
 
-        self.assertTrue("Max Relative Error (Jfwd - Jfd) / Jfwd : 3." in lines[10])
+        self.assertTrue("Max Relative Error (Jfwd - Jfd) / Jfwd : nan" in lines[10])
 
     def test_directional_bug_implicit(self):
         # Test for bug in directional derivative direction for implicit var and matrix-free.

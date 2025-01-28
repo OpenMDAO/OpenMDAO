@@ -6991,20 +6991,23 @@ class System(object, metaclass=SystemMetaclass):
                 parts.append(f'      rev value: {abs_vals[0].fwd_rev[0]:.6e}')
                 parts.append(f'      fwd value: {abs_vals[0].fwd_rev[1]:.6e}\n')
 
+            divname = {
+                'fwd': ['Jfwd', 'Jfd'],
+                'rev': ['Jrev', 'Jfd'],
+                'fwd_rev': ['Jrev', 'Jfwd']
+            }
+
             for i in range(len(abs_errs)):
-                if denom_idxs[i] == 0:
-                    if abs_errs[i].forward is None:
-                        divname = 'Jrev'
-                    else:
-                        divname = 'Jfwd'
-                else:
-                    divname = 'Jfd'
+                didxs = denom_idxs[i]
+                divname_fwd = divname['fwd'][didxs['fwd']]
+                divname_rev = divname['rev'][didxs['rev']]
+                divname_fwd_rev = divname['fwd_rev'][didxs['fwd_rev']]
 
                 # Relative Errors
                 if directional:
                     if totals and rel_errs[i].forward is not None:
                         err = _format_error(rel_errs[i].forward, rel_error_tol)
-                        parts.append(f'    Max Relative Error (Jfwd - Jfd) / {divname}'
+                        parts.append(f'    Max Relative Error (Jfwd - Jfd) / {divname_fwd}'
                                      f'{stepstrs[i]} : {err}')
                         parts.append(f'      fwd value: {rel_vals[i].forward[0]:.6e}')
                         parts.append(f'      fd value: {rel_vals[i].forward[1]:.6e} '
@@ -7014,14 +7017,14 @@ class System(object, metaclass=SystemMetaclass):
                             derivative_info['directional_fd_rev'][i]):
                         err = _format_error(rel_errs[i].reverse, rel_error_tol)
                         parts.append(f'    Max Relative Error ([rev, fd] Dot Product Test) '
-                                     f'/ {divname}{stepstrs[i]} : {err}')
+                                     f'/ {divname_rev}{stepstrs[i]} : {err}')
                         parts.append(f'      rev value: {rel_vals[i].reverse[0]:.6e}')
                         parts.append(f'      fd value: {rel_vals[i].reverse[1]:.6e} '
                                      f'({fd_desc}{stepstrs[i]})\n')
                 else:
                     if rel_errs[i].forward is not None:
                         err = _format_error(rel_errs[i].forward, rel_error_tol)
-                        parts.append(f'    Max Relative Error (Jfwd - Jfd) / {divname}'
+                        parts.append(f'    Max Relative Error (Jfwd - Jfd) / {divname_fwd}'
                                      f'{stepstrs[i]} : {err}')
                         parts.append(f'      fwd value: {rel_vals[i].forward[0]:.6e}')
                         parts.append(f'      fd value: {rel_vals[i].forward[1]:.6e} '
@@ -7029,7 +7032,7 @@ class System(object, metaclass=SystemMetaclass):
 
                     if rel_errs[i].reverse is not None:
                         err = _format_error(rel_errs[i].reverse, rel_error_tol)
-                        parts.append(f'    Max Relative Error (Jrev - Jfd) / {divname}'
+                        parts.append(f'    Max Relative Error (Jrev - Jfd) / {divname_rev}'
                                      f'{stepstrs[i]} : {err}')
                         parts.append(f'      rev value: {rel_vals[i].reverse[0]:.6e}')
                         parts.append(f'      fd value: {rel_vals[i].reverse[1]:.6e} '
@@ -7039,13 +7042,14 @@ class System(object, metaclass=SystemMetaclass):
                 if directional:
                     err = _format_error(rel_errs[0].fwd_rev, rel_error_tol)
                     parts.append(f'    Max Relative Error ([rev, fwd] Dot Product Test) / '
-                                 f'{divname} : {err}')
+                                 f'{divname_fwd_rev} : {err}')
                     rev, fwd = derivative_info['directional_fwd_rev']
                     parts.append(f'      rev value: {rev:.6e}')
                     parts.append(f'      fwd value: {fwd:.6e}\n')
                 else:
                     err = _format_error(rel_errs[0].fwd_rev, rel_error_tol)
-                    parts.append(f'    Max Relative Error (Jrev - Jfwd) / {divname} : {err}')
+                    parts.append(f'    Max Relative Error (Jrev - Jfwd) / {divname_fwd_rev} : '
+                                 f'{err}')
                     parts.append(f'      rev value: {rel_vals[0].fwd_rev[0]:.6e}')
                     parts.append(f'      fwd value: {rel_vals[0].fwd_rev[1]:.6e}\n')
 
@@ -7444,22 +7448,24 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
     abs_mags.update(Jreverse, 'rev')
 
     abs_errs_fwd_rev = abs_vals_fwd_rev = rel_errs_fwd_rev = rel_vals_fwd_rev = None
+    fwd_rev_didx = 1
     if matrix_free:
         derivative_info['matrix_free'] = True
         if directional:
             if Jforward is not None and Jreverse is not None:
                 mhatdotm, dhatdotd = derivative_info['directional_fwd_rev']
-                (abs_errs_fwd_rev, abs_vals_fwd_rev, rel_errs_fwd_rev, rel_vals_fwd_rev, didx) = \
-                    get_errors(dhatdotd, mhatdotm)
+                (abs_errs_fwd_rev, abs_vals_fwd_rev, rel_errs_fwd_rev, rel_vals_fwd_rev,
+                 fwd_rev_didx) = get_errors(dhatdotd, mhatdotm)
         elif not totals:
-            (abs_errs_fwd_rev, abs_vals_fwd_rev, rel_errs_fwd_rev, rel_vals_fwd_rev, didx) = \
-                get_errors(Jforward, Jreverse)
+            (abs_errs_fwd_rev, abs_vals_fwd_rev, rel_errs_fwd_rev, rel_vals_fwd_rev,
+             fwd_rev_didx) = get_errors(Jforward, Jreverse)
 
     for i, Jfd in enumerate(fdinfo):
         abs_errs = _ErrorData()
         abs_vals = _ErrorData()
         rel_errs = _ErrorData()
         rel_vals = _ErrorData()
+        denom_idxs = {'fwd': 1, 'rev': 1, 'fwd_rev': fwd_rev_didx}
 
         step = steps[i]
         abs_mags.update(Jfd, 'fd')
@@ -7469,29 +7475,31 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
                 if totals:
                     mhatdotm, dhatdotd = derivative_info['directional_fd_fwd'][i]
                     (abs_errs.forward, abs_vals.forward,
-                     rel_errs.forward, rel_vals.forward, didx) = \
-                        get_errors(mhatdotm, dhatdotd)
+                     rel_errs.forward, rel_vals.forward, didx) = get_errors(mhatdotm, dhatdotd)
                 else:
                     (abs_errs.forward, abs_vals.forward,
-                     rel_errs.forward, rel_vals.forward, didx) = \
-                        get_errors(Jforward, Jfd)
+                     rel_errs.forward, rel_vals.forward, didx) = get_errors(Jforward, Jfd)
+                denom_idxs['fwd'] = didx
 
             if Jreverse is not None:
                 mhatdotm, dhatdotd = derivative_info['directional_fd_rev'][i]
                 (abs_errs.reverse, abs_vals.reverse, rel_errs.reverse, rel_vals.reverse, didx) = \
                     get_errors(mhatdotm, dhatdotd)
+                denom_idxs['rev'] = didx
         else:
             if Jforward is not None:
                 (abs_errs.forward, abs_vals.forward, rel_errs.forward, rel_vals.forward, didx) = \
                     get_errors(Jforward, Jfd)
-
+                denom_idxs['fwd'] = didx
             if Jreverse is not None:
                 (abs_errs.reverse, abs_vals.reverse, rel_errs.reverse, rel_vals.reverse, didx) = \
                     get_errors(Jreverse, Jfd)
+                denom_idxs['rev'] = didx
 
         if Jfd is not None and Jforward is None and Jreverse is None:
             (abs_errs.reverse, abs_vals.reverse, rel_errs.reverse, rel_vals.reverse, didx) = \
                 get_errors(np.zeros_like(Jfd), Jfd)
+            denom_idxs['rev'] = didx
 
         if abs_errs_fwd_rev is not None:
             abs_errs.fwd_rev = abs_errs_fwd_rev
@@ -7501,14 +7509,13 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
 
         derivative_info['abs error'].append(abs_errs)
         derivative_info['rel error'].append(rel_errs)
-
+        derivative_info['denom_idx'].append(denom_idxs)
         derivative_info['magnitude'].append(abs_mags)
         derivative_info['vals_at_max_abs'].append(abs_vals)
         derivative_info['vals_at_max_rel'].append(rel_vals)
-        derivative_info['denom_idx'].append(didx)
         derivative_info['steps'].append(step)
 
-    return max([mag.max() for mag in derivative_info['magnitude']])
+    return max([err.max() for err in derivative_info['abs error']])
 
 
 def _errors_above_tol(deriv_info, abs_error_tol, rel_error_tol):
