@@ -1,20 +1,16 @@
-"""Define the NewtonSolver class."""
+"""Define the NonlinearSchurSolver class."""
 
 
 import numpy as np
 
-from openmdao.solvers.linesearch.backtracking import BoundsEnforceLS
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import Recording
-from openmdao.utils.mpi import MPI
-from openmdao.core.constants import _UNDEFINED
-from openmdao.utils.general_utils import ContainsAll
 import scipy
 
 
 class NonlinearSchurSolver(NonlinearSolver):
     """
-    Newton solver.
+    Nonlinear Schur complement
 
     The default linear solver is the linear_solver in the containing system.
 
@@ -29,7 +25,7 @@ class NonlinearSchurSolver(NonlinearSolver):
 
     SOLVER = "NL: NLSCHUR"
 
-    def __init__(self, mode_nonlinear="rev", groupNames=["group1", "group2"], bounds=None, **kwargs):
+    def __init__(self, mode_nonlinear="rev", sys_names=["group1", "group2"], bounds=None, **kwargs):
         """
         Initialize all attributes.
 
@@ -40,7 +36,7 @@ class NonlinearSchurSolver(NonlinearSolver):
         """
         self._bounds = bounds
         self._mode_nonlinear = mode_nonlinear
-        self._groupNames = groupNames
+        self._sys_names = sys_names
         super().__init__(**kwargs)
 
         # Slot for linear solver
@@ -90,7 +86,6 @@ class NonlinearSchurSolver(NonlinearSolver):
             depth of the current system (already incremented).
         """
         super()._setup_solvers(system, depth)
-        rank = MPI.COMM_WORLD.rank if MPI is not None else 0
 
         self._disallow_discrete_outputs()
 
@@ -154,21 +149,6 @@ class NonlinearSchurSolver(NonlinearSolver):
 
         # Enable local fd
         system._owns_approx_jac = approx_status
-
-    def _linearize_children(self):
-        """
-        Return a flag that is True when we need to call linearize on our subsystems' solvers.
-
-        Returns
-        -------
-        bool
-            Flag for indicating child linerization
-        """
-        return (
-            self.options["solve_subsystems"]
-            and not system.under_complex_step
-            and self._iter_count <= self.options["max_sub_solves"]
-        )
 
     def _linearize(self):
         """
@@ -246,8 +226,8 @@ class NonlinearSchurSolver(NonlinearSolver):
 
         # self._linearize()
         # extract the first and second subsystems
-        subsys1, _ = system._subsystems_allprocs[self._groupNames[0]]
-        subsys2, _ = system._subsystems_allprocs[self._groupNames[1]]
+        subsys1, _ = system._subsystems_allprocs[self._sys_names[0]]
+        subsys2, _ = system._subsystems_allprocs[self._sys_names[1]]
 
         # ideally, we are solving for all outputs in subsys2
         # so this will be our jacobian size
@@ -385,18 +365,9 @@ class NonlinearSchurSolver(NonlinearSolver):
         subsys2._vectors["residual"]["linear"].set_vec(subsys2._residuals)
         subsys2._vectors["residual"]["linear"] *= -1.0
 
-        # if system.comm.rank == 0:
-        #     print("\nSchur Jacobian: ", schur_jac, flush=True)
-        # print("My    Jacobian:\n", custom_jac, flush=True)
-        # system.comm.barrier()
-        # quit()
         iD_schur = np.eye(n_vars, dtype=system._vectors["residual"]["linear"].asarray(copy=True).dtype) * 1e-16
         schur_jac = schur_jac + iD_schur
         d_subsys2 = scipy.linalg.solve(schur_jac, subsys2._vectors["residual"]["linear"].asarray())
-
-        # if system.comm.rank == 0:
-        #     print("\nupdate vector: ", d_subsys2, flush=True)
-        #     print("\n==================================================")
 
         # loop over the variables just to be safe with the ordering
         for ii, var in enumerate(vars_to_solve):

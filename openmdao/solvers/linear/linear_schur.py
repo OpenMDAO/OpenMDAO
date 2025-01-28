@@ -1,18 +1,15 @@
-"""Define the LinearBlockGS class."""
+"""Define the LinearSchur class."""
 
-import sys
 import numpy as np
 
 from openmdao.core.constants import _UNDEFINED
-from openmdao.solvers.solver import BlockLinearSolver, LinearSolver
-from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
-from openmdao.utils.general_utils import ContainsAll
+from openmdao.solvers.solver import LinearSolver
 import scipy
 
 
 class LinearSchur(LinearSolver):
     """
-    Linear block Gauss-Seidel solver.
+    Linear Schur complement solver.
 
     Parameters
     ----------
@@ -31,7 +28,7 @@ class LinearSchur(LinearSolver):
 
     SOLVER = "LN: LNSCHUR"
 
-    def __init__(self, mode_linear="rev", groupNames=["group1", "group2"], **kwargs):
+    def __init__(self, mode_linear="rev", sys_names=["group1", "group2"], **kwargs):
         """
         Initialize all attributes.
         """
@@ -40,7 +37,7 @@ class LinearSchur(LinearSolver):
         self._theta_n_1 = None
         self._delta_d_n_1 = None
         self._mode_linear = mode_linear
-        self._groupNames = groupNames
+        self._sys_names = sys_names
 
     def _declare_options(self):
         """
@@ -58,11 +55,6 @@ class LinearSchur(LinearSolver):
         """
         Perform the operations in the iteration loop.
         """
-
-        # if mode != self._mode_linear:
-        #     raise ValueError(
-        #         f"The solve function is called with {mode} mode. But the user defined the linear Schur solve to work in {self._mode_linear} mode"
-        #     )
         self._mode = mode
         self._rel_systems = rel_systems
         system = self._system()
@@ -72,11 +64,10 @@ class LinearSchur(LinearSolver):
             self._rhs_vec = system._dresiduals.asarray(True)
         else:
             self._rhs_vec = system._doutputs.asarray(True)
-        # self._update_rhs_vec()
 
         # take the subsystems
-        subsys1, _ = system._subsystems_allprocs[self._groupNames[0]]
-        subsys2, _ = system._subsystems_allprocs[self._groupNames[1]]
+        subsys1, _ = system._subsystems_allprocs[self._sys_names[0]]
+        subsys2, _ = system._subsystems_allprocs[self._sys_names[1]]
 
         # TODO this may not be the most general case. think about just solving for a subset
         subsys2_outputs = subsys2._doutputs
@@ -101,14 +92,6 @@ class LinearSchur(LinearSolver):
         rvec = system._vectors["residual"]["linear"]
         ovec = system._vectors["output"]["linear"]
         ivec = system._vectors["input"]["linear"]
-
-        inpu_cache = system._dinputs.asarray(copy=True)
-        outp_cache = system._doutputs.asarray(copy=True)
-        resd_cache = system._dresiduals.asarray(copy=True)
-
-        r_data = rvec.asarray(copy=True)
-        o_data = ovec.asarray(copy=True)
-        i_data = ivec.asarray(copy=True)
 
         if mode == "fwd":
             parent_offset = system._dresiduals._root_offset
