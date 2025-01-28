@@ -6939,7 +6939,7 @@ class System(object, metaclass=SystemMetaclass):
                 stepstrs = [""]
 
             fd_desc = f"{fd_opts['method']}:{fd_opts['form']}"
-            parts.append(f"  {sys_name.rpartition('.')[-1]}: {of} wrt {wrt}")
+            parts.append(f"  {sys_name}: {of} wrt {wrt}")
             if not isinstance(of, tuple) and lcons and of.strip("'") in lcons:
                 parts[-1] += " (Linear constraint)"
             parts.append('')
