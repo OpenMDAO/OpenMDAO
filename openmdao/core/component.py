@@ -2191,12 +2191,14 @@ class Component(System):
             Where derivs_dict is a dict, where the top key is the component pathname.
             Under the top key, the subkeys are the (of, wrt) keys of the subjacs.
             Within the (of, wrt) entries are the following keys:
-            'rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev', and
-            'rank_inconsistent'.
-            For 'rel error', 'abs error', and 'magnitude' the value is a tuple containing norms
-            for forward - fd, adjoint - fd, forward - adjoint.
+            'rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev', 'vals_at_max_abs',
+            'vals_at_max_rel', and 'rank_inconsistent'.
             For 'J_fd', 'J_fwd', 'J_rev' the value is a numpy array representing the computed
             Jacobian for the three different methods of computation.
+            For 'rel error', 'abs error', 'vals_at_max_abs' and 'vals_at_max_rel' the value is a
+            tuple containing values for forward - fd, adjoint - fd, forward - adjoint. For
+            'magnitude' the value is a tuple indicating the maximum magnitude of values found in
+            Jfwd, Jrev, and Jfd.
             The boolean 'rank_inconsistent' indicates if the derivative wrt a serial variable is
             inconsistent across MPI ranks.
 
@@ -2335,9 +2337,7 @@ class Component(System):
                                         d = mfree_directions[inp]
                                         mhat = derivs
                                         dhat = deriv['J_fwd'][:, idx]
-
-                                        deriv['directional_fwd_rev'] = (mhat.dot(m),
-                                                                        dhat.dot(d))
+                                        deriv['directional_fwd_rev'] = (dhat.dot(d), mhat.dot(m))
                                     else:
                                         meta = abs2meta_in[out_abs] if out_abs in abs2meta_in \
                                             else abs2meta_out[out_abs]
@@ -2523,7 +2523,7 @@ class Component(System):
 
                         if 'directional_fd_rev' not in deriv:
                             deriv['directional_fd_rev'] = []
-                        deriv['directional_fd_rev'].append((dhat.dot(d), mhat.dot(m)))
+                        deriv['directional_fd_rev'].append((mhat.dot(m), dhat.dot(d)))
 
         # convert to regular dict from defaultdict
         partials_data = {key: dict(d) for key, d in partials_data.items()}

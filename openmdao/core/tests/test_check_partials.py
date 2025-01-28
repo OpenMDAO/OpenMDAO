@@ -197,12 +197,12 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         y_wrt_x1_line = lines.index("  comp: 'y' wrt 'x1'")
 
-        self.assertTrue(lines[y_wrt_x1_line+4].endswith('*'),
+        self.assertTrue(lines[y_wrt_x1_line+2].endswith('*'),
                         msg='Error flag expected in output but not displayed')
         self.assertTrue(lines[y_wrt_x1_line+6].endswith('*'),
                         msg='Error flag expected in output but not displayed')
         y_wrt_x2_line = lines.index("  comp: 'y' wrt 'x2'")
-        self.assertTrue(lines[y_wrt_x2_line+4].endswith('*'),
+        self.assertTrue(lines[y_wrt_x2_line+2].endswith('*'),
                         msg='Error flag not expected in output but displayed')
         self.assertTrue(lines[y_wrt_x2_line+6].endswith('*'),
                         msg='Error flag not expected in output but displayed')
@@ -353,7 +353,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         abs_error = data['comp']['y', 'x2']['abs error']
         rel_error = data['comp']['y', 'x2']['rel error']
         self.assertAlmostEqual(abs_error.forward, 4.)
-        self.assertAlmostEqual(rel_error.forward, 1.)
+        self.assertAlmostEqual(rel_error.forward, 4.)
         self.assertAlmostEqual(np.linalg.norm(data['comp']['y', 'x2']['J_fd'] - 4.), 0.,
                                delta=1e-6)
 
@@ -972,9 +972,9 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.check_partials(out_stream=stream)
 
         lines = stream.getvalue().splitlines()
-        self.assertTrue('cs' in lines[6],
+        self.assertTrue('CS' in lines[17],
                         msg='Did you change the format for printing check derivs?')
-        self.assertTrue('fd' in lines[21],
+        self.assertTrue('FD' in lines[35],
                         msg='Did you change the format for printing check derivs?')
 
     def test_set_check_partial_options_invalid(self):
@@ -1203,13 +1203,13 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.check_partials(out_stream=stream, abs_err_tol=1.1e-6, compact_print=True)
 
         self.assertEqual(stream.getvalue().count('n/a'), 0)
-        self.assertEqual(stream.getvalue().count('rev'), 6)
+        self.assertEqual(stream.getvalue().count('rev'), 8)
         self.assertEqual(stream.getvalue().count('Component'), 2)
         self.assertEqual(len([ln for ln in stream.getvalue().splitlines() if ln.startswith('| ')]), 12) # counts rows (including headers)
 
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=False)
-        self.assertEqual(stream.getvalue().count('Reverse Magnitude'), 4)
+        self.assertEqual(stream.getvalue().count('rev value:'), 16)
         self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'), 4)
         self.assertEqual(stream.getvalue().count('Jrev'), 20)
 
@@ -1242,8 +1242,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         stream = StringIO()
         partials_data = prob.check_partials(out_stream=stream, compact_print=False)
         # So for this case, they do all provide them, so rev should not be shown
-        self.assertEqual(stream.getvalue().count('Forward Magnitude'), 2)
-        self.assertEqual(stream.getvalue().count('Reverse Magnitude'), 0)
+        self.assertEqual(stream.getvalue().count('fwd value'), 4)
+        self.assertEqual(stream.getvalue().count('rev value'), 0)
         self.assertEqual(stream.getvalue().count('Absolute Error'), 2)
         self.assertEqual(stream.getvalue().count('Relative Error'), 2)
         self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 2)
@@ -1264,11 +1264,11 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
-        self.assertEqual(stream.getvalue().count('rev'), 12)
+        self.assertEqual(stream.getvalue().count('rev'), 16)
 
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=False)
-        self.assertEqual(stream.getvalue().count('Reverse'), 4)
+        self.assertEqual(stream.getvalue().count('Reverse'), 2)
         self.assertEqual(stream.getvalue().count('Jrev'), 10)
 
         # 4: Mixed comps. Some with jacobians. Some not
@@ -1289,14 +1289,14 @@ class TestProblemCheckPartials(unittest.TestCase):
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
         self.assertEqual(stream.getvalue().count('n/a'), 0)
-        self.assertEqual(stream.getvalue().count('rev'), 12)
+        self.assertEqual(stream.getvalue().count('rev'), 16)
         self.assertEqual(stream.getvalue().count('Component'), 2)
         self.assertEqual(len([ln for ln in stream.getvalue().splitlines() if ln.startswith('| ')]), 8)
 
         stream = StringIO()
         partials_data = prob.check_partials(out_stream=stream, compact_print=False)
-        self.assertEqual(stream.getvalue().count('Forward Magnitude'), 4)
-        self.assertEqual(stream.getvalue().count('Reverse Magnitude'), 2)
+        self.assertEqual(stream.getvalue().count('fwd value:'), 12)
+        self.assertEqual(stream.getvalue().count('rev value'), 8)
         self.assertEqual(stream.getvalue().count('Absolute Error'), 8)
         self.assertEqual(stream.getvalue().count('Relative Error'), 8)
         self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 4)
@@ -1486,9 +1486,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         lines = stream.getvalue().splitlines()
 
         entries = [s.strip() for s in lines[7].split('|') if s.strip()]
-        self.assertEqual(entries[3], 'n/a')
-        self.assertEqual(entries[9], 'n/a')
-        assert_near_equal(float(entries[11]), 0.0, 1e-15)
+        assert_near_equal(float(entries[19]), 0.0, 4e-15)
 
     def test_directional_mixed_matrix_free(self):
 
@@ -1815,7 +1813,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.check_partials(out_stream=stream)
         lines = stream.getvalue().splitlines()
 
-        self.assertTrue("Relative Error (Jfor - Jfd) / Jfor : 1." in lines[10])
+        self.assertTrue("Max Relative Error (Jfwd - Jfd) / Jfwd : 3." in lines[10])
 
     def test_directional_bug_implicit(self):
         # Test for bug in directional derivative direction for implicit var and matrix-free.
@@ -2825,10 +2823,10 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         nderivs = ncomps * 2
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count("Fd Magnitude:"), nderivs)
-        self.assertEqual(contents.count("Absolute Error (Jfor - Jfd), step="), 0)
-        self.assertEqual(contents.count("Absolute Error (Jfor - Jfd)"), nderivs)
-        self.assertEqual(contents.count("Relative Error (Jfor - Jfd) / Jf"), nderivs)
+        self.assertEqual(contents.count("fwd value:"), nderivs * 2)
+        self.assertEqual(contents.count("Absolute Error (Jfwd - Jfd), step="), 0)
+        self.assertEqual(contents.count("Absolute Error (Jfwd - Jfd)"), nderivs)
+        self.assertEqual(contents.count("Relative Error (Jfwd - Jfd) / Jf"), nderivs)
         self.assertEqual(contents.count("Raw FD Derivative (Jfd), step="), 0)
         self.assertEqual(contents.count("Raw FD Derivative (Jfd)"), nderivs)
 
@@ -2881,9 +2879,9 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         nderivs = ncomps * 2
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count("Fd Magnitude:"), nderivs * 2)
-        self.assertEqual(contents.count("Absolute Error (Jfor - Jfd), step="), nderivs * 2)
-        self.assertEqual(contents.count("Relative Error (Jfor - Jfd) / Jf"), nderivs * 2)
+        self.assertEqual(contents.count("fwd value:"), nderivs * 4)
+        self.assertEqual(contents.count("Absolute Error (Jfwd - Jfd), step="), nderivs * 2)
+        self.assertEqual(contents.count("Relative Error (Jfwd - Jfd) / Jf"), nderivs * 2)
         self.assertEqual(contents.count("Raw FD Derivative (Jfd), step="), nderivs * 2)
 
     def test_multi_fd_steps_compact(self):

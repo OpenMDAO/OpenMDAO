@@ -1108,7 +1108,7 @@ def safe_norm(arr):
 
 def get_errors(x, y):
     """
-    Compute the max absolute and relative errors and the magnitudes of the difference in x and y.
+    Compute the max absolute and relative errors of the difference in x and y.
 
     Parameters
     ----------
@@ -1120,15 +1120,15 @@ def get_errors(x, y):
     Returns
     -------
     tuple
-        Tuple of (max_abs_error, abs_max_x, abs_max_y, max_rel_error, rel_max_x, rel_max_y,
-        denom_idx, where ???_max_x and ???_max_y are the values of x and y at the locations where
+        Tuple of (max_abs_error, (abs_max_x, abs_max_y), max_rel_error, (rel_max_x, rel_max_y),
+        denom_idx), where ???_max_x and ???_max_y are the values of x and y at the locations where
         absolute and relative errors are max, respectively, and denom_idx is the index specifying
         which argument, 0 (x) or 1 (y), was used as the denominator in the relative error.
     """
     args = (x, y)
     abs_error = np.abs(x - y)
     if abs_error.size == 0:
-        return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, 0
+        return 0.0, (0.0, 0.0), 0.0, (0.0, 0.0), 0
 
     max_abs_error_idx = np.argmax(abs_error)
     max_abs_error = abs_error.flat[max_abs_error_idx]
@@ -1136,14 +1136,14 @@ def get_errors(x, y):
     abs_max_y = y.flat[max_abs_error_idx]
 
     # Filter values where the divisor would be zero
-    denom_idx = 0
-    nonzero = x != 0
+    denom_idx = 1
+    nonzero = y != 0.
     if not nonzero.any():
-        nonzero = y != 0
+        nonzero = x != 0.
         if not nonzero.any():
-            return max_abs_error, abs_max_x, abs_max_y, float('nan'), 0.0, 0.0, denom_idx
+            return max_abs_error, (abs_max_x, abs_max_y), float('nan'), (0.0, 0.0), denom_idx
         else:
-            denom_idx = 1
+            denom_idx = 0
 
     max_rel_error_nz = abs_error[nonzero] / np.abs(args[denom_idx][nonzero])
     max_rel_error_idx = np.argmax(max_rel_error_nz)
@@ -1151,4 +1151,9 @@ def get_errors(x, y):
     rel_max_x = x[nonzero].flat[max_rel_error_idx]
     rel_max_y = y[nonzero].flat[max_rel_error_idx]
 
-    return max_abs_error, abs_max_x, abs_max_y, max_rel_error, rel_max_x, rel_max_y, denom_idx
+    # if one value is zero and the other is very small at the max relative error location,
+    # just use the absolute error.
+    if rel_max_x == 0.0 or rel_max_y == 0.0:
+        max_rel_error = np.abs(rel_max_x - rel_max_y)
+
+    return max_abs_error, (abs_max_x, abs_max_y), max_rel_error, (rel_max_x, rel_max_y), denom_idx

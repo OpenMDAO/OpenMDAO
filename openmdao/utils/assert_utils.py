@@ -202,13 +202,16 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6, verbose=False, max_display
                 is the (output, input) tuple of strings;
             Third key:
                 is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev',
-                           'directional_fd_fwd', 'directional_fd_rev', 'directional_fwd_rev',
-                           'rank_inconsistent', 'steps', 'matrix_free', 'directional']
+                           'vals_at_max_abs', 'vals_at_max_rel', 'directional_fd_fwd',
+                           'directional_fd_rev', 'directional_fwd_rev', 'rank_inconsistent',
+                           'matrix_free', 'directional', 'steps', and 'rank_inconsistent'].
 
-            For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
-                forward - fd, adjoint - fd, forward - adjoint.
-            For 'J_fd', 'J_fwd', 'J_rev' the value is: A numpy array representing the computed
+                For 'J_fd', 'J_fwd', 'J_rev' the value is a numpy array representing the computed
                 Jacobian for the three different methods of computation.
+                For 'rel error', 'abs error', 'vals_at_max_abs' and 'vals_at_max_rel' the value is a
+                tuple containing values for forward - fd, adjoint - fd, forward - adjoint. For
+                'magnitude' the value is a tuple indicating the maximum magnitude of values found in
+                Jfwd, Jrev, and Jfd.
     atol : float
         Absolute error. Default is 1e-6.
     rtol : float
@@ -306,7 +309,8 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6, verbose=False, max_display
 
                 if not analytic_found:
                     # check if J_fd is all zeros.  If not, then we have a problem.
-                    if np.linalg.norm(J_fd) > 1e-15:
+                    abserr = np.max(np.abs(J_fd))
+                    if abserr > 1e-9:
                         if verbose:
                             bad_derivs.append(f"\nAnalytic deriv for '{key[0]}' wrt '{key[1]}' "
                                               f"is assumed zero, but finite difference{stepstr} "
@@ -378,10 +382,17 @@ def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6, max_display_shape=(20
         First key:
             is the (output, input) tuple of strings;
         Second key:
-            is one of ['rel error', 'abs error', 'magnitude', 'fdstep'];
+            is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev',
+                       'vals_at_max_abs', 'vals_at_max_rel', 'directional_fd_fwd',
+                       'directional_fd_rev', 'directional_fwd_rev', 'rank_inconsistent',
+                       'matrix_free', 'directional', 'steps', and 'rank_inconsistent'].
 
-        For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
-            forward - fd, adjoint - fd, forward - adjoint.
+            For 'J_fd', 'J_fwd', 'J_rev' the value is a numpy array representing the computed
+            Jacobian for the three different methods of computation.
+            For 'rel error', 'abs error', 'vals_at_max_abs' and 'vals_at_max_rel' the value is a
+            tuple containing values for forward - fd, adjoint - fd, forward - adjoint. For
+            'magnitude' the value is a tuple indicating the maximum magnitude of values found in
+            Jfwd, Jrev, and Jfd.
     atol : float
         Absolute error. Default is 1e-6.
     rtol : float

@@ -419,9 +419,9 @@ class TestProblemCheckTotals(unittest.TestCase):
         # Make sure auto-ivc sources are translated to promoted input names.
         self.assertTrue('x' in lines[4])
 
-        self.assertTrue('9.80614' in lines[5], "'9.80614' not found in '%s'" % lines[5])
-        self.assertTrue('9.80614' in lines[6], "'9.80614' not found in '%s'" % lines[6])
-        self.assertTrue('cs:None' in lines[6], "'cs:None not found in '%s'" % lines[6])
+        self.assertTrue('9.80614' in lines[7], "'9.80614' not found in '%s'" % lines[5])
+        self.assertTrue('9.80614' in lines[8], "'9.80614' not found in '%s'" % lines[6])
+        self.assertTrue('cs:None' in lines[8], "'cs:None not found in '%s'" % lines[6])
 
         assert_near_equal(totals['con2', 'x']['J_fwd'], [[0.09692762]], 1e-5)
         assert_near_equal(totals['con2', 'x']['J_fd'], [[0.09692762]], 1e-5)
@@ -501,9 +501,9 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         lines = stream.getvalue().splitlines()
 
-        self.assertTrue('1.000' in lines[5])
-        self.assertTrue('1.000' in lines[6])
-        self.assertTrue('0.000' in lines[8])
+        self.assertTrue('1.000' in lines[7])
+        self.assertTrue('1.000' in lines[8])
+        self.assertTrue('0.000' in lines[6])
         self.assertTrue('0.000' in lines[10])
 
         assert_near_equal(totals['x', 'x']['J_fwd'], [[1.0]], 1e-5)
@@ -1219,8 +1219,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         lines = stream.getvalue().splitlines()
 
         self.assertTrue("Full Model: 'lcy' wrt 'x' (Linear constraint)" in lines[4])
-        self.assertTrue("Absolute Error (Jfor - Jfd)" in lines[8])
-        self.assertTrue("Relative Error (Jfor - Jfd) / Jfd" in lines[10])
+        self.assertTrue("Absolute Error (Jfwd - Jfd)" in lines[6])
+        self.assertTrue("Relative Error (Jfwd - Jfd) / Jfd" in lines[10])
 
     def test_alias_constraints(self):
         prob = om.Problem()
@@ -1377,13 +1377,13 @@ class TestProblemCheckTotals(unittest.TestCase):
         data = prob.check_totals(method='cs', out_stream=stream, directional=True)
         content = stream.getvalue()
 
-        self.assertEqual(content.count('Reverse Magnitude:'), 0)
-        self.assertEqual(content.count('Forward Magnitude:'), 1)
-        self.assertEqual(content.count('Fd Magnitude:'), 1)
-        self.assertEqual(content.count('Directional Derivative (Jfor)'), 1)
+        self.assertEqual(content.count('rev value:'), 0)
+        self.assertEqual(content.count('fwd value:'), 2)
+        self.assertEqual(content.count('fd value:'), 2)
+        self.assertEqual(content.count('Directional Derivative (Jfwd)'), 1)
         self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 1)
-        self.assertTrue('Relative Error (Jfor - Jfd) / Jfd : ' in content)
-        self.assertTrue('Absolute Error (Jfor - Jfd) : ' in content)
+        self.assertTrue('Max Relative Error (Jfwd - Jfd) / Jfd : ' in content)
+        self.assertTrue('Max Absolute Error (Jfwd - Jfd) : ' in content)
         mhatdotm, dhatdotd =  data[(('comp.out',), 'comp.in')]['directional_fd_fwd']
         assert_near_equal(mhatdotm, dhatdotd, tolerance=2e-15)
 
@@ -1402,9 +1402,9 @@ class TestProblemCheckTotals(unittest.TestCase):
         content = stream.getvalue()
 
         self.assertEqual(content.count('comp.out (index size: 1)'), 1)
-        self.assertEqual(content.count('Reverse Magnitude:'), 1)
-        self.assertEqual(content.count('Forward Magnitude:'), 0)
-        self.assertEqual(content.count('Fd Magnitude:'), 1)
+        self.assertEqual(content.count('rev value:'), 2)
+        self.assertEqual(content.count('fwd value:'), 0)
+        self.assertEqual(content.count('fd value:'), 2)
         self.assertEqual(content.count('Directional Derivative (Jrev)'), 1)
         self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 1)
         self.assertTrue('Relative Error ([rev, fd] Dot Product Test) / Jfd : ' in content)
@@ -1427,9 +1427,9 @@ class TestProblemCheckTotals(unittest.TestCase):
         content = stream.getvalue()
 
         self.assertEqual(content.count("'comp.out' wrt (d)('comp.in',)"), 1)
-        self.assertEqual(content.count('Reverse Magnitude:'), 1)
-        self.assertEqual(content.count('Forward Magnitude:'), 0)
-        self.assertEqual(content.count('Fd Magnitude:'), 1)
+        self.assertEqual(content.count('rev value:'), 2)
+        self.assertEqual(content.count('fwd value:'), 0)
+        self.assertEqual(content.count('fd value:'), 2)
         self.assertEqual(content.count('Directional Derivative (Jrev)'), 1)
         self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 1)
         self.assertTrue('Relative Error ([rev, fd] Dot Product Test) / Jfd : ' in content)
@@ -1455,9 +1455,9 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         self.assertEqual(content.count("'comp.out1' wrt (d)('comp.in1', 'comp.in2')"), 1)
         self.assertEqual(content.count("'comp.out2' wrt (d)('comp.in1', 'comp.in2')"), 1)
-        self.assertEqual(content.count('Reverse Magnitude:'), 2)
-        self.assertEqual(content.count('Forward Magnitude:'), 0)
-        self.assertEqual(content.count('Fd Magnitude:'), 2)
+        self.assertEqual(content.count('rev value:'), 4)
+        self.assertEqual(content.count('fwd value:'), 0)
+        self.assertEqual(content.count('fd value:'), 4)
         self.assertEqual(content.count('Directional Derivative (Jrev)'), 2)
         self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 2)
         self.assertTrue(content.count('Relative Error ([rev, fd] Dot Product Test) / Jfd :'), 2)
@@ -1506,11 +1506,11 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         self.assertEqual(content.count("('comp.out1', 'comp.out2') wrt (d)'comp.in1'"), 1)
         self.assertEqual(content.count("('comp.out1', 'comp.out2') wrt (d)'comp.in2'"), 1)
-        self.assertEqual(content.count('Reverse Magnitude:'), 0)
-        self.assertEqual(content.count('Forward Magnitude:'), 2)
-        self.assertEqual(content.count('Fd Magnitude:'), 2)
+        self.assertEqual(content.count('rev value:'), 0)
+        self.assertEqual(content.count('fwd value:'), 4)
+        self.assertEqual(content.count('fd value:'), 4)
         self.assertEqual(content.count('Directional Derivative (Jrev)'), 0)
-        self.assertEqual(content.count('Directional Derivative (Jfor)'), 2)
+        self.assertEqual(content.count('Directional Derivative (Jfwd)'), 2)
         self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 2)
         self.assertEqual(content.count('Relative Error ([rev, fd] Dot Product Test) / Jfd :'), 0)
         self.assertEqual(content.count('Absolute Error ([rev, fd] Dot Product Test) :'), 0)
@@ -2019,10 +2019,10 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         contents = stream.getvalue()
         nsubjacs = 18
         self.assertEqual(contents.count("Full Model:"), nsubjacs)
-        self.assertEqual(contents.count("Fd Magnitude:"), nsubjacs)
-        self.assertEqual(contents.count("Absolute Error (Jfor - Jfd), step="), 0)
-        self.assertEqual(contents.count("Absolute Error (Jfor - Jfd)"), nsubjacs)
-        self.assertEqual(contents.count("Relative Error (Jfor - Jfd) / Jf"), nsubjacs)
+        self.assertEqual(contents.count("fd value:"), nsubjacs * 2)
+        self.assertEqual(contents.count("Absolute Error (Jfwd - Jfd), step="), 0)
+        self.assertEqual(contents.count("Absolute Error (Jfwd - Jfd)"), nsubjacs)
+        self.assertEqual(contents.count("Relative Error (Jfwd - Jfd) / Jf"), nsubjacs)
         self.assertEqual(contents.count("Raw FD Derivative (Jfd), step="), 0)
         self.assertEqual(contents.count("Raw FD Derivative (Jfd)"), nsubjacs)
 
@@ -2035,7 +2035,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         contents = stream.getvalue()
         nsubjacs = 18
         self.assertEqual(contents.count("Full Model:"), nsubjacs)
-        self.assertEqual(contents.count("Fd Magnitude:"), nsubjacs)
+        self.assertEqual(contents.count("fd value:"), nsubjacs * 2)
         self.assertEqual(contents.count("Absolute Error (Jrev - Jfd), step="), 0)
         self.assertEqual(contents.count("Absolute Error (Jrev - Jfd)"), nsubjacs)
         self.assertEqual(contents.count("Relative Error (Jrev - Jfd) / J"), nsubjacs)
@@ -2054,7 +2054,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 nsubjacs = 18
                 self.assertEqual(contents.count("step"), 0)
                 # check number of rows/cols
-                self.assertEqual(contents.count("+-----------------------------+----------------+-------------+--------------+-------------+-------------+--------------+-------------+--------------------+"), nsubjacs + 1)
+                self.assertEqual(contents.count("+-----------------------------+----------------+-------------+-------------+-------------+-------------+-------------+-------------+--------------------+"), nsubjacs + 1)
 
     def test_single_cs_step_compact(self):
         for mode in ('fwd', 'rev'):
@@ -2068,7 +2068,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 nsubjacs = 18
                 self.assertEqual(contents.count("step"), 0)
                 # check number of rows/cols
-                self.assertEqual(contents.count("+-----------------------------+----------------+-------------+--------------+-------------+-------------+--------------+-------------+------------+"), nsubjacs + 1)
+                self.assertEqual(contents.count("+-----------------------------+----------------+-------------+-------------+-------------+-------------+-------------+-------------+------------+"), nsubjacs + 1)
 
     def test_multi_fd_steps_fwd(self):
         p = om.Problem(model=CircleOpt(), driver=om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False))
@@ -2079,9 +2079,9 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         contents = stream.getvalue()
         nsubjacs = 18
         self.assertEqual(contents.count("Full Model:"), nsubjacs)
-        self.assertEqual(contents.count("Fd Magnitude:"), nsubjacs * 2)
-        self.assertEqual(contents.count("Absolute Error (Jfor - Jfd), step="), nsubjacs * 2)
-        self.assertEqual(contents.count("Relative Error (Jfor - Jfd) / Jf"), nsubjacs * 2)
+        self.assertEqual(contents.count("fd value:"), nsubjacs * 4)
+        self.assertEqual(contents.count("Absolute Error (Jfwd - Jfd), step="), nsubjacs * 2)
+        self.assertEqual(contents.count("Relative Error (Jfwd - Jfd) / Jf"), nsubjacs * 2)
         self.assertEqual(contents.count("Raw FD Derivative (Jfd), step="), nsubjacs * 2)
 
     def test_multi_fd_steps_fwd_directional(self):
@@ -2092,9 +2092,9 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         p.check_totals(step=[1e-6, 1e-7], directional=True, out_stream=stream)
         contents = stream.getvalue()
         self.assertEqual(contents.count("Full Model:"), 3)
-        self.assertEqual(contents.count("Fd Magnitude:"), 6)
-        self.assertEqual(contents.count("Absolute Error (Jfor - Jfd), step="), 6)
-        self.assertEqual(contents.count("Relative Error (Jfor - Jfd) / Jf"), 6)
+        self.assertEqual(contents.count("fd value:"), 12)
+        self.assertEqual(contents.count("Absolute Error (Jfwd - Jfd), step="), 6)
+        self.assertEqual(contents.count("Relative Error (Jfwd - Jfd) / Jf"), 6)
         self.assertEqual(contents.count("Directional FD Derivative (Jfd), step="), 6)
 
     def test_multi_fd_steps_rev(self):
@@ -2106,7 +2106,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         contents = stream.getvalue()
         nsubjacs = 18
         self.assertEqual(contents.count("Full Model:"), nsubjacs)
-        self.assertEqual(contents.count("Fd Magnitude:"), nsubjacs * 2)
+        self.assertEqual(contents.count("fd value:"), nsubjacs * 4)
         self.assertEqual(contents.count("Absolute Error (Jrev - Jfd), step="), nsubjacs * 2)
         self.assertEqual(contents.count("Relative Error (Jrev - Jfd) / J"), nsubjacs * 2)
         self.assertEqual(contents.count("Raw FD Derivative (Jfd), step="), nsubjacs * 2)
@@ -2119,7 +2119,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         p.check_totals(step=[1e-6, 1e-7], directional=True, out_stream=stream)
         contents = stream.getvalue()
         self.assertEqual(contents.count("Full Model:"), 6)
-        self.assertEqual(contents.count("Fd Magnitude:"), 12)
+        self.assertEqual(contents.count("fd value:"), 24)
         self.assertEqual(contents.count("Absolute Error ([rev, fd] Dot Product Test), step="), 12)
         self.assertEqual(contents.count("Relative Error ([rev, fd] Dot Product Test) / Jfd, step="), 12)
         self.assertEqual(contents.count("Directional FD Derivative (Jfd) Dot Product, step="), 12)
@@ -2131,12 +2131,12 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 p.setup(mode=mode)
                 p.run_model()
                 stream = StringIO()
-                p.check_totals(step=[1e-6, 1e-7], compact_print=True, out_stream=stream)
+                p.check_totals(step=[1e-6, 1e-7], compact_print=True, out_stream=stream, abs_err_tol=2e-6, rel_err_tol=3e-6)
                 contents = stream.getvalue()
                 nsubjacs = 18
                 self.assertEqual(contents.count("step"), 1)
                 # check number of rows/cols
-                self.assertEqual(contents.count("+-----------------------------+----------------+-------------+-------------+--------------+-------------+-------------+--------------+-------------+------------+"), (nsubjacs*2) + 1)
+                self.assertEqual(contents.count("+-----------------------------+----------------+-------------+-------------+-------------+-------------+-------------+-------------+-------------+------------+"), (nsubjacs*2) + 1)
 
     def test_multi_cs_steps_compact(self):
         for mode in ('fwd', 'rev'):
@@ -2150,7 +2150,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 nsubjacs = 18
                 self.assertEqual(contents.count("step"), 1)
                 # check number of rows/cols
-                self.assertEqual(contents.count("+-----------------------------+----------------+-------------+-------------+--------------+-------------+-------------+--------------+-------------+------------+"), (nsubjacs*2) + 1)
+                self.assertEqual(contents.count("+-----------------------------+----------------+-------------+-------------+-------------+-------------+-------------+-------------+-------------+------------+"), (nsubjacs*2) + 1)
 
     def test_multi_fd_steps_compact_directional(self):
         expected_divs = {
