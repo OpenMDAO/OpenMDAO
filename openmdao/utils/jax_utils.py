@@ -333,7 +333,8 @@ class CompJaxifyBase(ast.NodeTransformer):
         # arg["name"] with name.
 
         # NOTE: this will only work if the subscript is a string constant. If the subscript is a
-        # variable or some other expression, then we don't modify it.
+        # variable or some other expression, then we don't modify it and the conversion will
+        # likely fail.
         if (isinstance(node.value, ast.Name) and node.value.id in self._orig_args and
                 isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str)):
             return ast.copy_location(ast.Name(id=_fixname(node.slice.value), ctx=node.ctx), node)
