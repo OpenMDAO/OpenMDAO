@@ -25,7 +25,7 @@ class NonlinearSchurSolver(NonlinearSolver):
 
     SOLVER = "NL: NLSCHUR"
 
-    def __init__(self, mode_nonlinear="rev", sys_names=["group1", "group2"], bounds=None, **kwargs):
+    def __init__(self, mode_nonlinear="rev", sys_names=None, bounds=None, **kwargs):
         """
         Initialize all attributes.
 
@@ -88,6 +88,13 @@ class NonlinearSchurSolver(NonlinearSolver):
         super()._setup_solvers(system, depth)
 
         self._disallow_discrete_outputs()
+
+        if self._sys_names is None:
+            self._sys_names = [s for s in system._subsystems_allprocs.keys() if s != '_auto_ivc']
+
+        if len(self._sys_names) != 2:
+            raise ValueError(f'System {self.pathname} has a NonlinearSchur solver and is required to '
+                             'contain two subsystems, but it has {len(self._sys_names)}.\n{self._sys_names}')
 
         if not isinstance(self.options._dict["solve_subsystems"]["val"], bool):
             msg = "{}: solve_subsystems must be set by the user."

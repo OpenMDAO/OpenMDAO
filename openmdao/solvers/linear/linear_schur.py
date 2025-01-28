@@ -28,7 +28,7 @@ class LinearSchur(LinearSolver):
 
     SOLVER = "LN: LNSCHUR"
 
-    def __init__(self, mode_linear="rev", sys_names=["group1", "group2"], **kwargs):
+    def __init__(self, mode_linear="rev", sys_names=None, **kwargs):
         """
         Initialize all attributes.
         """
@@ -50,6 +50,27 @@ class LinearSchur(LinearSolver):
 
         self.options.undeclare("atol")
         self.options.undeclare("rtol")
+
+    def _setup_solvers(self, system, depth):
+        """
+        Assign system instance, set depth, and optionally perform setup.
+
+        Parameters
+        ----------
+        system : System
+            pointer to the owning system.
+        depth : int
+            depth of the current system (already incremented).
+        """
+        super()._setup_solvers(system, depth)
+
+        if self._sys_names is None:
+            self._sys_names = [s for s in system._subsystems_allprocs.keys() if s != '_auto_ivc']
+
+        if len(self._sys_names) != 2:
+            raise ValueError(f'System {self.pathname} has a LinearSchur solver and is required to '
+                             'contain two subsystems, but it has {len(self._sys_names)}.\n{self._sys_names}')
+
 
     def solve(self, mode, rel_systems=None):
         """
