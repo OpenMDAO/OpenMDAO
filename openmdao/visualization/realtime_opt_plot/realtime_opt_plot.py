@@ -2,6 +2,7 @@
 
 from collections import defaultdict
 import sqlite3
+import time  # TODO remove
 
 from bokeh.models import (
     ColumnDataSource,
@@ -44,8 +45,10 @@ except:
     def get_free_port():
         return 5000
 
-import time
+_obj_color = "black"
+
 start_time = time.time()
+
 
 def _realtime_opt_plot_setup_parser(parser):
     """
@@ -168,11 +171,19 @@ def _make_legend_item(varname, color):
 
 
 def _update_y_min_max(name, y, y_min, y_max):
-    y_min[name] = min(y_min[name], y)
-    y_max[name] = max(y_max[name], y)
-    if y_min[name] == y_max[name]:
-        y_min[name] = y_min[name] - 1
-        y_max[name] = y_max[name] + 1
+    min_max_changed = False
+    if y < y_min[name]:
+        y_min[name] = y
+        min_max_changed = True
+    if y > y_max[name]:
+        y_max[name] = y
+        min_max_changed = True
+    return min_max_changed
+    # y_min[name] = min(y_min[name], y)
+    # y_max[name] = max(y_max[name], y)
+    # if y_min[name] == y_max[name]:
+    #     y_min[name] = y_min[name] - 1
+    #     y_max[name] = y_max[name] + 1
 
 def _get_value_for_plotting(value_from_recorder, var_type):
     if value_from_recorder is None or value_from_recorder.size == 0:
@@ -180,8 +191,18 @@ def _get_value_for_plotting(value_from_recorder, var_type):
     if var_type == 'cons':
         # plot the worst case value
         return np.linalg.norm(value_from_recorder, ord=np.inf)
+    elif var_type == 'objs':
+        return value_from_recorder.item() # get as scalar
     else:
         return np.linalg.norm(value_from_recorder)
+
+def _make_header_text_for_variable_chooser(header_text):
+    header_text_div = Div(
+        text=f"<b>{header_text}</b>",
+        # width=200,
+        styles={"font-size": "14"},
+    ) 
+    return header_text_div
 
 
 class CaseTracker:
@@ -400,10 +421,6 @@ class CaseTracker:
 
         try:
             units = driver_case._get_units(name)
-
-
-
-
         except RuntimeError as err:
             if str(err).startswith("Can't get units for the promoted name"):
                 return "Ambiguous"
@@ -526,22 +543,17 @@ class RealTimeOptPlot(object):
 
                     # Objective
                     obj_names = case_tracker.get_obj_names()
-                    obj_label = Div(
-                        text="<b>OBJECTIVE</b>",
-                        width=200,
-                        styles={"font-size": "12"},  # Set font size using CSS
-                    )  # Fixed-width text label
-                    column_items.append(obj_label)
-
                     if len(obj_names) != 1:
                         raise ValueError(
                             f"Plot assumes there is on objective but {len(obj_names)} found"
                         )
+                    obj_label = _make_header_text_for_variable_chooser("OBJECTIVE")
+                    column_items.append(obj_label)
+
                     for i, obj_name in enumerate(obj_names):
                         units = case_tracker.get_units(obj_name)
 
-                        color = "black"
-                        toggle = _make_legend_item(f"{obj_name} ({units})", color)
+                        toggle = _make_legend_item(f"{obj_name} ({units})", _obj_color)
                         toggle.active = True
                         self.toggles.append(toggle)
 
@@ -555,8 +567,9 @@ class RealTimeOptPlot(object):
                         if not math.isnan(value): 
 
                             # set the range
-                            y_min = value
-                            y_max = value
+                            float_value = _get_value_for_plotting(value, "objs")
+                            y_min = float_value
+                            y_max = float_value
                             # if the range is zero, the axis will not be displayed. Plus need some range to make it
                             #    look good. Some other code seems to do +- 1 for the range in this case.
                             if y_min == y_max:
@@ -564,6 +577,7 @@ class RealTimeOptPlot(object):
                                 y_max = y_max + 1
 
                         else:
+                            print("------------------ NaN -------------")
                             y_min = -1
                             y_max = 1
 
@@ -574,8 +588,8 @@ class RealTimeOptPlot(object):
                             y=obj_name,
                             line_width=3,
                             source=self._source,
-                            color="black",
-                        )  # make the objective black
+                            color=_obj_color,
+                        )
                         p.yaxis.axis_label = f"Objective: {obj_name} ({units})"
 
                         self.lines.append(obj_line)
@@ -594,12 +608,7 @@ class RealTimeOptPlot(object):
                         p.add_tools(hover)
 
                     # desvars
-                    desvars_label = Div(
-                        text="<b>DESIGN VARS</b>",
-                        width=200,
-                        styles={"font-size": "12"},  # Set font size using CSS
-                    )  # Fixed-width text label
-
+                    desvars_label = _make_header_text_for_variable_chooser("DESIGN VARS")
                     column_items.append(desvars_label)
 
                     desvar_names = case_tracker.get_desvar_names()
@@ -607,27 +616,14 @@ class RealTimeOptPlot(object):
                         color = palette[i_color % 60]
                         units = case_tracker.get_units(desvar_name)
 
-                        toggle = _make_legend_item(f"{desvar_name} ({units})", color)
+                        # toggle = _make_legend_item(f"{desvar_name} ({units})", color)
+                        toggle = _make_legend_item(f"{desvar_name} ({units})", "black")
                         self.toggles.append(toggle)
                         column_items.append(toggle)
 
-                        # desvar_line = p.line(
-                        #     x="iteration",
-                        #     y=desvar_name,
-                        #     line_width=3,
-                        #     y_range_name=f"extra_y_{desvar_name}",
-                        #     source=self._source,
-                        #     # color=color,
-                        #     color="black",
-                        #     visible=False,
-                        # )
-                        # desvar_line.visible = False
-
                         value = new_data["desvars"][desvar_name]
 
-                        size = value.size
-
-                        if size == 1:
+                        if value.size == 1:
                             desvar_line = p.line(
                                 x="iteration",
                                 y=f"{desvar_name}_min",
@@ -638,33 +634,31 @@ class RealTimeOptPlot(object):
                                 color="black",
                                 # visible=False,
                             )
-                        else:
-                            desvar_line = p.varea(
-                                x="iteration",
-                                y1=f"{desvar_name}_min",
-                                y2=f"{desvar_name}_max",
-                                # line_width=3,
-                                y_range_name=f"extra_y_{desvar_name}",
-                                source=self._source,
-                                # color=color,
-                                color="black",
-                                # visible=False,
-                                # visible=True,
-                                alpha=0.3,
-                            )
+                        # Can't do hover tools for varea ! https://github.com/bokeh/bokeh/issues/8872
                         desvar_line.visible = False
 
                         self.lines.append(desvar_line)
 
-                        hover = HoverTool(
-                            renderers=[desvar_line],
-                            tooltips=[
-                                ("Iteration", "@iteration"),
-                                (desvar_name, "@{%s}" % desvar_name + "{0.00}"),
-                            ],
-                            mode="vline",
-                            visible=False,
-                        )
+                        if value.size == 1:
+                            hover = HoverTool(
+                                renderers=[desvar_line],
+                                tooltips=[
+                                    ("Iteration", "@iteration"),
+                                    (f"{desvar_name} min", "@{%s}" % (desvar_name + "_min") + "{0.00}"),
+                                ],
+                                mode="vline",
+                                visible=False,
+                            )
+                        else:
+                            hover = HoverTool(
+                                renderers=[desvar_line],
+                                tooltips=[
+                                    ("Iteration", "@iteration"),
+                                    (f"{desvar_name} min", "@{%s}" % (desvar_name + "_min") + "{0.00}"),
+                                ],
+                                mode="vline",
+                                visible=False,
+                            )
 
                         # Add the hover tools to the plot
                         p.add_tools(hover)
@@ -682,27 +676,27 @@ class RealTimeOptPlot(object):
                         p.add_layout(extra_y_axis, "right")
                         p.right[i_color].visible = False
 
+
+                        value = new_data["desvars"][desvar_name]
+                        float_value = _get_value_for_plotting(value, "desvars")
+
                         # set the range
-                        y_min = 200
-                        y_max = -200
-                        # if the range is zero, the axis will not be displayed. Plus need some range to make it
-                        #    look good. Some other code seems to do +- 1 for the range in this case.
-                        if y_min == y_max:
-                            y_min = y_min - 1
-                            y_max = y_max + 1
+                        # y_min = 200
+                        # y_max = -200
+                        # # if the range is zero, the axis will not be displayed. Plus need some range to make it
+                        # #    look good. Some other code seems to do +- 1 for the range in this case.
+                        # if y_min == y_max:
+                        #     y_min = y_min - 1
+                        #     y_max = y_max + 1
                         p.extra_y_ranges[f"extra_y_{desvar_name}"] = Range1d(
-                            y_min, y_max
+                            float_value - 1, float_value + 1
                         )
 
                         # p.add_layout(extra_y_axis, 'right')
                         i_color += 1
 
                     # cons
-                    cons_label = Div(
-                        text="<b>CONSTRAINTS</b>",
-                        width=200,
-                        styles={"font-size": "12"},  # Set font size using CSS
-                    )  # Fixed-width text label
+                    cons_label = _make_header_text_for_variable_chooser("CONSTRAINTS")
 
                     column_items.append(cons_label)
 
@@ -711,10 +705,6 @@ class RealTimeOptPlot(object):
                         color = palette[i_color % 60]
 
                         units = case_tracker.get_units(cons_name)
-
-
-                        # units = "junk"
-
                         toggle = _make_legend_item(f"{cons_name} ({units})", color)
                         self.toggles.append(toggle)
                         column_items.append(toggle)
@@ -759,13 +749,15 @@ class RealTimeOptPlot(object):
                         p.right[i_color].visible = False
 
                         # set the range
-                        y_min = -100
-                        y_max = 100
-                        # if the range is zero, the axis will not be displayed. Plus need some range to make it
-                        #    look good. Some other code seems to do +- 1 for the range in this case.
-                        if y_min == y_max:
-                            y_min = y_min - 1
-                            y_max = y_max + 1
+                        # y_min = -100
+                        # y_max = 100
+                        # # if the range is zero, the axis will not be displayed. Plus need some range to make it
+                        # #    look good. Some other code seems to do +- 1 for the range in this case.
+                        # if y_min == y_max:
+                        #     y_min = y_min - 1
+                        #     y_max = y_max + 1
+                        value = new_data["cons"][cons_name]
+                        float_value = _get_value_for_plotting(value, "cons")
                         p.extra_y_ranges[f"extra_y_{cons_name}"] = Range1d(y_min, y_max)
 
                         i_color += 1
@@ -1002,33 +994,31 @@ class RealTimeOptPlot(object):
 
                 for obj_name, obj_value in new_data["objs"].items():
 
-                    print(f"{obj_value=}")
-
                     float_obj_value = _get_value_for_plotting(obj_value, "objs")
 
                     import math
                     if not math.isnan(float_obj_value):
                         source_stream_dict[obj_name] = [float_obj_value]
-                        _update_y_min_max(obj_name, float_obj_value, self.y_min, self.y_max)
-                        print(f"{p.y_range.start=}")
-                        print(f"{p.y_range.end=}")
-                        p.y_range.start = self.y_min[obj_name]
-                        p.y_range.end = self.y_max[obj_name]
+                        min_max_changed = _update_y_min_max(obj_name, float_obj_value, self.y_min, self.y_max)
+                        if min_max_changed:
+                            p.y_range.start = self.y_min[obj_name]
+                            p.y_range.end = self.y_max[obj_name]
 
                     iline += 1
 
                 for desvar_name, desvar_value in new_data["desvars"].items():
-                    float_desvar_value = _get_value_for_plotting(desvar_value, "desvars")
+                    float_desvar_value = _get_value_for_plotting(desvar_value, "desvars")  # TODO is this used?
 
                     if not self._labels_updated_with_units and desvar_value.size > 1:
                         units = case_tracker.get_units(desvar_name)
                         self.toggles[iline].label = f"{desvar_name} ({units}) {desvar_value.shape}"
 
-                    _update_y_min_max(desvar_name, np.min(desvar_value), self.y_min, self.y_max)
-                    _update_y_min_max(desvar_name, np.max(desvar_value), self.y_min, self.y_max)
+                    min_max_changed = False
+                    min_max_changed = min_max_changed or _update_y_min_max(desvar_name, np.min(desvar_value), self.y_min, self.y_max)
+                    min_max_changed = min_max_changed or _update_y_min_max(desvar_name, np.max(desvar_value), self.y_min, self.y_max)
                     source_stream_dict[f"{desvar_name}_min"] = [np.min(desvar_value)]
                     source_stream_dict[f"{desvar_name}_max"] = [np.max(desvar_value)]
-                    if self.lines[iline].visible:
+                    if min_max_changed: # TODO fix
                         range = Range1d(
                             self.y_min[desvar_name], self.y_max[desvar_name]
                         )
@@ -1043,8 +1033,8 @@ class RealTimeOptPlot(object):
                         self.toggles[iline].label = f"{cons_name} ({units}) {cons_value.shape}"
 
                     source_stream_dict[cons_name] = [float_cons_value]
-                    _update_y_min_max(cons_name, float_cons_value, self.y_min, self.y_max)
-                    if self.lines[iline].visible:
+                    min_max_changed = _update_y_min_max(cons_name, float_cons_value, self.y_min, self.y_max)
+                    if min_max_changed:
 
                         range = Range1d(
                             self.y_min[cons_name], self.y_max[cons_name]
