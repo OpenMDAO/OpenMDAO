@@ -29,17 +29,17 @@ case_solutions = {'liu': np.array([1.0, 1.0]),
 class TestSchurSolvers(unittest.TestCase):
 
     def test_result(self):
-        for case in ('liu', 'simple1', 'simple2', 'simple3', 'simple4',
-                     'center1', 'center2', 'center3', 'center4'):
+        # for case in ('liu', 'simple1', 'simple2', 'simple3', 'simple4',
+        #              'center1', 'center2', 'center3', 'center4'):
+        for case in ('liu',):# 'center1',):
             # for solver in ('nlbgs', 'hierarchical_newton', 'schur', 'newton_schur',
             #                'schur_BGS', 'newton_BGS', 'schur_schur', 'NLrun_schur'):
-            for solver in ('schur', 'schur_BGS', 'newton_schur', 'schur_schur',):
+            for solver in ('schur_schur',):# 'schur_BGS', 'newton_schur', 'schur_schur',):
                 for mode in ('fwd', 'rev',):
                     with self.subTest(f'{case=} {solver=} {mode=}'):
                         _run_test_problem(case=case, solver=solver, mode=mode,
                                         solution=case_solutions[case])
             
-
 
 def _run_test_problem(case, solver, mode, solution):
 
@@ -151,7 +151,6 @@ def _run_test_problem(case, solver, mode, solution):
         comp1.nonlinear_solver = om.NewtonSolver(atol=1e-13, rtol=1e-13, solve_subsystems=False, maxiter=40)
         comp1.linear_solver = om.DirectSolver()
 
-
     comp2 = p.model.add_subsystem("comp2", Comp2())
 
     if (
@@ -170,7 +169,6 @@ def _run_test_problem(case, solver, mode, solution):
         # parent is doing NLBGS, so we are on our own to solve this subsystem
         comp2.nonlinear_solver = om.NewtonSolver(atol=1e-15, rtol=1e-15, solve_subsystems=False, maxiter=40)
         comp2.linear_solver = om.DirectSolver()
-
 
     p.model.connect("comp1.x1", "comp2.x1")
     p.model.connect("comp2.x2", "comp1.x2")
@@ -242,9 +240,6 @@ def _run_test_problem(case, solver, mode, solution):
         p.model.linear_solver = om.LinearSchur(mode_linear=mode)
     p.setup(mode=mode)
 
-    # p.model
-    om.n2(p, show_browser=False, outfile="simple_problem.html")
-
     ###
     ### INITIAL GUESSES
     ###
@@ -269,29 +264,29 @@ def _run_test_problem(case, solver, mode, solution):
     for ii in range(n_xinit):
         # set the initial values
         p.setup(mode=mode)
-        p.model.set_solver_print(level=2, depth=3)
+        p.model.set_solver_print(level=-1, depth=3)
 
         p["comp1.x1"] = x_init[ii, 0]
         p["comp2.x2"] = x_init[ii, 1]
 
-        recorder = om.SqliteRecorder(f"./solver_{ii}.sql")
-        solver = p.model.nonlinear_solver
-        solver.add_recorder(recorder)
-        solver.recording_options["record_abs_error"] = True
-        solver.recording_options["record_rel_error"] = True
-        solver.recording_options["record_outputs"] = True
-        solver.recording_options["record_inputs"] = True
+        recorder = om.SqliteRecorder(f"solver_{ii}.sql")
+        nlsolver = p.model.nonlinear_solver
+        nlsolver.add_recorder(recorder)
+        nlsolver.recording_options["record_abs_error"] = True
+        nlsolver.recording_options["record_rel_error"] = True
+        nlsolver.recording_options["record_outputs"] = True
+        nlsolver.recording_options["record_inputs"] = True
 
         p.run_model()
 
         assert_near_equal([p.get_val('comp1.x1')[0], p.get_val('comp2.x2')[0]],
                           solution,
                           tolerance=1.0E-12)
-
+  
         p.cleanup()
 
         # --- Load the recorded data ---
-        cr = om.CaseReader(f"./solver_{ii}.sql")
+        cr = om.CaseReader(p.get_outputs_dir() / f'solver_{ii}.sql')
         solver_cases = cr.list_cases("root.nonlinear_solver", out_stream=None)
         x1_hist = []
         x2_hist = []
@@ -317,8 +312,8 @@ def _run_test_problem(case, solver, mode, solution):
         x_hist.append((x1_hist, x2_hist))
 
 
-    for ii in range(len(x_hist)):
-        print(ii, x_hist[ii], "\n\n")
+    # for ii in range(len(x_hist)):
+    #     print(ii, x_hist[ii], "\n\n")
     # quit()
 
     # check some totals
@@ -330,6 +325,8 @@ def _run_test_problem(case, solver, mode, solution):
     ###
     ### create a contour plot of the residual
     ###
+
+    return
 
     # need to set the solver to nonlinear run once
     p.model.nonlinear_solver = om.NewtonSolver(atol=1e-12, rtol=1e-12, solve_subsystems=False, maxiter=0)

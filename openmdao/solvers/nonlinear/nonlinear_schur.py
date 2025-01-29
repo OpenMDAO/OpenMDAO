@@ -116,6 +116,21 @@ class NonlinearSchurSolver(NonlinearSolver):
             for s in self.linear_solver._assembled_jac_solver_iter():
                 yield s
 
+    def _linearize_children(self):
+        """
+        Return a flag that is True when we need to call linearize on our subsystems' solvers.
+
+        Returns
+        -------
+        bool
+            Flag for indicating child linerization
+        """
+        return (
+            self.options["solve_subsystems"]
+            and not self._system().under_complex_step
+            and self._iter_count <= self.options["max_sub_solves"]
+        )
+
     def _set_solver_print(self, level=2, type_="all"):
         """
         Control printing for solvers and subsolvers in the model.
@@ -399,14 +414,14 @@ class NonlinearSchurSolver(NonlinearSolver):
                     system._outputs[f"{subsys2.name}.{var}"] = upperB[ii]
 
         # print outputs
-        if system.comm.rank == 0:
-            print("\n+  -------------------")
-            print("+  Balance variables:")
-            print("+  -------------------\n+")
-            for ii, var in enumerate(vars_to_solve):
-                ivar = var.split(".")
-                print("+ ", ivar[-1], " = ", system._outputs[f"{subsys2.name}.{var}"][0])
-            print("\n")
+        # if system.comm.rank == 0:
+        #     print("\n+  -------------------")
+        #     print("+  Balance variables:")
+        #     print("+  -------------------\n+")
+        #     for ii, var in enumerate(vars_to_solve):
+        #         ivar = var.split(".")
+        #         print("+ ", ivar[-1], " = ", system._outputs[f"{subsys2.name}.{var}"][0])
+        #     print("\n")
 
         self._solver_info.pop()
 

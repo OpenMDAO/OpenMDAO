@@ -300,9 +300,6 @@ class Solver(object, metaclass=SolverMetaclass):
         recorder : <CaseRecorder>
            A recorder instance to be added to RecManager.
         """
-        if MPI:
-            raise RuntimeError(
-                "Recording of Solvers when running parallel code is not supported yet")
         self._rec_mgr.append(recorder)
 
     def _declare_options(self):
