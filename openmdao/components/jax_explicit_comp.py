@@ -3,13 +3,11 @@ An ExplicitComponent that uses JAX for derivatives.
 """
 
 import sys
-import inspect
 from types import MethodType
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.jax_utils import jax, jit, ExplicitCompJaxify, \
-    compute_partials as _jax_compute_partials, \
+from openmdao.utils.jax_utils import jax, jit, compute_partials as _jax_compute_partials, \
     compute_jacvec_product as _jax_compute_jacvec_product, ReturnChecker, _jax_register_pytree_class
 
 
@@ -44,36 +42,17 @@ class JaxExplicitComponent(ExplicitComponent):
         """
         Set up the jax interface for this component.
         """
+        if self.compute_primal is None:
+            raise RuntimeError(f"{self.msginfo}: compute_primal is not defined for this component.")
+
         if self.matrix_free is True:
             self.compute_jacvec_product = MethodType(_jax_compute_jacvec_product, self)
         else:
             self.compute_partials = MethodType(_jax_compute_partials, self)
             self._has_compute_partials = True
 
-        if self.compute_primal is None:
-            # convert the compute method to a compute_primal method
-            jaxifier = ExplicitCompJaxify(self, verbose=True)
-
-            if jaxifier.get_self_statics:
-                self.get_self_statics = MethodType(jaxifier.get_self_statics, self)
-            # replace existing compute method with base class method, so that compute_primal
-            # will be called.
-            self.compute = MethodType(ExplicitComponent.compute, self)
-
-            self.compute_primal = MethodType(jaxifier.compute_primal, self)
-            self._compute_primal_returns_tuple = True
-        else:
-            # check that compute_primal args are in the correct order
-            args = list(inspect.signature(self.compute_primal).parameters)
-            if args and args[0] == 'self':
-                args = args[1:]
-            compargs = self._get_compute_primal_argnames()
-            if args != compargs:
-                raise RuntimeError(f"{self.msginfo}: compute_primal method args {args} don't match "
-                                   f"the expected args {compargs}.")
-
-            # determine if the compute_primal method returns a tuple
-            self._compute_primal_returns_tuple = ReturnChecker(self.compute_primal).returns_tuple()
+        # determine if the compute_primal method returns a tuple
+        self._compute_primal_returns_tuple = ReturnChecker(self.compute_primal).returns_tuple()
 
         if self.options['use_jit']:
             static_argnums = []

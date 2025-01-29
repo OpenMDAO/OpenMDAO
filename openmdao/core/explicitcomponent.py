@@ -1,6 +1,7 @@
 """Define the ExplicitComponent class."""
 
 import numpy as np
+from itertools import chain
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.core.component import Component
@@ -167,7 +168,8 @@ class ExplicitComponent(Component):
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,
-                   shape_by_conn=False, copy_shape=None, compute_shape=None, distributed=None):
+                   shape_by_conn=False, copy_shape=None, compute_shape=None, distributed=None,
+                   primal_name=None):
         """
         Add an output variable to the component.
 
@@ -223,6 +225,9 @@ class ExplicitComponent(Component):
         distributed : bool
             If True, this variable is a distributed variable, so it can have different sizes/values
             across MPI processes.
+        primal_name : str or None
+            Valid python name to represent the variable in compute_primal if 'name' is not a valid
+            python name.
 
         Returns
         -------
@@ -238,7 +243,7 @@ class ExplicitComponent(Component):
                                   ref=ref, ref0=ref0, res_ref=res_ref,
                                   tags=tags, shape_by_conn=shape_by_conn,
                                   copy_shape=copy_shape, compute_shape=compute_shape,
-                                  distributed=distributed)
+                                  distributed=distributed, primal_name=primal_name)
 
     def _approx_subjac_keys_iter(self):
         is_output = self._outputs._contains_abs
@@ -614,8 +619,8 @@ class ExplicitComponent(Component):
         list
             List of argnames expected by the compute_primal method.
         """
-        argnames = []
-        argnames.extend(self._var_rel_names['input'])
-        if self._discrete_inputs:
-            argnames.extend(self._discrete_inputs)
-        return argnames
+        if self._valid_name_map:
+            return [self._valid_name_map.get(n, n) for n in chain(self._var_rel_names['input'],
+                                                                  self._discrete_inputs)]
+        else:
+            return list(chain(self._var_rel_names['input'], self._discrete_inputs))

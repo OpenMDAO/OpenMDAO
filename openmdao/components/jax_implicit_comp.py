@@ -3,7 +3,6 @@ An ImplicitComponent that uses JAX for derivatives.
 """
 
 import sys
-import inspect
 from types import MethodType
 
 from openmdao.core.implicitcomponent import ImplicitComponent
@@ -40,23 +39,14 @@ class JaxImplicitComponent(ImplicitComponent):
             self.options['derivs_method'] = fallback_derivs_method
 
     def _setup_jax(self):
+        if self.compute_primal is None:
+            raise RuntimeError(f"{self.msginfo}: compute_primal is not defined for this component.")
+
         if self.matrix_free is True:
             self.apply_linear = MethodType(_jax_apply_linear, self)
         else:
             self.linearize = MethodType(_jax_linearize, self)
             self._has_linearize = True
-
-        if self.compute_primal is None:
-            raise RuntimeError(f"{self.msginfo}: compute_primal is not defined for this component.")
-
-        # check that compute_primal args are in the correct order
-        args = list(inspect.signature(self.compute_primal).parameters)
-        if args and args[0] == 'self':
-            args = args[1:]
-        compargs = self._get_compute_primal_argnames()
-        if args != compargs:
-            raise RuntimeError(f"{self.msginfo}: compute_primal method args {args} don't match "
-                                f"the expected args {compargs}.")
 
         if self.options['use_jit']:
             static_argnums = []

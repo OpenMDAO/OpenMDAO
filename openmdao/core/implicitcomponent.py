@@ -1,6 +1,7 @@
 """Define the ImplicitComponent class."""
 
 from scipy.sparse import coo_matrix
+from itertools import chain
 import numpy as np
 
 from openmdao.core.component import Component, _allowed_types
@@ -935,14 +936,15 @@ class ImplicitComponent(Component):
             yield from discrete_inputs.values()
 
     def _get_compute_primal_argnames(self):
-        argnames = []
-        argnames.extend(name for name in self._var_rel_names['input']
-                        if name not in self._discrete_inputs)
-        argnames.extend(name for name in self._var_rel_names['output']
-                        if name not in self._discrete_outputs)
-        if self._discrete_inputs:
-            argnames.extend(self._discrete_inputs)
-        return argnames
+        if self._valid_name_map:
+            argnames = [self._valid_name_map.get(n, n) for n in self._var_rel_names['input']]
+            argnames.extend(self._valid_name_map.get(n, n) for n in self._var_rel_names['output'])
+            if self._discrete_inputs:
+                argnames.extend(self._valid_name_map.get(n, n) for n in self._discrete_inputs)
+            return argnames
+        else:
+            return list(chain(self._var_rel_names['input'], self._var_rel_names['output'],
+                              self._discrete_inputs))
 
 
 def meta2range_iter(meta_dict, names=None, shp_name='shape'):

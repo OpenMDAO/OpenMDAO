@@ -109,6 +109,7 @@ class DotProductMultDiscretePrimal(om.JaxExplicitComponent):
         self._discrete_outputs.set_vals((disc_out,))
         return (z, zz, disc_out)
 
+
 x_shape = (2, 3)
 y_shape = (3, 4)
 
@@ -324,7 +325,6 @@ class TestJaxComp(unittest.TestCase):
 
 
 if sys.version_info >= (3, 9):
-
 
     class CompRetValue(om.JaxExplicitComponent):
         def __init__(self, shape, nins=1, nouts=1, **kwargs):
