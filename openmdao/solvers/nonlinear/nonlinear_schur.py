@@ -14,6 +14,19 @@ class NonlinearSchurSolver(NonlinearSolver):
 
     The default linear solver is the linear_solver in the containing system.
 
+    Parameters
+    ----------
+    mode_nonlinear : str
+        Specify whether this system is being solved in 'fwd' or 'rev' mode.
+    sys_names : Sequence
+        A sequence of the coupled systems to be solved with the NonlienarSchurSolver.
+        If not provided, these will be determined automatically. If provided,
+        there must be two systems.
+    bounds : dict
+        A dictionary of lower and upper bounds.
+    **kwargs : dict
+        Options passed to the creation of the solver.
+
     Attributes
     ----------
     linear_solver : LinearSolver
@@ -34,30 +47,6 @@ class NonlinearSchurSolver(NonlinearSolver):
     def __init__(self, mode_nonlinear='rev', sys_names=None, bounds=None, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        mode_nonlinear : str
-            Specify whether this system is being solved in 'fwd' or 'rev' mode.
-        sys_names : Sequence
-            A sequence of the coupled systems to be solved with the NonlienarSchurSolver.
-            If not provided, these will be determined automatically. If provided,
-            there must be two systems.
-        bounds : dict
-            A dictionary of lower and upper bounds
-        **kwargs : dict
-            options dictionary.
-
-        Attributes
-        ----------
-        _mode_nonlinear : str
-            Specify whether this system is being solved in 'fwd' or 'rev' mode.
-        _sys_names : Sequence
-            A sequence of the coupled systems to be solved with the NonlienarSchurSolver.
-            If not provided, these will be determined automatically. If provided,
-            there must be two systems.
-        _bounds : dict
-            A dictionary of lower and upper bounds
         """
         self._bounds = bounds
         self._mode_nonlinear = mode_nonlinear

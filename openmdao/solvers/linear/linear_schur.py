@@ -13,6 +13,11 @@ class LinearSchur(LinearSolver):
 
     Parameters
     ----------
+    mode_linear : str
+        Specifies whether the solver is operating in forward ('fwd') or reverse ('rev') mode.
+    sys_names : Sequence
+        The two coupled systems being solved with this solver. If unspecified, LinearSchur
+        will attempt to determine them automatically.
     **kwargs : dict
         Options dictionary.
 
@@ -80,6 +85,13 @@ class LinearSchur(LinearSolver):
     def solve(self, mode, rel_systems=None):
         """
         Perform the operations in the iteration loop.
+
+        Parameters
+        ----------
+        mode : str
+            Specifies whether the solver is operating in forward ('fwd') or reverse ('rev') mode.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.  Deprecated.
         """
         self._mode = mode
         self._rel_systems = rel_systems
