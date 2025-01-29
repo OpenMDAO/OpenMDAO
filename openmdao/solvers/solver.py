@@ -1114,7 +1114,7 @@ class LinearSolver(Solver):
     def _vars_union(self, slv_vars, sys_vars):
         """
         Return the union of the two 'set's of variables.
-        
+
         The first 'set' comes from the this solver and the second from the set of variables
         from the current System that are relevent to the current matrix vector product. Note
         that this is called separately for input and output variables.
