@@ -1110,20 +1110,23 @@ class LinearSolver(Solver):
             system._apply_linear(self._assembled_jac, self._mode, scope_out, scope_in)
         finally:
             self._recording_iter.pop()
-    
+
     def _vars_union(self, slv_vars, sys_vars):
         """
         Return the union of the two 'set's of variables.
+        
         The first 'set' comes from the this solver and the second from the set of variables
         from the current System that are relevent to the current matrix vector product. Note
         that this is called separately for input and output variables.
         Also handles cases where incoming variables are _UNDEFINED or None instead of sets.
+
         Parameters
         ----------
         slv_vars : set, None, or _UNDEFINED
             First variable set.
         sys_vars : set, None, or _UNDEFINED
             Second variable set.
+
         Returns
         -------
         set, None, or _UNDEFINED
@@ -1131,7 +1134,7 @@ class LinearSolver(Solver):
         """
         if sys_vars is None or slv_vars is None:
             return None
-        if slv_vars is _UNDEFINED:
+        if slv_vars == _UNDEFINED:
             return sys_vars
         return sys_vars.union(slv_vars)
 

@@ -10,7 +10,7 @@ import scipy
 
 class NonlinearSchurSolver(NonlinearSolver):
     """
-    Nonlinear Schur complement
+    Nonlinear Schur complement solver implementation.
 
     The default linear solver is the linear_solver in the containing system.
 
@@ -19,20 +19,45 @@ class NonlinearSchurSolver(NonlinearSolver):
     linear_solver : LinearSolver
         Linear solver to use to find the Newton search direction. The default
         is the parent system's linear solver.
-    linesearch : NonlinearSolver
-        Line search algorithm. Default is None for no line search.
+    _mode_nonlinear : str
+        Specify whether this system is being solved in 'fwd' or 'rev' mode.
+    _sys_names : Sequence
+        A sequence of the coupled systems to be solved with the NonlienarSchurSolver.
+        If not provided, these will be determined automatically. If provided,
+        there must be two systems.
+    _bounds : dict
+        A dictionary of lower and upper bounds
     """
 
-    SOLVER = "NL: NLSCHUR"
+    SOLVER = 'NL: NLSCHUR'
 
-    def __init__(self, mode_nonlinear="rev", sys_names=None, bounds=None, **kwargs):
+    def __init__(self, mode_nonlinear='rev', sys_names=None, bounds=None, **kwargs):
         """
         Initialize all attributes.
 
         Parameters
         ----------
+        mode_nonlinear : str
+            Specify whether this system is being solved in 'fwd' or 'rev' mode.
+        sys_names : Sequence
+            A sequence of the coupled systems to be solved with the NonlienarSchurSolver.
+            If not provided, these will be determined automatically. If provided,
+            there must be two systems.
+        bounds : dict
+            A dictionary of lower and upper bounds
         **kwargs : dict
             options dictionary.
+
+        Attributes
+        ----------
+        _mode_nonlinear : str
+            Specify whether this system is being solved in 'fwd' or 'rev' mode.
+        _sys_names : Sequence
+            A sequence of the coupled systems to be solved with the NonlienarSchurSolver.
+            If not provided, these will be determined automatically. If provided,
+            there must be two systems.
+        _bounds : dict
+            A dictionary of lower and upper bounds
         """
         self._bounds = bounds
         self._mode_nonlinear = mode_nonlinear
@@ -51,28 +76,42 @@ class NonlinearSchurSolver(NonlinearSolver):
         """
         super()._declare_options()
 
-        self.options.declare("solve_subsystems", types=bool, desc="Set to True to turn on sub-solvers (Hybrid Newton).")
-        self.options.declare("max_sub_solves", types=int, default=10, desc="Maximum number of subsystem solves.")
-        self.options.declare("lamda", types=float, default=1.0, desc="Constant parameter for inexact schur step. 0 < lamda <=1. That is x(i+1) = x(i) + lamda * dx")
-        self.options.declare("factor_lamda", types=float, default=None, desc="When to use 'lamda'. When the nonlinear solution is too far away, we may want to take smaller steps to reach to the solution. However, when the the nonlinear solution is close to the fianl solution, we may want to allow the solver to take larger steps. This factor limits the allowable ratio of the new step to the current state variable value. For example, setting 1 will let the solver to use 'lamda' only when the ratio of the new step to the current state variable value is greater than equal to 1")
+        self.options.declare('solve_subsystems', types=bool,
+                             desc='Set to True to turn on sub-solvers (Hybrid Newton).')
+        self.options.declare('max_sub_solves', types=int, default=10,
+                             desc='Maximum number of subsystem solves.')
+        self.options.declare('lamda', types=float, default=1.0,
+                             desc='Constant parameter for inexact schur step. 0 < lamda <=1.'
+                                  ' That is x(i+1) = x(i) + lamda * dx')
+        self.options.declare('factor_lamda', types=float, default=None,
+                             desc='When to use "lamda". When the nonlinear solution '
+                             'is too far away, we may want to take smaller steps to '
+                             'reach to the solution. However, when the the nonlinear '
+                             'solution is close to the fianl solution, we may want '
+                             'to allow the solver to take larger steps. This factor '
+                             'limits the allowable ratio of the new step to the '
+                             'current state variable value. For example, setting 1 '
+                             'will let the solver to use "lamda" only when the ratio '
+                             'of the new step to the current state variable value '
+                             'is greater than equal to 1.')
         self.options.declare(
-            "cs_reconverge",
+            'cs_reconverge',
             types=bool,
             default=True,
-            desc="When True, when this driver solves under a complex step, nudge "
-            "the Solution vector by a small amount so that it reconverges.",
+            desc='When True, when this driver solves under a complex step, nudge '
+            'the Solution vector by a small amount so that it reconverges.',
         )
         self.options.declare(
-            "reraise_child_analysiserror",
+            'reraise_child_analysiserror',
             types=bool,
             default=False,
-            desc="When the option is true, a solver will reraise any "
-            "AnalysisError that arises during subsolve; when false, it will "
-            "continue solving.",
+            desc='When the option is true, a solver will reraise any '
+            'AnalysisError that arises during subsolve; when false, it will '
+            'continue solving.',
         )
 
-        self.supports["gradients"] = True
-        self.supports["implicit_components"] = True
+        self.supports['gradients'] = True
+        self.supports['implicit_components'] = True
 
     def _setup_solvers(self, system, depth):
         """
@@ -93,11 +132,12 @@ class NonlinearSchurSolver(NonlinearSolver):
             self._sys_names = [s for s in system._subsystems_allprocs.keys() if s != '_auto_ivc']
 
         if len(self._sys_names) != 2:
-            raise ValueError(f'System {self.pathname} has a NonlinearSchur solver and is required to '
-                             'contain two subsystems, but it has {len(self._sys_names)}.\n{self._sys_names}')
+            raise ValueError(f'System {self.pathname} has a NonlinearSchur solver and is '
+                             'required to contain two subsystems, but it has '
+                             f'{len(self._sys_names)}.\n{self._sys_names}')
 
-        if not isinstance(self.options._dict["solve_subsystems"]["val"], bool):
-            msg = "{}: solve_subsystems must be set by the user."
+        if not isinstance(self.options._dict['solve_subsystems']['val'], bool):
+            msg = '{}: solve_subsystems must be set by the user.'
             raise ValueError(msg.format(self.msginfo))
 
         if self.linear_solver is not None:
@@ -126,12 +166,12 @@ class NonlinearSchurSolver(NonlinearSolver):
             Flag for indicating child linerization
         """
         return (
-            self.options["solve_subsystems"]
+            self.options['solve_subsystems']
             and not self._system().under_complex_step
-            and self._iter_count <= self.options["max_sub_solves"]
+            and self._iter_count <= self.options['max_sub_solves']
         )
 
-    def _set_solver_print(self, level=2, type_="all"):
+    def _set_solver_print(self, level=2, type_='all'):
         """
         Control printing for solvers and subsolvers in the model.
 
@@ -146,7 +186,7 @@ class NonlinearSchurSolver(NonlinearSolver):
         """
         super()._set_solver_print(level=level, type_=type_)
 
-        if self.linear_solver is not None and type_ != "NL":
+        if self.linear_solver is not None and type_ != 'NL':
             self.linear_solver._set_solver_print(level=level, type_=type_)
 
         if self.linesearch is not None:
@@ -156,7 +196,7 @@ class NonlinearSchurSolver(NonlinearSolver):
         """
         Run the apply_nonlinear method on the system.
         """
-        self._recording_iter.push(("_run_apply", 0))
+        self._recording_iter.push(('_run_apply', 0))
 
         system = self._system()
 
@@ -194,17 +234,17 @@ class NonlinearSchurSolver(NonlinearSolver):
             error at the first iteration.
         """
         system = self._system()
-        solve_subsystems = self.options["solve_subsystems"] and not system.under_complex_step
+        solve_subsystems = self.options['solve_subsystems'] and not system.under_complex_step
 
-        if self.options["debug_print"]:
-            self._err_cache["inputs"] = system._inputs._copy_views()
-            self._err_cache["outputs"] = system._outputs._copy_views()
+        if self.options['debug_print']:
+            self._err_cache['inputs'] = system._inputs._copy_views()
+            self._err_cache['outputs'] = system._outputs._copy_views()
 
         # Execute guess_nonlinear if specified.
         system._guess_nonlinear()
 
-        with Recording("Newton_subsolve", 0, self) as rec:
-            if solve_subsystems and self._iter_count <= self.options["max_sub_solves"]:
+        with Recording('Newton_subsolve', 0, self) as rec:
+            if solve_subsystems and self._iter_count <= self.options['max_sub_solves']:
                 self._solver_info.append_solver()
 
                 # should call the subsystems solve before computing the first residual
@@ -228,9 +268,9 @@ class NonlinearSchurSolver(NonlinearSolver):
         system = self._system()
         self._solver_info.append_subsolver()
         do_subsolve = (
-            self.options["solve_subsystems"]
+            self.options['solve_subsystems']
             and not system.under_complex_step
-            and (self._iter_count < self.options["max_sub_solves"])
+            and (self._iter_count < self.options['max_sub_solves'])
         )
         do_sub_ln = self.linear_solver._linearize_children()
 
@@ -238,8 +278,8 @@ class NonlinearSchurSolver(NonlinearSolver):
         approx_status = system._owns_approx_jac
         system._owns_approx_jac = False
 
-        system._vectors["residual"]["linear"].set_vec(system._residuals)
-        system._vectors["residual"]["linear"] *= -1.0
+        system._vectors['residual']['linear'].set_vec(system._residuals)
+        system._vectors['residual']['linear'] *= -1.0
         my_asm_jac = self.linear_solver._assembled_jac
 
         system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
@@ -269,12 +309,13 @@ class NonlinearSchurSolver(NonlinearSolver):
 
         # initialize the schur complement jacobian for these variables
         # TODO better way to get the dtype?
-        schur_jac = np.zeros((n_vars, n_vars), dtype=system._vectors["residual"]["linear"].asarray(copy=True).dtype)
+        schur_jac = np.zeros((n_vars, n_vars),
+                             dtype=system._vectors['residual']['linear'].asarray(copy=True).dtype)
 
         # backup the vectors we are working with
-        rvec = system._vectors["residual"]["linear"]
-        ovec = system._vectors["output"]["linear"]
-        ivec = system._vectors["input"]["linear"]
+        rvec = system._vectors['residual']['linear']
+        ovec = system._vectors['output']['linear']
+        ivec = system._vectors['input']['linear']
 
         r_data = rvec.asarray(copy=True)
         o_data = ovec.asarray(copy=True)
@@ -283,99 +324,90 @@ class NonlinearSchurSolver(NonlinearSolver):
         # mode
         mode = self._mode_nonlinear
 
-        if mode == "fwd":
-            ########################
-            #### schur_jacobian ####
-            ########################
+        if mode == 'fwd':
+            # schur_jacobian
 
-            ## Schur_Jac = D - C A^-1 B ##
+            # Schur_Jac = D - C A^-1 B ##
 
             # set the ovec to zeros
             ovec.set_val(np.zeros(len(ovec)))
 
             for ii, var in enumerate(vars_to_solve):
                 # set the linear seed of the variable we want to solve for in subsys 2
-                ovec[f"{subsys2.name}.{var}"] = 1.0
+                ovec[f'{subsys2.name}.{var}'] = 1.0
 
                 # transfer this seed to the first subsystem
-                system._transfer("linear", mode, subsys1.name)
+                system._transfer('linear', mode, subsys1.name)
 
-                # run the jac-vec computation in the first subsystem, this ll give us the B[:,{ii}] vector
+                # run the jac-vec computation in the first subsystem,
+                # this ll give us the B[:,{ii}] vector
                 scope_out, scope_in = system._get_matvec_scope(subsys1)
 
-                subsys1._apply_linear(None,  mode, scope_out, scope_in)
+                subsys1._apply_linear(None, mode, scope_out, scope_in)
 
                 # amd then, by performing solve_linear we get A^-1 B[:,{ii}]
                 subsys1._solve_linear(mode, scope_out, scope_in)
 
-                # do another mat-mult with the solution of this linear system, we want to get the final
-                # jacobian using the schur method here, so we will need to do a bit more math
+                # Do another mat-mult with the solution of this linear system.
+                # We want to get the final jacobian using the schur method here,
+                # so we will need to do a bit more math.
 
                 # first negate the vector from the linear solve
-                subsys1._vectors["output"]["linear"] *= -1.0
+                subsys1._vectors['output']['linear'] *= -1.0
 
-                # finally, set the seed of the variable to 1 as well to get the diagonal contribution
-                # system._vectors["output"]["linear"][f"{subsys2.name}.{var}"]
+                # finally, set the seed of the variable to 1 as well to get
+                # the diagonal contribution
+                # system._vectors['output']['linear'][f'{subsys2.name}.{var}']
                 # this should already be at one since we perturbed it above!
 
                 # transfer the outputs to inputs
-                system._transfer("linear", mode)
+                system._transfer('linear', mode)
 
                 # run the apply linear. we do it on the complete system here
-                # the result is the final jacobian for this using the schur complement method D[:,{ii}] - C A^-1 B[:,{ii}]
+                # the result is the final jacobian for this using the
+                # schur complement method D[:,{ii}] - C A^-1 B[:,{ii}]
                 scope_out, scope_in = system._get_matvec_scope()
-                system._apply_linear(None,  mode, scope_out, scope_in)
+                system._apply_linear(None, mode, scope_out, scope_in)
 
                 # put this value into the jacobian.
-                schur_jac[:, ii] = subsys2._vectors["residual"]["linear"].asarray()
+                schur_jac[:, ii] = subsys2._vectors['residual']['linear'].asarray()
 
                 # set back the seed to zero for the next vector
-                ovec[f"{subsys2.name}.{var}"] = 0.0
-
-            ########################
-            #### schur_jacobian ####
-            ########################
-
+                ovec[f'{subsys2.name}.{var}'] = 0.0
         else:  # rev mode
-            ########################
-            #### schur_jacobian ####
-            ########################
-
-            ## Schur_Jac = D - C A^-1 B ##
+            # Schur_Jac = D - C A^-1 B ##
 
             rvec.set_val(np.zeros(len(rvec)))
 
             for ii, var in enumerate(resd_to_solve):
                 # set the linear seed of the variable we want to solve for in subsys 2
 
-                rvec[f"{subsys2.name}.{var}"] = 1.0
+                rvec[f'{subsys2.name}.{var}'] = 1.0
 
                 # we get the C[{ii},:] vector by apply_linear on the system
                 scope_out, scope_in = system._get_matvec_scope()
-                system._apply_linear(None,  mode, scope_out, scope_in)
+                system._apply_linear(None, mode, scope_out, scope_in)
 
                 # do a solve_linear to find C[{ii},:] A^-1
                 scope_out, scope_in = system._get_matvec_scope(subsys1)
-                subsys1._solve_linear(mode,  scope_out, scope_in)
+                subsys1._solve_linear(mode, scope_out, scope_in)
 
                 # negate the resdiual first
-                subsys1._vectors["residual"]["linear"] *= -1.0
+                subsys1._vectors['residual']['linear'] *= -1.0
 
                 # do a apply_linear on the subsys1 to find the D[{ii},:] - C[{ii},:] A^-1 B
                 scope_out, scope_in = system._get_matvec_scope(subsys1)
-                subsys1._apply_linear(None,  mode, scope_out, scope_in)
+                subsys1._apply_linear(None, mode, scope_out, scope_in)
 
-                system._transfer("linear", mode, subsys2.name)
+                system._transfer('linear', mode, subsys2.name)
 
                 # put this value into the jacobian.
-                schur_jac[ii, :] = subsys2._vectors["output"]["linear"].asarray()
+                schur_jac[ii, :] = subsys2._vectors['output']['linear'].asarray()
 
                 # set back the seed to zero for the next vector
-                rvec[f"{subsys2.name}.{var}"] = 0.0
+                rvec[f'{subsys2.name}.{var}'] = 0.0
 
-            ########################
-            #### schur_jacobian ####
-            ########################
+            # schur_jacobian
 
         # put back the vectors
         rvec.set_val(r_data)
@@ -384,50 +416,54 @@ class NonlinearSchurSolver(NonlinearSolver):
 
         # we now have the schur complement of the jacobian for the second component.
         # do a newton update with it!
-        subsys2._vectors["residual"]["linear"].set_vec(subsys2._residuals)
-        subsys2._vectors["residual"]["linear"] *= -1.0
+        subsys2._vectors['residual']['linear'].set_vec(subsys2._residuals)
+        subsys2._vectors['residual']['linear'] *= -1.0
 
-        iD_schur = np.eye(n_vars, dtype=system._vectors["residual"]["linear"].asarray(copy=True).dtype) * 1e-16
+        iD_schur = np.eye(n_vars,
+                          dtype=system._vectors['residual']['linear'].asarray(copy=True).dtype)
+        iD_schur *= 1.E-16
         schur_jac = schur_jac + iD_schur
-        d_subsys2 = scipy.linalg.solve(schur_jac, subsys2._vectors["residual"]["linear"].asarray())
+        d_subsys2 = scipy.linalg.solve(schur_jac, subsys2._vectors['residual']['linear'].asarray())
 
         # loop over the variables just to be safe with the ordering
         for ii, var in enumerate(vars_to_solve):
-            if self.options["factor_lamda"] is None:
-                system._outputs[f"{subsys2.name}.{var}"] += self.options["lamda"]*d_subsys2[ii]
+            var_name = f'{subsys2.name}.{var}'
+            if self.options['factor_lamda'] is None:
+                system._outputs[var_name] += self.options['lamda'] * d_subsys2[ii]
             else:
-                if abs(d_subsys2[ii]) >= abs(self.options["factor_lamda"]*system._outputs[f"{subsys2.name}.{var}"]):
-                    system._outputs[f"{subsys2.name}.{var}"] += self.options["lamda"]*d_subsys2[ii]
+                if abs(d_subsys2[ii]) >= abs(self.options['factor_lamda'] *
+                                             system._outputs[var_name]):
+                    system._outputs[var_name] += self.options['lamda'] * d_subsys2[ii]
                 else:
-                    system._outputs[f"{subsys2.name}.{var}"] += d_subsys2[ii]
+                    system._outputs[var_name] += d_subsys2[ii]
 
         if self._bounds is not None:
             for key in self._bounds.keys():
-                if key == "lower":
-                    lowerB = self._bounds["lower"]
-                elif key == "upper":
-                    upperB = self._bounds["upper"]
+                if key == 'lower':
+                    lowerB = self._bounds['lower']
+                elif key == 'upper':
+                    upperB = self._bounds['upper']
             for ii, var in enumerate(vars_to_solve):
-                if system._outputs[f"{subsys2.name}.{var}"] < lowerB[ii]:
-                    system._outputs[f"{subsys2.name}.{var}"] = lowerB[ii]
-                elif system._outputs[f"{subsys2.name}.{var}"] > upperB[ii]:
-                    system._outputs[f"{subsys2.name}.{var}"] = upperB[ii]
+                if system._outputs[f'{subsys2.name}.{var}'] < lowerB[ii]:
+                    system._outputs[f'{subsys2.name}.{var}'] = lowerB[ii]
+                elif system._outputs[f'{subsys2.name}.{var}'] > upperB[ii]:
+                    system._outputs[f'{subsys2.name}.{var}'] = upperB[ii]
 
         # print outputs
         # if system.comm.rank == 0:
-        #     print("\n+  -------------------")
-        #     print("+  Balance variables:")
-        #     print("+  -------------------\n+")
+        #     print('\n+  -------------------')
+        #     print('+  Balance variables:')
+        #     print('+  -------------------\n+')
         #     for ii, var in enumerate(vars_to_solve):
-        #         ivar = var.split(".")
-        #         print("+ ", ivar[-1], " = ", system._outputs[f"{subsys2.name}.{var}"][0])
-        #     print("\n")
+        #         ivar = var.split('.')
+        #         print('+ ', ivar[-1], ' = ', system._outputs[f'{subsys2.name}.{var}'][0])
+        #     print('\n')
 
         self._solver_info.pop()
 
         # Hybrid newton support.
         if do_subsolve:
-            with Recording("Newton_subsolve", 0, self):
+            with Recording('Newton_subsolve', 0, self):
                 self._solver_info.append_solver()
                 self._gs_iter()
                 self._solver_info.pop()
