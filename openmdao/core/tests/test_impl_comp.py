@@ -6,7 +6,7 @@ from io import StringIO
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
 from openmdao.utils.general_utils import remove_whitespace
 from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2
 
@@ -578,9 +578,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         assert_near_equal(prob['comp.x'], 3.)
 
         totals = prob.check_totals(of=['fn.y'], wrt=['p.a'], method='cs', out_stream=None)
-
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 3e-9)
+        assert_check_totals(totals)
 
     def test_guess_nonlinear_residuals(self):
 

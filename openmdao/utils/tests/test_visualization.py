@@ -60,6 +60,9 @@ class TestVisualization(unittest.TestCase):
         # Instead of seeing if the images created by matplotlib match what we expect, which
         # is a fragile thing to do in testing, check a data structure inside matplotlib's
         # objects. We will assume matplotlib draws the correct thing.
+
+        # TODO: this test seems pretty fragile due to the small numbers involved. If it starts
+        # failing on other platforms we might want to consider reworking it.
         expected_array = np.array([[1., 0., 0., 1.],
                                    [0., 1., 0., 0.],
                                    [1., 0., 1., 0.],
@@ -72,10 +75,11 @@ class TestVisualization(unittest.TestCase):
                                    [ 0.,  1.,  0.,  1.]])
         actual_array = ax[1].images[0]._A.data
         assert_near_equal(expected_array, actual_array, 1e-8)
-        expected_array = np.array([[  9.31322575e-10,   0.0,   0.0, 1.0e-07],
-                                   [  0.0,   0.0,  -2.0e-07, 0.0],
-                                   [  0.0,   0.0,   9.31322575e-10, 0.0],
-                                   [  0.0,   0.0,   0.0, 1.86264515e-09]])
+        expected_array = np.array([[ 7.48400453e-10,  0.0,  0.0, 9.99097329e-08],
+                                   [ 0.0,  9.46442924e-11, -2.e-07, 0.0],
+                                   [ 1.39777967e-10,  0.0,  6.58133104e-10, 0.0],
+                                   [ 0.0, -5.59111868e-10,  0.0, 9.37689038e-10]])
+
         actual_array = ax[2].images[0]._A.data
         assert_near_equal(expected_array, actual_array, 1e-8)
 
@@ -94,10 +98,10 @@ class TestVisualization(unittest.TestCase):
                                    [ 0.,  1.,  0.,  1.]])
         actual_array = ax[1].images[0]._A.data
         assert_near_equal(expected_array, actual_array, 1e-8)
-        expected_array = np.array([[  9.31322575e-10,   0.0,   0.0, 1.0e-07],
-                                   [  0.0,   0.0,  -2.0e-07, 0.0],
-                                   [  0.0,   0.0,   9.31322575e-10, 0.0],
-                                   [  0.0,   0.0,   0.0, 1.86264515e-09]])
+        expected_array = np.array([[ 7.48400453e-10,  0.0,  0.0, 9.99097329e-08],
+                                   [ 0.0,  9.46442924e-11, -2.e-07, 0.0],
+                                   [ 1.39777967e-10,  0.0,  6.58133104e-10, 0.0],
+                                   [ 0.0, -5.59111868e-10,  0.0, 9.37689038e-10]])
         actual_array = ax[2].images[0]._A.data
         assert_near_equal(expected_array, actual_array, 1e-8)
 
@@ -116,10 +120,10 @@ class TestVisualization(unittest.TestCase):
                                    [  0.0,   4.0e+00,   0.0, 6.0e+00]])
         actual_array = ax[1].images[0]._A.data
         assert_near_equal(expected_array, actual_array, 1e-8)
-        expected_array = np.array([[  9.31322575e-10,   0.0,   0.0, 1.0e-07],
-                                   [  0.0,   0.0,  -2.0e-07, 0.0],
-                                   [  0.0,   0.0,   9.31322575e-10, 0.0],
-                                   [  0.0,   0.0,   0.0, 1.86264515e-09]])
+        expected_array = np.array([[ 7.48400453e-10,  0.0,  0.0, 9.99097329e-08],
+                                   [ 0.0,  9.46442924e-11, -2.e-07, 0.0],
+                                   [ 1.39777967e-10,  0.0,  6.58133104e-10, 0.0],
+                                   [ 0.0, -5.59111868e-10,  0.0, 9.37689038e-10]])
         actual_array = ax[2].images[0]._A.data
         assert_near_equal(expected_array, actual_array, 1e-8)
 

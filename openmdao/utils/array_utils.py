@@ -1087,3 +1087,20 @@ def idxs2minmax_tuples(idxs):
         ranges.append((idxs[start], idxs[-1]))
 
     return ranges
+
+
+def safe_norm(arr):
+    """
+    Return the norm of the given array, or 0 if the array is None or empty.
+
+    Parameters
+    ----------
+    arr : ndarray or None
+        Array to be normed.
+
+    Returns
+    -------
+    float
+        Norm of the array or 0 if the array is None or empty.
+    """
+    return 0. if arr is None or arr.size == 0 else np.linalg.norm(arr)
