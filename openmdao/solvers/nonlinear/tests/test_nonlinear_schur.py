@@ -1,7 +1,5 @@
-import argparse
 import numpy as np
 import openmdao.api as om
-import matplotlib.pyplot as plt
 import unittest
 
 from openmdao.utils.assert_utils import assert_near_equal
@@ -326,125 +324,127 @@ def _run_test_problem(case, solver, mode, solution):
     ### create a contour plot of the residual
     ###
 
-    return
+    # import matplotlib.pyplot as plt
 
-    # need to set the solver to nonlinear run once
-    p.model.nonlinear_solver = om.NewtonSolver(atol=1e-12, rtol=1e-12, solve_subsystems=False, maxiter=0)
-    p.model.linear_solver = om.LinearRunOnce()
-    p.model.set_solver_print(level=-1)
-    p.setup(mode=mode)
+    # # need to set the solver to nonlinear run once
+    # p.model.nonlinear_solver = om.NewtonSolver(atol=1e-12, rtol=1e-12, solve_subsystems=False, maxiter=0)
+    # p.model.linear_solver = om.LinearRunOnce()
+    # p.model.set_solver_print(level=-1)
+    # p.setup(mode=mode)
 
-    nx1 = 201
-    nx2 = 201
-    contour_delta = 1.0
-    x1 = np.linspace(solution[0] - contour_delta, solution[0] + contour_delta, nx1)
-    x2 = np.linspace(solution[1] - contour_delta, solution[1] + contour_delta, nx2)
-    X1, X2 = np.meshgrid(x1, x2)
-    RES_LOG = np.zeros_like(X1)
-    RES_L2 = np.zeros_like(X1)
+    # nx1 = 201
+    # nx2 = 201
+    # contour_delta = 1.0
+    # x1 = np.linspace(solution[0] - contour_delta, solution[0] + contour_delta, nx1)
+    # x2 = np.linspace(solution[1] - contour_delta, solution[1] + contour_delta, nx2)
+    # X1, X2 = np.meshgrid(x1, x2)
+    # RES_LOG = np.zeros_like(X1)
+    # RES_L2 = np.zeros_like(X1)
 
-    # loop over x1 and x2 and set the residual array
-    for ii in range(nx1):
-        for jj in range(nx2):
-            x1 = X1[ii, jj]
-            x2 = X2[ii, jj]
+    # # loop over x1 and x2 and set the residual array
+    # for ii in range(nx1):
+    #     for jj in range(nx2):
+    #         x1 = X1[ii, jj]
+    #         x2 = X2[ii, jj]
 
-            # set the values
-            p["comp1.x1"] = x1
-            p["comp2.x2"] = x2
+    #         # set the values
+    #         p["comp1.x1"] = x1
+    #         p["comp2.x2"] = x2
 
-            # run the model
-            p.run_model()
+    #         # run the model
+    #         p.run_model()
 
-            # get the residual
-            r1 = p.model._residuals["comp1.x1"]
-            r2 = p.model._residuals["comp2.x2"]
+    #         # get the residual
+    #         r1 = p.model._residuals["comp1.x1"]
+    #         r2 = p.model._residuals["comp2.x2"]
 
-            RES_LOG[ii, jj] = np.log(np.sqrt(r1**2 + r2**2) + 1)
-            RES_L2[ii, jj] = np.sqrt((r1**2 + r2**2))
-            # to just show the residual norm itself, which appears small
-            # RES[ii, jj] = np.sqrt(r1 ** 2 + r2 ** 2)
+    #         RES_LOG[ii, jj] = np.log(np.sqrt(r1**2 + r2**2) + 1)
+    #         RES_L2[ii, jj] = np.sqrt((r1**2 + r2**2))
+    #         # to just show the residual norm itself, which appears small
+    #         # RES[ii, jj] = np.sqrt(r1 ** 2 + r2 ** 2)
 
-    ###
-    ### PLOTTING PARAMETERS
-    ###
-    plt.rc("text", usetex=True)
-    plt.rc("font", size=22)
+    # ###
+    # ### PLOTTING PARAMETERS
+    # ###
+    # plt.rc("text", usetex=True)
+    # plt.rc("font", size=22)
 
-    # cm_dict = niceplots.get_niceColors()
-    cm = [
-        "Blue",
-        "Orange"
-    ]
+    # # cm_dict = niceplots.get_niceColors()
+    # cm = [
+    #     "Blue",
+    #     "Orange"
+    # ]
 
-    ###
-    ### LOG PLOT
-    ###
+    # ###
+    # ### LOG PLOT
+    # ###
 
-    plot_names = ["log", "l2"]
+    # plot_names = ["log", "l2"]
 
-    for kk, RES in enumerate([RES_LOG, RES_L2]):
-        fig = plt.figure(figsize=(8, 6))
-        ax = fig.add_subplot(111)
+    # for kk, RES in enumerate([RES_LOG, RES_L2]):
+    #     fig = plt.figure(figsize=(8, 6))
+    #     ax = fig.add_subplot(111)
 
-        CS = ax.contourf(X1, X2, RES, 50, alpha=1.0)
-        ax.contour(X1, X2, RES, 50, alpha=0.5, colors="w", linewidths=0.2)
-        cbar = fig.colorbar(CS, ax=ax, shrink=0.9)
-        if kk == 0:
-            cbar.set_label(r"$\log ( || \mathcal{R}|| + 1)$", rotation=0, labelpad=10)
-        else:
-            cbar.set_label(r"$|| \mathcal{R}||_2$", rotation=0, labelpad=10)
+    #     CS = ax.contourf(X1, X2, RES, 50, alpha=1.0)
+    #     ax.contour(X1, X2, RES, 50, alpha=0.5, colors="w", linewidths=0.2)
+    #     cbar = fig.colorbar(CS, ax=ax, shrink=0.9)
+    #     if kk == 0:
+    #         cbar.set_label(r"$\log ( || \mathcal{R}|| + 1)$", rotation=0, labelpad=10)
+    #     else:
+    #         cbar.set_label(r"$|| \mathcal{R}||_2$", rotation=0, labelpad=10)
 
-        cbar.set_ticks([np.min(RES), np.max(RES)])
+    #     cbar.set_ticks([np.min(RES), np.max(RES)])
 
-        # loop over all initial guesses
-        for ii in range(n_xinit):
-            x1_hist = x_hist[ii][0]
-            x2_hist = x_hist[ii][1]
-            # print(ii, x1_hist, x2_hist)
+    #     # loop over all initial guesses
+    #     for ii in range(n_xinit):
+    #         x1_hist = x_hist[ii][0]
+    #         x2_hist = x_hist[ii][1]
+    #         # print(ii, x1_hist, x2_hist)
 
-            # plot the solver convergence path
-            ax.plot(
-                x1_hist,
-                x2_hist,
-                label=" ",
-                linewidth=2,
-                marker=".",
-                markersize=6,
-                markeredgewidth=0.4,
-                markeredgecolor="w",
-                c=cm[ii],
-            )
+    #         # plot the solver convergence path
+    #         ax.plot(
+    #             x1_hist,
+    #             x2_hist,
+    #             label=" ",
+    #             linewidth=2,
+    #             marker=".",
+    #             markersize=6,
+    #             markeredgewidth=0.4,
+    #             markeredgecolor="w",
+    #             c=cm[ii],
+    #         )
 
-            # for jj in range(len(x1_hist)):
-            #     # just print the first 4 iters
-            #     if jj < 4:
-            #         ax.annotate(jj, (x1_hist[jj], x2_hist[jj]), c=cm[ii])
+    #         # for jj in range(len(x1_hist)):
+    #         #     # just print the first 4 iters
+    #         #     if jj < 4:
+    #         #         ax.annotate(jj, (x1_hist[jj], x2_hist[jj]), c=cm[ii])
 
-        # put at star at the solution
-        ax.scatter([solution[0]], [solution[1]], marker="*", color="r", s=120)
+    #     # put at star at the solution
+    #     ax.scatter([solution[0]], [solution[1]], marker="*", color="r", s=120)
 
-        ax.set_xlabel(r"$u_1$")
-        ax.set_ylabel(r"$u_2$", rotation=0, labelpad=10)
-        ax.set_xticks([solution[0] - contour_delta, solution[0], solution[0] + contour_delta])
-        ax.set_yticks([solution[1] - contour_delta, solution[1], solution[1] + contour_delta])
-        # ax.set_title(r"\rm Simple Nonlinear Problem")
-        plt.axis([solution[0] - contour_delta, solution[0] + contour_delta, solution[1] - contour_delta, solution[1] + contour_delta])
-        ax.set_aspect("equal")
+    #     ax.set_xlabel(r"$u_1$")
+    #     ax.set_ylabel(r"$u_2$", rotation=0, labelpad=10)
+    #     ax.set_xticks([solution[0] - contour_delta, solution[0], solution[0] + contour_delta])
+    #     ax.set_yticks([solution[1] - contour_delta, solution[1], solution[1] + contour_delta])
+    #     # ax.set_title(r"\rm Simple Nonlinear Problem")
+    #     plt.axis([solution[0] - contour_delta, solution[0] + contour_delta, solution[1] - contour_delta, solution[1] + contour_delta])
+    #     ax.set_aspect("equal")
 
-        plt.tight_layout()
-        fig.suptitle(f'{case}\n{solver}')
-        plt.savefig(f"{plot_names[kk]}_{case}_{solver}_problem_contour.jpg", dpi=600)
-        # plt.savefig(f"{case}_problem_contour_{plot_names[kk]}.pdf")
+    #     plt.tight_layout()
+    #     fig.suptitle(f'{case}\n{solver}')
+    #     plt.savefig(f"{plot_names[kk]}_{case}_{solver}_problem_contour.jpg", dpi=600)
+    #     # plt.savefig(f"{case}_problem_contour_{plot_names[kk]}.pdf")
 
 
 if __name__ == '__main__':
+    unittest.main()
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--case", type=str, default="center3")
-    parser.add_argument("--solver", type=str, default="schur_schur")
-    parser.add_argument("--mode", type=str, default="rev")
-    args = parser.parse_args()
+    # import argparse
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--case", type=str, default="center3")
+    # parser.add_argument("--solver", type=str, default="schur_schur")
+    # parser.add_argument("--mode", type=str, default="rev")
+    # args = parser.parse_args()
 
-    _run_test_problem(case=args.case, solver=args.solver, mode=args.mode,
-                      solution=case_solutions[args.case])
+    # _run_test_problem(case=args.case, solver=args.solver, mode=args.mode,
+    #                   solution=case_solutions[args.case])
