@@ -231,7 +231,6 @@ class CaseTracker:
 
     def get_new_case(self):
         num_driver_iterations_recorded = self._get_num_driver_iterations()
-        # print(f"{num_driver_iterations_recorded=} {self._num_iterations_read=}")
         if num_driver_iterations_recorded > self._num_iterations_read:
             case_counter = self._num_iterations_read + 1  # counter starts at 1 
             driver_case = self._get_case_by_counter(case_counter)
@@ -245,7 +244,6 @@ class CaseTracker:
             design_vars = driver_case.get_design_vars(scaled=False)
             constraints = driver_case.get_constraints(scaled=False)
 
-            # print(f"{driver_case.counter=}")
             new_data = {
                 "counter": int(driver_case.counter),
             }
@@ -270,10 +268,6 @@ class CaseTracker:
 
             new_data["cons"] = cons
 
-            # self._case_ids_read.append(
-            #     case_id
-            # )  # remember that this one has been plotted
-
             return new_data
         return None
 
@@ -289,17 +283,13 @@ class CaseTracker:
             # just get the first one
             case_id = new_case_ids[0]
 
-
             print(f"getting case with id {case_id}")
-
 
             driver_case = self._cr.get_case(case_id)
             objs = driver_case.get_objectives(scaled=False)
             design_vars = driver_case.get_design_vars(scaled=False)
             constraints = driver_case.get_constraints(scaled=False)
 
-
-            # print(f"{driver_case.counter=}")
             new_data = {
                 "counter": int(driver_case.counter),
             }
@@ -391,14 +381,29 @@ class CaseTracker:
                 self._initial_cr_with_one_case = cr
             else:
                 return None
-        case_ids = self._initial_cr_with_one_case.list_cases("driver", out_stream=None)
-        driver_case = self._initial_cr_with_one_case.get_case(case_ids[0])
+
+
+
+
+
+        # case_ids = self._initial_cr_with_one_case.list_cases("driver", out_stream=None)
+        # return "junk"
+        # driver_case = self._initial_cr_with_one_case.get_case(case_ids[0])
+
+
+        driver_case = self._initial_cr_with_one_case.get_case(0)
+
 
         # meta = driver_case.get_io_metadata(includes=name)
+        # meta2 = self._initial_cr_with_one_case.problem_metadata
         # shape = meta[name]['shape']
 
         try:
             units = driver_case._get_units(name)
+
+
+
+
         except RuntimeError as err:
             if str(err).startswith("Can't get units for the promoted name"):
                 return "Ambiguous"
@@ -541,6 +546,28 @@ class RealTimeOptPlot(object):
                         self.toggles.append(toggle)
 
                         column_items.append(toggle)
+
+
+                        value = new_data["objs"][obj_name]
+
+                        import math 
+
+                        if not math.isnan(value): 
+
+                            # set the range
+                            y_min = value
+                            y_max = value
+                            # if the range is zero, the axis will not be displayed. Plus need some range to make it
+                            #    look good. Some other code seems to do +- 1 for the range in this case.
+                            if y_min == y_max:
+                                y_min = y_min - 1
+                                y_max = y_max + 1
+
+                        else:
+                            y_min = -1
+                            y_max = 1
+
+                        p.y_range = Range1d(y_min, y_max)
 
                         obj_line = p.line(
                             x="iteration",
@@ -685,6 +712,9 @@ class RealTimeOptPlot(object):
 
                         units = case_tracker.get_units(cons_name)
 
+
+                        # units = "junk"
+
                         toggle = _make_legend_item(f"{cons_name} ({units})", color)
                         self.toggles.append(toggle)
                         column_items.append(toggle)
@@ -785,7 +815,6 @@ class RealTimeOptPlot(object):
                                 
                                     getColor(variableName) {
                                     if (this.variableColorMap.has(variableName)) {
-                                        console.log("already have that color");
                                         return this.variableColorMap.get(variableName);
                                     }
                                 
@@ -837,35 +866,15 @@ class RealTimeOptPlot(object):
                                 axes[index-1].visible = toggle.active;
                             }
 
-
-
-
-                                // Let's inspect the origin object
-                                //console.log('Button properties:', cb_obj.origin);
-                                // Try to access label through origin
-                                console.log('Label attempt 1:', cb_obj.label);
-                                // Also check model properties
-                                //console.log('Model properties:', cb_obj.origin.properties);
-
-
-
-
-
-
                             let variable_name = cb_obj.label;
                             // if turning on, get a color and set the line and toggle button to that color
                             if (toggle.active) {
                                 let color = window.colorManager.getColor(variable_name);
-                                console.log("color " + color);
-                                console.log("before toggle.active axes[index-1].axis_line_color", axes[index-1].axis_line_color);
-                                console.log("before toggle.active lines[index].glyph.line_color)", lines[index].glyph.line_color);
                                 axes[index-1].axis_label_text_color = color
                                 lines[index].glyph.line_color = color;
                                 lines[index].glyph.fill_color = color;
                                 lines[index].glyph.attributes.line_color = color;
 
-                                console.log("after toggle.active axes[index-1].axis_line_color", axes[index-1].axis_line_color);
-                                console.log("after toggle.active lines[index].glyph.line_color)", lines[index].glyph.line_color);
                                 toggle.stylesheets = [`
                                     .bk-btn {
                                         color: ${color}
@@ -898,13 +907,8 @@ class RealTimeOptPlot(object):
                             // if turning off, return the color to the pool and set the color of the button to black
                             } else {
                                 window.colorManager.releaseColor(variable_name);
-                                console.log("releasing ", variable_name);
-                                console.log("before toggle.inactive axes[index-1].axis_line_color", axes[index-1].axis_line_color);
-                                console.log("before toggle.inactive lines[index].glyph.line_color)", lines[index].glyph.line_color);
                                 axes[index-1].axis_label_text_color = 'black'
                                 lines[index].glyph.line_color = 'black';
-                                console.log("after toggle.inactive axes[index-1].axis_line_color", axes[index-1].axis_line_color);
-                                console.log("after toggle.inactive lines[index].glyph.line_color)", lines[index].glyph.line_color);
                                 toggle.stylesheets = [`
                                     .bk-btn {
                                         color: black
@@ -967,8 +971,6 @@ class RealTimeOptPlot(object):
                     label_and_toggle_column = Column(
                         label,
                         toggle_column,
-                        # width_policy="max",
-                        # height_policy="max",
                         sizing_mode="stretch_height",
                         height_policy="fit",
                          styles={
@@ -981,16 +983,9 @@ class RealTimeOptPlot(object):
                         child=label_and_toggle_column,
                         sizing_mode="stretch_height",
                         height_policy="max",
-                        # width=800,  # Width can still be fixed as needed
-                        # height="100vh",  # Use viewport height unit
-                        # style={
-                        #     "overflow-y": "auto",
-                        #     "max-height": "100vh",  # Ensures it doesn't exceed viewport
-                        # },
                     )
 
                     graph = Row(p, scroll_box, sizing_mode="stretch_both")
-                    # graph = Row(p, label_and_toggle_column, sizing_mode="stretch_both")
                     doc.add_root(graph)
                     print(f"after initial setup at {time.time()-start_time}")
 
@@ -1006,23 +1001,24 @@ class RealTimeOptPlot(object):
                 iline = 0
 
                 for obj_name, obj_value in new_data["objs"].items():
+
+                    print(f"{obj_value=}")
+
                     float_obj_value = _get_value_for_plotting(obj_value, "objs")
 
-                    source_stream_dict[obj_name] = [float_obj_value]
-                    _update_y_min_max(obj_name, float_obj_value, self.y_min, self.y_max)
-                    p.y_range.start = self.y_min[obj_name]
-                    p.y_range.end = self.y_max[obj_name]
+                    import math
+                    if not math.isnan(float_obj_value):
+                        source_stream_dict[obj_name] = [float_obj_value]
+                        _update_y_min_max(obj_name, float_obj_value, self.y_min, self.y_max)
+                        print(f"{p.y_range.start=}")
+                        print(f"{p.y_range.end=}")
+                        p.y_range.start = self.y_min[obj_name]
+                        p.y_range.end = self.y_max[obj_name]
 
                     iline += 1
 
                 for desvar_name, desvar_value in new_data["desvars"].items():
                     float_desvar_value = _get_value_for_plotting(desvar_value, "desvars")
-
-                    # if desvar_name == 'traj.rotation.states:distance':
-                    # print(f"traj.rotation.states:distance values are {np.min(desvar_value)} {np.max(desvar_value)}")
-
-                    # source_stream_dict[desvar_name] = [float_desvar_value]
-                    # _update_y_min_max(desvar_name, float_desvar_value, self.y_min, self.y_max)
 
                     if not self._labels_updated_with_units and desvar_value.size > 1:
                         units = case_tracker.get_units(desvar_name)
@@ -1033,7 +1029,6 @@ class RealTimeOptPlot(object):
                     source_stream_dict[f"{desvar_name}_min"] = [np.min(desvar_value)]
                     source_stream_dict[f"{desvar_name}_max"] = [np.max(desvar_value)]
                     if self.lines[iline].visible:
-                        print(f"range for {desvar_name} is {self.y_min[desvar_name]}, {self.y_max[desvar_name]}")
                         range = Range1d(
                             self.y_min[desvar_name], self.y_max[desvar_name]
                         )
@@ -1056,9 +1051,7 @@ class RealTimeOptPlot(object):
                         )
                         p.extra_y_ranges[f"extra_y_{cons_name}"] = range
                     iline += 1
-                print(f"before self._source.stream at {time.time()-start_time}")
                 self._source.stream(source_stream_dict)
-                print(f"second if new_data done at {time.time()-start_time}")
                 self._labels_updated_with_units = True 
 
         doc.add_periodic_callback(update, self._callback_period)
