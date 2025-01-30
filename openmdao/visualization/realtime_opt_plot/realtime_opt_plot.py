@@ -455,13 +455,9 @@ class RealTimeOptPlot(object):
                     print(f"if new_data at {time.time()-start_time}")
                     self.setup_source_dict()
                     self._source = ColumnDataSource(self._source_dict)
-                    #### make the lines and legends
-                    palette = (
-                        Category20[20] + Category20b[20] + Category20c[20]
-                    )  # gives us 60 colors
-                    i_color = (
-                        0  # index of line across all variables: obj, desvars, cons
-                    )
+                    # index of lines across all variables: obj, desvars, cons
+                    i_line = 0
+                    
                     column_items = []
                     axes = []
 
@@ -537,7 +533,6 @@ class RealTimeOptPlot(object):
 
                     desvar_names = self._case_tracker.get_desvar_names()
                     for i, desvar_name in enumerate(desvar_names):
-                        color = palette[i_color % 60]
                         units = self._case_tracker.get_units(desvar_name)
 
                         # toggle = _make_legend_item(f"{desvar_name} ({units})", color)
@@ -558,7 +553,20 @@ class RealTimeOptPlot(object):
                                 color="black",
                                 # visible=False,
                             )
-                        # Can't do hover tools for varea ! https://github.com/bokeh/bokeh/issues/8872
+                        else:
+                            desvar_line = self.p.varea(
+                                x="iteration",
+                                y1=f"{desvar_name}_min",
+                                y2=f"{desvar_name}_max",
+                                # line_width=3,
+                                y_range_name=f"extra_y_{desvar_name}",
+                                source=self._source,
+                                # color=color,
+                                color="black",
+                                # visible=False,
+                                # visible=True,
+                                alpha=0.3,
+                            )
                         desvar_line.visible = False
 
                         self.lines.append(desvar_line)
@@ -573,19 +581,8 @@ class RealTimeOptPlot(object):
                                 mode="vline",
                                 visible=False,
                             )
-                        else:
-                            hover = HoverTool(
-                                renderers=[desvar_line],
-                                tooltips=[
-                                    ("Iteration", "@iteration"),
-                                    (f"{desvar_name} min", "@{%s}" % (desvar_name + "_min") + "{0.00}"),
-                                ],
-                                mode="vline",
-                                visible=False,
-                            )
-
-                        # Add the hover tools to the plot
-                        self.p.add_tools(hover)
+                            self.p.add_tools(hover)
+                        # Can't do hover tools for varea ! https://github.com/bokeh/bokeh/issues/8872
 
                         extra_y_axis = LinearAxis(
                             y_range_name=f"extra_y_{desvar_name}",
@@ -598,26 +595,17 @@ class RealTimeOptPlot(object):
                         axes.append(extra_y_axis)
 
                         self.p.add_layout(extra_y_axis, "right")
-                        self.p.right[i_color].visible = False
+                        self.p.right[i_line].visible = False
 
 
                         value = new_data["desvars"][desvar_name]
                         float_value = _get_value_for_plotting(value, "desvars")
 
-                        # set the range
-                        # y_min = 200
-                        # y_max = -200
-                        # # if the range is zero, the axis will not be displayed. Plus need some range to make it
-                        # #    look good. Some other code seems to do +- 1 for the range in this case.
-                        # if y_min == y_max:
-                        #     y_min = y_min - 1
-                        #     y_max = y_max + 1
                         self.p.extra_y_ranges[f"extra_y_{desvar_name}"] = Range1d(
                             float_value - 1, float_value + 1
                         )
 
-                        # self.p.add_layout(extra_y_axis, 'right')
-                        i_color += 1
+                        i_line += 1
 
                     # cons
                     cons_label = _make_header_text_for_variable_chooser("CONSTRAINTS")
@@ -626,10 +614,8 @@ class RealTimeOptPlot(object):
 
                     cons_names = self._case_tracker.get_cons_names()
                     for i, cons_name in enumerate(cons_names):
-                        color = palette[i_color % 60]
-
                         units = self._case_tracker.get_units(cons_name)
-                        toggle = _make_legend_item(f"{cons_name} ({units})", color)
+                        toggle = _make_legend_item(f"{cons_name} ({units})", "black")
                         self.toggles.append(toggle)
                         column_items.append(toggle)
 
@@ -670,7 +656,7 @@ class RealTimeOptPlot(object):
 
                         axes.append(extra_y_axis)
                         self.p.add_layout(extra_y_axis, "right")
-                        self.p.right[i_color].visible = False
+                        self.p.right[i_line].visible = False
 
                         # set the range
                         # y_min = -100
@@ -684,7 +670,7 @@ class RealTimeOptPlot(object):
                         float_value = _get_value_for_plotting(value, "cons")
                         self.p.extra_y_ranges[f"extra_y_{cons_name}"] = Range1d(y_min, y_max)
 
-                        i_color += 1
+                        i_line += 1
 
                     print(f"after making all the lines and axes at {time.time()-start_time}")
 
