@@ -46,6 +46,7 @@ except:
         return 5000
 
 _obj_color = "black"
+_non_active_plot_color = "black"
 
 start_time = time.time()
 
@@ -388,7 +389,7 @@ class RealTimeOptPlot(object):
                     for i, obj_name in enumerate(obj_names):
                         units = self._case_tracker.get_units(obj_name)
 
-                        toggle = self._make_legend_item(f"{obj_name} ({units})", _obj_color, True)
+                        self._make_legend_item(f"{obj_name} ({units})", _obj_color, True)
 
                         value = new_data["objs"][obj_name]
 
@@ -403,29 +404,7 @@ class RealTimeOptPlot(object):
                             y_max = y_max + 1
                         self.p.y_range = Range1d(y_min, y_max)
 
-                        obj_line = self.p.line(
-                            x="iteration",
-                            y=obj_name,
-                            line_width=3,
-                            source=self._source,
-                            color=_obj_color,
-                        )
-                        self.p.yaxis.axis_label = f"Objective: {obj_name} ({units})"
-
-                        self.lines.append(obj_line)
-
-                        hover = HoverTool(
-                            renderers=[obj_line],
-                            tooltips=[
-                                ("Iteration", "@iteration"),
-                                (obj_name, "@{%s}" % obj_name + "{0.00}"),
-                            ],
-                            mode="vline",
-                            visible=False,
-                        )
-
-                        # Add the hover tools to the plot
-                        self.p.add_tools(hover)
+                        self._make_line_and_hover_tool("objs", obj_name, False, _obj_color,"solid", True)
 
                     # desvars
                     desvars_label = _make_header_text_for_variable_chooser("DESIGN VARS")
@@ -435,54 +414,54 @@ class RealTimeOptPlot(object):
                     for i, desvar_name in enumerate(desvar_names):
                         units = self._case_tracker.get_units(desvar_name)
 
-                        # toggle = _make_legend_item(f"{desvar_name} ({units})", color)
                         self._make_legend_item(f"{desvar_name} ({units})", "black", False)
-                        # self._toggles.append(toggle)
-                        # column_items.append(toggle)
 
                         value = new_data["desvars"][desvar_name]
 
-                        # If the variable is a vector, use the varea plot, not a line
-                        if value.size == 1:
-                            desvar_line = self.p.line(
-                                x="iteration",
-                                y=f"{desvar_name}_min",
-                                line_width=3,
-                                y_range_name=f"extra_y_{desvar_name}",
-                                source=self._source,
-                                color="black",
-                            )
-                        else:
-                            desvar_line = self.p.varea(
-                                x="iteration",
-                                y1=f"{desvar_name}_min",
-                                y2=f"{desvar_name}_max",
-                                y_range_name=f"extra_y_{desvar_name}",
-                                source=self._source,
-                                color="black",
-                                alpha=0.3,
-                            )
-                        desvar_line.visible = False
-                        self.lines.append(desvar_line)
 
-                        # Can't do hover tools for varea ! https://github.com/bokeh/bokeh/issues/8872
-                        if value.size == 1:
-                            hover = HoverTool(
-                                renderers=[desvar_line],
-                                tooltips=[
-                                    ("Iteration", "@iteration"),
-                                    (f"{desvar_name} min", "@{%s}" % (desvar_name + "_min") + "{0.00}"),
-                                ],
-                                mode="vline",
-                                visible=False,
-                            )
-                            self.p.add_tools(hover)
+                        use_varea = value.size > 1
+                        self._make_line_and_hover_tool("desvars", desvar_name, use_varea, _non_active_plot_color, "solid", False)
+
+                        # If the variable is a vector, use the varea plot, not a line
+                        # if value.size == 1:
+                        #     desvar_line = self.p.line(
+                        #         x="iteration",
+                        #         y=f"{desvar_name}_min",
+                        #         line_width=3,
+                        #         y_range_name=f"extra_y_{desvar_name}",
+                        #         source=self._source,
+                        #         color="black",
+                        #     )
+                        # else:
+                        #     desvar_line = self.p.varea(
+                        #         x="iteration",
+                        #         y1=f"{desvar_name}_min",
+                        #         y2=f"{desvar_name}_max",
+                        #         y_range_name=f"extra_y_{desvar_name}",
+                        #         source=self._source,
+                        #         color="black",
+                        #         alpha=0.3,
+                        #     )
+                        # desvar_line.visible = False
+                        # self.lines.append(desvar_line)
+
+                        # # Can't do hover tools for varea ! https://github.com/bokeh/bokeh/issues/8872
+                        # if value.size == 1:
+                        #     hover = HoverTool(
+                        #         renderers=[desvar_line],
+                        #         tooltips=[
+                        #             ("Iteration", "@iteration"),
+                        #             (f"{desvar_name} min", "@{%s}" % (desvar_name + "_min") + "{0.00}"),
+                        #         ],
+                        #         mode="vline",
+                        #         visible=False,
+                        #     )
+                        #     self.p.add_tools(hover)
 
                         # Make axis for this variable on the right
                         extra_y_axis = LinearAxis(
                             y_range_name=f"extra_y_{desvar_name}",
                             axis_label=f"{desvar_name} ({units})",
-                            axis_label_text_color="black",
                             axis_label_text_font_size="20px",
                         )
                         axes.append(extra_y_axis)
@@ -505,40 +484,11 @@ class RealTimeOptPlot(object):
                     for i, cons_name in enumerate(cons_names):
                         units = self._case_tracker.get_units(cons_name)
                         self._make_legend_item(f"{cons_name} ({units})", "black", False)
-                        # self._toggles.append(toggle)
-                        # column_items.append(toggle)
 
-                        cons_line = self.p.line(
-                            x="iteration",
-                            y=cons_name,
-                            line_width=3,
-                            line_dash="dashed",
-                            y_range_name=f"extra_y_{cons_name}",
-                            source=self._source,
-                            color="black",
-                            visible=False,
-                        )
-
-                        self.lines.append(cons_line)
-
-                        hover = HoverTool(
-                            renderers=[cons_line],
-                            tooltips=[
-                                ("Iteration", "@iteration"),
-                                (cons_name, "@{%s}" % cons_name + "{0.00}"),
-                            ],
-                            mode="vline",
-                            visible=False,
-                        )
-
-                        # Add the hover tools to the plot
-                        self.p.add_tools(hover)
-
-                        # Add 
+                        self._make_line_and_hover_tool("cons", cons_name, False, _non_active_plot_color, "dashed", False)
                         extra_y_axis = LinearAxis(
                             y_range_name=f"extra_y_{cons_name}",
                             axis_label=f"{cons_name} ({units})",
-                            axis_label_text_color="black",
                             axis_label_text_font_size="20px",
                         )
 
@@ -939,6 +889,43 @@ class RealTimeOptPlot(object):
     ]
 
         return toggle
+
+    def _make_line_and_hover_tool(self,var_type,varname, use_varea, color,line_dash,visible):
+        if use_varea:
+            line = self.p.varea(
+                x="iteration",
+                y1=f"{varname}_min",
+                y2=f"{varname}_max",
+                source=self._source,
+                color=color,
+                alpha=0.3,
+                visible=visible,
+            )
+        else:
+            line = self.p.line(
+                x="iteration",
+                y=varname,
+                line_width=3,
+                line_dash=line_dash,
+                source=self._source,
+                color=color,
+                visible=visible,
+            )
+        if var_type != "objs":
+            line.y_range_name=f"extra_y_{varname}"
+        self.lines.append(line)
+        if not use_varea:
+            hover = HoverTool(
+                renderers=[line],
+                tooltips=[
+                    ("Iteration", "@iteration"),
+                    (varname, "@{%s}" % varname + "{0.00}"),
+                ],
+                mode="vline",
+                visible=visible,
+            )
+            self.p.add_tools(hover)
+
 
     def setup_figure(self):
         # Make the figure and all the settings for it
