@@ -394,7 +394,7 @@ class System(object, metaclass=SystemMetaclass):
     _promotion_tree : dict
         Mapping of system path to promotion info indicating all subsystems where variables
         were promoted.
-    _during_sparsity : bool
+    _during_coloring : bool
         If True, we're doing a sparsity computation and uncolored approxs need to be restricted
         to only colored columns.
     compute_primal : function or None
@@ -545,7 +545,7 @@ class System(object, metaclass=SystemMetaclass):
         self._output_solver_options = {}
         self._promotion_tree = None
 
-        self._during_sparsity = False
+        self._during_coloring = False
 
         if not hasattr(self, 'compute_primal'):
             self.compute_primal = None
@@ -1790,7 +1790,7 @@ class System(object, metaclass=SystemMetaclass):
         # tell approx scheme to limit itself to only colored columns
         if not use_jax:
             approx_scheme._reset()
-            self._during_sparsity = True
+            self._during_coloring = True
 
         self._coloring_info._update_wrt_matches(self)
 
@@ -1818,7 +1818,7 @@ class System(object, metaclass=SystemMetaclass):
         self._jacobian = save_jac
 
         if not use_jax:
-            self._during_sparsity = False
+            self._during_coloring = False
 
         self._first_call_to_linearize = save_first_call
 
@@ -6447,7 +6447,7 @@ class System(object, metaclass=SystemMetaclass):
         str
             The best direction for derivative calculations, 'fwd' or 'rev'.
         """
-        return 'fwd' if len(self._outputs) > len(self._inputs) else 'rev'
+        return 'fwd' if len(self._outputs) >= len(self._inputs) else 'rev'
 
     def _get_sys_promotion_tree(self, tree=None):
         """

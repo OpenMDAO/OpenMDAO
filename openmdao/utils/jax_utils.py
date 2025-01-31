@@ -878,10 +878,10 @@ def compute_jacvec_product(inst, inputs, d_inputs, d_outputs, mode, discrete_inp
         inhash = ((inputs.get_hash(),) + tuple(inst._discrete_inputs.values()) +
                   inst.get_self_statics())
         if inhash != inst._vjp_hash:
-            dx = tuple(d_inputs.values())
+            ncont_ins = d_inputs.nvars()
             full_invals = tuple(inst._get_compute_primal_invals(inputs, discrete_inputs))
-            x = full_invals[:len(dx)]
-            other = full_invals[len(dx):]
+            x = full_invals[:ncont_ins]
+            other = full_invals[ncont_ins:]
             # recompute vjp function if inputs have changed
             _, inst._vjp_fun = jax.vjp(lambda *args: inst.compute_primal(*args, *other), *x)
             inst._vjp_hash = inhash
@@ -949,11 +949,10 @@ def linearize(inst, inputs, outputs, partials, discrete_inputs=None, discrete_ou
             dvals = dvals[wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
 
             sjmeta = partials.get_metadata(key)
-            rows = sjmeta['rows']
-            if rows is None:
+            if sjmeta['rows'] is None:
                 partials[ofname, wrtname] = dvals
             else:
-                partials[ofname, wrtname] = dvals[rows, sjmeta['cols']]
+                partials[ofname, wrtname] = dvals[sjmeta['rows'], sjmeta['cols']]
 
 
 def apply_linear(inst, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
@@ -1022,6 +1021,52 @@ def apply_linear(inst, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
 
         d_inputs.set_vals(deriv_vals[:ninputs])
         d_outputs.set_vals(deriv_vals[ninputs:])
+
+
+def get_vmap_tangents(vals, use_nans=False):
+    """
+    Return a tuple of tangents values for use with vmap.
+
+    Parameters
+    ----------
+    vals : list
+        List of function input or outputvalues.
+    use_nans : bool
+        If True, use nans instead of random values for seeds.
+
+    Returns
+    -------
+    tuple of ndarray or ndarray
+        The tangents values to be passed to vmap.
+    """
+    sizes = [np.size(a) for a in vals]
+    totsize = np.sum(sizes)
+
+    if use_nans:
+        arr = np.empty(totsize)
+        arr[:] = np.nan
+    else:
+        arr = np.random.random(totsize)
+
+    tangent = np.diag(arr)
+
+    tangents = []
+    start = end = 0
+    for v in vals:
+        end += np.size(v)
+        vartan = tangent[start:end]  # get rows corresponding to each var
+        vartan.shape = np.shape(v) + (totsize,)
+        print('vartan, v shape', v.shape, 'vartan.shape', vartan.shape)
+        print(vartan)
+        tangents.append(vartan)
+        start = end
+
+    if len(vals) == 1:
+        tangents = tangents[0]
+    else:
+        tangents = tuple(tangents)
+
+    return tangents
 
 
 def _to_compute_primal_setup_parser(parser):

@@ -110,6 +110,18 @@ class DotProductMultDiscretePrimal(om.JaxExplicitComponent):
         return (z, zz, disc_out)
 
 
+class VecMultPrimal(om.JaxExplicitComponent):
+    def setup(self):
+        self.add_input('x', shape_by_conn=True)
+        self.add_input('y', shape_by_conn=True)
+        self.add_output('z', copy_shape='x')
+        self.add_output('zz', copy_shape='x')
+
+    def compute_primal(self, x, y):
+        return x * y, x / y
+
+
+
 x_shape = (2, 3)
 y_shape = (3, 4)
 
@@ -459,4 +471,45 @@ class TestJaxShapesAndReturns(unittest.TestCase):
     # TODO: test with mixed np and jnp in compute
 
 if __name__ == '__main__':
-    unittest.main()
+    # unittest.main()
+    p = om.Problem()
+    ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
+    ivc.add_output('y', val=np.ones(y_shape))
+    ivc.add_discrete_output('disc_out', val=3)
+    comp = p.model.add_subsystem('comp', DotProductMultDiscretePrimal())
+
+    p.model.connect('ivc.x', 'comp.x')
+    p.model.connect('ivc.y', 'comp.y')
+    p.model.connect('ivc.disc_out', 'comp.disc_in')
+
+    p.setup()
+
+    x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
+    y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
+    p.set_val('ivc.x', x)
+    p.set_val('ivc.y', y)
+    p.final_setup()
+    p.run_model()
+
+    comp.get_sparsity(use_nans=True, direction='fwd')
+
+    shape = (2,3)
+
+    p = om.Problem()
+    ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(shape)))
+    ivc.add_output('y', val=np.ones(shape))
+    comp = p.model.add_subsystem('comp', VecMultPrimal())
+
+    p.model.connect('ivc.x', 'comp.x')
+    p.model.connect('ivc.y', 'comp.y')
+
+    p.setup()
+
+    x = np.arange(1,np.prod(shape)+1)
+    y = np.arange(1,np.prod(shape)+1)
+    p.set_val('ivc.x', x)
+    p.set_val('ivc.y', y)
+    p.final_setup()
+    p.run_model()
+
+    comp.get_sparsity(use_nans=True, direction='fwd')
