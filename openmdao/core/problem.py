@@ -1351,12 +1351,12 @@ class Problem(object, metaclass=ProblemMetaclass):
         Returns
         -------
         Dict of Dicts of Tuples of Floats
-
             First key:
                 is the (output, input) tuple of strings;
             Second key:
-            'rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev', 'vals_at_max_abs',
-            'vals_at_max_rel', and 'rank_inconsistent'.
+                'rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev', 'vals_at_max_abs',
+                'vals_at_max_rel', and 'rank_inconsistent'.
+
             For 'rel error', 'abs error', 'vals_at_max_abs' and 'vals_at_max_rel' the value is a
             tuple containing values for forward - fd, adjoint - fd, forward - adjoint. For
             'magnitude' the value is a tuple indicating the maximum magnitude of values found in
