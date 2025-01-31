@@ -87,87 +87,6 @@ def _realtime_opt_plot_cmd(options, user_args):
     results = pstats.Stats(profile)
     results.dump_stats("realtime_opt_plot.prof")
 
-def _make_legend_item(varname, color):
-
-    from bokeh.models import Button, CustomJS, InlineStyleSheet
-    stylesheet = InlineStyleSheet(css=".bk-btn.bk-btn-default.bk-active { font-size: 22px; } .bk-btn { font-size: 22px; } .bk-btn:focus {outline: none;}")
-
-    # TODO what should we do with colors?
-    color = 'black'
-
-    toggle = Toggle(
-        label=varname,
-        active=False,
-        margin=(0, 0, 5, 0),
-        stylesheets=[stylesheet],
-    )
-
-    # Add custom CSS styles for both active and inactive states
-    toggle.stylesheets = [
-        f"""
-            .bk-btn {{
-                color: {color};
-                border-color: {color};
-                background-color: white;
-                display: flex;
-                align-items: center; /* Vertical centering */
-                justify-content: center; /* Horizontal centering */
-                height: 20px; /* Example height, adjust as needed */
-                border-width: 0px; /* Adjust to desired thickness */
-                border-style: solid; /* Ensures a solid border */
-                font-size: 22px !important; 
-            }}
-
-            .bk-btn.bk-active {{
-                --font-size: 32px;  /* Set the variable */
-                color: white;
-                border-color: {color};
-                background-color: {color};
-                display: flex;
-                align-items: center; /* Vertical centering */
-                justify-content: center; /* Horizontal centering */
-                height: 20px; /* Example height, adjust as needed */
-                border-width: 0px; /* Adjust to desired thickness */
-                border-style: solid; /* Ensures a solid border */
-                font-size: 22px !important;
-            }}
-
-            .button.bk-btn.bk-btn-default {{
-                font-size: 22px !important;  /* Override the variable */
-                display: flex;
-            /* ... rest of your styles ... */
-            }}
-
-            .bk-btn.bk-btn-default {{
-                font-size: 22px !important;  /* Override the variable */
-                display: flex;
-            /* ... rest of your styles ... */
-            }}
-
-            .button.bk-btn.bk-btn-default.bk-active {{
-                font-size: 22px !important;  /* Override the variable */
-                display: flex;
-                /* ... rest of your styles ... */
-            }}
-
-
-            .button.bk-btn.bk-btn-default.bk-active {{
-                font-size: 22px !important;
-                display: flex;
-                }}
-
-            .bk-btn ::file-selector-button {{
-                font-size: 22px !important;
-                display: flex;
-            }}
-            .bk-btn:focus {{
-                outline: none; /* Removes the default focus ring */
-                display: flex;
-            }}
-        """
-   ]
-
-    return toggle
 
 
 def _update_y_min_max(name, y, y_min, y_max):
@@ -421,11 +340,12 @@ class CaseTracker:
 
 class RealTimeOptPlot(object):
     def __init__(self, case_recorder_filename, callback_period, doc):
-        self._source = None
-        self._callback_period = callback_period
         self._case_recorder_filename = case_recorder_filename
+
+        self._source = None
         self.lines = []
-        self.toggles = []
+        self._toggles = []
+        self._column_items = []
         self._labels_updated_with_units = False
 
         self._case_tracker = CaseTracker(case_recorder_filename)
@@ -436,9 +356,6 @@ class RealTimeOptPlot(object):
         #    the axes ranges can be adjusted as data comes in
         self.y_min = defaultdict(lambda: float("inf") )
         self.y_max = defaultdict(lambda: float("-inf"))
-
-        self._source_dict = None
-
 
         def update():
 
@@ -453,12 +370,10 @@ class RealTimeOptPlot(object):
                 new_data = self._case_tracker.get_new_case()
                 if new_data:
                     print(f"if new_data at {time.time()-start_time}")
-                    self.setup_source_dict()
-                    self._source = ColumnDataSource(self._source_dict)
+                    self.setup_data_source()
                     # index of lines across all variables: obj, desvars, cons
                     i_line = 0
                     
-                    column_items = []
                     axes = []
 
                     # Objective
@@ -468,39 +383,24 @@ class RealTimeOptPlot(object):
                             f"Plot assumes there is on objective but {len(obj_names)} found"
                         )
                     obj_label = _make_header_text_for_variable_chooser("OBJECTIVE")
-                    column_items.append(obj_label)
+                    self._column_items.append(obj_label)
 
                     for i, obj_name in enumerate(obj_names):
                         units = self._case_tracker.get_units(obj_name)
 
-                        toggle = _make_legend_item(f"{obj_name} ({units})", _obj_color)
-                        toggle.active = True
-                        self.toggles.append(toggle)
-
-                        column_items.append(toggle)
-
+                        toggle = self._make_legend_item(f"{obj_name} ({units})", _obj_color, True)
 
                         value = new_data["objs"][obj_name]
 
-                        import math 
-
-                        if not math.isnan(value): 
-
-                            # set the range
-                            float_value = _get_value_for_plotting(value, "objs")
-                            y_min = float_value
-                            y_max = float_value
-                            # if the range is zero, the axis will not be displayed. Plus need some range to make it
-                            #    look good. Some other code seems to do +- 1 for the range in this case.
-                            if y_min == y_max:
-                                y_min = y_min - 1
-                                y_max = y_max + 1
-
-                        else:
-                            print("------------------ NaN -------------")
-                            y_min = -1
-                            y_max = 1
-
+                        # set the range
+                        float_value = _get_value_for_plotting(value, "objs")
+                        y_min = float_value
+                        y_max = float_value
+                        # if the range is zero, the axis will not be displayed. Plus need some range to make it
+                        #    look good. Some other code seems to do +- 1 for the range in this case.
+                        if y_min == y_max:
+                            y_min = y_min - 1
+                            y_max = y_max + 1
                         self.p.y_range = Range1d(y_min, y_max)
 
                         obj_line = self.p.line(
@@ -529,19 +429,20 @@ class RealTimeOptPlot(object):
 
                     # desvars
                     desvars_label = _make_header_text_for_variable_chooser("DESIGN VARS")
-                    column_items.append(desvars_label)
+                    self._column_items.append(desvars_label)
 
                     desvar_names = self._case_tracker.get_desvar_names()
                     for i, desvar_name in enumerate(desvar_names):
                         units = self._case_tracker.get_units(desvar_name)
 
                         # toggle = _make_legend_item(f"{desvar_name} ({units})", color)
-                        toggle = _make_legend_item(f"{desvar_name} ({units})", "black")
-                        self.toggles.append(toggle)
-                        column_items.append(toggle)
+                        self._make_legend_item(f"{desvar_name} ({units})", "black", False)
+                        # self._toggles.append(toggle)
+                        # column_items.append(toggle)
 
                         value = new_data["desvars"][desvar_name]
 
+                        # If the variable is a vector, use the varea plot, not a line
                         if value.size == 1:
                             desvar_line = self.p.line(
                                 x="iteration",
@@ -549,28 +450,22 @@ class RealTimeOptPlot(object):
                                 line_width=3,
                                 y_range_name=f"extra_y_{desvar_name}",
                                 source=self._source,
-                                # color=color,
                                 color="black",
-                                # visible=False,
                             )
                         else:
                             desvar_line = self.p.varea(
                                 x="iteration",
                                 y1=f"{desvar_name}_min",
                                 y2=f"{desvar_name}_max",
-                                # line_width=3,
                                 y_range_name=f"extra_y_{desvar_name}",
                                 source=self._source,
-                                # color=color,
                                 color="black",
-                                # visible=False,
-                                # visible=True,
                                 alpha=0.3,
                             )
                         desvar_line.visible = False
-
                         self.lines.append(desvar_line)
 
+                        # Can't do hover tools for varea ! https://github.com/bokeh/bokeh/issues/8872
                         if value.size == 1:
                             hover = HoverTool(
                                 renderers=[desvar_line],
@@ -582,25 +477,20 @@ class RealTimeOptPlot(object):
                                 visible=False,
                             )
                             self.p.add_tools(hover)
-                        # Can't do hover tools for varea ! https://github.com/bokeh/bokeh/issues/8872
 
+                        # Make axis for this variable on the right
                         extra_y_axis = LinearAxis(
                             y_range_name=f"extra_y_{desvar_name}",
                             axis_label=f"{desvar_name} ({units})",
-                            # axis_label_text_color=color,
                             axis_label_text_color="black",
                             axis_label_text_font_size="20px",
                         )
-
                         axes.append(extra_y_axis)
-
                         self.p.add_layout(extra_y_axis, "right")
                         self.p.right[i_line].visible = False
 
-
                         value = new_data["desvars"][desvar_name]
                         float_value = _get_value_for_plotting(value, "desvars")
-
                         self.p.extra_y_ranges[f"extra_y_{desvar_name}"] = Range1d(
                             float_value - 1, float_value + 1
                         )
@@ -609,15 +499,14 @@ class RealTimeOptPlot(object):
 
                     # cons
                     cons_label = _make_header_text_for_variable_chooser("CONSTRAINTS")
-
-                    column_items.append(cons_label)
+                    self._column_items.append(cons_label)
 
                     cons_names = self._case_tracker.get_cons_names()
                     for i, cons_name in enumerate(cons_names):
                         units = self._case_tracker.get_units(cons_name)
-                        toggle = _make_legend_item(f"{cons_name} ({units})", "black")
-                        self.toggles.append(toggle)
-                        column_items.append(toggle)
+                        self._make_legend_item(f"{cons_name} ({units})", "black", False)
+                        # self._toggles.append(toggle)
+                        # column_items.append(toggle)
 
                         cons_line = self.p.line(
                             x="iteration",
@@ -626,7 +515,6 @@ class RealTimeOptPlot(object):
                             line_dash="dashed",
                             y_range_name=f"extra_y_{cons_name}",
                             source=self._source,
-                            # color=color,
                             color="black",
                             visible=False,
                         )
@@ -646,10 +534,10 @@ class RealTimeOptPlot(object):
                         # Add the hover tools to the plot
                         self.p.add_tools(hover)
 
+                        # Add 
                         extra_y_axis = LinearAxis(
                             y_range_name=f"extra_y_{cons_name}",
                             axis_label=f"{cons_name} ({units})",
-                            # axis_label_text_color=color,
                             axis_label_text_color="black",
                             axis_label_text_font_size="20px",
                         )
@@ -658,14 +546,6 @@ class RealTimeOptPlot(object):
                         self.p.add_layout(extra_y_axis, "right")
                         self.p.right[i_line].visible = False
 
-                        # set the range
-                        # y_min = -100
-                        # y_max = 100
-                        # # if the range is zero, the axis will not be displayed. Plus need some range to make it
-                        # #    look good. Some other code seems to do +- 1 for the range in this case.
-                        # if y_min == y_max:
-                        #     y_min = y_min - 1
-                        #     y_max = y_max + 1
                         value = new_data["cons"][cons_name]
                         float_value = _get_value_for_plotting(value, "cons")
                         self.p.extra_y_ranges[f"extra_y_{cons_name}"] = Range1d(y_min, y_max)
@@ -676,7 +556,7 @@ class RealTimeOptPlot(object):
 
                     # Create CustomJS callback for toggle buttons
                     callback = CustomJS(
-                        args=dict(lines=self.lines, axes=axes, toggles=self.toggles),
+                        args=dict(lines=self.lines, axes=axes, toggles=self._toggles),
                         code="""
 
                             if (typeof window.ColorManager === 'undefined') {
@@ -845,15 +725,12 @@ class RealTimeOptPlot(object):
                     )
 
                     # Add callback to all toggles
-                    for toggle in self.toggles:
+                    for toggle in self._toggles:
                         toggle.js_on_change("active", callback)
 
                     # Create a column of toggles with scrolling
                     toggle_column = Column(
-                        children=column_items,
-                        # width=150,
-                        # height=400,
-                        # sizing_mode="stretch_width",
+                        children=self._column_items,
                         sizing_mode="stretch_both",
                         height_policy="fit",
                         styles={
@@ -865,11 +742,12 @@ class RealTimeOptPlot(object):
                         },
                     )
 
+                    # header for the variable list
                     label = Div(
-                        text="<b>Variables</b>",
+                        text="Variables",
                         width=200,
-                        styles={"font-size": "20px"},  # Set font size using CSS
-                    )  # Fixed-width text label
+                        styles={"font-size": "20px", "font-weight": "bold"},
+                    )
                     label_and_toggle_column = Column(
                         label,
                         toggle_column,
@@ -879,7 +757,6 @@ class RealTimeOptPlot(object):
                             'max-height': '100vh'  # Ensures it doesn't exceed viewport
                         },
                        )
-                    
 
                     scroll_box = ScrollBox(
                         child=label_and_toggle_column,
@@ -921,7 +798,7 @@ class RealTimeOptPlot(object):
 
                     if not self._labels_updated_with_units and desvar_value.size > 1:
                         units = self._case_tracker.get_units(desvar_name)
-                        self.toggles[iline].label = f"{desvar_name} ({units}) {desvar_value.shape}"
+                        self._toggles[iline].label = f"{desvar_name} ({units}) {desvar_value.shape}"
 
                     min_max_changed = False
                     min_max_changed = min_max_changed or _update_y_min_max(desvar_name, np.min(desvar_value), self.y_min, self.y_max)
@@ -940,7 +817,7 @@ class RealTimeOptPlot(object):
 
                     if not self._labels_updated_with_units and cons_value.size > 1:
                         units = self._case_tracker.get_units(cons_name)
-                        self.toggles[iline].label = f"{cons_name} ({units}) {cons_value.shape}"
+                        self._toggles[iline].label = f"{cons_name} ({units}) {cons_value.shape}"
 
                     source_stream_dict[cons_name] = [float_cons_value]
                     min_max_changed = _update_y_min_max(cons_name, float_cons_value, self.y_min, self.y_max)
@@ -954,32 +831,114 @@ class RealTimeOptPlot(object):
                 self._source.stream(source_stream_dict)
                 self._labels_updated_with_units = True 
 
-        doc.add_periodic_callback(update, self._callback_period)
+        doc.add_periodic_callback(update, callback_period)
         doc.title = "OpenMDAO Optimization"
 
-    def setup_source_dict(self):
-        self._source_dict = {"iteration": []}
-
+    def setup_data_source(self):
         ####  make the source dict
-        self._source_dict = {"iteration": []}
+        _source_dict = {"iteration": []}
 
         # Obj
         obj_names = self._case_tracker.get_obj_names()
         for obj_name in obj_names:
-            self._source_dict[obj_name] = []
+            _source_dict[obj_name] = []
 
         # Desvars
         desvar_names = self._case_tracker.get_desvar_names()
         for desvar_name in desvar_names:
-            # self._source_dict[desvar_name] = []
-            self._source_dict[f"{desvar_name}_min"] = []
-            self._source_dict[f"{desvar_name}_max"] = []
+            _source_dict[f"{desvar_name}_min"] = []
+            _source_dict[f"{desvar_name}_max"] = []
 
         # Cons
         con_names = self._case_tracker.get_cons_names()
         for con_name in con_names:
-            self._source_dict[con_name] = []
+            _source_dict[con_name] = []
 
+        self._source = ColumnDataSource(_source_dict)
+
+    def _make_legend_item(self, varname, color, active):
+
+        from bokeh.models import Button, CustomJS, InlineStyleSheet
+        stylesheet = InlineStyleSheet(css=".bk-btn.bk-btn-default.bk-active { font-size: 22px; } .bk-btn { font-size: 22px; } .bk-btn:focus {outline: none;}")
+
+        # TODO what should we do with colors?
+        color = 'black'
+
+        toggle = Toggle(
+            label=varname,
+            active=active,
+            margin=(0, 0, 5, 0),
+            stylesheets=[stylesheet],
+        )
+        self._toggles.append(toggle)
+        self._column_items.append(toggle)
+
+        # Add custom CSS styles for both active and inactive states
+        toggle.stylesheets = [
+            f"""
+                .bk-btn {{
+                    color: {color};
+                    border-color: {color};
+                    background-color: white;
+                    display: flex;
+                    align-items: center; /* Vertical centering */
+                    justify-content: center; /* Horizontal centering */
+                    height: 20px; /* Example height, adjust as needed */
+                    border-width: 0px; /* Adjust to desired thickness */
+                    border-style: solid; /* Ensures a solid border */
+                    font-size: 22px !important; 
+                }}
+
+                .bk-btn.bk-active {{
+                    --font-size: 32px;  /* Set the variable */
+                    color: white;
+                    border-color: {color};
+                    background-color: {color};
+                    display: flex;
+                    align-items: center; /* Vertical centering */
+                    justify-content: center; /* Horizontal centering */
+                    height: 20px; /* Example height, adjust as needed */
+                    border-width: 0px; /* Adjust to desired thickness */
+                    border-style: solid; /* Ensures a solid border */
+                    font-size: 22px !important;
+                }}
+
+                .button.bk-btn.bk-btn-default {{
+                    font-size: 22px !important;  /* Override the variable */
+                    display: flex;
+                /* ... rest of your styles ... */
+                }}
+
+                .bk-btn.bk-btn-default {{
+                    font-size: 22px !important;  /* Override the variable */
+                    display: flex;
+                /* ... rest of your styles ... */
+                }}
+
+                .button.bk-btn.bk-btn-default.bk-active {{
+                    font-size: 22px !important;  /* Override the variable */
+                    display: flex;
+                    /* ... rest of your styles ... */
+                }}
+
+
+                .button.bk-btn.bk-btn-default.bk-active {{
+                    font-size: 22px !important;
+                    display: flex;
+                    }}
+
+                .bk-btn ::file-selector-button {{
+                    font-size: 22px !important;
+                    display: flex;
+                }}
+                .bk-btn:focus {{
+                    outline: none; /* Removes the default focus ring */
+                    display: flex;
+                }}
+            """
+    ]
+
+        return toggle
 
     def setup_figure(self):
         # Make the figure and all the settings for it
