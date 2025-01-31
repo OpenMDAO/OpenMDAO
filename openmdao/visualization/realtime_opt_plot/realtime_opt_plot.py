@@ -347,6 +347,7 @@ class RealTimeOptPlot(object):
         self.lines = []
         self._toggles = []
         self._column_items = []
+        self._axes = []
         self._labels_updated_with_units = False
 
         self._case_tracker = CaseTracker(case_recorder_filename)
@@ -375,138 +376,58 @@ class RealTimeOptPlot(object):
                     # index of lines across all variables: obj, desvars, cons
                     i_line = 0
                     
-                    axes = []
-
                     # Objective
                     obj_names = self._case_tracker.get_obj_names()
                     if len(obj_names) != 1:
                         raise ValueError(
                             f"Plot assumes there is on objective but {len(obj_names)} found"
                         )
+                    
+                    # objs
                     obj_label = _make_header_text_for_variable_chooser("OBJECTIVE")
                     self._column_items.append(obj_label)
 
                     for i, obj_name in enumerate(obj_names):
                         units = self._case_tracker.get_units(obj_name)
-
                         self._make_legend_item(f"{obj_name} ({units})", _obj_color, True)
-
-                        value = new_data["objs"][obj_name]
-
-                        # set the range
-                        float_value = _get_value_for_plotting(value, "objs")
-                        y_min = float_value
-                        y_max = float_value
-                        # if the range is zero, the axis will not be displayed. Plus need some range to make it
-                        #    look good. Some other code seems to do +- 1 for the range in this case.
-                        if y_min == y_max:
-                            y_min = y_min - 1
-                            y_max = y_max + 1
-                        self.p.y_range = Range1d(y_min, y_max)
-
                         self._make_line_and_hover_tool("objs", obj_name, False, _obj_color,"solid", True)
+                        value = new_data["objs"][obj_name]
+                        float_value = _get_value_for_plotting(value, "objs")
+                        self.p.y_range = Range1d(float_value - 1, float_value + 1)
+
+                    # TODO do we need to increment i_line ?
 
                     # desvars
                     desvars_label = _make_header_text_for_variable_chooser("DESIGN VARS")
                     self._column_items.append(desvars_label)
-
                     desvar_names = self._case_tracker.get_desvar_names()
                     for i, desvar_name in enumerate(desvar_names):
                         units = self._case_tracker.get_units(desvar_name)
-
                         self._make_legend_item(f"{desvar_name} ({units})", "black", False)
-
                         value = new_data["desvars"][desvar_name]
-
-
                         use_varea = value.size > 1
                         self._make_line_and_hover_tool("desvars", desvar_name, use_varea, _non_active_plot_color, "solid", False)
-
-                        # If the variable is a vector, use the varea plot, not a line
-                        # if value.size == 1:
-                        #     desvar_line = self.p.line(
-                        #         x="iteration",
-                        #         y=f"{desvar_name}_min",
-                        #         line_width=3,
-                        #         y_range_name=f"extra_y_{desvar_name}",
-                        #         source=self._source,
-                        #         color="black",
-                        #     )
-                        # else:
-                        #     desvar_line = self.p.varea(
-                        #         x="iteration",
-                        #         y1=f"{desvar_name}_min",
-                        #         y2=f"{desvar_name}_max",
-                        #         y_range_name=f"extra_y_{desvar_name}",
-                        #         source=self._source,
-                        #         color="black",
-                        #         alpha=0.3,
-                        #     )
-                        # desvar_line.visible = False
-                        # self.lines.append(desvar_line)
-
-                        # # Can't do hover tools for varea ! https://github.com/bokeh/bokeh/issues/8872
-                        # if value.size == 1:
-                        #     hover = HoverTool(
-                        #         renderers=[desvar_line],
-                        #         tooltips=[
-                        #             ("Iteration", "@iteration"),
-                        #             (f"{desvar_name} min", "@{%s}" % (desvar_name + "_min") + "{0.00}"),
-                        #         ],
-                        #         mode="vline",
-                        #         visible=False,
-                        #     )
-                        #     self.p.add_tools(hover)
-
-                        # Make axis for this variable on the right
-                        extra_y_axis = LinearAxis(
-                            y_range_name=f"extra_y_{desvar_name}",
-                            axis_label=f"{desvar_name} ({units})",
-                            axis_label_text_font_size="20px",
-                        )
-                        axes.append(extra_y_axis)
-                        self.p.add_layout(extra_y_axis, "right")
-                        self.p.right[i_line].visible = False
-
-                        value = new_data["desvars"][desvar_name]
                         float_value = _get_value_for_plotting(value, "desvars")
-                        self.p.extra_y_ranges[f"extra_y_{desvar_name}"] = Range1d(
-                            float_value - 1, float_value + 1
-                        )
-
+                        self._make_axis(desvar_name, float_value, units)
                         i_line += 1
 
                     # cons
                     cons_label = _make_header_text_for_variable_chooser("CONSTRAINTS")
                     self._column_items.append(cons_label)
-
                     cons_names = self._case_tracker.get_cons_names()
                     for i, cons_name in enumerate(cons_names):
                         units = self._case_tracker.get_units(cons_name)
                         self._make_legend_item(f"{cons_name} ({units})", "black", False)
-
                         self._make_line_and_hover_tool("cons", cons_name, False, _non_active_plot_color, "dashed", False)
-                        extra_y_axis = LinearAxis(
-                            y_range_name=f"extra_y_{cons_name}",
-                            axis_label=f"{cons_name} ({units})",
-                            axis_label_text_font_size="20px",
-                        )
-
-                        axes.append(extra_y_axis)
-                        self.p.add_layout(extra_y_axis, "right")
-                        self.p.right[i_line].visible = False
-
                         value = new_data["cons"][cons_name]
-                        float_value = _get_value_for_plotting(value, "cons")
-                        self.p.extra_y_ranges[f"extra_y_{cons_name}"] = Range1d(y_min, y_max)
-
+                        self._make_axis(cons_name, value, units)
                         i_line += 1
 
                     print(f"after making all the lines and axes at {time.time()-start_time}")
 
                     # Create CustomJS callback for toggle buttons
                     callback = CustomJS(
-                        args=dict(lines=self.lines, axes=axes, toggles=self._toggles),
+                        args=dict(lines=self.lines, axes=self._axes, toggles=self._toggles),
                         code="""
 
                             if (typeof window.ColorManager === 'undefined') {
@@ -925,6 +846,23 @@ class RealTimeOptPlot(object):
                 visible=visible,
             )
             self.p.add_tools(hover)
+
+
+    def _make_axis(self, varname, plot_value, units):
+        # Make axis for this variable on the right
+        extra_y_axis = LinearAxis(
+            y_range_name=f"extra_y_{varname}",
+            axis_label=f"{varname} ({units})",
+            axis_label_text_font_size="20px",
+            visible=False,
+        )
+        self._axes.append(extra_y_axis)
+        self.p.add_layout(extra_y_axis, "right")
+        self.p.extra_y_ranges[f"extra_y_{varname}"] = Range1d(
+            plot_value - 1, plot_value + 1
+        )
+
+
 
 
     def setup_figure(self):
