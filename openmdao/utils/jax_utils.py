@@ -1054,10 +1054,9 @@ def get_vmap_tangents(vals, use_nans=False):
     start = end = 0
     for v in vals:
         end += np.size(v)
-        vartan = tangent[start:end]  # get rows corresponding to each var
+        vartan = tangent[start:end]  # get rows corresponding to each input
         vartan.shape = np.shape(v) + (totsize,)
-        print('vartan, v shape', v.shape, 'vartan.shape', vartan.shape)
-        print(vartan)
+
         tangents.append(vartan)
         start = end
 

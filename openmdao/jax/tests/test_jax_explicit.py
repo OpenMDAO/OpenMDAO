@@ -472,6 +472,9 @@ class TestJaxShapesAndReturns(unittest.TestCase):
 
 if __name__ == '__main__':
     # unittest.main()
+
+    mode = 'rev'
+
     p = om.Problem()
     ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
     ivc.add_output('y', val=np.ones(y_shape))
@@ -491,7 +494,13 @@ if __name__ == '__main__':
     p.final_setup()
     p.run_model()
 
-    comp.get_sparsity(use_nans=True, direction='fwd')
+    J = comp.get_sparsity(use_nans=True, direction='fwd')
+    print("J fwd")
+    print(J)
+    J = comp.get_sparsity(use_nans=True, direction='rev')
+    print("J rev")
+    print(J)
+
 
     shape = (2,3)
 
@@ -512,4 +521,9 @@ if __name__ == '__main__':
     p.final_setup()
     p.run_model()
 
-    comp.get_sparsity(use_nans=True, direction='fwd')
+    J = comp.get_sparsity(use_nans=True, direction='fwd')
+    print("J fwd")
+    print(J)
+    J = comp.get_sparsity(use_nans=True, direction='rev')
+    print("J rev")
+    print(J)
