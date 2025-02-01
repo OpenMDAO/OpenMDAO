@@ -406,10 +406,10 @@ if sys.version_info >= (3, 9):
             return (x0**2 + x1**2,)
 
         def compute_primal_1_2(self, x0):
-            return x0**2, x0*2
+            return (x0**2, x0*2)
 
         def compute_primal_2_2(self, x0, x1):
-            return x0**2, x1**2
+            return (x0**2, x1**2)
 
 
     class TopGrp(om.Group):
@@ -468,6 +468,9 @@ class TestJaxShapesAndReturns(unittest.TestCase):
         assert_check_partials(prob.check_partials(method='cs', out_stream=None), atol=1e-5)
         assert_check_totals(prob.check_totals(of=ofs, wrt=wrts, method='cs', out_stream=None), atol=1e-5)
 
+        for c in prob.model.system_iter(recurse=True, typ=om.JaxExplicitComponent):
+            print(c.compute_sparsity(direction=mode)[0])
+
     # TODO: test with mixed np and jnp in compute
 
 if __name__ == '__main__':
@@ -494,11 +497,11 @@ if __name__ == '__main__':
     p.final_setup()
     p.run_model()
 
-    J = comp.compute_sparsity(direction='fwd')
+    J,_ = comp.compute_sparsity(direction='fwd')
     print("J fwd")
     J = np.array(J.toarray(), dtype=int)
     print(J)
-    J = comp.compute_sparsity(direction='rev')
+    J,_ = comp.compute_sparsity(direction='rev')
     print("J rev")
     J = np.array(J.toarray(), dtype=int)
     print(J)
@@ -523,11 +526,43 @@ if __name__ == '__main__':
     p.final_setup()
     p.run_model()
 
-    J = comp.compute_sparsity(direction='fwd')
+    J,_ = comp.compute_sparsity(direction='fwd')
     print("J fwd")
     J = np.array(J.toarray(), dtype=int)
     print(J)
-    J = comp.compute_sparsity(direction='rev')
+    J,_ = comp.compute_sparsity(direction='rev')
+    print("J rev")
+    J = np.array(J.toarray(), dtype=int)
+    print(J)
+
+    shape = (2,3)
+    nins = 1
+    nouts = 1
+    p = om.Problem()
+    comp = p.model.add_subsystem('comp', CompRetTuple(shape=shape, nins=nins, nouts=nouts))
+    p.setup()
+    p.run_model()
+    J,_ = comp.compute_sparsity(direction='fwd')
+    print("J fwd")
+    J = np.array(J.toarray(), dtype=int)
+    print(J)
+    J,_ = comp.compute_sparsity(direction='rev')
+    print("J rev")
+    J = np.array(J.toarray(), dtype=int)
+    print(J)
+
+    shape = (2,3)
+    nins = 1
+    nouts = 1
+    p = om.Problem()
+    comp = p.model.add_subsystem('comp', CompRetValue(shape=shape, nins=nins, nouts=nouts))
+    p.setup()
+    p.run_model()
+    J,_ = comp.compute_sparsity(direction='fwd')
+    print("J fwd")
+    J = np.array(J.toarray(), dtype=int)
+    print(J)
+    J,_ = comp.compute_sparsity(direction='rev')
     print("J rev")
     J = np.array(J.toarray(), dtype=int)
     print(J)

@@ -9,7 +9,7 @@ from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.jax_utils import jax, jit, \
     linearize as _jax_linearize, apply_linear as _jax_apply_linear, _jax_register_pytree_class, \
-    _compute_sparsity
+    _compute_sparsity, ReturnChecker
 
 
 class JaxImplicitComponent(ImplicitComponent):
@@ -49,6 +49,9 @@ class JaxImplicitComponent(ImplicitComponent):
             self.linearize = MethodType(_jax_linearize, self)
             self._has_linearize = True
 
+        # determine if the compute_primal method returns a tuple
+        self._compute_primal_returns_tuple = ReturnChecker(self.compute_primal).returns_tuple()
+
         if self.options['use_jit']:
             static_argnums = []
             idx = len(self._var_rel_names['input']) + len(self._var_rel_names['output']) + 1
@@ -81,3 +84,11 @@ class JaxImplicitComponent(ImplicitComponent):
         Get the sparsity of the Jacobian.
         """
         return _compute_sparsity(self, direction)
+
+    def compare_sparsity(self, direction=None):
+        """
+        Compare the sparsity of the Jacobian computed by JAX vs. the sparsity computed using
+        finite differences.
+        """
+        Jjax, _ = self.compute_sparsity(direction)
+        Jfd, _ = self.compute_fd_sparsity(direction)

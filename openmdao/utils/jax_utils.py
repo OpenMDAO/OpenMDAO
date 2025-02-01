@@ -1024,14 +1024,16 @@ def apply_linear(inst, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
         d_outputs.set_vals(deriv_vals[ninputs:])
 
 
-def get_vmap_tangents(vals, use_nans=False):
+def get_vmap_tangents(vals, direction, use_nans=False, returns_tuple=False):
     """
     Return a tuple of tangents values for use with vmap.
 
     Parameters
     ----------
     vals : list
-        List of function input or outputvalues.
+        List of function input or output values.
+    direction : str
+        The direction to compute the sparsity in.  It must be 'fwd' or 'rev'.
     use_nans : bool
         If True, use nans instead of ones for seeds.
 
@@ -1059,7 +1061,7 @@ def get_vmap_tangents(vals, use_nans=False):
         tangents.append(vartan)
         start = end
 
-    if len(vals) == 1:
+    if len(vals) == 1 and direction == 'rev' and not returns_tuple:
         tangents = tangents[0]
     else:
         tangents = tuple(tangents)
@@ -1070,6 +1072,17 @@ def get_vmap_tangents(vals, use_nans=False):
 def _compute_sparsity(self, direction=None):
     """
     Get the sparsity of the Jacobian.
+
+    Parameters
+    ----------
+    direction : str or None
+        The direction to compute the sparsity in.  If None, the best direction is chosen based
+        on the number of inputs and outputs.  If a str, it must be 'fwd' or 'rev'.
+
+    Returns
+    -------
+    coo_matrix, dict
+        The boolean sparsity matrix and info.
     """
     if direction is None:
         direction = self.best_partial_deriv_direction()
@@ -1089,7 +1102,7 @@ def _compute_sparsity(self, direction=None):
     idiscvals = full_invals[ncontins:]  # discrete inputs
 
     # exclude the discrete inputs from the inputs and the discrete outputs from the outputs
-    if implicit:
+    if implicit or (ncontouts == 1 and not self._compute_primal_returns_tuple):
         def differentiable_part(*contvals):
             return self.compute_primal(*contvals, *idiscvals)
     else:
@@ -1097,7 +1110,8 @@ def _compute_sparsity(self, direction=None):
             return self.compute_primal(*contvals, *idiscvals)[:ncontouts]
 
     if direction == 'fwd':
-        tangents = get_vmap_tangents(icontvals, use_nans=True)
+        tangents = get_vmap_tangents(icontvals, 'fwd', use_nans=True,
+                                     returns_tuple=self._compute_primal_returns_tuple)
 
         # make a function that takes only a tuple of tangents to make it easier to vectorize
         # using vmap
@@ -1106,11 +1120,11 @@ def _compute_sparsity(self, direction=None):
             return jax.jvp(differentiable_part, icontvals, tangent)[1]
 
         # vectorize over the last axis of the tangent vectors
-        batched_jvp = jax.vmap(jvp_at_point, in_axes=-1, out_axes=-1)(tangents)
-        if len(batched_jvp) == 1:
-            J = np.atleast_2d(batched_jvp[0])
-        else:
-            J = np.vstack([j.reshape(np.prod(j.shape[:-1]), j.shape[-1]) for j in batched_jvp])
+        J = jax.vmap(jvp_at_point, in_axes=-1, out_axes=-1)(tangents)
+        # if len(batched) == 1:
+        #     J = np.atleast_2d(batched[0])
+        # else:
+        #     J = np.vstack([j.reshape(np.prod(j.shape[:-1]), j.shape[-1]) for j in batched])
 
     else:  # rev
         # Returns primal and a function to compute VJP so just take [1], the vjp function
@@ -1119,19 +1133,49 @@ def _compute_sparsity(self, direction=None):
         def vjp_at_point(cotangent):
             return vjp_fn(cotangent)
 
-        cotangents = get_vmap_tangents(tuple(self._outputs.values()), use_nans=True)
+        cotangents = get_vmap_tangents(tuple(self._outputs.values()), 'rev', use_nans=True,
+                                       returns_tuple=self._compute_primal_returns_tuple)
 
         # Batch over last axis of cotangents
-        batched_vjp = jax.vmap(vjp_at_point, in_axes=-1, out_axes=-1)(cotangents)
+        J = jax.vmap(vjp_at_point, in_axes=-1, out_axes=-1)(cotangents)
 
-        if len(batched_vjp) == 1:
-            J = np.atleast_2d(batched_vjp[0])
-        else:
-            J = np.vstack([j.reshape(np.prod(j.shape[:-1]), j.shape[-1]) for j in batched_vjp]).T
+        # if len(batched) == 1:
+        #     J = np.atleast_2d(batched[0])
+        # else:
+        #     J = np.vstack([j.reshape(np.prod(j.shape[:-1]), j.shape[-1]) for j in batched]).T
+
+    if not isinstance(J, tuple):
+        J = (J,)
+
+    if len(J) == 1:
+        J = J[0]
+        if len(J.shape) > 2:
+            # flatten 'variable' dimensions.  Last dimension is the batching dimension.
+            J = J.reshape(np.prod(J.shape[:-1]), J.shape[-1])
+        elif len(J.shape) == 1:
+            J = np.atleast_2d(J)
+    else:
+        # flatten 'variable' dimensions for each variable.  Last dimension is the batching
+        # dimension.  Then vertically stack all the flattened 'variable' arrays.
+        J = np.vstack([j.reshape(np.prod(j.shape[:-1]), j.shape[-1]) for j in J])
+
+    if direction != 'fwd':
+        J = J.T
 
     nz = np.nonzero(J)
     data = np.ones(len(nz[0]), dtype=bool)
-    return coo_matrix((data, nz), shape=J.shape)
+
+    info = {
+        'tol': 0.,
+        'orders': 1,
+        'good_tol': 0.,
+        'nz_matches': 0,
+        'n_tested': 0,
+        'nz_entries': len(nz[0]),
+        'J_shape': J.shape,
+    }
+
+    return coo_matrix((data, nz), shape=J.shape), info
 
 
 def _to_compute_primal_setup_parser(parser):
