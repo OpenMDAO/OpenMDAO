@@ -1028,6 +1028,8 @@ def get_vmap_tangents(vals, direction, use_nans=False, returns_tuple=False):
     """
     Return a tuple of tangents values for use with vmap.
 
+    The batching dimension is the last axis of each tangent.
+
     Parameters
     ----------
     vals : list
@@ -1036,6 +1038,9 @@ def get_vmap_tangents(vals, direction, use_nans=False, returns_tuple=False):
         The direction to compute the sparsity in.  It must be 'fwd' or 'rev'.
     use_nans : bool
         If True, use nans instead of ones for seeds.
+    returns_tuple : bool
+        If True, the compute_primal method returns a tuple.  One item tuples require special
+        handling.
 
     Returns
     -------
@@ -1071,7 +1076,7 @@ def get_vmap_tangents(vals, direction, use_nans=False, returns_tuple=False):
 
 def _compute_sparsity(self, direction=None):
     """
-    Get the sparsity of the Jacobian.
+    Compute the sparsity of the Jacobian using jvp/vjp with nans for the seeds.
 
     Parameters
     ----------
@@ -1109,6 +1114,9 @@ def _compute_sparsity(self, direction=None):
         def differentiable_part(*contvals):
             return self.compute_primal(*contvals, *idiscvals)[:ncontouts]
 
+    if self.options['use_jit']:
+        differentiable_part = jax.jit(differentiable_part)
+
     if direction == 'fwd':
         tangents = get_vmap_tangents(icontvals, 'fwd', use_nans=True,
                                      returns_tuple=self._compute_primal_returns_tuple)
@@ -1121,10 +1129,6 @@ def _compute_sparsity(self, direction=None):
 
         # vectorize over the last axis of the tangent vectors
         J = jax.vmap(jvp_at_point, in_axes=-1, out_axes=-1)(tangents)
-        # if len(batched) == 1:
-        #     J = np.atleast_2d(batched[0])
-        # else:
-        #     J = np.vstack([j.reshape(np.prod(j.shape[:-1]), j.shape[-1]) for j in batched])
 
     else:  # rev
         # Returns primal and a function to compute VJP so just take [1], the vjp function
@@ -1138,11 +1142,6 @@ def _compute_sparsity(self, direction=None):
 
         # Batch over last axis of cotangents
         J = jax.vmap(vjp_at_point, in_axes=-1, out_axes=-1)(cotangents)
-
-        # if len(batched) == 1:
-        #     J = np.atleast_2d(batched[0])
-        # else:
-        #     J = np.vstack([j.reshape(np.prod(j.shape[:-1]), j.shape[-1]) for j in batched]).T
 
     if not isinstance(J, tuple):
         J = (J,)

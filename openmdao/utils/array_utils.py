@@ -282,11 +282,18 @@ def sparsity_diff_viz(arr1, arr2, val_map=None, stream=sys.stdout):
         Mapping of array values to characters.
     stream : file-like
         Stream where output will be written.
+
+    Returns
+    -------
+    bool
+        True if they agree, False otherwise.
     """
     if val_map is None:
         val_map = {0: '.', 1: '1', 3: '2', 4: 'x'}
     spdiff = get_sparsity_diff_array(arr1, arr2)
     csr_array_viz(spdiff, val_map=val_map, stream=stream)
+
+    return 1 not in spdiff.data and 3 not in spdiff.data
 
 
 def array_viz(arr, prob=None, of=None, wrt=None, stream=sys.stdout):
@@ -1049,6 +1056,14 @@ def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, s
             col_start = col_end
 
             yield (of, wrt, submat.row, submat.col, submat.shape)
+
+
+def name_val2size_iter(name_val_iter):
+    """
+    Yield the size of each variable.
+    """
+    for name, val in name_val_iter:
+        yield (name, np.size(val))
 
 
 def idxs2minmax_tuples(idxs):

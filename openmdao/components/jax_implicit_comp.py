@@ -84,11 +84,3 @@ class JaxImplicitComponent(ImplicitComponent):
         Get the sparsity of the Jacobian.
         """
         return _compute_sparsity(self, direction)
-
-    def compare_sparsity(self, direction=None):
-        """
-        Compare the sparsity of the Jacobian computed by JAX vs. the sparsity computed using
-        finite differences.
-        """
-        Jjax, _ = self.compute_sparsity(direction)
-        Jfd, _ = self.compute_fd_sparsity(direction)

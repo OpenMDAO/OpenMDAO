@@ -376,12 +376,5 @@ if __name__ == '__main__':
 
     p.final_setup()
     p.run_model()
-
-    J, _ = comp.compute_sparsity(direction='fwd')
-    print("J fwd")
-    J = np.array(J.toarray(), dtype=int)
-    print(J)
-    J, _ = comp.compute_sparsity(direction='rev')
-    print("J rev")
-    J = np.array(J.toarray(), dtype=int)
-    print(J)
+    comp.sparsity_matches_fd(direction='fwd')
+    comp.sparsity_matches_fd(direction='rev')

@@ -3,7 +3,8 @@ import sys
 import itertools
 
 import numpy as np
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, \
+    assert_check_totals, assert_sparsity_matches_fd
 import openmdao.api as om
 
 from openmdao.utils.jax_utils import jax, jnp
@@ -156,6 +157,7 @@ class TestJaxComp(unittest.TestCase):
         assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
         assert_check_totals(p.check_totals(of=['comp.z'], wrt=['comp.x', 'comp.y'], method='cs', show_only_incorrect=True))
         assert_check_partials(p.check_partials(method='cs', show_only_incorrect=True))
+        assert_sparsity_matches_fd(comp, outstream=None)
 
     @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]), name_func=parameterized_name)
     def test_jax_explicit_comp2primal(self, mode, matrix_free):
@@ -182,6 +184,7 @@ class TestJaxComp(unittest.TestCase):
         assert_check_totals(p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'],
                                            method='fd', show_only_incorrect=True))
         assert_check_partials(p.check_partials(show_only_incorrect=True))
+        assert_sparsity_matches_fd(comp, outstream=None)
 
     @parameterized.expand(itertools.product(['fwd', 'rev'], ['fd', 'cs']), name_func=parameterized_name)
     def test_jax_explicit_comp2primal_nodecl(self, mode, derivs_method):
@@ -189,7 +192,7 @@ class TestJaxComp(unittest.TestCase):
         p = om.Problem()
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
         ivc.add_output('y', val=np.ones(y_shape))
-        p.model.add_subsystem('comp', DotProdMultPrimalNoDeclPartials(derivs_method=derivs_method))
+        comp = p.model.add_subsystem('comp', DotProdMultPrimalNoDeclPartials(derivs_method=derivs_method))
         p.model.connect('ivc.x', 'comp.x')
         p.model.connect('ivc.y', 'comp.y')
 
@@ -212,6 +215,7 @@ class TestJaxComp(unittest.TestCase):
         assert_check_totals(p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'],
                                            method=method, show_only_incorrect=True))
         assert_check_partials(p.check_partials(method=method, show_only_incorrect=True))
+        assert_sparsity_matches_fd(comp, outstream=None)
 
     @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]), name_func=parameterized_name)
     def test_jax_explicit_comp2primal_w_option(self, mode, matrix_free):
@@ -240,6 +244,7 @@ class TestJaxComp(unittest.TestCase):
         assert_check_totals(p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'],
                                            method='fd', show_only_incorrect=True))
         assert_check_partials(p.check_partials(show_only_incorrect=True))
+        assert_sparsity_matches_fd(comp, outstream=None)
 
         comp.options['mult'] = 3.5
         p.set_val('ivc.x', x)
@@ -251,7 +256,7 @@ class TestJaxComp(unittest.TestCase):
         assert_check_totals(p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'],
                                            method='fd', show_only_incorrect=True))
         assert_check_partials(p.check_partials(show_only_incorrect=True))
-
+        assert_sparsity_matches_fd(comp, outstream=None)
         comp.stat = 1./3.5
         p.set_val('ivc.x', x)
         p.set_val('ivc.y', y)
@@ -262,6 +267,7 @@ class TestJaxComp(unittest.TestCase):
         assert_check_totals(p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'],
                                            method='fd', show_only_incorrect=True))
         assert_check_partials(p.check_partials(show_only_incorrect=True))
+        assert_sparsity_matches_fd(comp, outstream=None)
 
     @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]), name_func=parameterized_name)
     def test_jax_explicit_comp_with_option(self, mode, matrix_free):
@@ -288,6 +294,7 @@ class TestJaxComp(unittest.TestCase):
         assert_check_totals(p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'],
                                            method='fd', show_only_incorrect=True))
         assert_check_partials(p.check_partials(show_only_incorrect=True))
+        assert_sparsity_matches_fd(comp, outstream=None)
 
         p.set_val('ivc.x', x)
         p.set_val('ivc.y', y)
@@ -298,6 +305,7 @@ class TestJaxComp(unittest.TestCase):
         assert_check_totals(p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'],
                                            method='fd', show_only_incorrect=True))
         assert_check_partials(p.check_partials(show_only_incorrect=True))
+        assert_sparsity_matches_fd(comp, outstream=None)
 
     @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]), name_func=parameterized_name)
     def test_jax_explicit_comp_with_discrete_primal(self, mode, matrix_free):
@@ -326,6 +334,7 @@ class TestJaxComp(unittest.TestCase):
         assert_check_totals(p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'],
                                              method='fd', show_only_incorrect=True))
         assert_check_partials(p.check_partials(show_only_incorrect=True))
+        assert_sparsity_matches_fd(comp, outstream=None)
 
         p.set_val('ivc.disc_out', -2)
         p.run_model()
@@ -334,7 +343,7 @@ class TestJaxComp(unittest.TestCase):
         assert_check_totals(p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'],
                                            method='fd', show_only_incorrect=True))
         assert_check_partials(p.check_partials(show_only_incorrect=True))
-
+        assert_sparsity_matches_fd(comp, outstream=None)
 
 if sys.version_info >= (3, 9):
 
@@ -469,14 +478,12 @@ class TestJaxShapesAndReturns(unittest.TestCase):
         assert_check_totals(prob.check_totals(of=ofs, wrt=wrts, method='cs', out_stream=None), atol=1e-5)
 
         for c in prob.model.system_iter(recurse=True, typ=om.JaxExplicitComponent):
-            print(c.compute_sparsity(direction=mode)[0])
+            assert_sparsity_matches_fd(c, direction=mode, outstream=None)
 
     # TODO: test with mixed np and jnp in compute
 
 if __name__ == '__main__':
     # unittest.main()
-
-    mode = 'rev'
 
     p = om.Problem()
     ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
@@ -496,15 +503,9 @@ if __name__ == '__main__':
     p.set_val('ivc.y', y)
     p.final_setup()
     p.run_model()
+    comp.sparsity_matches_fd(direction='fwd')
+    comp.sparsity_matches_fd(direction='rev')
 
-    J,_ = comp.compute_sparsity(direction='fwd')
-    print("J fwd")
-    J = np.array(J.toarray(), dtype=int)
-    print(J)
-    J,_ = comp.compute_sparsity(direction='rev')
-    print("J rev")
-    J = np.array(J.toarray(), dtype=int)
-    print(J)
 
 
     shape = (2,3)
@@ -525,15 +526,9 @@ if __name__ == '__main__':
     p.set_val('ivc.y', y)
     p.final_setup()
     p.run_model()
+    comp.sparsity_matches_fd(direction='fwd')
+    comp.sparsity_matches_fd(direction='rev')
 
-    J,_ = comp.compute_sparsity(direction='fwd')
-    print("J fwd")
-    J = np.array(J.toarray(), dtype=int)
-    print(J)
-    J,_ = comp.compute_sparsity(direction='rev')
-    print("J rev")
-    J = np.array(J.toarray(), dtype=int)
-    print(J)
 
     shape = (2,3)
     nins = 1
@@ -542,14 +537,8 @@ if __name__ == '__main__':
     comp = p.model.add_subsystem('comp', CompRetTuple(shape=shape, nins=nins, nouts=nouts))
     p.setup()
     p.run_model()
-    J,_ = comp.compute_sparsity(direction='fwd')
-    print("J fwd")
-    J = np.array(J.toarray(), dtype=int)
-    print(J)
-    J,_ = comp.compute_sparsity(direction='rev')
-    print("J rev")
-    J = np.array(J.toarray(), dtype=int)
-    print(J)
+    comp.sparsity_matches_fd(direction='fwd')
+    comp.sparsity_matches_fd(direction='rev')
 
     shape = (2,3)
     nins = 1
@@ -558,11 +547,5 @@ if __name__ == '__main__':
     comp = p.model.add_subsystem('comp', CompRetValue(shape=shape, nins=nins, nouts=nouts))
     p.setup()
     p.run_model()
-    J,_ = comp.compute_sparsity(direction='fwd')
-    print("J fwd")
-    J = np.array(J.toarray(), dtype=int)
-    print(J)
-    J,_ = comp.compute_sparsity(direction='rev')
-    print("J rev")
-    J = np.array(J.toarray(), dtype=int)
-    print(J)
+    comp.sparsity_matches_fd(direction='fwd')
+    comp.sparsity_matches_fd(direction='rev')

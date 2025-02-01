@@ -2,6 +2,7 @@
 Functions for making assertions about OpenMDAO Systems.
 """
 
+import sys
 from fnmatch import fnmatch
 import warnings
 import unittest
@@ -689,6 +690,14 @@ def assert_near_equal(actual, desired, tolerance=1e-15, tol_type='rel'):
             'actual and desired have unexpected types: %s, %s' % (type(actual), type(desired)))
 
     return error
+
+
+def assert_sparsity_matches_fd(system, direction='fwd', outstream=sys.stdout):
+    """
+    Assert that the sparsity of the system matches the finite difference sparsity.
+    """
+    assert system.sparsity_matches_fd(direction=direction, outstream=outstream), \
+        f"{system.msginfo}: Sparsity does not match finite difference sparsity"
 
 
 def assert_equal_arrays(a1, a2):

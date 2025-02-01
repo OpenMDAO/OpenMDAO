@@ -28,7 +28,8 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path, has_match
 from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
 from openmdao.utils.variable_table import write_var_table, NA
-from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len, safe_norm
+from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len, safe_norm, \
+    sparsity_diff_viz, get_sparsity_diff_array
 from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
@@ -1834,6 +1835,56 @@ class System(object, metaclass=SystemMetaclass):
         self._first_call_to_linearize = save_first_call
 
         return sparsity, sp_info
+
+    def sparsity_matches_fd(self, direction=None, outstream=sys.stdout):
+        """
+        Compare the sparsity computed by this system vs. the sparsity computed using fd.
+
+        Note that some systems use fd to compute their sparsity, so no difference will ever be
+        found even if the sparsity is somehow incorrect.
+
+        Parameters
+        ----------
+        direction : str
+            Compute derivatives in fwd or rev mode, or whichever is based based on input and
+            output sizes if value is None.  Note that only fwd is possible when using finite
+            difference.
+        outstream : file-like
+            Stream where output will be written.  If None, no output will be written. The output
+            is a text visualization of the sparsity difference.
+
+        Returns
+        -------
+        bool
+            True if they match, False otherwise.
+
+        Parameters
+        ----------
+        direction : str
+            Compute derivatives in fwd or rev mode, or whichever is based based on input and
+            output sizes if value is None.  Note that only fwd is possible when using finite
+            difference.
+        outstream : file-like
+            Stream where output will be written.  If None, no output will be written.
+        """
+        if self.pathname == '' or not ('use_jax' in self.options and self.options['use_jax']):
+            if outstream is not None:
+                print(f"{self.msginfo} already uses fd to compute sparsity so no comparison was "
+                      "performed.")
+            return True
+
+        Jsys, _ = self.compute_sparsity(direction)
+        Jfd, _ = self.compute_fd_sparsity()
+
+        if outstream is not None:
+            print(f"{self.msginfo} sparsity comparison with fd (direction={direction})")
+            print("0 or x = both agree, 1 = sys nonzero and fd zero, 2 = fd nonzero and sys zero")
+            ret = sparsity_diff_viz(Jsys, Jfd, stream=outstream)
+        else:
+            spdiff = get_sparsity_diff_array(Jsys, Jfd)
+            ret = 1 not in spdiff.data and 3 not in spdiff.data
+
+        return ret
 
     def _compute_coloring(self, recurse=False, **overrides):
         """
