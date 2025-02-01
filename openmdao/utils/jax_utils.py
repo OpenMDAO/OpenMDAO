@@ -12,6 +12,7 @@ from collections import defaultdict
 import importlib
 
 import numpy as np
+from scipy.sparse import coo_matrix
 
 from openmdao.visualization.tables.table_builder import generate_table
 from openmdao.utils.code_utils import _get_long_name, remove_src_blocks, replace_src_block, \
@@ -1032,7 +1033,7 @@ def get_vmap_tangents(vals, use_nans=False):
     vals : list
         List of function input or outputvalues.
     use_nans : bool
-        If True, use nans instead of random values for seeds.
+        If True, use nans instead of ones for seeds.
 
     Returns
     -------
@@ -1045,10 +1046,9 @@ def get_vmap_tangents(vals, use_nans=False):
     if use_nans:
         arr = np.empty(totsize)
         arr[:] = np.nan
+        tangent = np.diag(arr)
     else:
-        arr = np.random.random(totsize)
-
-    tangent = np.diag(arr)
+        tangent = np.eye(totsize)
 
     tangents = []
     start = end = 0
@@ -1056,7 +1056,6 @@ def get_vmap_tangents(vals, use_nans=False):
         end += np.size(v)
         vartan = tangent[start:end]  # get rows corresponding to each input
         vartan.shape = np.shape(v) + (totsize,)
-
         tangents.append(vartan)
         start = end
 
@@ -1066,6 +1065,73 @@ def get_vmap_tangents(vals, use_nans=False):
         tangents = tuple(tangents)
 
     return tangents
+
+
+def _compute_sparsity(self, direction=None):
+    """
+    Get the sparsity of the Jacobian.
+    """
+    if direction is None:
+        direction = self.best_partial_deriv_direction()
+
+    assert direction in ['fwd', 'rev']
+
+    ncontins = self._inputs.nvars()
+    ncontouts = self._outputs.nvars()
+
+    implicit = not self.is_explicit()
+
+    if implicit:
+        ncontins += ncontouts
+
+    full_invals = tuple(self._get_compute_primal_invals())
+    icontvals = full_invals[:ncontins]  # continuous inputs
+    idiscvals = full_invals[ncontins:]  # discrete inputs
+
+    # exclude the discrete inputs from the inputs and the discrete outputs from the outputs
+    if implicit:
+        def differentiable_part(*contvals):
+            return self.compute_primal(*contvals, *idiscvals)
+    else:
+        def differentiable_part(*contvals):
+            return self.compute_primal(*contvals, *idiscvals)[:ncontouts]
+
+    if direction == 'fwd':
+        tangents = get_vmap_tangents(icontvals, use_nans=True)
+
+        # make a function that takes only a tuple of tangents to make it easier to vectorize
+        # using vmap
+        def jvp_at_point(tangent):
+            # [1] is the derivative, [0] is the primal (we don't need the primal)
+            return jax.jvp(differentiable_part, icontvals, tangent)[1]
+
+        # vectorize over the last axis of the tangent vectors
+        batched_jvp = jax.vmap(jvp_at_point, in_axes=-1, out_axes=-1)(tangents)
+        if len(batched_jvp) == 1:
+            J = np.atleast_2d(batched_jvp[0])
+        else:
+            J = np.vstack([j.reshape(np.prod(j.shape[:-1]), j.shape[-1]) for j in batched_jvp])
+
+    else:  # rev
+        # Returns primal and a function to compute VJP so just take [1], the vjp function
+        vjp_fn = jax.vjp(differentiable_part, *icontvals)[1]
+
+        def vjp_at_point(cotangent):
+            return vjp_fn(cotangent)
+
+        cotangents = get_vmap_tangents(tuple(self._outputs.values()), use_nans=True)
+
+        # Batch over last axis of cotangents
+        batched_vjp = jax.vmap(vjp_at_point, in_axes=-1, out_axes=-1)(cotangents)
+
+        if len(batched_vjp) == 1:
+            J = np.atleast_2d(batched_vjp[0])
+        else:
+            J = np.vstack([j.reshape(np.prod(j.shape[:-1]), j.shape[-1]) for j in batched_vjp]).T
+
+    nz = np.nonzero(J)
+    data = np.ones(len(nz[0]), dtype=bool)
+    return coo_matrix((data, nz), shape=J.shape)
 
 
 def _to_compute_primal_setup_parser(parser):

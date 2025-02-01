@@ -912,7 +912,7 @@ class ImplicitComponent(Component):
         """
         return self._list_states()
 
-    def _get_compute_primal_invals(self, inputs, outputs, discrete_inputs):
+    def _get_compute_primal_invals(self, inputs=None, outputs=None, discrete_inputs=None):
         """
         Yield inputs and outputs in the order expected by the compute_primal method.
 
@@ -930,6 +930,13 @@ class ImplicitComponent(Component):
         any
             Inputs and outputs in the order expected by the compute_primal method.
         """
+        if inputs is None:
+            inputs = self._inputs
+        if outputs is None:
+            outputs = self._outputs
+        if discrete_inputs is None:
+            discrete_inputs = self._discrete_inputs
+
         yield from inputs.values()
         yield from outputs.values()
         if discrete_inputs:

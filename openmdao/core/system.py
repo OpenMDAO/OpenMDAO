@@ -1766,9 +1766,16 @@ class System(object, metaclass=SystemMetaclass):
         self._outputs.set_val(starting_outputs)
         self._residuals.set_val(starting_resids)
 
-    def compute_sparsity(self):
+    def compute_sparsity(self, direction=None):
         """
         Compute the sparsity of the partial jacobian.
+
+        Parameters
+        ----------
+        direction : str
+            Compute derivatives in fwd or rev mode, or whichever is based based on input and
+            output sizes if value is None.  Note that only fwd is possible when using finite
+            difference.
 
         Returns
         -------
@@ -1802,18 +1809,22 @@ class System(object, metaclass=SystemMetaclass):
         from openmdao.core.group import Group
         is_total = isinstance(self, Group)
 
-        for i in self._perturbation_iter(self._coloring_info['num_full_jacs'],
-                                         self._coloring_info['perturb_size']):
-            if use_jax:
-                self._jax_linearize()
-                sparsity, sp_info = self._jacobian.get_sparsity()
-            elif is_total:
-                self.run_linearize(sub_do_ln=False)
-                sparsity, sp_info = self._jacobian.get_sparsity()
-            else:  # for components
-                # this avoids calling any compute_partials/linearize methods which will fail
-                # because _ColSparsityJac only supports set_col and not dict access.
-                sparsity, sp_info = self.compute_fd_sparsity()
+        if not is_total and not use_jax:
+            # this avoids calling any compute_partials/linearize methods which will fail
+            # because _ColSparsityJac only supports set_col and not dict access.
+            sparsity, sp_info = \
+                self.compute_fd_sparsity(method=self._coloring_info['method'],
+                                         num_full_jacs=self._coloring_info['num_full_jacs'],
+                                         perturb_size=self._coloring_info['perturb_size'])
+        else:
+            for i in self._perturbation_iter(self._coloring_info['num_full_jacs'],
+                                             self._coloring_info['perturb_size']):
+                if use_jax:
+                    self._jax_linearize()
+                    sparsity, sp_info = self._jacobian.get_sparsity()
+                elif is_total:
+                    self.run_linearize(sub_do_ln=False)
+                    sparsity, sp_info = self._jacobian.get_sparsity()
 
         self._jacobian = save_jac
 

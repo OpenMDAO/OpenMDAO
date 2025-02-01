@@ -8,7 +8,8 @@ from types import MethodType
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.jax_utils import jax, jit, \
-    linearize as _jax_linearize, apply_linear as _jax_apply_linear, _jax_register_pytree_class
+    linearize as _jax_linearize, apply_linear as _jax_apply_linear, _jax_register_pytree_class, \
+    _compute_sparsity
 
 
 class JaxImplicitComponent(ImplicitComponent):
@@ -74,3 +75,9 @@ class JaxImplicitComponent(ImplicitComponent):
                                                  static_argnums=static_argnums),
                                              self)
         return self._jac_func_
+
+    def compute_sparsity(self, direction=None):
+        """
+        Get the sparsity of the Jacobian.
+        """
+        return _compute_sparsity(self, direction)

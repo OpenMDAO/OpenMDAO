@@ -494,11 +494,13 @@ if __name__ == '__main__':
     p.final_setup()
     p.run_model()
 
-    J = comp.get_sparsity(use_nans=True, direction='fwd')
+    J = comp.compute_sparsity(direction='fwd')
     print("J fwd")
+    J = np.array(J.toarray(), dtype=int)
     print(J)
-    J = comp.get_sparsity(use_nans=True, direction='rev')
+    J = comp.compute_sparsity(direction='rev')
     print("J rev")
+    J = np.array(J.toarray(), dtype=int)
     print(J)
 
 
@@ -521,9 +523,11 @@ if __name__ == '__main__':
     p.final_setup()
     p.run_model()
 
-    J = comp.get_sparsity(use_nans=True, direction='fwd')
+    J = comp.compute_sparsity(direction='fwd')
     print("J fwd")
+    J = np.array(J.toarray(), dtype=int)
     print(J)
-    J = comp.get_sparsity(use_nans=True, direction='rev')
+    J = comp.compute_sparsity(direction='rev')
     print("J rev")
+    J = np.array(J.toarray(), dtype=int)
     print(J)

@@ -355,4 +355,35 @@ class TestJaxImplicitComp(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    # unittest.main()
+    matrix_free = False
+    shape = (3,2)
+    mode = 'fwd'
+    p = om.Problem()
+    ivc = p.model.add_subsystem('ivc', om.IndepVarComp('a', shape=shape))
+    ivc.add_output('b', shape=shape)
+    ivc.add_output('c', shape=shape)
+    comp = p.model.add_subsystem('comp', JaxQuadraticCompPrimal(shape=shape))
+    comp.matrix_free = bool(matrix_free)
+    p.model.connect('ivc.a', 'comp.a')
+    p.model.connect('ivc.b', 'comp.b')
+    p.model.connect('ivc.c', 'comp.c')
+    p.setup(mode=mode)
+
+    # p.set_val('ivc.a', 1.0)
+    # p.set_val('ivc.b', -4.0)
+    # p.set_val('ivc.c', 3.0)
+
+    p.final_setup()
+    p.run_model()
+
+    J = comp.compute_sparsity(direction='fwd')
+    print("J fwd")
+    print(J)
+    J = np.array(J.toarray(), dtype=int)
+    print(J)
+    J = comp.compute_sparsity(direction='rev')
+    print("J rev")
+    print(J)
+    J = np.array(J.toarray(), dtype=int)
+    print(J)

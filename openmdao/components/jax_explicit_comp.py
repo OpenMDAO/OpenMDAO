@@ -5,13 +5,11 @@ An ExplicitComponent that uses JAX for derivatives.
 import sys
 from types import MethodType
 
-import numpy as np
-
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.jax_utils import jax, jit, compute_partials as _jax_compute_partials, \
     compute_jacvec_product as _jax_compute_jacvec_product, ReturnChecker, \
-    _jax_register_pytree_class, get_vmap_tangents
+    _jax_register_pytree_class, _compute_sparsity
 
 class JaxExplicitComponent(ExplicitComponent):
     """
@@ -93,58 +91,8 @@ class JaxExplicitComponent(ExplicitComponent):
 
         return self._jac_func_
 
-    def get_sparsity(self, use_nans=True, direction=None, num_full_jacs=1, perturb_size=1e-9):
+    def compute_sparsity(self, direction=None):
         """
         Get the sparsity of the Jacobian.
         """
-        if direction is None:
-            direction = self.best_partial_deriv_direction()
-
-        assert direction in ['fwd', 'rev']
-
-        # if use_nans:
-        #     num_full_jacs = 1  # only one jacobian is needed if using nans
-
-        icontvals = tuple(self._inputs.values())  # continuous inputs
-        idiscvals = tuple(self._discrete_inputs.values())  # discrete inputs
-
-        ncontouts = self._outputs.nvars()
-
-        # exclude the discrete inputs from the inputs and the discrete outputs from the outputs
-        def differentiable_part(*contvals):
-            return self.compute_primal(*contvals, *idiscvals)[:ncontouts]
-
-        if direction == 'fwd':
-            tangents = get_vmap_tangents(icontvals, use_nans=use_nans)
-
-            # make a function that takes only a tuple of tangents to make it easier to vectorize
-            # using vmap
-            def jvp_at_point(tangent):
-                # [1] is the derivative, [0] is the primal (we don't need the primal)
-                return jax.jvp(differentiable_part, icontvals, tangent)[1]
-
-            # vectorize over the last axis of the tangent vectors
-            batched_jvp = jax.vmap(jvp_at_point, in_axes=-1, out_axes=-1)(tangents)
-            J = np.vstack([j.reshape(np.prod(j.shape[:-1]), j.shape[-1]) for j in batched_jvp])
-
-        else:  # rev
-            cotangents = get_vmap_tangents(tuple(self._outputs.values()), use_nans=use_nans)
-
-            # Returns primal and a function to compute VJP so just take [1], the vjp function
-            vjp_fn = jax.vjp(differentiable_part, *icontvals)[1]
-
-            def vjp_at_point(cotangent):
-                # Here, we compute the VJP for the entire output at once
-                # input_tangents = vjp_fn(cotangent)
-                # # Combine gradients for x and z
-                # return jnp.concatenate([tangent.ravel() for tangent in input_tangents])
-                return vjp_fn(cotangent)
-
-            # Batch over cotangents (directions)
-            batched_vjp = jax.vmap(vjp_at_point, in_axes=-1, out_axes=-1)(cotangents)
-            J = np.vstack([j.reshape(np.prod(j.shape[:-1]), j.shape[-1]) for j in batched_vjp]).T
-
-            # print("Batch VJP results:", [a.shape for a in batched_vjp])
-            # print(batched_vjp)
-
-        return J
+        return _compute_sparsity(self, direction)

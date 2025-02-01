@@ -590,7 +590,7 @@ class ExplicitComponent(Component):
         """
         return True
 
-    def _get_compute_primal_invals(self, inputs, discrete_inputs):
+    def _get_compute_primal_invals(self, inputs=None, discrete_inputs=None):
         """
         Yield the inputs expected by the compute_primal method.
 
@@ -606,6 +606,11 @@ class ExplicitComponent(Component):
         any
             Inputs expected by the compute_primal method.
         """
+        if inputs is None:
+            inputs = self._inputs
+        if discrete_inputs is None:
+            discrete_inputs = self._discrete_inputs
+
         yield from inputs.values()
         if discrete_inputs:
             yield from discrete_inputs.values()
