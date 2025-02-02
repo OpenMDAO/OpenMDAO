@@ -1926,12 +1926,8 @@ class Coloring(object):
         ndarray
             tangent array for inputs (fwd) or outputs (rev)
         """
-        if direction == 'fwd':
-            size = self._shape[1]
-            fwd = True
-        else:
-            size = self._shape[0]
-            fwd = False
+        fwd = direction == 'fwd'
+        size = self._shape[1] if fwd else self._shape[0]
 
         if arr is None:
             arr = np.empty(size)

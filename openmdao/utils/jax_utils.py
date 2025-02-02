@@ -1074,6 +1074,56 @@ def get_vmap_tangents(vals, direction, use_nans=False, returns_tuple=False):
     return tangents
 
 
+# def get_vmap_colored_tangents(coloring, direction, use_nans=False):
+#     """
+#     Return compressed tangent (or cotangent) matrix for use with vmap based on a Coloring object.
+
+#     This function computes batched tangents similar to get_vmap_tangents,
+#     but groups columns by color. Each column in the returned matrix corresponds
+#     to a color group, with ones at the positions of variables belonging to that color
+#     and zeros (or NaNs if use_nans is True) elsewhere.
+
+#     Parameters
+#     ----------
+#     coloring : Coloring
+#         A Coloring object that contains coloring information including nonzero indices.
+#     direction : str
+#         Derivative computation direction ('fwd' for forward mode, 'rev' for reverse mode).
+#     use_nans : bool, optional
+#         If True, the inactive entries in the tangent matrix are filled with NaNs. Default is
+#         False.
+
+#     Returns
+#     -------
+#     numpy.ndarray
+#         A 2D array of shape (n, num_colors) where n is the size of the variable vector (number of
+#         columns for 'fwd' or rows for 'rev') and num_colors is the number of color groups. This
+#         array can be passed as batched tangents to jax.vmap(jvp(...)).
+#     """
+#     # Determine the size based on the derivative direction.
+#     if direction == 'fwd':
+#         size = coloring._shape[1]  # number of input columns
+#     else:  # 'rev'
+#         size = coloring._shape[0]  # number of output rows
+
+#     tangent_cols = []
+#     # Iterate over each color group using the tangent_iter method of the Coloring object.
+#     # Each iteration provides a one-hot vector (via 'arr') for that color group.
+#     for arr, nzs, nzparts in coloring.tangent_iter(direction, arr=None, trans=None):
+#         if use_nans:
+#             tmp = np.empty_like(arr)
+#             tmp[:] = np.nan
+#             tmp[nzs] = 1
+#         else:
+#             tmp = np.zeros_like(arr)
+#             tmp[nzs] = 1
+#         tangent_cols.append(tmp.copy())
+
+#     # Stack the individual tangent vectors as columns into a compressed tangent matrix.
+#     tangent = np.column_stack(tangent_cols)
+#     return tangent
+
+
 def _compute_sparsity(self, direction=None):
     """
     Compute the sparsity of the Jacobian using jvp/vjp with nans for the seeds.

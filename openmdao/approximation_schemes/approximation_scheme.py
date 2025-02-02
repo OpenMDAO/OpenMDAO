@@ -64,6 +64,17 @@ class ApproximationScheme(object):
         self._totals_directions = {}
         self._totals_directional_mode = None
 
+    def __bool__(self):
+        """
+        Return True if the approximation scheme contains any approximations.
+
+        Returns
+        -------
+        bool
+            True if the approximation scheme contains any approximations, False otherwise.
+        """
+        return bool(self._wrt_meta)
+
     def __repr__(self):
         """
         Return a simple string representation.

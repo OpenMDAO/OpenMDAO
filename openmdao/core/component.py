@@ -1952,6 +1952,8 @@ class Component(System):
             The type of finite difference to perform. Valid options are 'fd' for forward difference,
             or 'cs' for complex step.
         """
+        if method == 'jax':
+            method = 'fd'
         fd_methods = {'fd': _supported_methods['fd'], 'cs': _supported_methods['cs']}
         try:
             approximation = fd_methods[method]()
