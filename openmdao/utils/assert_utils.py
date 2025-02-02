@@ -695,6 +695,15 @@ def assert_near_equal(actual, desired, tolerance=1e-15, tol_type='rel'):
 def assert_sparsity_matches_fd(system, direction='fwd', outstream=sys.stdout):
     """
     Assert that the sparsity of the system matches the finite difference sparsity.
+
+    Parameters
+    ----------
+    system : System
+        The system to check.
+    direction : str
+        The direction to check. 'fwd' or 'rev'.
+    outstream : file
+        The stream to write the output to.  If None, no output is written.
     """
     assert system.sparsity_matches_fd(direction=direction, outstream=outstream), \
         f"{system.msginfo}: Sparsity does not match finite difference sparsity"

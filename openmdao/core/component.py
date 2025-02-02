@@ -525,29 +525,6 @@ class Component(System):
     def _promoted_wrt_iter(self):
         yield from self._get_partials_wrts()
 
-    def _update_subjac_sparsity(self, sparsity_iter):
-        """
-        Update subjac sparsity info based on the given coloring.
-
-        The sparsity of the partial derivatives in this component will be used when computing
-        the sparsity of the total jacobian for the entire model.  Without this, all of this
-        component's partials would be treated as dense, resulting in an overly conservative
-        coloring of the total jacobian.
-
-        Parameters
-        ----------
-        sparsity_iter : iter of tuple
-            Tuple of the form (of, wrt, rows, cols, shape).
-        """
-        # sparsity uses relative names, so we need to convert to absolute
-        prefix = self.pathname + '.'
-        for of, wrt, rows, cols, shape in sparsity_iter:
-            if rows is None:
-                continue
-            abs_key = (prefix + of, prefix + wrt)
-            if abs_key in self._subjacs_info:
-                self._subjacs_info[abs_key]['sparsity'] = (rows, cols, shape)
-
     def add_input(self, name, val=1.0, shape=None, units=None, desc='', tags=None,
                   shape_by_conn=False, copy_shape=None, compute_shape=None,
                   require_connection=False, distributed=None, primal_name=None):
@@ -1820,9 +1797,7 @@ class Component(System):
         if self._first_call_to_linearize:
             self._first_call_to_linearize = False  # only do this once
             if coloring_mod._use_partial_sparsity:
-                coloring = self._get_coloring()
-                if coloring is not None:
-                    self._update_subjac_sparsity(coloring._subjac_sparsity_iter())
+                self._get_coloring()
                 if self._jacobian is not None:
                     self._jacobian._restore_approx_sparsity()
 
@@ -2626,6 +2601,27 @@ class Component(System):
                                    "to the 'primal_name' arg when calling "
                                    "add_output/add_discrete_output. This is only necessary if "
                                    "the declared component output name is not a valid Python name.")
+
+    def get_declare_partials_calls(self, sparsity=None):
+        """
+        Return a string containing declare_partials() calls based on the subjac sparsity.
+
+        Parameters
+        ----------
+        sparsity : coo_matrix or None
+            Sparsity matrix to use. If None, compute_sparsity will be called to compute it.
+
+        Returns
+        -------
+        str
+            A string containing a declare_partials() call for each nonzero subjac. This
+            string may be cut and pasted into a component's setup() method.
+        """
+        lines = []
+        for of, wrt, nzrows, nzcols, _ in self.subjac_sparsity_iter(sparsity=sparsity):
+            lines.append(f"    self.declare_partials(of='{of}', wrt='{wrt}', "
+                         f"rows={list(nzrows)}, cols={list(nzcols)})")
+        return '\n'.join(lines)
 
 
 class _DictValues(object):

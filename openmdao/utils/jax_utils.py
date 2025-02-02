@@ -1080,6 +1080,8 @@ def _compute_sparsity(self, direction=None):
 
     Parameters
     ----------
+    self : Component
+        The component to compute the sparsity for.
     direction : str or None
         The direction to compute the sparsity in.  If None, the best direction is chosen based
         on the number of inputs and outputs.  If a str, it must be 'fwd' or 'rev'.
@@ -1174,7 +1176,9 @@ def _compute_sparsity(self, direction=None):
         'J_shape': J.shape,
     }
 
-    return coo_matrix((data, nz), shape=J.shape), info
+    sparsity = coo_matrix((data, nz), shape=J.shape)
+    self._update_subjac_sparsity(self.subjac_sparsity_iter(sparsity=sparsity))
+    return sparsity, info
 
 
 def _to_compute_primal_setup_parser(parser):

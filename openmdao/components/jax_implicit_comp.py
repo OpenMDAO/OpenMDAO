@@ -22,12 +22,20 @@ class JaxImplicitComponent(ImplicitComponent):
         The method to use if JAX is not available. Default is 'fd'.
     **kwargs : dict
         Additional arguments to be passed to the base class.
+
+    Attributes
+    ----------
+    _compute_primal_returns_tuple : bool
+        Whether the compute_primal method returns a tuple.
     """
 
     def __init__(self, fallback_derivs_method='fd', **kwargs):  # noqa
         if sys.version_info < (3, 9):
             raise RuntimeError("JaxImplicitComponent requires Python 3.9 or newer.")
         super().__init__(**kwargs)
+
+        self._compute_primal_returns_tuple = False
+
         # if derivs_method is explicitly passed in, just use it
         if 'derivs_method' in kwargs:
             return
@@ -82,5 +90,15 @@ class JaxImplicitComponent(ImplicitComponent):
     def compute_sparsity(self, direction=None):
         """
         Get the sparsity of the Jacobian.
+
+        Parameters
+        ----------
+        direction : str
+            The direction to compute the sparsity for.
+
+        Returns
+        -------
+        coo_matrix
+            The sparsity of the Jacobian.
         """
         return _compute_sparsity(self, direction)

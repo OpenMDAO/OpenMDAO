@@ -11,6 +11,7 @@ from openmdao.utils.jax_utils import jax, jit, compute_partials as _jax_compute_
     compute_jacvec_product as _jax_compute_jacvec_product, ReturnChecker, \
     _jax_register_pytree_class, _compute_sparsity
 
+
 class JaxExplicitComponent(ExplicitComponent):
     """
     Base class for explicit components when using JAX for derivatives.
@@ -21,6 +22,11 @@ class JaxExplicitComponent(ExplicitComponent):
         The method to use if JAX is not available. Default is 'fd'.
     **kwargs : dict
         Additional arguments to be passed to the base class.
+
+    Attributes
+    ----------
+    _compute_primal_returns_tuple : bool
+        Whether the compute_primal method returns a tuple.
     """
 
     def __init__(self, fallback_derivs_method='fd', **kwargs):  # noqa
@@ -97,5 +103,15 @@ class JaxExplicitComponent(ExplicitComponent):
     def compute_sparsity(self, direction=None):
         """
         Get the sparsity of the Jacobian.
+
+        Parameters
+        ----------
+        direction : str
+            The direction to compute the sparsity for.
+
+        Returns
+        -------
+        coo_matrix
+            The sparsity of the Jacobian.
         """
         return _compute_sparsity(self, direction)

@@ -985,6 +985,7 @@ class ExecComp(ExplicitComponent):
 
         sparsity, sp_info = jac.get_sparsity()
         sparsity_time = time.perf_counter() - sparsity_start_time
+        self._update_subjac_sparsity(self.subjac_sparsity_iter(sparsity=sparsity))
 
         coloring = _compute_coloring(sparsity, 'fwd')
 

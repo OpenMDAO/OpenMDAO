@@ -1058,14 +1058,6 @@ def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, s
             yield (of, wrt, submat.row, submat.col, submat.shape)
 
 
-def name_val2size_iter(name_val_iter):
-    """
-    Yield the size of each variable.
-    """
-    for name, val in name_val_iter:
-        yield (name, np.size(val))
-
-
 def idxs2minmax_tuples(idxs):
     """
     Convert a flat array of indices into a list of contiguous (min, max) tuples.

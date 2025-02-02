@@ -1834,7 +1834,72 @@ class System(object, metaclass=SystemMetaclass):
 
         self._first_call_to_linearize = save_first_call
 
+        self._update_subjac_sparsity(self.subjac_sparsity_iter(sparsity=sparsity))
+
         return sparsity, sp_info
+
+    def _update_subjac_sparsity(self, sparsity_iter):
+        """
+        Update subjac sparsity info based on the given sparsity iterator.
+
+        The sparsity of the partial derivatives in this component will be used when computing
+        the sparsity of the total jacobian for the entire model.  Without this, all of this
+        component's partials would be treated as dense, resulting in an overly conservative
+        coloring of the total jacobian.
+
+        Parameters
+        ----------
+        sparsity_iter : iter of tuple
+            Tuple of the form (of, wrt, rows, cols, shape).
+        """
+        # sparsity uses relative names, so we need to convert to absolute
+        prefix = self.pathname + '.'
+        for of, wrt, rows, cols, shape in sparsity_iter:
+            if rows is None:
+                continue
+            abs_key = (prefix + of, prefix + wrt)
+            if abs_key in self._subjacs_info:
+                self._subjacs_info[abs_key]['sparsity'] = (rows, cols, shape)
+
+    def subjac_sparsity_iter(self, sparsity=None, wrt_matches=None):
+        """
+        Iterate over sparsity for each subjac in the jacobian.
+
+        Parameters
+        ----------
+        sparsity : coo_matrix or None
+            Sparsity matrix to use. If None, compute_sparsity will be called to compute it.
+        wrt_matches : set or None
+            Only include row vars that are contained in this set.
+
+        Yields
+        ------
+        str
+            Name of 'of' variable.
+        str
+            Name of 'wrt' variable.
+        ndarray
+            Row indices of the non-zero elements local to the subjac.
+        ndarray
+            Column indices of the non-zero elements local to the subjac.
+        tuple
+            Shape of the subjac.
+        """
+        if sparsity is None:
+            sparsity, _ = self.compute_sparsity()
+        rows = sparsity.row
+        cols = sparsity.col
+        plen = len(self.pathname) + 1 if self.pathname else 0
+        for of, ofstart, ofend, _, _ in self._jac_of_iter():
+            for wrt, wrtstart, wrtend, _, _, _ in self._jac_wrt_iter(wrt_matches):
+                subrows = np.logical_and(sparsity.row >= ofstart, sparsity.row < ofend)
+                subcols = np.logical_and(sparsity.col >= wrtstart, sparsity.col < wrtend)
+                matching = np.logical_and(subrows, subcols)
+                nzrows = rows[matching] - ofstart
+                if nzrows.size > 0:
+                    nzcols = cols[matching] - wrtstart
+                    shape = (ofend - ofstart, wrtend - wrtstart)
+                    yield of[plen:], wrt[plen:], nzrows, nzcols, shape
 
     def sparsity_matches_fd(self, direction=None, outstream=sys.stdout):
         """
@@ -1867,7 +1932,8 @@ class System(object, metaclass=SystemMetaclass):
         outstream : file-like
             Stream where output will be written.  If None, no output will be written.
         """
-        if self.pathname == '' or not ('use_jax' in self.options and self.options['use_jax']):
+        if self.pathname == '' or not ('derivs_method' in self.options and
+                                       self.options['derivs_method'] == 'jax'):
             if outstream is not None:
                 print(f"{self.msginfo} already uses fd to compute sparsity so no comparison was "
                       "performed.")
@@ -2123,6 +2189,7 @@ class System(object, metaclass=SystemMetaclass):
         else:
             if not self._coloring_info.dynamic:
                 coloring._check_config_partial(self)
+            self._update_subjac_sparsity(coloring._subjac_sparsity_iter())
 
         return coloring
 

@@ -506,7 +506,7 @@ if __name__ == '__main__':
     comp.sparsity_matches_fd(direction='fwd')
     comp.sparsity_matches_fd(direction='rev')
 
-
+    print(comp.get_declare_partials_calls())
 
     shape = (2,3)
 
@@ -529,7 +529,7 @@ if __name__ == '__main__':
     comp.sparsity_matches_fd(direction='fwd')
     comp.sparsity_matches_fd(direction='rev')
 
-
+    print(comp.get_declare_partials_calls())
     shape = (2,3)
     nins = 1
     nouts = 1
@@ -540,6 +540,8 @@ if __name__ == '__main__':
     comp.sparsity_matches_fd(direction='fwd')
     comp.sparsity_matches_fd(direction='rev')
 
+    print(comp.get_declare_partials_calls())
+
     shape = (2,3)
     nins = 1
     nouts = 1
@@ -549,3 +551,4 @@ if __name__ == '__main__':
     p.run_model()
     comp.sparsity_matches_fd(direction='fwd')
     comp.sparsity_matches_fd(direction='rev')
+    print(comp.get_declare_partials_calls())
