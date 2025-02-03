@@ -16,6 +16,9 @@ from bokeh.models import (
     CustomJS,
     Div,ScrollBox
 )
+
+from bokeh.models import Button, CustomJS, InlineStyleSheet
+
 from bokeh.models.tools import (
     BoxZoomTool,
     ResetTool,
@@ -47,6 +50,162 @@ except:
 
 _obj_color = "black"
 _non_active_plot_color = "black"
+callback_code="""
+
+                            if (typeof window.ColorManager === 'undefined') {
+                                window.ColorManager = class {
+                                    constructor(palette = 'Category10') {
+                                    if (ColorManager.instance) {
+                                        return ColorManager.instance;
+                                    }
+                                    // Define our own palettes
+                                    this.palettes = {
+                                        'Category20': [
+                                        '#1f77b4', '#aec7e8', '#ff7f0e', '#ffbb78', '#2ca02c',
+                                        '#98df8a', '#d62728', '#ff9896', '#9467bd', '#c5b0d5',
+                                        '#8c564b', '#c49c94', '#e377c2', '#f7b6d2', '#7f7f7f',
+                                        '#c7c7c7', '#bcbd22', '#dbdb8d', '#17becf', '#9edae5'
+                                        ],
+                                        'Colorblind': [
+                                        '#0072B2', '#E69F00', '#009E73', '#CC79A7', '#56B4E9',
+                                        '#D55E00', '#F0E442', '#000000'
+                                        ]
+                                    };
+                                    
+                                    this.palette = this.palettes[palette] || this.palettes.Colorblind;
+                                    this.usedColors = new Set();
+                                    this.variableColorMap = new Map();
+                                    
+                                    ColorManager.instance = this;
+                                    } //  end of constructor
+                                
+                                    getColor(variableName) {
+                                    if (this.variableColorMap.has(variableName)) {
+                                        return this.variableColorMap.get(variableName);
+                                    }
+                                
+                                    const availableColor = this.palette.find(color => !this.usedColors.has(color));
+                                    const newColor = availableColor || this.palette[this.usedColors.size % this.palette.length];
+                                    
+                                    this.usedColors.add(newColor);
+                                    this.variableColorMap.set(variableName, newColor);
+                                    return newColor;
+                                    } // end of getColor
+                                
+                                    releaseColor(variableName) {
+                                    const color = this.variableColorMap.get(variableName);
+                                    if (color) {
+                                        this.usedColors.delete(color);
+                                        this.variableColorMap.delete(variableName);
+                                    }
+                                    } // end of releaseColor
+                                
+                                    // Get all available palettes
+                                    getPaletteNames() {
+                                    return Object.keys(this.palettes);
+                                    }
+                                
+                                    // Change active palette
+                                    setPalette(paletteName) {
+                                    if (this.palettes[paletteName]) {
+                                        this.palette = this.palettes[paletteName];
+                                        // Optionally reset all color assignments
+                                        this.usedColors.clear();
+                                        this.variableColorMap.clear();
+                                    }
+                                    } // end of setPalette
+
+                                }; // end of class definition
+
+                                window.colorManager = new window.ColorManager("Colorblind");
+                            }  // end of if
+
+                            // Get the toggle that triggered the callback
+                            const toggle = cb_obj;
+                            const index = toggles.indexOf(toggle);
+
+                            // Set line visibility
+                            lines[index].visible = toggle.active;
+
+                            // Set axis visibility if it exists (all except first line)
+                            if (index > 0 && index-1 < axes.length) {
+                                axes[index-1].visible = toggle.active;
+                            }
+
+                            let variable_name = cb_obj.label;
+                            // if turning on, get a color and set the line and toggle button to that color
+                            if (toggle.active) {
+                                let color = window.colorManager.getColor(variable_name);
+                                axes[index-1].axis_label_text_color = color
+                                lines[index].glyph.line_color = color;
+                                lines[index].glyph.fill_color = color;
+                                lines[index].glyph.attributes.line_color = color;
+
+                                toggle.stylesheets = [`
+                                    .bk-btn {
+                                        color: ${color}
+                                        border-color: ${color}
+                                        background-color: white
+                                        display: flex;
+                                        align-items: center; /* Vertical centering */
+                                        justify-content: center; /* Horizontal centering */
+                                        height: 22px; /* Example height, adjust as needed */
+                                        border-width: 0px; /* Adjust to desired thickness */
+                                        border-style: solid; /* Ensures a solid border */
+                                        font-size: 22px;
+                                    }
+                                    .bk-btn.bk-active {
+                                        color: white;
+                                        border-color: ${color};
+                                        background-color: ${color};
+                                        display: flex;
+                                        align-items: center; /* Vertical centering */
+                                        justify-content: center; /* Horizontal centering */
+                                        height: 22px; /* Example height, adjust as needed */
+                                        font-size: 22px;
+                                        border-width: 0px; /* Adjust to desired thickness */
+                                        border-style: solid; /* Ensures a solid border */
+                                    }
+                                    .bk-btn.bk-btn-default {
+                                        display: flex;
+                                    }
+                                `];
+                            // if turning off, return the color to the pool and set the color of the button to black
+                            } else {
+                                window.colorManager.releaseColor(variable_name);
+                                axes[index-1].axis_label_text_color = 'black'
+                                lines[index].glyph.line_color = 'black';
+                                toggle.stylesheets = [`
+                                    .bk-btn {
+                                        color: black
+                                        border-color: black
+                                        background-color: white
+                                        display: flex;
+                                        align-items: center; /* Vertical centering */
+                                        justify-content: center; /* Horizontal centering */
+                                        height: 22px; /* Example height, adjust as needed */
+                                        border-width: 0px; /* Adjust to desired thickness */
+                                        font-size: 22px;
+                                        border-style: solid; /* Ensures a solid border */
+                                    }
+                                    .bk-btn.bk-active {
+                                        color: white;
+                                        border-color: black;
+                                        background-color: black;
+                                        display: flex;
+                                        align-items: center; /* Vertical centering */
+                                        justify-content: center; /* Horizontal centering */
+                                        font-size: 22px;
+                                        height: 22px; /* Example height, adjust as needed */
+                                        border-width: 0px; /* Adjust to desired thickness */
+                                        border-style: solid; /* Ensures a solid border */
+                                    }
+                                    .bk-btn.bk-btn-default {
+                                        display: flex;
+                                    }
+                                `];
+                            }
+                    """
 
 start_time = time.time()
 
@@ -383,13 +542,19 @@ class RealTimeOptPlot(object):
                             f"Plot assumes there is on objective but {len(obj_names)} found"
                         )
                     
+                    # Create CustomJS callback for toggle buttons
+                    legend_item_callback = CustomJS(
+                        args=dict(lines=self.lines, axes=self._axes, toggles=self._toggles),
+                        code=callback_code,
+                    )
+
                     # objs
                     obj_label = _make_header_text_for_variable_chooser("OBJECTIVE")
                     self._column_items.append(obj_label)
 
                     for i, obj_name in enumerate(obj_names):
                         units = self._case_tracker.get_units(obj_name)
-                        self._make_legend_item(f"{obj_name} ({units})", _obj_color, True)
+                        self._make_legend_item(f"{obj_name} ({units})", _obj_color, True, legend_item_callback)
                         self._make_line_and_hover_tool("objs", obj_name, False, _obj_color,"solid", True)
                         value = new_data["objs"][obj_name]
                         float_value = _get_value_for_plotting(value, "objs")
@@ -403,7 +568,7 @@ class RealTimeOptPlot(object):
                     desvar_names = self._case_tracker.get_desvar_names()
                     for i, desvar_name in enumerate(desvar_names):
                         units = self._case_tracker.get_units(desvar_name)
-                        self._make_legend_item(f"{desvar_name} ({units})", "black", False)
+                        self._make_legend_item(f"{desvar_name} ({units})", "black", False, legend_item_callback)
                         value = new_data["desvars"][desvar_name]
                         use_varea = value.size > 1
                         self._make_line_and_hover_tool("desvars", desvar_name, use_varea, _non_active_plot_color, "solid", False)
@@ -417,187 +582,19 @@ class RealTimeOptPlot(object):
                     cons_names = self._case_tracker.get_cons_names()
                     for i, cons_name in enumerate(cons_names):
                         units = self._case_tracker.get_units(cons_name)
-                        self._make_legend_item(f"{cons_name} ({units})", "black", False)
+                        self._make_legend_item(f"{cons_name} ({units})", "black", False, legend_item_callback)
                         self._make_line_and_hover_tool("cons", cons_name, False, _non_active_plot_color, "dashed", False)
                         value = new_data["cons"][cons_name]
-                        self._make_axis(cons_name, value, units)
+                        float_value = _get_value_for_plotting(value, "cons")
+                        self._make_axis(cons_name, float_value, units)
                         i_line += 1
 
                     print(f"after making all the lines and axes at {time.time()-start_time}")
 
-                    # Create CustomJS callback for toggle buttons
-                    callback = CustomJS(
-                        args=dict(lines=self.lines, axes=self._axes, toggles=self._toggles),
-                        code="""
-
-                            if (typeof window.ColorManager === 'undefined') {
-                                window.ColorManager = class {
-                                    constructor(palette = 'Category10') {
-                                    if (ColorManager.instance) {
-                                        return ColorManager.instance;
-                                    }
-                                    // Define our own palettes
-                                    this.palettes = {
-                                        'Category10': [
-                                        '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-                                        '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
-                                        ],
-                                        'Category20': [
-                                        '#1f77b4', '#aec7e8', '#ff7f0e', '#ffbb78', '#2ca02c',
-                                        '#98df8a', '#d62728', '#ff9896', '#9467bd', '#c5b0d5',
-                                        '#8c564b', '#c49c94', '#e377c2', '#f7b6d2', '#7f7f7f',
-                                        '#c7c7c7', '#bcbd22', '#dbdb8d', '#17becf', '#9edae5'
-                                        ],
-                                        'Colorblind': [
-                                        '#0072B2', '#E69F00', '#009E73', '#CC79A7', '#56B4E9',
-                                        '#D55E00', '#F0E442', '#000000'
-                                        ],
-                                        'Set3': [
-                                        '#8DD3C7', '#FFFFB3', '#BEBADA', '#FB8072', '#80B1D3',
-                                        '#FDB462', '#B3DE69', '#FCCDE5', '#D9D9D9', '#BC80BD',
-                                        '#CCEBC5', '#FFED6F'
-                                        ]
-                                    };
-                                    
-                                    this.palette = this.palettes[palette] || this.palettes.Category10;
-                                    this.usedColors = new Set();
-                                    this.variableColorMap = new Map();
-                                    
-                                    ColorManager.instance = this;
-                                    } //  end of constructor
-                                
-                                    getColor(variableName) {
-                                    if (this.variableColorMap.has(variableName)) {
-                                        return this.variableColorMap.get(variableName);
-                                    }
-                                
-                                    const availableColor = this.palette.find(color => !this.usedColors.has(color));
-                                    const newColor = availableColor || this.palette[this.usedColors.size % this.palette.length];
-                                    
-                                    this.usedColors.add(newColor);
-                                    this.variableColorMap.set(variableName, newColor);
-                                    return newColor;
-                                    } // end of getColor
-                                
-                                    releaseColor(variableName) {
-                                    const color = this.variableColorMap.get(variableName);
-                                    if (color) {
-                                        this.usedColors.delete(color);
-                                        this.variableColorMap.delete(variableName);
-                                    }
-                                    } // end of releaseColor
-                                
-                                    // Get all available palettes
-                                    getPaletteNames() {
-                                    return Object.keys(this.palettes);
-                                    }
-                                
-                                    // Change active palette
-                                    setPalette(paletteName) {
-                                    if (this.palettes[paletteName]) {
-                                        this.palette = this.palettes[paletteName];
-                                        // Optionally reset all color assignments
-                                        this.usedColors.clear();
-                                        this.variableColorMap.clear();
-                                    }
-                                    } // end of setPalette
-
-                                }; // end of class definition
-
-                                window.colorManager = new window.ColorManager("Colorblind");
-                            }  // end of if
-
-                            // Get the toggle that triggered the callback
-                            const toggle = cb_obj;
-                            const index = toggles.indexOf(toggle);
-
-                            // Set line visibility
-                            lines[index].visible = toggle.active;
-
-                            // Set axis visibility if it exists (all except first line)
-                            if (index > 0 && index-1 < axes.length) {
-                                axes[index-1].visible = toggle.active;
-                            }
-
-                            let variable_name = cb_obj.label;
-                            // if turning on, get a color and set the line and toggle button to that color
-                            if (toggle.active) {
-                                let color = window.colorManager.getColor(variable_name);
-                                axes[index-1].axis_label_text_color = color
-                                lines[index].glyph.line_color = color;
-                                lines[index].glyph.fill_color = color;
-                                lines[index].glyph.attributes.line_color = color;
-
-                                toggle.stylesheets = [`
-                                    .bk-btn {
-                                        color: ${color}
-                                        border-color: ${color}
-                                        background-color: white
-                                        display: flex;
-                                        align-items: center; /* Vertical centering */
-                                        justify-content: center; /* Horizontal centering */
-                                        height: 22px; /* Example height, adjust as needed */
-                                        border-width: 0px; /* Adjust to desired thickness */
-                                        border-style: solid; /* Ensures a solid border */
-                                        font-size: 22px;
-                                    }
-                                    .bk-btn.bk-active {
-                                        color: white;
-                                        border-color: ${color};
-                                        background-color: ${color};
-                                        display: flex;
-                                        align-items: center; /* Vertical centering */
-                                        justify-content: center; /* Horizontal centering */
-                                        height: 22px; /* Example height, adjust as needed */
-                                        font-size: 22px;
-                                        border-width: 0px; /* Adjust to desired thickness */
-                                        border-style: solid; /* Ensures a solid border */
-                                    }
-                                    .bk-btn.bk-btn-default {
-                                        display: flex;
-                                    }
-                                `];
-                            // if turning off, return the color to the pool and set the color of the button to black
-                            } else {
-                                window.colorManager.releaseColor(variable_name);
-                                axes[index-1].axis_label_text_color = 'black'
-                                lines[index].glyph.line_color = 'black';
-                                toggle.stylesheets = [`
-                                    .bk-btn {
-                                        color: black
-                                        border-color: black
-                                        background-color: white
-                                        display: flex;
-                                        align-items: center; /* Vertical centering */
-                                        justify-content: center; /* Horizontal centering */
-                                        height: 22px; /* Example height, adjust as needed */
-                                        border-width: 0px; /* Adjust to desired thickness */
-                                        font-size: 22px;
-                                        border-style: solid; /* Ensures a solid border */
-                                    }
-                                    .bk-btn.bk-active {
-                                        color: white;
-                                        border-color: black;
-                                        background-color: black;
-                                        display: flex;
-                                        align-items: center; /* Vertical centering */
-                                        justify-content: center; /* Horizontal centering */
-                                        font-size: 22px;
-                                        height: 22px; /* Example height, adjust as needed */
-                                        border-width: 0px; /* Adjust to desired thickness */
-                                        border-style: solid; /* Ensures a solid border */
-                                    }
-                                    .bk-btn.bk-btn-default {
-                                        display: flex;
-                                    }
-                                `];
-                            }
-                    """,
-                    )
 
                     # Add callback to all toggles
                     for toggle in self._toggles:
-                        toggle.js_on_change("active", callback)
+                        toggle.js_on_change("active", legend_item_callback)
 
                     # Create a column of toggles with scrolling
                     toggle_column = Column(
@@ -643,44 +640,38 @@ class RealTimeOptPlot(object):
                 new_data = self._case_tracker.get_new_case()
             if new_data:
                 print(f"second if new_data at {time.time()-start_time}")
-                num_driver_iterations = self._case_tracker._get_num_driver_iterations()
+                # num_driver_iterations = self._case_tracker._get_num_driver_iterations()
 
                 counter = new_data["counter"]
+                # start 
                 source_stream_dict = {"iteration": [counter]}
 
                 iline = 0
 
                 for obj_name, obj_value in new_data["objs"].items():
-
                     float_obj_value = _get_value_for_plotting(obj_value, "objs")
-
-                    import math
-                    if not math.isnan(float_obj_value):
-                        source_stream_dict[obj_name] = [float_obj_value]
-                        min_max_changed = _update_y_min_max(obj_name, float_obj_value, self.y_min, self.y_max)
-                        if min_max_changed:
-                            self.p.y_range.start = self.y_min[obj_name]
-                            self.p.y_range.end = self.y_max[obj_name]
-
+                    source_stream_dict[obj_name] = [float_obj_value]
+                    min_max_changed = _update_y_min_max(obj_name, float_obj_value, self.y_min, self.y_max)
+                    if min_max_changed:
+                        self.p.y_range.start = self.y_min[obj_name]
+                        self.p.y_range.end = self.y_max[obj_name]
                     iline += 1
 
                 for desvar_name, desvar_value in new_data["desvars"].items():
                     float_desvar_value = _get_value_for_plotting(desvar_value, "desvars")  # TODO is this used?
-
                     if not self._labels_updated_with_units and desvar_value.size > 1:
                         units = self._case_tracker.get_units(desvar_name)
                         self._toggles[iline].label = f"{desvar_name} ({units}) {desvar_value.shape}"
-
                     min_max_changed = False
                     min_max_changed = min_max_changed or _update_y_min_max(desvar_name, np.min(desvar_value), self.y_min, self.y_max)
                     min_max_changed = min_max_changed or _update_y_min_max(desvar_name, np.max(desvar_value), self.y_min, self.y_max)
-                    source_stream_dict[f"{desvar_name}_min"] = [np.min(desvar_value)]
-                    source_stream_dict[f"{desvar_name}_max"] = [np.max(desvar_value)]
                     if min_max_changed: # TODO fix
                         range = Range1d(
                             self.y_min[desvar_name], self.y_max[desvar_name]
                         )
                         self.p.extra_y_ranges[f"extra_y_{desvar_name}"] = range
+                    source_stream_dict[f"{desvar_name}_min"] = [np.min(desvar_value)]
+                    source_stream_dict[f"{desvar_name}_max"] = [np.max(desvar_value)]
                     iline += 1
 
                 for cons_name, cons_value in new_data["cons"].items():
@@ -693,7 +684,6 @@ class RealTimeOptPlot(object):
                     source_stream_dict[cons_name] = [float_cons_value]
                     min_max_changed = _update_y_min_max(cons_name, float_cons_value, self.y_min, self.y_max)
                     if min_max_changed:
-
                         range = Range1d(
                             self.y_min[cons_name], self.y_max[cons_name]
                         )
@@ -727,9 +717,8 @@ class RealTimeOptPlot(object):
 
         self._source = ColumnDataSource(_source_dict)
 
-    def _make_legend_item(self, varname, color, active):
+    def _make_legend_item(self, varname, color, active, callback):
 
-        from bokeh.models import Button, CustomJS, InlineStyleSheet
         stylesheet = InlineStyleSheet(css=".bk-btn.bk-btn-default.bk-active { font-size: 22px; } .bk-btn { font-size: 22px; } .bk-btn:focus {outline: none;}")
 
         # TODO what should we do with colors?
@@ -741,6 +730,7 @@ class RealTimeOptPlot(object):
             margin=(0, 0, 5, 0),
             stylesheets=[stylesheet],
         )
+        toggle.js_on_change("active", callback)
         self._toggles.append(toggle)
         self._column_items.append(toggle)
 
@@ -863,8 +853,6 @@ class RealTimeOptPlot(object):
         )
 
 
-
-
     def setup_figure(self):
         # Make the figure and all the settings for it
         self.p = figure(
@@ -898,11 +886,6 @@ class RealTimeOptPlot(object):
         self.p.xaxis.minor_tick_line_color = None
         self.p.axis.axis_label_text_font_style = "bold"
         self.p.axis.axis_label_text_font_size = "20pt"
-        # self.p.xgrid.band_hatch_pattern = "/"
-        self.p.xgrid.band_hatch_alpha = 0.1
-        self.p.xgrid.band_hatch_color = "lightgrey"
-        self.p.xgrid.band_hatch_weight = 0.5
-        self.p.xgrid.band_hatch_scale = 10
 
 def realtime_opt_plot(case_recorder_filename, callback_period):
     """
