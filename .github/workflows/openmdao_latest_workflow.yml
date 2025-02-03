@@ -137,7 +137,7 @@ jobs:
       - name: Install MacOS-specific dependencies
         if: matrix.OS == 'macos-13'
         run: |
-          conda install compilers swig
+          conda install compilers swig 'superlu<7'
 
       - name: Install NumPy/SciPy
         run: |
