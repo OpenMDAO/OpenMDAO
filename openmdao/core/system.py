@@ -36,7 +36,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, \
-    DerivativesWarning, PromotionWarning, UnusedOptionWarning, UnitsWarning, warn_deprecation
+    PromotionWarning, UnusedOptionWarning, UnitsWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, is_undefined, \
     format_as_float_or_array, all_ancestors, match_prom_or_abs, \
     ensure_compatible, env_truthy, make_traceback, _is_slicer_op, _wrap_comm, _unwrap_comm, \
@@ -1991,44 +1991,38 @@ class System(object, metaclass=SystemMetaclass):
             return [c for c in colorings if c is not None] or [None]
 
         info = self._coloring_info
-
-        use_jax = self.options['derivs_method'] == 'jax'
-
         info.update(overrides)
 
         if info['method'] is None and self._approx_schemes:
             info['method'] = list(self._approx_schemes)[0]
 
-        if info.coloring is None:
-            # check to see if any approx or jax derivs have been declared
-            for meta in self._subjacs_info.values():
-                if 'method' in meta and meta['method']:
-                    break
-            else:  # no approx or jax partials found
-                method = info['method']
-                if self._subjacs_info:
-                    for meta in self._subjacs_info.values():
-                        meta['method'] = method
+        # if info.coloring is None:
+        #     # check to see if any approx or jax derivs have been declared
+        #     for meta in self._subjacs_info.values():
+        #         if 'method' in meta and meta['method']:
+        #             break
+        #     else:  # no approx or jax partials found
+        #         method = info['method']
+        #         if self._subjacs_info:
+        #             for meta in self._subjacs_info.values():
+        #                 meta['method'] = method
 
-                else:  # declare all derivs as approx
-                    if not (self._owns_approx_of or self._owns_approx_wrt):
-                        issue_warning("No approx or jax partials found but coloring was requested. "
-                                      "Declaring ALL partials as dense "
-                                      "(method='{}')".format(info['method']),
-                                      prefix=self.msginfo, category=DerivativesWarning)
-                        try:
-                            self.declare_partials('*', '*', method=info['method'])
-                        except AttributeError:  # assume system is a group
-                            from openmdao.core.component import Component
-                            from openmdao.core.indepvarcomp import IndepVarComp
-                            from openmdao.components.exec_comp import ExecComp
-                            for s in self.system_iter(recurse=True, typ=Component):
-                                if not isinstance(s, ExecComp) and not isinstance(s, IndepVarComp):
-                                    s.declare_partials('*', '*', method=info['method'])
-                        self._setup_partials()
-
-        if not use_jax:
-            approx_scheme = self._get_approx_scheme(info['method'])
+        #         else:  # declare all derivs as approx
+        #             if not (self._owns_approx_of or self._owns_approx_wrt):
+        #                 issue_warning("No approx or jax partials found but coloring was requested. "
+        #                               "Declaring ALL partials as dense "
+        #                               "(method='{}')".format(info['method']),
+        #                               prefix=self.msginfo, category=DerivativesWarning)
+        #                 try:
+        #                     self.declare_partials('*', '*', method=info['method'])
+        #                 except AttributeError:  # assume system is a group
+        #                     from openmdao.core.component import Component
+        #                     from openmdao.core.indepvarcomp import IndepVarComp
+        #                     from openmdao.components.exec_comp import ExecComp
+        #                     for s in self.system_iter(recurse=True, typ=Component):
+        #                         if not isinstance(s, ExecComp) and not isinstance(s, IndepVarComp):
+        #                             s.declare_partials('*', '*', method=info['method'])
+        #                 self._setup_partials()
 
         if info.coloring is None and info.static is None:
             info.dynamic = True
@@ -2047,19 +2041,16 @@ class System(object, metaclass=SystemMetaclass):
                 print("\n{} using class coloring for class '{}'".format(self.pathname,
                                                                         type(self).__name__))
                 info.update(coloring._meta)
-                # force regen of approx groups during next compute_approximations
-                if not use_jax:
-                    approx_scheme._reset()
             return [coloring]
 
         sparsity_start_time = time.perf_counter()
         sparsity, sp_info = self.compute_sparsity()
         sparsity_time = time.perf_counter() - sparsity_start_time
 
-        if use_jax:
-            direction = self.best_partial_deriv_direction()
-        else:
+        if self.uses_approx():
             direction = 'fwd'
+        else:
+            direction = self.best_partial_deriv_direction()
 
         coloring = _compute_coloring(sparsity, direction)
 
