@@ -1358,7 +1358,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                 'vals_at_max_rel', and 'rank_inconsistent'.
 
             For 'rel error', 'abs error', 'vals_at_max_abs' and 'vals_at_max_rel' the value is a
-            tuple containing values for forward - fd, adjoint - fd, forward - adjoint. For
+            tuple containing values for forward - fd, reverse - fd, forward - reverse. For
             'magnitude' the value is a tuple indicating the maximum magnitude of values found in
             Jfwd, Jrev, and Jfd.
         """

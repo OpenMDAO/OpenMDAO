@@ -209,7 +209,7 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6, verbose=False, max_display
                 For 'J_fd', 'J_fwd', 'J_rev' the value is a numpy array representing the computed
                 Jacobian for the three different methods of computation.
                 For 'rel error', 'abs error', 'vals_at_max_abs' and 'vals_at_max_rel' the value is a
-                tuple containing values for forward - fd, adjoint - fd, forward - adjoint. For
+                tuple containing values for forward - fd, reverse - fd, forward - reverse. For
                 'magnitude' the value is a tuple indicating the maximum magnitude of values found in
                 Jfwd, Jrev, and Jfd.
     atol : float
@@ -402,7 +402,7 @@ def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6, max_display_shape=(20
             For 'J_fd', 'J_fwd', 'J_rev' the value is a numpy array representing the computed
             Jacobian for the three different methods of computation.
             For 'rel error', 'abs error', 'vals_at_max_abs' and 'vals_at_max_rel' the value is a
-            tuple containing values for forward - fd, adjoint - fd, forward - adjoint. For
+            tuple containing values for forward - fd, reverse - fd, forward - reverse. For
             'magnitude' the value is a tuple indicating the maximum magnitude of values found in
             Jfwd, Jrev, and Jfd.
     atol : float

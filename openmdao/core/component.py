@@ -2196,7 +2196,7 @@ class Component(System):
             For 'J_fd', 'J_fwd', 'J_rev' the value is a numpy array representing the computed
             Jacobian for the three different methods of computation.
             For 'rel error', 'abs error', 'vals_at_max_abs' and 'vals_at_max_rel' the value is a
-            tuple containing values for forward - fd, adjoint - fd, forward - adjoint. For
+            tuple containing values for forward - fd, reverse - fd, forward - reverse. For
             'magnitude' the value is a tuple indicating the maximum magnitude of values found in
             Jfwd, Jrev, and Jfd.
             The boolean 'rank_inconsistent' indicates if the derivative wrt a serial variable is
