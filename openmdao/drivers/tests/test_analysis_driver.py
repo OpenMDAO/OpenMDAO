@@ -362,40 +362,6 @@ class TestAnalysisDriverParallel(unittest.TestCase):
             print('outputs')
             print(last_case.list_outputs())
 
-    # def test_beam_np4(self):
-
-    #     if MPI.COMM_WORLD.size == 1:
-    #         self.skipTest('Test cannot run with a single proc.')
-
-    #     E = 1.
-    #     L = 1.
-    #     b = 0.1
-    #     volume = 0.01
-
-    #     num_elements = 50 * 32
-    #     num_cp = 4
-    #     num_load_cases = 32
-
-    #     beam_model = MultipointBeamGroup(E=E, L=L, b=b, volume=volume,
-    #                                      num_elements=num_elements, num_cp=num_cp,
-    #                                      num_load_cases=num_load_cases)
-
-    #     prob = om.Problem(model=beam_model, driver=AnalysisDriver(procs_per_model=2))
-
-    #     prob.set_solver_print(2)
-
-    #     prob.setup()
-    #     prob.run_driver()
-
-    #     if prob.comm.rank == 0:
-    #         num_recorded_cases = 0
-    #         for file in glob.glob(str(prob.get_outputs_dir() / "cases.sql*")):
-    #             if file.endswith('meta'):
-    #                 continue
-    #             cr = om.CaseReader(file)
-    #             num_recorded_cases += len(cr.list_cases(out_stream=None))
-    #         self.assertEqual(num_recorded_cases, 1)
-
 
 @use_tempdirs
 class TestAnalysisDriver(unittest.TestCase):

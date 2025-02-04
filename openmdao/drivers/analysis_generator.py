@@ -19,7 +19,7 @@ class AnalysisGenerator(Iterator):
     ----------
     var_dict : dict
         A dictionary whose keys are promoted paths of variables to be set, and whose
-        keys are the arguments to `set_val`.
+        values are the arguments to `set_val`.
 
     Attributes
     ----------

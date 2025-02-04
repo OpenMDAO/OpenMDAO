@@ -26,28 +26,14 @@ class AnalysisDriver(Driver):
     testing (x=0, y=4), (x=1, y=5), and (x=2, y=6).  Units may be optionally
     provided.
 
-    .. code-block:: python
-
-        [{'x': {'val': 0.0, 'units': None}, 'y': {'val': 4.0, 'units': None}},
-        {'x': {'val': 1.0, 'units': None}, 'y': {'val': 5.0, 'units': None}},
-        {'x': {'val': 2.0, 'units': None}, 'y': {'val': 6.0, 'units': None}}]
-
     Alternatively, samples can be provided as an instance of AnalysisGenerator,
     which will provide each sample in a lazily-evaluated way.
 
     Responses are the outputs of the model to be recorded. These can be added
     using the standard driver interface.
 
-    .. code-block:: python
-
-        prob.driver.add_response('z', units='m')
-
     In systems with a lot of outputs, this would be a very tedious process,
     in which case we can use the add_responses method.
-
-    .. code-block:: python
-
-        prob.driver.add_responses(['foo', 'bar', 'baz'])
 
     Parameters
     ----------
@@ -82,6 +68,9 @@ class AnalysisDriver(Driver):
         elif samples is not None:
             raise ValueError('If given, samples must be a list, tuple, '
                              f'or derived from AnalysisDriver but got {type(samples)}')
+        else:
+            # TODO: Write a method to append to this prior to run_driver.
+            self._samples = []
 
         super().__init__(**kwargs)
 
@@ -250,9 +239,10 @@ class AnalysisDriver(Driver):
         self.iter_count = 0
 
         # Variables allowed samples are the inputs or implicit outputs in the model.
-        # Non-model-inputs would just have their value overridden when evaluating the model.
+        # Outputs from sources other than IndepVarComps would just have their value
+        # overridden when evaluating the model.
         # Implicit outputs can override the value given in the case, but it might be a
-        # useful mechanism for providing an initial guess.
+        # useful mechanism for providing an initial guess for a nonlinear solver.
         model_inputs = {meta['prom_name'] for _, meta in
                         model.list_inputs(is_indep_var=True, out_stream=None)}
         model_implicit_outputs = {meta['prom_name'] for _, meta
