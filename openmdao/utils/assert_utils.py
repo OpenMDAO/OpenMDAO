@@ -183,10 +183,29 @@ def _parse_assert_allclose_error(msg):
         if not line.startswith('Max'):
             continue
         parts = line.split()
+
+        # Note change in format of assert_allclose error message for NumPy 2.x
+
+        # Numpy 1.x format:
+        # ----------------
+        # Not equal to tolerance rtol=1e-06, atol=1e-06
+        #
+        # Mismatched elements: 15 / 15 (100%)
+        # Max absolute difference: 2.7
+        # Max relative difference: 1.
+
+        # Numpy 2.x format:
+        # ----------------
+        # Not equal to tolerance rtol=1e-06, atol=1e-06
+        #
+        # Mismatched elements: 15 / 15 (100%)
+        # Max absolute difference among violations: 2.7
+        # Max relative difference among violations: 1.
+
         if parts[1] == 'absolute':
-            abs_err = float(parts[3])
+            abs_err = float(parts[-1])
         elif parts[1] == 'relative':
-            rel_err = float(parts[3])
+            rel_err = float(parts[-1])
     return abs_err, rel_err
 
 
