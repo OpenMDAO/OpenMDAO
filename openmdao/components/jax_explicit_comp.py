@@ -8,7 +8,7 @@ from types import MethodType
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.jax_utils import jax, jit, ReturnChecker, \
-    _jax_register_pytree_class, _compute_sparsity, get_vmap_tangents
+    _jax_register_pytree_class, _compute_sparsity, get_vmap_tangents, _compute_jac
 
 
 class JaxExplicitComponent(ExplicitComponent):
@@ -65,7 +65,7 @@ class JaxExplicitComponent(ExplicitComponent):
                 self._coloring_info.deactivate()
             self.compute_jacvec_product = MethodType(compute_jacvec_product, self)
         else:
-            if self._coloring_info.use_coloring(self):
+            if self._coloring_info.use_coloring():
                 coloring = self._get_coloring()  # make sure the coloring is computed
                 direction = self.best_partial_deriv_direction()
                 self._get_tangents(direction, coloring)
@@ -123,12 +123,42 @@ class JaxExplicitComponent(ExplicitComponent):
                 self._jac_func_ = MethodType(fjax(self.compute_primal.__func__, argnums=wrt_idxs),
                                              self)
 
-            if self.options['use_jit']:
-                static_argnums = tuple(range(1 + len(wrt_idxs), 1 + len(wrt_idxs) + nstatic))
-                self._jac_func_ = MethodType(jit(self._jac_func_.__func__,
-                                                 static_argnums=static_argnums), self)
+                if self.options['use_jit']:
+                    static_argnums = tuple(range(1 + len(wrt_idxs), 1 + len(wrt_idxs) + nstatic))
+                    self._jac_func_ = MethodType(jit(self._jac_func_.__func__,
+                                                    static_argnums=static_argnums), self)
 
         return self._jac_func_
+
+    def declare_coloring(self, **kwargs):
+        kwargs['method'] = 'jax'
+        super().declare_coloring(**kwargs)
+
+    # we define compute_partials here instead of making this the base class version as we
+    # did with compute, because the existence of a compute_partials method that is not the
+    # base class method is used to determine if a given component computes its own partials.
+    def _compute_partials(self, inputs, partials, discrete_inputs=None):
+        """
+        Compute sub-jacobian parts. The model is assumed to be in an unscaled state.
+
+        Parameters
+        ----------
+        self : ImplicitComponent
+            The component instance.
+        inputs : Vector
+            Unscaled, dimensional input variables read via inputs[key].
+        partials : Jacobian
+            Sub-jac components written to partials[output_name, input_name]..
+        discrete_inputs : dict or None
+            If not None, dict containing discrete input values.
+        """
+        deriv_vals = self._get_jac_func()(*self._get_compute_primal_invals(inputs,
+                                                                        self._discrete_inputs))
+        # check to see if we even need this with jax.  A jax component doesn't need to map string
+        # keys to partials.  We could just use the jacobian as an array to compute the derivatives.
+        # Maybe make a simple JaxJacobian that is just a thin wrapper around the jacobian array.  The
+        # only issue is do higher level jacobians need the subjacobian info?
+        self.jax_derivs2partials(deriv_vals, partials)
 
     def _jacfwd_colored(self, inputs, partials, discrete_inputs=None):
         """
@@ -143,10 +173,8 @@ class JaxExplicitComponent(ExplicitComponent):
         discrete_inputs : dict or None
             If not None, dict containing discrete input values.
         """
-        # tangents = self._get_tangents('fwd', self._coloring_info.coloring)
-
-        deriv_vals = self._get_jac_func()(inputs, partials, discrete_inputs)
-        self.jax_derivs2partials(deriv_vals, partials)
+        J = _compute_jac(self, 'fwd')
+        self.dense_jac2partials(J, partials)
 
     def _jacrev_colored(self, inputs, partials, discrete_inputs=None):
         """
@@ -161,10 +189,8 @@ class JaxExplicitComponent(ExplicitComponent):
         discrete_inputs : dict or None
             If not None, dict containing discrete input values.
         """
-        # tangents = self._get_tangents('rev', self._coloring_info.coloring)
-
-        deriv_vals = self._get_jac_func()(inputs, partials, discrete_inputs)
-        self.jax_derivs2partials(deriv_vals, partials)
+        J = _compute_jac(self, 'rev')
+        self.dense_jac2partials(J, partials)
 
     def compute_sparsity(self, direction=None):
         """
@@ -191,6 +217,38 @@ class JaxExplicitComponent(ExplicitComponent):
                 self._tangents[direction] = get_vmap_tangents(tuple(self._outputs.values()),
                                                               direction, fill=1., coloring=coloring)
         return self._tangents[direction]
+
+    def dense_jac2partials(self, J, partials):
+        """
+        Copy a dense Jacobian into partials.
+
+        Parameters
+        ----------
+        J : ndarray
+            The dense Jacobian.
+        partials : dict
+            The partials to copy the Jacobian into, keyed by (of_name, wrt_name).
+        """
+        ofstart = ofend = 0
+        for ofname in self._var_rel_names['output']:
+            ofmeta = self._var_rel2meta[ofname]
+            ofend += ofmeta['size']
+            wrtstart = wrtend = 0
+            for wrtname in self._var_rel_names['input']:
+                wrtmeta = self._var_rel2meta[wrtname]
+                wrtend += wrtmeta['size']
+                key = (ofname, wrtname)
+                if key not in partials:
+                    # FIXME: this means that we computed a derivative that we didn't need
+                    continue
+
+                dvals = J[ofstart:ofend, wrtstart:wrtend]
+                sjmeta = partials.get_metadata(key)
+                rows = sjmeta['rows']
+                if rows is None:
+                    partials[ofname, wrtname] = dvals
+                else:
+                    partials[ofname, wrtname] = dvals[rows, sjmeta['cols']]
 
     def jax_derivs2partials(self, deriv_vals, partials):
         """
@@ -231,34 +289,6 @@ class JaxExplicitComponent(ExplicitComponent):
                     partials[ofname, wrtname] = dvals
                 else:
                     partials[ofname, wrtname] = dvals[rows, sjmeta['cols']]
-
-
-# we define compute_partials here instead of making this the base class version as we
-# did with compute, because the existence of a compute_partials method that is not the
-# base class method is used to determine if a given component computes its own partials.
-def compute_partials(self, inputs, partials, discrete_inputs=None):
-    """
-    Compute sub-jacobian parts. The model is assumed to be in an unscaled state.
-
-    Parameters
-    ----------
-    self : ImplicitComponent
-        The component instance.
-    inputs : Vector
-        Unscaled, dimensional input variables read via inputs[key].
-    partials : Jacobian
-        Sub-jac components written to partials[output_name, input_name]..
-    discrete_inputs : dict or None
-        If not None, dict containing discrete input values.
-    """
-    deriv_vals = self._get_jac_func()(*self._get_compute_primal_invals(inputs,
-                                                                       self._discrete_inputs))
-    # check to see if we even need this with jax.  A jax component doesn't need to map string
-    # keys to partials.  We could just use the jacobian as an array to compute the derivatives.
-    # Maybe make a simple JaxJacobian that is just a thin wrapper around the jacobian array.  The
-    # only issue is do higher level jacobians need the subjacobian info?
-    self.jax_derivs2partials(deriv_vals, partials)
-
 
 
 def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode, discrete_inputs=None):

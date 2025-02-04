@@ -2240,7 +2240,7 @@ class Component(System):
         if self.matrix_free:
             directions = ('fwd', 'rev')
         else:
-            directions = ('fwd',)  # rev same as fwd for analytic jacobians
+            directions = (self.best_partial_deriv_direction(),)  # rev same as fwd for analytic jacobians
             self.run_linearize(sub_do_ln=False)
 
         nondep_derivs = set()

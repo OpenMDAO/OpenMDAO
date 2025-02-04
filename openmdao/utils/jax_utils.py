@@ -15,7 +15,8 @@ import numpy as np
 from scipy.sparse import coo_matrix
 
 from openmdao.visualization.tables.table_builder import generate_table
-from openmdao.utils.code_utils import _get_long_name, remove_src_blocks, replace_src_block
+from openmdao.utils.code_utils import _get_long_name, remove_src_blocks, replace_src_block, \
+    get_function_deps
 from openmdao.utils.file_utils import get_module_path, _load_and_exec
 
 
@@ -826,6 +827,7 @@ def get_vmap_tangents(vals, direction, fill=1., returns_tuple=False, coloring=No
         arr = np.empty(totsize)
         arr[:] = fill
         tangent = np.diag(arr)
+        ncols = totsize
     else:
         # using coloring, so 'compress' the diagonal matrix to one with ncolors columns.
         # columns are the batching dimension for vmap and each column also corresponds to a color.
@@ -833,7 +835,7 @@ def get_vmap_tangents(vals, direction, fill=1., returns_tuple=False, coloring=No
         tangent = np.zeros((totsize, len(colors)))
         for i, nzs in enumerate(colors):
             tangent[nzs, i] = 1.
-
+        ncols = len(colors)
     # take the 2D tangent array and reshape it to match the shape of each input variable.
     # (with the additional batching dimension as the last axis)
     tangents = []
@@ -842,7 +844,7 @@ def get_vmap_tangents(vals, direction, fill=1., returns_tuple=False, coloring=No
         end += np.size(v)
         vartan = tangent[start:end]  # get rows corresponding to each input
         # take each flat column and reshape it to the shape of the input
-        vartan.shape = np.shape(v) + (totsize,)
+        vartan.shape = np.shape(v) + (ncols,)
         tangents.append(vartan)
         start = end
 
@@ -948,7 +950,7 @@ def _compute_sparsity(self, direction=None):
 
     info = {
         'tol': 0.,
-        'orders': 1,
+        'orders': None,
         'good_tol': 0.,
         'nz_matches': 0,
         'n_tested': 0,
@@ -966,6 +968,9 @@ def _compute_jac(self, direction):
     ncontouts = self._outputs.nvars()
 
     implicit = not self.is_explicit()
+
+    print("inputs")
+    print(self._inputs.asarray())
 
     if implicit:
         ncontins += ncontouts
@@ -987,6 +992,8 @@ def _compute_jac(self, direction):
 
     if direction == 'fwd':
         tangents = self._get_tangents('fwd', self._coloring_info.coloring)
+        print("tangents")
+        print(tangents)
 
         # make a function that takes only a tuple of tangents to make it easier to vectorize
         # using vmap
@@ -994,8 +1001,14 @@ def _compute_jac(self, direction):
             # [1] is the derivative, [0] is the primal (we don't need the primal)
             return jax.jvp(differentiable_part, icontvals, tangent)[1]
 
+        if False:  # self.options['use_jit']:
+            jvp_at_point = jax.jit(jvp_at_point)
+
         # vectorize over the last axis of the tangent vectors
         J = jax.vmap(jvp_at_point, in_axes=-1, out_axes=-1)(tangents)
+
+        print("var J")
+        print(J)
 
     else:  # rev
         # Returns primal and a function to compute VJP so just take [1], the vjp function
@@ -1004,10 +1017,18 @@ def _compute_jac(self, direction):
         def vjp_at_point(cotangent):
             return vjp_fn(cotangent)
 
+        if self.options['use_jit']:
+            vjp_at_point = jax.jit(vjp_at_point)
+
         cotangents = self._get_tangents('rev', self._coloring_info.coloring)
+        print("cotangents")
+        print(cotangents)
 
         # Batch over last axis of cotangents
         J = jax.vmap(vjp_at_point, in_axes=-1, out_axes=-1)(cotangents)
+
+        print("var J")
+        print(J)
 
     if not isinstance(J, tuple):
         J = (J,)
@@ -1026,6 +1047,19 @@ def _compute_jac(self, direction):
 
     if direction != 'fwd':
         J = J.T
+
+    J = uncompress_jac(self, J)
+    print("uncompressed J")
+    print(J)
+
+    return J
+
+
+def uncompress_jac(self, J):
+    if self._coloring_info.coloring is not None:
+        return self._coloring_info.coloring.expand_jac(J, self.best_partial_deriv_direction())
+
+    return J
 
 
 def _to_compute_primal_setup_parser(parser):
@@ -1175,7 +1209,6 @@ def to_compute_primal(inst, outfile='stdout', verbose=False):
 
 if __name__ == '__main__':
     import openmdao.api as om
-    from openmdao.utils.code_utils import get_function_deps
 
     def func(x, y):  # noqa: D103
         z = jnp.sin(x) * y

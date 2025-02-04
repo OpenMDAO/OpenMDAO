@@ -117,6 +117,7 @@ class VecMultPrimal(om.JaxExplicitComponent):
         self.add_input('y', shape_by_conn=True)
         self.add_output('z', copy_shape='x')
         self.add_output('zz', copy_shape='x')
+        self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
 
     def compute_primal(self, x, y):
         return x * y, x / y
@@ -359,12 +360,12 @@ if sys.version_info >= (3, 9):
         def setup(self):
             if self.shape == ():
                 for i in range(self.nins):
-                    self.add_input(f'x{i}', val=0.)
+                    self.add_input(f'x{i}', val=1.)
                 for i in range(self.nouts):
                     self.add_output(f'y{i}', val=0.)
             else:
                 for i in range(self.nins):
-                    self.add_input(f'x{i}', val=jnp.zeros(self.shape))
+                    self.add_input(f'x{i}', val=jnp.ones(self.shape))
                 for i in range(self.nouts):
                     self.add_output(f'y{i}', val=jnp.zeros(self.shape))
 
@@ -485,28 +486,29 @@ class TestJaxShapesAndReturns(unittest.TestCase):
 if __name__ == '__main__':
     # unittest.main()
 
-    p = om.Problem()
-    ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
-    ivc.add_output('y', val=np.ones(y_shape))
-    ivc.add_discrete_output('disc_out', val=3)
-    comp = p.model.add_subsystem('comp', DotProductMultDiscretePrimal())
+    # p = om.Problem()
+    # ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
+    # ivc.add_output('y', val=np.ones(y_shape))
+    # ivc.add_discrete_output('disc_out', val=3)
+    # comp = p.model.add_subsystem('comp', DotProductMultDiscretePrimal())
 
-    p.model.connect('ivc.x', 'comp.x')
-    p.model.connect('ivc.y', 'comp.y')
-    p.model.connect('ivc.disc_out', 'comp.disc_in')
+    # p.model.connect('ivc.x', 'comp.x')
+    # p.model.connect('ivc.y', 'comp.y')
+    # p.model.connect('ivc.disc_out', 'comp.disc_in')
 
-    p.setup()
+    # p.setup()
 
-    x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
-    y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
-    p.set_val('ivc.x', x)
-    p.set_val('ivc.y', y)
-    p.final_setup()
-    p.run_model()
-    comp.sparsity_matches_fd(direction='fwd')
-    comp.sparsity_matches_fd(direction='rev')
+    # x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
+    # y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
+    # p.set_val('ivc.x', x)
+    # p.set_val('ivc.y', y)
+    # p.final_setup()
+    # p.run_model()
+    # comp.sparsity_matches_fd(direction='fwd')
+    # comp.sparsity_matches_fd(direction='rev')
 
-    print(comp.get_declare_partials_calls())
+    # print(comp.get_declare_partials_calls())
+    # comp.check_partials(show_only_incorrect=True)
 
     shape = (2,3)
 
@@ -526,29 +528,32 @@ if __name__ == '__main__':
     p.set_val('ivc.y', y)
     p.final_setup()
     p.run_model()
-    comp.sparsity_matches_fd(direction='fwd')
-    comp.sparsity_matches_fd(direction='rev')
-
-    print(comp.get_declare_partials_calls())
-    shape = (2,3)
-    nins = 1
-    nouts = 1
-    p = om.Problem()
-    comp = p.model.add_subsystem('comp', CompRetTuple(shape=shape, nins=nins, nouts=nouts))
-    p.setup()
-    p.run_model()
-    comp.sparsity_matches_fd(direction='fwd')
-    comp.sparsity_matches_fd(direction='rev')
-
-    print(comp.get_declare_partials_calls())
-
-    shape = (2,3)
-    nins = 1
-    nouts = 1
-    p = om.Problem()
-    comp = p.model.add_subsystem('comp', CompRetValue(shape=shape, nins=nins, nouts=nouts))
-    p.setup()
-    p.run_model()
+    comp.check_partials(show_only_incorrect=True)
     comp.sparsity_matches_fd(direction='fwd')
     comp.sparsity_matches_fd(direction='rev')
     print(comp.get_declare_partials_calls())
+
+    # shape = (2,3)
+    # nins = 1
+    # nouts = 1
+    # p = om.Problem()
+    # comp = p.model.add_subsystem('comp', CompRetTuple(shape=shape, nins=nins, nouts=nouts))
+    # p.setup()
+    # p.run_model()
+    # comp.sparsity_matches_fd(direction='fwd')
+    # comp.sparsity_matches_fd(direction='rev')
+    # print(comp.get_declare_partials_calls())
+    # comp.check_partials(show_only_incorrect=True)
+
+    # shape = (2,3)
+    # nins = 1
+    # nouts = 1
+    # p = om.Problem()
+    # comp = p.model.add_subsystem('comp', CompRetValue(shape=shape, nins=nins, nouts=nouts))
+    # comp.declare_coloring()
+    # p.setup()
+    # p.run_model()
+    # comp.sparsity_matches_fd(direction='fwd')
+    # comp.sparsity_matches_fd(direction='rev')
+    # print(comp.get_declare_partials_calls())
+    # comp.check_partials(show_only_incorrect=True)

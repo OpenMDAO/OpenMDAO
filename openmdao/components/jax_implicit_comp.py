@@ -115,6 +115,10 @@ class JaxImplicitComponent(ImplicitComponent):
                                                               direction, fill=1.)
         return self._tangents[direction]
 
+    def declare_coloring(self, **kwargs):
+        kwargs['method'] = 'jax'
+        super().declare_coloring(**kwargs)
+
 
 # we define linearize here instead of making this the base class version as we
 # did with apply_nonlinear, because the existence of a linearize method that is not the
@@ -141,7 +145,7 @@ def linearize(inst, inputs, outputs, partials, discrete_inputs=None, discrete_ou
         If not None, dict containing discrete output values.
     """
     deriv_vals = inst._get_jac_func()(*inst._get_compute_primal_invals(inputs, outputs,
-                                                                       discrete_inputs))
+                                                                       discrete_inputs)[0])
     nested_tup = isinstance(deriv_vals, tuple) and len(deriv_vals) > 0 and \
         isinstance(deriv_vals[0], tuple)
 
