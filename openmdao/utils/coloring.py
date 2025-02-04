@@ -384,6 +384,14 @@ class ColoringMeta(object):
         self._coloring = None
         self._failed = False
 
+    def deactivate(self):
+        """
+        Deactivate the coloring.
+        """
+        self._coloring = None
+        self.static = None
+        self._failed = True
+
     def _pct_improvement_good(self, coloring, msginfo=''):
         """
         Return True if the percentage improvement is greater than the minimum allowed.
@@ -426,12 +434,25 @@ class ColoringMeta(object):
     def use_coloring(self):
         """
         Return True if coloring should be used.
+
+        It may not have been computed yet.
+
+        Returns
+        -------
+        bool
+            True if coloring should be used.
         """
-        return not self._failed and self.coloring is not None
+        return not self._failed and (self.coloring is not None or self.dynamic or \
+                                     self.has_static_coloring())
 
     def has_static_coloring(self):
         """
         Return True if a static coloring is available.
+
+        Returns
+        -------
+        bool
+            True if a static coloring is available.
         """
         return isinstance(self.static, (str, STD_COLORING_FNAME, Coloring))
 

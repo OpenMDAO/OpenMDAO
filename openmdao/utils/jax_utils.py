@@ -962,6 +962,73 @@ def _compute_sparsity(self, direction=None):
     return sparsity, info
 
 
+def _compute_jac(self, direction):
+    ncontins = self._inputs.nvars()
+    ncontouts = self._outputs.nvars()
+
+    implicit = not self.is_explicit()
+
+    if implicit:
+        ncontins += ncontouts
+
+    full_invals = tuple(self._get_compute_primal_invals())
+    icontvals = full_invals[:ncontins]  # continuous inputs
+    idiscvals = full_invals[ncontins:]  # discrete inputs
+
+    # exclude the discrete inputs from the inputs and the discrete outputs from the outputs
+    if implicit or (ncontouts == 1 and not self._compute_primal_returns_tuple):
+        if len(idiscvals) > 0:
+            def differentiable_part(*contvals):
+                return self.compute_primal(*contvals, *idiscvals)
+        else:
+            differentiable_part = self.compute_primal
+    else:
+        def differentiable_part(*contvals):
+            return self.compute_primal(*contvals, *idiscvals)[:ncontouts]
+
+    if direction == 'fwd':
+        tangents = self._get_tangents('fwd', self._coloring_info.coloring)
+
+        # make a function that takes only a tuple of tangents to make it easier to vectorize
+        # using vmap
+        def jvp_at_point(tangent):
+            # [1] is the derivative, [0] is the primal (we don't need the primal)
+            return jax.jvp(differentiable_part, icontvals, tangent)[1]
+
+        # vectorize over the last axis of the tangent vectors
+        J = jax.vmap(jvp_at_point, in_axes=-1, out_axes=-1)(tangents)
+
+    else:  # rev
+        # Returns primal and a function to compute VJP so just take [1], the vjp function
+        vjp_fn = jax.vjp(differentiable_part, *icontvals)[1]
+
+        def vjp_at_point(cotangent):
+            return vjp_fn(cotangent)
+
+        cotangents = self._get_tangents('rev', self._coloring_info.coloring)
+
+        # Batch over last axis of cotangents
+        J = jax.vmap(vjp_at_point, in_axes=-1, out_axes=-1)(cotangents)
+
+    if not isinstance(J, tuple):
+        J = (J,)
+
+    if len(J) == 1:
+        J = J[0]
+        if len(J.shape) > 2:
+            # flatten 'variable' dimensions.  Last dimension is the batching dimension.
+            J = J.reshape(np.prod(J.shape[:-1]), J.shape[-1])
+        elif len(J.shape) == 1:
+            J = np.atleast_2d(J)
+    else:
+        # flatten 'variable' dimensions for each variable.  Last dimension is the batching
+        # dimension.  Then vertically stack all the flattened 'variable' arrays.
+        J = np.vstack([j.reshape(np.prod(j.shape[:-1]), j.shape[-1]) for j in J])
+
+    if direction != 'fwd':
+        J = J.T
+
+
 def _to_compute_primal_setup_parser(parser):
     """
     Set up the command line options for the 'openmdao call_tree' command line tool.

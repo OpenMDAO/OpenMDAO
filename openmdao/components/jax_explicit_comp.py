@@ -58,27 +58,32 @@ class JaxExplicitComponent(ExplicitComponent):
         if self.compute_primal is None:
             raise RuntimeError(f"{self.msginfo}: compute_primal is not defined for this component.")
 
-        use_coloring = self._coloring_info.use_coloring()
-
         if self.matrix_free is True:
-            if use_coloring:
+            if self._coloring_info.use_coloring():
                 issue_warning(f"{self.msginfo}: coloring has been set but matrix_free is True, "
                               "so coloring will be ignored.")
+                self._coloring_info.deactivate()
             self.compute_jacvec_product = MethodType(compute_jacvec_product, self)
         else:
-            if use_coloring:
-                pass
+            if self._coloring_info.use_coloring(self):
+                coloring = self._get_coloring()  # make sure the coloring is computed
+                direction = self.best_partial_deriv_direction()
+                self._get_tangents(direction, coloring)
+                if direction == 'fwd':
+                    self.compute_partials = self._jacfwd_colored
+                else:
+                    self.compute_partials = self._jacrev_colored
             else:
-                self.compute_partials = MethodType(compute_partials, self)
-                self._has_compute_partials = True
+                self.compute_partials = self._compute_partials
+            self._has_compute_partials = True
 
         # determine if the compute_primal method returns a tuple
         self._compute_primal_returns_tuple = ReturnChecker(self.compute_primal).returns_tuple()
 
         if self.options['use_jit']:
-            static_argnums = []
+            # jit the compute_primal method
             idx = len(self._var_rel_names['input']) + 1
-            static_argnums.extend(range(idx, idx + len(self._discrete_inputs)))
+            static_argnums = list(range(idx, idx + len(self._discrete_inputs)))
             self.compute_primal = MethodType(jit(self.compute_primal.__func__,
                                                  static_argnums=static_argnums), self)
 
@@ -102,19 +107,7 @@ class JaxExplicitComponent(ExplicitComponent):
         # TODO: modify this to use relevance and possibly compile multiple jac functions depending
         # on DV/response so that we don't compute any derivatives that are always zero.
         if self._jac_func_ is None:
-            # if no coloring just just jacfwd or jacrev
-            if self._coloring_info.coloring is None and not self._coloring_info.dynamic:
-                fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
-                nstatic = len(self._discrete_inputs)
-                wrt_idxs = list(range(1, len(self._var_abs2meta['input']) + 1))
-                self._jac_func_ = MethodType(fjax(self.compute_primal.__func__,
-                                                  argnums=wrt_idxs), self)
-
-                if self.options['use_jit']:
-                    static_argnums = tuple(range(1 + len(wrt_idxs), 1 + len(wrt_idxs) + nstatic))
-                    self._jac_func_ = MethodType(jit(self._jac_func_.__func__,
-                                                     static_argnums=static_argnums), self)
-            else:
+            if self._coloring_info.use_coloring():
                 if self._coloring_info.coloring is None:
                     # need to dynamically compute the coloring first
                     self._compute_coloring()
@@ -123,6 +116,17 @@ class JaxExplicitComponent(ExplicitComponent):
                     self._jac_func_ = self._jacfwd_colored
                 else:
                     self._jac_func_ = self._jacrev_colored
+            else:  # just use jacfwd or jacrev
+                fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
+                nstatic = len(self._discrete_inputs)
+                wrt_idxs = list(range(1, len(self._var_abs2meta['input']) + 1))
+                self._jac_func_ = MethodType(fjax(self.compute_primal.__func__, argnums=wrt_idxs),
+                                             self)
+
+            if self.options['use_jit']:
+                static_argnums = tuple(range(1 + len(wrt_idxs), 1 + len(wrt_idxs) + nstatic))
+                self._jac_func_ = MethodType(jit(self._jac_func_.__func__,
+                                                 static_argnums=static_argnums), self)
 
         return self._jac_func_
 
@@ -139,6 +143,8 @@ class JaxExplicitComponent(ExplicitComponent):
         discrete_inputs : dict or None
             If not None, dict containing discrete input values.
         """
+        # tangents = self._get_tangents('fwd', self._coloring_info.coloring)
+
         deriv_vals = self._get_jac_func()(inputs, partials, discrete_inputs)
         self.jax_derivs2partials(deriv_vals, partials)
 
@@ -155,6 +161,8 @@ class JaxExplicitComponent(ExplicitComponent):
         discrete_inputs : dict or None
             If not None, dict containing discrete input values.
         """
+        # tangents = self._get_tangents('rev', self._coloring_info.coloring)
+
         deriv_vals = self._get_jac_func()(inputs, partials, discrete_inputs)
         self.jax_derivs2partials(deriv_vals, partials)
 
@@ -174,14 +182,14 @@ class JaxExplicitComponent(ExplicitComponent):
         """
         return _compute_sparsity(self, direction)
 
-    def _get_tangents(self, direction):
+    def _get_tangents(self, direction, coloring=None):
         if self._tangents[direction] is None:
             if direction == 'fwd':
                 self._tangents[direction] = get_vmap_tangents(tuple(self._inputs.values()),
-                                                              direction, fill=1.)
+                                                              direction, fill=1., coloring=coloring)
             else:
                 self._tangents[direction] = get_vmap_tangents(tuple(self._outputs.values()),
-                                                              direction, fill=1.)
+                                                              direction, fill=1., coloring=coloring)
         return self._tangents[direction]
 
     def jax_derivs2partials(self, deriv_vals, partials):
@@ -245,6 +253,10 @@ def compute_partials(self, inputs, partials, discrete_inputs=None):
     """
     deriv_vals = self._get_jac_func()(*self._get_compute_primal_invals(inputs,
                                                                        self._discrete_inputs))
+    # check to see if we even need this with jax.  A jax component doesn't need to map string
+    # keys to partials.  We could just use the jacobian as an array to compute the derivatives.
+    # Maybe make a simple JaxJacobian that is just a thin wrapper around the jacobian array.  The
+    # only issue is do higher level jacobians need the subjacobian info?
     self.jax_derivs2partials(deriv_vals, partials)
 
 
