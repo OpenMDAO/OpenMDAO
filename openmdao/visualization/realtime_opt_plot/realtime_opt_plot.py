@@ -258,11 +258,6 @@ def _update_y_min_max(name, y, y_min, y_max):
         y_max[name] = y
         min_max_changed = True
     return min_max_changed
-    # y_min[name] = min(y_min[name], y)
-    # y_max[name] = max(y_max[name], y)
-    # if y_min[name] == y_max[name]:
-    #     y_min[name] = y_min[name] - 1
-    #     y_max[name] = y_max[name] + 1
 
 def _get_value_for_plotting(value_from_recorder, var_type):
     if value_from_recorder is None or value_from_recorder.size == 0:
@@ -290,9 +285,7 @@ class CaseTracker:
         self._case_recorder_filename = case_recorder_filename
         self._cr = None
         self.source = None
-
         self._num_iterations_read = 0
-
         self._initial_cr_with_one_case = None
 
     def _get_case_by_counter(self, counter):
@@ -508,7 +501,6 @@ class RealTimeOptPlot(object):
         self._column_items = []
         self._axes = []
         self._labels_updated_with_units = False
-
         self._case_tracker = CaseTracker(case_recorder_filename)
 
         self.setup_figure()
@@ -521,176 +513,176 @@ class RealTimeOptPlot(object):
         def update():
 
             print(f"start update at {time.time()-start_time}")
-            new_data = None
+            new_data = self._case_tracker.get_new_case()
+            if new_data is None:
+                return
 
             # See if source is defined yet. If not, see if we have any data
             #   in the case file yet. If there is data, create the
             #   source object and add the lines to the figure
             # if source not setup yet, need to do that to setup streaming
             if self._source is None:
-                new_data = self._case_tracker.get_new_case()
-                if new_data:
-                    print(f"if new_data at {time.time()-start_time}")
-                    self.setup_data_source()
-                    # index of lines across all variables: obj, desvars, cons
-                    i_line = 0
-                    
-                    # Objective
-                    obj_names = self._case_tracker.get_obj_names()
-                    if len(obj_names) != 1:
-                        raise ValueError(
-                            f"Plot assumes there is on objective but {len(obj_names)} found"
-                        )
-                    
-                    # Create CustomJS callback for toggle buttons
-                    legend_item_callback = CustomJS(
-                        args=dict(lines=self.lines, axes=self._axes, toggles=self._toggles),
-                        code=callback_code,
+                print(f"if new_data at {time.time()-start_time}")
+                self.setup_data_source()
+                # index of lines across all variables: obj, desvars, cons
+                i_line = 0
+                
+                # Objective
+                obj_names = self._case_tracker.get_obj_names()
+                if len(obj_names) != 1:
+                    raise ValueError(
+                        f"Plot assumes there is on objective but {len(obj_names)} found"
                     )
+                
+                # Create CustomJS callback for toggle buttons
+                legend_item_callback = CustomJS(
+                    args=dict(lines=self.lines, axes=self._axes, toggles=self._toggles),
+                    code=callback_code,
+                )
 
-                    # objs
-                    obj_label = _make_header_text_for_variable_chooser("OBJECTIVE")
-                    self._column_items.append(obj_label)
+                # objs
+                obj_label = _make_header_text_for_variable_chooser("OBJECTIVE")
+                self._column_items.append(obj_label)
 
-                    for i, obj_name in enumerate(obj_names):
-                        units = self._case_tracker.get_units(obj_name)
-                        self._make_legend_item(f"{obj_name} ({units})", _obj_color, True, legend_item_callback)
-                        self._make_line_and_hover_tool("objs", obj_name, False, _obj_color,"solid", True)
-                        value = new_data["objs"][obj_name]
-                        float_value = _get_value_for_plotting(value, "objs")
-                        self.p.y_range = Range1d(float_value - 1, float_value + 1)
+                for i, obj_name in enumerate(obj_names):
+                    units = self._case_tracker.get_units(obj_name)
+                    self._make_legend_item(f"{obj_name} ({units})", _obj_color, True, legend_item_callback)
+                    self._make_line_and_hover_tool("objs", obj_name, False, _obj_color,"solid", True)
+                    value = new_data["objs"][obj_name]
+                    float_value = _get_value_for_plotting(value, "objs")
+                    self.p.y_range = Range1d(float_value - 1, float_value + 1)
 
-                    # TODO do we need to increment i_line ?
+                # TODO do we need to increment i_line ?
 
-                    # desvars
-                    desvars_label = _make_header_text_for_variable_chooser("DESIGN VARS")
-                    self._column_items.append(desvars_label)
-                    desvar_names = self._case_tracker.get_desvar_names()
-                    for i, desvar_name in enumerate(desvar_names):
-                        units = self._case_tracker.get_units(desvar_name)
-                        self._make_legend_item(f"{desvar_name} ({units})", "black", False, legend_item_callback)
-                        value = new_data["desvars"][desvar_name]
-                        use_varea = value.size > 1
-                        self._make_line_and_hover_tool("desvars", desvar_name, use_varea, _non_active_plot_color, "solid", False)
-                        float_value = _get_value_for_plotting(value, "desvars")
-                        self._make_axis(desvar_name, float_value, units)
-                        i_line += 1
+                # desvars
+                desvars_label = _make_header_text_for_variable_chooser("DESIGN VARS")
+                self._column_items.append(desvars_label)
+                desvar_names = self._case_tracker.get_desvar_names()
+                for i, desvar_name in enumerate(desvar_names):
+                    units = self._case_tracker.get_units(desvar_name)
+                    self._make_legend_item(f"{desvar_name} ({units})", "black", False, legend_item_callback)
+                    value = new_data["desvars"][desvar_name]
+                    use_varea = value.size > 1
+                    self._make_line_and_hover_tool("desvars", desvar_name, use_varea, _non_active_plot_color, "solid", False)
 
-                    # cons
-                    cons_label = _make_header_text_for_variable_chooser("CONSTRAINTS")
-                    self._column_items.append(cons_label)
-                    cons_names = self._case_tracker.get_cons_names()
-                    for i, cons_name in enumerate(cons_names):
-                        units = self._case_tracker.get_units(cons_name)
-                        self._make_legend_item(f"{cons_name} ({units})", "black", False, legend_item_callback)
-                        self._make_line_and_hover_tool("cons", cons_name, False, _non_active_plot_color, "dashed", False)
-                        value = new_data["cons"][cons_name]
-                        float_value = _get_value_for_plotting(value, "cons")
-                        self._make_axis(cons_name, float_value, units)
-                        i_line += 1
+                    float_value = _get_value_for_plotting(value, "desvars")
+                    self._make_axis("desvars", desvar_name, float_value, units)
+                    i_line += 1
+                    print(f"{i_line=}")
 
-                    print(f"after making all the lines and axes at {time.time()-start_time}")
+                print("cons")
+                # cons
+                cons_label = _make_header_text_for_variable_chooser("CONSTRAINTS")
+                self._column_items.append(cons_label)
+                cons_names = self._case_tracker.get_cons_names()
+                for i, cons_name in enumerate(cons_names):
+                    units = self._case_tracker.get_units(cons_name)
+                    self._make_legend_item(f"{cons_name} ({units})", "black", False, legend_item_callback)
+                    self._make_line_and_hover_tool("cons", cons_name, False, _non_active_plot_color, "dashed", False)
+                    value = new_data["cons"][cons_name]
+                    float_value = _get_value_for_plotting(value, "cons")
+                    self._make_axis("cons", cons_name, float_value, units)
+                    i_line += 1
+                    print(f"{i_line=}")
 
+                print(f"after making all the lines and axes at {time.time()-start_time}")
 
-                    # Add callback to all toggles
-                    for toggle in self._toggles:
-                        toggle.js_on_change("active", legend_item_callback)
+                # Add callback to all toggles
+                for toggle in self._toggles:
+                    toggle.js_on_change("active", legend_item_callback)
 
-                    # Create a column of toggles with scrolling
-                    toggle_column = Column(
-                        children=self._column_items,
-                        sizing_mode="stretch_both",
-                        height_policy="fit",
+                # Create a column of toggles with scrolling
+                toggle_column = Column(
+                    children=self._column_items,
+                    sizing_mode="stretch_both",
+                    height_policy="fit",
+                    styles={
+                        "overflow-y": "auto",
+                        "border": "1px solid #ddd",
+                        "padding": "8px",
+                        "background-color": "#dddddd",
+                        'max-height': '100vh'  # Ensures it doesn't exceed viewport
+                    },
+                )
+
+                # header for the variable list
+                label = Div(
+                    text="Variables",
+                    width=200,
+                    styles={"font-size": "20px", "font-weight": "bold"},
+                )
+                label_and_toggle_column = Column(
+                    label,
+                    toggle_column,
+                    sizing_mode="stretch_height",
+                    height_policy="fit",
                         styles={
-                            "overflow-y": "auto",
-                            "border": "1px solid #ddd",
-                            "padding": "8px",
-                            "background-color": "#dddddd",
-                            'max-height': '100vh'  # Ensures it doesn't exceed viewport
-                        },
+                        'max-height': '100vh'  # Ensures it doesn't exceed viewport
+                    },
                     )
 
-                    # header for the variable list
-                    label = Div(
-                        text="Variables",
-                        width=200,
-                        styles={"font-size": "20px", "font-weight": "bold"},
+                scroll_box = ScrollBox(
+                    child=label_and_toggle_column,
+                    sizing_mode="stretch_height",
+                    height_policy="max",
+                )
+
+                graph = Row(self.p, scroll_box, sizing_mode="stretch_both")
+                doc.add_root(graph)
+                print(f"after initial setup at {time.time()-start_time}")
+                # end of self._source is None - plottng is setup
+
+            # num_driver_iterations = self._case_tracker._get_num_driver_iterations()
+
+            counter = new_data["counter"]
+            source_stream_dict = {"iteration": [counter]}
+
+            iline = 0
+            for obj_name, obj_value in new_data["objs"].items():
+                float_obj_value = _get_value_for_plotting(obj_value, "objs")
+                source_stream_dict[obj_name] = [float_obj_value]
+                min_max_changed = _update_y_min_max(obj_name, float_obj_value, self.y_min, self.y_max)
+                if min_max_changed:
+                    self.p.y_range.start = self.y_min[obj_name]
+                    self.p.y_range.end = self.y_max[obj_name]
+                iline += 1
+
+            for desvar_name, desvar_value in new_data["desvars"].items():
+                float_desvar_value = _get_value_for_plotting(desvar_value, "desvars")  # TODO is this used?
+                if not self._labels_updated_with_units and desvar_value.size > 1:
+                    units = self._case_tracker.get_units(desvar_name)
+                    self._toggles[iline].label = f"{desvar_name} ({units}) {desvar_value.shape}"
+                min_max_changed = False
+                min_max_changed = min_max_changed or _update_y_min_max(desvar_name, np.min(desvar_value), self.y_min, self.y_max)
+                min_max_changed = min_max_changed or _update_y_min_max(desvar_name, np.max(desvar_value), self.y_min, self.y_max)
+                if min_max_changed: # TODO fix
+                    range = Range1d(
+                        self.y_min[desvar_name], self.y_max[desvar_name]
                     )
-                    label_and_toggle_column = Column(
-                        label,
-                        toggle_column,
-                        sizing_mode="stretch_height",
-                        height_policy="fit",
-                         styles={
-                            'max-height': '100vh'  # Ensures it doesn't exceed viewport
-                        },
-                       )
+                    self.p.extra_y_ranges[f"extra_y_{desvar_name}_min"] = range
 
-                    scroll_box = ScrollBox(
-                        child=label_and_toggle_column,
-                        sizing_mode="stretch_height",
-                        height_policy="max",
+                source_stream_dict[f"{desvar_name}_min"] = [np.min(desvar_value)]
+                source_stream_dict[f"{desvar_name}_max"] = [np.max(desvar_value)]
+                iline += 1
+
+            for cons_name, cons_value in new_data["cons"].items():
+                float_cons_value = _get_value_for_plotting(cons_value, "cons")
+
+                if not self._labels_updated_with_units and cons_value.size > 1:
+                    units = self._case_tracker.get_units(cons_name)
+                    self._toggles[iline].label = f"{cons_name} ({units}) {cons_value.shape}"
+
+                source_stream_dict[cons_name] = [float_cons_value]
+                min_max_changed = _update_y_min_max(cons_name, float_cons_value, self.y_min, self.y_max)
+                if min_max_changed:
+                    range = Range1d(
+                        self.y_min[cons_name], self.y_max[cons_name]
                     )
-
-                    graph = Row(self.p, scroll_box, sizing_mode="stretch_both")
-                    doc.add_root(graph)
-                    print(f"after initial setup at {time.time()-start_time}")
-
-            if new_data is None:
-                new_data = self._case_tracker.get_new_case()
-            if new_data:
-                print(f"second if new_data at {time.time()-start_time}")
-                # num_driver_iterations = self._case_tracker._get_num_driver_iterations()
-
-                counter = new_data["counter"]
-                # start 
-                source_stream_dict = {"iteration": [counter]}
-
-                iline = 0
-
-                for obj_name, obj_value in new_data["objs"].items():
-                    float_obj_value = _get_value_for_plotting(obj_value, "objs")
-                    source_stream_dict[obj_name] = [float_obj_value]
-                    min_max_changed = _update_y_min_max(obj_name, float_obj_value, self.y_min, self.y_max)
-                    if min_max_changed:
-                        self.p.y_range.start = self.y_min[obj_name]
-                        self.p.y_range.end = self.y_max[obj_name]
-                    iline += 1
-
-                for desvar_name, desvar_value in new_data["desvars"].items():
-                    float_desvar_value = _get_value_for_plotting(desvar_value, "desvars")  # TODO is this used?
-                    if not self._labels_updated_with_units and desvar_value.size > 1:
-                        units = self._case_tracker.get_units(desvar_name)
-                        self._toggles[iline].label = f"{desvar_name} ({units}) {desvar_value.shape}"
-                    min_max_changed = False
-                    min_max_changed = min_max_changed or _update_y_min_max(desvar_name, np.min(desvar_value), self.y_min, self.y_max)
-                    min_max_changed = min_max_changed or _update_y_min_max(desvar_name, np.max(desvar_value), self.y_min, self.y_max)
-                    if min_max_changed: # TODO fix
-                        range = Range1d(
-                            self.y_min[desvar_name], self.y_max[desvar_name]
-                        )
-                        self.p.extra_y_ranges[f"extra_y_{desvar_name}"] = range
-                    source_stream_dict[f"{desvar_name}_min"] = [np.min(desvar_value)]
-                    source_stream_dict[f"{desvar_name}_max"] = [np.max(desvar_value)]
-                    iline += 1
-
-                for cons_name, cons_value in new_data["cons"].items():
-                    float_cons_value = _get_value_for_plotting(cons_value, "cons")
-
-                    if not self._labels_updated_with_units and cons_value.size > 1:
-                        units = self._case_tracker.get_units(cons_name)
-                        self._toggles[iline].label = f"{cons_name} ({units}) {cons_value.shape}"
-
-                    source_stream_dict[cons_name] = [float_cons_value]
-                    min_max_changed = _update_y_min_max(cons_name, float_cons_value, self.y_min, self.y_max)
-                    if min_max_changed:
-                        range = Range1d(
-                            self.y_min[cons_name], self.y_max[cons_name]
-                        )
-                        self.p.extra_y_ranges[f"extra_y_{cons_name}"] = range
-                    iline += 1
-                self._source.stream(source_stream_dict)
-                self._labels_updated_with_units = True 
+                    self.p.extra_y_ranges[f"extra_y_{cons_name}"] = range
+                iline += 1
+            self._source.stream(source_stream_dict)
+            self._labels_updated_with_units = True 
+            # end of update method
 
         doc.add_periodic_callback(update, callback_period)
         doc.title = "OpenMDAO Optimization"
@@ -813,16 +805,22 @@ class RealTimeOptPlot(object):
                 visible=visible,
             )
         else:
+            if var_type == "desvars":
+                y_name = f"{varname}_min"
+            else:
+                y_name = varname
             line = self.p.line(
                 x="iteration",
-                y=varname,
+                y=y_name,
                 line_width=3,
                 line_dash=line_dash,
                 source=self._source,
                 color=color,
                 visible=visible,
             )
-        if var_type != "objs":
+        if var_type == "desvars":
+            line.y_range_name=f"extra_y_{varname}_min"
+        elif var_type == "cons":
             line.y_range_name=f"extra_y_{varname}"
         self.lines.append(line)
         if not use_varea:
@@ -838,17 +836,21 @@ class RealTimeOptPlot(object):
             self.p.add_tools(hover)
 
 
-    def _make_axis(self, varname, plot_value, units):
+    def _make_axis(self, var_type, varname, plot_value, units):
         # Make axis for this variable on the right
+        if var_type == "desvars":
+            y_range_name = f"extra_y_{varname}_min"
+        else:
+            y_range_name = f"extra_y_{varname}"
         extra_y_axis = LinearAxis(
-            y_range_name=f"extra_y_{varname}",
+            y_range_name=y_range_name,
             axis_label=f"{varname} ({units})",
             axis_label_text_font_size="20px",
             visible=False,
         )
         self._axes.append(extra_y_axis)
         self.p.add_layout(extra_y_axis, "right")
-        self.p.extra_y_ranges[f"extra_y_{varname}"] = Range1d(
+        self.p.extra_y_ranges[y_range_name] = Range1d(
             plot_value - 1, plot_value + 1
         )
 
