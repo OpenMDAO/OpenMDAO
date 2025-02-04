@@ -428,6 +428,7 @@ def get_return_names(func):
         def __init__(self, func):
             super().__init__()
             self._ret_infos = []
+            self.fstack = []
             self.visit(ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec'))
 
         def get_return_names(self):
@@ -462,6 +463,22 @@ def get_return_names(func):
                     self._ret_infos[-1].append(_get_return_name(n))
             else:
                 self._ret_infos[-1].append(_get_return_name(node.value))
+
+        def visit_FunctionDef(self, node):
+            """
+            Visit a FunctionDef node.
+
+            Parameters
+            ----------
+            node : ASTnode
+                The function definition node being visited.
+            """
+            if self.fstack:
+                return  # skip nested functions
+            self.fstack.append(node)
+            for stmt in node.body:
+                self.visit(stmt)
+            self.fstack.pop()
 
     return _FuncRetNameCollector(func).get_return_names()
 

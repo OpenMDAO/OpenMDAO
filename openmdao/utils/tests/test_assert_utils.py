@@ -82,6 +82,9 @@ J_fd - J_fwd:
 [[-36.]]
 """.strip()
 
+        if np.__version__.split('.')[0] > '1':
+            expected = expected.replace('difference:', 'difference among violations:')
+
         try:
             assert_check_partials(data, atol=1.e-6, rtol=1.e-6, verbose=True)
         except Exception as err:
@@ -261,6 +264,8 @@ J_fd - J_fwd:
 [[nan]]
 """.strip()
 
+        if np.__version__.split('.')[0] > '1':
+            expected = expected.replace('difference:', 'difference among violations:')
 
         try:
             assert_check_partials(data, atol=1.e-6, rtol=1.e-6, verbose=True)

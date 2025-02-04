@@ -6758,7 +6758,7 @@ class System(object, metaclass=SystemMetaclass):
         """
         return ()
 
-    def _setup_jax(self, from_group=False):
+    def _setup_jax(self):
         pass
 
     def _sys_tree_visitor(self, func, predicate=None, recurse=True, include_self=True,

@@ -92,9 +92,7 @@ def register_jax_component(comp_class):
                                   f'\nCannot register class {comp_class} as a jax jit-compatible '
                                   f'component.')
 
-    jax.tree_util.register_pytree_node(comp_class,
-                                       comp_class._tree_flatten,
-                                       comp_class._tree_unflatten)
+    _jax_register_pytree_class(comp_class)
     return comp_class
 
 
@@ -332,7 +330,8 @@ class CompJaxifyBase(ast.NodeTransformer):
         # arg["name"] with name.
 
         # NOTE: this will only work if the subscript is a string constant. If the subscript is a
-        # variable or some other expression, then we don't modify it.
+        # variable or some other expression, then we don't modify it and the conversion will
+        # likely fail.
         if (isinstance(node.value, ast.Name) and node.value.id in self._orig_args and
                 isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str)):
             return ast.copy_location(ast.Name(id=_fixname(node.slice.value), ctx=node.ctx), node)
@@ -778,16 +777,12 @@ else:
         """
         Register a class with jax so that it can be used with jax.jit.
 
+        This can be called after instantiating the class if necessary.
+
         Parameters
         ----------
         cls : class
             The class to be registered.
-        name : str
-            The name of the class.
-        bases : tuple
-            The base classes of the class.
-        attrs : dict
-            The attributes of the class.
         """
         global _registered_classes
         if cls not in _registered_classes:
