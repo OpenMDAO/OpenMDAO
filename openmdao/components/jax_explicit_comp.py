@@ -206,6 +206,23 @@ class JaxExplicitComponent(ExplicitComponent):
         return _compute_sparsity(self, direction)
 
     def _get_tangents(self, direction, coloring=None):
+        """
+        Get the tangents for the inputs or outputs.
+
+        If coloring is not None, then the tangents will be compressed based on the coloring.
+
+        Parameters
+        ----------
+        direction : str
+            The direction to get the tangents for.
+        coloring : Coloring
+            The coloring to use.
+
+        Returns
+        -------
+        tuple
+            The tangents.
+        """
         if self._tangents[direction] is None:
             if direction == 'fwd':
                 self._tangents[direction] = get_vmap_tangents(tuple(self._inputs.values()),
