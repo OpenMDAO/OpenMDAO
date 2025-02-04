@@ -137,7 +137,7 @@ jobs:
       - name: Install MacOS-specific dependencies
         if: matrix.OS == 'macos-13'
         run: |
-          conda install compilers swig 'superlu<7'
+          conda install compilers swig
 
       - name: Install NumPy/SciPy
         run: |
@@ -162,7 +162,7 @@ jobs:
           if [[ "${{ matrix.NUMPY }}" == "<2" ]]; then
             conda install mpich mpi4py petsc4py=3.21.2 -q -y
           else
-            conda install mpich mpi4py petsc4py -q -y
+            conda install mpich mpi4py petsc4py=3.22.2 -q -y
           fi
 
           echo "============================================================="
