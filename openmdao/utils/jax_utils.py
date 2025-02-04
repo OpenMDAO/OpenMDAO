@@ -793,238 +793,7 @@ else:
             _registered_classes.add(cls)
 
 
-# we define compute_partials here instead of making this the base class version as we
-# did with compute, because the existence of a compute_partials method that is not the
-# base class method is used to determine if a given component computes its own partials.
-def compute_partials(inst, inputs, partials, discrete_inputs=None):
-    """
-    Compute sub-jacobian parts. The model is assumed to be in an unscaled state.
-
-    Parameters
-    ----------
-    inst : ImplicitComponent
-        The component instance.
-    inputs : Vector
-        Unscaled, dimensional input variables read via inputs[key].
-    partials : Jacobian
-        Sub-jac components written to partials[output_name, input_name]..
-    discrete_inputs : dict or None
-        If not None, dict containing discrete input values.
-    """
-    deriv_vals = inst._get_jac_func()(*inst._get_compute_primal_invals(inputs,
-                                                                       inst._discrete_inputs))
-    nested_tup = isinstance(deriv_vals, tuple) and len(deriv_vals) > 0 and \
-        isinstance(deriv_vals[0], tuple)
-
-    nof = len(inst._var_rel_names['output'])
-    for ofidx, ofname in enumerate(inst._var_rel_names['output']):
-        ofmeta = inst._var_rel2meta[ofname]
-        for wrtidx, wrtname in enumerate(inst._var_rel_names['input']):
-            key = (ofname, wrtname)
-            if key not in partials:
-                # FIXME: this means that we computed a derivative that we didn't need
-                continue
-
-            wrtmeta = inst._var_rel2meta[wrtname]
-            dvals = deriv_vals
-            # if there's only one 'of' value, we only take the indexed value if the
-            # return value of compute_primal is single entry tuple. If a single array or
-            # scalar is returned, we don't apply the 'of' index.
-            if nof > 1 or nested_tup:
-                dvals = dvals[ofidx]
-
-            dvals = dvals[wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
-
-            sjmeta = partials.get_metadata(key)
-            rows = sjmeta['rows']
-            if rows is None:
-                partials[ofname, wrtname] = dvals
-            else:
-                partials[ofname, wrtname] = dvals[rows, sjmeta['cols']]
-
-
-def compute_jacvec_product(inst, inputs, d_inputs, d_outputs, mode, discrete_inputs=None):
-    r"""
-    Compute jac-vector product. The model is assumed to be in an unscaled state.
-
-    If mode is:
-        'fwd': d_inputs \|-> d_outputs
-
-        'rev': d_outputs \|-> d_inputs
-
-    Parameters
-    ----------
-    inst : ImplicitComponent
-        The component instance.
-    inputs : Vector
-        Unscaled, dimensional input variables read via inputs[key].
-    d_inputs : Vector
-        See inputs; product must be computed only if var_name in d_inputs.
-    d_outputs : Vector
-        See outputs; product must be computed only if var_name in d_outputs.
-    mode : str
-        Either 'fwd' or 'rev'.
-    discrete_inputs : dict or None
-        If not None, dict containing discrete input values.
-    """
-    if mode == 'fwd':
-        dx = tuple(d_inputs.values())
-        full_invals = tuple(inst._get_compute_primal_invals(inputs, discrete_inputs))
-        x = full_invals[:len(dx)]
-        other = full_invals[len(dx):]
-        _, deriv_vals = jax.jvp(lambda *args: inst.compute_primal(*args, *other),
-                                primals=x, tangents=dx)
-        d_outputs.set_vals(deriv_vals)
-    else:
-        inhash = ((inputs.get_hash(),) + tuple(inst._discrete_inputs.values()) +
-                  inst.get_self_statics())
-        if inhash != inst._vjp_hash:
-            ncont_ins = d_inputs.nvars()
-            full_invals = tuple(inst._get_compute_primal_invals(inputs, discrete_inputs))
-            x = full_invals[:ncont_ins]
-            other = full_invals[ncont_ins:]
-            # recompute vjp function if inputs have changed
-            _, inst._vjp_fun = jax.vjp(lambda *args: inst.compute_primal(*args, *other), *x)
-            inst._vjp_hash = inhash
-
-        if inst._compute_primal_returns_tuple:
-            deriv_vals = inst._vjp_fun(tuple(d_outputs.values()) +
-                                       tuple(inst._discrete_outputs.values()))
-        else:
-            deriv_vals = inst._vjp_fun(tuple(d_outputs.values())[0])
-
-        d_inputs.set_vals(deriv_vals)
-
-
-# we define linearize here instead of making this the base class version as we
-# did with apply_nonlinear, because the existence of a linearize method that is not the
-# base class method is used to determine if a given component computes its own partials.
-def linearize(inst, inputs, outputs, partials, discrete_inputs=None, discrete_outputs=None):
-    """
-    Compute sub-jacobian parts and any applicable matrix factorizations.
-
-    The model is assumed to be in an unscaled state.
-
-    Parameters
-    ----------
-    inst : ImplicitComponent
-        The component instance.
-    inputs : Vector
-        Unscaled, dimensional input variables read via inputs[key].
-    outputs : Vector
-        Unscaled, dimensional output variables read via outputs[key].
-    partials : partial Jacobian
-        Sub-jac components written to jacobian[output_name, input_name].
-    discrete_inputs : dict or None
-        If not None, dict containing discrete input values.
-    discrete_outputs : dict or None
-        If not None, dict containing discrete output values.
-    """
-    deriv_vals = inst._get_jac_func()(*inst._get_compute_primal_invals(inputs, outputs,
-                                                                       discrete_inputs))
-    nested_tup = isinstance(deriv_vals, tuple) and len(deriv_vals) > 0 and \
-        isinstance(deriv_vals[0], tuple)
-
-    nof = len(inst._var_rel_names['output'])
-    ofidx = len(inst._discrete_outputs) - 1
-    for ofname in inst._var_rel_names['output']:
-        ofidx += 1
-        ofmeta = inst._var_rel2meta[ofname]
-        for wrtidx, wrtname in enumerate(chain(inst._var_rel_names['input'],
-                                               inst._var_rel_names['output'])):
-            key = (ofname, wrtname)
-            if key not in partials:
-                # FIXME: this means that we computed a derivative that we didn't need
-                continue
-
-            wrtmeta = inst._var_rel2meta[wrtname]
-            dvals = deriv_vals
-            # if there's only one 'of' value, we only take the indexed value if the
-            # return value of compute_primal is single entry tuple. If a single array or
-            # scalar is returned, we don't apply the 'of' index.
-            if nof > 1 or nested_tup:
-                dvals = dvals[ofidx]
-
-            # print(ofidx, ofname, ofmeta['shape'], wrtidx, wrtname, wrtmeta['shape'],
-            #       'subjac_shape', dvals[wrtidx].shape)
-            dvals = dvals[wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
-
-            sjmeta = partials.get_metadata(key)
-            if sjmeta['rows'] is None:
-                partials[ofname, wrtname] = dvals
-            else:
-                partials[ofname, wrtname] = dvals[sjmeta['rows'], sjmeta['cols']]
-
-
-def apply_linear(inst, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
-    r"""
-    Compute jac-vector product. The model is assumed to be in an unscaled state.
-
-    If mode is:
-        'fwd': (d_inputs, d_outputs) \|-> d_residuals
-
-        'rev': d_residuals \|-> (d_inputs, d_outputs)
-
-    Parameters
-    ----------
-    inst : ImplicitComponent
-        The component instance.
-    inputs : Vector
-        Unscaled, dimensional input variables read via inputs[key].
-    outputs : Vector
-        Unscaled, dimensional output variables read via outputs[key].
-    d_inputs : Vector
-        See inputs; product must be computed only if var_name in d_inputs.
-    d_outputs : Vector
-        See outputs; product must be computed only if var_name in d_outputs.
-    d_residuals : Vector
-        See outputs.
-    mode : str
-        Either 'fwd' or 'rev'.
-    """
-    if mode == 'fwd':
-        dx = tuple(chain(d_inputs.values(), d_outputs.values()))
-        full_invals = tuple(inst._get_compute_primal_invals(inputs, outputs, inst._discrete_inputs))
-        x = full_invals[:len(dx)]
-        other = full_invals[len(dx):]
-        _, deriv_vals = jax.jvp(lambda *args: inst.compute_primal(*args, *other),
-                                primals=x, tangents=dx)
-        if isinstance(deriv_vals, tuple):
-            d_residuals.set_vals(deriv_vals)
-        else:
-            d_residuals.asarray()[:] = deriv_vals.flatten()
-    else:
-        inhash = (inputs.get_hash(), outputs.get_hash()) + tuple(inst._discrete_inputs.values())
-        if inhash != inst._vjp_hash:
-            # recompute vjp function only if inputs or outputs have changed
-            dx = tuple(chain(d_inputs.values(), d_outputs.values()))
-            full_invals = tuple(inst._get_compute_primal_invals(inputs, outputs,
-                                                                inst._discrete_inputs))
-            x = full_invals[:len(dx)]
-            other = full_invals[len(dx):]
-            _, inst._vjp_fun = jax.vjp(lambda *args: inst.compute_primal(*args, *other), *x)
-            inst._vjp_hash = inhash
-
-            if inst._compute_primals_out_shape is None:
-                shape = jax.eval_shape(lambda *args: inst.compute_primal(*args, *other), *x)
-                if isinstance(shape, tuple):
-                    shape = (tuple(s.shape for s in shape), True, len(inst._var_rel_names['input']))
-                else:
-                    shape = (shape.shape, False, len(inst._var_rel_names['input']))
-                inst._compute_primals_out_shape = shape
-
-        shape, istup, ninputs = inst._compute_primals_out_shape
-
-        if istup:
-            deriv_vals = (inst._vjp_fun(tuple(d_residuals.values())))
-        else:
-            deriv_vals = inst._vjp_fun(tuple(d_residuals.values())[0])
-
-        d_inputs.set_vals(deriv_vals[:ninputs])
-        d_outputs.set_vals(deriv_vals[ninputs:])
-
-
-def get_vmap_tangents(vals, direction, use_nans=False, returns_tuple=False):
+def get_vmap_tangents(vals, direction, fill=1., returns_tuple=False, coloring=None):
     """
     Return a tuple of tangents values for use with vmap.
 
@@ -1036,11 +805,13 @@ def get_vmap_tangents(vals, direction, use_nans=False, returns_tuple=False):
         List of function input or output values.
     direction : str
         The direction to compute the sparsity in.  It must be 'fwd' or 'rev'.
-    use_nans : bool
-        If True, use nans instead of ones for seeds.
+    fill : float
+        The value to fill nonzero entries in the tangent with.
     returns_tuple : bool
         If True, the compute_primal method returns a tuple.  One item tuples require special
         handling.
+    coloring : Coloring or None
+        A Coloring object that contains coloring information including nonzero indices.
 
     Returns
     -------
@@ -1050,18 +821,28 @@ def get_vmap_tangents(vals, direction, use_nans=False, returns_tuple=False):
     sizes = [np.size(a) for a in vals]
     totsize = np.sum(sizes)
 
-    if use_nans:
+    if coloring is None:
+        # start with a full diagonal matrix, which allows us to set a seed for each input value
+        # in parallel.
         arr = np.empty(totsize)
-        arr[:] = np.nan
+        arr[:] = fill
         tangent = np.diag(arr)
     else:
-        tangent = np.eye(totsize)
+        # using coloring, so 'compress' the diagonal matrix to one with ncolors columns.
+        # columns are the batching dimension for vmap and each column also corresponds to a color.
+        colors = list(coloring.color_iter(direction))
+        tangent = np.zeros((totsize, len(colors)))
+        for i, nzs in enumerate(colors):
+            tangent[nzs, i] = 1.
 
+    # take the 2D tangent array and reshape it to match the shape of each input variable.
+    # (with the additional batching dimension as the last axis)
     tangents = []
     start = end = 0
     for v in vals:
         end += np.size(v)
         vartan = tangent[start:end]  # get rows corresponding to each input
+        # take each flat column and reshape it to the shape of the input
         vartan.shape = np.shape(v) + (totsize,)
         tangents.append(vartan)
         start = end
@@ -1072,56 +853,6 @@ def get_vmap_tangents(vals, direction, use_nans=False, returns_tuple=False):
         tangents = tuple(tangents)
 
     return tangents
-
-
-# def get_vmap_colored_tangents(coloring, direction, use_nans=False):
-#     """
-#     Return compressed tangent (or cotangent) matrix for use with vmap based on a Coloring object.
-
-#     This function computes batched tangents similar to get_vmap_tangents,
-#     but groups columns by color. Each column in the returned matrix corresponds
-#     to a color group, with ones at the positions of variables belonging to that color
-#     and zeros (or NaNs if use_nans is True) elsewhere.
-
-#     Parameters
-#     ----------
-#     coloring : Coloring
-#         A Coloring object that contains coloring information including nonzero indices.
-#     direction : str
-#         Derivative computation direction ('fwd' for forward mode, 'rev' for reverse mode).
-#     use_nans : bool, optional
-#         If True, the inactive entries in the tangent matrix are filled with NaNs. Default is
-#         False.
-
-#     Returns
-#     -------
-#     numpy.ndarray
-#         A 2D array of shape (n, num_colors) where n is the size of the variable vector (number of
-#         columns for 'fwd' or rows for 'rev') and num_colors is the number of color groups. This
-#         array can be passed as batched tangents to jax.vmap(jvp(...)).
-#     """
-#     # Determine the size based on the derivative direction.
-#     if direction == 'fwd':
-#         size = coloring._shape[1]  # number of input columns
-#     else:  # 'rev'
-#         size = coloring._shape[0]  # number of output rows
-
-#     tangent_cols = []
-#     # Iterate over each color group using the tangent_iter method of the Coloring object.
-#     # Each iteration provides a one-hot vector (via 'arr') for that color group.
-#     for arr, nzs, nzparts in coloring.tangent_iter(direction, arr=None, trans=None):
-#         if use_nans:
-#             tmp = np.empty_like(arr)
-#             tmp[:] = np.nan
-#             tmp[nzs] = 1
-#         else:
-#             tmp = np.zeros_like(arr)
-#             tmp[nzs] = 1
-#         tangent_cols.append(tmp.copy())
-
-#     # Stack the individual tangent vectors as columns into a compressed tangent matrix.
-#     tangent = np.column_stack(tangent_cols)
-#     return tangent
 
 
 def _compute_sparsity(self, direction=None):
@@ -1170,7 +901,7 @@ def _compute_sparsity(self, direction=None):
         differentiable_part = jax.jit(differentiable_part)
 
     if direction == 'fwd':
-        tangents = get_vmap_tangents(icontvals, 'fwd', use_nans=True,
+        tangents = get_vmap_tangents(icontvals, 'fwd', fill=np.nan,
                                      returns_tuple=self._compute_primal_returns_tuple)
 
         # make a function that takes only a tuple of tangents to make it easier to vectorize
@@ -1189,7 +920,7 @@ def _compute_sparsity(self, direction=None):
         def vjp_at_point(cotangent):
             return vjp_fn(cotangent)
 
-        cotangents = get_vmap_tangents(tuple(self._outputs.values()), 'rev', use_nans=True,
+        cotangents = get_vmap_tangents(tuple(self._outputs.values()), 'rev', fill=np.nan,
                                        returns_tuple=self._compute_primal_returns_tuple)
 
         # Batch over last axis of cotangents

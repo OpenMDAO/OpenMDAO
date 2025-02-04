@@ -78,15 +78,18 @@ _use_total_sparsity = True
 # new partial/semi-total coloring.
 _use_partial_sparsity = True
 
-# If True, ignore use_fixed_coloring if the coloring passed to it is _STD_COLORING_FNAME.
+# If True, ignore use_fixed_coloring if the coloring passed to it is STD_COLORING_FNAME.
 # This is used when the 'openmdao partial_coloring' or 'openmdao total_coloring' commands
 # are running, because the intent there is to generate new coloring files regardless of
 # whether use_fixed_coloring was called.
 _force_dyn_coloring = False
 
 # used as an indicator that we should automatically name coloring file based on class module
-# path or system pathname
-_STD_COLORING_FNAME = object()
+# path or system pathname. Use isinstance to check values to avoid any weirdness with using 'is a'
+# across processes.
+class STD_COLORING_FNAME(object):
+    pass
+
 
 _default_coloring_imagefile = 'coloring.png'
 
@@ -365,8 +368,7 @@ class ColoringMeta(object):
             Prefix for warning/error messages.
         """
         if coloring is None:
-            self._coloring = None
-            self._failed = False
+            self.reset_coloring()
         elif self._pct_improvement_good(coloring, msginfo):
             self._coloring = coloring
             self._failed = False
@@ -420,6 +422,18 @@ class ColoringMeta(object):
             Copy of the metadata.
         """
         return type(self)(**dict(self))
+
+    def use_coloring(self):
+        """
+        Return True if coloring should be used.
+        """
+        return not self._failed and self.coloring is not None
+
+    def has_static_coloring(self):
+        """
+        Return True if a static coloring is available.
+        """
+        return isinstance(self.static, (str, STD_COLORING_FNAME, Coloring))
 
 
 class Partial_ColoringMeta(ColoringMeta):
@@ -735,6 +749,8 @@ class Coloring(object):
     def color_nonzero_iter(self, direction):
         """
         Given a direction, yield an iterator over (columns, nz_rows) or (rows, nz_columns).
+
+        nz_rows and nz_cols are lists of nonzero rows/columns for each column/row.
 
         Parameters
         ----------

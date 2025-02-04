@@ -1428,7 +1428,7 @@ class Driver(object, metaclass=DriverMetaclass):
         self._coloring_info.randomize_seeds = randomize_seeds
         self._coloring_info.direct = direct
 
-    def use_fixed_coloring(self, coloring=coloring_mod._STD_COLORING_FNAME):
+    def use_fixed_coloring(self, coloring=coloring_mod.STD_COLORING_FNAME()):
         """
         Tell the driver to use a precomputed coloring.
 
@@ -1439,7 +1439,8 @@ class Driver(object, metaclass=DriverMetaclass):
             determined automatically.
         """
         if self.supports['simultaneous_derivatives']:
-            if coloring_mod._force_dyn_coloring and coloring is coloring_mod._STD_COLORING_FNAME:
+            if coloring_mod._force_dyn_coloring and isinstance(coloring,
+                                                               coloring_mod.STD_COLORING_FNAME):
                 # force the generation of a dynamic coloring this time
                 self._coloring_info.dynamic = True
                 self._coloring_info.static = None
@@ -1487,12 +1488,11 @@ class Driver(object, metaclass=DriverMetaclass):
         else:
             coloring = info.coloring
 
-            if coloring is None and (static is coloring_mod._STD_COLORING_FNAME or
-                                     isinstance(static, str)):
-                if static is coloring_mod._STD_COLORING_FNAME:
-                    fname = self._get_total_coloring_fname(mode='input')
-                else:
+            if coloring is None and isinstance(static, (str, coloring_mod.STD_COLORING_FNAME)):
+                if isinstance(static, str):
                     fname = static
+                else:
+                    fname = self._get_total_coloring_fname(mode='input')
 
                 print(f"loading total coloring from file {fname}")
                 coloring = info.coloring = coloring_mod.Coloring.load(fname)

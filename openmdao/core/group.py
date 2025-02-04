@@ -809,7 +809,6 @@ class Group(System):
         # the connections.
         self._setup_global_connections()
         self._setup_dynamic_shapes()
-        self._setup_jax()
 
         self._top_level_post_connections()
 
@@ -1095,6 +1094,8 @@ class Group(System):
             self._setup_partials()
 
         self._setup_vectors(self._get_root_vectors())
+
+        self._setup_jax()
 
         self._fd_rev_xfer_correction_dist = {}
 

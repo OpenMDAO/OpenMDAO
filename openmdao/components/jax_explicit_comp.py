@@ -7,9 +7,8 @@ from types import MethodType
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.jax_utils import jax, jit, compute_partials as _jax_compute_partials, \
-    compute_jacvec_product as _jax_compute_jacvec_product, ReturnChecker, \
-    _jax_register_pytree_class, _compute_sparsity
+from openmdao.utils.jax_utils import jax, jit, ReturnChecker, \
+    _jax_register_pytree_class, _compute_sparsity, get_vmap_tangents
 
 
 class JaxExplicitComponent(ExplicitComponent):
@@ -27,6 +26,8 @@ class JaxExplicitComponent(ExplicitComponent):
     ----------
     _compute_primal_returns_tuple : bool
         Whether the compute_primal method returns a tuple.
+    _tangents : dict
+        The tangents for the inputs and outputs.
     """
 
     def __init__(self, fallback_derivs_method='fd', **kwargs):  # noqa
@@ -35,6 +36,7 @@ class JaxExplicitComponent(ExplicitComponent):
         super().__init__(**kwargs)
 
         self._compute_primal_returns_tuple = False
+        self._tangents = {'fwd': None, 'rev': None}
 
         # if derivs_method is explicitly passed in, just use it
         if 'derivs_method' in kwargs:
@@ -50,15 +52,25 @@ class JaxExplicitComponent(ExplicitComponent):
     def _setup_jax(self):
         """
         Set up the jax interface for this component.
+
+        This happens in final_setup after all var sizes and partials are set.
         """
         if self.compute_primal is None:
             raise RuntimeError(f"{self.msginfo}: compute_primal is not defined for this component.")
 
+        use_coloring = self._coloring_info.use_coloring()
+
         if self.matrix_free is True:
-            self.compute_jacvec_product = MethodType(_jax_compute_jacvec_product, self)
+            if use_coloring:
+                issue_warning(f"{self.msginfo}: coloring has been set but matrix_free is True, "
+                              "so coloring will be ignored.")
+            self.compute_jacvec_product = MethodType(compute_jacvec_product, self)
         else:
-            self.compute_partials = MethodType(_jax_compute_partials, self)
-            self._has_compute_partials = True
+            if use_coloring:
+                pass
+            else:
+                self.compute_partials = MethodType(compute_partials, self)
+                self._has_compute_partials = True
 
         # determine if the compute_primal method returns a tuple
         self._compute_primal_returns_tuple = ReturnChecker(self.compute_primal).returns_tuple()
@@ -76,8 +88,11 @@ class JaxExplicitComponent(ExplicitComponent):
         """
         Return the jacobian function for this component.
 
-        In forward mode, jax.jacfwd is used, and in reverse mode, jax.jacrev is used.  The direction
-        is chosen automatically based on the sizes of the inputs and outputs.
+        In forward mode without coloring, jax.jacfwd is used, and in reverse mode without coloring,
+        jax.jacrev is used.
+
+        If coloring is used, then the jacobian is computed using vmap with jvp or vjp depending on
+        the direction, with the tangents determined by the coloring information.
 
         Returns
         -------
@@ -87,18 +102,61 @@ class JaxExplicitComponent(ExplicitComponent):
         # TODO: modify this to use relevance and possibly compile multiple jac functions depending
         # on DV/response so that we don't compute any derivatives that are always zero.
         if self._jac_func_ is None:
-            fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
-            nstatic = len(self._discrete_inputs)
-            wrt_idxs = list(range(1, len(self._var_abs2meta['input']) + 1))
-            self._jac_func_ = MethodType(fjax(self.compute_primal.__func__, argnums=wrt_idxs), self)
+            # if no coloring just just jacfwd or jacrev
+            if self._coloring_info.coloring is None and not self._coloring_info.dynamic:
+                fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
+                nstatic = len(self._discrete_inputs)
+                wrt_idxs = list(range(1, len(self._var_abs2meta['input']) + 1))
+                self._jac_func_ = MethodType(fjax(self.compute_primal.__func__,
+                                                  argnums=wrt_idxs), self)
 
-            if self.options['use_jit']:
-                static_argnums = tuple(range(1 + len(wrt_idxs), 1 + len(wrt_idxs) + nstatic))
-                self._jac_func_ = MethodType(jit(self._jac_func_.__func__,
-                                                 static_argnums=static_argnums),
-                                             self)
+                if self.options['use_jit']:
+                    static_argnums = tuple(range(1 + len(wrt_idxs), 1 + len(wrt_idxs) + nstatic))
+                    self._jac_func_ = MethodType(jit(self._jac_func_.__func__,
+                                                     static_argnums=static_argnums), self)
+            else:
+                if self._coloring_info.coloring is None:
+                    # need to dynamically compute the coloring first
+                    self._compute_coloring()
+
+                if self.best_partial_deriv_direction() == 'fwd':
+                    self._jac_func_ = self._jacfwd_colored
+                else:
+                    self._jac_func_ = self._jacrev_colored
 
         return self._jac_func_
+
+    def _jacfwd_colored(self, inputs, partials, discrete_inputs=None):
+        """
+        Compute the forward jacobian using vmap with jvp.
+
+        Parameters
+        ----------
+        inputs : dict
+            The inputs to the component.
+        partials : dict
+            The partials to compute.
+        discrete_inputs : dict or None
+            If not None, dict containing discrete input values.
+        """
+        deriv_vals = self._get_jac_func()(inputs, partials, discrete_inputs)
+        self.jax_derivs2partials(deriv_vals, partials)
+
+    def _jacrev_colored(self, inputs, partials, discrete_inputs=None):
+        """
+        Compute the reverse jacobian using vmap with vjp.
+
+        Parameters
+        ----------
+        inputs : dict
+            The inputs to the component.
+        partials : dict
+            The partials to compute.
+        discrete_inputs : dict or None
+            If not None, dict containing discrete input values.
+        """
+        deriv_vals = self._get_jac_func()(inputs, partials, discrete_inputs)
+        self.jax_derivs2partials(deriv_vals, partials)
 
     def compute_sparsity(self, direction=None):
         """
@@ -115,3 +173,130 @@ class JaxExplicitComponent(ExplicitComponent):
             The sparsity of the Jacobian.
         """
         return _compute_sparsity(self, direction)
+
+    def _get_tangents(self, direction):
+        if self._tangents[direction] is None:
+            if direction == 'fwd':
+                self._tangents[direction] = get_vmap_tangents(tuple(self._inputs.values()),
+                                                              direction, fill=1.)
+            else:
+                self._tangents[direction] = get_vmap_tangents(tuple(self._outputs.values()),
+                                                              direction, fill=1.)
+        return self._tangents[direction]
+
+    def jax_derivs2partials(self, deriv_vals, partials):
+        """
+        Copy JAX derivatives into partials.
+
+        Parameters
+        ----------
+        deriv_vals : tuple
+            The derivatives.
+        partials : dict
+            The partials to copy the derivatives into, keyed by (of_name, wrt_name).
+        """
+        nested_tup = isinstance(deriv_vals, tuple) and len(deriv_vals) > 0 and \
+            isinstance(deriv_vals[0], tuple)
+        nof = len(self._var_rel_names['output'])
+
+        for ofidx, ofname in enumerate(self._var_rel_names['output']):
+            ofmeta = self._var_rel2meta[ofname]
+            for wrtidx, wrtname in enumerate(self._var_rel_names['input']):
+                key = (ofname, wrtname)
+                if key not in partials:
+                    # FIXME: this means that we computed a derivative that we didn't need
+                    continue
+
+                wrtmeta = self._var_rel2meta[wrtname]
+                dvals = deriv_vals
+                # if there's only one 'of' value, we only take the indexed value if the
+                # return value of compute_primal is single entry tuple. If a single array or
+                # scalar is returned, we don't apply the 'of' index.
+                if nof > 1 or nested_tup:
+                    dvals = dvals[ofidx]
+
+                dvals = dvals[wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
+
+                sjmeta = partials.get_metadata(key)
+                rows = sjmeta['rows']
+                if rows is None:
+                    partials[ofname, wrtname] = dvals
+                else:
+                    partials[ofname, wrtname] = dvals[rows, sjmeta['cols']]
+
+
+# we define compute_partials here instead of making this the base class version as we
+# did with compute, because the existence of a compute_partials method that is not the
+# base class method is used to determine if a given component computes its own partials.
+def compute_partials(self, inputs, partials, discrete_inputs=None):
+    """
+    Compute sub-jacobian parts. The model is assumed to be in an unscaled state.
+
+    Parameters
+    ----------
+    self : ImplicitComponent
+        The component instance.
+    inputs : Vector
+        Unscaled, dimensional input variables read via inputs[key].
+    partials : Jacobian
+        Sub-jac components written to partials[output_name, input_name]..
+    discrete_inputs : dict or None
+        If not None, dict containing discrete input values.
+    """
+    deriv_vals = self._get_jac_func()(*self._get_compute_primal_invals(inputs,
+                                                                       self._discrete_inputs))
+    self.jax_derivs2partials(deriv_vals, partials)
+
+
+
+def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode, discrete_inputs=None):
+    r"""
+    Compute jac-vector product (explicit). The model is assumed to be in an unscaled state.
+
+    If mode is:
+        'fwd': d_inputs \|-> d_outputs
+
+        'rev': d_outputs \|-> d_inputs
+
+    Parameters
+    ----------
+    self : ExplicitComponent
+        The component instance.
+    inputs : Vector
+        Unscaled, dimensional input variables read via inputs[key].
+    d_inputs : Vector
+        See inputs; product must be computed only if var_name in d_inputs.
+    d_outputs : Vector
+        See outputs; product must be computed only if var_name in d_outputs.
+    mode : str
+        Either 'fwd' or 'rev'.
+    discrete_inputs : dict or None
+        If not None, dict containing discrete input values.
+    """
+    if mode == 'fwd':
+        dx = tuple(d_inputs.values())
+        full_invals = tuple(self._get_compute_primal_invals(inputs, discrete_inputs))
+        x = full_invals[:len(dx)]
+        other = full_invals[len(dx):]
+        _, deriv_vals = jax.jvp(lambda *args: self.compute_primal(*args, *other),
+                                primals=x, tangents=dx)
+        d_outputs.set_vals(deriv_vals)
+    else:
+        inhash = ((inputs.get_hash(),) + tuple(self._discrete_inputs.values()) +
+                  self.get_self_statics())
+        if inhash != self._vjp_hash:
+            ncont_ins = d_inputs.nvars()
+            full_invals = tuple(self._get_compute_primal_invals(inputs, discrete_inputs))
+            x = full_invals[:ncont_ins]
+            other = full_invals[ncont_ins:]
+            # recompute vjp function if inputs have changed
+            _, self._vjp_fun = jax.vjp(lambda *args: self.compute_primal(*args, *other), *x)
+            self._vjp_hash = inhash
+
+        if self._compute_primal_returns_tuple:
+            deriv_vals = self._vjp_fun(tuple(d_outputs.values()) +
+                                       tuple(self._discrete_outputs.values()))
+        else:
+            deriv_vals = self._vjp_fun(tuple(d_outputs.values())[0])
+
+        d_inputs.set_vals(deriv_vals)

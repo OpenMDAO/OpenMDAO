@@ -32,7 +32,7 @@ from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len, safe_n
     sparsity_diff_viz, get_sparsity_diff_array
 from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
-    _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
+    STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, \
@@ -1520,7 +1520,7 @@ class System(object, metaclass=SystemMetaclass):
 
         return self._approx_subjac_keys
 
-    def use_fixed_coloring(self, coloring=_STD_COLORING_FNAME, recurse=True):
+    def use_fixed_coloring(self, coloring=STD_COLORING_FNAME(), recurse=True):
         """
         Use a precomputed coloring for this System.
 
@@ -1533,14 +1533,14 @@ class System(object, metaclass=SystemMetaclass):
             If True, set fixed coloring in all subsystems that declare a coloring. Ignored
             if a specific coloring is passed in.
         """
-        if coloring_mod._force_dyn_coloring and coloring is _STD_COLORING_FNAME:
+        if coloring_mod._force_dyn_coloring and isinstance(coloring, STD_COLORING_FNAME):
             self._coloring_info.dynamic = True
             return  # don't use static this time
 
         self._coloring_info.static = coloring
         self._coloring_info.dynamic = False
 
-        if coloring is not _STD_COLORING_FNAME:
+        if not isinstance(coloring, STD_COLORING_FNAME):
             if recurse:
                 issue_warning('recurse was passed to use_fixed_coloring but a specific coloring '
                               'was set, so recurse was ignored.',
@@ -1996,34 +1996,6 @@ class System(object, metaclass=SystemMetaclass):
         if info['method'] is None and self._approx_schemes:
             info['method'] = list(self._approx_schemes)[0]
 
-        # if info.coloring is None:
-        #     # check to see if any approx or jax derivs have been declared
-        #     for meta in self._subjacs_info.values():
-        #         if 'method' in meta and meta['method']:
-        #             break
-        #     else:  # no approx or jax partials found
-        #         method = info['method']
-        #         if self._subjacs_info:
-        #             for meta in self._subjacs_info.values():
-        #                 meta['method'] = method
-
-        #         else:  # declare all derivs as approx
-        #             if not (self._owns_approx_of or self._owns_approx_wrt):
-        #                 issue_warning("No approx or jax partials found but coloring was requested. "
-        #                               "Declaring ALL partials as dense "
-        #                               "(method='{}')".format(info['method']),
-        #                               prefix=self.msginfo, category=DerivativesWarning)
-        #                 try:
-        #                     self.declare_partials('*', '*', method=info['method'])
-        #                 except AttributeError:  # assume system is a group
-        #                     from openmdao.core.component import Component
-        #                     from openmdao.core.indepvarcomp import IndepVarComp
-        #                     from openmdao.components.exec_comp import ExecComp
-        #                     for s in self.system_iter(recurse=True, typ=Component):
-        #                         if not isinstance(s, ExecComp) and not isinstance(s, IndepVarComp):
-        #                             s.declare_partials('*', '*', method=info['method'])
-        #                 self._setup_partials()
-
         if info.coloring is None and info.static is None:
             info.dynamic = True
 
@@ -2130,12 +2102,12 @@ class System(object, metaclass=SystemMetaclass):
             return coloring
 
         static = info.static
-        if static is _STD_COLORING_FNAME or isinstance(static, str):
+        if isinstance(static, (str, STD_COLORING_FNAME)):
             std_fname = self.get_coloring_fname(mode='input')
-            if static is _STD_COLORING_FNAME:
-                fname = std_fname
-            else:
+            if isinstance(static, str):
                 fname = static
+            else:
+                fname = std_fname
             print(f"{self.msginfo}: loading coloring from file {fname}")
             info.coloring = coloring = Coloring.load(fname)
 
@@ -2152,7 +2124,7 @@ class System(object, metaclass=SystemMetaclass):
             approx = self._get_approx_scheme(info['method'])
             # force regen of approx groups during next compute_approximations
             approx._reset()
-        elif isinstance(static, coloring_mod.Coloring):
+        elif isinstance(static, Coloring):
             info.coloring = coloring = static
 
         if coloring is not None:
