@@ -54,6 +54,7 @@ from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_d
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.file_utils import _get_outputs_dir, text2html, get_work_dir
+from openmdao.utils.testing_utils import _fix_comp_check_data
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -1201,24 +1202,17 @@ class Problem(object, metaclass=ProblemMetaclass):
         dict of dicts of dicts
             First key is the component name.
             Second key is the (output, input) tuple of strings.
-            Third key is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev',
-            'rank_inconsistent'].
-            For 'rel error', 'abs error', and 'magnitude' the value is a tuple containing norms for
-            forward - fd, adjoint - fd, forward - adjoint.
-            For 'J_fd', 'J_fwd', 'J_rev' the value is a numpy array representing the computed
-            Jacobian for the three different methods of computation.
+            The third key is one of:
+            'rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev', 'vals_at_max_abs',
+            'vals_at_max_rel', and 'rank_inconsistent'.
+            For 'rel error', 'abs error', 'vals_at_max_abs' and 'vals_at_max_rel' the value is a
+            tuple containing values for forward - fd, adjoint - fd, forward - adjoint. For
+            'magnitude' the value is a tuple indicating the maximum magnitude of values found in
+            Jfwd, Jrev, and Jfd.
             The boolean 'rank_inconsistent' indicates if the derivative wrt a serial variable is
             inconsistent across MPI ranks.
         """
         model = self.model
-
-        # on master, we were doing this:
-        # if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-        #     self.final_setup()
-
-        # model.run_apply_nonlinear()
-
-        # but it seems more correct to run the model first if it hasn't been run yet, correct?
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP or model.iter_count == 0:
             self.run_model()
 
@@ -1357,14 +1351,16 @@ class Problem(object, metaclass=ProblemMetaclass):
         Returns
         -------
         Dict of Dicts of Tuples of Floats
-
             First key:
                 is the (output, input) tuple of strings;
             Second key:
-                is one of ['rel error', 'abs error', 'magnitude', 'fdstep'];
+                'rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev', 'vals_at_max_abs',
+                'vals_at_max_rel', and 'rank_inconsistent'.
 
-            For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
-                forward - fd, adjoint - fd, forward - adjoint.
+            For 'rel error', 'abs error', 'vals_at_max_abs' and 'vals_at_max_rel' the value is a
+            tuple containing values for forward - fd, reverse - fd, forward - reverse. For
+            'magnitude' the value is a tuple indicating the maximum magnitude of values found in
+            Jfwd, Jrev, and Jfd.
         """
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
@@ -1547,7 +1543,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                         # check directional fwd against fd (one must have negative seed)
                         meta['J_fwd'] = total_info.J[:, Jcalc_slices['wrt'][wrt].start]
                         meta['J_fd'].append(Jfd[:, Jcalc_slices['wrt'][wrt].start])
-                        meta['directional_fd_fwd'].append((meta['J_fwd'], meta['J_fd'][-1]))
+                        meta['directional_fd_fwd'].append((meta['J_fd'][-1], meta['J_fwd']))
                     else:  # rev
                         if 'directional_fd_rev' not in meta:
                             meta['directional_fd_rev'] = []
@@ -1562,7 +1558,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                         mhat_dot_m = mhat.dot(m)
 
                         # Dot product test for adjoint validity.
-                        meta['directional_fd_rev'].append((dhat_dot_d, mhat_dot_m))
+                        meta['directional_fd_rev'].append((mhat_dot_m, dhat_dot_d))
                         meta['J_rev'] = dhat_dot_d
                         meta['J_fd'].append(mhat_dot_m)
                 else:
@@ -2539,13 +2535,6 @@ def _fix_check_data(data):
     data : dict
         Dictionary containing derivative information keyed by system name.
     """
-    names = ['J_fd', 'abs error', 'rel error', 'magnitude', 'directional_fd_fwd',
-             'directional_fd_rev']
-
     for sdata in data.values():
         for dct in sdata.values():
-            for name in names:
-                if name in dct:
-                    dct[name] = dct[name][0]
-            if 'steps' in dct:
-                del dct['steps']
+            _fix_comp_check_data(dct)

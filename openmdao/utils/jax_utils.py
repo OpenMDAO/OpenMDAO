@@ -14,8 +14,7 @@ import importlib
 import numpy as np
 
 from openmdao.visualization.tables.table_builder import generate_table
-from openmdao.utils.code_utils import _get_long_name, remove_src_blocks, replace_src_block, \
-    get_partials_deps
+from openmdao.utils.code_utils import _get_long_name, remove_src_blocks, replace_src_block
 from openmdao.utils.file_utils import get_module_path, _load_and_exec
 
 
@@ -1171,6 +1170,7 @@ def to_compute_primal(inst, outfile='stdout', verbose=False):
 
 if __name__ == '__main__':
     import openmdao.api as om
+    from openmdao.utils.code_utils import get_function_deps
 
     def func(x, y):  # noqa: D103
         z = jnp.sin(x) * y
@@ -1178,7 +1178,7 @@ if __name__ == '__main__':
         zz = q + x * 1.5
         return z, zz
 
-    print('partials are:\n', list(get_partials_deps(func, ('z', 'zz'))))
+    print('partials are:\n', list(get_function_deps(func, ('z', 'zz'))))
 
     p = om.Problem()
     comp = p.model.add_subsystem('comp', om.ExecComp('y = 2.0*x', x=np.ones(3), y=np.ones(3)))

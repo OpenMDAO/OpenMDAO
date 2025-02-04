@@ -221,13 +221,16 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6, verbose=False, max_display
                 is the (output, input) tuple of strings;
             Third key:
                 is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev',
-                           'directional_fd_fwd', 'directional_fd_rev', 'directional_fwd_rev',
-                           'rank_inconsistent', 'steps', 'matrix_free', 'directional']
+                           'vals_at_max_abs', 'vals_at_max_rel', 'directional_fd_fwd',
+                           'directional_fd_rev', 'directional_fwd_rev', 'rank_inconsistent',
+                           'matrix_free', 'directional', 'steps', and 'rank_inconsistent'].
 
-            For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
-                forward - fd, adjoint - fd, forward - adjoint.
-            For 'J_fd', 'J_fwd', 'J_rev' the value is: A numpy array representing the computed
+                For 'J_fd', 'J_fwd', 'J_rev' the value is a numpy array representing the computed
                 Jacobian for the three different methods of computation.
+                For 'rel error', 'abs error', 'vals_at_max_abs' and 'vals_at_max_rel' the value is a
+                tuple containing values for forward - fd, reverse - fd, forward - reverse. For
+                'magnitude' the value is a tuple indicating the maximum magnitude of values found in
+                Jfwd, Jrev, and Jfd.
     atol : float
         Absolute error. Default is 1e-6.
     rtol : float
@@ -296,17 +299,24 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6, verbose=False, max_display
                         analytic_found = True
                         try:
                             if fwd and dfwd is not None:
-                                dJfwd, dJfd = dfwd
-                                np.testing.assert_allclose(dJfwd, dJfd, atol=atol, rtol=rtol,
+                                J1, J2 = dfwd
+                                np.testing.assert_allclose(J1, J2, atol=atol, rtol=rtol,
                                                            verbose=False, equal_nan=False)
                             elif not fwd and drev is not None:
-                                dJrev, dJfd = drev
-                                np.testing.assert_allclose(dJrev, dJfd, atol=atol, rtol=rtol,
+                                J1, J2 = drev
+                                np.testing.assert_allclose(J1, J2, atol=atol, rtol=rtol,
                                                            verbose=False, equal_nan=False)
                             else:
-                                np.testing.assert_allclose(J, J_fd, atol=atol, rtol=rtol,
+                                J1, J2 = J, J_fd
+                                np.testing.assert_allclose(J1, J2, atol=atol, rtol=rtol,
                                                            verbose=False, equal_nan=False)
                         except Exception as err:
+                            abserr, relerr = _parse_assert_allclose_error(err.args[0])
+                            if abserr < atol and not (np.any(J1) or np.any(J2)):
+                                # if one array is all zeros and we don't violate the absolute
+                                # tolerance, then don't flag the relative error.
+                                continue
+
                             if verbose:
                                 bad_derivs.append(f"\n{direction} derivatives of '{key[0]}' wrt "
                                                   f"'{key[1]}' do not match finite "
@@ -317,7 +327,6 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6, verbose=False, max_display
                                         bad_derivs[-1] += f'\nJ_fd - {Jname}:\n' + \
                                             np.array2string(J_fd - J)
                             else:
-                                abserr, relerr = _parse_assert_allclose_error(err.args[0])
                                 bad_derivs.append([f"{key[0]} wrt {key[1]}", "abs",
                                                    f"fd-{Jname[2:]}", f"{abserr}"])
                                 bad_derivs.append([f"{key[0]} wrt {key[1]}", "rel",
@@ -325,7 +334,8 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6, verbose=False, max_display
 
                 if not analytic_found:
                     # check if J_fd is all zeros.  If not, then we have a problem.
-                    if np.linalg.norm(J_fd) > 1e-15:
+                    abserr = np.max(np.abs(J_fd))
+                    if abserr > atol:
                         if verbose:
                             bad_derivs.append(f"\nAnalytic deriv for '{key[0]}' wrt '{key[1]}' "
                                               f"is assumed zero, but finite difference{stepstr} "
@@ -343,12 +353,19 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6, verbose=False, max_display
                 try:
                     if dir_fwd_rev is not None:
                         dJfwd, dJrev = dir_fwd_rev
+                        either_zero = not (np.any(dJfwd) or np.any(dJrev))
                         np.testing.assert_allclose(dJfwd, dJrev, atol=atol, rtol=rtol,
                                                    verbose=False, equal_nan=False)
                     else:
+                        either_zero = not (np.any(J_fwd) or np.any(J_rev))
                         np.testing.assert_allclose(J_fwd, J_rev, atol=atol, rtol=rtol,
                                                    verbose=False, equal_nan=False)
                 except Exception as err:
+                    abserr, relerr = _parse_assert_allclose_error(err.args[0])
+                    if abserr < atol and either_zero:
+                        # if one array is all zeros and we don't violate the absolute
+                        # tolerance, then don't flag the relative error.
+                        continue
                     if verbose:
                         bad_derivs.append(f"\nForward and Reverse derivatives of '{key[0]}' wrt "
                                           f"'{key[1]}' do not match.\n")
@@ -358,7 +375,6 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6, verbose=False, max_display
                                 bad_derivs[-1] += '\nJ_fwd - J_rev:\n' + \
                                     np.array2string(J_fwd - J_rev)
                     else:
-                        abserr, relerr = _parse_assert_allclose_error(err.args[0])
                         bad_derivs.append([f"{key[0]} wrt {key[1]}", "abs", "fwd-rev", f"{abserr}"])
                         bad_derivs.append([f"{key[0]} wrt {key[1]}", "rel", "fwd-rev", f"{relerr}"])
 
@@ -397,10 +413,17 @@ def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6, max_display_shape=(20
         First key:
             is the (output, input) tuple of strings;
         Second key:
-            is one of ['rel error', 'abs error', 'magnitude', 'fdstep'];
+            is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev',
+                       'vals_at_max_abs', 'vals_at_max_rel', 'directional_fd_fwd',
+                       'directional_fd_rev', 'directional_fwd_rev', 'rank_inconsistent',
+                       'matrix_free', 'directional', 'steps', and 'rank_inconsistent'].
 
-        For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
-            forward - fd, adjoint - fd, forward - adjoint.
+            For 'J_fd', 'J_fwd', 'J_rev' the value is a numpy array representing the computed
+            Jacobian for the three different methods of computation.
+            For 'rel error', 'abs error', 'vals_at_max_abs' and 'vals_at_max_rel' the value is a
+            tuple containing values for forward - fd, reverse - fd, forward - reverse. For
+            'magnitude' the value is a tuple indicating the maximum magnitude of values found in
+            Jfwd, Jrev, and Jfd.
     atol : float
         Absolute error. Default is 1e-6.
     rtol : float
@@ -441,6 +464,11 @@ def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6, max_display_shape=(20
                     np.testing.assert_allclose(J, J_fd, atol=atol, rtol=rtol, verbose=False,
                                                equal_nan=False)
                 except Exception as err:
+                    abserr, relerr = _parse_assert_allclose_error(err.args[0])
+                    if abserr < atol and not (np.any(J) or np.any(J_fd)):
+                        # if one array is all zeros and we don't violate the absolute
+                        # tolerance, then don't flag the relative error.
+                        continue
                     fails.append(f"\n{direction} derivatives of '{key[0]}' w.r.t '{key[1]}' "
                                  "do not match finite difference.\n")
                     fails[-1] += _filter_np_err(err.args[0])

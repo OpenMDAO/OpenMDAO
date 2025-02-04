@@ -353,6 +353,10 @@ class TestScipyKrylovFeature(unittest.TestCase):
         model.linear_solver = om.ScipyKrylov()
 
         prob.setup()
+        
+        # set input values to old defaults to get results to match
+        prob['sub1.q1.b'] = 1.
+        prob['sub2.q2.b'] = 1.
 
         model.sub1.linear_solver = om.DirectSolver()
         model.sub2.linear_solver = om.DirectSolver()
