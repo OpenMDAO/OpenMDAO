@@ -2,6 +2,7 @@
 
 import sys
 import types
+import inspect
 from collections import defaultdict
 from collections.abc import Iterable
 from itertools import product
@@ -27,7 +28,8 @@ from openmdao.utils.indexer import Indexer, indexer
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
     DerivativesWarning, warn_deprecation, OMInvalidCheckDerivativesOptionsWarning
-from openmdao.utils.code_utils import is_lambda, LambdaPickleWrapper, get_partials_deps
+from openmdao.utils.code_utils import is_lambda, LambdaPickleWrapper, get_partials_deps, \
+    get_return_names
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -82,7 +84,7 @@ class Component(System):
     _var_rel_names : {'input': [str, ...], 'output': [str, ...]}
         List of relative names of owned variables existing on current proc.
         This is only needed while adding inputs and outputs. During setup, these are used to
-        determine the list of absolute names.
+        determine the list of absolute names. This includes only continuous variables.
     _static_var_rel_names : dict
         Static version of above - stores names of variables added outside of setup.
     _declared_partials_patterns : dict
@@ -97,6 +99,8 @@ class Component(System):
     _compute_primals_out_shape : tuple or None
         Cached (shape, istuple) of the output from compute_primal function.  If istuple is True,
         then shape is a tuple of shapes, otherwise it is a single shape.
+    _valid_name_map : dict
+        Mapping of declared input/output names to valid Python names.
     """
 
     def __init__(self, **kwargs):
@@ -116,6 +120,7 @@ class Component(System):
         self._no_check_partials = False
         self._has_distrib_outputs = False
         self._compute_primals_out_shape = None
+        self._valid_name_map = {}
 
     def _tree_flatten(self):
         """
@@ -331,6 +336,10 @@ class Component(System):
             if msg:
                 raise RuntimeError(msg)
 
+        if self.compute_primal is not None:
+            self._check_compute_primal_args()
+            self._check_compute_primal_returns()
+
         self._serial_idxs = None
         self._inconsistent_keys = set()
 
@@ -541,7 +550,7 @@ class Component(System):
 
     def add_input(self, name, val=1.0, shape=None, units=None, desc='', tags=None,
                   shape_by_conn=False, copy_shape=None, compute_shape=None,
-                  require_connection=False, distributed=None):
+                  require_connection=False, distributed=None, primal_name=None):
         """
         Add an input variable to the component.
 
@@ -575,6 +584,9 @@ class Component(System):
         distributed : bool
             If True, this variable is a distributed variable, so it can have different sizes/values
             across MPI processes.
+        primal_name : str or None
+            Valid python name to represent the variable in compute_primal if 'name' is not a valid
+            python name.
 
         Returns
         -------
@@ -635,6 +647,9 @@ class Component(System):
         if compute_shape is not None and is_lambda(compute_shape):
             compute_shape = LambdaPickleWrapper(compute_shape)
 
+        if primal_name is not None:
+            self._valid_name_map[name] = primal_name
+
         metadata = {
             'val': val,
             'shape': shape,
@@ -672,7 +687,7 @@ class Component(System):
 
         return metadata
 
-    def add_discrete_input(self, name, val, desc='', tags=None):
+    def add_discrete_input(self, name, val, desc='', tags=None, primal_name=None):
         """
         Add a discrete input variable to the component.
 
@@ -687,6 +702,9 @@ class Component(System):
         tags : str or list of strs
             User defined tags that can be used to filter what gets listed when calling
             list_inputs and list_outputs.
+        primal_name : str or None
+            Valid python name to represent the variable in compute_primal if 'name' is not a valid
+            python name.
 
         Returns
         -------
@@ -700,6 +718,9 @@ class Component(System):
             raise NameError("%s: '%s' is not a valid input name." % (self.msginfo, name))
         if tags is not None and not isinstance(tags, (str, list)):
             raise TypeError('%s: The tags argument should be a str or list' % self.msginfo)
+
+        if primal_name is not None:
+            self._valid_name_map[name] = primal_name
 
         metadata = {}
 
@@ -730,7 +751,8 @@ class Component(System):
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,
-                   shape_by_conn=False, copy_shape=None, compute_shape=None, distributed=None):
+                   shape_by_conn=False, copy_shape=None, compute_shape=None, distributed=None,
+                   primal_name=None):
         """
         Add an output variable to the component.
 
@@ -784,6 +806,9 @@ class Component(System):
         distributed : bool
             If True, this variable is a distributed variable, so it can have different sizes/values
             across MPI processes.
+        primal_name : str or None
+            Valid python name to represent the variable in compute_primal if 'name' is not a valid
+            python name.
 
         Returns
         -------
@@ -891,6 +916,9 @@ class Component(System):
         if compute_shape is not None and is_lambda(compute_shape):
             compute_shape = LambdaPickleWrapper(compute_shape)
 
+        if primal_name is not None:
+            self._valid_name_map[name] = primal_name
+
         metadata = {
             'val': val,
             'shape': shape,
@@ -933,7 +961,7 @@ class Component(System):
 
         return metadata
 
-    def add_discrete_output(self, name, val, desc='', tags=None):
+    def add_discrete_output(self, name, val, desc='', tags=None, primal_name=None):
         """
         Add an output variable to the component.
 
@@ -948,6 +976,9 @@ class Component(System):
         tags : str or list of strs or set of strs
             User defined tags that can be used to filter what gets listed when calling
             list_inputs and list_outputs.
+        primal_name : str or None
+            Valid python name to represent the variable in compute_primal if 'name' is not a valid
+            python name.
 
         Returns
         -------
@@ -960,6 +991,9 @@ class Component(System):
             raise NameError("%s: '%s' is not a valid output name." % (self.msginfo, name))
         if tags is not None and not isinstance(tags, (str, set, list)):
             raise TypeError('%s: The tags argument should be a str, set, or list' % self.msginfo)
+
+        if primal_name is not None:
+            self._valid_name_map[name] = primal_name
 
         metadata = {}
 
@@ -2550,6 +2584,48 @@ class Component(System):
         # add pathname to the partials dict to make it compatible with the return value
         # from Problem.check_partials and passable to assert_check_partials.
         return {self.pathname: partials_data}, worst
+
+    def _check_compute_primal_args(self):
+        """
+        Check that the compute_primal method args are in the correct order.
+        """
+        args = list(inspect.signature(self.compute_primal).parameters)
+        if args and args[0] == 'self':
+            args = args[1:]
+        compargs = self._get_compute_primal_argnames()
+        if args != compargs:
+            raise RuntimeError(f"{self.msginfo}: compute_primal method args {args} don't match "
+                               f"the args {compargs} mapped from this component's inputs. To "
+                               "map inputs to the compute_primal method, set the name used in "
+                               "compute_primal to the 'primal_name' arg when calling "
+                               "add_input/add_discrete_input. This is only necessary if the "
+                               "declared component input name is not a valid Python name.")
+
+    def _check_compute_primal_returns(self):
+        """
+        Check that the compute_primal method returns a tuple.
+        """
+        retnames = get_return_names(self.compute_primal)
+        if self._valid_name_map:
+            expected_names = [self._valid_name_map.get(n, n) for n in self._var_rel_names['output']]
+            expected_names.extend([self._valid_name_map.get(n, n) for n in self._discrete_outputs])
+        else:
+            expected_names = list(self._var_rel_names['output'])
+            expected_names.extend(self._discrete_outputs)
+
+        if len(retnames) != len(expected_names):
+            raise RuntimeError(f"{self.msginfo}: compute_primal method returns {len(retnames)} "
+                               f"values but expected {len(expected_names)}.")
+
+        for i, (expname, rname) in enumerate(zip(expected_names, retnames)):
+            if rname is not None and expname != rname:
+                raise RuntimeError(f"{self.msginfo}: compute_primal method returns {rname} "
+                                   f"for return value {i} but the name of the output that was "
+                                   f"mapped for this component is {expname}. To map outputs to "
+                                   "the compute_primal method, set the name used in compute_primal "
+                                   "to the 'primal_name' arg when calling "
+                                   "add_output/add_discrete_output. This is only necessary if "
+                                   "the declared component output name is not a valid Python name.")
 
 
 class _DictValues(object):
