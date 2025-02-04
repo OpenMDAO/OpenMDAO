@@ -66,10 +66,7 @@ class JaxExplicitComponent(ExplicitComponent):
             self.compute_jacvec_product = MethodType(compute_jacvec_product, self)
         else:
             if self._coloring_info.use_coloring():
-                coloring = self._get_coloring()  # make sure the coloring is computed
-                direction = self.best_partial_deriv_direction()
-                self._get_tangents(direction, coloring)
-                if direction == 'fwd':
+                if self.best_partial_deriv_direction() == 'fwd':
                     self.compute_partials = self._jacfwd_colored
                 else:
                     self.compute_partials = self._jacrev_colored
@@ -173,7 +170,7 @@ class JaxExplicitComponent(ExplicitComponent):
         discrete_inputs : dict or None
             If not None, dict containing discrete input values.
         """
-        J = _compute_jac(self, 'fwd')
+        J = _compute_jac(self, 'fwd', inputs=inputs, discrete_inputs=discrete_inputs)
         self.dense_jac2partials(J, partials)
 
     def _jacrev_colored(self, inputs, partials, discrete_inputs=None):
@@ -189,7 +186,7 @@ class JaxExplicitComponent(ExplicitComponent):
         discrete_inputs : dict or None
             If not None, dict containing discrete input values.
         """
-        J = _compute_jac(self, 'rev')
+        J = _compute_jac(self, 'rev', inputs=inputs, discrete_inputs=discrete_inputs)
         self.dense_jac2partials(J, partials)
 
     def compute_sparsity(self, direction=None):

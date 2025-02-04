@@ -6541,7 +6541,9 @@ class System(object, metaclass=SystemMetaclass):
         str
             The best direction for derivative calculations, 'fwd' or 'rev'.
         """
-        return 'fwd' if len(self._outputs) >= len(self._inputs) else 'rev'
+        nouts = np.sum(self._var_sizes['output'][self.comm.rank, :])
+        nins = np.sum(self._var_sizes['input'][self.comm.rank, :])
+        return 'fwd' if nouts >= nins else 'rev'
 
     def _get_sys_promotion_tree(self, tree=None):
         """

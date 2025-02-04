@@ -1090,12 +1090,12 @@ class Group(System):
         """
         self._setup_residuals()
 
+        self._setup_jax()
+
         if self._use_derivatives:
             self._setup_partials()
 
         self._setup_vectors(self._get_root_vectors())
-
-        self._setup_jax()
 
         self._fd_rev_xfer_correction_dist = {}
 

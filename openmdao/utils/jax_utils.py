@@ -963,19 +963,41 @@ def _compute_sparsity(self, direction=None):
     return sparsity, info
 
 
-def _compute_jac(self, direction):
-    ncontins = self._inputs.nvars()
+def _compute_jac(self, direction, inputs=None, discrete_inputs=None):
+    """
+    Compute the Jacobian using jvp/vjp with nans for the seeds.
+
+    Parameters
+    ----------
+    self : Component
+        The component to compute the Jacobian for.
+    direction : str
+        The direction to compute the Jacobian in.
+    inputs : dict
+        The inputs to the component.
+    discrete_inputs : dict
+        The discrete inputs to the component.
+
+    Returns
+    -------
+    dict
+        The partials.
+    """
+    if inputs is None:
+        inputs = self._inputs.asarray()
+    if discrete_inputs is None:
+        discrete_inputs = {}
+
+    ncontins = inputs.nvars()
     ncontouts = self._outputs.nvars()
 
     implicit = not self.is_explicit()
 
-    print("inputs")
-    print(self._inputs.asarray())
-
     if implicit:
         ncontins += ncontouts
 
-    full_invals = tuple(self._get_compute_primal_invals())
+    full_invals = tuple(self._get_compute_primal_invals(inputs=inputs,
+                                                        discrete_inputs=discrete_inputs))
     icontvals = full_invals[:ncontins]  # continuous inputs
     idiscvals = full_invals[ncontins:]  # discrete inputs
 
@@ -992,8 +1014,6 @@ def _compute_jac(self, direction):
 
     if direction == 'fwd':
         tangents = self._get_tangents('fwd', self._coloring_info.coloring)
-        print("tangents")
-        print(tangents)
 
         # make a function that takes only a tuple of tangents to make it easier to vectorize
         # using vmap
@@ -1001,14 +1021,11 @@ def _compute_jac(self, direction):
             # [1] is the derivative, [0] is the primal (we don't need the primal)
             return jax.jvp(differentiable_part, icontvals, tangent)[1]
 
-        if False:  # self.options['use_jit']:
+        if self.options['use_jit']:
             jvp_at_point = jax.jit(jvp_at_point)
 
         # vectorize over the last axis of the tangent vectors
         J = jax.vmap(jvp_at_point, in_axes=-1, out_axes=-1)(tangents)
-
-        print("var J")
-        print(J)
 
     else:  # rev
         # Returns primal and a function to compute VJP so just take [1], the vjp function
@@ -1021,14 +1038,9 @@ def _compute_jac(self, direction):
             vjp_at_point = jax.jit(vjp_at_point)
 
         cotangents = self._get_tangents('rev', self._coloring_info.coloring)
-        print("cotangents")
-        print(cotangents)
 
         # Batch over last axis of cotangents
         J = jax.vmap(vjp_at_point, in_axes=-1, out_axes=-1)(cotangents)
-
-        print("var J")
-        print(J)
 
     if not isinstance(J, tuple):
         J = (J,)
@@ -1048,11 +1060,7 @@ def _compute_jac(self, direction):
     if direction != 'fwd':
         J = J.T
 
-    J = uncompress_jac(self, J)
-    print("uncompressed J")
-    print(J)
-
-    return J
+    return uncompress_jac(self, J)
 
 
 def uncompress_jac(self, J):
