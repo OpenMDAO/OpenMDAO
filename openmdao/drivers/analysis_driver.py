@@ -29,12 +29,6 @@ class AnalysisDriver(Driver):
     Alternatively, samples can be provided as an instance of AnalysisGenerator,
     which will provide each sample in a lazily-evaluated way.
 
-    Responses are the outputs of the model to be recorded. These can be added
-    using the standard driver interface.
-
-    In systems with a lot of outputs, this would be a very tedious process,
-    in which case we can use the add_responses method.
-
     Parameters
     ----------
     samples : Sequence or None
