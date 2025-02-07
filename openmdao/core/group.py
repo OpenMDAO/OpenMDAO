@@ -19,7 +19,6 @@ from openmdao.core.constants import _UNDEFINED, INT_DTYPE, _SetupStatus
 from openmdao.vectors.vector import _full_slice
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
 from openmdao.jacobians.jacobian import SUBJAC_META_DEFAULTS
-from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
@@ -861,21 +860,21 @@ class Group(System):
         assert self.pathname == '', "call _get_dataflow_graph on the top level Group only."
 
         graph = nx.DiGraph()
-        comp_seen = set()
+        empty_comps = set()
 
         # locate any components that don't have any inputs or outputs and add them to the graph
         for subsys in self.system_iter(recurse=True, typ=Component):
             if not subsys._var_abs2meta['input'] and not subsys._var_abs2meta['output']:
                 graph.add_node(subsys.pathname, local=True)
-                comp_seen.add(subsys.pathname)
+                empty_comps.add(subsys.pathname)
 
         if self.comm.size > 1:
-            allemptycomps = self.comm.allgather(comp_seen)
+            allemptycomps = self.comm.allgather(empty_comps)
             for compset in allemptycomps:
                 for comp in compset:
-                    if comp not in comp_seen:
+                    if comp not in empty_comps:
                         graph.add_node(comp, local=False)
-                        comp_seen.add(comp)
+                        empty_comps.add(comp)
 
         for direction in ('input', 'output'):
             isout = direction == 'output'
@@ -890,9 +889,9 @@ class Group(System):
                 graph.add_node(vname, type_=direction, local=local)
 
                 comp = vname.rpartition('.')[0]
-                if comp not in comp_seen:
+                if comp not in empty_comps:
                     graph.add_node(comp, local=local)
-                    comp_seen.add(comp)
+                    empty_comps.add(comp)
 
                 if isout:
                     graph.add_edge(comp, vname)
@@ -1090,12 +1089,12 @@ class Group(System):
         """
         self._setup_residuals()
 
-        self._setup_jax()
-
         if self._use_derivatives:
             self._setup_partials()
 
         self._setup_vectors(self._get_root_vectors())
+
+        self._setup_jax()
 
         self._fd_rev_xfer_correction_dist = {}
 
@@ -3836,7 +3835,7 @@ class Group(System):
                 not isinstance(self._jacobian, coloring_mod._ColSparsityJac)):
             self._jacobian = self._tot_jac
         elif self._jacobian is None:
-            self._jacobian = DictionaryJacobian(self)
+            self._init_jacobian()
 
         self._check_first_linearize()
 
@@ -4207,7 +4206,7 @@ class Group(System):
         Add approximations for all approx derivs.
         """
         if self._jacobian is None:
-            self._jacobian = DictionaryJacobian(system=self)
+            self._init_jacobian()
 
         abs2meta = self._var_allprocs_abs2meta
         total = self.pathname == ''

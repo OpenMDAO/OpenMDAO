@@ -856,7 +856,46 @@ def get_vmap_tangents(vals, direction, fill=1., returns_tuple=False, coloring=No
     return tangents
 
 
-def _compute_sparsity(self, direction=None):
+def _update_subjac_sparsity(sparsity_iter, pathname, subjacs_info):
+    """
+    Update subjac sparsity info based on the given sparsity iterator.
+
+    The sparsity of the partial derivatives in this component will be used when computing
+    the sparsity of the total jacobian for the entire model.  Without this, all of this
+    component's partials would be treated as dense, resulting in an overly conservative
+    coloring of the total jacobian.
+
+    Parameters
+    ----------
+    sparsity_iter : iter of tuple
+        Tuple of the form (of, wrt, rows, cols, shape).
+    pathname : str
+        The pathname of the component.
+    subjacs_info : dict
+        The subjac sparsity info.
+    """
+    prefix = pathname + '.'
+    for of, wrt, rows, cols, shape in sparsity_iter:
+        # sparsity uses relative names, so convert to absolute
+        abs_key = (prefix + of, prefix + wrt)
+        if abs_key not in subjacs_info:
+            subjacs_info[abs_key] = {
+                'shape': shape,
+                'dependent': True,
+            }
+        if rows is None:
+            subjacs_info[abs_key]['val'] = np.zeros(shape)
+            continue
+        else:
+            subjacs_info[abs_key].update({
+                'sparsity': (rows, cols, shape),
+                'rows': rows,
+                'cols': cols,
+                'val': np.zeros(len(rows))
+            })
+
+
+def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_nan=False):
     """
     Compute the sparsity of the Jacobian using jvp/vjp with nans for the seeds.
 
@@ -867,6 +906,12 @@ def _compute_sparsity(self, direction=None):
     direction : str or None
         The direction to compute the sparsity in.  If None, the best direction is chosen based
         on the number of inputs and outputs.  If a str, it must be 'fwd' or 'rev'.
+    num_iters : int
+        The number of times to run the perturbation iteration.
+    perturb_size : float
+        The size of the perturbation to use.
+    use_nan : bool
+        If True, use nans for the seeds.
 
     Returns
     -------
@@ -886,67 +931,75 @@ def _compute_sparsity(self, direction=None):
     if implicit:
         ncontins += ncontouts
 
-    full_invals = tuple(self._get_compute_primal_invals())
-    icontvals = full_invals[:ncontins]  # continuous inputs
-    idiscvals = full_invals[ncontins:]  # discrete inputs
+    sparsity = None
 
-    # exclude the discrete inputs from the inputs and the discrete outputs from the outputs
-    if implicit or (ncontouts == 1 and not self._compute_primal_returns_tuple):
-        def differentiable_part(*contvals):
-            return self.compute_primal(*contvals, *idiscvals)
-    else:
-        def differentiable_part(*contvals):
-            return self.compute_primal(*contvals, *idiscvals)[:ncontouts]
+    for _ in self._perturbation_iter(num_iters=num_iters, perturb_size=perturb_size):
+        full_invals = tuple(self._get_compute_primal_invals())
+        icontvals = full_invals[:ncontins]  # continuous inputs
+        idiscvals = full_invals[ncontins:]  # discrete inputs
 
-    if self.options['use_jit']:
-        differentiable_part = jax.jit(differentiable_part)
+        # exclude the discrete inputs from the inputs and the discrete outputs from the outputs
+        if implicit or (ncontouts == 1 and not self._compute_primal_returns_tuple):
+            def differentiable_part(*contvals):
+                return self.compute_primal(*contvals, *idiscvals)
+        else:
+            def differentiable_part(*contvals):
+                return self.compute_primal(*contvals, *idiscvals)[:ncontouts]
 
-    if direction == 'fwd':
-        tangents = get_vmap_tangents(icontvals, 'fwd', fill=np.nan,
-                                     returns_tuple=self._compute_primal_returns_tuple)
+        if self.options['use_jit']:
+            differentiable_part = jax.jit(differentiable_part)
 
-        # make a function that takes only a tuple of tangents to make it easier to vectorize
-        # using vmap
-        def jvp_at_point(tangent):
-            # [1] is the derivative, [0] is the primal (we don't need the primal)
-            return jax.jvp(differentiable_part, icontvals, tangent)[1]
+        if direction == 'fwd':
+            tangents = get_vmap_tangents(icontvals, 'fwd', fill=np.nan if use_nan else 1.,
+                                         returns_tuple=self._compute_primal_returns_tuple)
 
-        # vectorize over the last axis of the tangent vectors
-        J = jax.vmap(jvp_at_point, in_axes=-1, out_axes=-1)(tangents)
+            def jvp_at_point(tangent):
+                # [1] is the derivative, [0] is the primal (we don't need the primal)
+                return jax.jvp(differentiable_part, icontvals, tangent)[1]
 
-    else:  # rev
-        # Returns primal and a function to compute VJP so just take [1], the vjp function
-        vjp_fn = jax.vjp(differentiable_part, *icontvals)[1]
+            # vectorize over the last axis of the tangent vectors
+            J = jax.vmap(jvp_at_point, in_axes=-1, out_axes=-1)(tangents)
 
-        def vjp_at_point(cotangent):
-            return vjp_fn(cotangent)
+        else:  # rev
+            # Returns primal and a function to compute VJP so just take [1], the vjp function
+            vjp_fn = jax.vjp(differentiable_part, *icontvals)[1]
 
-        cotangents = get_vmap_tangents(tuple(self._outputs.values()), 'rev', fill=np.nan,
-                                       returns_tuple=self._compute_primal_returns_tuple)
+            def vjp_at_point(cotangent):
+                return vjp_fn(cotangent)
 
-        # Batch over last axis of cotangents
-        J = jax.vmap(vjp_at_point, in_axes=-1, out_axes=-1)(cotangents)
+            cotangents = get_vmap_tangents(tuple(self._outputs.values()), 'rev',
+                                           fill=np.nan if use_nan else 1.,
+                                           returns_tuple=self._compute_primal_returns_tuple)
 
-    if not isinstance(J, tuple):
-        J = (J,)
+            # Batch over last axis of cotangents
+            J = jax.vmap(vjp_at_point, in_axes=-1, out_axes=-1)(cotangents)
 
-    if len(J) == 1:
-        J = J[0]
-        if len(J.shape) > 2:
-            # flatten 'variable' dimensions.  Last dimension is the batching dimension.
-            J = J.reshape(np.prod(J.shape[:-1]), J.shape[-1])
-        elif len(J.shape) == 1:
-            J = np.atleast_2d(J)
-    else:
-        # flatten 'variable' dimensions for each variable.  Last dimension is the batching
-        # dimension.  Then vertically stack all the flattened 'variable' arrays.
-        J = np.vstack([j.reshape(np.prod(j.shape[:-1]), j.shape[-1]) for j in J])
+        if not isinstance(J, tuple):
+            J = (J,)
 
-    if direction != 'fwd':
-        J = J.T
+        if len(J) == 1:
+            J = J[0]
+            if len(J.shape) > 2:
+                # flatten 'variable' dimensions.  Last dimension is the batching dimension.
+                J = J.reshape(np.prod(J.shape[:-1]), J.shape[-1])
+            elif len(J.shape) == 1:
+                J = np.atleast_2d(J)
+        else:
+            # flatten 'variable' dimensions for each variable.  Last dimension is the batching
+            # dimension.  Then vertically stack all the flattened 'variable' arrays.
+            J = np.vstack([j.reshape(np.prod(j.shape[:-1]), j.shape[-1]) for j in J])
 
-    nz = np.nonzero(J)
-    data = np.ones(len(nz[0]), dtype=bool)
+        if direction != 'fwd':
+            J = J.T
+
+        nz = np.nonzero(J)
+        data = np.ones(len(nz[0]), dtype=bool)
+        J = coo_matrix((data, nz), shape=J.shape)
+
+        if sparsity is None:
+            sparsity = J
+        else:
+            sparsity += J
 
     info = {
         'tol': 0.,
@@ -955,15 +1008,16 @@ def _compute_sparsity(self, direction=None):
         'nz_matches': 0,
         'n_tested': 0,
         'nz_entries': len(nz[0]),
-        'J_shape': J.shape,
+        'J_shape': sparsity.shape,
     }
 
-    sparsity = coo_matrix((data, nz), shape=J.shape)
     self._update_subjac_sparsity(self.subjac_sparsity_iter(sparsity=sparsity))
+
     return sparsity, info
 
 
-def _compute_jac(self, direction, inputs=None, discrete_inputs=None):
+def _compute_jac(self, direction, inputs=None, outputs=None, discrete_inputs=None,
+                 discrete_outputs=None):
     """
     Compute the Jacobian using jvp/vjp with nans for the seeds.
 
@@ -975,8 +1029,12 @@ def _compute_jac(self, direction, inputs=None, discrete_inputs=None):
         The direction to compute the Jacobian in.
     inputs : dict
         The inputs to the component.
+    outputs : dict
+        The outputs to the component.
     discrete_inputs : dict
         The discrete inputs to the component.
+    discrete_outputs : dict
+        The discrete outputs to the component.
 
     Returns
     -------
@@ -984,9 +1042,13 @@ def _compute_jac(self, direction, inputs=None, discrete_inputs=None):
         The partials.
     """
     if inputs is None:
-        inputs = self._inputs.asarray()
+        inputs = self._inputs
+    if outputs is None:
+        outputs = self._outputs
     if discrete_inputs is None:
-        discrete_inputs = {}
+        discrete_inputs = self._discrete_inputs
+    if discrete_outputs is None:
+        discrete_outputs = self._discrete_outputs
 
     ncontins = inputs.nvars()
     ncontouts = self._outputs.nvars()
@@ -1060,13 +1122,29 @@ def _compute_jac(self, direction, inputs=None, discrete_inputs=None):
     if direction != 'fwd':
         J = J.T
 
-    return uncompress_jac(self, J)
+    return _uncompress_jac(self, J, direction)
 
 
-def uncompress_jac(self, J):
+def _uncompress_jac(self, J, direction):
+    """
+    Uncompress the Jacobian using the coloring information.
+
+    Parameters
+    ----------
+    self : Component
+        The component to uncompress the Jacobian for.
+    J : ndarray
+        The Jacobian to uncompress.
+    direction : str
+        The direction to uncompress the Jacobian in.
+
+    Returns
+    -------
+    ndarray
+        The uncompressed Jacobian.
+    """
     if self._coloring_info.coloring is not None:
-        return self._coloring_info.coloring.expand_jac(J, self.best_partial_deriv_direction())
-
+        return self._coloring_info.coloring.expand_jac(J, direction)
     return J
 
 

@@ -499,6 +499,8 @@ class ImplicitComponent(Component):
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         """
         super()._setup_vectors(root_vectors)
+        if self._jacobian is None:
+            self._init_jacobian()
 
         if self._declared_residuals:
             name2slcshape = _get_slice_shape_dict(self._resid_name_shape_iter())

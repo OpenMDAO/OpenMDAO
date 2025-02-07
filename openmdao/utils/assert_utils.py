@@ -244,6 +244,11 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6, verbose=False, max_display
     """
     error_strings = []
 
+    if isinstance(data, tuple):
+        if len(data) != 2:
+            raise RuntimeError(f"partials data format error (tuple of size {len(data)})")
+        data = data[0]
+
     for comp in data:
         bad_derivs = []
         inconsistent_derivs = set()

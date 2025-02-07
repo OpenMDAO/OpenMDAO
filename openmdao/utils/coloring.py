@@ -85,9 +85,17 @@ _use_partial_sparsity = True
 _force_dyn_coloring = False
 
 # used as an indicator that we should automatically name coloring file based on class module
-# path or system pathname. Use isinstance to check values to avoid any weirdness with using 'is a'
-# across processes.
+# path or system pathname. U
+
+
 class STD_COLORING_FNAME(object):
+    """
+    Used to indicate that coloring file should have a standard name.
+
+    The standard name is based on the class module path or system pathname.
+    Use isinstance to check values to avoid any weirdness with using 'is a' across processes.
+    """
+
     pass
 
 
@@ -442,7 +450,7 @@ class ColoringMeta(object):
         bool
             True if coloring should be used.
         """
-        return not self._failed and (self.coloring is not None or self.dynamic or \
+        return not self._failed and (self.coloring is not None or self.dynamic or
                                      self.has_static_coloring())
 
     def has_static_coloring(self):
@@ -607,14 +615,6 @@ class Partial_ColoringMeta(ColoringMeta):
                              "options: {}.".format(self.msginfo, self.wrt_patterns))
 
         return self.wrt_matches
-
-    def reset_coloring(self):
-        """
-        Reset coloring and fname metadata.
-        """
-        super().reset_coloring()
-        if not self.per_instance:
-            _CLASS_COLORINGS[self.get_coloring_fname()] = None
 
     def update(self, dct):
         """

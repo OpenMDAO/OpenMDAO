@@ -19,7 +19,7 @@ import numpy as np
 
 from openmdao.core.constants import _DEFAULT_COLORING_DIR, _DEFAULT_OUT_STREAM, \
     _UNDEFINED, INT_DTYPE, INF_BOUND, _SetupStatus
-from openmdao.jacobians.jacobian import Jacobian
+from openmdao.jacobians.dictionary_jacobian import Jacobian, DictionaryJacobian
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import _full_slice
@@ -786,6 +786,14 @@ class System(object, metaclass=SystemMetaclass):
                 dist_sizes = sizes_in[:, toidx[wrt]] if tometa_in[wrt]['distributed'] else None
                 yield wrt, start, end, vec, _full_slice, dist_sizes
                 start = end
+
+    def _init_jacobian(self):
+        """
+        Initialize the jacobian.
+
+        Override this in a subclass to use a different jacobian type than DictionaryJacobian.
+        """
+        self._jacobian = DictionaryJacobian(system=self)
 
     def _declare_options(self):
         """
@@ -1893,8 +1901,8 @@ class System(object, metaclass=SystemMetaclass):
         cols = sparsity.col
         plen = len(self.pathname) + 1 if self.pathname else 0
         for of, ofstart, ofend, _, _ in self._jac_of_iter():
+            subrows = np.logical_and(sparsity.row >= ofstart, sparsity.row < ofend)
             for wrt, wrtstart, wrtend, _, _, _ in self._jac_wrt_iter(wrt_matches):
-                subrows = np.logical_and(sparsity.row >= ofstart, sparsity.row < ofend)
                 subcols = np.logical_and(sparsity.col >= wrtstart, sparsity.col < wrtend)
                 matching = np.logical_and(subrows, subcols)
                 nzrows = rows[matching] - ofstart
@@ -3028,14 +3036,6 @@ class System(object, metaclass=SystemMetaclass):
     @property
     def _relevance(self):
         return self._problem_meta['relevance']
-
-    @property
-    def _jax_group(self):
-        return self._problem_meta['jax_group']
-
-    @_jax_group.setter
-    def _jax_group(self, val):
-        self._problem_meta['jax_group'] = val
 
     @property
     def _static_mode(self):
@@ -7577,7 +7577,7 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
                      rel_errs.forward, rel_vals.forward, didx) = get_errors(Jforward, Jfd)
                 denom_idxs['fwd'] = didx
 
-            if Jreverse is not None:
+            if Jreverse is not None and 'directional_fd_rev' in derivative_info:
                 mhatdotm, dhatdotd = derivative_info['directional_fd_rev'][i]
                 (abs_errs.reverse, abs_vals.reverse, rel_errs.reverse, rel_vals.reverse, didx) = \
                     get_errors(mhatdotm, dhatdotd)

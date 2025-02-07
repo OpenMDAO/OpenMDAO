@@ -16,7 +16,7 @@ from scipy.sparse import issparse, coo_matrix, csr_matrix
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
     global_meta_names, collect_errors, _iter_derivs
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM, _SetupStatus
-from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian, _CheckingJacobian
+from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_name2abs_name, \
     rel_key2abs_key
@@ -394,7 +394,7 @@ class Component(System):
         """
         self._subjacs_info = {}
         if not self.matrix_free:
-            self._jacobian = DictionaryJacobian(system=self)
+            self._init_jacobian()
 
         self.setup_partials()  # hook for component writers to specify sparsity patterns
 
@@ -2240,7 +2240,9 @@ class Component(System):
         if self.matrix_free:
             directions = ('fwd', 'rev')
         else:
-            directions = (self.best_partial_deriv_direction(),)  # rev same as fwd for analytic jacobians
+            # TODO: replace 'fwd' with self.best_partial_deriv_direction(). Currently fails
+            # when it equals 'rev' for directional derivatives.
+            directions = ('fwd',)  # rev same as fwd for analytic jacobians
             self.run_linearize(sub_do_ln=False)
 
         nondep_derivs = set()
