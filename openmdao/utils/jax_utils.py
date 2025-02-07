@@ -860,11 +860,6 @@ def _update_subjac_sparsity(sparsity_iter, pathname, subjacs_info):
     """
     Update subjac sparsity info based on the given sparsity iterator.
 
-    The sparsity of the partial derivatives in this component will be used when computing
-    the sparsity of the total jacobian for the entire model.  Without this, all of this
-    component's partials would be treated as dense, resulting in an overly conservative
-    coloring of the total jacobian.
-
     Parameters
     ----------
     sparsity_iter : iter of tuple
@@ -882,13 +877,13 @@ def _update_subjac_sparsity(sparsity_iter, pathname, subjacs_info):
             subjacs_info[abs_key] = {
                 'shape': shape,
                 'dependent': True,
+                'rows': rows,
+                'cols': cols,
             }
         if rows is None:
             subjacs_info[abs_key]['val'] = np.zeros(shape)
-            continue
         else:
             subjacs_info[abs_key].update({
-                'sparsity': (rows, cols, shape),
                 'rows': rows,
                 'cols': cols,
                 'val': np.zeros(len(rows))
@@ -971,7 +966,7 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
                                            fill=np.nan if use_nan else 1.,
                                            returns_tuple=self._compute_primal_returns_tuple)
 
-            # Batch over last axis of cotangents
+            # vectorize over last axis of cotangents
             J = jax.vmap(vjp_at_point, in_axes=-1, out_axes=-1)(cotangents)
 
         if not isinstance(J, tuple):

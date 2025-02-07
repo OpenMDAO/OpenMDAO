@@ -104,7 +104,10 @@ class JaxImplicitComponent(ImplicitComponent):
         return self._jac_func_
 
     def _update_subjac_sparsity(self, sparsity_iter):
-        _update_subjac_sparsity(sparsity_iter, self.pathname, self._subjacs_info)
+        if self.options['derivs_method'] == 'jax':
+            _update_subjac_sparsity(sparsity_iter, self.pathname, self._subjacs_info)
+        else:
+            super()._update_subjac_sparsity(sparsity_iter)
 
     def compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9):
         """

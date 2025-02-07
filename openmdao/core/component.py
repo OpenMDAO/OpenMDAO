@@ -412,6 +412,8 @@ class Component(System):
                 # declare all partials as 'cs' or 'fd'
                 for of, wrt in get_function_deps(self.compute_primal,
                                                  self._var_rel_names['output']):
+                    if of in self._discrete_outputs or wrt in self._discrete_inputs:
+                        continue
                     self.declare_partials(of, wrt, method=method)
             else:
                 # declare only those partials that have been declared

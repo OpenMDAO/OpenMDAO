@@ -38,6 +38,7 @@ class JaxExplicitComponent(ExplicitComponent):
 
         self._compute_primal_returns_tuple = False
         self._tangents = {'fwd': None, 'rev': None}
+        self._sparsity = None
 
         # if derivs_method is explicitly passed in, just use it
         if 'derivs_method' in kwargs:
@@ -223,11 +224,19 @@ class JaxExplicitComponent(ExplicitComponent):
         coo_matrix
             The sparsity of the Jacobian.
         """
-        self._sparsity = _compute_sparsity(self, direction, num_iters, perturb_size)
+        if self._sparsity is None:
+            if self.options['derivs_method'] == 'jax':
+                self._sparsity = _compute_sparsity(self, direction, num_iters, perturb_size)
+            else:
+                self._sparsity = super().compute_sparsity(direction=direction, num_iters=num_iters,
+                                                          perturb_size=perturb_size)
         return self._sparsity
 
     def _update_subjac_sparsity(self, sparsity_iter):
-        _update_subjac_sparsity(sparsity_iter, self.pathname, self._subjacs_info)
+        if self.options['derivs_method'] == 'jax':
+            _update_subjac_sparsity(sparsity_iter, self.pathname, self._subjacs_info)
+        else:
+            super()._update_subjac_sparsity(sparsity_iter)
 
     def _get_tangents(self, direction, coloring=None):
         """

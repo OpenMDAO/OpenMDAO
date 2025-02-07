@@ -259,17 +259,26 @@ class ColoringMeta(object):
             if name in self._meta_names:
                 setattr(self, name, val)
 
-    def display(self):
+    def display(self, show_summary=None, show_sparsity=None):
         """
         Display information about the coloring.
+
+        Parameters
+        ----------
+        show_summary : bool or None
+            If True, show a summary of the coloring, else use the value of show_summary from this
+            object.
+        show_sparsity : bool or None
+            If True, show a plot of the sparsity, else use the value of show_sparsity from this
+            object.
         """
         if self.coloring is None:
-            if self.show_summary or self.show_sparsity:
+            if self.show_summary or self.show_sparsity or show_summary or show_sparsity:
                 print("No coloring was computed successfully.")
         else:
-            if self.show_summary:
+            if self.show_summary or show_summary:
                 self.coloring.summary()
-            if self.show_sparsity:
+            if self.show_sparsity or show_sparsity:
                 self.coloring.display_bokeh(show=True)
 
     def __iter__(self):

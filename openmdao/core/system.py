@@ -1438,14 +1438,17 @@ class System(object, metaclass=SystemMetaclass):
         ApproximationScheme
             The ApproximationScheme associated with the given method.
         """
-        if method == 'exact':
-            return None
         if method not in _supported_methods:
             msg = '{}: Method "{}" is not supported, method must be one of {}'
             raise ValueError(msg.format(self.msginfo, method,
-                                        [m for m in _supported_methods if m != 'exact']))
+                                        [m for m, v in _supported_methods.items()
+                                         if v is not None]))
+        if _supported_methods[method] is None:
+            return None
+
         if method not in self._approx_schemes:
             self._approx_schemes[method] = _supported_methods[method]()
+
         return self._approx_schemes[method]
 
     def get_source(self, name):
@@ -1712,7 +1715,8 @@ class System(object, metaclass=SystemMetaclass):
         for approx in self._approx_schemes.values():
             if approx:
                 return True
-        return False
+        method = self.options['derivs_method']
+        return method in ('fd', 'cs')
 
     def _perturbation_iter(self, num_iters, perturb_size):
         """
@@ -1785,7 +1789,7 @@ class System(object, metaclass=SystemMetaclass):
         self._outputs.set_val(starting_outputs)
         self._residuals.set_val(starting_resids)
 
-    def compute_sparsity(self, direction=None):
+    def compute_sparsity(self, direction=None, num_iters=2, perturb_size=1e-9):
         """
         Compute the sparsity of the partial jacobian.
 
@@ -1795,6 +1799,10 @@ class System(object, metaclass=SystemMetaclass):
             Compute derivatives in fwd or rev mode, or whichever is based based on input and
             output sizes if value is None.  Note that only fwd is possible when using finite
             difference.
+        num_iters : int
+            Number of times to compute the full jacobian.
+        perturb_size : float
+            Size of relative perturbation.  If base value is 0.0, perturbation is absolute.
 
         Returns
         -------
@@ -1803,9 +1811,18 @@ class System(object, metaclass=SystemMetaclass):
         dict
             Metadata about the sparsity computation.
         """
+        if self._coloring_info.coloring is not None:
+            method = self._coloring_info['method']
+            num_iters = self._coloring_info['num_full_jacs']
+            perturb_size = self._coloring_info['perturb_size']
+        else:
+            method = self.options['derivs_method']
+            if method is None:
+                method = 'fd'
+
         uses_approx = self.uses_approx()
         if uses_approx:
-            approx_scheme = self._get_approx_scheme(self._coloring_info['method'])
+            approx_scheme = self._get_approx_scheme(method)
 
         save_first_call = self._first_call_to_linearize
         self._first_call_to_linearize = False
@@ -1828,17 +1845,15 @@ class System(object, metaclass=SystemMetaclass):
         from openmdao.core.group import Group
 
         if isinstance(self, Group):
-            for _ in self._perturbation_iter(self._coloring_info['num_full_jacs'],
-                                             self._coloring_info['perturb_size']):
+            for _ in self._perturbation_iter(num_iters, perturb_size):
                 self.run_linearize(sub_do_ln=False)
             sparsity, sp_info = self._jacobian.get_sparsity()
         else:
             # this avoids calling any compute_partials/linearize methods which will fail
             # because _ColSparsityJac only supports set_col and not dict access.
             sparsity, sp_info = \
-                self.compute_fd_sparsity(method=self._coloring_info['method'],
-                                         num_full_jacs=self._coloring_info['num_full_jacs'],
-                                         perturb_size=self._coloring_info['perturb_size'])
+                self.compute_fd_sparsity(method=method, num_full_jacs=num_iters,
+                                         perturb_size=perturb_size)
 
         self._jacobian = save_jac
         self._during_coloring = False
@@ -1903,13 +1918,12 @@ class System(object, metaclass=SystemMetaclass):
         for of, ofstart, ofend, _, _ in self._jac_of_iter():
             subrows = np.logical_and(sparsity.row >= ofstart, sparsity.row < ofend)
             for wrt, wrtstart, wrtend, _, _, _ in self._jac_wrt_iter(wrt_matches):
-                subcols = np.logical_and(sparsity.col >= wrtstart, sparsity.col < wrtend)
-                matching = np.logical_and(subrows, subcols)
+                matching = np.logical_and(sparsity.col >= wrtstart, sparsity.col < wrtend)
+                matching &= subrows
                 nzrows = rows[matching] - ofstart
-                if nzrows.size > 0:
-                    nzcols = cols[matching] - wrtstart
-                    shape = (ofend - ofstart, wrtend - wrtstart)
-                    yield of[plen:], wrt[plen:], nzrows, nzcols, shape
+                shape = (ofend - ofstart, wrtend - wrtstart)
+                nzcols = cols[matching] - wrtstart
+                yield of[plen:], wrt[plen:], nzrows, nzcols, shape
 
     def sparsity_matches_fd(self, direction=None, outstream=sys.stdout):
         """

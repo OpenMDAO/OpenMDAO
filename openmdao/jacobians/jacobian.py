@@ -306,7 +306,6 @@ class Jacobian(object):
         # to be overly conservative.
         subjac_info = self._subjacs_info[key]
         if 'sparsity' in subjac_info:
-            assert subjac_info['rows'] is None
             rows, cols, shape = subjac_info['sparsity']
             r = np.zeros(shape)
             val = self._randgen.random(len(rows))
