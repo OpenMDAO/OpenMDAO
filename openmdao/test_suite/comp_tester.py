@@ -128,3 +128,8 @@ class ComponentTester(object):
         msg = textwrap.indent(msg.getvalue(), '      ')
         print(msg, file=self._out_stream)
 
+    def test_coloring(self):
+        _, comp = self.wrapped_instance()
+        _, comp_colored = self.wrapped_instance(final_setup=False, run_model=False)
+        comp_colored.declare_coloring()
+        comp_colored.run_model()

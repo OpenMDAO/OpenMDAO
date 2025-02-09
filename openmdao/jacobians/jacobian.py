@@ -408,7 +408,7 @@ class Jacobian(object):
             for wrt, wstart, wend, _, _, _ in wrtiter:
                 key = (of, wrt)
                 if key in self._subjacs_info:
-                    subjac = self._subjacs_info[key]
+                    subjac = self.get_metadata(key)
                     if subjac['cols'] is None:  # dense
                         subjac['val'][:, :] = jac[start:end, wstart:wend]
                     else:  # our COO format

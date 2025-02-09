@@ -15,6 +15,7 @@ from openmdao.utils.general_utils import format_as_float_or_array, _subjac_meta2
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.utils.om_warnings import issue_warning
+from openmdao.utils.coloring import _ColSparsityJac
 
 
 _tuplist = (tuple, list)
@@ -954,6 +955,32 @@ class ImplicitComponent(Component):
         else:
             return list(chain(self._var_rel_names['input'], self._var_rel_names['output'],
                               self._discrete_inputs))
+
+    def compute_fd_sparsity(self, method='fd', num_full_jacs=2, perturb_size=1e-9):
+        """
+        Use finite difference to compute a sparsity matrix.
+
+        Parameters
+        ----------
+        method : str
+            The type of finite difference to perform. Valid options are 'fd' for forward difference,
+            or 'cs' for complex step.
+        num_full_jacs : int
+            Number of times to repeat jacobian computation using random perturbations.
+        perturb_size : float
+            Size of the random perturbation.
+
+        Returns
+        -------
+        coo_matrix
+            The sparsity matrix.
+        """
+        jac = _ColSparsityJac(self)
+        for _ in self._perturbation_iter(num_full_jacs, perturb_size,
+                                         (self._inputs, self._outputs), (self._residuals,)):
+            self._apply_nonlinear()
+            self.compute_fd_jac(jac=jac, method=method)
+        return jac.get_sparsity()
 
 
 def meta2range_iter(meta_dict, names=None, shp_name='shape'):

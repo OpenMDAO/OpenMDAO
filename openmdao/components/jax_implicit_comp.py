@@ -8,7 +8,8 @@ from itertools import chain
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.jax_utils import jax, jit, _jax_register_pytree_class, \
-    _compute_sparsity, ReturnChecker, get_vmap_tangents, _update_subjac_sparsity
+    _compute_sparsity, ReturnChecker, get_vmap_tangents, _update_subjac_sparsity, \
+    _jax_derivs2partials
 
 
 class JaxImplicitComponent(ImplicitComponent):
@@ -28,6 +29,8 @@ class JaxImplicitComponent(ImplicitComponent):
         Whether the compute_primal method returns a tuple.
     _tangents : dict
         The tangents for the inputs and outputs.
+    _sparsity : coo_matrix or None
+        The sparsity of the Jacobian.
     """
 
     def __init__(self, fallback_derivs_method='fd', **kwargs):  # noqa
@@ -37,6 +40,8 @@ class JaxImplicitComponent(ImplicitComponent):
 
         self._compute_primal_returns_tuple = False
         self._tangents = {'fwd': None, 'rev': None}
+        self._sparsity = None
+
         # if derivs_method is explicitly passed in, just use it
         if 'derivs_method' in kwargs:
             return
@@ -49,6 +54,8 @@ class JaxImplicitComponent(ImplicitComponent):
             self.options['derivs_method'] = fallback_derivs_method
 
     def _setup_jax(self):
+        self._sparsity = None
+
         if self.compute_primal is None:
             raise RuntimeError(f"{self.msginfo}: compute_primal is not defined for this component.")
 
@@ -85,7 +92,7 @@ class JaxImplicitComponent(ImplicitComponent):
 
         _jax_register_pytree_class(self.__class__)
 
-    def _get_jac_func(self):
+    def _get_jacobian_func(self):
         # TODO: modify this to use relevance and possibly compile multiple jac functions depending
         # on DV/response so that we don't compute any derivatives that are always zero.
         if self._jac_func_ is None:
@@ -127,7 +134,8 @@ class JaxImplicitComponent(ImplicitComponent):
         coo_matrix
             The sparsity of the Jacobian.
         """
-        self._sparsity = _compute_sparsity(self, direction, num_iters, perturb_size)
+        if self._sparsity is None:
+            self._sparsity = _compute_sparsity(self, direction, num_iters, perturb_size)
         return self._sparsity
 
     def _get_tangents(self, direction):
@@ -175,40 +183,10 @@ class JaxImplicitComponent(ImplicitComponent):
         discrete_outputs : dict or None
             If not None, dict containing discrete output values.
         """
-        deriv_vals = self._get_jac_func()(*self._get_compute_primal_invals(inputs, outputs,
-                                                                           discrete_inputs))
-        nested_tup = isinstance(deriv_vals, tuple) and len(deriv_vals) > 0 and \
-            isinstance(deriv_vals[0], tuple)
-
-        nof = len(self._var_rel_names['output'])
-        ofidx = len(self._discrete_outputs) - 1
-        for ofname in self._var_rel_names['output']:
-            ofidx += 1
-            ofmeta = self._var_rel2meta[ofname]
-            for wrtidx, wrtname in enumerate(chain(self._var_rel_names['input'],
-                                                   self._var_rel_names['output'])):
-                key = (ofname, wrtname)
-                if key not in partials:
-                    # FIXME: this means that we computed a derivative that we didn't need
-                    continue
-
-                wrtmeta = self._var_rel2meta[wrtname]
-                dvals = deriv_vals
-                # if there's only one 'of' value, we only take the indexed value if the
-                # return value of compute_primal is single entry tuple. If a single array or
-                # scalar is returned, we don't apply the 'of' index.
-                if nof > 1 or nested_tup:
-                    dvals = dvals[ofidx]
-
-                # print(ofidx, ofname, ofmeta['shape'], wrtidx, wrtname, wrtmeta['shape'],
-                #       'subjac_shape', dvals[wrtidx].shape)
-                dvals = dvals[wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
-
-                sjmeta = partials.get_metadata(key)
-                if sjmeta['rows'] is None:
-                    partials[ofname, wrtname] = dvals
-                else:
-                    partials[ofname, wrtname] = dvals[sjmeta['rows'], sjmeta['cols']]
+        derivs = self._get_jacobian_func()(*self._get_compute_primal_invals(inputs, outputs,
+                                                                            discrete_inputs))
+        _jax_derivs2partials(self, derivs, partials, self._var_rel_names['output'],
+                             chain(self._var_rel_names['input'], self._var_rel_names['output']))
 
     def _jax_apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
         r"""

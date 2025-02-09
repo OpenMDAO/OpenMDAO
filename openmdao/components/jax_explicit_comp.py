@@ -9,7 +9,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.jax_utils import jax, jit, ReturnChecker, \
     _jax_register_pytree_class, _compute_sparsity, get_vmap_tangents, _compute_jac, \
-        _update_subjac_sparsity
+    _update_subjac_sparsity, _jax_derivs2partials
 
 
 class JaxExplicitComponent(ExplicitComponent):
@@ -29,6 +29,8 @@ class JaxExplicitComponent(ExplicitComponent):
         Whether the compute_primal method returns a tuple.
     _tangents : dict
         The tangents for the inputs and outputs.
+    _sparsity : coo_matrix or None
+        The sparsity of the Jacobian.
     """
 
     def __init__(self, fallback_derivs_method='fd', **kwargs):  # noqa
@@ -57,6 +59,8 @@ class JaxExplicitComponent(ExplicitComponent):
 
         This happens in final_setup after all var sizes and partials are set.
         """
+        self._sparsity = None
+
         if self.compute_primal is None:
             raise RuntimeError(f"{self.msginfo}: compute_primal is not defined for this component.")
 
@@ -93,7 +97,7 @@ class JaxExplicitComponent(ExplicitComponent):
 
         _jax_register_pytree_class(self.__class__)
 
-    def _get_jac_func(self):
+    def _get_jacobian_func(self):
         """
         Return the jacobian function for this component.
 
@@ -166,17 +170,18 @@ class JaxExplicitComponent(ExplicitComponent):
         discrete_inputs : dict or None
             If not None, dict containing discrete input values.
         """
-        derivs = self._get_jac_func()(*self._get_compute_primal_invals(inputs,
-                                                                       self._discrete_inputs))
+        derivs = self._get_jacobian_func()(*self._get_compute_primal_invals(inputs,
+                                                                            self._discrete_inputs))
         # check to see if we even need this with jax.  A jax component doesn't need to map string
         # keys to partials.  We could just use the jacobian as an array to compute the derivatives.
         # Maybe make a simple JaxJacobian that is just a thin wrapper around the jacobian array.
         # The only issue is do higher level jacobians need the subjacobian info?
-        self.jax_derivs2partials(derivs, partials)
+        _jax_derivs2partials(self, derivs, partials, self._var_rel_names['output'],
+                             self._var_rel_names['input'])
 
     def _jacfwd_colored(self, inputs, partials, discrete_inputs=None):
         """
-        Compute the forward jacobian using vmap with jvp.
+        Compute the forward jacobian using vmap with jvp and coloring.
 
         Parameters
         ----------
@@ -188,11 +193,11 @@ class JaxExplicitComponent(ExplicitComponent):
             If not None, dict containing discrete input values.
         """
         J = _compute_jac(self, 'fwd', inputs=inputs, discrete_inputs=discrete_inputs)
-        self.dense_jac2partials(J, partials)
+        partials.set_dense_jac(self, J)
 
     def _jacrev_colored(self, inputs, partials, discrete_inputs=None):
         """
-        Compute the reverse jacobian using vmap with vjp.
+        Compute the reverse jacobian using vmap with vjp and coloring.
 
         Parameters
         ----------
@@ -204,7 +209,7 @@ class JaxExplicitComponent(ExplicitComponent):
             If not None, dict containing discrete input values.
         """
         J = _compute_jac(self, 'rev', inputs=inputs, discrete_inputs=discrete_inputs)
-        self.dense_jac2partials(J, partials)
+        partials.set_dense_jac(self, J)
 
     def compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9):
         """
@@ -264,80 +269,6 @@ class JaxExplicitComponent(ExplicitComponent):
                 self._tangents[direction] = get_vmap_tangents(tuple(self._outputs.values()),
                                                               direction, fill=1., coloring=coloring)
         return self._tangents[direction]
-
-    def dense_jac2partials(self, J, partials):
-        """
-        Copy a dense Jacobian into partials.
-
-        Parameters
-        ----------
-        J : ndarray
-            The dense Jacobian.
-        partials : dict
-            The partials to copy the Jacobian into, keyed by (of_name, wrt_name).
-        """
-        ofstart = ofend = 0
-        for ofname in self._var_rel_names['output']:
-            ofmeta = self._var_rel2meta[ofname]
-            ofend += ofmeta['size']
-            wrtstart = wrtend = 0
-            for wrtname in self._var_rel_names['input']:
-                wrtmeta = self._var_rel2meta[wrtname]
-                wrtend += wrtmeta['size']
-                key = (ofname, wrtname)
-                if key not in partials:
-                    # FIXME: this means that we computed a derivative that we didn't need
-                    continue
-
-                dvals = J[ofstart:ofend, wrtstart:wrtend]
-                sjmeta = partials.get_metadata(key)
-                rows = sjmeta['rows']
-                if rows is None:
-                    partials[ofname, wrtname] = dvals
-                else:
-                    partials[ofname, wrtname] = dvals[rows, sjmeta['cols']]
-                wrtstart = wrtend
-            ofstart = ofend
-
-    def jax_derivs2partials(self, deriv_vals, partials):
-        """
-        Copy JAX derivatives into partials.
-
-        Parameters
-        ----------
-        deriv_vals : tuple
-            The derivatives.
-        partials : dict
-            The partials to copy the derivatives into, keyed by (of_name, wrt_name).
-        """
-        nested_tup = isinstance(deriv_vals, tuple) and len(deriv_vals) > 0 and \
-            isinstance(deriv_vals[0], tuple)
-        nof = len(self._var_rel_names['output'])
-
-        for ofidx, ofname in enumerate(self._var_rel_names['output']):
-            ofmeta = self._var_rel2meta[ofname]
-            for wrtidx, wrtname in enumerate(self._var_rel_names['input']):
-                key = (ofname, wrtname)
-                if key not in partials:
-                    # FIXME: this means that we computed a derivative that we didn't need
-                    continue
-
-                wrtmeta = self._var_rel2meta[wrtname]
-                dvals = deriv_vals
-                # if there's only one 'of' value, we only take the indexed value if the
-                # return value of compute_primal is single entry tuple. If a single array or
-                # scalar is returned, we don't apply the 'of' index.
-                if nof > 1 or nested_tup:
-                    dvals = dvals[ofidx]
-
-                dvals = dvals[wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
-
-                sjmeta = partials.get_metadata(key)
-                rows = sjmeta['rows']
-                if rows is None:
-                    partials[ofname, wrtname] = dvals
-                else:
-                    partials[ofname, wrtname] = dvals[rows, sjmeta['cols']]
 
     def _compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode, discrete_inputs=None):
         r"""

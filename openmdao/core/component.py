@@ -1983,30 +1983,6 @@ class Component(System):
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
             approximation.compute_approximations(self, jac=jac)
 
-    def compute_fd_sparsity(self, method='fd', num_full_jacs=2, perturb_size=1e-9):
-        """
-        Use finite difference to compute a sparsity matrix.
-
-        Parameters
-        ----------
-        method : str
-            The type of finite difference to perform. Valid options are 'fd' for forward difference,
-            or 'cs' for complex step.
-        num_full_jacs : int
-            Number of times to repeat jacobian computation using random perturbations.
-        perturb_size : float
-            Size of the random perturbation.
-
-        Returns
-        -------
-        coo_matrix
-            The sparsity matrix.
-        """
-        jac = coloring_mod._ColSparsityJac(self)
-        for _ in self._perturbation_iter(num_full_jacs, perturb_size):
-            self.compute_fd_jac(jac=jac, method=method)
-        return jac.get_sparsity()
-
     def check_sparsity(self, method='fd', max_nz=90., out_stream=_DEFAULT_OUT_STREAM):
         """
         Check the sparsity of the computed jacobian against the declared sparsity.

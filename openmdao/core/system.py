@@ -1718,17 +1718,16 @@ class System(object, metaclass=SystemMetaclass):
         method = self.options['derivs_method']
         return method in ('fd', 'cs')
 
-    def _perturbation_iter(self, num_iters, perturb_size):
+    def _perturbation_iter(self, num_iters, perturb_size, perturb_vecs=(), save_vecs=()):
         """
-        Iterate over random perturbations of the inputs array.
+        Iterate over random perturbations of the given Vectors.
 
-        For implicit components, we also randomize the outputs.  The perturbation is relative
-        to the starting value of the input or output, unless that value is 0.0, in which case
-        the perturbation is absolute.  The final value of the input or output is the perturbation
-        multiplied by a random number between 0 and 1 added to the starting value.
+        The perturbation is relative to the starting value, unless that value is 0.0,
+        in which case the perturbation is absolute.  Otherwise, the perturbed value is the
+        perturb_size multiplied by a random number between 0 and 1 added to the starting value.
 
-        Inputs, outputs, and residuals are all restored to their starting values at the end of
-        the iterations.
+        All vectors in perturb_vecs and save_vecs are restored to their starting values at the end
+        of the iterations.  The same vector should NOT be added to both perturb_vecs and save_vecs.
 
         Parameters
         ----------
@@ -1736,46 +1735,33 @@ class System(object, metaclass=SystemMetaclass):
             Number of iterations to perform.
         perturb_size : float
             Size of relative perturbation.  If base value is 0.0, perturbation is absolute.
+        perturb_vecs : list of Vector
+            List of Vectors to perturb.
+        save_vecs : list of Vector
+            List of Vectors to save. This should not include any vectors in perturb_vecs.
 
         Yields
         ------
         int
             The current iteration number.
         """
-        from openmdao.core.group import Group
-        is_total = isinstance(self, Group)
         use_approx = self.uses_approx()
-        is_implicit = not self.is_explicit()
 
-        starting_inputs = self._inputs.asarray(copy=True)
-        starting_outputs = self._outputs.asarray(copy=True)
-        starting_resids = self._residuals.asarray(copy=True)
+        save_perturb_arrays = [vec.asarray(copy=True) for vec in perturb_vecs]
+        save_arrays = [vec.asarray(copy=True) for vec in save_vecs]
 
         # compute perturbations
-        in_perturbs = starting_inputs.copy()
-        in_perturbs[in_perturbs == 0.0] = 1.0
-        in_perturbs *= perturb_size
-
-        if is_implicit:
-            out_perturbs = starting_outputs.copy()
-            out_perturbs[out_perturbs == 0.0] = 1.0
-            out_perturbs *= perturb_size
+        perturbs = []
+        for arr in save_perturb_arrays:
+            perturb = arr.copy()
+            perturb[perturb == 0.0] = 1.0
+            perturb *= perturb_size
+            perturbs.append(perturb)
 
         for i in range(num_iters):
-            # randomize inputs (and outputs if implicit)
-            self._inputs.set_val(starting_inputs + in_perturbs * np.random.random(in_perturbs.size))
-            if is_implicit:
-                self._outputs.set_val(starting_outputs +
-                                      out_perturbs * np.random.random(out_perturbs.size))
-            if is_total:
-                with self._relevance.nonlinear_active('iter'):
-                    self._solve_nonlinear()
-            else:
-                self._apply_nonlinear()
-
-            if use_approx:
-                for scheme in self._approx_schemes.values():
-                    scheme._reset()  # force a re-initialization of approx
+            # add random noise to the perturbed vectors
+            for pvec, starting, perturb in zip(perturb_vecs, save_perturb_arrays, perturbs):
+                pvec.set_val(starting + perturb * np.random.random(perturb.size))
 
             yield i
 
@@ -1784,10 +1770,11 @@ class System(object, metaclass=SystemMetaclass):
             for scheme in self._approx_schemes.values():
                 scheme._reset()
 
-        # restore original inputs/outputs/resids
-        self._inputs.set_val(starting_inputs)
-        self._outputs.set_val(starting_outputs)
-        self._residuals.set_val(starting_resids)
+        # restore original Vectors
+        for vec, save_array in zip(perturb_vecs, save_perturb_arrays):
+            vec.set_val(save_array)
+        for vec, save_array in zip(save_vecs, save_arrays):
+            vec.set_val(save_array)
 
     def compute_sparsity(self, direction=None, num_iters=2, perturb_size=1e-9):
         """
@@ -1842,10 +1829,19 @@ class System(object, metaclass=SystemMetaclass):
         # use special sparse jacobian to collect sparsity info
         self._jacobian = _ColSparsityJac(self)
 
+        if self.is_explicit():
+            pvecs = (self._inputs,)
+            save_vecs = (self._outputs, self._residuals)
+        else:
+            pvecs = (self._inputs, self._outputs)
+            save_vecs = (self._residuals,)
+
         from openmdao.core.group import Group
 
         if isinstance(self, Group):
-            for _ in self._perturbation_iter(num_iters, perturb_size):
+            for _ in self._perturbation_iter(num_iters, perturb_size, pvecs, save_vecs):
+                with self._relevance.nonlinear_active('iter'):
+                    self._solve_nonlinear()
                 self.run_linearize(sub_do_ln=False)
             sparsity, sp_info = self._jacobian.get_sparsity()
         else:

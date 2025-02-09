@@ -918,17 +918,25 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
 
     assert direction in ['fwd', 'rev']
 
-    ncontins = self._inputs.nvars()
     ncontouts = self._outputs.nvars()
 
     implicit = not self.is_explicit()
 
     if implicit:
-        ncontins += ncontouts
+        ncontins = self._inputs.nvars() + ncontouts
+        pvecs = (self._inputs, self._outputs)
+        save_vecs = (self._residuals,)
+    else:
+        ncontins = self._inputs.nvars()
+        pvecs = (self._inputs,)
+        save_vecs = (self._outputs, self._residuals,)
 
     sparsity = None
 
-    for _ in self._perturbation_iter(num_iters=num_iters, perturb_size=perturb_size):
+    for _ in self._perturbation_iter(num_iters=num_iters, perturb_size=perturb_size,
+                                     perturb_vecs=pvecs, save_vecs=save_vecs):
+        self._apply_nonlinear()
+
         full_invals = tuple(self._get_compute_primal_invals())
         icontvals = full_invals[:ncontins]  # continuous inputs
         idiscvals = full_invals[ncontins:]  # discrete inputs
@@ -1141,6 +1149,60 @@ def _uncompress_jac(self, J, direction):
     if self._coloring_info.coloring is not None:
         return self._coloring_info.coloring.expand_jac(J, direction)
     return J
+
+
+def _jax_derivs2partials(self, deriv_vals, partials, ofnames, wrtnames):
+    """
+    Copy JAX derivatives into partials.
+
+    Parameters
+    ----------
+    self : Component
+        The component to copy the derivatives into.
+    deriv_vals : tuple
+        The derivatives.
+    partials : dict
+        The partials to copy the derivatives into, keyed by (of_name, wrt_name).
+    ofnames : list
+        The output names.
+    wrtnames : list
+        The input names.
+    """
+    nested_tup = isinstance(deriv_vals, tuple) and len(deriv_vals) > 0 and \
+        isinstance(deriv_vals[0], tuple)
+    nof = len(ofnames)
+
+    discrete_outs = self._discrete_outputs
+    discrete_ins = self._discrete_inputs
+
+    for ofidx, ofname in enumerate(ofnames):
+        if ofname in discrete_outs:
+            continue
+        ofmeta = self._var_rel2meta[ofname]
+        for wrtidx, wrtname in enumerate(wrtnames):
+            if wrtname in discrete_ins or wrtname in discrete_outs:
+                continue
+            key = (ofname, wrtname)
+            if key not in partials:
+                # FIXME: this means that we computed a derivative that we didn't need
+                continue
+
+            wrtmeta = self._var_rel2meta[wrtname]
+            dvals = deriv_vals
+            # if there's only one 'of' value, we only take the indexed value if the
+            # return value of compute_primal is single entry tuple. If a single array or
+            # scalar is returned, we don't apply the 'of' index.
+            if nof > 1 or nested_tup:
+                dvals = dvals[ofidx]
+
+            dvals = dvals[wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
+
+            sjmeta = partials.get_metadata(key)
+            rows = sjmeta['rows']
+            if rows is None:
+                partials[ofname, wrtname] = dvals
+            else:
+                partials[ofname, wrtname] = dvals[rows, sjmeta['cols']]
 
 
 def _to_compute_primal_setup_parser(parser):
