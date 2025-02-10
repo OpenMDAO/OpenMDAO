@@ -133,7 +133,7 @@ class _TotalJacInfo(object):
             driver = problem.driver
         self.model = model = problem.model
 
-        self.comm = problem.comm
+        self.comm = model.comm
         self._orig_mode = problem._orig_mode
         self.has_scaling = driver and driver._has_scaling and driver_scaling
         self.return_format = return_format
