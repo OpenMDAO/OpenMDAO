@@ -308,21 +308,6 @@ class TestAnalysisDriverParallel(unittest.TestCase):
                 num_recorded_cases += len(cr.list_cases(out_stream=None))
             self.assertEqual(num_recorded_cases, 5)
 
-    def test_zip_generator_incompatible_sizes(self):
-        """
-        Test that ZipGenerator raises if the given value lists do not agree in shape.
-        """
-        samples = {'x': {'val': [0.0, 0.5, 1.0, 1.5, 2.0]},
-                   'y': {'val': [0.0, 0.5, 1.0, 1.5]}}
-
-        with self.assertRaises(ValueError) as e:
-            om.ZipGenerator(samples)
-
-        expected = ("ZipGenerator requires that val for all var_dict have the same length:\n"
-                   "{'x': 5, 'y': 4}")
-
-        self.assertEqual(expected, str(e.exception))
-
     def test_parallel_system(self):
         import numpy as np
         import openmdao.api as om
@@ -368,12 +353,10 @@ class TestAnalysisDriverParallel(unittest.TestCase):
         prob.driver.recording_options['includes'].append('sub.c1.x')
         prob.driver.recording_options['includes'].append('sub.c2.x')
 
-
         prob.setup()
         prob.final_setup()
         prob.run_driver()
         prob.cleanup()
-
 
         num_models = prob.comm.size // procs_per_model
         rank = prob.comm.rank
@@ -387,14 +370,6 @@ class TestAnalysisDriverParallel(unittest.TestCase):
 
             # On rank 0 we should have even cases, with odd cases on rank 1
             self.assertSetEqual(case_nums, {i for i in range(rank, 100, 2)})
-
-            last_case = cr.get_cases(source='driver')[-1]
-            print(last_case)
-            print('inputs')
-            print(last_case.list_inputs())
-            print('outputs')
-            print(last_case.list_outputs())
-
 
 @use_tempdirs
 class TestAnalysisDriver(unittest.TestCase):
@@ -549,6 +524,20 @@ class TestAnalysisDriver(unittest.TestCase):
             self.assertEqual(outputs['x'][0], expected_case['x'][0])
             self.assertEqual(outputs['y'][0], expected_case['y'][0])
 
+    def test_zip_generator_incompatible_sizes(self):
+        """
+        Test that ZipGenerator raises if the given value lists do not agree in shape.
+        """
+        samples = {'x': {'val': [0.0, 0.5, 1.0, 1.5, 2.0]},
+                   'y': {'val': [0.0, 0.5, 1.0, 1.5]}}
+
+        with self.assertRaises(ValueError) as e:
+            om.ZipGenerator(samples)
+
+        expected = ("ZipGenerator requires that val for all var_dict have the same length:\n"
+                   "{'x': 5, 'y': 4}")
+
+        self.assertEqual(expected, str(e.exception))
 
 
 if __name__ == "__main__":

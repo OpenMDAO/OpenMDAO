@@ -31,16 +31,14 @@ class AnalysisDriver(Driver):
 
     Parameters
     ----------
-    samples : Sequence or None
-        If given, provides a Sequence of samples (variable names and values to be tested). If None,
-        samples is an empty list which may be appended.
+    samples : list, tuple, or AnalysisGenerator
+        If given, provides a list or tuple of samples (variable names and values to be tested), or
+        an AnalysisGenerator which provides samples.
     **kwargs : dict of keyword arguments
         Keyword arguments that will be mapped into the Driver options.
 
     Attributes
     ----------
-    _samples : list or tuple or AnalysisGenerator
-        A list of samples to be executed by the AnalysisDriver.
     _name : str
         The name used to identify this driver in recorded samples.
     _problem_comm : MPI.Comm or None
@@ -51,6 +49,8 @@ class AnalysisDriver(Driver):
         The number of total MPI colors for the run.
     _prev_sample_vars : set
         The set of variables seen in the previous iteration of the driver on this rank.
+    _generator : AnalysisGenerator
+        The internal AnalysisGenerator providing samples.
     """
 
     def __init__(self, samples=None, **kwargs):
@@ -259,17 +259,21 @@ class AnalysisDriver(Driver):
                 if comm.rank == 0:
                     job_queues = [deque() for _ in range(n_procs)]
                     # Rank 0 pushes batch_size jobs to the ranks in job_queues
-                    for i, sample in enumerate(self._generator):
-                        # Ranks of the same color get the same samples
+                    batch_i = 0
+                    while True:
+                        try:
+                            sample = next(self._generator)
+                        except StopIteration:
+                            samples_complete = True
+                            break
+
                         color_idx = next(color_cycler)
                         for rank_idx in color_to_rank_map[color_idx]:
                             job_queues[rank_idx].appendleft((sample_num, sample))
-                        sample_num += 1
-                        if i >= batch_size - 1:
-                            # Break once batch_size samples obtained
+                        if batch_i >= batch_size:
                             break
-                    else:
-                        samples_complete = True
+                        batch_i += 1
+                        sample_num += 1
 
                 # Broadcast the samples_complete signal from root to all ranks
                 samples_complete = comm.bcast(samples_complete, root=0)

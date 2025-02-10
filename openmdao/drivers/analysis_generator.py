@@ -7,7 +7,6 @@ of variables and values to be tested, produce some set of sample values to be ev
 """
 
 from collections.abc import Iterator
-from collections import deque
 import csv
 import itertools
 
@@ -255,18 +254,38 @@ class SequenceGenerator:
     ----------
     container : container
         A python container, excluding strings, bytes, or bytearray.
+ 
+    Attributes
+    ----------
+    _sampled_vars : list(str)
+        A list of the variables in the model being sampled.
+    _iter : Iterator
+        The internal iterator over the users case data.
+
+    Raises
+    ------
+    StopIteration
+        When given list or tuple is exhausted.
     """
+
     def __init__(self, container):
+        """
+        Instantiate a SequenceGenerator with the given container of samples.
+        """
         self._sampled_vars = [k for k in list(container)[0].keys()]
-        self._data = deque(container)
+        self._iter = iter(container)
 
     def __iter__(self):
+        """
+        Provide the python iterator for this instance.
+        """
         return self
 
     def __next__(self):
-        if not self._data:
-            raise StopIteration
-        return self._data.popleft()  # Removes and returns the first element
+        """
+        Provide the next values for the variables in the generator.
+        """
+        return next(self._iter)
 
     def _get_sampled_vars(self):
         """
