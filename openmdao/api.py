@@ -87,7 +87,8 @@ from openmdao.drivers.doe_generators import ListGenerator, CSVGenerator, Uniform
     FullFactorialGenerator, PlackettBurmanGenerator, BoxBehnkenGenerator, LatinHypercubeGenerator, \
     GeneralizedSubsetGenerator
 from openmdao.drivers.analysis_driver import AnalysisDriver
-from openmdao.drivers.analysis_generator import ProductGenerator, ZipGenerator
+from openmdao.drivers.analysis_generator import ProductGenerator, ZipGenerator, SequenceGenerator, \
+    CSVGenerator as CSVAnalysisGenerator
 
 # System-Building Tools
 from openmdao.utils.options_dictionary import OptionsDictionary

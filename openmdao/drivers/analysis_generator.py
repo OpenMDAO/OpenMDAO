@@ -254,7 +254,7 @@ class SequenceGenerator:
     ----------
     container : container
         A python container, excluding strings, bytes, or bytearray.
- 
+
     Attributes
     ----------
     _sampled_vars : list(str)

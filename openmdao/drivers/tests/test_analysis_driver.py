@@ -495,8 +495,7 @@ class TestAnalysisDriver(unittest.TestCase):
         prob.setup()
 
         # # create DOEDriver using generated CSV file
-        from openmdao.drivers.analysis_generator import CSVGenerator
-        prob.driver = om.AnalysisDriver(CSVGenerator('samples.csv', has_units=True, has_indices=True))
+        prob.driver = om.AnalysisDriver(om.CSVAnalysisGenerator('samples.csv', has_units=True, has_indices=True))
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.run_driver()
