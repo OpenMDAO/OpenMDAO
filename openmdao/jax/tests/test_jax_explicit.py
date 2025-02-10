@@ -118,7 +118,6 @@ class DotProductMultDiscretePrimal(om.JaxExplicitComponent):
         disc_out = -disc_in
         z, zz = jax.lax.cond(disc_in >= 0, pos, neg, x, y)
 
-        self._discrete_outputs.set_vals((disc_out,))
         return (z, zz, disc_out)
 
 
@@ -333,12 +332,11 @@ if sys.version_info >= (3, 9):
 
     class CompRetValue(om.JaxExplicitComponent):
         def __init__(self, shape, nins=1, nouts=1, **kwargs):
+            self.compute_primal = getattr(self, f'compute_primal_{nins}_{nouts}')
             super().__init__(**kwargs)
             self.shape = shape
             self.nins = nins
             self.nouts = nouts
-
-            self.compute_primal = getattr(self, f'compute_primal_{self.nins}_{self.nouts}')
 
         def setup(self):
             if self.shape == ():
@@ -370,12 +368,11 @@ if sys.version_info >= (3, 9):
 
     class CompRetTuple(om.JaxExplicitComponent):
         def __init__(self, shape, nins=1, nouts=1, **kwargs):
+            self.compute_primal = getattr(self, f'compute_primal_{nins}_{nouts}')
             super().__init__(**kwargs)
             self.shape = shape
             self.nins = nins
             self.nouts = nouts
-
-            self.compute_primal = getattr(self, f'compute_primal_{self.nins}_{self.nouts}')
 
         def setup(self):
             if self.shape == ():
@@ -478,7 +475,7 @@ if __name__ == '__main__':
     # unittest.main()
 
     from openmdao.test_suite.comp_tester import ComponentTester
-    ComponentTester(DotProductMultDiscretePrimal, (), {'xshape': x_shape, 'yshape': y_shape}).run()
+    ComponentTester(DotProductMultDiscretePrimal, (), {'xshape': (200,1), 'yshape': (1,200)}).run()
 
     #p = om.Problem()
     #ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))

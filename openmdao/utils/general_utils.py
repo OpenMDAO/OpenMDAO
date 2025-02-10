@@ -2,6 +2,7 @@
 import os
 import re
 import sys
+import textwrap
 from types import TracebackType
 import unittest
 from contextlib import contextmanager
@@ -648,6 +649,50 @@ def printoptions(*args, **kwds):
         yield np.get_printoptions()
     finally:
         np.set_printoptions(**opts)
+
+
+@contextmanager
+def indent_context(stream, indent='   '):
+    """
+    Context manager for indenting all std output.
+
+    Parameters
+    ----------
+    stream : stream
+        The stream to write indented output to.
+    stdouts : list of stream
+        A list of streams to buffer stdout from.  If None, use sys.stdout.
+    indent : str
+        The string to use for indentation.
+
+    Returns
+    -------
+    contextmanager
+        A context manager for indenting output.
+    """
+    save_stdout = sys.stdout
+    save_stderr = sys.stderr
+
+    # buffer all of stdout so we can indent it all
+    sys.stdout = StringIO()
+    sys.stderr = sys.stdout
+
+    try:
+        yield sys.stdout
+    except Exception:
+        # not sure what happened, so just print the whole thing without indentation
+        print(sys.stdout.getvalue(), file=save_stdout)
+        errs = sys.stderr.getvalue()
+        if errs:
+            print(errs, file=save_stderr)
+        raise
+    else:
+        # nothing went wrong so do indentation
+        if stream is not None:
+            stream.write(textwrap.indent(sys.stdout.getvalue(), indent))
+    finally:
+        sys.stderr = save_stderr
+        sys.stdout = save_stdout
 
 
 def _nothing():

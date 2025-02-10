@@ -143,16 +143,16 @@ class ApproximationScheme(object):
         raise NotImplementedError("add_approximation has not been implemented")
 
     def _init_colored_approximations(self, system):
+        # don't do anything if the coloring doesn't exist yet, or if there is no
+        # forward coloring
+        coloring = system._coloring_info.coloring
+        if coloring is None or coloring._fwd is None:
+            return
+
         is_total = system.pathname == ''
         is_semi = _is_group(system) and not is_total
         self._colored_approx_groups = []
         wrt_ranges = []
-
-        # don't do anything if the coloring doesn't exist yet, or if there is no
-        # forward coloring
-        coloring = system._coloring_info.coloring
-        if not isinstance(coloring, coloring_mod.Coloring) or coloring._fwd is None:
-            return
 
         wrt_matches = system._coloring_info._update_wrt_matches(system)
         out_slices = system._outputs.get_slice_dict()

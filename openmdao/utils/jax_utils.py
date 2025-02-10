@@ -1172,16 +1172,9 @@ def _jax_derivs2partials(self, deriv_vals, partials, ofnames, wrtnames):
         isinstance(deriv_vals[0], tuple)
     nof = len(ofnames)
 
-    discrete_outs = self._discrete_outputs
-    discrete_ins = self._discrete_inputs
-
     for ofidx, ofname in enumerate(ofnames):
-        if ofname in discrete_outs:
-            continue
         ofmeta = self._var_rel2meta[ofname]
         for wrtidx, wrtname in enumerate(wrtnames):
-            if wrtname in discrete_ins or wrtname in discrete_outs:
-                continue
             key = (ofname, wrtname)
             if key not in partials:
                 # FIXME: this means that we computed a derivative that we didn't need

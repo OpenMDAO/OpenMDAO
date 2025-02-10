@@ -2,9 +2,11 @@ import traceback
 import sys
 from io import StringIO
 import textwrap
+from timeit import timeit
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_check_totals, assert_check_partials
+from openmdao.utils.general_utils import indent_context
 
 
 class ComponentTester(object):
@@ -37,7 +39,7 @@ class ComponentTester(object):
             'partials_complex': self.test_partials_complex,
             'totals': self.test_totals,
             'totals_complex': self.test_totals_complex,
-            # 'coloring': self.test_coloring,
+            'coloring': self.test_coloring,
             'sparsity': self.test_sparsity,
             # 'fd': self.test_fd,
             # 'config': self.test_config,
@@ -74,17 +76,14 @@ class ComponentTester(object):
             print(f"\nTesting class {self._comp_class.__name__}", file=self._out_stream)
 
         for test in tests:
-            if self._out_stream is not None:
-                print(f'   Running test {test}', file=self._out_stream)
-            try:
-                self._test_methods[test]()
-            except Exception as e:
-                if self._out_stream is not None:
-                    msg = StringIO()
-                    print(traceback.format_exc(), file=msg)
-                    msg = textwrap.indent(msg.getvalue(), '         ')
-                    print(f'      {test} failed:\n{msg}', file=self._out_stream)
-                failed.append(test)
+            with indent_context(self._out_stream) as outer_stream:
+                print(f'Running test {test}')
+                try:
+                    with indent_context(outer_stream) as inner_stream:
+                        self._test_methods[test]()
+                except Exception:
+                    print(f'{test} failed:\n{traceback.format_exc()}')
+                    failed.append(test)
 
         if failed:
             raise Exception(f'{len(failed)} tests failed: {", ".join(failed)}')
@@ -128,8 +127,24 @@ class ComponentTester(object):
         msg = textwrap.indent(msg.getvalue(), '      ')
         print(msg, file=self._out_stream)
 
-    def test_coloring(self):
-        _, comp = self.wrapped_instance()
-        _, comp_colored = self.wrapped_instance(final_setup=False, run_model=False)
-        comp_colored.declare_coloring()
-        comp_colored.run_model()
+    def test_coloring(self, nlinearize=2, show_sparsity=False):
+        save = self._reuse
+        self._reuse = False
+        try:
+            p_colored, comp_colored = self.wrapped_instance(final_setup=False, run_model=False)
+            comp_colored.declare_coloring(show_summary=True, show_sparsity=show_sparsity)
+            p_colored.run_model()
+            comp_colored._linearize()  # force coloring to be computed
+
+            if comp_colored._coloring_info.coloring is None:
+                print(f'{comp_colored.msginfo}: Coloring failed to be computed.')
+                return
+
+            _, comp = self.wrapped_instance()
+            t = timeit(lambda: comp._linearize(), number=nlinearize)
+            print(f'\nuncolored linearize time: {t/nlinearize:10.4e} s')
+            t_colored = timeit(lambda: comp_colored._linearize(), number=nlinearize)
+            print(f'colored linearize time: {t_colored/nlinearize:10.4e} s')
+
+        finally:
+            self._reuse = save

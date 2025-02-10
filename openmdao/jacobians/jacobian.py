@@ -60,12 +60,13 @@ class Jacobian(object):
         self._col2name_ind = None
 
     def _get_abs_key(self, key):
-        if key in self._abs_keys:
+        try:
             return self._abs_keys[key]
-        abskey = key2abs_key(self._system(), key)
-        if abskey is not None:
-            self._abs_keys[key] = abskey
-        return abskey
+        except KeyError:
+            abskey = key2abs_key(self._system(), key)
+            if abskey is not None:
+                self._abs_keys[key] = abskey
+            return abskey
 
     def _abs_key2shape(self, abs_key):
         """
@@ -105,10 +106,9 @@ class Jacobian(object):
         dict
             Metadata dict for the given key.
         """
-        abs_key = self._get_abs_key(key)
-        if abs_key in self._subjacs_info:
-            return self._subjacs_info[abs_key]
-        else:
+        try:
+            return self._subjacs_info[self._get_abs_key(key)]
+        except KeyError:
             msg = '{}: Variable name pair ("{}", "{}") not found.'
             raise KeyError(msg.format(self.msginfo, key[0], key[1]))
 
@@ -142,10 +142,9 @@ class Jacobian(object):
         ndarray or spmatrix or list[3]
             sub-Jacobian as an array, sparse mtx, or AIJ/IJ list or tuple.
         """
-        abs_key = self._get_abs_key(key)
-        if abs_key in self._subjacs_info:
-            return self._subjacs_info[abs_key]['val']
-        else:
+        try:
+            return self._subjacs_info[self._get_abs_key(key)]['val']
+        except KeyError:
             msg = '{}: Variable name pair ("{}", "{}") not found.'
             raise KeyError(msg.format(self.msginfo, key[0], key[1]))
 

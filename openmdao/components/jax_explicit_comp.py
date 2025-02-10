@@ -41,6 +41,13 @@ class JaxExplicitComponent(ExplicitComponent):
         self._compute_primal_returns_tuple = False
         self._tangents = {'fwd': None, 'rev': None}
         self._sparsity = None
+        self._static_hash = None
+        self._differentiable_compute_primal = None
+
+        if self.compute_primal is None:
+            raise RuntimeError(f"{self.msginfo}: compute_primal is not defined for this component.")
+
+        self._orig_compute_primal = self.compute_primal
 
         # if derivs_method is explicitly passed in, just use it
         if 'derivs_method' in kwargs:
@@ -61,8 +68,9 @@ class JaxExplicitComponent(ExplicitComponent):
         """
         self._sparsity = None
 
-        if self.compute_primal is None:
-            raise RuntimeError(f"{self.msginfo}: compute_primal is not defined for this component.")
+        # compute_primal is overridden during setup, so restore the original method in case this
+        # is called more than once.
+        self.compute_primal = self._orig_compute_primal
 
         if self.matrix_free:
             if self._coloring_info.use_coloring():
@@ -88,33 +96,108 @@ class JaxExplicitComponent(ExplicitComponent):
         # determine if the compute_primal method returns a tuple
         self._compute_primal_returns_tuple = ReturnChecker(self.compute_primal).returns_tuple()
 
-        if self.options['use_jit']:
-            # jit the compute_primal method
-            idx = len(self._var_rel_names['input']) + 1
-            static_argnums = list(range(idx, idx + len(self._discrete_inputs)))
-            self.compute_primal = MethodType(jit(self.compute_primal.__func__,
-                                                 static_argnums=static_argnums), self)
-
         _jax_register_pytree_class(self.__class__)
 
-    def _get_jacobian_func(self):
+    def _statics_changed(self, discrete_inputs):
         """
-        Return the jacobian function for this component.
+        Determine if jitting is needed based on changes in static values since the last call.
 
-        In forward mode without coloring, jax.jacfwd is used, and in reverse mode without coloring,
-        jax.jacrev is used.
+        Parameters
+        ----------
+        discrete_inputs : dict
+            dict containing discrete input values.
 
-        If coloring is used, then the jacobian is computed using vmap with jvp or vjp depending on
-        the direction, with the tangents determined by the coloring information.
+        Returns
+        -------
+        bool
+            Whether jitting is needed.
+        """
+        # if static values change, we need to rejit
+        inhash = tuple(discrete_inputs) if discrete_inputs else ()
+        inhash = inhash + self.get_self_statics()
+        if inhash != self._static_hash:
+            self._static_hash = inhash
+            return True
+        return False
+
+    def _get_differentiable_compute_primal(self, discrete_inputs, need_jit):
+        """
+        Get the compute_primal function for the jacobian.
+
+        This version of the compute primal should take no discrete inputs and return no discrete
+        outputs. It will be called by jax.jvp or jax.vjp to compute the jacobian.
+
+        Parameters
+        ----------
+        discrete_inputs : iter of discrete values
+            The discrete input values.
+        need_jit : bool
+            Whether to jit the compute_primal function.
 
         Returns
         -------
         function
-            The jacobian function.
+            The compute_primal function to be used to compute the jacobian.
         """
-        # TODO: modify this to use relevance and possibly compile multiple jac functions depending
-        # on DV/response so that we don't compute any derivatives that are always zero.
-        if self._jac_func_ is None:
+        ncontouts = self._outputs.nvars()
+
+        # exclude the discrete inputs from the inputs and the discrete outputs from the outputs
+        if ncontouts == 1 and not self._compute_primal_returns_tuple:
+            if discrete_inputs:
+                def differentiable_compute_primal(*contvals):
+                    return self.compute_primal.__func__(*contvals, *discrete_inputs)
+            else:
+                differentiable_compute_primal = self.compute_primal.__func__
+        elif not discrete_inputs and not self._discrete_outputs:
+            differentiable_compute_primal = self.compute_primal.__func__
+        else:
+            def differentiable_compute_primal(*contvals):
+                return self.compute_primal.__func__(*contvals, *discrete_inputs)[:ncontouts]
+
+        if need_jit:
+            differentiable_compute_primal = jit(differentiable_compute_primal)
+
+        return differentiable_compute_primal
+
+    def _get_jax_compute_primal(self, discrete_inputs, need_jit):
+        """
+        Get the jax version of the compute_primal function.
+        """
+        compute_primal = self._orig_compute_primal.__func__
+
+        if need_jit:
+            # jit the compute_primal method
+            idx = self._inputs.nvars() + 1
+            static_argnums = list(range(idx, idx + len(discrete_inputs)))
+            compute_primal = jit(compute_primal, static_argnums=static_argnums)
+
+        return compute_primal
+
+    def _update_jax_functs(self, discrete_inputs):
+        """
+        Update the jax functions for this component if necessary.
+
+        An update is required if jitting is enabled and any static values have changed.
+
+        Parameters
+        ----------
+        discrete_inputs : dict or None
+            If not None, dict containing discrete input values.
+
+        Returns
+        -------
+        tuple
+            The jax functions (jax_compute_primal, jax_compute_jac). Note that these are not
+            methods, but rather functions. To make them methods you need to assign
+            MethodType(function, self) to an attribute of the instance.
+        """
+        need_jit = self.options['use_jit']
+        if need_jit and self._statics_changed(discrete_inputs):
+            self._jax_functs = None
+
+        if self._jax_functs is None:
+            jax_compute_primal = self._get_jax_compute_primal(discrete_inputs, need_jit)
+            jax_compute_jac = self._get_differentiable_compute_primal(discrete_inputs, need_jit)
             if self._coloring_info.use_coloring():
                 if self._coloring_info.coloring is None:
                     # need to dynamically compute the coloring first
@@ -124,19 +207,61 @@ class JaxExplicitComponent(ExplicitComponent):
                     self._jac_func_ = self._jacfwd_colored
                 else:
                     self._jac_func_ = self._jacrev_colored
-            else:  # just use jacfwd or jacrev
+            else:
                 fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
-                nstatic = len(self._discrete_inputs)
                 wrt_idxs = list(range(1, len(self._var_abs2meta['input']) + 1))
-                self._jac_func_ = MethodType(fjax(self.compute_primal.__func__, argnums=wrt_idxs),
-                                             self)
 
-                if self.options['use_jit']:
-                    static_argnums = tuple(range(1 + len(wrt_idxs), 1 + len(wrt_idxs) + nstatic))
-                    self._jac_func_ = MethodType(jit(self._jac_func_.__func__,
-                                                     static_argnums=static_argnums), self)
+            self._jax_functs = (jax_compute_primal, jax_compute_jac)
 
-        return self._jac_func_
+            self._jac_func_ = MethodType(fjax(jax_compute_jac, argnums=wrt_idxs), self)
+            self.compute_primal = MethodType(jax_compute_primal, self)
+
+    # def _get_jacobian_func(self, discrete_inputs):
+    #     """
+    #     Return the jacobian function for this component.
+
+    #     In forward mode without coloring, jax.jacfwd is used, and in reverse mode without coloring,
+    #     jax.jacrev is used.
+
+    #     If coloring is used, then the jacobian is computed using vmap with jvp or vjp depending on
+    #     the direction, with the tangents determined by the coloring information.
+
+    #     Parameters
+    #     ----------
+    #     discrete_inputs : dict or None
+    #         If not None, dict containing discrete input values.
+
+    #     Returns
+    #     -------
+    #     function
+    #         The jacobian function.
+    #     """
+    #     if self._statics_changed(discrete_inputs):
+    #         self._jac_func_ = None
+
+    #     if self._jac_func_ is None:
+    #         if self._coloring_info.use_coloring():
+    #             if self._coloring_info.coloring is None:
+    #                 # need to dynamically compute the coloring first
+    #                 self._compute_coloring()
+
+    #             if self.best_partial_deriv_direction() == 'fwd':
+    #                 self._jac_func_ = self._jacfwd_colored
+    #             else:
+    #                 self._jac_func_ = self._jacrev_colored
+    #         else:  # just use jacfwd or jacrev
+    #             fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
+    #             wrt_idxs = list(range(1, len(self._var_abs2meta['input']) + 1))
+    #             self._jac_func_ = MethodType(fjax(self._get_differentiable_compute_primal(discrete_inputs),
+    #                                               argnums=wrt_idxs), self)
+
+    #             # if self.options['use_jit']:
+    #             #     static_argnums = tuple(range(1 + len(wrt_idxs),
+    #             #                                  1 + len(wrt_idxs) + len(self._discrete_inputs)))
+    #             #     self._jac_func_ = MethodType(jit(self._jac_func_.__func__,
+    #             #                                      static_argnums=static_argnums), self)
+
+    #     return self._jac_func_
 
     def declare_coloring(self, **kwargs):
         """
@@ -170,8 +295,10 @@ class JaxExplicitComponent(ExplicitComponent):
         discrete_inputs : dict or None
             If not None, dict containing discrete input values.
         """
-        derivs = self._get_jacobian_func()(*self._get_compute_primal_invals(inputs,
-                                                                            self._discrete_inputs))
+        discrete_inputs = discrete_inputs.values() if discrete_inputs else ()
+        self._update_jax_functs(discrete_inputs)
+        derivs = self._jac_func_(*inputs.values())
+
         # check to see if we even need this with jax.  A jax component doesn't need to map string
         # keys to partials.  We could just use the jacobian as an array to compute the derivatives.
         # Maybe make a simple JaxJacobian that is just a thin wrapper around the jacobian array.
@@ -305,14 +432,14 @@ class JaxExplicitComponent(ExplicitComponent):
         else:
             inhash = ((inputs.get_hash(),) + tuple(self._discrete_inputs.values()) +
                       self.get_self_statics())
-            if inhash != self._vjp_hash:
+            if inhash != self._static_hash:
                 ncont_ins = d_inputs.nvars()
                 full_invals = tuple(self._get_compute_primal_invals(inputs, discrete_inputs))
                 x = full_invals[:ncont_ins]
                 other = full_invals[ncont_ins:]
                 # recompute vjp function if inputs have changed
                 _, self._vjp_fun = jax.vjp(lambda *args: self.compute_primal(*args, *other), *x)
-                self._vjp_hash = inhash
+                self._static_hash = inhash
 
             if self._compute_primal_returns_tuple:
                 deriv_vals = self._vjp_fun(tuple(d_outputs.values()) +
