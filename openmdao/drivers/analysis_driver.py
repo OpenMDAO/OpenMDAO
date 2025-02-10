@@ -9,7 +9,7 @@ import traceback
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.core.analysis_error import AnalysisError
 
-from openmdao.drivers.analysis_generator import AnalysisGenerator
+from openmdao.drivers.analysis_generator import AnalysisGenerator, SequenceGenerator
 from openmdao.utils.mpi import MPI
 from openmdao.utils.om_warnings import issue_warning, DriverWarning
 
@@ -57,14 +57,13 @@ class AnalysisDriver(Driver):
         """
         Construct an AnalysisDriver.
         """
-        if isinstance(samples, (list, tuple, AnalysisGenerator)):
-            self._samples = samples
+        if isinstance(samples, (list, tuple)):
+            self._generator = SequenceGenerator(samples)
+        elif isinstance(samples, AnalysisGenerator):
+            self._generator = samples
         elif samples is not None:
             raise ValueError('If given, samples must be a list, tuple, '
                              f'or derived from AnalysisDriver but got {type(samples)}')
-        else:
-            # TODO: Write a method to append to this prior to run_driver.
-            self._samples = []
 
         super().__init__(**kwargs)
 
@@ -260,7 +259,7 @@ class AnalysisDriver(Driver):
                 if comm.rank == 0:
                     job_queues = [deque() for _ in range(n_procs)]
                     # Rank 0 pushes batch_size jobs to the ranks in job_queues
-                    for i, sample in enumerate(self._samples):
+                    for i, sample in enumerate(self._generator):
                         # Ranks of the same color get the same samples
                         color_idx = next(color_cycler)
                         for rank_idx in color_to_rank_map[color_idx]:
@@ -289,7 +288,7 @@ class AnalysisDriver(Driver):
 
         else:
             # Not under MPI
-            for sample_num, sample in enumerate(self._samples):
+            for sample_num, sample in enumerate(self._generator):
                 self._run_sample(sample, sample_num)
 
         return False
@@ -366,11 +365,11 @@ class AnalysisDriver(Driver):
         """
         Return all of the variables (promoted name) to be sampled by this driver.
         """
-        if hasattr(self._samples, '_get_sampled_vars'):
-            return set(self._samples._get_sampled_vars())
-        elif isinstance(self._samples, (list, tuple)):
+        if hasattr(self._generator, '_get_sampled_vars'):
+            return set(self._generator._get_sampled_vars())
+        elif isinstance(self._generator, (list, tuple)):
             try:
-                return set(self._samples[0].keys())
+                return set(self._generator[0].keys())
             except IndexError:
                 pass
         raise AttributeError('The samples for AnalysisDriver must be a list, tuple, '

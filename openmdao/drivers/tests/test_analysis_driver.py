@@ -126,7 +126,7 @@ class TestAnalysisDriverParallel(unittest.TestCase):
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = om.AnalysisDriver(samples=fullfact3)
+        prob.driver = om.AnalysisDriver(samples=fullfact3, run_parallel=True)
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.driver.add_response('f_xy', units=None, indices=[0])
@@ -157,7 +157,7 @@ class TestAnalysisDriverParallel(unittest.TestCase):
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = om.AnalysisDriver(samples=fullfact3)
+        prob.driver = om.AnalysisDriver(samples=fullfact3, run_parallel=True)
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
         prob.driver.recording_options.set(record_derivatives=True)
 
@@ -195,7 +195,40 @@ class TestAnalysisDriverParallel(unittest.TestCase):
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = om.AnalysisDriver(samples=om.ProductGenerator(samples))
+        prob.driver = om.AnalysisDriver(samples=om.ProductGenerator(samples), run_parallel=True)
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.driver.add_response('f_xy', units=None, indices=[0])
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        if prob.comm.rank == 0:
+            num_recorded_cases = 0
+            for file in glob.glob(str(prob.get_outputs_dir() / "cases.sql*")):
+                if file.endswith('meta'):
+                    continue
+                cr = om.CaseReader(file)
+                num_recorded_cases += len(cr.list_cases(out_stream=None))
+            self.assertEqual(num_recorded_cases, 9)
+
+    def test_list_parallel(self):
+        """
+        Test AnalysisDriver with an explicit list of samples to be run.
+        """
+        samples = {'x': {'val': [0.0, 0.5, 1.0]},
+                   'y': {'val': [0.0, 0.5, 1.0]}}
+        
+        generator = om.ProductGenerator(samples)
+
+        samples_list = [s for s in generator]
+
+        prob = om.Problem()
+
+        prob.model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        prob.driver = om.AnalysisDriver(samples=samples_list, run_parallel=True, batch_size=4)
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.driver.add_response('f_xy', units=None, indices=[0])
@@ -224,7 +257,7 @@ class TestAnalysisDriverParallel(unittest.TestCase):
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = om.AnalysisDriver(samples=om.ProductGenerator(samples))
+        prob.driver = om.AnalysisDriver(samples=om.ProductGenerator(samples), run_parallel=True)
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
         # from openmdao.recorders.stream_recorder import StreamRecorder
         # prob.driver.add_recorder(StreamRecorder())
@@ -257,7 +290,7 @@ class TestAnalysisDriverParallel(unittest.TestCase):
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = om.AnalysisDriver(samples=om.ZipGenerator(samples))
+        prob.driver = om.AnalysisDriver(samples=om.ZipGenerator(samples), run_parallel=True)
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.driver.add_response('f_xy', units=None, indices=[0])

@@ -7,6 +7,7 @@ of variables and values to be tested, produce some set of sample values to be ev
 """
 
 from collections.abc import Iterator
+from collections import deque
 import csv
 import itertools
 
@@ -241,3 +242,34 @@ class CSVGenerator(AnalysisGenerator):
         """
         if self._csv_file and not self._csv_file.closed:
             self._csv_file.close()
+
+
+class SequenceGenerator:
+    """
+    A generator which provides samples from python lists or tuples.
+    
+    Internally this generator converts the list or tuple to a deque and then consumes it
+    as it iterates over it.
+
+    Parameters
+    ----------
+    container : container
+        A python container, excluding strings, bytes, or bytearray.
+    """
+    def __init__(self, container):
+        self._sampled_vars = [k for k in list(container)[0].keys()]
+        self._data = deque(container)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if not self._data:
+            raise StopIteration
+        return self._data.popleft()  # Removes and returns the first element
+
+    def _get_sampled_vars(self):
+        """
+        Return the set of variable names whose value are provided by this generator.
+        """
+        return self._sampled_vars
