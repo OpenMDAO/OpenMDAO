@@ -247,7 +247,7 @@ class CSVGenerator(AnalysisGenerator):
 class SequenceGenerator:
     """
     A generator which provides samples from python lists or tuples.
-    
+
     Internally this generator converts the list or tuple to a deque and then consumes it
     as it iterates over it.
 
