@@ -2374,7 +2374,7 @@ class Group(System):
         vnames = self._var_abs2prom[io] if local else self._var_allprocs_abs2prom[io]
         return set(vnames).difference(self._conn_global_abs_in2out)
 
-    def _setup_jax(self, from_group=False):
+    def _setup_jax(self):
         if jax is None:
             return
 
@@ -2382,7 +2382,7 @@ class Group(System):
         # jax anywhere below where it's active, then return.
         for subsys in self._subsystems_myproc:
             if isinstance(subsys, Group) or subsys.options['derivs_method'] == 'jax':
-                subsys._setup_jax(from_group)
+                subsys._setup_jax()
 
     def _setup_dynamic_shapes(self):
         """
