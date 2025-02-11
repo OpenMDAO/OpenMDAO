@@ -333,18 +333,18 @@ class TestJaxComp(unittest.TestCase):
 
         assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
         assert_near_equal(p.get_val('comp.zz'), y * 3.0)
+        assert_check_partials(p.check_partials(method=method, show_only_incorrect=True))
         assert_check_totals(p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'],
                                              method=method, show_only_incorrect=True))
-        assert_check_partials(p.check_partials(method=method, show_only_incorrect=True))
         assert_sparsity_matches_fd(comp, outstream=None)
 
         p.set_val('ivc.disc_out', -2)
         p.run_model()
         assert_near_equal(p.get_val('comp.z'), -np.dot(x, y))
         assert_near_equal(p.get_val('comp.zz'), y * 2.5)
+        assert_check_partials(p.check_partials(method=method, show_only_incorrect=True))
         assert_check_totals(p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'],
                                            method=method, show_only_incorrect=True))
-        assert_check_partials(p.check_partials(method=method, show_only_incorrect=True))
         assert_sparsity_matches_fd(comp, outstream=None)
 
 if sys.version_info >= (3, 9):
@@ -500,7 +500,7 @@ class TestJaxShapesAndReturns(unittest.TestCase):
             prob.driver.declare_coloring()
 
         prob.setup(force_alloc_complex=True, check=False, mode=mode)
-        prob.final_setup()
+        prob.run_model()
         prob.compute_totals(of=ofs, wrt=wrts)
 
         method = method_dict[derivs_method]
