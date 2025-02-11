@@ -60,7 +60,8 @@ class DotProdMultPrimal(DotProdMultPrimalNoDeclPartials):
         super().setup()
 
     def setup_partials(self):
-        self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
+        self.declare_partials(of=['z'], wrt=['x', 'y'])
+        self.declare_partials(of=['zz'], wrt=['y'])
 
 
 class DotProdMultPrimalOption(om.JaxExplicitComponent):
@@ -129,23 +130,29 @@ method_dict = {'fd': 'cs', 'cs': 'fd', 'jax': 'fd'}
 @unittest.skipIf(jax is None or sys.version_info < (3, 9), 'jax is not available or python < 3.9.')
 class TestJaxComp(unittest.TestCase):
 
-    @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False], ['jax', 'fd'], [True, False]),
+    @parameterized.expand(itertools.product(['fwd', 'rev'], ['matfree', 'jac'], ['jax', 'fd'],
+                                            ['coloring', 'nocoloring']),
                           name_func=parameterized_name)
-    def test_jax_explicit_comp2primal(self, mode, matrix_free, derivs_method, use_coloring):
+    def test_jax_explicit_comp2primal(self, mode, matrix_free, derivs_method, slvtype):
         # this component defines its own compute_primal method
         p = om.Problem()
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
         ivc.add_output('y', val=np.ones(y_shape))
         comp = p.model.add_subsystem('comp', DotProdMultPrimal(derivs_method=derivs_method))
-        comp.matrix_free = matrix_free if derivs_method == 'jax' else False
+        p.model.add_subsystem('objcomp', om.ExecComp('y=x+1.'))
+        if derivs_method == 'jax':
+            comp.matrix_free = matrix_free == 'matfree'
         p.model.connect('ivc.x', 'comp.x')
         p.model.connect('ivc.y', 'comp.y')
-        if use_coloring:
+        p.model.connect('comp.zz', 'objcomp.x', src_indices=[0], flat_src_indices=True)
+        if slvtype == 'coloring':
             comp.declare_coloring()
-            p.model.add_constraint('comp.zz', lower=0.)
-            p.model.add_constraint('comp.z', lower=0.)
-            p.model.add_design_var('ivc.x', lower=0.)
-            p.model.add_design_var('ivc.y', lower=0.)
+            p.model.add_constraint('comp.zz', lower=0., upper=1000.)
+            p.model.add_constraint('comp.z', lower=0., upper=1000.)
+            p.model.add_design_var('ivc.x', lower=0., upper=1000.)
+            p.model.add_design_var('ivc.y', lower=0., upper=1000.)
+            p.model.add_objective('objcomp.y')
+            p.driver = om.ScipyOptimizeDriver(maxiter=2)
             p.driver.declare_coloring()
 
         p.setup(mode=mode, force_alloc_complex=True)
@@ -166,11 +173,15 @@ class TestJaxComp(unittest.TestCase):
         assert_check_partials(p.check_partials(method=method, show_only_incorrect=True))
         assert_sparsity_matches_fd(comp, outstream=None)
 
-        # coloring = p.driver._get_coloring()
-        # p.driver._coloring_info.display(show_sparsity=True)
+        if slvtype == 'coloring':
+            p.run_driver()
+            coloring = p.driver._coloring_info.coloring
+            self.assertTrue(coloring is not None, 'coloring is None')
+            self.assertEqual(coloring.total_solves(), 6 if mode=='fwd' else 4)
 
-    @parameterized.expand(itertools.product(['fwd', 'rev'], ['jax','fd', 'cs']), name_func=parameterized_name)
-    def test_jax_explicit_comp2primal_nodecl(self, mode, derivs_method):
+    @parameterized.expand(itertools.product(['fwd', 'rev'], ['jax','fd', 'cs'],
+                                            ['coloring', 'nocoloring']), name_func=parameterized_name)
+    def test_jax_explicit_comp2primal_nodecl(self, mode, derivs_method, slvtype):
         # this component defines its own compute_primal method
         p = om.Problem()
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
@@ -178,6 +189,14 @@ class TestJaxComp(unittest.TestCase):
         comp = p.model.add_subsystem('comp', DotProdMultPrimalNoDeclPartials(derivs_method=derivs_method))
         p.model.connect('ivc.x', 'comp.x')
         p.model.connect('ivc.y', 'comp.y')
+
+        if slvtype == 'coloring':
+            comp.declare_coloring()
+            p.model.add_constraint('comp.zz', lower=0.)
+            p.model.add_constraint('comp.z', lower=0.)
+            p.model.add_design_var('ivc.x', lower=0.)
+            p.model.add_design_var('ivc.y', lower=0.)
+            p.driver.declare_coloring()
 
         p.setup(mode=mode, force_alloc_complex=True)
 
@@ -234,9 +253,9 @@ class TestJaxComp(unittest.TestCase):
 
         assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
         assert_near_equal(p.get_val('comp.zz'), y * 7.0)
+        assert_check_partials(p.check_partials(method=method, show_only_incorrect=True))
         assert_check_totals(p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'],
                                            method=method, show_only_incorrect=True))
-        assert_check_partials(p.check_partials(method=method, show_only_incorrect=True))
         assert_sparsity_matches_fd(comp, outstream=None)
         comp.stat = 1./3.5
         p.set_val('ivc.x', x)
@@ -245,9 +264,9 @@ class TestJaxComp(unittest.TestCase):
 
         assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
         assert_near_equal(p.get_val('comp.zz'), y)
+        assert_check_partials(p.check_partials(method=method, show_only_incorrect=True))
         assert_check_totals(p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'],
                                            method=method, show_only_incorrect=True))
-        assert_check_partials(p.check_partials(method=method, show_only_incorrect=True))
         assert_sparsity_matches_fd(comp, outstream=None)
 
     @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False], ['jax','fd']), name_func=parameterized_name)
@@ -403,7 +422,8 @@ if sys.version_info >= (3, 9):
 
 
     class TopGrp(om.Group):
-        def __init__(self, shape, ret_tuple=False, nins=1, nouts=1, matrix_free=False, derivs_method='jax', **kwargs):
+        def __init__(self, shape, ret_tuple=False, nins=1, nouts=1, matrix_free=False, derivs_method='jax',
+                     use_coloring=False, **kwargs):
             super().__init__(**kwargs)
             self.shape = shape
             self.ret_tuple = ret_tuple
@@ -411,6 +431,7 @@ if sys.version_info >= (3, 9):
             self.nouts = nouts
             self.matrix_free = matrix_free if derivs_method == 'jax' else False
             self.derivs_method = derivs_method
+            self.use_coloring = use_coloring
 
         def setup(self):
             self.add_subsystem('ivc', om.IndepVarComp())
@@ -435,6 +456,8 @@ if sys.version_info >= (3, 9):
                                                                    nouts=self.nouts, derivs_method=self.derivs_method))
 
             comp.matrix_free = self.matrix_free
+            if self.use_coloring:
+                comp.declare_coloring()
 
             for io in range(self.nouts):
                 for ii in range(self.nins):
@@ -446,16 +469,35 @@ if sys.version_info >= (3, 9):
 @unittest.skipIf(jax is None or sys.version_info < (3, 9), 'jax is not available or python < 3.9.')
 class TestJaxShapesAndReturns(unittest.TestCase):
     @parameterized.expand(itertools.product([(), (2,), (2,3)], [(1, 1), (2, 2), (1, 2), (2, 1)],
-                                            [True, False], [True, False], ['fwd', 'rev'], ['jax','fd']), name_func=parameterized_name)
-    def test_compute_primal_return_shapes(self, shape, sizetup, ret_tuple, matrix_free, mode, derivs_method):
+                                            [True, False], [True, False], ['fwd', 'rev'], ['jax','fd'],
+                                            ['coloring', 'nocoloring']), name_func=parameterized_name)
+    def test_compute_primal_return_shapes(self, shape, sizetup, ret_tuple, matrix_free, mode, derivs_method, slvtype):
         nins, nouts = sizetup
         prob = om.Problem()
         prob.model = TopGrp(shape=shape, ret_tuple=ret_tuple, nins=nins, nouts=nouts,
-                            matrix_free=matrix_free, derivs_method=derivs_method)
+                            matrix_free=matrix_free, derivs_method=derivs_method, use_coloring=slvtype=='coloring')
         prob.set_solver_print(level=0)
 
         ofs = [f'comp.y{i}' for i in range(nouts)]
         wrts = [f'ivc.x{i}' for i in range(nins)]
+
+        do_coloring = shape==(2,3) and slvtype == 'coloring'
+
+        print("RET TUPLE:", ret_tuple)
+
+        # only color for 2x3 for now, others too dense
+        if do_coloring:
+            prob.driver = om.ScipyOptimizeDriver(maxiter=2)
+            for wrt in wrts:
+                prob.model.add_design_var(wrt)
+            for of in ofs:
+                prob.model.add_constraint(of, lower=200.)
+
+            prob.model.add_subsystem('objcomp', om.ExecComp('y=x+1.'))
+            prob.model.connect(f'comp.y{nouts - 1}', 'objcomp.x', src_indices=[0], flat_src_indices=True)
+            prob.model.add_objective('objcomp.y')
+            ofs.append('objcomp.y')
+            prob.driver.declare_coloring()
 
         prob.setup(force_alloc_complex=True, check=False, mode=mode)
         prob.final_setup()
@@ -469,13 +511,19 @@ class TestJaxShapesAndReturns(unittest.TestCase):
         for c in prob.model.system_iter(recurse=True, typ=om.JaxExplicitComponent):
             assert_sparsity_matches_fd(c, direction=mode, outstream=None)
 
-    # TODO: test with mixed np and jnp in compute
+        if do_coloring:
+            prob['ivc.x0'] = np.ones(shape) * -10.
+            prob.run_driver()
+            coloring = prob.driver._coloring_info.coloring
+            self.assertTrue(coloring is not None, 'coloring is None')
+            self.assertTrue(coloring.total_solves() <= 2)
+
 
 if __name__ == '__main__':
-    # unittest.main()
+    unittest.main()
 
-    from openmdao.test_suite.comp_tester import ComponentTester
-    ComponentTester(DotProductMultDiscretePrimal, (), {'xshape': (200,1), 'yshape': (1,200)}).run()
+    #from openmdao.test_suite.comp_tester import ComponentTester
+    #ComponentTester(DotProductMultDiscretePrimal, (), {'xshape': (200,1), 'yshape': (1,200)}).run()
 
     #p = om.Problem()
     #ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))

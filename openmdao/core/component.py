@@ -2345,7 +2345,7 @@ class Component(System):
                                     if idx is not None:
                                         deriv[jac_key][idx, :] = derivs
 
-                # These components already have a Jacobian with calculated derivatives.
+                # This component already has a Jacobian with calculated derivatives.
                 else:
 
                     subjacs = self._jacobian._subjacs_info

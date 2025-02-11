@@ -570,6 +570,8 @@ class ReturnChecker(ast.NodeVisitor):
     """
 
     def __init__(self, method):  # noqa
+        print("ReturnChecker")
+        print(inspect.getsource(method))
         self._returns = []
         self.visit(ast.parse(textwrap.dedent(inspect.getsource(method)), mode='exec'))
 
@@ -848,6 +850,10 @@ def get_vmap_tangents(vals, direction, fill=1., returns_tuple=False, coloring=No
         tangents.append(vartan)
         start = end
 
+    print("get_vmap_tangents")
+    print("vals:", vals)
+    print("direction:", direction)
+    print("returns_tuple:", returns_tuple)
     if len(vals) == 1 and direction == 'rev' and not returns_tuple:
         tangents = tangents[0]
     else:
@@ -874,20 +880,27 @@ def _update_subjac_sparsity(sparsity_iter, pathname, subjacs_info):
         # sparsity uses relative names, so convert to absolute
         abs_key = (prefix + of, prefix + wrt)
         if abs_key not in subjacs_info:
+            if rows is not None and len(rows) == 0:
+                continue
+
             subjacs_info[abs_key] = {
                 'shape': shape,
                 'dependent': True,
                 'rows': rows,
                 'cols': cols,
             }
+
         if rows is None:
             subjacs_info[abs_key]['val'] = np.zeros(shape)
         else:
-            subjacs_info[abs_key].update({
-                'rows': rows,
-                'cols': cols,
-                'val': np.zeros(len(rows))
-            })
+            if len(rows) == 0:
+                del subjacs_info[abs_key]
+            else:
+                subjacs_info[abs_key].update({
+                    'rows': rows,
+                    'cols': cols,
+                    'val': np.zeros(len(rows))
+                })
 
 
 def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_nan=False):
@@ -970,6 +983,7 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
             def vjp_at_point(cotangent):
                 return vjp_fn(cotangent)
 
+            print("RETURNS TUPLE:", self._compute_primal_returns_tuple)
             cotangents = get_vmap_tangents(tuple(self._outputs.values()), 'rev',
                                            fill=np.nan if use_nan else 1.,
                                            returns_tuple=self._compute_primal_returns_tuple)
