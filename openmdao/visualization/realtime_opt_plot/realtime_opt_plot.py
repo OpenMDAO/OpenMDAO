@@ -14,7 +14,7 @@ from bokeh.models import (
     CustomJS,
     Div,
     ScrollBox,
-    InlineStyleSheet
+    SingleIntervalTicker
 )
 
 from bokeh.models.tools import (
@@ -47,75 +47,95 @@ _time_between_callbacks_in_ms = 2000
 _unused_session_lifetime_milliseconds = 1000 * 60 * 10  # TODO try different values here
 _obj_color = "black"
 _non_active_plot_color = "black"
-callback_code="""
+_varea_alpha = 0.3 # how transparent is the area part of the plot for desvars that are vectors
 
-if (typeof window.ColorManager === 'undefined') {
-    window.ColorManager = class {
-        constructor(palette = 'Category10') {
-        if (ColorManager.instance) {
-            return ColorManager.instance;
-        }
-        // Define our own palettes
-        this.palettes = {
-            'Category20': [
-            '#1f77b4', '#aec7e8', '#ff7f0e', '#ffbb78', '#2ca02c',
-            '#98df8a', '#d62728', '#ff9896', '#9467bd', '#c5b0d5',
-            '#8c564b', '#c49c94', '#e377c2', '#f7b6d2', '#7f7f7f',
-            '#c7c7c7', '#bcbd22', '#dbdb8d', '#17becf', '#9edae5'
-            ],
-            'Colorblind': [
-            '#0072B2', '#E69F00', '#009E73', '#CC79A7', '#56B4E9',
-            '#D55E00', '#F0E442', '#000000'
-            ]
-        };
-        
-        this.palette = this.palettes[palette] || this.palettes.Colorblind;
-        this.usedColors = new Set();
-        this.variableColorMap = new Map();
-        
-        ColorManager.instance = this;
-        } //  end of constructor
+toggle_active_styles = """
+            font-size: 22px !important; 
+            background-color: rgb(from #0072B2 R G B / 0.3);
+            box-shadow: 
+                inset 0 4px 6px rgba(0, 0, 0, 0.15),  /* Strong inner shadow from top */
+                inset 0 1px 3px rgba(0, 0, 0, 0.1),   /* Subtle inner shadow */
+                inset 0 -2px 2px rgba(255, 255, 255, 0.1);  /* Bottom inner highlight */
+"""
+
+
+toggle_not_active_styles = """
+            font-size: 22px !important; 
+            box-shadow: 
+                0 4px 6px rgba(0, 0, 0, 0.1),    /* Distant shadow */
+                0 1px 3px rgba(0, 0, 0, 0.08),   /* Close shadow */
+                inset 0 2px 2px rgba(255, 255, 255, 0.2);  /* Top inner highlight */
+"""
+
+callback_code=f"""
+// Create the ColorManager class first
+if (typeof window.ColorManager === 'undefined') {{
+    window.ColorManager = class {{
+        constructor(palette = 'Category10') {{
+            if (ColorManager.instance) {{
+                return ColorManager.instance;
+            }}
+            // Define our own palettes
+            this.palettes = {{
+                'Category20': [
+                '#1f77b4', '#aec7e8', '#ff7f0e', '#ffbb78', '#2ca02c',
+                '#98df8a', '#d62728', '#ff9896', '#9467bd', '#c5b0d5',
+                '#8c564b', '#c49c94', '#e377c2', '#f7b6d2', '#7f7f7f',
+                '#c7c7c7', '#bcbd22', '#dbdb8d', '#17becf', '#9edae5'
+                ],
+                'Colorblind': [
+                '#0072B2', '#E69F00', '#009E73', '#CC79A7', '#56B4E9',
+                '#D55E00', '#F0E442', '#000000'
+                ]
+            }};
+            
+            this.palette = this.palettes[palette] || this.palettes.Colorblind;
+            this.usedColors = new Set();
+            this.variableColorMap = new Map();
+            
+            ColorManager.instance = this;
+        }} //  end of constructor
     
-        getColor(variableName) {
-        if (this.variableColorMap.has(variableName)) {
-            return this.variableColorMap.get(variableName);
-        }
+        getColor(variableName) {{
+            if (this.variableColorMap.has(variableName)) {{
+                return this.variableColorMap.get(variableName);
+            }}
     
-        const availableColor = this.palette.find(color => !this.usedColors.has(color));
-        const newColor = availableColor || this.palette[this.usedColors.size % this.palette.length];
-        
-        this.usedColors.add(newColor);
-        this.variableColorMap.set(variableName, newColor);
-        return newColor;
-        } // end of getColor
+            const availableColor = this.palette.find(color => !this.usedColors.has(color));
+            const newColor = availableColor || this.palette[this.usedColors.size % this.palette.length];
+            
+            this.usedColors.add(newColor);
+            this.variableColorMap.set(variableName, newColor);
+            return newColor;
+        }} // end of getColor
     
-        releaseColor(variableName) {
-        const color = this.variableColorMap.get(variableName);
-        if (color) {
-            this.usedColors.delete(color);
-            this.variableColorMap.delete(variableName);
-        }
-        } // end of releaseColor
+        releaseColor(variableName) {{
+            const color = this.variableColorMap.get(variableName);
+            if (color) {{
+                this.usedColors.delete(color);
+                this.variableColorMap.delete(variableName);
+            }}
+        }} // end of releaseColor
     
         // Get all available palettes
-        getPaletteNames() {
-        return Object.keys(this.palettes);
-        }
+        getPaletteNames() {{
+            return Object.keys(this.palettes);
+        }}
     
         // Change active palette
-        setPalette(paletteName) {
-        if (this.palettes[paletteName]) {
-            this.palette = this.palettes[paletteName];
-            // Optionally reset all color assignments
-            this.usedColors.clear();
-            this.variableColorMap.clear();
-        }
-        } // end of setPalette
+        setPalette(paletteName) {{
+            if (this.palettes[paletteName]) {{
+                this.palette = this.palettes[paletteName];
+                // Optionally reset all color assignments
+                this.usedColors.clear();
+                this.variableColorMap.clear();
+            }}
+        }} // end of setPalette
 
-    }; // end of class definition
+    }}; // end of class definition
 
     window.colorManager = new window.ColorManager("Colorblind");
-}  // end of if
+}}  // end of if
 
 // Get the toggle that triggered the callback
 const toggle = cb_obj;
@@ -125,13 +145,13 @@ const index = toggles.indexOf(toggle);
 lines[index].visible = toggle.active;
 
 // Set axis visibility if it exists (all except first line)
-if (index > 0 && index-1 < axes.length) {
+if (index > 0 && index-1 < axes.length) {{
     axes[index-1].visible = toggle.active;
-}
+}}
 
 let variable_name = cb_obj.label;
 // if turning on, get a color and set the line and toggle button to that color
-if (toggle.active) {
+if (toggle.active) {{
     let color = window.colorManager.getColor(variable_name);
     axes[index-1].axis_label_text_color = color
     lines[index].glyph.line_color = color;
@@ -139,82 +159,35 @@ if (toggle.active) {
     lines[index].glyph.attributes.line_color = color;
 
     toggle.stylesheets = [`
-        .bk-btn {
-            color: ${color}
-            border-color: ${color}
-            background-color: white
-            display: flex;
-            align-items: center; /* Vertical centering */
-            justify-content: center; /* Horizontal centering */
-            height: 22px; /* Example height, adjust as needed */
-            border-width: 0px; /* Adjust to desired thickness */
-            border-style: solid; /* Ensures a solid border */
-            font-size: 22px;
-        }
-        .bk-btn.bk-active {
-            color: white;
-            border-color: ${color};
-            background-color: ${color};
-            display: flex;
-            align-items: center; /* Vertical centering */
-            justify-content: center; /* Horizontal centering */
-            height: 22px; /* Example height, adjust as needed */
-            font-size: 22px;
-            border-width: 0px; /* Adjust to desired thickness */
-            border-style: solid; /* Ensures a solid border */
-            box-shadow: inset 5px 5px 10px -5px rgba(0, 0, 0, 0.5);
-outline-style: solid;
-outline-color: transparent;
-box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.5);
-
-        }
-        .bk-btn.bk-btn-default {
-            display: flex;
-        }
+        .bk-btn.bk-active {{
+            font-size: 22px !important; 
+            background-color: rgb(from ${{color}} R G B / 0.3);
+            box-shadow: 
+                inset 0 4px 6px rgba(0, 0, 0, 0.15),  /* Strong inner shadow from top */
+                inset 0 1px 3px rgba(0, 0, 0, 0.1),   /* Subtle inner shadow */
+                inset 0 -2px 2px rgba(255, 255, 255, 0.1);  /* Bottom inner highlight */
+        }}
     `];
 // if turning off, return the color to the pool and set the color of the button to black
-} else {
+}} else {{
     window.colorManager.releaseColor(variable_name);
     axes[index-1].axis_label_text_color = 'black'
     lines[index].glyph.line_color = 'black';
-    toggle.stylesheets = [`
-        .bk-btn {
-            color: black
-            border-color: black
-            background-color: white
-            display: flex;
-            align-items: center; /* Vertical centering */
-            justify-content: center; /* Horizontal centering */
-            height: 22px; /* Example height, adjust as needed */
-            border-width: 0px; /* Adjust to desired thickness */
-            font-size: 22px;
-            border-style: solid; /* Ensures a solid border */
-        }
-        .bk-btn.bk-active {
-            color: white;
-            border-color: black;
-            background-color: black;
-            display: flex;
-            align-items: center; /* Vertical centering */
-            justify-content: center; /* Horizontal centering */
-            font-size: 22px;
-            height: 22px; /* Example height, adjust as needed */
-            border-width: 0px; /* Adjust to desired thickness */
-            border-style: solid; /* Ensures a solid border */
-            box-shadow: inset 5px 5px 10px -5px rgba(0, 0, 0, 0.5);
-outline-style: solid;
-outline-color: transparent;
-box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.5);
 
-        }
-        .bk-btn.bk-btn-default {
-            display: flex;
-        }
+    toggle.stylesheets = [`
+        .bk-btn {{
+            {toggle_not_active_styles}
+        }}
     `];
-}
+
+}}
 """
 
-start_time = time.time()
+
+# callback_code="""
+# """
+
+start_time = time.time()  # remove TODO
 
 def _realtime_opt_plot_setup_parser(parser):
     """
@@ -269,7 +242,6 @@ def _get_value_for_plotting(value_from_recorder, var_type):
 def _make_header_text_for_variable_chooser(header_text):
     header_text_div = Div(
         text=f"<b>{header_text}</b>",
-        # width=200,
         styles={"font-size": "14"},
     ) 
     return header_text_div
@@ -410,7 +382,7 @@ class RealTimeOptPlot(object):
         self._case_recorder_filename = case_recorder_filename
 
         self._source = None
-        self.lines = []
+        self._lines = []
         self._toggles = []
         self._column_items = []
         self._axes = []
@@ -450,7 +422,7 @@ class RealTimeOptPlot(object):
                 
                 # Create CustomJS callback for toggle buttons
                 legend_item_callback = CustomJS(
-                    args=dict(lines=self.lines, axes=self._axes, toggles=self._toggles),
+                    args=dict(lines=self._lines, axes=self._axes, toggles=self._toggles),
                     code=callback_code,
                 )
 
@@ -597,7 +569,6 @@ class RealTimeOptPlot(object):
         doc.title = "OpenMDAO Optimization"
 
     def setup_data_source(self):
-        ####  make the source dict
         _source_dict = {"iteration": []}
 
         # Obj
@@ -619,23 +590,14 @@ class RealTimeOptPlot(object):
         self._source = ColumnDataSource(_source_dict)
 
     def _make_legend_item(self, varname, color, active, callback):
-
-        # TODO this seems to have no effect!
-        stylesheet = InlineStyleSheet(css="""
-            .bk-btn.bk-btn-default.bk-active { font-size: 32px; box-shadow: inset 5px 5px 10px -5px rgba(0, 0, 0, 1);} 
-            .bk-btn { font-size: 32px; } 
-            .bk-btn:focus {outline: none;}
-            """
-            )
-
         # TODO what should we do with colors?
         color = 'black'
+        color = 'blue'
 
         toggle = Toggle(
             label=varname,
             active=active,
             margin=(0, 0, 8, 0),
-            stylesheets=[stylesheet],
         )
         toggle.js_on_change("active", callback)
         self._toggles.append(toggle)
@@ -644,86 +606,19 @@ class RealTimeOptPlot(object):
         # Add custom CSS styles for both active and inactive states
         toggle.stylesheets = [
             f"""
-                .bk-btn.bk-active:active {{
-                    --font-size: 22px;  /* Set the variable */
-                    color: white;
-                    border-color: {color};
-                    background-color: {color};
-                    display: flex;
-                    align-items: center; /* Vertical centering */
-                    justify-content: center; /* Horizontal centering */
-                    height: 20px; /* Example height, adjust as needed */
-                    border-width: 0px; /* Adjust to desired thickness */
-                    border-style: solid; /* Ensures a solid border */
-                    font-size: 42px !important;
-                    box-shadow: inset 5px 5px 10px -5px rgba(0, 0, 0, 0.5);
+                .bk-btn {{
+                    {toggle_not_active_styles}
                 }}
-
-
+                .bk-btn.bk-active {{
+                    font-size: 22px !important; 
+                    background-color: rgb(from #000000 R G B / 0.3);
+                    box-shadow: 
+                        inset 0 4px 6px rgba(0, 0, 0, 0.15),  /* Strong inner shadow from top */
+                        inset 0 1px 3px rgba(0, 0, 0, 0.1),   /* Subtle inner shadow */
+                        inset 0 -2px 2px rgba(255, 255, 255, 0.1);  /* Bottom inner highlight */
+                }}
             """
     ]
-
-    #     toggle.stylesheets = [
-    #         f"""
-    #             .bk-btn {{
-    #                 color: {color};
-    #                 border-color: {color};
-    #                 background-color: white;
-    #                 display: flex;
-    #                 align-items: center; /* Vertical centering */
-    #                 justify-content: center; /* Horizontal centering */
-    #                 height: 20px; /* Example height, adjust as needed */
-    #                 border-width: 0px; /* Adjust to desired thickness */
-    #                 border-style: solid; /* Ensures a solid border */
-    #                 font-size: 22px !important; 
-    #             }}
-
-    #             .bk-btn.bk-active {{
-    #                 --font-size: 22px;  /* Set the variable */
-    #                 color: white;
-    #                 border-color: {color};
-    #                 background-color: {color};
-    #                 display: flex;
-    #                 align-items: center; /* Vertical centering */
-    #                 justify-content: center; /* Horizontal centering */
-    #                 height: 20px; /* Example height, adjust as needed */
-    #                 border-width: 0px; /* Adjust to desired thickness */
-    #                 border-style: solid; /* Ensures a solid border */
-    #                 font-size: 22px !important;
-    #             }}
-
-    #             .bk-btn.bk-btn-default {{
-    #                 font-size: 22px !important;  /* Override the variable */
-    #                 display: flex;
-    #             /* ... rest of your styles ... */
-    #             }}
-
-    #             .bk-btn ::file-selector-button {{
-    #                 font-size: 32px !important;
-    #                 display: flex;
-    #             }}
-
-    #             .bk-btn:focus {{
-    #                 outline: none; /* Removes the default focus ring */
-    #                 display: flex;
-    #             }}
-
-    #             .button.bk-btn.bk-btn-default.bk-active {{
-    #                 font-size: 22px !important;  /* Override the variable */
-    #                 display: flex;
-    #                 /* ... rest of your styles ... */
-    #             }}
-
-    #             .button.bk-btn.bk-btn-default {{
-    #                 font-size: 22px !important;  /* Override the variable */
-    #                 display: flex;
-    #             /* ... rest of your styles ... */
-    #             }}
-
-
-    #         """
-    # ]
-
         return toggle
 
     def _make_line_and_hover_tool(self,var_type,varname, use_varea, color,line_dash,visible):
@@ -734,7 +629,7 @@ class RealTimeOptPlot(object):
                 y2=f"{varname}_max",
                 source=self._source,
                 color=color,
-                alpha=0.3,
+                alpha=_varea_alpha,
                 visible=visible,
             )
         else:
@@ -755,7 +650,7 @@ class RealTimeOptPlot(object):
             line.y_range_name=f"extra_y_{varname}_min"
         elif var_type == "cons":
             line.y_range_name=f"extra_y_{varname}"
-        self.lines.append(line)
+        self._lines.append(line)
         if not use_varea:
             hover = HoverTool(
                 renderers=[line],
@@ -818,8 +713,13 @@ class RealTimeOptPlot(object):
 
         self.p.xaxis.axis_label = "Driver iterations"
         self.p.xaxis.minor_tick_line_color = None
+        self.p.xaxis.ticker = SingleIntervalTicker(interval=1)
+
         self.p.axis.axis_label_text_font_style = "bold"
         self.p.axis.axis_label_text_font_size = "20pt"
+
+
+
 
 def realtime_opt_plot(case_recorder_filename, callback_period):
     """
