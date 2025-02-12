@@ -49,17 +49,7 @@ _obj_color = "black"
 _non_active_plot_color = "black"
 _varea_alpha = 0.3 # how transparent is the area part of the plot for desvars that are vectors
 
-toggle_active_styles = """
-            font-size: 22px !important; 
-            background-color: rgb(from #0072B2 R G B / 0.3);
-            box-shadow: 
-                inset 0 4px 6px rgba(0, 0, 0, 0.15),  /* Strong inner shadow from top */
-                inset 0 1px 3px rgba(0, 0, 0, 0.1),   /* Subtle inner shadow */
-                inset 0 -2px 2px rgba(255, 255, 255, 0.1);  /* Bottom inner highlight */
-"""
-
-
-toggle_not_active_styles = """
+toggle_styles = """
             font-size: 22px !important; 
             box-shadow: 
                 0 4px 6px rgba(0, 0, 0, 0.1),    /* Distant shadow */
@@ -151,41 +141,35 @@ if (index > 0 && index-1 < axes.length) {{
 
 let variable_name = cb_obj.label;
 // if turning on, get a color and set the line and toggle button to that color
+
 if (toggle.active) {{
     let color = window.colorManager.getColor(variable_name);
     axes[index-1].axis_label_text_color = color
-    lines[index].glyph.line_color = color;
-    lines[index].glyph.fill_color = color;
-    lines[index].glyph.attributes.line_color = color;
+
+    if (lines[index].glyph.type == "VArea"){{
+        lines[index].glyph.fill_color = color;
+    }}
+    if (lines[index].glyph.type == "Line"){{
+        lines[index].glyph.line_color = color;
+    }}
 
     toggle.stylesheets = [`
         .bk-btn.bk-active {{
-            font-size: 22px !important; 
             background-color: rgb(from ${{color}} R G B / 0.3);
-            box-shadow: 
-                inset 0 4px 6px rgba(0, 0, 0, 0.15),  /* Strong inner shadow from top */
-                inset 0 1px 3px rgba(0, 0, 0, 0.1),   /* Subtle inner shadow */
-                inset 0 -2px 2px rgba(255, 255, 255, 0.1);  /* Bottom inner highlight */
+            {toggle_styles}
         }}
     `];
 // if turning off, return the color to the pool and set the color of the button to black
 }} else {{
     window.colorManager.releaseColor(variable_name);
-    axes[index-1].axis_label_text_color = 'black'
-    lines[index].glyph.line_color = 'black';
-
     toggle.stylesheets = [`
         .bk-btn {{
-            {toggle_not_active_styles}
+            {toggle_styles}
         }}
     `];
 
 }}
 """
-
-
-# callback_code="""
-# """
 
 start_time = time.time()  # remove TODO
 
@@ -607,15 +591,11 @@ class RealTimeOptPlot(object):
         toggle.stylesheets = [
             f"""
                 .bk-btn {{
-                    {toggle_not_active_styles}
+                    {toggle_styles}
                 }}
                 .bk-btn.bk-active {{
-                    font-size: 22px !important; 
                     background-color: rgb(from #000000 R G B / 0.3);
-                    box-shadow: 
-                        inset 0 4px 6px rgba(0, 0, 0, 0.15),  /* Strong inner shadow from top */
-                        inset 0 1px 3px rgba(0, 0, 0, 0.1),   /* Subtle inner shadow */
-                        inset 0 -2px 2px rgba(255, 255, 255, 0.1);  /* Bottom inner highlight */
+                    {toggle_styles}
                 }}
             """
     ]
