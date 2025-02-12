@@ -53,6 +53,17 @@ except ImportError:
     bokeh_resources = None
 
 
+try:
+    import jax
+    jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
+    import jax.numpy as jnp
+    from jax.experimental.sparse import BCOO
+except ImportError:
+
+    jax = None
+    jnp = np
+
+
 CITATIONS = """
 @article{Coleman+VermaSISC1998,
   author  = {Thomas F. Coleman and Arun Verma},
@@ -846,16 +857,8 @@ class Coloring(object):
         ndarray
             The full jacobian.
         """
-        if direction == 'fwd':
-            J = np.zeros(self._shape)
-            for col, nzpart, icol in self.colored_jac_iter(compressed_j, direction):
-                J[nzpart, icol] = col
-            return J
-        else:  # rev
-            J = np.zeros(self._shape)
-            for row, nzpart, irow in self.colored_jac_iter(compressed_j, direction):
-                J[irow, nzpart] = row
-            return J
+        sparsity = self.get_sparsity_of_type(bool).toarray()
+        return colored2full_jac(compressed_j, sparsity, self.color_iter(direction), direction)
 
     def get_row_col_map(self, direction):
         """
@@ -1799,7 +1802,7 @@ class Coloring(object):
     @property
     def sparsity(self):
         """
-        Return the sparsity matrix as a COO sparse matrix.
+        Return the sparsity matrix as a COO sparse matrix of type np.uint8.
 
         Returns
         -------
@@ -1808,6 +1811,31 @@ class Coloring(object):
         """
         return coo_matrix((np.ones(len(self._nzrows), dtype=np.uint8),
                            (self._nzrows, self._nzcols)), shape=self._shape)
+
+    def get_sparsity_of_type(self, dtype):
+        """
+        Return the sparsity matrix as a COO sparse matrix of a given dtype.
+
+        Parameters
+        ----------
+        dtype : object
+            Data type of returned numpy array.
+
+        Returns
+        -------
+        coo_matrix
+            The sparsity matrix.
+        """
+        return coo_matrix((np.ones(len(self._nzrows), dtype=dtype),
+                           (self._nzrows, self._nzcols)), shape=self._shape)
+
+    def get_jax_sparsity(self):
+        """
+        Return the sparsity matrix as a jax array.
+        """
+        data = jnp.ones(len(self._nzrows))
+        indices = jnp.array(zip(self._nzrows, self._nzcols))
+        return BCOO((data, indices), shape=self._shape)
 
     def get_dense_sparsity(self, dtype=np.uint8):
         """
@@ -2174,6 +2202,99 @@ class Coloring(object):
                             subtractions.setdefault((subfromrow, nzcol), []).extend(tosub)
 
         return _sort_subtractions(subtractions)
+
+
+def _get_colormap(color_array):
+    """
+    Get a map of colors to column indices.
+
+    Parameters
+    ----------
+    color_array : ndarray
+        Array of colors.
+
+    Returns
+    -------
+    dict
+        Map of colors to column indices.
+    """
+    colmap = {}
+    for i, c in enumerate(color_array):
+        if c not in colmap:
+            colmap[c] = []
+        colmap[c].append(i)
+    return colmap
+
+
+def _get_expander_matrix(sparsity, color_iter, direction):
+    """
+    Get a matrix to expand a colored jacobian to an expanded colored jacobian.
+
+    The expanded colored jacobian is the shape of the full jacobian but columns sharing
+    the same color are summed together.
+
+    Parameters
+    ----------
+    sparsity : csc_matrix
+        Sparsity pattern of the jacobian.
+    color_iter : iterator
+        Iterator over columns for each color.
+
+    Returns
+    -------
+    csc_matrix
+        Matrix to expand a colored jacobian to an expanded colored jacobian.
+    """
+    # Ic looks like an identity matrix (ncols x nncols for fwd) with all columns corresponding
+    # to the same color being summed together.
+    # Ic = csc_matrix((np.array([]), (np.array([], dtype=np.int), np.array([], dtype=np.int))),
+    #                 shape=(I.shape[1], np.unique(color_array).size))
+    Ic_rows = []
+    Ic_cols = []
+    ncolors = 0
+    for c, cols in enumerate(color_iter):
+        ncolors += 1
+        for col in cols:
+            Ic_cols.append(c)
+            Ic_rows.append(col)
+
+    if direction == 'rev':
+        Ic_cols, Ic_rows = Ic_rows, Ic_cols
+        nrows = ncolors
+        ncolors = sparsity.shape[0]
+    else:
+        nrows =  sparsity.shape[1]
+
+    Ic = coo_matrix((np.ones(len(Ic_rows)), (Ic_rows, Ic_cols)),
+                    shape=(nrows, ncolors)).tocsc()
+
+    return Ic.T
+
+
+def colored2full_jac(Jc, sparsity, color_iter, direction):
+    """
+    Expand a colored jacobian to a full jacobian.
+
+    Parameters
+    ----------
+    Jc : csc_matrix
+        Colored jacobian.
+    sparsity : csc_matrix
+        Sparsity pattern of the jacobian.
+    color_iter : iterator
+        Iterator over columns for each color.
+
+    Returns
+    -------
+    csc_matrix
+        Full jacobian.
+    """
+    X = _get_expander_matrix(sparsity, color_iter, direction).toarray()
+    if direction == 'fwd':
+        return jnp.where(sparsity, Jc @ X, 0.)
+    else:
+        return jnp.where(sparsity, X @ Jc, 0.)
+    # return (Jc @ expander) * sparsity
 
 
 def _order_by_ID(col_adj_matrix):
@@ -2966,15 +3087,11 @@ def _compute_coloring(J, mode, direct=True):
 
     col2rows = [None] * ncols  # will contain list of nonzero rows for each column
 
-    for r, c in zip(nzrows, nzcols):
+    for r, c in sorted(zip(nzrows, nzcols)):
         if col2rows[c] is None:
             col2rows[c] = [r]
         else:
             col2rows[c].append(r)
-
-    for c, rows in enumerate(col2rows):
-        if rows is not None:
-            col2rows[c] = sorted(rows)
 
     if rev:
         coloring._rev = (col_groups, col2rows)

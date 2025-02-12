@@ -570,8 +570,6 @@ class ReturnChecker(ast.NodeVisitor):
     """
 
     def __init__(self, method):  # noqa
-        print("ReturnChecker")
-        print(inspect.getsource(method))
         self._returns = []
         self.visit(ast.parse(textwrap.dedent(inspect.getsource(method)), mode='exec'))
 
@@ -850,10 +848,6 @@ def get_vmap_tangents(vals, direction, fill=1., returns_tuple=False, coloring=No
         tangents.append(vartan)
         start = end
 
-    print("get_vmap_tangents")
-    print("vals:", vals)
-    print("direction:", direction)
-    print("returns_tuple:", returns_tuple)
     if len(vals) == 1 and direction == 'rev' and not returns_tuple:
         tangents = tangents[0]
     else:
@@ -983,7 +977,6 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
             def vjp_at_point(cotangent):
                 return vjp_fn(cotangent)
 
-            print("RETURNS TUPLE:", self._compute_primal_returns_tuple)
             cotangents = get_vmap_tangents(tuple(self._outputs.values()), 'rev',
                                            fill=np.nan if use_nan else 1.,
                                            returns_tuple=self._compute_primal_returns_tuple)

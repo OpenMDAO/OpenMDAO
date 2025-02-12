@@ -71,7 +71,6 @@ class JaxExplicitComponent(ExplicitComponent):
 
         # determine if the compute_primal method returns a tuple
         self._compute_primal_returns_tuple = ReturnChecker(self.compute_primal).returns_tuple()
-        print("_compute_primal_returns_tuple:", self._compute_primal_returns_tuple)
 
         if self.matrix_free:
             if self._coloring_info.use_coloring():
@@ -83,16 +82,11 @@ class JaxExplicitComponent(ExplicitComponent):
             if self._coloring_info.use_coloring():
                 # ensure coloring (and sparsity) is computed before partials
                 self._get_coloring()
-                # if self.best_partial_deriv_direction() == 'fwd':
-                #     self.compute_partials = self._jacfwd_colored
-                # else:
-                #     self.compute_partials = self._jacrev_colored
-                self.compute_partials = self._compute_partials
             else:
                 if not self._declared_partials_patterns:
                     # auto determine subjac sparsities
                     self.compute_sparsity()
-                self.compute_partials = self._compute_partials
+            self.compute_partials = self._compute_partials
             self._has_compute_partials = True
 
         _jax_register_pytree_class(self.__class__)
@@ -143,20 +137,15 @@ class JaxExplicitComponent(ExplicitComponent):
         # exclude the discrete inputs from the inputs and the discrete outputs from the outputs
         if ncontouts > 1 or self._compute_primal_returns_tuple:
             if not discrete_inputs and not self._discrete_outputs:
-                differentiable_compute_primal = self.compute_primal  #.__func__
+                differentiable_compute_primal = self.compute_primal
             else:
                 def differentiable_compute_primal(*contvals):
-                    # return self.compute_primal.__func__(*contvals, *discrete_inputs)[:ncontouts]
                     return self.compute_primal(*contvals, *discrete_inputs)[:ncontouts]
         elif discrete_inputs:
             def differentiable_compute_primal(*contvals):
-                # return self.compute_primal.__func__(*contvals, *discrete_inputs)
                 return self.compute_primal(*contvals, *discrete_inputs)
         else:
-            differentiable_compute_primal = self.compute_primal  #.__func__
-
-        #if need_jit:
-            #differentiable_compute_primal = jit(differentiable_compute_primal)
+            differentiable_compute_primal = self.compute_primal
 
         return differentiable_compute_primal
 
@@ -164,7 +153,7 @@ class JaxExplicitComponent(ExplicitComponent):
         """
         Get the jax version of the compute_primal function.
         """
-        compute_primal = self.compute_primal.__func__
+        compute_primal = self._orig_compute_primal.__func__
 
         if need_jit:
             # jit the compute_primal method
@@ -194,9 +183,11 @@ class JaxExplicitComponent(ExplicitComponent):
         """
         need_jit = self.options['use_jit']
         if need_jit and self._statics_changed(discrete_inputs):
+            print("STATICS CHANGED")
             self._jac_func_ = None
 
         if self._jac_func_ is None:
+            print("REJITTING")
             jax_compute_primal = self._get_jax_compute_primal(discrete_inputs, need_jit)
             self.compute_primal = MethodType(jax_compute_primal, self)
             differentiable_cp = self._get_differentiable_compute_primal(discrete_inputs, need_jit)
@@ -215,29 +206,27 @@ class JaxExplicitComponent(ExplicitComponent):
                     def jvp_at_point(tangent, icontvals):
                         # [1] is the derivative, [0] is the primal (we don't need the primal)
                         res = jax.jvp(differentiable_cp, icontvals, tangent)[1]
-                        res = jnp.vstack(res).flatten()
+                        res = jnp.concatenate([r.flatten() for r in res])
                         return res
 
                     # vectorize over the last axis of the tangent vectors and use the same
                     # inputs for all cases.
-                    self._jac_func_vmap_ = jax.vmap(jvp_at_point, in_axes=[-1, None], out_axes=-1)
+                    self._jac_func_ = jax.vmap(jvp_at_point, in_axes=[-1, None], out_axes=-1)
                     self._jac_colored_ = self._jacfwd_colored
                 else:  # rev
                     def vjp_at_point(cotangent, icontvals):
                         # Returns primal and a function to compute VJP so just take [1],
                         # the vjp function
                         res = jax.vjp(differentiable_cp, *icontvals)[1](cotangent)
-                        print("res:", res)
-                        res = jnp.vstack(res).flatten()
+                        res = jnp.concatenate([r.flatten() for r in res])
                         return res
-
-                    if self.options['use_jit']:
-                        vjp_at_point = jax.jit(vjp_at_point)
 
                     self._get_tangents('rev', self._coloring_info.coloring)
 
                     # Batch over last axis of cotangents
-                    self._jac_func_vmap_ = jax.vmap(vjp_at_point, in_axes=[-1, None], out_axes=-1)
+                    self._jac_func_ = jax.vmap(vjp_at_point, in_axes=[-1, None], out_axes=-1)
+                    if need_jit:
+                        self._jac_func_ = jax.jit(self._jac_func_)
                     self._jac_colored_ = self._jacrev_colored
             else:
                 self._jac_colored_ = None
@@ -305,27 +294,7 @@ class JaxExplicitComponent(ExplicitComponent):
         discrete_inputs : dict or None
             If not None, dict containing discrete input values.
         """
-        #discrete_inputs = discrete_inputs.values() if discrete_inputs else ()
-        #self._update_jax_functs(discrete_inputs)
-        print("JACFWD_COLORED")
-        J = self._jac_func_vmap_(self._tangents['fwd'], tuple(inputs.values()))
-        # if not isinstance(J, tuple):
-        #     J = (J,)
-
-        # if len(J) == 1:
-        #     J = J[0]
-        #     if len(J.shape) > 2:
-        #         # flatten 'variable' dimensions.  Last dimension is the batching dimension.
-        #         J = J.reshape(np.prod(J.shape[:-1]), J.shape[-1])
-        #     elif len(J.shape) == 1:
-        #         J = np.atleast_2d(J)
-        # else:
-        #     # flatten 'variable' dimensions for each variable.  Last dimension is the batching
-        #     # dimension.  Then vertically stack all the flattened 'variable' arrays.
-        #     J = np.vstack([j.reshape(np.prod(j.shape[:-1]), j.shape[-1]) for j in J])
-
-        # if direction != 'fwd':
-        #     J = J.T
+        J = self._jac_func_(self._tangents['fwd'], tuple(inputs.values()))
         partials.set_dense_jac(self, _uncompress_jac(self, J, 'fwd'))
 
     def _jacrev_colored(self, inputs, partials, discrete_inputs=None):
@@ -341,8 +310,7 @@ class JaxExplicitComponent(ExplicitComponent):
         discrete_inputs : dict or None
             If not None, dict containing discrete input values.
         """
-        print("JACREV_COLORED")
-        J = self._jac_func_vmap_(self._tangents['rev'], tuple(inputs.values()))
+        J = self._jac_func_(self._tangents['rev'], tuple(inputs.values()))
         partials.set_dense_jac(self, _uncompress_jac(self, J.T, 'rev'))
 
     def compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9):
