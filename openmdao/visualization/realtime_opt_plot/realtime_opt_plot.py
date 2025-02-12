@@ -6,18 +6,16 @@ import time  # TODO remove
 
 from bokeh.models import (
     ColumnDataSource,
-    Legend,
-    LegendItem,
     LinearAxis,
     Range1d,
     Toggle,
     Column,
     Row,
     CustomJS,
-    Div,ScrollBox
+    Div,
+    ScrollBox,
+    InlineStyleSheet
 )
-
-from bokeh.models import Button, CustomJS, InlineStyleSheet
 
 from bokeh.models.tools import (
     BoxZoomTool,
@@ -29,11 +27,8 @@ from bokeh.models.tools import (
     ZoomInTool,
     ZoomOutTool,
 )
-from bokeh.plotting import curdoc, figure
+from bokeh.plotting import figure
 from bokeh.server.server import Server
-from tornado.ioloop import IOLoop
-from bokeh.palettes import Category20, Category20b, Category20c
-from bokeh.layouts import row, column, Spacer
 from bokeh.application.application import Application
 from bokeh.application.handlers import FunctionHandler
 
@@ -48,167 +43,178 @@ except:
     def get_free_port():
         return 5000
 
+_time_between_callbacks_in_ms = 2000
+_unused_session_lifetime_milliseconds = 1000 * 60 * 10  # TODO try different values here
 _obj_color = "black"
 _non_active_plot_color = "black"
 callback_code="""
 
-                            if (typeof window.ColorManager === 'undefined') {
-                                window.ColorManager = class {
-                                    constructor(palette = 'Category10') {
-                                    if (ColorManager.instance) {
-                                        return ColorManager.instance;
-                                    }
-                                    // Define our own palettes
-                                    this.palettes = {
-                                        'Category20': [
-                                        '#1f77b4', '#aec7e8', '#ff7f0e', '#ffbb78', '#2ca02c',
-                                        '#98df8a', '#d62728', '#ff9896', '#9467bd', '#c5b0d5',
-                                        '#8c564b', '#c49c94', '#e377c2', '#f7b6d2', '#7f7f7f',
-                                        '#c7c7c7', '#bcbd22', '#dbdb8d', '#17becf', '#9edae5'
-                                        ],
-                                        'Colorblind': [
-                                        '#0072B2', '#E69F00', '#009E73', '#CC79A7', '#56B4E9',
-                                        '#D55E00', '#F0E442', '#000000'
-                                        ]
-                                    };
-                                    
-                                    this.palette = this.palettes[palette] || this.palettes.Colorblind;
-                                    this.usedColors = new Set();
-                                    this.variableColorMap = new Map();
-                                    
-                                    ColorManager.instance = this;
-                                    } //  end of constructor
-                                
-                                    getColor(variableName) {
-                                    if (this.variableColorMap.has(variableName)) {
-                                        return this.variableColorMap.get(variableName);
-                                    }
-                                
-                                    const availableColor = this.palette.find(color => !this.usedColors.has(color));
-                                    const newColor = availableColor || this.palette[this.usedColors.size % this.palette.length];
-                                    
-                                    this.usedColors.add(newColor);
-                                    this.variableColorMap.set(variableName, newColor);
-                                    return newColor;
-                                    } // end of getColor
-                                
-                                    releaseColor(variableName) {
-                                    const color = this.variableColorMap.get(variableName);
-                                    if (color) {
-                                        this.usedColors.delete(color);
-                                        this.variableColorMap.delete(variableName);
-                                    }
-                                    } // end of releaseColor
-                                
-                                    // Get all available palettes
-                                    getPaletteNames() {
-                                    return Object.keys(this.palettes);
-                                    }
-                                
-                                    // Change active palette
-                                    setPalette(paletteName) {
-                                    if (this.palettes[paletteName]) {
-                                        this.palette = this.palettes[paletteName];
-                                        // Optionally reset all color assignments
-                                        this.usedColors.clear();
-                                        this.variableColorMap.clear();
-                                    }
-                                    } // end of setPalette
+if (typeof window.ColorManager === 'undefined') {
+    window.ColorManager = class {
+        constructor(palette = 'Category10') {
+        if (ColorManager.instance) {
+            return ColorManager.instance;
+        }
+        // Define our own palettes
+        this.palettes = {
+            'Category20': [
+            '#1f77b4', '#aec7e8', '#ff7f0e', '#ffbb78', '#2ca02c',
+            '#98df8a', '#d62728', '#ff9896', '#9467bd', '#c5b0d5',
+            '#8c564b', '#c49c94', '#e377c2', '#f7b6d2', '#7f7f7f',
+            '#c7c7c7', '#bcbd22', '#dbdb8d', '#17becf', '#9edae5'
+            ],
+            'Colorblind': [
+            '#0072B2', '#E69F00', '#009E73', '#CC79A7', '#56B4E9',
+            '#D55E00', '#F0E442', '#000000'
+            ]
+        };
+        
+        this.palette = this.palettes[palette] || this.palettes.Colorblind;
+        this.usedColors = new Set();
+        this.variableColorMap = new Map();
+        
+        ColorManager.instance = this;
+        } //  end of constructor
+    
+        getColor(variableName) {
+        if (this.variableColorMap.has(variableName)) {
+            return this.variableColorMap.get(variableName);
+        }
+    
+        const availableColor = this.palette.find(color => !this.usedColors.has(color));
+        const newColor = availableColor || this.palette[this.usedColors.size % this.palette.length];
+        
+        this.usedColors.add(newColor);
+        this.variableColorMap.set(variableName, newColor);
+        return newColor;
+        } // end of getColor
+    
+        releaseColor(variableName) {
+        const color = this.variableColorMap.get(variableName);
+        if (color) {
+            this.usedColors.delete(color);
+            this.variableColorMap.delete(variableName);
+        }
+        } // end of releaseColor
+    
+        // Get all available palettes
+        getPaletteNames() {
+        return Object.keys(this.palettes);
+        }
+    
+        // Change active palette
+        setPalette(paletteName) {
+        if (this.palettes[paletteName]) {
+            this.palette = this.palettes[paletteName];
+            // Optionally reset all color assignments
+            this.usedColors.clear();
+            this.variableColorMap.clear();
+        }
+        } // end of setPalette
 
-                                }; // end of class definition
+    }; // end of class definition
 
-                                window.colorManager = new window.ColorManager("Colorblind");
-                            }  // end of if
+    window.colorManager = new window.ColorManager("Colorblind");
+}  // end of if
 
-                            // Get the toggle that triggered the callback
-                            const toggle = cb_obj;
-                            const index = toggles.indexOf(toggle);
+// Get the toggle that triggered the callback
+const toggle = cb_obj;
+const index = toggles.indexOf(toggle);
 
-                            // Set line visibility
-                            lines[index].visible = toggle.active;
+// Set line visibility
+lines[index].visible = toggle.active;
 
-                            // Set axis visibility if it exists (all except first line)
-                            if (index > 0 && index-1 < axes.length) {
-                                axes[index-1].visible = toggle.active;
-                            }
+// Set axis visibility if it exists (all except first line)
+if (index > 0 && index-1 < axes.length) {
+    axes[index-1].visible = toggle.active;
+}
 
-                            let variable_name = cb_obj.label;
-                            // if turning on, get a color and set the line and toggle button to that color
-                            if (toggle.active) {
-                                let color = window.colorManager.getColor(variable_name);
-                                axes[index-1].axis_label_text_color = color
-                                lines[index].glyph.line_color = color;
-                                lines[index].glyph.fill_color = color;
-                                lines[index].glyph.attributes.line_color = color;
+let variable_name = cb_obj.label;
+// if turning on, get a color and set the line and toggle button to that color
+if (toggle.active) {
+    let color = window.colorManager.getColor(variable_name);
+    axes[index-1].axis_label_text_color = color
+    lines[index].glyph.line_color = color;
+    lines[index].glyph.fill_color = color;
+    lines[index].glyph.attributes.line_color = color;
 
-                                toggle.stylesheets = [`
-                                    .bk-btn {
-                                        color: ${color}
-                                        border-color: ${color}
-                                        background-color: white
-                                        display: flex;
-                                        align-items: center; /* Vertical centering */
-                                        justify-content: center; /* Horizontal centering */
-                                        height: 22px; /* Example height, adjust as needed */
-                                        border-width: 0px; /* Adjust to desired thickness */
-                                        border-style: solid; /* Ensures a solid border */
-                                        font-size: 22px;
-                                    }
-                                    .bk-btn.bk-active {
-                                        color: white;
-                                        border-color: ${color};
-                                        background-color: ${color};
-                                        display: flex;
-                                        align-items: center; /* Vertical centering */
-                                        justify-content: center; /* Horizontal centering */
-                                        height: 22px; /* Example height, adjust as needed */
-                                        font-size: 22px;
-                                        border-width: 0px; /* Adjust to desired thickness */
-                                        border-style: solid; /* Ensures a solid border */
-                                    }
-                                    .bk-btn.bk-btn-default {
-                                        display: flex;
-                                    }
-                                `];
-                            // if turning off, return the color to the pool and set the color of the button to black
-                            } else {
-                                window.colorManager.releaseColor(variable_name);
-                                axes[index-1].axis_label_text_color = 'black'
-                                lines[index].glyph.line_color = 'black';
-                                toggle.stylesheets = [`
-                                    .bk-btn {
-                                        color: black
-                                        border-color: black
-                                        background-color: white
-                                        display: flex;
-                                        align-items: center; /* Vertical centering */
-                                        justify-content: center; /* Horizontal centering */
-                                        height: 22px; /* Example height, adjust as needed */
-                                        border-width: 0px; /* Adjust to desired thickness */
-                                        font-size: 22px;
-                                        border-style: solid; /* Ensures a solid border */
-                                    }
-                                    .bk-btn.bk-active {
-                                        color: white;
-                                        border-color: black;
-                                        background-color: black;
-                                        display: flex;
-                                        align-items: center; /* Vertical centering */
-                                        justify-content: center; /* Horizontal centering */
-                                        font-size: 22px;
-                                        height: 22px; /* Example height, adjust as needed */
-                                        border-width: 0px; /* Adjust to desired thickness */
-                                        border-style: solid; /* Ensures a solid border */
-                                    }
-                                    .bk-btn.bk-btn-default {
-                                        display: flex;
-                                    }
-                                `];
-                            }
-                    """
+    toggle.stylesheets = [`
+        .bk-btn {
+            color: ${color}
+            border-color: ${color}
+            background-color: white
+            display: flex;
+            align-items: center; /* Vertical centering */
+            justify-content: center; /* Horizontal centering */
+            height: 22px; /* Example height, adjust as needed */
+            border-width: 0px; /* Adjust to desired thickness */
+            border-style: solid; /* Ensures a solid border */
+            font-size: 22px;
+        }
+        .bk-btn.bk-active {
+            color: white;
+            border-color: ${color};
+            background-color: ${color};
+            display: flex;
+            align-items: center; /* Vertical centering */
+            justify-content: center; /* Horizontal centering */
+            height: 22px; /* Example height, adjust as needed */
+            font-size: 22px;
+            border-width: 0px; /* Adjust to desired thickness */
+            border-style: solid; /* Ensures a solid border */
+            box-shadow: inset 5px 5px 10px -5px rgba(0, 0, 0, 0.5);
+outline-style: solid;
+outline-color: transparent;
+box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.5);
+
+        }
+        .bk-btn.bk-btn-default {
+            display: flex;
+        }
+    `];
+// if turning off, return the color to the pool and set the color of the button to black
+} else {
+    window.colorManager.releaseColor(variable_name);
+    axes[index-1].axis_label_text_color = 'black'
+    lines[index].glyph.line_color = 'black';
+    toggle.stylesheets = [`
+        .bk-btn {
+            color: black
+            border-color: black
+            background-color: white
+            display: flex;
+            align-items: center; /* Vertical centering */
+            justify-content: center; /* Horizontal centering */
+            height: 22px; /* Example height, adjust as needed */
+            border-width: 0px; /* Adjust to desired thickness */
+            font-size: 22px;
+            border-style: solid; /* Ensures a solid border */
+        }
+        .bk-btn.bk-active {
+            color: white;
+            border-color: black;
+            background-color: black;
+            display: flex;
+            align-items: center; /* Vertical centering */
+            justify-content: center; /* Horizontal centering */
+            font-size: 22px;
+            height: 22px; /* Example height, adjust as needed */
+            border-width: 0px; /* Adjust to desired thickness */
+            border-style: solid; /* Ensures a solid border */
+            box-shadow: inset 5px 5px 10px -5px rgba(0, 0, 0, 0.5);
+outline-style: solid;
+outline-color: transparent;
+box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.5);
+
+        }
+        .bk-btn.bk-btn-default {
+            display: flex;
+        }
+    `];
+}
+"""
 
 start_time = time.time()
-
 
 def _realtime_opt_plot_setup_parser(parser):
     """
@@ -237,17 +243,7 @@ def _realtime_opt_plot_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    import cProfile, pstats
-
-    with cProfile.Profile() as profile:
-        realtime_opt_plot(
-            options.case_recorder_filename,
-            2000 # ms between callback calls
-        )
-    results = pstats.Stats(profile)
-    results.dump_stats("realtime_opt_plot.prof")
-
-
+    realtime_opt_plot(options.case_recorder_filename, _time_between_callbacks_in_ms)
 
 def _update_y_min_max(name, y, y_min, y_max):
     min_max_changed = False
@@ -287,6 +283,7 @@ class CaseTracker:
         self.source = None
         self._num_iterations_read = 0
         self._initial_cr_with_one_case = None
+        self._next_id_to_read = 1
 
     def _get_case_by_counter(self, counter):
         with sqlite3.connect(self._case_recorder_filename) as con:
@@ -310,109 +307,40 @@ class CaseTracker:
         else:
             return None
 
-    def _get_num_driver_iterations(self):
-        row_count = None
-        with sqlite3.connect(self._case_recorder_filename) as con:
-            con.row_factory = sqlite3.Row
-            cur = con.cursor()
-            # Query to count the number of rows in the table
-            query = f"SELECT COUNT(*) FROM driver_iterations"
-            cur.execute(query)
-            row_count = cur.fetchone()[0]
-        con.close()
-        return row_count
-
     def get_new_case(self):
-        num_driver_iterations_recorded = self._get_num_driver_iterations()
-        if num_driver_iterations_recorded > self._num_iterations_read:
-            case_counter = self._num_iterations_read + 1  # counter starts at 1 
-            driver_case = self._get_case_by_counter(case_counter)
+        driver_case = self._get_case_by_counter(self._next_id_to_read)
+        if driver_case is None:
+            return None
+        objs = driver_case.get_objectives(scaled=False)
+        design_vars = driver_case.get_design_vars(scaled=False)
+        constraints = driver_case.get_constraints(scaled=False)
 
-            if driver_case is None:
-                return None
+        new_data = {
+            "counter": int(driver_case.counter),
+        }
 
-            self._num_iterations_read += 1
+        # get objectives
+        objectives = {}
+        for name, value in objs.items():
+            objectives[name] = value
 
-            objs = driver_case.get_objectives(scaled=False)
-            design_vars = driver_case.get_design_vars(scaled=False)
-            constraints = driver_case.get_constraints(scaled=False)
+        new_data["objs"] = objectives
 
-            new_data = {
-                "counter": int(driver_case.counter),
-            }
+        # get des vars
+        desvars = {}
+        for name, value in design_vars.items():
+            desvars[name] = value
+        new_data["desvars"] = desvars
 
-            # get objectives
-            objectives = {}
-            for name, value in objs.items():
-                objectives[name] = value
+        # get cons
+        cons = {}
+        for name, value in constraints.items():
+            cons[name] = value
 
-            new_data["objs"] = objectives
+        new_data["cons"] = cons
 
-            # get des vars
-            desvars = {}
-            for name, value in design_vars.items():
-                desvars[name] = value
-            new_data["desvars"] = desvars
-
-            # get cons
-            cons = {}
-            for name, value in constraints.items():
-                cons[name] = value
-
-            new_data["cons"] = cons
-
-            return new_data
-        return None
-
-    def get_new_cases(self):
-        # need to read this each time since the constructor does all of the actual reading
-        # TODO - add code SqliteCaseReader for reading real-time data
-        self._cr = SqliteCaseReader(self._case_recorder_filename)
-        case_ids = self._cr.list_cases("driver", out_stream=None)
-        new_case_ids = [
-            case_id for case_id in case_ids if case_id not in set(self._case_ids_read)
-        ]
-        if new_case_ids:
-            # just get the first one
-            case_id = new_case_ids[0]
-
-            print(f"getting case with id {case_id}")
-
-            driver_case = self._cr.get_case(case_id)
-            objs = driver_case.get_objectives(scaled=False)
-            design_vars = driver_case.get_design_vars(scaled=False)
-            constraints = driver_case.get_constraints(scaled=False)
-
-            new_data = {
-                "counter": int(driver_case.counter),
-            }
-
-            # get objectives
-            objectives = {}
-            for name, value in objs.items():
-                objectives[name] = value
-
-            new_data["objs"] = objectives
-
-            # get des vars
-            desvars = {}
-            for name, value in design_vars.items():
-                desvars[name] = value
-            new_data["desvars"] = desvars
-
-            # get cons
-            cons = {}
-            for name, value in constraints.items():
-                cons[name] = value
-
-            new_data["cons"] = cons
-
-            self._case_ids_read.append(
-                case_id
-            )  # remember that this one has been plotted
-
-            return new_data
-        return None
+        self._next_id_to_read += 1
+        return new_data
 
     def get_obj_names(self):
         if self._initial_cr_with_one_case is None:
@@ -453,19 +381,6 @@ class CaseTracker:
         cons = driver_case.get_constraints()
         return cons.keys()
 
-    def get_obj_names(self):
-        if self._initial_cr_with_one_case is None:
-            cr = SqliteCaseReader(self._case_recorder_filename)
-            case_ids = cr.list_cases("driver", out_stream=None)
-            if len(case_ids) > 0:
-                self._initial_cr_with_one_case = cr
-            else:
-                return None
-        case_ids = self._initial_cr_with_one_case.list_cases("driver", out_stream=None)
-        driver_case = self._initial_cr_with_one_case.get_case(case_ids[0])
-        obj_vars = driver_case.get_objectives()
-        return obj_vars.keys()
-
     def get_units(self, name):
         if self._initial_cr_with_one_case is None:
             cr = SqliteCaseReader(self._case_recorder_filename)
@@ -490,7 +405,6 @@ class CaseTracker:
 
         return units
 
-
 class RealTimeOptPlot(object):
     def __init__(self, case_recorder_filename, callback_period, doc):
         self._case_recorder_filename = case_recorder_filename
@@ -503,7 +417,7 @@ class RealTimeOptPlot(object):
         self._labels_updated_with_units = False
         self._case_tracker = CaseTracker(case_recorder_filename)
 
-        self.setup_figure()
+        self._setup_figure()
 
         # used to keep track of the y min and max of the data so that 
         #    the axes ranges can be adjusted as data comes in
@@ -568,9 +482,7 @@ class RealTimeOptPlot(object):
                     float_value = _get_value_for_plotting(value, "desvars")
                     self._make_axis("desvars", desvar_name, float_value, units)
                     i_line += 1
-                    print(f"{i_line=}")
 
-                print("cons")
                 # cons
                 cons_label = _make_header_text_for_variable_chooser("CONSTRAINTS")
                 self._column_items.append(cons_label)
@@ -583,7 +495,6 @@ class RealTimeOptPlot(object):
                     float_value = _get_value_for_plotting(value, "cons")
                     self._make_axis("cons", cons_name, float_value, units)
                     i_line += 1
-                    print(f"{i_line=}")
 
                 print(f"after making all the lines and axes at {time.time()-start_time}")
 
@@ -631,8 +542,6 @@ class RealTimeOptPlot(object):
                 doc.add_root(graph)
                 print(f"after initial setup at {time.time()-start_time}")
                 # end of self._source is None - plottng is setup
-
-            # num_driver_iterations = self._case_tracker._get_num_driver_iterations()
 
             counter = new_data["counter"]
             source_stream_dict = {"iteration": [counter]}
@@ -711,7 +620,13 @@ class RealTimeOptPlot(object):
 
     def _make_legend_item(self, varname, color, active, callback):
 
-        stylesheet = InlineStyleSheet(css=".bk-btn.bk-btn-default.bk-active { font-size: 22px; } .bk-btn { font-size: 22px; } .bk-btn:focus {outline: none;}")
+        # TODO this seems to have no effect!
+        stylesheet = InlineStyleSheet(css="""
+            .bk-btn.bk-btn-default.bk-active { font-size: 32px; box-shadow: inset 5px 5px 10px -5px rgba(0, 0, 0, 1);} 
+            .bk-btn { font-size: 32px; } 
+            .bk-btn:focus {outline: none;}
+            """
+            )
 
         # TODO what should we do with colors?
         color = 'black'
@@ -719,7 +634,7 @@ class RealTimeOptPlot(object):
         toggle = Toggle(
             label=varname,
             active=active,
-            margin=(0, 0, 5, 0),
+            margin=(0, 0, 8, 0),
             stylesheets=[stylesheet],
         )
         toggle.js_on_change("active", callback)
@@ -729,21 +644,8 @@ class RealTimeOptPlot(object):
         # Add custom CSS styles for both active and inactive states
         toggle.stylesheets = [
             f"""
-                .bk-btn {{
-                    color: {color};
-                    border-color: {color};
-                    background-color: white;
-                    display: flex;
-                    align-items: center; /* Vertical centering */
-                    justify-content: center; /* Horizontal centering */
-                    height: 20px; /* Example height, adjust as needed */
-                    border-width: 0px; /* Adjust to desired thickness */
-                    border-style: solid; /* Ensures a solid border */
-                    font-size: 22px !important; 
-                }}
-
-                .bk-btn.bk-active {{
-                    --font-size: 32px;  /* Set the variable */
+                .bk-btn.bk-active:active {{
+                    --font-size: 22px;  /* Set the variable */
                     color: white;
                     border-color: {color};
                     background-color: {color};
@@ -753,43 +655,74 @@ class RealTimeOptPlot(object):
                     height: 20px; /* Example height, adjust as needed */
                     border-width: 0px; /* Adjust to desired thickness */
                     border-style: solid; /* Ensures a solid border */
-                    font-size: 22px !important;
-                }}
-
-                .button.bk-btn.bk-btn-default {{
-                    font-size: 22px !important;  /* Override the variable */
-                    display: flex;
-                /* ... rest of your styles ... */
-                }}
-
-                .bk-btn.bk-btn-default {{
-                    font-size: 22px !important;  /* Override the variable */
-                    display: flex;
-                /* ... rest of your styles ... */
-                }}
-
-                .button.bk-btn.bk-btn-default.bk-active {{
-                    font-size: 22px !important;  /* Override the variable */
-                    display: flex;
-                    /* ... rest of your styles ... */
+                    font-size: 42px !important;
+                    box-shadow: inset 5px 5px 10px -5px rgba(0, 0, 0, 0.5);
                 }}
 
 
-                .button.bk-btn.bk-btn-default.bk-active {{
-                    font-size: 22px !important;
-                    display: flex;
-                    }}
-
-                .bk-btn ::file-selector-button {{
-                    font-size: 22px !important;
-                    display: flex;
-                }}
-                .bk-btn:focus {{
-                    outline: none; /* Removes the default focus ring */
-                    display: flex;
-                }}
             """
     ]
+
+    #     toggle.stylesheets = [
+    #         f"""
+    #             .bk-btn {{
+    #                 color: {color};
+    #                 border-color: {color};
+    #                 background-color: white;
+    #                 display: flex;
+    #                 align-items: center; /* Vertical centering */
+    #                 justify-content: center; /* Horizontal centering */
+    #                 height: 20px; /* Example height, adjust as needed */
+    #                 border-width: 0px; /* Adjust to desired thickness */
+    #                 border-style: solid; /* Ensures a solid border */
+    #                 font-size: 22px !important; 
+    #             }}
+
+    #             .bk-btn.bk-active {{
+    #                 --font-size: 22px;  /* Set the variable */
+    #                 color: white;
+    #                 border-color: {color};
+    #                 background-color: {color};
+    #                 display: flex;
+    #                 align-items: center; /* Vertical centering */
+    #                 justify-content: center; /* Horizontal centering */
+    #                 height: 20px; /* Example height, adjust as needed */
+    #                 border-width: 0px; /* Adjust to desired thickness */
+    #                 border-style: solid; /* Ensures a solid border */
+    #                 font-size: 22px !important;
+    #             }}
+
+    #             .bk-btn.bk-btn-default {{
+    #                 font-size: 22px !important;  /* Override the variable */
+    #                 display: flex;
+    #             /* ... rest of your styles ... */
+    #             }}
+
+    #             .bk-btn ::file-selector-button {{
+    #                 font-size: 32px !important;
+    #                 display: flex;
+    #             }}
+
+    #             .bk-btn:focus {{
+    #                 outline: none; /* Removes the default focus ring */
+    #                 display: flex;
+    #             }}
+
+    #             .button.bk-btn.bk-btn-default.bk-active {{
+    #                 font-size: 22px !important;  /* Override the variable */
+    #                 display: flex;
+    #                 /* ... rest of your styles ... */
+    #             }}
+
+    #             .button.bk-btn.bk-btn-default {{
+    #                 font-size: 22px !important;  /* Override the variable */
+    #                 display: flex;
+    #             /* ... rest of your styles ... */
+    #             }}
+
+
+    #         """
+    # ]
 
         return toggle
 
@@ -855,7 +788,7 @@ class RealTimeOptPlot(object):
         )
 
 
-    def setup_figure(self):
+    def _setup_figure(self):
         # Make the figure and all the settings for it
         self.p = figure(
             tools=[
@@ -883,7 +816,6 @@ class RealTimeOptPlot(object):
         self.p.title.align = "center"
         self.p.title.standoff = 40  # Adds 40 pixels of space below the title
 
-        self.p.title.background_fill_color = "#eeeeee"
         self.p.xaxis.axis_label = "Driver iterations"
         self.p.xaxis.minor_tick_line_color = None
         self.p.axis.axis_label_text_font_style = "bold"
@@ -891,29 +823,31 @@ class RealTimeOptPlot(object):
 
 def realtime_opt_plot(case_recorder_filename, callback_period):
     """
-    Visualize a ??.
+    Visualize the objectives, desvars, and constraints during an optimization process.
 
     Parameters
     ----------
     case_recorder_filename : MetaModelStructuredComp or MetaModelUnStructuredComp
         The metamodel component.
+    callback_period : float
+        The time period between when the application calls the update method.
     """
 
     def _make_realtime_opt_plot_doc(doc):
         RealTimeOptPlot(case_recorder_filename, callback_period, doc=doc)
 
-    port_number = get_free_port()
+    _port_number = get_free_port()
 
     try:
         server = Server(
             {"/": Application(FunctionHandler(_make_realtime_opt_plot_doc))},
-            port=port_number,
-            unused_session_lifetime_milliseconds=1000 * 60 * 10,
+            port=_port_number,
+            unused_session_lifetime_milliseconds=_unused_session_lifetime_milliseconds,
         )
         server.start()
         server.io_loop.add_callback(server.show, "/")
 
-        print(f"Bokeh server running on http://localhost:{port_number}")
+        print(f"Bokeh server running on http://localhost:{_port_number}")
         server.io_loop.start()
     except KeyboardInterrupt as e:
         print(f"Server stopped due to keyboard interrupt")
