@@ -842,10 +842,7 @@ def get_vmap_tangents(vals, direction, fill=1., returns_tuple=False, coloring=No
     start = end = 0
     for v in vals:
         end += np.size(v)
-        vartan = tangent[start:end]  # get rows corresponding to each input
-        # take each flat column and reshape it to the shape of the input
-        vartan.shape = np.shape(v) + (ncols,)
-        tangents.append(vartan)
+        tangents.append(jnp.array(tangent[start:end].reshape(np.shape(v) + (ncols,))))
         start = end
 
     if len(vals) == 1 and direction == 'rev' and not returns_tuple:
@@ -944,6 +941,7 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
                                      perturb_vecs=pvecs, save_vecs=save_vecs):
         self._apply_nonlinear()
 
+        # J = self._compute_partials(self._inputs,
         full_invals = tuple(self._get_compute_primal_invals())
         icontvals = full_invals[:ncontins]  # continuous inputs
         idiscvals = full_invals[ncontins:]  # discrete inputs
@@ -1026,113 +1024,15 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
     return sparsity, info
 
 
-def _compute_jac(self, direction, inputs=None, outputs=None, discrete_inputs=None,
-                 discrete_outputs=None):
-    """
-    Compute the Jacobian using jvp/vjp with nans for the seeds.
-
-    Parameters
-    ----------
-    self : Component
-        The component to compute the Jacobian for.
-    direction : str
-        The direction to compute the Jacobian in.
-    inputs : dict
-        The inputs to the component.
-    outputs : dict
-        The outputs to the component.
-    discrete_inputs : dict
-        The discrete inputs to the component.
-    discrete_outputs : dict
-        The discrete outputs to the component.
-
-    Returns
-    -------
-    dict
-        The partials.
-    """
-    if inputs is None:
-        inputs = self._inputs
-    if outputs is None:
-        outputs = self._outputs
-    if discrete_inputs is None:
-        discrete_inputs = self._discrete_inputs
-    if discrete_outputs is None:
-        discrete_outputs = self._discrete_outputs
-
-    ncontins = inputs.nvars()
-    ncontouts = self._outputs.nvars()
-
-    implicit = not self.is_explicit()
-
-    if implicit:
-        ncontins += ncontouts
-
-    full_invals = tuple(self._get_compute_primal_invals(inputs=inputs,
-                                                        discrete_inputs=discrete_inputs))
-    icontvals = full_invals[:ncontins]  # continuous inputs
-    idiscvals = full_invals[ncontins:]  # discrete inputs
-
-    # exclude the discrete inputs from the inputs and the discrete outputs from the outputs
-    if implicit or (ncontouts == 1 and not self._compute_primal_returns_tuple):
-        if len(idiscvals) > 0:
-            def differentiable_part(*contvals):
-                return self.compute_primal(*contvals, *idiscvals)
+def _jax2np(J):
+    if isinstance(J, tuple):
+        if len(J) == 1:
+            J = np.asarray(J[0])
+            return J.reshape(-1, J.shape[-1])
         else:
-            differentiable_part = self.compute_primal
+            return np.concatenate([np.asarray(a).reshape(-1, a.shape[-1]) for a in J])
     else:
-        def differentiable_part(*contvals):
-            return self.compute_primal(*contvals, *idiscvals)[:ncontouts]
-
-    if direction == 'fwd':
-        tangents = self._get_tangents('fwd', self._coloring_info.coloring)
-
-        # make a function that takes only a tuple of tangents to make it easier to vectorize
-        # using vmap
-        def jvp_at_point(tangent):
-            # [1] is the derivative, [0] is the primal (we don't need the primal)
-            return jax.jvp(differentiable_part, icontvals, tangent)[1]
-
-        if self.options['use_jit']:
-            jvp_at_point = jax.jit(jvp_at_point)
-
-        # vectorize over the last axis of the tangent vectors
-        J = jax.vmap(jvp_at_point, in_axes=-1, out_axes=-1)(tangents)
-
-    else:  # rev
-        # Returns primal and a function to compute VJP so just take [1], the vjp function
-        vjp_fn = jax.vjp(differentiable_part, *icontvals)[1]
-
-        def vjp_at_point(cotangent):
-            return vjp_fn(cotangent)
-
-        if self.options['use_jit']:
-            vjp_at_point = jax.jit(vjp_at_point)
-
-        cotangents = self._get_tangents('rev', self._coloring_info.coloring)
-
-        # Batch over last axis of cotangents
-        J = jax.vmap(vjp_at_point, in_axes=-1, out_axes=-1)(cotangents)
-
-    if not isinstance(J, tuple):
-        J = (J,)
-
-    if len(J) == 1:
-        J = J[0]
-        if len(J.shape) > 2:
-            # flatten 'variable' dimensions.  Last dimension is the batching dimension.
-            J = J.reshape(np.prod(J.shape[:-1]), J.shape[-1])
-        elif len(J.shape) == 1:
-            J = np.atleast_2d(J)
-    else:
-        # flatten 'variable' dimensions for each variable.  Last dimension is the batching
-        # dimension.  Then vertically stack all the flattened 'variable' arrays.
-        J = np.vstack([j.reshape(np.prod(j.shape[:-1]), j.shape[-1]) for j in J])
-
-    if direction != 'fwd':
-        J = J.T
-
-    return _uncompress_jac(self, J, direction)
+        return np.asarray(J).reshape(-1, J.shape[-1])
 
 
 def _uncompress_jac(self, J, direction):
@@ -1187,7 +1087,6 @@ def _jax_derivs2partials(self, deriv_vals, partials, ofnames, wrtnames):
                 # FIXME: this means that we computed a derivative that we didn't need
                 continue
 
-            wrtmeta = self._var_rel2meta[wrtname]
             dvals = deriv_vals
             # if there's only one 'of' value, we only take the indexed value if the
             # return value of compute_primal is single entry tuple. If a single array or
@@ -1195,7 +1094,7 @@ def _jax_derivs2partials(self, deriv_vals, partials, ofnames, wrtnames):
             if nof > 1 or nested_tup:
                 dvals = dvals[ofidx]
 
-            dvals = dvals[wrtidx].reshape(ofmeta['size'], wrtmeta['size'])
+            dvals = dvals[wrtidx].reshape(ofmeta['size'], self._var_rel2meta[wrtname]['size'])
 
             sjmeta = partials.get_metadata(key)
             rows = sjmeta['rows']

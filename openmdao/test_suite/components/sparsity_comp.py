@@ -33,7 +33,10 @@ class SparsityComp(ExplicitComponent):
         self.add_output('y', shape=self.sparsity.shape[0])
 
     def setup_partials(self):
-        self.declare_partials('y', 'x', rows=self.nzrows, cols=self.nzcols)
+        if self.use_sparse:
+            self.declare_partials('y', 'x', rows=self.nzrows, cols=self.nzcols)
+        else:
+            self.declare_partials('y', 'x')
 
     def compute(self, inputs, outputs):
         outputs['y'] = self.sparsity @ inputs['x']
@@ -42,7 +45,7 @@ class SparsityComp(ExplicitComponent):
         if self.use_sparse:
             partials['y', 'x'] = self.sparsity.data
         else:
-            partials['y', 'x'] = self.sparsity[self.nzrows, self.nzcols]
+            partials['y', 'x'] = self.sparsity  # [self.nzrows, self.nzcols]
 
 
 class JaxSparsityComp(JaxExplicitComponent):
@@ -72,14 +75,15 @@ class JaxSparsityComp(JaxExplicitComponent):
         super(JaxSparsityComp, self).__init__(**kwargs)
         self.declare = declare_partials
         if isinstance(sparsity, (np.ndarray, jnp.ndarray)):
-            # self.use_sparse = False
             self.sparsity = jnp.array(sparsity)
             self.nzrows, self.nzcols = jnp.nonzero(self.sparsity)
+        elif issparse(sparsity):
+            sparsity = sparsity.tocoo()
+            self.nzrows, self.nzcols = jnp.array(sparsity.row), jnp.array(sparsity.col)
+            indices = jnp.array(list(zip(self.nzrows, self.nzcols)), dtype=jnp.int32)
+            self.sparsity = jsparse.BCOO((jnp.array(sparsity.data), indices), shape=sparsity.shape)
         else:
-            raise ValueError(f"{self.msginfo}: no support for sparse arrays yet")
-            # self.use_sparse = True
-            # self.sparsity = sparsity.tocoo()
-            # self.nzrows, self.nzcols = self.sparsity.row, self.sparsity.col
+            raise ValueError(f"{self.msginfo}: no support for sparse type of {type(sparsity)}")
 
     def setup(self):
         self.add_input('x', shape=self.sparsity.shape[1])

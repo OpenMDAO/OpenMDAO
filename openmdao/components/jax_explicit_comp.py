@@ -4,12 +4,11 @@ An ExplicitComponent that uses JAX for derivatives.
 
 import sys
 from types import MethodType
-
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.jax_utils import jax, jnp, jit, ReturnChecker, \
+from openmdao.utils.jax_utils import jax, jit, ReturnChecker, \
     _jax_register_pytree_class, _compute_sparsity, get_vmap_tangents, \
-    _update_subjac_sparsity, _jax_derivs2partials, _uncompress_jac
+    _update_subjac_sparsity, _jax_derivs2partials, _uncompress_jac, _jax2np
 
 
 class JaxExplicitComponent(ExplicitComponent):
@@ -205,9 +204,7 @@ class JaxExplicitComponent(ExplicitComponent):
                     # jacobian (the compressed jacobian in the colored case).
                     def jvp_at_point(tangent, icontvals):
                         # [1] is the derivative, [0] is the primal (we don't need the primal)
-                        res = jax.jvp(differentiable_cp, icontvals, tangent)[1]
-                        res = jnp.concatenate([r.flatten() for r in res])
-                        return res
+                        return jax.jvp(differentiable_cp, icontvals, tangent)[1]
 
                     # vectorize over the last axis of the tangent vectors and use the same
                     # inputs for all cases.
@@ -217,9 +214,7 @@ class JaxExplicitComponent(ExplicitComponent):
                     def vjp_at_point(cotangent, icontvals):
                         # Returns primal and a function to compute VJP so just take [1],
                         # the vjp function
-                        res = jax.vjp(differentiable_cp, *icontvals)[1](cotangent)
-                        res = jnp.concatenate([r.flatten() for r in res])
-                        return res
+                        return jax.vjp(differentiable_cp, *icontvals)[1](cotangent)
 
                     self._get_tangents('rev', self._coloring_info.coloring)
 
@@ -247,6 +242,12 @@ class JaxExplicitComponent(ExplicitComponent):
         """
         kwargs['method'] = 'jax'
         super().declare_coloring(**kwargs)
+
+    # def _compute_partials_dense(self, inputs, partials, discrete_inputs=None):
+    #     """
+    #     Compute the dense Jacobian.
+    #     """
+    #     return self._compute_partials(inputs, partials, discrete_inputs)
 
     # we define compute_partials here instead of making this the base class version as we
     # did with compute, because the existence of a compute_partials method that is not the
@@ -295,7 +296,7 @@ class JaxExplicitComponent(ExplicitComponent):
             If not None, dict containing discrete input values.
         """
         J = self._jac_func_(self._tangents['fwd'], tuple(inputs.values()))
-        partials.set_dense_jac(self, _uncompress_jac(self, J, 'fwd'))
+        partials.set_dense_jac(self, _uncompress_jac(self, _jax2np(J), 'fwd'))
 
     def _jacrev_colored(self, inputs, partials, discrete_inputs=None):
         """
@@ -311,7 +312,7 @@ class JaxExplicitComponent(ExplicitComponent):
             If not None, dict containing discrete input values.
         """
         J = self._jac_func_(self._tangents['rev'], tuple(inputs.values()))
-        partials.set_dense_jac(self, _uncompress_jac(self, J.T, 'rev'))
+        partials.set_dense_jac(self, _uncompress_jac(self, _jax2np(J).T, 'rev'))
 
     def compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9):
         """

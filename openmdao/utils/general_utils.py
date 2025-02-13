@@ -660,8 +660,6 @@ def indent_context(stream, indent='   '):
     ----------
     stream : stream
         The stream to write indented output to.
-    stdouts : list of stream
-        A list of streams to buffer stdout from.  If None, use sys.stdout.
     indent : str
         The string to use for indentation.
 

@@ -8,7 +8,6 @@ from scipy.sparse import coo_matrix
 import openmdao.api as om
 from openmdao.utils.coloring import _compute_coloring
 from openmdao.utils.assert_utils import assert_near_equal
-from openmdao.devtools.debug import compare_jacs
 from openmdao.test_suite.components.sparsity_comp import SparsityComp
 
 

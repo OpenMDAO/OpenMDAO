@@ -2226,7 +2226,7 @@ def _get_colormap(color_array):
     return colmap
 
 
-def _get_expander_matrix(sparsity, color_iter, direction):
+def _get_expander_matrix(sparsity_shape, color_iter, direction):
     """
     Get a matrix to expand a colored jacobian to an expanded colored jacobian.
 
@@ -2235,10 +2235,12 @@ def _get_expander_matrix(sparsity, color_iter, direction):
 
     Parameters
     ----------
-    sparsity : csc_matrix
-        Sparsity pattern of the jacobian.
+    sparsity_shape : tuple
+        Shape of the sparsity pattern of the jacobian.
     color_iter : iterator
         Iterator over columns for each color.
+    direction : str
+        Direction of the jacobian to expand.
 
     Returns
     -------
@@ -2261,14 +2263,17 @@ def _get_expander_matrix(sparsity, color_iter, direction):
     if direction == 'rev':
         Ic_cols, Ic_rows = Ic_rows, Ic_cols
         nrows = ncolors
-        ncolors = sparsity.shape[0]
+        ncolors = sparsity_shape[0]
     else:
-        nrows =  sparsity.shape[1]
+        nrows = sparsity_shape[1]
 
     Ic = coo_matrix((np.ones(len(Ic_rows)), (Ic_rows, Ic_cols)),
-                    shape=(nrows, ncolors)).tocsc()
+                    shape=(nrows, ncolors)).T
 
-    return Ic.T
+    if direction == 'fwd':
+        return Ic.tocsc()
+    else:
+        return Ic.tocsr()
 
 
 def colored2full_jac(Jc, sparsity, color_iter, direction):
@@ -2283,18 +2288,19 @@ def colored2full_jac(Jc, sparsity, color_iter, direction):
         Sparsity pattern of the jacobian.
     color_iter : iterator
         Iterator over columns for each color.
+    direction : str
+        Direction of the jacobian to expand.
 
     Returns
     -------
     csc_matrix
         Full jacobian.
     """
-    X = _get_expander_matrix(sparsity, color_iter, direction).toarray()
+    X = _get_expander_matrix(sparsity.shape, color_iter, direction).toarray()
     if direction == 'fwd':
-        return jnp.where(sparsity, Jc @ X, 0.)
+        return np.where(sparsity, Jc @ X, 0.)
     else:
-        return jnp.where(sparsity, X @ Jc, 0.)
-    # return (Jc @ expander) * sparsity
+        return np.where(sparsity, X @ Jc, 0.)
 
 
 def _order_by_ID(col_adj_matrix):
