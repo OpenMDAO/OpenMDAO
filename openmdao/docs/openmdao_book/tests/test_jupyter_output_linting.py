@@ -83,7 +83,7 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
         mpi_header.extend(header)
 
         for file in _get_files():
-            with open(file) as f:
+            with open(file, 'r') as f:
 
                 # This one is exempt from these lint rules.
                 if 'getting_started.ipynb'  in file:
