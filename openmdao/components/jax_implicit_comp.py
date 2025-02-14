@@ -3,13 +3,15 @@ An ImplicitComponent that uses JAX for derivatives.
 """
 
 import sys
+import inspect
 from types import MethodType
 from itertools import chain
+
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.jax_utils import jax, jit, _jax_register_pytree_class, \
-    _compute_sparsity, ReturnChecker, get_vmap_tangents, _update_subjac_sparsity, \
-    _jax_derivs2partials
+    _compute_sparsity, get_vmap_tangents, _update_subjac_sparsity, \
+    _jax_derivs2partials, _ensure_returns_tuple
 
 
 class JaxImplicitComponent(ImplicitComponent):
@@ -25,8 +27,6 @@ class JaxImplicitComponent(ImplicitComponent):
 
     Attributes
     ----------
-    _compute_primal_returns_tuple : bool
-        Whether the compute_primal method returns a tuple.
     _tangents : dict
         The tangents for the inputs and outputs.
     _sparsity : coo_matrix or None
@@ -38,9 +38,13 @@ class JaxImplicitComponent(ImplicitComponent):
             raise RuntimeError("JaxImplicitComponent requires Python 3.9 or newer.")
         super().__init__(**kwargs)
 
-        self._compute_primal_returns_tuple = False
         self._tangents = {'fwd': None, 'rev': None}
         self._sparsity = None
+
+        self._orig_compute_primal = self.compute_primal
+        self._ret_tuple_compute_primal = \
+            MethodType(_ensure_returns_tuple(self.compute_primal.__func__), self)
+        self.compute_primal = self._ret_tuple_compute_primal
 
         # if derivs_method is explicitly passed in, just use it
         if 'derivs_method' in kwargs:
@@ -80,9 +84,6 @@ class JaxImplicitComponent(ImplicitComponent):
                 self.linearize = self._jax_linearize
             self._has_linearize = True
 
-        # determine if the compute_primal method returns a tuple
-        self._compute_primal_returns_tuple = ReturnChecker(self.compute_primal).returns_tuple()
-
         if self.options['use_jit']:
             static_argnums = []
             idx = len(self._var_rel_names['input']) + len(self._var_rel_names['output']) + 1
@@ -91,6 +92,22 @@ class JaxImplicitComponent(ImplicitComponent):
                                                  static_argnums=static_argnums), self)
 
         _jax_register_pytree_class(self.__class__)
+
+    def _check_compute_primal_args(self):
+        """
+        Check that the compute_primal method args are in the correct order.
+        """
+        args = list(inspect.signature(self._orig_compute_primal).parameters)
+        if args and args[0] == 'self':
+            args = args[1:]
+        compargs = self._get_compute_primal_argnames()
+        if args != compargs:
+            raise RuntimeError(f"{self.msginfo}: compute_primal method args {args} don't match "
+                               f"the args {compargs} mapped from this component's inputs. To "
+                               "map inputs to the compute_primal method, set the name used in "
+                               "compute_primal to the 'primal_name' arg when calling "
+                               "add_input/add_discrete_input. This is only necessary if the "
+                               "declared component input name is not a valid Python name.")
 
     def _get_jacobian_func(self):
         # TODO: modify this to use relevance and possibly compile multiple jac functions depending

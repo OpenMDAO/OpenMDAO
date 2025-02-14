@@ -18,6 +18,7 @@ from openmdao.visualization.tables.table_builder import generate_table
 from openmdao.utils.code_utils import _get_long_name, remove_src_blocks, replace_src_block, \
     get_function_deps
 from openmdao.utils.file_utils import get_module_path, _load_and_exec
+from openmdao.utils.om_warnings import issue_warning
 
 
 def jit_stub(f, *args, **kwargs):
@@ -793,7 +794,7 @@ else:
             _registered_classes.add(cls)
 
 
-def get_vmap_tangents(vals, direction, fill=1., returns_tuple=False, coloring=None):
+def get_vmap_tangents(vals, direction, fill=1., coloring=None):
     """
     Return a tuple of tangents values for use with vmap.
 
@@ -807,9 +808,6 @@ def get_vmap_tangents(vals, direction, fill=1., returns_tuple=False, coloring=No
         The direction to compute the sparsity in.  It must be 'fwd' or 'rev'.
     fill : float
         The value to fill nonzero entries in the tangent with.
-    returns_tuple : bool
-        If True, the compute_primal method returns a tuple.  One item tuples require special
-        handling.
     coloring : Coloring or None
         A Coloring object that contains coloring information including nonzero indices.
 
@@ -845,10 +843,7 @@ def get_vmap_tangents(vals, direction, fill=1., returns_tuple=False, coloring=No
         tangents.append(jnp.array(tangent[start:end].reshape(np.shape(v) + (ncols,))))
         start = end
 
-    if len(vals) == 1 and direction == 'rev' and not returns_tuple:
-        tangents = tangents[0]
-    else:
-        tangents = tuple(tangents)
+    tangents = tuple(tangents)
 
     return tangents
 
@@ -947,7 +942,7 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
         idiscvals = full_invals[ncontins:]  # discrete inputs
 
         # exclude the discrete inputs from the inputs and the discrete outputs from the outputs
-        if implicit or (ncontouts == 1 and not self._compute_primal_returns_tuple):
+        if implicit:
             def differentiable_part(*contvals):
                 return self.compute_primal(*contvals, *idiscvals)
         else:
@@ -958,8 +953,7 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
             differentiable_part = jax.jit(differentiable_part)
 
         if direction == 'fwd':
-            tangents = get_vmap_tangents(icontvals, 'fwd', fill=np.nan if use_nan else 1.,
-                                         returns_tuple=self._compute_primal_returns_tuple)
+            tangents = get_vmap_tangents(icontvals, 'fwd', fill=np.nan if use_nan else 1.)
 
             def jvp_at_point(tangent):
                 # [1] is the derivative, [0] is the primal (we don't need the primal)
@@ -976,8 +970,7 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
                 return vjp_fn(cotangent)
 
             cotangents = get_vmap_tangents(tuple(self._outputs.values()), 'rev',
-                                           fill=np.nan if use_nan else 1.,
-                                           returns_tuple=self._compute_primal_returns_tuple)
+                                           fill=np.nan if use_nan else 1.)
 
             # vectorize over last axis of cotangents
             J = jax.vmap(vjp_at_point, in_axes=-1, out_axes=-1)(cotangents)
@@ -1024,10 +1017,78 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
     return sparsity, info
 
 
+def _ensure_returns_tuple(func):
+    """
+    Ensure that the function returns a tuple.
+
+    If the function already returns a tuple, it is returned unchanged.
+    Otherwise, a wrapper function is returned that returns a tuple.
+
+    If for some reason the function cannot be parsed, it is returned unchanged.
+
+    Parameters
+    ----------
+    func : function
+        The function to ensure returns a tuple.
+
+    Returns
+    -------
+    function
+        The function that returns a tuple.
+    """
+    try:
+        checker = ReturnChecker(func)
+    except Exception:
+        issue_warning(f"Failed to parse function {func.__name__} to check if it returns a tuple."
+                      "Returning original function.")
+        return func
+    else:
+        if checker.returns_tuple():
+            return func
+        else:
+            def wrapper(*args, **kwargs):
+                return (func(*args, **kwargs),)
+            wrapper.__name__ = func.__name__
+            wrapper.__doc__ = func.__doc__
+            return wrapper
+
+
+def _wrap_differentiable(self, func, discrete_inputs):
+    """
+    Wrap a function so that it doesn't take or return discrete variables.
+
+    Parameters
+    ----------
+    self : Component
+        The component to wrap the function for.
+    func : function or method
+        The function or method to wrap.
+    discrete_inputs : dict
+        The discrete inputs.
+
+    Returns
+    -------
+    function
+        The wrapped function.
+    """
+    if discrete_inputs:
+        if self._discrete_outputs:
+            ncontouts = self._outputs.nvars()
+            def wrapper(*contvals):
+                return func(*contvals, *discrete_inputs)[:ncontouts]
+        else:
+            def wrapper(*contvals):
+                return func(*contvals, *discrete_inputs)
+        return wrapper
+
+    return func
+
+
 def _jax2np(J):
     if isinstance(J, tuple):
         if len(J) == 1:
             J = np.asarray(J[0])
+            # reshape(-1, ...) to flatten all but the last dimension
             return J.reshape(-1, J.shape[-1])
         else:
             return np.concatenate([np.asarray(a).reshape(-1, a.shape[-1]) for a in J])

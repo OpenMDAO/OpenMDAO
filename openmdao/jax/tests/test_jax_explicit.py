@@ -483,8 +483,6 @@ class TestJaxShapesAndReturns(unittest.TestCase):
 
         do_coloring = shape==(2,3) and slvtype == 'coloring'
 
-        print("RET TUPLE:", ret_tuple)
-
         # only color for 2x3 for now, others too dense
         if do_coloring:
             prob.driver = om.ScipyOptimizeDriver(maxiter=2)

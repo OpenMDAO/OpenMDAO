@@ -121,6 +121,7 @@ class Component(System):
         self._has_distrib_outputs = False
         self._compute_primals_out_shape = None
         self._valid_name_map = {}
+        self._orig_compute_primal = self.compute_primal
 
     def _tree_flatten(self):
         """
@@ -2571,7 +2572,7 @@ class Component(System):
         """
         Check that the compute_primal method args are in the correct order.
         """
-        args = list(inspect.signature(self.compute_primal).parameters)
+        args = list(inspect.signature(self._orig_compute_primal).parameters)
         if args and args[0] == 'self':
             args = args[1:]
         compargs = self._get_compute_primal_argnames()

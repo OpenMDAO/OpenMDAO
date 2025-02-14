@@ -4,11 +4,13 @@ An ExplicitComponent that uses JAX for derivatives.
 
 import sys
 from types import MethodType
+
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.jax_utils import jax, jit, ReturnChecker, \
+from openmdao.utils.jax_utils import jax, jit, \
     _jax_register_pytree_class, _compute_sparsity, get_vmap_tangents, \
-    _update_subjac_sparsity, _jax_derivs2partials, _uncompress_jac, _jax2np
+    _update_subjac_sparsity, _jax_derivs2partials, _uncompress_jac, _jax2np, \
+    _ensure_returns_tuple
 
 
 class JaxExplicitComponent(ExplicitComponent):
@@ -24,8 +26,6 @@ class JaxExplicitComponent(ExplicitComponent):
 
     Attributes
     ----------
-    _compute_primal_returns_tuple : bool
-        Whether the compute_primal method returns a tuple.
     _tangents : dict
         The tangents for the inputs and outputs.
     _sparsity : coo_matrix or None
@@ -37,16 +37,15 @@ class JaxExplicitComponent(ExplicitComponent):
             raise RuntimeError("JaxExplicitComponent requires Python 3.9 or newer.")
         super().__init__(**kwargs)
 
-        self._compute_primal_returns_tuple = False
-        self._tangents = {'fwd': None, 'rev': None}
-        self._sparsity = None
-        self._static_hash = None
-        self._jac_func_ = None
-        self._jac_colored_ = None
+        self._re_init()
+
         if self.compute_primal is None:
             raise RuntimeError(f"{self.msginfo}: compute_primal is not defined for this component.")
 
         self._orig_compute_primal = self.compute_primal
+        self._ret_tuple_compute_primal = \
+            MethodType(_ensure_returns_tuple(self.compute_primal.__func__), self)
+        self.compute_primal = self._ret_tuple_compute_primal
 
         # if derivs_method is explicitly passed in, just use it
         if 'derivs_method' in kwargs:
@@ -59,17 +58,31 @@ class JaxExplicitComponent(ExplicitComponent):
                           "will be used for derivatives.")
             self.options['derivs_method'] = fallback_derivs_method
 
+    def _re_init(self):
+        """
+        Re-initialize the component for a new run.
+        """
+        self._tangents = {'fwd': None, 'rev': None}
+        self._sparsity = None
+        self._jac_func_ = None
+        self._static_hash = None
+        self._jac_colored_ = None
+
     def _setup_jax(self):
         """
         Set up the jax interface for this component.
 
         This happens in final_setup after all var sizes and partials are set.
         """
-        self._sparsity = None
-        self._jac_func_ = None
+        _jax_register_pytree_class(self.__class__)
 
-        # determine if the compute_primal method returns a tuple
-        self._compute_primal_returns_tuple = ReturnChecker(self.compute_primal).returns_tuple()
+        self._re_init()
+
+        self.compute = self._jax_compute
+
+        if not self._discrete_inputs and not self.get_self_statics():
+            # avoid unnecessary statics checks
+            self._statics_changed = self._statics_noop
 
         if self.matrix_free:
             if self._coloring_info.use_coloring():
@@ -87,8 +100,6 @@ class JaxExplicitComponent(ExplicitComponent):
                     self.compute_sparsity()
             self.compute_partials = self._compute_partials
             self._has_compute_partials = True
-
-        _jax_register_pytree_class(self.__class__)
 
     def _statics_changed(self, discrete_inputs):
         """
@@ -112,7 +123,50 @@ class JaxExplicitComponent(ExplicitComponent):
             return True
         return False
 
-    def _get_differentiable_compute_primal(self, discrete_inputs, need_jit):
+    def _statics_noop(self, discrete_inputs):
+        """
+        Use this function if the component has no discrete inputs or self statics.
+
+        Parameters
+        ----------
+        discrete_inputs : dict
+            dict containing discrete input values.
+
+        Returns
+        -------
+        bool
+            Always returns False.
+        """
+        return False
+
+    def _jax_compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
+        """
+        Compute outputs given inputs. The model is assumed to be in an unscaled state.
+
+        An inherited component may choose to either override this function or to define a
+        compute_primal function.
+
+        Parameters
+        ----------
+        inputs : Vector
+            Unscaled, dimensional input variables read via inputs[key].
+        outputs : Vector
+            Unscaled, dimensional output variables read via outputs[key].
+        discrete_inputs : dict-like or None
+            If not None, dict-like object containing discrete input values.
+        discrete_outputs : dict-like or None
+            If not None, dict-like object containing discrete output values.
+        """
+
+        if discrete_outputs:
+            returns = self.compute_primal(*self._get_compute_primal_invals(inputs, discrete_inputs))
+            outputs.set_vals(returns[:outputs.nvars()])
+            self._discrete_outputs.set_vals(returns[outputs.nvars():])
+        else:
+            outputs.set_vals(self.compute_primal(*self._get_compute_primal_invals(inputs,
+                                                                                  discrete_inputs)))
+
+    def _get_differentiable_compute_primal(self, discrete_inputs):
         """
         Get the compute_primal function for the jacobian.
 
@@ -123,36 +177,31 @@ class JaxExplicitComponent(ExplicitComponent):
         ----------
         discrete_inputs : iter of discrete values
             The discrete input values.
-        need_jit : bool
-            Whether to jit the compute_primal function.
 
         Returns
         -------
         function
             The compute_primal function to be used to compute the jacobian.
         """
-        ncontouts = self._outputs.nvars()
-
         # exclude the discrete inputs from the inputs and the discrete outputs from the outputs
-        if ncontouts > 1 or self._compute_primal_returns_tuple:
-            if not discrete_inputs and not self._discrete_outputs:
-                differentiable_compute_primal = self.compute_primal
-            else:
+        if discrete_inputs:
+            if self._discrete_outputs:
+                ncontouts = self._outputs.nvars()
                 def differentiable_compute_primal(*contvals):
                     return self.compute_primal(*contvals, *discrete_inputs)[:ncontouts]
-        elif discrete_inputs:
-            def differentiable_compute_primal(*contvals):
-                return self.compute_primal(*contvals, *discrete_inputs)
-        else:
-            differentiable_compute_primal = self.compute_primal
+            else:
+                def differentiable_compute_primal(*contvals):
+                    return self.compute_primal(*contvals, *discrete_inputs)
 
-        return differentiable_compute_primal
+            return differentiable_compute_primal
+
+        return self.compute_primal
 
     def _get_jax_compute_primal(self, discrete_inputs, need_jit):
         """
         Get the jax version of the compute_primal function.
         """
-        compute_primal = self._orig_compute_primal.__func__
+        compute_primal = self._ret_tuple_compute_primal.__func__
 
         if need_jit:
             # jit the compute_primal method
@@ -189,7 +238,7 @@ class JaxExplicitComponent(ExplicitComponent):
             print("REJITTING")
             jax_compute_primal = self._get_jax_compute_primal(discrete_inputs, need_jit)
             self.compute_primal = MethodType(jax_compute_primal, self)
-            differentiable_cp = self._get_differentiable_compute_primal(discrete_inputs, need_jit)
+            differentiable_cp = self._get_differentiable_compute_primal(discrete_inputs)
 
             if self._coloring_info.use_coloring():
                 if self._coloring_info.coloring is None:
@@ -369,13 +418,11 @@ class JaxExplicitComponent(ExplicitComponent):
                 self._tangents[direction] = \
                     get_vmap_tangents(tuple(self._inputs.values()),
                                       direction, fill=1.,
-                                      returns_tuple=self._compute_primal_returns_tuple,
                                       coloring=coloring)
             else:
                 self._tangents[direction] = \
                     get_vmap_tangents(tuple(self._outputs.values()),
                                       direction, fill=1.,
-                                      returns_tuple=self._compute_primal_returns_tuple,
                                       coloring=coloring)
         return self._tangents[direction]
 
@@ -423,10 +470,7 @@ class JaxExplicitComponent(ExplicitComponent):
                 _, self._vjp_fun = jax.vjp(lambda *args: self.compute_primal(*args, *other), *x)
                 self._static_hash = inhash
 
-            if self._compute_primal_returns_tuple:
-                deriv_vals = self._vjp_fun(tuple(d_outputs.values()) +
-                                           tuple(self._discrete_outputs.values()))
-            else:
-                deriv_vals = self._vjp_fun(tuple(d_outputs.values())[0])
+            deriv_vals = self._vjp_fun(tuple(d_outputs.values()) +
+                                       tuple(self._discrete_outputs.values()))
 
             d_inputs.set_vals(deriv_vals)
