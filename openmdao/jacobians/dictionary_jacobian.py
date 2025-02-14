@@ -4,6 +4,7 @@ import scipy.sparse as sp
 
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.core.constants import INT_DTYPE
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 
 
 class DictionaryJacobian(Jacobian):
@@ -357,7 +358,7 @@ class _CheckingJacobian(DictionaryJacobian):
                     arr[row_inds] = 0.  # zero out the rows that are covered by sparsity
                     nzs = np.nonzero(arr)[0]
                     if nzs.size > 0:
-                        self._errors.append(f"{system.msginfo}: User specified sparsity (rows/cols)"
-                                            f" for subjac '{of}' wrt '{wrt}' is incorrect. There "
-                                            f"are non-covered nonzeros in column {loc_idx} at "
-                                            f"row(s) {nzs}.")
+                        issue_warning(f"{system.msginfo}: User specified sparsity (rows/cols)"
+                                      f" for subjac '{of}' wrt '{wrt}' is incorrect. There "
+                                      f"are non-covered nonzeros in column {loc_idx} at "
+                                      f"row(s) {nzs}.", category=DerivativesWarning)

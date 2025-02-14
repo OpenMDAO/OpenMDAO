@@ -1979,11 +1979,13 @@ class TestComponentComplexStep(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        with self.assertRaises(Exception) as cm:
+        expected_warnings = [(om.DerivativesWarning,
+                              "'comp' <class BadSparsityComp>: User specified sparsity (rows/cols) "
+                              "for subjac 'comp.y1' wrt 'comp.x0' is incorrect. There are non-covered nonzeros in column "
+                              "3 at row(s) [1]."),]
+
+        with assert_warnings(expected_warnings):
             prob.check_partials(includes=['comp'])
-
-        self.assertEqual(cm.exception.args[0], "'comp' <class BadSparsityComp>: User specified sparsity (rows/cols) for subjac 'comp.y1' wrt 'comp.x0' is incorrect. There are non-covered nonzeros in column 3 at row(s) [1].")
-
 
 
 class ApproxTotalsFeature(unittest.TestCase):
