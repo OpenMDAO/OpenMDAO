@@ -20,8 +20,9 @@ from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian, _Checking
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_name2abs_name, \
     rel_key2abs_key
-from openmdao.utils.mpi import MPI, multi_proc_exception_check
+from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import shape_to_len, submat_sparsity_iter, sparsity_diff_viz
+from openmdao.utils.deriv_display import _deriv_display, _deriv_display_compact
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     find_matches, make_set, inconsistent_across_procs, LocalRangeIterable
 from openmdao.utils.indexer import Indexer, indexer
@@ -2531,10 +2532,6 @@ class Component(System):
                 # Perform the FD here.
                 approximation.compute_approximations(self, jac=approx_jac)
 
-            with multi_proc_exception_check(self.comm):
-                if approx_jac._errors:
-                    raise RuntimeError('\n'.join(approx_jac._errors))
-
             for abs_key, partial in approx_jac.items():
                 rel_key = abs_key2rel_key(self, abs_key)
                 deriv = partials_data[rel_key]
@@ -2584,13 +2581,13 @@ class Component(System):
         worst = None
         if out_stream is not None:
             if compact_print:
-                worst = self._deriv_display_compact(err_iter, partials_data, out_stream,
-                                                    totals=False,
-                                                    show_only_incorrect=show_only_incorrect,
-                                                    show_worst=show_worst)
+                worst = _deriv_display_compact(self, err_iter, partials_data, out_stream,
+                                              totals=False,
+                                              show_only_incorrect=show_only_incorrect,
+                                              show_worst=show_worst)
             else:
-                self._deriv_display(err_iter, partials_data, rel_err_tol, abs_err_tol, out_stream,
-                                    all_fd_options, False, show_only_incorrect)
+                _deriv_display(self, err_iter, partials_data, rel_err_tol, abs_err_tol, out_stream,
+                              all_fd_options, False, show_only_incorrect)
 
         # check for zero subjacs that are declared as dependent
         zero_keys = set()
