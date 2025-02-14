@@ -152,6 +152,7 @@ class JaxImplicitComponent(ImplicitComponent):
             The sparsity of the Jacobian.
         """
         if self._sparsity is None:
+            raise RuntimeError("FOO")
             self._sparsity = _compute_sparsity(self, direction, num_iters, perturb_size)
         return self._sparsity
 

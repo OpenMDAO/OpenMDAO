@@ -934,12 +934,13 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
     idiscvals = tuple(self._discrete_inputs.values())
 
     # exclude the discrete inputs from the inputs and the discrete outputs from the outputs
-    if implicit:
-        def differentiable_part(*contvals):
-            return self.compute_primal(*contvals, *idiscvals)
-    else:
-        def differentiable_part(*contvals):
-            return self.compute_primal(*contvals, *idiscvals)[:ncontouts]
+    # if implicit:
+    #     def differentiable_part(*contvals):
+    #         return self.compute_primal(*contvals, *idiscvals)
+    # else:
+    #     def differentiable_part(*contvals):
+    #         return self.compute_primal(*contvals, *idiscvals)[:ncontouts]
+    differentiable_part = self._get_differentiable_compute_primal(idiscvals)
 
     # when computing tangents we only care about shapes of the values, not the values themselves,
     # so we can use the unperturbed values for the tangents

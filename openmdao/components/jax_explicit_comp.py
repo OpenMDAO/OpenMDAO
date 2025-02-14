@@ -171,7 +171,7 @@ class JaxExplicitComponent(ExplicitComponent):
         Get the compute_primal function for the jacobian.
 
         This version of the compute primal should take no discrete inputs and return no discrete
-        outputs. It will be called by jax.jvp or jax.vjp to compute the jacobian.
+        outputs. It will be called when computing the jacobian.
 
         Parameters
         ----------
@@ -195,25 +195,35 @@ class JaxExplicitComponent(ExplicitComponent):
 
             return differentiable_compute_primal
 
+        elif self._discrete_outputs:
+            ncontouts = self._outputs.nvars()
+            def differentiable_compute_primal(*contvals):
+                return self.compute_primal(*contvals)[:ncontouts]
+
+            return differentiable_compute_primal
+
         return self.compute_primal
 
     def _get_jax_compute_primal(self, discrete_inputs, need_jit):
         """
-        Get the jax version of the compute_primal function.
+        Get the jax version of the compute_primal method.
         """
         compute_primal = self._ret_tuple_compute_primal.__func__
 
         if need_jit:
             # jit the compute_primal method
             idx = self._inputs.nvars() + 1
-            static_argnums = list(range(idx, idx + len(discrete_inputs)))
+            if discrete_inputs:
+                static_argnums = list(range(idx, idx + len(discrete_inputs)))
+            else:
+                static_argnums = []
             compute_primal = jit(compute_primal, static_argnums=static_argnums)
 
-        return compute_primal
+        return MethodType(compute_primal, self)
 
-    def _update_jax_functs(self, discrete_inputs):
+    def _update_jac_functs(self, discrete_inputs):
         """
-        Update the jax functions for this component if necessary.
+        Update the jax function that computes the jacobian for this component if necessary.
 
         An update is required if jitting is enabled and any static values have changed.
 
@@ -231,13 +241,10 @@ class JaxExplicitComponent(ExplicitComponent):
         """
         need_jit = self.options['use_jit']
         if need_jit and self._statics_changed(discrete_inputs):
-            print("STATICS CHANGED")
             self._jac_func_ = None
 
         if self._jac_func_ is None:
-            print("REJITTING")
-            jax_compute_primal = self._get_jax_compute_primal(discrete_inputs, need_jit)
-            self.compute_primal = MethodType(jax_compute_primal, self)
+            self.compute_primal = self._get_jax_compute_primal(discrete_inputs, need_jit)
             differentiable_cp = self._get_differentiable_compute_primal(discrete_inputs)
 
             if self._coloring_info.use_coloring():
@@ -269,14 +276,15 @@ class JaxExplicitComponent(ExplicitComponent):
 
                     # Batch over last axis of cotangents
                     self._jac_func_ = jax.vmap(vjp_at_point, in_axes=[-1, None], out_axes=-1)
-                    if need_jit:
-                        self._jac_func_ = jax.jit(self._jac_func_)
                     self._jac_colored_ = self._jacrev_colored
             else:
                 self._jac_colored_ = None
                 fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
                 wrt_idxs = list(range(len(self._var_abs2meta['input'])))
                 self._jac_func_ = fjax(differentiable_cp, argnums=wrt_idxs)
+
+            if need_jit:
+                self._jac_func_ = jax.jit(self._jac_func_)
 
     def declare_coloring(self, **kwargs):
         """
@@ -315,7 +323,7 @@ class JaxExplicitComponent(ExplicitComponent):
             If not None, dict containing discrete input values.
         """
         discrete_inputs = discrete_inputs.values() if discrete_inputs else ()
-        self._update_jax_functs(discrete_inputs)
+        self._update_jac_functs(discrete_inputs)
 
         if self._jac_colored_ is not None:
             return self._jac_colored_(inputs, partials, discrete_inputs)
