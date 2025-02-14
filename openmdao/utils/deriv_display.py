@@ -1,3 +1,7 @@
+"""
+Functions used for the display of derivatives matrices.
+"""
+
 import textwrap
 from io import StringIO
 
@@ -15,6 +19,8 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
 
     Parameters
     ----------
+    system : System
+        The system for which derivatives are being displayed.
     err_iter : iterator
         Iterator that yields tuples of the form (key, fd_norm, fd_opts, directional, above_abs,
         above_rel, inconsistent) for each subjac.
@@ -290,13 +296,15 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
         out_stream.write(sys_buffer.getvalue())
 
 
-def deriv_display_compact(self, err_iter, derivatives, out_stream, totals=False,
+def deriv_display_compact(system, err_iter, derivatives, out_stream, totals=False,
                           show_only_incorrect=False, show_worst=False):
     """
     Print derivative error info to out_stream in a compact tabular format.
 
     Parameters
     ----------
+    system : System
+        The system for which derivatives are being displayed.
     err_iter : iterator
         Iterator that yields tuples of the form (key, fd_norm, fd_opts, directional, above_abs,
         above_rel, inconsistent) for each subjac.
@@ -323,14 +331,14 @@ def deriv_display_compact(self, err_iter, derivatives, out_stream, totals=False,
     from openmdao.core.component import Component
 
     # Match header to appropriate type.
-    if isinstance(self, Component):
+    if isinstance(system, Component):
         sys_type = 'Component'
     else:
         sys_type = 'Group'
 
-    sys_name = self.pathname
-    sys_class_name = type(self).__name__
-    matrix_free = self.matrix_free and not totals
+    sys_name = system.pathname
+    sys_class_name = type(system).__name__
+    matrix_free = system.matrix_free and not totals
 
     if totals:
         sys_name = 'Full Model'
