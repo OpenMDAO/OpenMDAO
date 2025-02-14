@@ -2538,6 +2538,7 @@ class Component(System):
             for abs_key, partial in approx_jac.items():
                 rel_key = abs_key2rel_key(self, abs_key)
                 deriv = partials_data[rel_key]
+                subjacs_info = approx_jac._subjacs_info[abs_key]
                 _of, _wrt = rel_key
 
                 if 'J_fd' not in deriv:
@@ -2545,6 +2546,9 @@ class Component(System):
                     deriv['steps'] = []
                 deriv['J_fd'].append(partial)
                 deriv['steps'] = actual_steps[rel_key]
+
+                if 'uncovered_nz' in subjacs_info:
+                    deriv['uncovered_nz'] = subjacs_info['uncovered_nz']
 
                 if _wrt in local_opts and local_opts[_wrt]['directional']:
                     if self.matrix_free:
@@ -2577,7 +2581,6 @@ class Component(System):
         err_iter = list(_iter_derivs(partials_data, show_only_incorrect, all_fd_options, False,
                                      nondeps, self.matrix_free, abs_err_tol, rel_err_tol,
                                      incon_keys))
-
         worst = None
         if out_stream is not None:
             if compact_print:

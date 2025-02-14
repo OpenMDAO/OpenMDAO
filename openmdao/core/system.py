@@ -7060,6 +7060,15 @@ class System(object, metaclass=SystemMetaclass):
             if MPI and comm.size > 1:
                 parts.append(f'\n    MPI Rank {comm.rank}\n')
 
+            if 'uncovered_nz' in derivative_info:
+                uncovered_nz = list(derivative_info['uncovered_nz'])
+                rs = np.array([r for r, _ in uncovered_nz], dtype=int)
+                cs = np.array([c for _, c in uncovered_nz])
+                parts.append(f'    Sparsity excludes {len(uncovered_nz)} entries '
+                             'which appear to be non-zero!')
+                parts.append(f'      Rows: {rs}')
+                parts.append(f'      Cols: {cs}\n')
+
             with np.printoptions(linewidth=240):
                 # Raw Derivatives
                 if abs_errs[0].forward is not None:
@@ -7196,6 +7205,8 @@ class System(object, metaclass=SystemMetaclass):
                 err_desc.append(' >REL_TOL')
             if inconsistent:
                 err_desc.append(' <RANK INCONSISTENT>')
+            if 'uncovered_nz' in derivative_info:
+                err_desc.append(' <BAD SPARSITY>')
             err_desc = ''.join(err_desc)
 
             abs_errs = derivative_info['abs error']
