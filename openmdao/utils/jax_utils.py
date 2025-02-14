@@ -931,49 +931,52 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
         save_vecs = (self._outputs, self._residuals,)
 
     sparsity = None
+    idiscvals = tuple(self._discrete_inputs.values())
+
+    # exclude the discrete inputs from the inputs and the discrete outputs from the outputs
+    if implicit:
+        def differentiable_part(*contvals):
+            return self.compute_primal(*contvals, *idiscvals)
+    else:
+        def differentiable_part(*contvals):
+            return self.compute_primal(*contvals, *idiscvals)[:ncontouts]
+
+    # when computing tangents we only care about shapes of the values, not the values themselves,
+    # so we can use the unperturbed values for the tangents
+    full_invals = tuple(self._get_compute_primal_invals())
+    icontvals = full_invals[:ncontins]  # continuous inputs
+    if direction == 'fwd':
+        tangents = get_vmap_tangents(icontvals, 'fwd', fill=np.nan if use_nan else 1.)
+        def jvp_at_point(tangent, contvals):
+            # [1] is the derivative, [0] is the primal (we don't need the primal)
+            return jax.jvp(differentiable_part, contvals, tangent)[1]
+        Jfunc = jax.vmap(jvp_at_point, in_axes=[-1, None], out_axes=-1)
+    else:
+        cotangents = get_vmap_tangents(tuple(self._outputs.values()), 'rev',
+                                       fill=np.nan if use_nan else 1.)
+        def vjp_at_point(cotangent, contvals):
+            return jax.vjp(differentiable_part, *contvals)[1](cotangent)
+
+        # vectorize over last axis of cotangents
+        Jfunc = jax.vmap(vjp_at_point, in_axes=[-1, None], out_axes=-1)
+
+    if self.options['use_jit']:
+        Jfunc = jax.jit(Jfunc)
 
     for _ in self._perturbation_iter(num_iters=num_iters, perturb_size=perturb_size,
                                      perturb_vecs=pvecs, save_vecs=save_vecs):
         self._apply_nonlinear()
 
-        # J = self._compute_partials(self._inputs,
         full_invals = tuple(self._get_compute_primal_invals())
         icontvals = full_invals[:ncontins]  # continuous inputs
-        idiscvals = full_invals[ncontins:]  # discrete inputs
-
-        # exclude the discrete inputs from the inputs and the discrete outputs from the outputs
-        if implicit:
-            def differentiable_part(*contvals):
-                return self.compute_primal(*contvals, *idiscvals)
-        else:
-            def differentiable_part(*contvals):
-                return self.compute_primal(*contvals, *idiscvals)[:ncontouts]
-
-        if self.options['use_jit']:
-            differentiable_part = jax.jit(differentiable_part)
 
         if direction == 'fwd':
-            tangents = get_vmap_tangents(icontvals, 'fwd', fill=np.nan if use_nan else 1.)
-
-            def jvp_at_point(tangent):
-                # [1] is the derivative, [0] is the primal (we don't need the primal)
-                return jax.jvp(differentiable_part, icontvals, tangent)[1]
-
-            # vectorize over the last axis of the tangent vectors
-            J = jax.vmap(jvp_at_point, in_axes=-1, out_axes=-1)(tangents)
+            # vectorize over the last axis of the tangents
+            J = Jfunc(tangents, icontvals)
 
         else:  # rev
-            # Returns primal and a function to compute VJP so just take [1], the vjp function
-            vjp_fn = jax.vjp(differentiable_part, *icontvals)[1]
-
-            def vjp_at_point(cotangent):
-                return vjp_fn(cotangent)
-
-            cotangents = get_vmap_tangents(tuple(self._outputs.values()), 'rev',
-                                           fill=np.nan if use_nan else 1.)
-
             # vectorize over last axis of cotangents
-            J = jax.vmap(vjp_at_point, in_axes=-1, out_axes=-1)(cotangents)
+            J = Jfunc(cotangents, icontvals)
 
         if not isinstance(J, tuple):
             J = (J,)

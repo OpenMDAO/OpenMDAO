@@ -289,18 +289,16 @@ class JaxExplicitComponent(ExplicitComponent):
         **kwargs : dict
             Additional arguments to be passed to the base class.
         """
-        kwargs['method'] = 'jax'
+        if 'method' in kwargs and kwargs['method'] != self.options['derivs_method']:
+            raise ValueError(f"method must be '{self.options['derivs_method']}' for this component "
+                             "but got '{kwargs['method']}'.")
+        kwargs['method'] = self.options['derivs_method']
         super().declare_coloring(**kwargs)
 
-    # def _compute_partials_dense(self, inputs, partials, discrete_inputs=None):
-    #     """
-    #     Compute the dense Jacobian.
-    #     """
-    #     return self._compute_partials(inputs, partials, discrete_inputs)
-
-    # we define compute_partials here instead of making this the base class version as we
-    # did with compute, because the existence of a compute_partials method that is not the
-    # base class method is used to determine if a given component computes its own partials.
+    # we define _compute_partials here and possibly later rename it to compute_partials instead of
+    # making this the base class version as we did with compute, because the existence of a
+    # compute_partials method that is not the base class method is used to determine if a given
+    # component computes its own partials.
     def _compute_partials(self, inputs, partials, discrete_inputs=None):
         """
         Compute sub-jacobian parts. The model is assumed to be in an unscaled state.
