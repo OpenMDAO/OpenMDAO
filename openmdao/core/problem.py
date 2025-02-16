@@ -37,7 +37,7 @@ from openmdao.error_checking.check_config import _default_checks, _all_checks, \
 from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data, \
     record_model_options
-from openmdao.utils.deriv_display import _print_deriv_table, _deriv_display, deriv_display_compact
+from openmdao.utils.deriv_display import _print_deriv_table, _deriv_display, _deriv_display_compact
 from openmdao.utils.mpi import MPI, FakeComm, multi_proc_exception_check, check_mpi_env
 from openmdao.utils.name_maps import name2abs_names
 from openmdao.utils.options_dictionary import OptionsDictionary
@@ -1580,8 +1580,8 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         if out_stream is not None:
             if compact_print:
-                deriv_display_compact(model, err_iter, data[''], out_stream,
-                                      totals=True, show_only_incorrect=show_only_incorrect)
+                _deriv_display_compact(model, err_iter, data[''], out_stream,
+                                       totals=True, show_only_incorrect=show_only_incorrect)
             else:
                 _deriv_display(model, err_iter, data[''], rel_err_tol, abs_err_tol,
                                out_stream, fd_args, totals=True, lcons=lcons,
