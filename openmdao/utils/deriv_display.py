@@ -297,7 +297,7 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
 
 
 def _deriv_display_compact(system, err_iter, derivatives, out_stream, totals=False,
-                          show_only_incorrect=False, show_worst=False):
+                           show_only_incorrect=False, show_worst=False):
     """
     Print derivative error info to out_stream in a compact tabular format.
 
