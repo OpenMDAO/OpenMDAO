@@ -1,6 +1,7 @@
 """ Testing for group finite differencing."""
 import time
 import unittest
+from io import StringIO
 
 from packaging.version import Version
 
@@ -1940,6 +1941,7 @@ class TestComponentComplexStep(unittest.TestCase):
                      [0, 1, 0, 1, 1, 0, 1]], dtype=int)
 
                 self.add_input('x0', val=np.ones(4))
+
                 self.add_input('x1', val=np.ones(2))
                 self.add_input('x2', val=np.ones(1))
 
@@ -1970,20 +1972,40 @@ class TestComponentComplexStep(unittest.TestCase):
                     end += outputs[outname].size
                     outputs[outname] = prod[start:end]
                     start = end
+        
+        for compact_print in [True, False]:
+            with self.subTest(f'{compact_print=}'):
+                prob = om.Problem()
+                model = prob.model
+                model.add_subsystem('comp', BadSparsityComp())
 
-        prob = om.Problem()
-        model = prob.model
-        model.add_subsystem('comp', BadSparsityComp())
+                prob.setup(check=False, mode='fwd')
+                prob.set_solver_print(level=0)
+                prob.run_model()
 
-        prob.setup(check=False, mode='fwd')
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        with self.assertRaises(Exception) as cm:
-            prob.check_partials(includes=['comp'])
-
-        self.assertEqual(cm.exception.args[0], "'comp' <class BadSparsityComp>: User specified sparsity (rows/cols) for subjac 'comp.y1' wrt 'comp.x0' is incorrect. There are non-covered nonzeros in column 3 at row(s) [1].")
-
+                ss = StringIO()
+                prob.check_partials(includes=['comp'], compact_print=compact_print, out_stream=ss)
+                if compact_print:
+                    expected = ("| y1            | x0             |  1.0000e+00 |  1.0000e+00 |  1.3978e-10 "
+                                "|  1.0000e+00 |  1.0000e+00 |  1.3978e-10 |  <BAD SPARSITY> |")
+                else:
+                    expected = (
+                        "  comp: 'y1' wrt 'x0'\n"
+                        "\n"
+                        "    Max Absolute Error (Jfwd - Jfd) : 1.397780e-10\n"
+                        "      fwd value: 1.000000e+00\n"
+                        "      fd value: 1.000000e+00 (fd:forward)\n"
+                        "\n"
+                        "    Max Relative Error (Jfwd - Jfd) / Jfd : 1.397780e-10\n"
+                        "      fwd value: 1.000000e+00\n"
+                        "      fd value: 1.000000e+00 (fd:forward)\n"
+                        "\n"
+                        "    Sparsity excludes 1 entries which appear to be non-zero. (Magnitudes exceed 1e-16) *\n"
+                        "      Rows: [1]\n"
+                        "      Cols: [3]\n"
+                    )
+                
+                self.assertIn(expected, ss.getvalue())
 
 
 class ApproxTotalsFeature(unittest.TestCase):
