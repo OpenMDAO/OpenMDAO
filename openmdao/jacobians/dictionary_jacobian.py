@@ -355,7 +355,7 @@ class _CheckingJacobian(DictionaryJacobian):
                     arr = scratch[start:end]
                     arr[:] = column[start:end]
                     arr[row_inds] = 0.  # zero out the rows that are covered by sparsity
-                    nzs = np.where(np.abs(arr) > 0)[0]
+                    nzs = np.where(np.abs(arr) > self._uncovered_threshold)[0]
                     if nzs.size > 0:
                         if 'uncovered_nz' not in subjac:
                             subjac['uncovered_nz'] = []
