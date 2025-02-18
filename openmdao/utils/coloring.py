@@ -2253,7 +2253,7 @@ def _get_expander_matrix(sparsity_shape, color_iter, direction):
         Matrix to expand a colored jacobian to an expanded colored jacobian.
     """
     # Ic looks like an identity matrix (ncols x nncols for fwd) with all columns corresponding
-    # to the same color being summed together.
+    # to the same color being summed together and combined into a single column.
     # Ic = csc_matrix((np.array([]), (np.array([], dtype=np.int), np.array([], dtype=np.int))),
     #                 shape=(I.shape[1], np.unique(color_array).size))
     Ic_rows = []
