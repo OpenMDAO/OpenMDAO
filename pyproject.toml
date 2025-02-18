@@ -125,6 +125,7 @@ jaxexplicitcomponent = "openmdao.components.jax_explicit_comp:JaxExplicitCompone
 jaximplicitcomponent = "openmdao.components.jax_implicit_comp:JaxImplicitComponent"
 
 [project.entry-points.openmdao_driver]
+analysisdriver = "openmdao.drivers.analysis_driver:AnalysisDriver"
 differentialevolutiondriver = "openmdao.drivers.differential_evolution_driver:DifferentialEvolutionDriver"
 doedriver = "openmdao.drivers.doe_driver:DOEDriver"
 driver = "openmdao.core.driver:Driver"
