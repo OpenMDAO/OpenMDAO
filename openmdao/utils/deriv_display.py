@@ -237,12 +237,14 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
 
         if 'uncovered_nz' in derivative_info:
             uncovered_nz = list(derivative_info['uncovered_nz'])
+            uncovered_threshold = derivative_info['uncovered_threshold']
             rs = np.array([r for r, _ in uncovered_nz], dtype=int)
             cs = np.array([c for _, c in uncovered_nz])
-            parts.append(f'    Sparsity excludes {len(uncovered_nz)} entries '
-                         'which appear to be non-zero!')
-            parts.append(f'      Rows: {rs}')
-            parts.append(f'      Cols: {cs}\n')
+            parts.append(f'    Sparsity excludes {len(uncovered_nz)} entries which'
+                         f' appear to be non-zero. (Magnitudes exceed {uncovered_threshold}) *')
+            with np.printoptions(linewidth=1000, formatter={'int': lambda i: f'{i}'}):
+                parts.append(f'      Rows: {rs}')
+                parts.append(f'      Cols: {cs}\n')
 
         with np.printoptions(linewidth=240):
             # Raw Derivatives

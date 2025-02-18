@@ -2000,7 +2000,7 @@ class TestComponentComplexStep(unittest.TestCase):
                         "      fwd value: 1.000000e+00\n"
                         "      fd value: 1.000000e+00 (fd:forward)\n"
                         "\n"
-                        "    Sparsity excludes 1 entries which appear to be non-zero!\n"
+                        "    Sparsity excludes 1 entries which appear to be non-zero. (Magnitudes exceed 1e-16) *\n"
                         "      Rows: [1]\n"
                         "      Cols: [3]\n"
                     )

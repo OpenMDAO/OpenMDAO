@@ -226,9 +226,10 @@ class _CheckingJacobian(DictionaryJacobian):
     nonzero values found in the column being set.
     """
 
-    def __init__(self, system):
+    def __init__(self, system, uncovered_threshold=1.0E-16):
         super().__init__(system)
         self._subjacs_info = self._subjacs_info.copy()
+        self._uncovered_threshold = uncovered_threshold
 
         # Convert any scipy.sparse subjacs to OpenMDAO's interal COO specification.
         for key, subjac in self._subjacs_info.items():
@@ -354,6 +355,9 @@ class _CheckingJacobian(DictionaryJacobian):
                     arr = scratch[start:end]
                     arr[:] = column[start:end]
                     arr[row_inds] = 0.  # zero out the rows that are covered by sparsity
-                    nzs = np.nonzero(arr)[0]
+                    nzs = np.where(np.abs(arr) > 0)[0]
                     if nzs.size > 0:
-                        subjac['uncovered_nz'] = list(zip(nzs, loc_idx * np.ones_like(nzs)))
+                        if 'uncovered_nz' not in subjac:
+                            subjac['uncovered_nz'] = []
+                            subjac['uncovered_threshold'] = self._uncovered_threshold
+                        subjac['uncovered_nz'].extend(list(zip(nzs, loc_idx * np.ones_like(nzs))))

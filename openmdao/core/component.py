@@ -2546,6 +2546,7 @@ class Component(System):
 
                 if 'uncovered_nz' in subjacs_info:
                     deriv['uncovered_nz'] = subjacs_info['uncovered_nz']
+                    deriv['uncovered_threshold'] = subjacs_info['uncovered_threshold']
 
                 if _wrt in local_opts and local_opts[_wrt]['directional']:
                     if self.matrix_free:
