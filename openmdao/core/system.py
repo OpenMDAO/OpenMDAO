@@ -1930,7 +1930,7 @@ class System(object, metaclass=SystemMetaclass):
 
         Parameters
         ----------
-        direction : str
+        direction : str or None
             Compute derivatives in fwd or rev mode, or whichever is based based on input and
             output sizes if value is None.  Note that only fwd is possible when using finite
             difference.
@@ -1942,15 +1942,6 @@ class System(object, metaclass=SystemMetaclass):
         -------
         bool
             True if they match, False otherwise.
-
-        Parameters
-        ----------
-        direction : str
-            Compute derivatives in fwd or rev mode, or whichever is based based on input and
-            output sizes if value is None.  Note that only fwd is possible when using finite
-            difference.
-        outstream : file-like
-            Stream where output will be written.  If None, no output will be written.
         """
         if self.pathname == '' or not ('derivs_method' in self.options and
                                        self.options['derivs_method'] == 'jax'):
