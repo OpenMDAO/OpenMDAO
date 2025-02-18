@@ -101,6 +101,8 @@ class Component(System):
         then shape is a tuple of shapes, otherwise it is a single shape.
     _valid_name_map : dict
         Mapping of declared input/output names to valid Python names.
+    _orig_compute_primal : function
+        The original compute_primal method.
     """
 
     def __init__(self, **kwargs):
@@ -121,7 +123,7 @@ class Component(System):
         self._has_distrib_outputs = False
         self._compute_primals_out_shape = None
         self._valid_name_map = {}
-        self._orig_compute_primal = self.compute_primal
+        self._orig_compute_primal = getattr(self, 'compute_primal')
 
     def _tree_flatten(self):
         """
