@@ -942,13 +942,16 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
     icontvals = full_invals[:ncontins]  # continuous inputs
     if direction == 'fwd':
         tangents = get_vmap_tangents(icontvals, 'fwd', fill=np.nan if use_nan else 1.)
+
         def jvp_at_point(tangent, contvals):
             # [1] is the derivative, [0] is the primal (we don't need the primal)
             return jax.jvp(differentiable_part, contvals, tangent)[1]
+
         Jfunc = jax.vmap(jvp_at_point, in_axes=[-1, None], out_axes=-1)
     else:
         cotangents = get_vmap_tangents(tuple(self._outputs.values()), 'rev',
                                        fill=np.nan if use_nan else 1.)
+
         def vjp_at_point(cotangent, contvals):
             return jax.vjp(differentiable_part, *contvals)[1](cotangent)
 

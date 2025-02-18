@@ -30,6 +30,16 @@ class JaxExplicitComponent(ExplicitComponent):
         The tangents for the inputs and outputs.
     _sparsity : coo_matrix or None
         The sparsity of the Jacobian.
+    _jac_func_ : function or None
+        The function that computes the jacobian.
+    _jac_colored_ : function or None
+        The function that computes the colored jacobian.
+    _static_hash : tuple
+        The hash of the static values.
+    _orig_compute_primal : function
+        The original compute_primal method.
+    _ret_tuple_compute_primal : function
+        The compute_primal method that returns a tuple.
     """
 
     def __init__(self, fallback_derivs_method='fd', **kwargs):  # noqa
@@ -157,7 +167,6 @@ class JaxExplicitComponent(ExplicitComponent):
         discrete_outputs : dict-like or None
             If not None, dict-like object containing discrete output values.
         """
-
         if discrete_outputs:
             returns = self.compute_primal(*self._get_compute_primal_invals(inputs, discrete_inputs))
             outputs.set_vals(returns[:outputs.nvars()])
@@ -187,9 +196,12 @@ class JaxExplicitComponent(ExplicitComponent):
         if discrete_inputs:
             if self._discrete_outputs:
                 ncontouts = self._outputs.nvars()
+
                 def differentiable_compute_primal(*contvals):
                     return self.compute_primal(*contvals, *discrete_inputs)[:ncontouts]
+
             else:
+
                 def differentiable_compute_primal(*contvals):
                     return self.compute_primal(*contvals, *discrete_inputs)
 
@@ -197,6 +209,7 @@ class JaxExplicitComponent(ExplicitComponent):
 
         elif self._discrete_outputs:
             ncontouts = self._outputs.nvars()
+
             def differentiable_compute_primal(*contvals):
                 return self.compute_primal(*contvals)[:ncontouts]
 
@@ -335,7 +348,7 @@ class JaxExplicitComponent(ExplicitComponent):
         # Maybe make a simple JaxJacobian that is just a thin wrapper around the jacobian array.
         # The only issue is do higher level jacobians need the subjacobian info?
         _jax_derivs2partials(self, derivs, partials, self._var_rel_names['output'],
-                            self._var_rel_names['input'])
+                             self._var_rel_names['input'])
 
     def _jacfwd_colored(self, inputs, partials, discrete_inputs=None):
         """

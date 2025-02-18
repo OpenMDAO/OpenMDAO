@@ -663,10 +663,10 @@ def indent_context(stream, indent='   '):
     indent : str
         The string to use for indentation.
 
-    Returns
-    -------
-    contextmanager
-        A context manager for indenting output.
+    Yields
+    ------
+    str
+        The current stdout.
     """
     save_stdout = sys.stdout
     save_stderr = sys.stderr

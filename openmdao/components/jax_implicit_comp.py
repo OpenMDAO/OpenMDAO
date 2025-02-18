@@ -31,6 +31,14 @@ class JaxImplicitComponent(ImplicitComponent):
         The tangents for the inputs and outputs.
     _sparsity : coo_matrix or None
         The sparsity of the Jacobian.
+    _jac_func_ : function or None
+        The function that computes the jacobian.
+    _static_hash : tuple
+        The hash of the static values.
+    _orig_compute_primal : function
+        The original compute_primal method.
+    _ret_tuple_compute_primal : function
+        The compute_primal method that returns a tuple.
     """
 
     def __init__(self, fallback_derivs_method='fd', **kwargs):  # noqa
