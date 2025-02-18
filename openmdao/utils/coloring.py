@@ -1832,6 +1832,11 @@ class Coloring(object):
     def get_jax_sparsity(self):
         """
         Return the sparsity matrix as a jax array.
+
+        Returns
+        -------
+        BCOO
+            The sparsity matrix in jax BCOO format.
         """
         data = jnp.ones(len(self._nzrows))
         indices = jnp.array(zip(self._nzrows, self._nzcols))

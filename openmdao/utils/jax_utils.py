@@ -934,12 +934,6 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
     idiscvals = tuple(self._discrete_inputs.values())
 
     # exclude the discrete inputs from the inputs and the discrete outputs from the outputs
-    # if implicit:
-    #     def differentiable_part(*contvals):
-    #         return self.compute_primal(*contvals, *idiscvals)
-    # else:
-    #     def differentiable_part(*contvals):
-    #         return self.compute_primal(*contvals, *idiscvals)[:ncontouts]
     differentiable_part = self._get_differentiable_compute_primal(idiscvals)
 
     # when computing tangents we only care about shapes of the values, not the values themselves,
@@ -1055,37 +1049,6 @@ def _ensure_returns_tuple(func):
             wrapper.__name__ = func.__name__
             wrapper.__doc__ = func.__doc__
             return wrapper
-
-
-def _wrap_differentiable(self, func, discrete_inputs):
-    """
-    Wrap a function so that it doesn't take or return discrete variables.
-
-    Parameters
-    ----------
-    self : Component
-        The component to wrap the function for.
-    func : function or method
-        The function or method to wrap.
-    discrete_inputs : dict
-        The discrete inputs.
-
-    Returns
-    -------
-    function
-        The wrapped function.
-    """
-    if discrete_inputs:
-        if self._discrete_outputs:
-            ncontouts = self._outputs.nvars()
-            def wrapper(*contvals):
-                return func(*contvals, *discrete_inputs)[:ncontouts]
-        else:
-            def wrapper(*contvals):
-                return func(*contvals, *discrete_inputs)
-        return wrapper
-
-    return func
 
 
 def _jax2np(J):
