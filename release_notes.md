@@ -1,4 +1,47 @@
 ***********************************
+# Release Notes for OpenMDAO 3.37.0
+
+Feb 21, 2024
+
+OpenMDAO 3.37.0 introduces a new AnalysisDriver, which is intended to eventually replace DOEDriver, but allow for users to more easily specify what variables they wish to change when evaluating a model.
+See the documentation for more explanation of how to use it.
+
+In JaxExplicitComponent and JaxImplicitComponent, the user now has the ability to specify the name of the argument corresponding to the OpenMDAO input name using the `primal_name` option.  This is necessary in cases where the OpenMDAO input/output name is not a legal Python variable name.
+
+When using JaxExplicitComponent, users no longer are required to explicitly declare the partials.
+The component will determine the appropriate derivatives itself. In addition, `declare_coloring`
+can now be used in JaxExplicitComponent to compute the derivatives more quickly. Note that this
+feature is still in development and may not give a significant improvement over uncolored derivative calculation.
+
+From a performance perspective, an unnecessary nonlinear solve was removed when performing a hot start.
+
+## New Features
+
+- Added AnalysisDriver [#3365](https://github.com/OpenMDAO/OpenMDAO/pull/3365)
+- Added `is_undefined` function for MPI-safe and array-compatible checks. [#3423](https://github.com/OpenMDAO/OpenMDAO/pull/3423)
+- Updated check_partials and check_totals to measure absolute and relative err in the same way that np.assert_allclose does [#3442](https://github.com/OpenMDAO/OpenMDAO/pull/3442)
+- Make printout of sparsity summary subject to the 'show_summary' flag. [#3427](https://github.com/OpenMDAO/OpenMDAO/pull/3427)
+
+
+## Bug Fixes
+
+- Fixed an issue with the dependency check for parallel derivative coloring [#3419](https://github.com/OpenMDAO/OpenMDAO/pull/3419)
+- Modified assert_check_partials to use numpy.assert_allclose [#3424](https://github.com/OpenMDAO/OpenMDAO/pull/3424)
+- Fixed a NumPy 2.x compatibility issue in FiniteDifference [#3429](https://github.com/OpenMDAO/OpenMDAO/pull/3429)
+- Addressed change in `numpy.testing.allclose` error message in NumPy 2.x [#3438](https://github.com/OpenMDAO/OpenMDAO/pull/3438)
+- Fix for computed sparsity when some subjacs are zero. [#3430](https://github.com/OpenMDAO/OpenMDAO/pull/3430)
+- Removed unnecessary NL solve when performing a hot start. [#3432](https://github.com/OpenMDAO/OpenMDAO/pull/3432)
+- Added name mapping from component names to valid python names for use in compute_primal method [#3444](https://github.com/OpenMDAO/OpenMDAO/pull/3444)
+
+## Miscellaneous
+
+
+- Updated latest workflow to use a known working version of PETSc [#3446](https://github.com/OpenMDAO/OpenMDAO/pull/3446)
+- Updated Ubuntu images used by test workflows [#3425](https://github.com/OpenMDAO/OpenMDAO/pull/3425)
+
+
+
+***********************************
 # Release Notes for OpenMDAO 3.36.0
 
 Dec 13, 2024
