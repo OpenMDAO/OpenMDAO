@@ -54,7 +54,7 @@ from openmdao.utils.general_utils import pad_name, _find_dict_meta, env_truthy, 
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.file_utils import _get_outputs_dir, text2html, get_work_dir
+from openmdao.utils.file_utils import _get_outputs_dir, text2html, _get_work_dir
 from openmdao.utils.testing_utils import _fix_comp_check_data
 
 try:
@@ -264,8 +264,11 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         # General options
         self.options = OptionsDictionary(parent_name=type(self).__name__)
+        default_workdir = options['work_dir'] if 'work_dir' in options else _get_work_dir()
+        self.options.declare('work_dir', default=default_workdir,
+                             desc='Working directory for the problem.')
         self.options.declare('coloring_dir', types=str,
-                             default=os.path.join(get_work_dir(), 'coloring_files'),
+                             default=os.path.join(default_workdir, 'coloring_files'),
                              desc='Directory containing coloring files (if any) for this Problem.')
         self.options.declare('group_by_pre_opt_post', types=bool,
                              default=False,
@@ -962,6 +965,7 @@ class Problem(object, metaclass=ProblemMetaclass):
             'name': self._name,  # the name of this Problem
             'pathname': None,  # the pathname of this Problem in the current tree of Problems
             'comm': comm,
+            'work_dir': pathlib.Path(self.options['work_dir']),
             'coloring_dir': _DEFAULT_COLORING_DIR,  # directory for input coloring files
             'recording_iter': _RecIteration(comm.rank),  # manager of recorder iterations
             'local_vector_class': local_vector_class,
