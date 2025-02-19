@@ -28,7 +28,9 @@ _allowed_meta = {'value', 'val', 'shape', 'units', 'res_units', 'desc',
 
 # Names that are not allowed for input or output variables (keywords for options)
 _disallowed_names = {'has_diag_partials', 'units', 'shape', 'shape_by_conn', 'run_root_only',
-                     'constant', 'do_coloring'}
+                     'constant', 'do_coloring',
+                     'assembled_jac_type', 'derivs_method',
+                     'distributed', 'run_root_onoy', 'always_opt', 'use_jit'}
 
 
 def check_option(option, value):

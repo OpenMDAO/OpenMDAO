@@ -302,6 +302,21 @@ class TestExecComp(unittest.TestCase):
                          "'C1' <class ExecComp>: arg 'xx' in call to ExecComp() does not refer to any variable "
                          "in the expressions ['y=x+1.']")
 
+    def test_super_kwargs(self):
+        prob = om.Problem()
+        # Instantiate ExecComp with additional arguments that should be passed to
+        # the super class.
+        prob.model.add_subsystem('C1', om.ExecComp('y=x+1.',
+                                                   y={'copy_shape': 'x'}, x={'shape': (10,)},
+                                                   has_diag_partials=True,
+                                                   always_opt=True,
+                                                   use_jit=False))
+        prob.setup()
+        prob.set_val('C1.x', np.linspace(0, 1, 10))
+        prob.run_model()
+        assert_near_equal(prob.get_val('C1.y'), np.linspace(0, 1, 10) + 1)
+
+
     def test_bad_kwargs_meta(self):
         prob = om.Problem()
         prob.model.add_subsystem('C1', om.ExecComp('y=x+1.',
