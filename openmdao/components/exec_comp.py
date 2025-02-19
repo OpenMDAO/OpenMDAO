@@ -30,7 +30,7 @@ _allowed_meta = {'value', 'val', 'shape', 'units', 'res_units', 'desc',
 _disallowed_names = {'has_diag_partials', 'units', 'shape', 'shape_by_conn', 'run_root_only',
                      'constant', 'do_coloring',
                      'assembled_jac_type', 'derivs_method',
-                     'distributed', 'run_root_onoy', 'always_opt', 'use_jit'}
+                     'distributed', 'always_opt', 'use_jit'}
 
 
 def check_option(option, value):
