@@ -30,7 +30,8 @@ def act_tanh(x, mu=1.0E-2, z=0., a=-1., b=1.):
     mu : float
         A shaping parameter which impacts the "abruptness" of
         the activation function. As this value approaches zero
-        the response approaches that of a step function.
+        the response approaches that of a step function. This
+        function is singular at mu = 0.
     z : float
         The value of the independent variable about which the
         activation response is centered.
@@ -137,7 +138,7 @@ def smooth_abs(x, mu=1.0E-2):
 @jit
 def smooth_round(x, mu=0.01):
     """
-    Computes a smooth and differentiable approximation to the round function.
+    Compute a smooth and differentiable approximation to the round function.
 
     Parameters
     ----------
@@ -147,15 +148,13 @@ def smooth_round(x, mu=0.01):
         A shaping parameter which impacts the tradeoff between the
         smoothness and accuracy of the function. As this value
         approaches zero the response approaches that of the true
-        absolute value.
+        value produced by np.round(). This function is singular at mu = 0.
 
     Returns
     -------
     float or array
         An approximation of the round function rounded to the nearest decimal specified
         by the user. The values returned will not be exact integers. However, they
-        will be smooth and the derivatives will be continuous. 
+        will be smooth and the derivatives will be continuous.
     """
-
-    # Apply smooth rounding
-    return jnp.floor(x) + 0.5 * (1 + jnp.tanh(1/mu * (x - jnp.floor(x) - 0.5)))
+    return jnp.floor(x) + 0.5 * (1 + jnp.tanh((x - jnp.floor(x) - 0.5) / mu))
