@@ -156,9 +156,6 @@ class SqliteCaseReader(BaseCaseReader):
         Dictionary mapping promoted names to absolute names.
     _conns : dict
         Dictionary of all model connections.
-    _auto_ivc_map : dict
-        Dictionary that maps all auto_ivc sources to either an absolute input name for single
-        connections or a promoted input name for multiple connections. This is for output display.
     _driver_cases : DriverCases
         Helper object for accessing cases from the driver_iterations table.
     _system_cases : SystemCases
@@ -186,19 +183,8 @@ class SqliteCaseReader(BaseCaseReader):
         self._prom2abs = None
         self._abs2meta = None
         self._conns = None
-        self._auto_ivc_map = {}
         self._global_iterations = None
-
-        filename = str(filename)
-
-        
-        
-        self._filename_for_connect = filename
-        
-        
-        
-        
-        
+       
         with sqlite3.connect(filename) as con:
             con.row_factory = sqlite3.Row
             cur = con.cursor()
@@ -206,8 +192,6 @@ class SqliteCaseReader(BaseCaseReader):
             # get the global iterations table, and save it as an attribute
             self._global_iterations = self._get_global_iterations(cur)
             
-            # print(f"when reading the file {len(self._global_iterations)=}")
-
             # If separate metadata not specified, check the current db
             # to make sure it's there
             if metadata_filename is None:
@@ -256,19 +240,18 @@ class SqliteCaseReader(BaseCaseReader):
         self._driver_cases = DriverCases(filename, self._format_version, self._global_iterations,
                                          self._prom2abs, self._abs2prom, self._abs2meta,
                                          self._conns, self._auto_ivc_map, var_info)
-        # print(f"when reading the file {self._driver_cases.count()=}")
         self._system_cases = SystemCases(filename, self._format_version, self._global_iterations,
                                          self._prom2abs, self._abs2prom, self._abs2meta,
-                                         self._conns, self._auto_ivc_map, var_info)
+                                         self._conns, var_info)
         self._solver_cases = SolverCases(filename, self._format_version, self._global_iterations,
                                          self._prom2abs, self._abs2prom, self._abs2meta,
-                                         self._conns, self._auto_ivc_map, var_info)
+                                         self._conns, var_info)
         if self._format_version >= 2:
             self._problem_cases = ProblemCases(filename,
                                                self._format_version,
                                                self._global_iterations,
                                                self._prom2abs, self._abs2prom, self._abs2meta,
-                                               self._conns, self._auto_ivc_map, var_info)
+                                               self._conns, var_info)
 
         # if requested, load all the iteration data into memory
         if pre_load:
@@ -334,26 +317,6 @@ class SqliteCaseReader(BaseCaseReader):
                     meta['lower'] = np.resize(np.array(meta['lower']), meta['shape'])
                 if 'upper' in meta and meta['upper'] is not None:
                     meta['upper'] = np.resize(np.array(meta['upper']), meta['shape'])
-
-            # Map source names to input display text.
-            if version >= 11:
-                self._auto_ivc_map = auto_ivc_map = {}
-                abs2prom_in = self._abs2prom['input']
-                for target, src in self._conns.items():
-                    if src.startswith('_auto_ivc.'):
-                        if src not in auto_ivc_map:
-                            auto_ivc_map[src] = []
-                        auto_ivc_map[src].append(target)
-                for output, input_list in auto_ivc_map.items():
-                    if len(input_list) > 1:
-                        for input_name in input_list:
-                            # If this recorder is on a component, we might have only a subset of
-                            # the metadata dictionary, but one of them will be in there.
-                            if input_name in abs2prom_in:
-                                auto_ivc_map[output] = abs2prom_in[input_name]
-                                break
-                    else:
-                        auto_ivc_map[output] = abs2prom_in[input_list[0]]
 
         elif version in (1, 2):
             abs2prom = row['abs2prom']
@@ -783,12 +746,7 @@ class SqliteCaseReader(BaseCaseReader):
                     # return list of cases from the source plus child cases
                     cases = []
                     source_cases = case_table.get_cases(source)
-                    # print()
-                    # print()
-                    # print('-' * 40)
-                    # print(f"in list cases, {len(source_cases)=}")
                     for case in source_cases:
-                        # print(f"calling _list_cases_recurse_flat for case {case.name}")
                         cases += self._list_cases_recurse_flat(case.name, out_stream=None)
                 else:
                     # return nested dict of cases from the source and child cases
@@ -840,38 +798,14 @@ class SqliteCaseReader(BaseCaseReader):
         driver_cases = self._driver_cases.list_cases()
         if self._format_version >= 2:
             problem_cases = self._problem_cases.list_cases()
-            
-            
-            
-            
-            
-            
-
-        with sqlite3.connect(self._filename_for_connect) as con:
-            con.row_factory = sqlite3.Row
-            cur = con.cursor()
-
-            # get the global iterations table, and save it as an attribute
-            self._global_iterations = self._get_global_iterations(cur)
-
-        con.close()
-
-
-
-
         global_iters = self._global_iterations
         
-        # print(f"DEBUG_LEN: inside _list_cases_recurse_flat, {len(global_iters)=}")
-        # print(f"DEBUG_LEN: inside _list_cases_recurse_flat, {len(driver_cases)=}")
-        # print(f"DEBUG: inside _list_cases_recurse_flat, {coord in driver_cases=}")
-
         if not coord:
             # will return all cases
             coord = ''
             parent_case_counter = len(global_iters)
         elif coord in driver_cases:
             parent_case_counter = self._driver_cases.get_case(coord).counter
-            # print(f"inside _list_cases_recurse_flat, {parent_case_counter=}")
         elif coord in system_cases:
             parent_case_counter = self._system_cases.get_case(coord).counter
         elif coord in solver_cases:
@@ -891,7 +825,6 @@ class SqliteCaseReader(BaseCaseReader):
         current_table = None
         current_cases = []
 
-        # print(f"inside _list_cases_recurse_flat parent looping over parent_case_counter {parent_case_counter} cases")
         for i in range(0, parent_case_counter):
             global_iter = global_iters[i]
             table, row = global_iter[1], global_iter[2]
@@ -1103,10 +1036,6 @@ class CaseTable(object):
         Dictionary mapping absolute variable names to variable metadata.
     conns : dict
         Dictionary of all model connections.
-    auto_ivc_map : dict
-        Dictionary that maps all auto_ivc sources to either an absolute input name for single
-        connections or a promoted input name for multiple connections. This is for output
-        display.
     var_info : dict
         Dictionary with information about variables (scaling, indices, execution order).
 
@@ -1138,15 +1067,12 @@ class CaseTable(object):
         List of keys of cases in the table.
     _cases : dict
         Dictionary mapping keys to cases that have already been loaded.
-    _auto_ivc_map : dict
-        Dictionary that maps all auto_ivc sources to either an absolute input name for single
-        connections or a promoted input name for multiple connections. This is for output display.
     _global_iterations : list
         List of iteration cases and the table and row in which they are found.
     """
 
     def __init__(self, fname, ver, table, index, giter, prom2abs, abs2prom, abs2meta, conns,
-                 auto_ivc_map, var_info):
+                 var_info):
         """
         Initialize.
         """
@@ -1159,7 +1085,6 @@ class CaseTable(object):
         self._abs2prom = abs2prom
         self._abs2meta = abs2meta
         self._conns = conns
-        self._auto_ivc_map = auto_ivc_map
         self._var_info = var_info
 
         # cached keys/cases
@@ -1325,7 +1250,7 @@ class CaseTable(object):
                 source = self._get_source(row[self._index_name])
 
             case = Case(source, row, self._prom2abs, self._abs2prom, self._abs2meta,
-                        self._conns, self._auto_ivc_map, self._var_info, self._format_version)
+                        self._conns, self._var_info, self._format_version)
 
             # cache it if requested
             if cache:
@@ -1377,7 +1302,7 @@ class CaseTable(object):
                 case_id = row[self._index_name]
                 source = self._get_source(case_id)
                 case = Case(source, row, self._prom2abs, self._abs2prom, self._abs2meta,
-                            self._conns, self._auto_ivc_map, self._var_info, self._format_version)
+                            self._conns, self._var_info, self._format_version)
                 if cache:
                     self._cases[case_id] = case
                 yield case
@@ -1447,7 +1372,7 @@ class CaseTable(object):
         str
             The source of the case.
         """
-        table = self._table_name.split('_')[0]  # remove "_iterations" from table name
+        table = self._table_name.partition('_')[0]  # remove "_iterations" from table name
 
         for global_iter in self._global_iterations:
             record_type, row, source = global_iter[1], global_iter[2], global_iter[3]
@@ -1497,24 +1422,18 @@ class DriverCases(CaseTable):
         Dictionary mapping absolute variable names to variable metadata.
     conns : dict
         Dictionary of all model connections.
-    auto_ivc_map : dict
-        Dictionary that maps all auto_ivc sources to either an absolute input name for single
-        connections or a promoted input name for multiple connections. This is for output
-        display.
     var_info : dict
         Dictionary with information about variables (scaling, indices, execution order).
     """
 
     def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, conns,
-                 auto_ivc_map, var_info):
+                 var_info):
         """
         Initialize.
         """
         super().__init__(filename, format_version,
                          'driver_iterations', 'iteration_coordinate', giter,
-                         prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
-                         var_info)
-        self._var_info = var_info
+                         prom2abs, abs2prom, abs2meta, conns, var_info)
 
     def cases(self, cache=False):
         """
@@ -1550,7 +1469,7 @@ class DriverCases(CaseTable):
                         row['jacobian'] = derivs_row['derivatives']
 
                 case = Case('driver', row, self._prom2abs, self._abs2prom, self._abs2meta,
-                            self._conns, self._auto_ivc_map, self._var_info, self._format_version)
+                            self._conns, self._var_info, self._format_version)
 
                 if cache:
                     self._cases[case.name] = case
@@ -1610,7 +1529,7 @@ class DriverCases(CaseTable):
         # if found, create Case object (and cache it if requested) else return None
         if row:
             case = Case('driver', row, self._prom2abs, self._abs2prom, self._abs2meta,
-                        self._conns, self._auto_ivc_map, self._var_info, self._format_version)
+                        self._conns, self._var_info, self._format_version)
             if cache:
                 self._cases[case_id] = case
             return case
@@ -1681,23 +1600,18 @@ class SystemCases(CaseTable):
         Dictionary mapping absolute variable names to variable metadata.
     conns : dict
         Dictionary of all model connections.
-    auto_ivc_map : dict
-        Dictionary that maps all auto_ivc sources to either an absolute input name for single
-        connections or a promoted input name for multiple connections. This is for output
-        display.
     var_info : dict
         Dictionary with information about variables (scaling, indices, execution order).
     """
 
     def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, conns,
-                 auto_ivc_map, var_info):
+                 var_info):
         """
         Initialize.
         """
         super().__init__(filename, format_version,
                          'system_iterations', 'iteration_coordinate', giter,
-                         prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
-                         var_info)
+                         prom2abs, abs2prom, abs2meta, conns, var_info)
 
 
 class SolverCases(CaseTable):
@@ -1720,23 +1634,18 @@ class SolverCases(CaseTable):
         Dictionary mapping absolute variable names to variable metadata.
     conns : dict
         Dictionary of all model connections.
-    auto_ivc_map : dict
-        Dictionary that maps all auto_ivc sources to either an absolute input name for single
-        connections or a promoted input name for multiple connections. This is for output
-        display.
     var_info : dict
         Dictionary with information about variables (scaling, indices, execution order).
     """
 
     def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, conns,
-                 auto_ivc_map, var_info):
+                 var_info):
         """
         Initialize.
         """
         super().__init__(filename, format_version,
                          'solver_iterations', 'iteration_coordinate', giter,
-                         prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
-                         var_info)
+                         prom2abs, abs2prom, abs2meta, conns, var_info)
 
     def _get_source(self, iteration_coordinate):
         """
@@ -1757,11 +1666,11 @@ class SolverCases(CaseTable):
         system_solve = source_system.split('.')[-1] + '._solve_nonlinear'
         system_coord_len = iteration_coordinate.index(system_solve) + len(system_solve)
         system_coord_nodes = len(iteration_coordinate[:system_coord_len].split('|')) + 1
-        iter_coord_nodes = len(iteration_coordinate.split('|'))
+        num_coord_nodes = iteration_coordinate.count('|') + 1
 
-        if iter_coord_nodes == system_coord_nodes + 2:
+        if num_coord_nodes == system_coord_nodes + 2:
             return source_system + '.nonlinear_solver'
-        elif iter_coord_nodes == system_coord_nodes + 4:
+        elif num_coord_nodes == system_coord_nodes + 4:
             return source_system + '.nonlinear_solver.linesearch'
         else:
             raise RuntimeError("Can't parse solver iteration coordinate: %s" % iteration_coordinate)
@@ -1787,23 +1696,18 @@ class ProblemCases(CaseTable):
         Dictionary mapping absolute variable names to variable metadata.
     conns : dict
         Dictionary of all model connections.
-    auto_ivc_map : dict
-        Dictionary that maps all auto_ivc sources to either an absolute input name for single
-        connections or a promoted input name for multiple connections. This is for output
-        display.
     var_info : dict
         Dictionary with information about variables (scaling, indices, execution order).
     """
 
     def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, conns,
-                 auto_ivc_map, var_info):
+                 var_info):
         """
         Initialize.
         """
         super().__init__(filename, format_version,
                          'problem_cases', 'case_name', giter,
-                         prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
-                         var_info)
+                         prom2abs, abs2prom, abs2meta, conns, var_info)
 
     def list_sources(self):
         """

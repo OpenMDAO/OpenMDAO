@@ -5,6 +5,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.mpi import MPI
+from openmdao.utils.assert_utils import assert_check_totals
 
 try:
     from parameterized import parameterized
@@ -241,9 +242,7 @@ class SerialTests(unittest.TestCase):
         p['indep.x'] = [9.9]
         p['indep.g'] = 9.80665
         p.run_model()
-        totals = p.check_totals(compact_print=True, method='cs', out_stream=None)
-        for key, meta in totals.items():
-            np.testing.assert_allclose(meta['abs error'][0], 0.)
+        assert_check_totals(p.check_totals(show_only_incorrect=True, method='cs', out_stream=None))
 
     def test_set_val_auto_ivc(self):
         p = om.Problem()

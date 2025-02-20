@@ -3485,7 +3485,7 @@ class TestLinearOnlyDVs(unittest.TestCase):
         shape = (2, 5)
         # do first opt without coloring
         driver = om.pyOptSparseDriver(optimizer='IPOPT', print_results=False)
-        driver.opt_settings['print_level'] = 5
+        driver.opt_settings['print_level'] = 0
         driver.opt_settings['max_iter'] = 1000
         p = self.setup_lin_only_dv_problem(driver=driver, shape=shape)
         p.run_model()
@@ -3494,7 +3494,7 @@ class TestLinearOnlyDVs(unittest.TestCase):
         assert_check_totals(p.check_totals(method='cs', out_stream=None))
 
         driver = om.pyOptSparseDriver(optimizer='IPOPT', print_results=False)
-        driver.opt_settings['print_level'] = 5
+        driver.opt_settings['print_level'] = 0
         driver.opt_settings['max_iter'] = 1000
         driver.declare_coloring()
         p = self.setup_lin_only_dv_problem(driver=driver, shape=shape)

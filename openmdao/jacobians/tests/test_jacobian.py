@@ -603,7 +603,7 @@ class TestJacobian(unittest.TestCase):
         model = prob.model
         model.add_subsystem('comp', Comp1())
 
-        msg = "'comp' <class Comp1>: d\(y\)/d\(x\): declare_partials has been called with rows and cols, which" + \
+        msg = r"'comp' <class Comp1>: d\(y\)/d\(x\): declare_partials has been called with rows and cols, which" + \
               " should be arrays of equal length, but rows is length 2 while " + \
               "cols is length 1."
         with self.assertRaisesRegex(RuntimeError, msg):
@@ -613,7 +613,7 @@ class TestJacobian(unittest.TestCase):
         model = prob.model
         model.add_subsystem('comp', Comp2())
 
-        msg = "'comp' <class Comp2>: d\(y\)/d\(x\): declare_partials has been called with rows and cols, which" + \
+        msg = r"'comp' <class Comp2>: d\(y\)/d\(x\): declare_partials has been called with rows and cols, which" + \
             " should be arrays of equal length, but rows is length 1 while " + \
             "cols is length 2."
         with self.assertRaisesRegex(RuntimeError, msg):
@@ -772,7 +772,7 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        msg = 'Variable name pair \("{}", "{}"\) must first be declared.'
+        msg = r'Variable name pair \("{}", "{}"\) must first be declared.'
         with self.assertRaisesRegex(KeyError, msg.format('y', 'x')):
             prob.compute_totals(of=['comp.y'], wrt=['p1.x'])
 
@@ -1035,7 +1035,7 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        msg = "'comp' \<class MyComp\>: Error calling compute_partials\(\), DictionaryJacobian in 'comp' \<class MyComp\>: Sub-jacobian for key \('comp.y', 'comp.x'\) has the wrong shape \(\(3,\)\), expected \(\(2,\)\)."
+        msg = r"'comp' \<class MyComp\>: Error calling compute_partials\(\), DictionaryJacobian in 'comp' \<class MyComp\>: Sub-jacobian for key \('comp.y', 'comp.x'\) has the wrong shape \(\(3,\)\), expected \(\(2,\)\)."
         with self.assertRaisesRegex(ValueError, msg):
             prob.compute_totals(of=['comp.y'], wrt=['comp.x'])
 

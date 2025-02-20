@@ -3,7 +3,7 @@ import unittest
 
 import numpy as np
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_check_totals
 from openmdao.utils.mpi import MPI  # MPI will be None here if MPI is not active
 
 try:
@@ -76,8 +76,7 @@ class SerialImplicitDerivConsist(unittest.TestCase):
         prob.setup(mode="rev")
         prob.run_model()
         totals = prob.check_totals(of="total", wrt="s0")
-        for var, err in totals.items():
-            assert_near_equal(err["rel error"].reverse, 0.0, 5e-3)
+        assert_check_totals(totals)
 
 
 if __name__ == "__main__":

@@ -111,16 +111,17 @@ class DOEDriver(Driver):
             procs_per_model = self.options['procs_per_model']
 
             full_size = comm.size
-            size = full_size // procs_per_model
-            if full_size != size * procs_per_model:
+            ncolors = full_size // procs_per_model
+            if full_size != ncolors * procs_per_model:
                 raise RuntimeError("The total number of processors is not evenly divisible by the "
                                    "specified number of processors per model.\n Provide a "
                                    "number of processors that is a multiple of %d, or "
                                    "specify a number of processors per model that divides "
                                    "into %d." % (procs_per_model, full_size))
 
-            color = self._color = comm.rank % size
-            return comm.Split(color)
+            color = self._color = comm.rank % ncolors
+            self.comm = comm.Split(color)
+            return self.comm
 
     def _set_name(self):
         """
@@ -255,12 +256,11 @@ class DOEDriver(Driver):
         list
             list of name, value tuples for the design variables.
         """
-        size = self._problem_comm.size // self.options['procs_per_model']
+        ncolors = self._problem_comm.size // self.options['procs_per_model']
         color = self._color
 
-        generator = self.options['generator']
-        for i, case in enumerate(generator(design_vars, model)):
-            if i % size == color:
+        for i, case in enumerate(self.options['generator'](design_vars, model)):
+            if i % ncolors == color:
                 yield case
 
     def _setup_recording(self):
@@ -278,8 +278,7 @@ class DOEDriver(Driver):
                     if procs_per_model == 1:
                         recorder.record_on_process = True
                     else:
-                        size = self._problem_comm.size // procs_per_model
-                        if self._problem_comm.rank < size:
+                        if self.comm.rank == 0:
                             recorder.record_on_process = True
 
                 elif self._problem_comm.rank == 0:
@@ -287,20 +286,3 @@ class DOEDriver(Driver):
                     recorder.record_on_process = True
 
         super()._setup_recording()
-
-    def _get_recorder_metadata(self, case_name):
-        """
-        Return metadata from the latest iteration for use in the recorder.
-
-        Parameters
-        ----------
-        case_name : str
-            Name of current case.
-
-        Returns
-        -------
-        dict
-            Metadata dictionary for the recorder.
-        """
-        self._metadata['name'] = case_name
-        return self._metadata

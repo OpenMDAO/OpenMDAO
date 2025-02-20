@@ -1,6 +1,7 @@
 """ Testing for group finite differencing."""
 import time
 import unittest
+from io import StringIO
 
 from packaging.version import Version
 
@@ -735,7 +736,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         p.run_model()
         # Formerly a KeyError
         derivs = p.check_totals(compact_print=True, out_stream=None)
-        assert_near_equal(0.0, derivs['y', 'x']['abs error'][1])
+        assert_check_totals(derivs)
 
         # Coverage
         derivs = p.driver._compute_totals(return_format='dict')
@@ -891,10 +892,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         totals = prob.driver._compute_totals(of=of, wrt=['p.x'], return_format='dict')
         assert_near_equal(totals['sub.ndp.g']['p.x'], np.diag([7.0, -2.0, 10.0]), 1e-6)
 
-        totals = prob.check_totals()
-
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+        assert_check_totals(prob.check_totals())
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -1923,13 +1921,13 @@ class TestComponentComplexStep(unittest.TestCase):
 
         prob.run_model()
 
-        prob.check_totals(method='cs', out_stream=None)
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
 
-        prob.check_totals(method='cs', step=1e-12, out_stream=None)
+        assert_check_totals(prob.check_totals(method='cs', step=1e-12, out_stream=None))
 
-        prob.check_partials(method='cs', out_stream=None)
+        assert_check_partials(prob.check_partials(method='cs', out_stream=None))
 
-        prob.check_partials(method='cs', step=1e-14, out_stream=None)
+        assert_check_partials(prob.check_partials(method='cs', step=1e-14, out_stream=None))
 
     def test_partials_bad_sparse_explicit(self):
         class BadSparsityComp(om.ExplicitComponent):
@@ -1943,6 +1941,7 @@ class TestComponentComplexStep(unittest.TestCase):
                      [0, 1, 0, 1, 1, 0, 1]], dtype=int)
 
                 self.add_input('x0', val=np.ones(4))
+
                 self.add_input('x1', val=np.ones(2))
                 self.add_input('x2', val=np.ones(1))
 
@@ -1973,20 +1972,40 @@ class TestComponentComplexStep(unittest.TestCase):
                     end += outputs[outname].size
                     outputs[outname] = prod[start:end]
                     start = end
+        
+        for compact_print in [True, False]:
+            with self.subTest(f'{compact_print=}'):
+                prob = om.Problem()
+                model = prob.model
+                model.add_subsystem('comp', BadSparsityComp())
 
-        prob = om.Problem()
-        model = prob.model
-        model.add_subsystem('comp', BadSparsityComp())
+                prob.setup(check=False, mode='fwd')
+                prob.set_solver_print(level=0)
+                prob.run_model()
 
-        prob.setup(check=False, mode='fwd')
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        with self.assertRaises(Exception) as cm:
-            prob.check_partials(includes=['comp'])
-
-        self.assertEqual(cm.exception.args[0], "'comp' <class BadSparsityComp>: User specified sparsity (rows/cols) for subjac 'comp.y1' wrt 'comp.x0' is incorrect. There are non-covered nonzeros in column 3 at row(s) [1].")
-
+                ss = StringIO()
+                prob.check_partials(includes=['comp'], compact_print=compact_print, out_stream=ss)
+                if compact_print:
+                    expected = ("| y1            | x0             |  1.0000e+00 |  1.0000e+00 |  1.3978e-10 "
+                                "|  1.0000e+00 |  1.0000e+00 |  1.3978e-10 |  <BAD SPARSITY> |")
+                else:
+                    expected = (
+                        "  comp: 'y1' wrt 'x0'\n"
+                        "\n"
+                        "    Max Absolute Error (Jfwd - Jfd) : 1.397780e-10\n"
+                        "      fwd value: 1.000000e+00\n"
+                        "      fd value: 1.000000e+00 (fd:forward)\n"
+                        "\n"
+                        "    Max Relative Error (Jfwd - Jfd) / Jfd : 1.397780e-10\n"
+                        "      fwd value: 1.000000e+00\n"
+                        "      fd value: 1.000000e+00 (fd:forward)\n"
+                        "\n"
+                        "    Sparsity excludes 1 entries which appear to be non-zero. (Magnitudes exceed 1e-16) *\n"
+                        "      Rows: [1]\n"
+                        "      Cols: [3]\n"
+                    )
+                
+                self.assertIn(expected, ss.getvalue())
 
 
 class ApproxTotalsFeature(unittest.TestCase):
@@ -2485,7 +2504,9 @@ class TestFDRelative(unittest.TestCase):
         # This derivative requires rel_element to be accurate.
         self.assertTrue(np.abs(partials['comp']['y', 'x_element']['J_fd'][2, 2]) < 1e-9)
 
-        totals = prob.check_totals(of='comp.y', wrt=['comp.x_element'], step_calc='rel_element', out_stream=None)
+        totals = prob.check_totals(of='comp.y', wrt=['comp.x_element'], step_calc='rel_element',
+                                   out_stream=None)
+        assert_check_totals(totals)
 
         # This derivative requires rel_element to be accurate.
         self.assertTrue(np.abs(totals['comp.y', 'comp.x_element']['J_fd'][2, 2]) < 1e-9)
@@ -2619,7 +2640,7 @@ class CheckTotalsIndices(unittest.TestCase):
         prob.setup()
 
         prob.run_model()
-        prob.check_totals(compact_print=True)
+        assert_check_totals(prob.check_totals(compact_print=True, out_stream=None))
 
 
 def _setup_1ivc_fdgroupwithpar_1sink(size=7):
@@ -2939,14 +2960,13 @@ class TestFDWithParallelSubGroups(unittest.TestCase):
         prob = _setup_1ivc_fdgroupwithpar_1sink(size=7)
         prob.setup(mode='fwd', force_alloc_complex=True)
         prob.run_model()
-        assert_check_totals(prob.check_totals(method='fd'), atol=3e-6)
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
 
     def test_group_fd_inner_par_rev(self):
         prob = _setup_1ivc_fdgroupwithpar_1sink(size=7)
         prob.setup(mode='rev', force_alloc_complex=True)
         prob.run_model()
-        # assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
-        assert_check_totals(prob.check_totals(method='fd', show_only_incorrect=True), atol=3e-6)
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
 
     def test_group_fd_inner_par2_fwd(self):
         prob = _setup_2ivcs_fdgroupwithpar_2sinks(size=7)
@@ -2989,8 +3009,6 @@ class TestFDWithParallelSubGroups(unittest.TestCase):
         prob.setup(mode='fwd', force_alloc_complex=True)
         prob.run_model()
         prob.compute_totals()
-        import pprint
-        pprint.pprint({n: m['val'] for n,m in prob.model.sub._jacobian._subjacs_info.items()})
         assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
 
     def test_2ivcs_fdgroupwithcrisscrosspars_1sink_rev(self):
@@ -3021,7 +3039,7 @@ class TestFDWithParallelSubGroups(unittest.TestCase):
         prob = _setup_2ivcs_fdgroupwithpar_1sink(size=7)
         prob.setup(mode='rev', force_alloc_complex=True)
         prob.run_model()
-        assert_check_totals(prob.check_totals(method='fd'), atol=3e-6)
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
 
     def test_group_fd_inner_par_indirect_fwd(self):
         prob = _setup_1ivc_dum_fdgroupwithpar_1sink(size=7)
@@ -3033,8 +3051,7 @@ class TestFDWithParallelSubGroups(unittest.TestCase):
         prob = _setup_1ivc_dum_fdgroupwithpar_1sink(size=7)
         prob.setup(mode='rev', force_alloc_complex=True)
         prob.run_model()
-        # assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
-        assert_check_totals(prob.check_totals(method='fd', show_only_incorrect=True), atol=3e-6)
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
 
     def test_group_fd_inner_par_indirect2_fwd(self):
         prob = _setup_1ivc_dum_fdgroupwithpar_1sink_c4(size=7)
@@ -3046,8 +3063,7 @@ class TestFDWithParallelSubGroups(unittest.TestCase):
         prob = _setup_1ivc_dum_fdgroupwithpar_1sink_c4(size=7)
         prob.setup(mode='rev', force_alloc_complex=True)
         prob.run_model()
-        # assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
-        assert_check_totals(prob.check_totals(method='fd', show_only_incorrect=True), atol=3e-6)
+        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=3e-6)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
