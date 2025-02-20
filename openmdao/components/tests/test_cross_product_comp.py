@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.utils.testing_utils import force_check_partials
 
 
@@ -55,12 +55,7 @@ class TestCrossProductCompNx3(unittest.TestCase):
 
     def test_partials(self):
         cpd = force_check_partials(self.p, out_stream=None, method='cs')
-
-        for comp in cpd:
-            for (var, wrt) in cpd[comp]:
-                np.testing.assert_almost_equal(actual=cpd[comp][var, wrt]['J_fwd'],
-                                               desired=cpd[comp][var, wrt]['J_fd'],
-                                               decimal=6)
+        assert_check_partials(cpd)
 
 class TestCrossProductCompNx3x1(unittest.TestCase):
 
@@ -110,12 +105,7 @@ class TestCrossProductCompNx3x1(unittest.TestCase):
 
     def test_partials(self):
         cpd = force_check_partials(self.p, out_stream=None, method='cs')
-
-        for comp in cpd:
-            for (var, wrt) in cpd[comp]:
-                np.testing.assert_almost_equal(actual=cpd[comp][var, wrt]['J_fwd'],
-                                               desired=cpd[comp][var, wrt]['J_fd'],
-                                               decimal=6)
+        assert_check_partials(cpd)
 
 class TestCrossProductCompNonVectorized(unittest.TestCase):
 
@@ -163,12 +153,7 @@ class TestCrossProductCompNonVectorized(unittest.TestCase):
 
     def test_partials(self):
         cpd = force_check_partials(self.p, out_stream=None, method='cs')
-
-        for comp in cpd:
-            for (var, wrt) in cpd[comp]:
-                np.testing.assert_almost_equal(actual=cpd[comp][var, wrt]['J_fwd'],
-                                               desired=cpd[comp][var, wrt]['J_fd'],
-                                               decimal=6)
+        assert_check_partials(cpd)
 
 
 class TestUnits(unittest.TestCase):
@@ -214,12 +199,7 @@ class TestUnits(unittest.TestCase):
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
         cpd = force_check_partials(self.p, compact_print=True, out_stream=None)
-
-        for comp in cpd:
-            for (var, wrt) in cpd[comp]:
-                np.testing.assert_almost_equal(actual=cpd[comp][var, wrt]['J_fwd'],
-                                               desired=cpd[comp][var, wrt]['J_fd'],
-                                               decimal=6)
+        assert_check_partials(cpd)
 
 
 class TestMultipleUnits(unittest.TestCase):
@@ -277,12 +257,7 @@ class TestMultipleUnits(unittest.TestCase):
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
         cpd = force_check_partials(self.p, compact_print=True, out_stream=None)
-
-        for comp in cpd:
-            for (var, wrt) in cpd[comp]:
-                np.testing.assert_almost_equal(actual=cpd[comp][var, wrt]['J_fwd'],
-                                               desired=cpd[comp][var, wrt]['J_fd'],
-                                               decimal=6)
+        assert_check_partials(cpd)
 
 
 class TestMultipleConfigure(unittest.TestCase):
@@ -342,12 +317,7 @@ class TestMultipleConfigure(unittest.TestCase):
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
         cpd = force_check_partials(self.p, compact_print=True, out_stream=None)
-
-        for comp in cpd:
-            for (var, wrt) in cpd[comp]:
-                np.testing.assert_almost_equal(actual=cpd[comp][var, wrt]['J_fwd'],
-                                               desired=cpd[comp][var, wrt]['J_fd'],
-                                               decimal=6)
+        assert_check_partials(cpd)
 
 
 class TestMultipleCommonA(unittest.TestCase):
@@ -403,12 +373,7 @@ class TestMultipleCommonA(unittest.TestCase):
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
         cpd = force_check_partials(self.p, compact_print=True, out_stream=None)
-
-        for comp in cpd:
-            for (var, wrt) in cpd[comp]:
-                np.testing.assert_almost_equal(actual=cpd[comp][var, wrt]['J_fwd'],
-                                               desired=cpd[comp][var, wrt]['J_fd'],
-                                               decimal=6)
+        assert_check_partials(cpd)
 
 
 class TestMultipleCommonB(unittest.TestCase):
@@ -464,12 +429,7 @@ class TestMultipleCommonB(unittest.TestCase):
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
         cpd = force_check_partials(self.p, compact_print=True, out_stream=None)
-
-        for comp in cpd:
-            for (var, wrt) in cpd[comp]:
-                np.testing.assert_almost_equal(actual=cpd[comp][var, wrt]['J_fwd'],
-                                               desired=cpd[comp][var, wrt]['J_fd'],
-                                               decimal=6)
+        assert_check_partials(cpd)
 
 
 class TestMultipleErrors(unittest.TestCase):

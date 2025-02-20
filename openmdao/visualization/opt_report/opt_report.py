@@ -24,7 +24,6 @@ except ImportError:
 
 from openmdao.core.constants import INF_BOUND
 from openmdao.utils.mpi import MPI
-from openmdao.utils.om_warnings import issue_warning, DriverWarning
 from openmdao.visualization.tables.table_builder import generate_table
 
 
@@ -115,9 +114,6 @@ def opt_report(prob, outfile=None):
     """
     driver = prob.driver
     if not driver.supports['optimization']:
-        driver_class = type(driver).__name__
-        issue_warning(f"The optimizer report is not applicable for Driver type '{driver_class}', "
-                      "which does not support optimization", category=DriverWarning)
         return
 
     # only create report on rank 0

@@ -133,7 +133,7 @@ class _TotalJacInfo(object):
             driver = problem.driver
         self.model = model = problem.model
 
-        self.comm = problem.comm
+        self.comm = model.comm
         self._orig_mode = problem._orig_mode
         self.has_scaling = driver and driver._has_scaling and driver_scaling
         self.return_format = return_format
@@ -1487,7 +1487,8 @@ class _TotalJacInfo(object):
 
                 # if some of the wrt vars are distributed in fwd mode, we bcast from the rank
                 # where each part of the distrib var exists
-                if self.get_remote and mode == 'fwd' and self.has_wrt_dist:
+                if self.get_remote and mode == 'fwd' and self.has_wrt_dist and \
+                        self.dist_input_range_map:
                     for start, stop, rank in self.dist_input_range_map[mode]:
                         contig = self.J[:, start:stop].copy()
                         model.comm.Bcast(contig, root=rank)

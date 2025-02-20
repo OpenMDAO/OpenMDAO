@@ -13,9 +13,9 @@ class QuadraticComp(om.ImplicitComponent):
 
     def setup(self):
         self.add_input('a', val=1.)
-        self.add_input('b', val=1.)
+        self.add_input('b', val=5.)
         self.add_input('c', val=1.)
-        self.add_output('x', val=0.)
+        self.add_output('x', val=1.)
 
     def setup_partials(self):
         self.declare_partials(of='x', wrt='*')

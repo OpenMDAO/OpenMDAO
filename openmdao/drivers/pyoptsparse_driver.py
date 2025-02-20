@@ -373,8 +373,8 @@ class pyOptSparseDriver(Driver):
 
         # Only need initial run if we have linear constraints or if we are using an optimizer that
         # doesn't perform one initially.
-        model_ran = False
-        if optimizer in run_required or linear_constraints:
+        model_ran = bool(self.options['hotstart_file'])
+        if not model_ran and (optimizer in run_required or linear_constraints):
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 self._run_solve_nonlinear()
                 rec.abs = 0.0
@@ -417,6 +417,9 @@ class pyOptSparseDriver(Driver):
         lin_dvs = self._get_lin_dvs()
         nl_dvs = self._get_nl_dvs()
 
+        # compute dynamic simul deriv coloring
+        problem.get_total_coloring(self._coloring_info, run_model=not model_ran)
+
         # Calculate and save derivatives for any linear constraints.
         if linear_constraints:
             _lin_jacs = self._compute_totals(of=linear_constraints, wrt=list(lin_dvs),
@@ -439,9 +442,6 @@ class pyOptSparseDriver(Driver):
                             # convert to 'coo' format here to avoid an emphatic warning
                             # by pyoptsparse.
                             jacdct[n] = {'coo': [mat.row, mat.col, mat.data], 'shape': mat.shape}
-
-        # # compute dynamic simul deriv coloring
-        problem.get_total_coloring(self._coloring_info, run_model=not model_ran)
 
         bad_resps = [n for n in relevance._no_dv_responses if n in self._cons]
         bad_cons = [n for n, m in self._cons.items() if m['source'] in bad_resps]

@@ -5,14 +5,12 @@ import hashlib
 import pathlib
 import time
 import functools
-
 from contextlib import contextmanager
 from collections import defaultdict
 from itertools import chain
 from enum import IntEnum
 
 from fnmatch import fnmatchcase
-
 from numbers import Integral
 
 import numpy as np
@@ -28,7 +26,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path, has_match
 from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
 from openmdao.utils.variable_table import write_var_table, NA
-from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len
+from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len, get_errors
 from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
@@ -36,13 +34,14 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, \
     DerivativesWarning, PromotionWarning, UnusedOptionWarning, UnitsWarning, warn_deprecation
-from openmdao.utils.general_utils import determine_adder_scaler, \
+from openmdao.utils.general_utils import determine_adder_scaler, is_undefined, \
     format_as_float_or_array, all_ancestors, match_prom_or_abs, \
     ensure_compatible, env_truthy, make_traceback, _is_slicer_op, _wrap_comm, _unwrap_comm, \
     _om_dump, SystemMetaclass
 from openmdao.utils.file_utils import _get_outputs_dir
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
+
 
 _empty_frozen_set = frozenset()
 
@@ -709,9 +708,6 @@ class System(object, metaclass=SystemMetaclass):
         """
         Iterate over (name, offset, end, slice, dist_sizes) for each 'of' (row) var in the jacobian.
 
-        The slice is internal to the given variable in the result, and this is always a full
-        slice except when indices are defined for the 'of' variable.
-
         Yields
         ------
         str
@@ -721,7 +717,7 @@ class System(object, metaclass=SystemMetaclass):
         int
             Ending index.
         slice or ndarray
-            A full slice or indices for the 'of' variable.
+            A full slice.
         ndarray or None
             Distributed sizes if var is distributed else None
         """
@@ -1025,9 +1021,9 @@ class System(object, metaclass=SystemMetaclass):
         #   method and what were the existing bounds
         if are_new_bounds:
             # wipe out all the bounds and only use what is set by the arguments to this call
-            if lower is _UNDEFINED:
+            if is_undefined(lower):
                 lower = None
-            if upper is _UNDEFINED:
+            if is_undefined(upper):
                 upper = None
         else:
             lower = existing_dv_meta['lower']
@@ -1043,13 +1039,13 @@ class System(object, metaclass=SystemMetaclass):
 
         # Now figure out scaling
         if are_new_scaling:
-            if scaler is _UNDEFINED:
+            if is_undefined(scaler):
                 scaler = None
-            if adder is _UNDEFINED:
+            if is_undefined(adder):
                 adder = None
-            if ref is _UNDEFINED:
+            if is_undefined(ref):
                 ref = None
-            if ref0 is _UNDEFINED:
+            if is_undefined(ref0):
                 ref0 = None
         else:
             scaler = existing_dv_meta['scaler']
@@ -1193,11 +1189,11 @@ class System(object, metaclass=SystemMetaclass):
         #   method and what were the existing bounds
         if are_new_bounds:
             # wipe the slate clean and only use what is set by the arguments to this call
-            if equals is _UNDEFINED:
+            if is_undefined(equals):
                 equals = None
-            if lower is _UNDEFINED:
+            if is_undefined(lower):
                 lower = None
-            if upper is _UNDEFINED:
+            if is_undefined(upper):
                 upper = None
         else:
             equals = existing_cons_meta['equals']
@@ -1216,13 +1212,13 @@ class System(object, metaclass=SystemMetaclass):
 
         # Now figure out scaling
         if are_new_scaling:
-            if scaler is _UNDEFINED:
+            if is_undefined(scaler):
                 scaler = None
-            if adder is _UNDEFINED:
+            if is_undefined(adder):
                 adder = None
-            if ref is _UNDEFINED:
+            if is_undefined(ref):
                 ref = None
-            if ref0 is _UNDEFINED:
+            if is_undefined(ref0):
                 ref0 = None
         else:
             scaler = existing_cons_meta['scaler']
@@ -1340,10 +1336,16 @@ class System(object, metaclass=SystemMetaclass):
             name = alias
 
         # At least one of the scaling parameters must be set or function does nothing
-        if scaler is _UNDEFINED and adder is _UNDEFINED and ref is _UNDEFINED and ref0 == \
-                _UNDEFINED:
+        if (
+            is_undefined(scaler)
+            and is_undefined(adder)
+            and is_undefined(ref)
+            and is_undefined(ref0)
+        ):
             raise RuntimeError(
-                'Must set a value for at least one argument in call to set_objective_options.')
+                'Must set a value for at least one argument '
+                'in call to set_objective_options.'
+            )
 
         if self._static_mode and self._static_responses:
             responses = self._static_responses
@@ -1360,13 +1362,13 @@ class System(object, metaclass=SystemMetaclass):
 
         # Since one or more of these are being set by the incoming arguments, the
         #   ones that are not being set should be set to None since they will be re-computed below
-        if scaler is _UNDEFINED:
+        if is_undefined(scaler):
             scaler = None
-        if adder is _UNDEFINED:
+        if is_undefined(adder):
             adder = None
-        if ref is _UNDEFINED:
+        if is_undefined(ref):
             ref = None
-        if ref0 is _UNDEFINED:
+        if is_undefined(ref0):
             ref0 = None
 
         # Convert ref/ref0 to ndarray/float as necessary
@@ -1647,7 +1649,7 @@ class System(object, metaclass=SystemMetaclass):
         info.set_coloring(coloring, msginfo=self.msginfo)
         if info._failed:
             if not info.per_instance:
-                # save the class coloring for so resources won't be wasted computing
+                # save the class coloring so resources won't be wasted computing
                 # a bad coloring
                 fname = self.get_coloring_fname(mode='output')
                 coloring_mod._CLASS_COLORINGS[fname] = None
@@ -1687,6 +1689,81 @@ class System(object, metaclass=SystemMetaclass):
 
         return True
 
+    def _perturbation_iter(self, num_full_jacs, perturb_size):
+        """
+        Iterate over random perturbations of the inputs array.
+
+        For implicit components, we also randomize the outputs.  The perturbation is relative
+        to the starting value of the input or output, unless that value is 0.0, in which case
+        the perturbation is absolute.  The final value of the input or output is the perturbation
+        multiplied by a random number between 0 and 1 added to the starting value.
+
+        Inputs, outputs, and residuals are all restored to their starting values at the end of
+        the iterations.
+
+        Parameters
+        ----------
+        num_full_jacs : int
+            Number of full jacobians to compute.
+        perturb_size : float
+            Size of relative perturbation.  If base value is 0.0, perturbation is absolute.
+
+        Yields
+        ------
+        int
+            The current iteration number.
+        """
+        from openmdao.core.group import Group
+        is_total = isinstance(self, Group)
+        use_jax = self.options['derivs_method'] == 'jax'
+        is_explicit = self.is_explicit()
+
+        starting_inputs = self._inputs.asarray(copy=True)
+        starting_outputs = self._outputs.asarray(copy=True)
+        starting_resids = self._residuals.asarray(copy=True)
+
+        # compute perturbations
+        in_offsets = starting_inputs.copy()
+        in_offsets[in_offsets == 0.0] = 1.0
+        in_offsets *= perturb_size
+
+        if not is_explicit:
+            out_offsets = starting_outputs.copy()
+            out_offsets[out_offsets == 0.0] = 1.0
+            out_offsets *= perturb_size
+
+        for i in range(num_full_jacs):
+            # randomize inputs (and outputs if implicit)
+            if i > 0:
+                self._inputs.set_val(starting_inputs +
+                                     in_offsets * np.random.random(in_offsets.size))
+                if not is_explicit:
+                    self._outputs.set_val(starting_outputs +
+                                          out_offsets * np.random.random(out_offsets.size))
+                if is_total:
+                    with self._relevance.nonlinear_active('iter'):
+                        self._solve_nonlinear()
+                else:
+                    self._apply_nonlinear()
+
+                if not use_jax:
+                    for scheme in self._approx_schemes.values():
+                        scheme._reset()  # force a re-initialization of approx
+            elif is_explicit and not is_total:
+                self._apply_nonlinear()  # need this to get the output values into the resids
+
+            yield i
+
+        if not use_jax:
+            # revert uncolored approx back to normal
+            for scheme in self._approx_schemes.values():
+                scheme._reset()
+
+        # restore original inputs/outputs/resids
+        self._inputs.set_val(starting_inputs)
+        self._outputs.set_val(starting_outputs)
+        self._residuals.set_val(starting_resids)
+
     def compute_sparsity(self):
         """
         Compute the sparsity of the partial jacobian.
@@ -1718,65 +1795,28 @@ class System(object, metaclass=SystemMetaclass):
         save_jac = self._jacobian
 
         # use special sparse jacobian to collect sparsity info
-        self._jacobian = _ColSparsityJac(self, self._coloring_info)
+        self._jacobian = _ColSparsityJac(self)
 
         from openmdao.core.group import Group
         is_total = isinstance(self, Group)
-        is_explicit = self.is_explicit()
 
-        # compute perturbations
-        starting_inputs = self._inputs.asarray(copy=True)
-        in_offsets = starting_inputs.copy()
-        in_offsets[in_offsets == 0.0] = 1.0
-        in_offsets *= self._coloring_info['perturb_size']
-
-        starting_outputs = self._outputs.asarray(copy=True)
-
-        if not is_explicit:
-            out_offsets = starting_outputs.copy()
-            out_offsets[out_offsets == 0.0] = 1.0
-            out_offsets *= self._coloring_info['perturb_size']
-
-        starting_resids = self._residuals.asarray(copy=True)
-
-        for i in range(self._coloring_info['num_full_jacs']):
-            # randomize inputs (and outputs if implicit)
-            if i > 0:
-                self._inputs.set_val(starting_inputs +
-                                     in_offsets * np.random.random(in_offsets.size))
-                if not is_explicit:
-                    self._outputs.set_val(starting_outputs +
-                                          out_offsets * np.random.random(out_offsets.size))
-                if is_total:
-                    with self._relevance.nonlinear_active('iter'):
-                        self._solve_nonlinear()
-                else:
-                    self._apply_nonlinear()
-
-                if not use_jax:
-                    for scheme in self._approx_schemes.values():
-                        scheme._reset()  # force a re-initialization of approx
-
+        for i in self._perturbation_iter(self._coloring_info['num_full_jacs'],
+                                         self._coloring_info['perturb_size']):
             if use_jax:
                 self._jax_linearize()
-            else:
+                sparsity, sp_info = self._jacobian.get_sparsity()
+            elif is_total:
                 self.run_linearize(sub_do_ln=False)
-
-        sparsity, sp_info = self._jacobian.get_sparsity(self)
+                sparsity, sp_info = self._jacobian.get_sparsity()
+            else:  # for components
+                # this avoids calling any compute_partials/linearize methods which will fail
+                # because _ColSparsityJac only supports set_col and not dict access.
+                sparsity, sp_info = self.compute_fd_sparsity()
 
         self._jacobian = save_jac
 
         if not use_jax:
             self._during_sparsity = False
-
-            # revert uncolored approx back to normal
-            for scheme in self._approx_schemes.values():
-                scheme._reset()
-
-        # restore original inputs/outputs
-        self._inputs.set_val(starting_inputs)
-        self._outputs.set_val(starting_outputs)
-        self._residuals.set_val(starting_resids)
 
         self._first_call_to_linearize = save_first_call
 
@@ -1832,22 +1872,28 @@ class System(object, metaclass=SystemMetaclass):
             for meta in self._subjacs_info.values():
                 if 'method' in meta and meta['method']:
                     break
-            else:  # no approx derivs found
-                if not (self._owns_approx_of or self._owns_approx_wrt):
-                    issue_warning("No partials found but coloring was requested.  "
-                                  "Declaring ALL partials as dense "
-                                  "(method='{}')".format(info['method']),
-                                  prefix=self.msginfo, category=DerivativesWarning)
-                    try:
-                        self.declare_partials('*', '*', method=info['method'])
-                    except AttributeError:  # assume system is a group
-                        from openmdao.core.component import Component
-                        from openmdao.core.indepvarcomp import IndepVarComp
-                        from openmdao.components.exec_comp import ExecComp
-                        for s in self.system_iter(recurse=True, typ=Component):
-                            if not isinstance(s, ExecComp) and not isinstance(s, IndepVarComp):
-                                s.declare_partials('*', '*', method=info['method'])
-                    self._setup_partials()
+            else:  # no approx or jax partials found
+                method = info['method']
+                if self._subjacs_info:
+                    for meta in self._subjacs_info.values():
+                        meta['method'] = method
+
+                else:  # declare all derivs as approx
+                    if not (self._owns_approx_of or self._owns_approx_wrt):
+                        issue_warning("No approx or jax partials found but coloring was requested. "
+                                      "Declaring ALL partials as dense "
+                                      "(method='{}')".format(info['method']),
+                                      prefix=self.msginfo, category=DerivativesWarning)
+                        try:
+                            self.declare_partials('*', '*', method=info['method'])
+                        except AttributeError:  # assume system is a group
+                            from openmdao.core.component import Component
+                            from openmdao.core.indepvarcomp import IndepVarComp
+                            from openmdao.components.exec_comp import ExecComp
+                            for s in self.system_iter(recurse=True, typ=Component):
+                                if not isinstance(s, ExecComp) and not isinstance(s, IndepVarComp):
+                                    s.declare_partials('*', '*', method=info['method'])
+                        self._setup_partials()
 
         if not use_jax:
             approx_scheme = self._get_approx_scheme(info['method'])
@@ -5322,7 +5368,7 @@ class System(object, metaclass=SystemMetaclass):
                 # TODO: could cache these offsets
                 offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
                 offsets[1:] = np.cumsum(sizes[:-1])
-                if val is _UNDEFINED:
+                if is_undefined(val):
                     loc_val = np.zeros(sizes[myrank])
                 else:
                     loc_val = np.ascontiguousarray(val)
@@ -6722,7 +6768,7 @@ class System(object, metaclass=SystemMetaclass):
         """
         return ()
 
-    def _setup_jax(self, from_group=False):
+    def _setup_jax(self):
         pass
 
     def _sys_tree_visitor(self, func, predicate=None, recurse=True, include_self=True,
@@ -6802,3 +6848,315 @@ class System(object, metaclass=SystemMetaclass):
             if path not in seen:
                 seen.add(path)
                 yield path
+
+
+class _ErrorData(object):
+    __slots__ = ['forward', 'reverse', 'fwd_rev']
+
+    def __init__(self, forward=None, reverse=None, fwd_rev=None):
+        self.forward = forward
+        self.reverse = reverse
+        self.fwd_rev = fwd_rev
+
+    def __iter__(self):
+        yield self.forward
+        yield self.reverse
+        yield self.fwd_rev
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(forward={self.forward}, reverse={self.reverse}, " \
+            f"fwd_rev={self.fwd_rev})"
+
+    def max(self):
+        ret = 0.0
+        for err in self:
+            if err is not None:
+                if isinstance(err, tuple):
+                    for e in err:
+                        if ret < np.abs(e):
+                            ret = np.abs(e)
+                else:
+                    if ret < np.abs(err):
+                        ret = np.abs(err)
+        return ret
+
+    def __getitem__(self, idx):
+        return tuple(self)[idx]
+
+
+class _MagnitudeData(object):
+    __slots__ = ['forward', 'reverse', 'fd']
+
+    def __init__(self):
+        self.forward = 0.
+        self.reverse = 0.
+        self.fd = 0.
+
+    def __iter__(self):
+        yield self.forward
+        yield self.reverse
+        yield self.fd
+
+    def __repr__(self):
+        return f"_MagnitudeData(forward={self.forward}, reverse={self.reverse}, fd={self.fd})"
+
+    def max(self):
+        ret = 0.0
+        for mag in self:
+            if mag is not None and mag > ret:
+                ret = mag
+        return ret
+
+    def __getitem__(self, idx):
+        return tuple(self)[idx]
+
+    def update(self, J, Jtype):
+        if J is not None and J.size > 0:
+            if Jtype == 'fwd':
+                self.forward = max(self.forward, np.max(np.abs(J)))
+            elif Jtype == 'rev':
+                self.reverse = max(self.reverse, np.max(np.abs(J)))
+            elif Jtype == 'fd':
+                self.fd = max(self.fd, np.max(np.abs(J)))
+
+
+def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
+    """
+    Compute the errors between derivatives that were computed using different modes or methods.
+
+    Error information in the derivative_info dict is updated by this function.
+
+    Parameters
+    ----------
+    derivative_info : dict
+        Metadata dict corresponding to a particular (of, wrt) pair.
+    matrix_free : bool
+        True if the current dirivatives are computed in a matrix free manner.
+    directional : bool
+        True if the current dirivtives are directional.
+    totals : bool or _TotalJacInfo
+        _TotalJacInfo if the current derivatives are total derivatives.
+
+    Returns
+    -------
+    float
+        The norm of the FD jacobian.
+    """
+    Jforward = derivative_info.get('J_fwd')
+    Jreverse = derivative_info.get('J_rev')
+
+    try:
+        fdinfo = derivative_info['J_fd']
+        steps = derivative_info['steps']
+    except KeyError:
+        # this can happen when a partial is not declared, which means it should be zero
+        fdinfo = (None,)
+        steps = (None,)
+
+    derivative_info['abs error'] = []
+    derivative_info['rel error'] = []
+    derivative_info['magnitude'] = []
+    derivative_info['vals_at_max_abs'] = []
+    derivative_info['vals_at_max_rel'] = []
+    derivative_info['denom_idx'] = []
+    derivative_info['steps'] = []
+
+    abs_mags = _MagnitudeData()
+    abs_mags.update(Jforward, 'fwd')
+    abs_mags.update(Jreverse, 'rev')
+
+    abs_errs_fwd_rev = abs_vals_fwd_rev = rel_errs_fwd_rev = rel_vals_fwd_rev = None
+    fwd_rev_didx = 1
+    if matrix_free:
+        derivative_info['matrix_free'] = True
+        if directional:
+            if Jforward is not None and Jreverse is not None:
+                mhatdotm, dhatdotd = derivative_info['directional_fwd_rev']
+                (abs_errs_fwd_rev, abs_vals_fwd_rev, rel_errs_fwd_rev, rel_vals_fwd_rev,
+                 fwd_rev_didx) = get_errors(dhatdotd, mhatdotm)
+        elif not totals:
+            (abs_errs_fwd_rev, abs_vals_fwd_rev, rel_errs_fwd_rev, rel_vals_fwd_rev,
+             fwd_rev_didx) = get_errors(Jforward, Jreverse)
+
+    for i, Jfd in enumerate(fdinfo):
+        abs_errs = _ErrorData()
+        abs_vals = _ErrorData()
+        rel_errs = _ErrorData()
+        rel_vals = _ErrorData()
+        denom_idxs = {'fwd': 1, 'rev': 1, 'fwd_rev': fwd_rev_didx}
+
+        step = steps[i]
+        abs_mags.update(Jfd, 'fd')
+
+        if directional:
+            if Jforward is not None:
+                if totals:
+                    mhatdotm, dhatdotd = derivative_info['directional_fd_fwd'][i]
+                    (abs_errs.forward, abs_vals.forward,
+                     rel_errs.forward, rel_vals.forward, didx) = get_errors(mhatdotm, dhatdotd)
+                else:
+                    (abs_errs.forward, abs_vals.forward,
+                     rel_errs.forward, rel_vals.forward, didx) = get_errors(Jforward, Jfd)
+                denom_idxs['fwd'] = didx
+
+            if Jreverse is not None:
+                mhatdotm, dhatdotd = derivative_info['directional_fd_rev'][i]
+                (abs_errs.reverse, abs_vals.reverse, rel_errs.reverse, rel_vals.reverse, didx) = \
+                    get_errors(mhatdotm, dhatdotd)
+                denom_idxs['rev'] = didx
+        else:
+            if Jforward is not None:
+                (abs_errs.forward, abs_vals.forward, rel_errs.forward, rel_vals.forward, didx) = \
+                    get_errors(Jforward, Jfd)
+                denom_idxs['fwd'] = didx
+            if Jreverse is not None:
+                (abs_errs.reverse, abs_vals.reverse, rel_errs.reverse, rel_vals.reverse, didx) = \
+                    get_errors(Jreverse, Jfd)
+                denom_idxs['rev'] = didx
+
+        if Jfd is not None and Jforward is None and Jreverse is None:
+            (abs_errs.reverse, abs_vals.reverse, rel_errs.reverse, rel_vals.reverse, didx) = \
+                get_errors(np.zeros_like(Jfd), Jfd)
+            denom_idxs['rev'] = didx
+
+        if abs_errs_fwd_rev is not None:
+            abs_errs.fwd_rev = abs_errs_fwd_rev
+            abs_vals.fwd_rev = abs_vals_fwd_rev
+            rel_errs.fwd_rev = rel_errs_fwd_rev
+            rel_vals.fwd_rev = rel_vals_fwd_rev
+
+        derivative_info['abs error'].append(abs_errs)
+        derivative_info['rel error'].append(rel_errs)
+        derivative_info['denom_idx'].append(denom_idxs)
+        derivative_info['magnitude'].append(abs_mags)
+        derivative_info['vals_at_max_abs'].append(abs_vals)
+        derivative_info['vals_at_max_rel'].append(rel_vals)
+        derivative_info['steps'].append(step)
+
+    return max([err.max() for err in derivative_info['abs error']])
+
+
+def _errors_above_tol(deriv_info, abs_error_tol, rel_error_tol):
+    """
+    Return if either abs or rel tolerances are violated when comparing a group of derivatives.
+
+    Parameters
+    ----------
+    deriv_info : dict
+        Metadata dict corresponding to a particular (of, wrt) pair.
+    abs_error_tol : float
+        Absolute error tolerance.
+    rel_error_tol : float
+        Relative error tolerance.
+
+    Returns
+    -------
+    bool
+        True if absolute tolerance is violated.
+    bool
+        True if relative tolerance is violated.
+    """
+    abs_errs = deriv_info['abs error']
+    rel_errs = deriv_info['rel error']
+
+    above_abs = above_rel = False
+
+    for abs_err in abs_errs:
+        for error in abs_err:
+            if error is not None and not np.isnan(error) and error >= abs_error_tol:
+                above_abs = True
+                break
+        if above_abs:
+            break
+
+    for rel_err in rel_errs:
+        for error in rel_err:
+            if error is not None and not np.isnan(error) and error >= rel_error_tol:
+                above_rel = True
+                break
+        if above_rel:
+            break
+
+    return above_abs, above_rel
+
+
+def _iter_derivs(derivatives, show_only_incorrect, all_fd_opts, totals, nondep_derivs,
+                 matrix_free, abs_error_tol=1e-6, rel_error_tol=1e-6, incon_keys=(),
+                 sort=True):
+    """
+    Iterate over all of the derivatives.
+
+    If show_only_incorrect is True, only the derivatives with abs or rel errors outside of
+    tolerance or derivatives wrt serial variables that are inconsistent across ranks will be
+    returned.
+
+    Parameters
+    ----------
+    derivatives : dict
+        Dict of metadata for derivative groups, keyed on (of, wrt) pairs.
+    show_only_incorrect : bool
+        If True, yield only derivatives with errors outside of tolerance.
+    all_fd_opts : dict
+        Dictionary containing the options for the approximation.
+    totals : bool
+        True if derivatives are totals.
+    nondep_derivs : set
+        Contains the of/wrt keys that are declared not dependent or not declared at all.
+    matrix_free : bool
+        True if the system computes matrix free derivatives.
+    abs_error_tol : float
+        Absolute error tolerance.
+    rel_error_tol : float
+        Relative error tolerance.
+    incon_keys : set or tuple
+        Keys where there are serial d_inputs variables that are inconsistent across processes.
+    sort : bool
+        If True, sort the derivatives alphabetically.
+
+    Yields
+    ------
+    tuple
+        The (of, wrt) pair for the current derivatives being compared.
+    dict
+        The FD options.
+    bool
+        True if the current derivatives are directional.
+    bool
+        True if the differences for the current derivatives are above the absolute error tolerance.
+    bool
+        True if the differences for the current derivatives are above the relative error tolerance.
+    bool
+        True if the current derivative was computed where some serial d_inputs variables were not
+        consistent across processes.
+    """
+    keys = sorted(derivatives) if sort else derivatives
+
+    for key in keys:
+
+        inconsistent = False
+        derivative_info = derivatives[key]
+
+        if totals:
+            fd_opts = all_fd_opts
+        else:
+            _, wrt = key
+            fd_opts = all_fd_opts[wrt]
+
+        if key in incon_keys:
+            inconsistent = True
+
+        directional = bool(fd_opts) and fd_opts.get('directional')
+
+        max_mag = _compute_deriv_errors(derivative_info, matrix_free, directional, totals)
+
+        # Skip printing the non-dependent keys if the derivatives are fine.
+        if key in nondep_derivs and max_mag < abs_error_tol:
+            del derivatives[key]
+            continue
+
+        above_abs, above_rel = _errors_above_tol(derivative_info, abs_error_tol, rel_error_tol)
+
+        if show_only_incorrect and not (above_abs or above_rel or inconsistent):
+            continue
+
+        yield key, fd_opts, directional, above_abs, above_rel, inconsistent

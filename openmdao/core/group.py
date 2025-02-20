@@ -28,7 +28,7 @@ from openmdao.utils.array_utils import array_connection_compatible, _flatten_src
     shape_to_len, ValueRepeater
 from openmdao.utils.general_utils import common_subpath, \
     convert_src_inds, shape2tuple, get_connection_owner, ensure_compatible, \
-    meta2src_iter, get_rev_conns
+    meta2src_iter, get_rev_conns, is_undefined
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
 from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo
@@ -319,7 +319,7 @@ class Group(System):
             Assumed shape of any connected source or higher level promoted input.
         """
         meta = {'prom': name, 'auto': False}
-        if val is _UNDEFINED:
+        if is_undefined(val):
             src_shape = shape2tuple(src_shape)
         else:
             if src_shape is not None:
@@ -1905,7 +1905,7 @@ class Group(System):
                     if submeta['auto']:
                         continue
                     if key in submeta:
-                        if fullmeta[key] is _UNDEFINED:
+                        if is_undefined(fullmeta[key]):
                             origin = submeta['path']
                             origin_prom = submeta['prom']
                             val = fullmeta[key] = submeta[key]
@@ -2393,7 +2393,7 @@ class Group(System):
         vnames = self._var_abs2prom[io] if local else self._var_allprocs_abs2prom[io]
         return set(vnames).difference(self._conn_global_abs_in2out)
 
-    def _setup_jax(self, from_group=False):
+    def _setup_jax(self):
         if jax is None:
             return
 
@@ -2401,7 +2401,7 @@ class Group(System):
         # jax anywhere below where it's active, then return.
         for subsys in self._subsystems_myproc:
             if isinstance(subsys, Group) or subsys.options['derivs_method'] == 'jax':
-                subsys._setup_jax(from_group)
+                subsys._setup_jax()
 
     def _setup_dynamic_shapes(self):
         """

@@ -1,9 +1,8 @@
 """Define the ImplicitComponent class."""
 
-import inspect
 from scipy.sparse import coo_matrix
+from itertools import chain
 import numpy as np
-from types import MethodType
 
 from openmdao.core.component import Component, _allowed_types
 from openmdao.core.constants import _UNDEFINED, _SetupStatus
@@ -11,12 +10,11 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.array_utils import shape_to_len
-from openmdao.utils.general_utils import format_as_float_or_array, _subjac_meta2value
+from openmdao.utils.general_utils import format_as_float_or_array, _subjac_meta2value, \
+    is_undefined
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.jax_utils import jax, jit, ImplicitCompJaxify, \
-    linearize as _jax_linearize, apply_linear as _jax_apply_linear, _jax_register_pytree_class
 
 
 _tuplist = (tuple, list)
@@ -96,16 +94,16 @@ class ImplicitComponent(Component):
         """
         self._has_guess = overrides_method('guess_nonlinear', self, ImplicitComponent)
 
-        if self._has_linearize is _UNDEFINED:
+        if is_undefined(self._has_linearize):
             self._has_linearize = overrides_method('linearize', self, ImplicitComponent)
 
-        if self._has_solve_nl is _UNDEFINED:
+        if is_undefined(self._has_solve_nl):
             self._has_solve_nl = overrides_method('solve_nonlinear', self, ImplicitComponent)
 
-        if self._has_solve_linear is _UNDEFINED:
+        if is_undefined(self._has_solve_linear):
             self._has_solve_linear = overrides_method('solve_linear', self, ImplicitComponent)
 
-        if self.matrix_free is _UNDEFINED:
+        if is_undefined(self.matrix_free):
             self.matrix_free = overrides_method('apply_linear', self, ImplicitComponent)
 
     def _apply_nonlinear(self):
@@ -230,7 +228,7 @@ class ImplicitComponent(Component):
                     d_inputs.set_val(new_ins)
                     d_outputs.set_val(new_outs)
         else:
-            if self.comm.size > 1 and mode == 'rev' and self._problem_meta['checking']:
+            if self._problem_meta['checking'] and self.comm.size > 1 and mode == 'rev':
                 nzdresids = self._get_dist_nz_dresids()
                 self.apply_linear(inputs, outputs, d_inputs, d_outputs, d_residuals, mode)
                 self._check_consistent_serial_dinputs(nzdresids)
@@ -938,69 +936,15 @@ class ImplicitComponent(Component):
             yield from discrete_inputs.values()
 
     def _get_compute_primal_argnames(self):
-        argnames = []
-        argnames.extend(name for name in self._var_rel_names['input']
-                        if name not in self._discrete_inputs)
-        argnames.extend(name for name in self._var_rel_names['output']
-                        if name not in self._discrete_outputs)
-        if self._discrete_inputs:
-            argnames.extend(self._discrete_inputs)
-        return argnames
-
-    def _setup_jax(self, from_group=False):
-        if self.matrix_free is True:
-            self.apply_linear = MethodType(_jax_apply_linear, self)
+        if self._valid_name_map:
+            argnames = [self._valid_name_map.get(n, n) for n in self._var_rel_names['input']]
+            argnames.extend(self._valid_name_map.get(n, n) for n in self._var_rel_names['output'])
+            if self._discrete_inputs:
+                argnames.extend(self._valid_name_map.get(n, n) for n in self._discrete_inputs)
+            return argnames
         else:
-            self.linearize = MethodType(_jax_linearize, self)
-            self._has_linearize = True
-
-        if self.compute_primal is None:
-            jaxifier = ImplicitCompJaxify(self, verbose=True)
-
-            if jaxifier.get_self_statics:
-                self.get_self_statics = MethodType(jaxifier.get_self_statics, self)
-
-            # replace existing apply_nonlinear method with base class method, so that compute_primal
-            # will be called.
-            self.apply_nonlinear = MethodType(ImplicitComponent.apply_nonlinear, self)
-
-            self.compute_primal = MethodType(jaxifier.compute_primal, self)
-        else:
-            # check that compute_primal args are in the correct order
-            args = list(inspect.signature(self.compute_primal).parameters)
-            if args and args[0] == 'self':
-                args = args[1:]
-            compargs = self._get_compute_primal_argnames()
-            if args != compargs:
-                raise RuntimeError(f"{self.msginfo}: compute_primal method args {args} don't match "
-                                   f"the expected args {compargs}.")
-
-        if not from_group and self.options['use_jit']:
-            static_argnums = []
-            idx = len(self._var_rel_names['input']) + len(self._var_rel_names['output']) + 1
-            static_argnums.extend(range(idx, idx + len(self._discrete_inputs)))
-            self.compute_primal = MethodType(jit(self.compute_primal.__func__,
-                                                 static_argnums=static_argnums), self)
-
-        _jax_register_pytree_class(self.__class__)
-
-    def _get_jac_func(self):
-        # TODO: modify this to use relevance and possibly compile multiple jac functions depending
-        # on DV/response so that we don't compute any derivatives that are always zero.
-        if self._jac_func_ is None:
-            fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
-            wrt_idxs = list(range(1, len(self._var_abs2meta['input']) +
-                                  len(self._var_abs2meta['output']) + 1))
-            primal_func = self.compute_primal.__func__
-            self._jac_func_ = MethodType(fjax(primal_func, argnums=wrt_idxs), self)
-
-            if self.options['use_jit']:
-                static_argnums = tuple(range(1 + len(wrt_idxs), 1 + len(wrt_idxs) +
-                                             len(self._discrete_inputs)))
-                self._jac_func_ = MethodType(jit(self._jac_func_.__func__,
-                                                 static_argnums=static_argnums),
-                                             self)
-        return self._jac_func_
+            return list(chain(self._var_rel_names['input'], self._var_rel_names['output'],
+                              self._discrete_inputs))
 
 
 def meta2range_iter(meta_dict, names=None, shp_name='shape'):

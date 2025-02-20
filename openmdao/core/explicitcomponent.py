@@ -1,9 +1,7 @@
 """Define the ExplicitComponent class."""
-import inspect
 
 import numpy as np
-from types import MethodType
-
+from itertools import chain
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.core.component import Component
@@ -11,9 +9,7 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE, _UNDEFINED
-from openmdao.utils.jax_utils import jax, jit, ExplicitCompJaxify, \
-    compute_partials as _jax_compute_partials, \
-    compute_jacvec_product as _jax_compute_jacvec_product, ReturnChecker, _jax_register_pytree_class
+from openmdao.utils.general_utils import is_undefined
 
 
 _tuplist = (tuple, list)
@@ -81,7 +77,7 @@ class ExplicitComponent(Component):
         """
         Configure this system to assign children settings and detect if matrix_free.
         """
-        if self.matrix_free is _UNDEFINED:
+        if is_undefined(self.matrix_free):
             self.matrix_free = overrides_method('compute_jacvec_product', self, ExplicitComponent)
 
     def _jac_wrt_iter(self, wrt_matches=None):
@@ -172,7 +168,8 @@ class ExplicitComponent(Component):
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,
-                   shape_by_conn=False, copy_shape=None, compute_shape=None, distributed=None):
+                   shape_by_conn=False, copy_shape=None, compute_shape=None, distributed=None,
+                   primal_name=None):
         """
         Add an output variable to the component.
 
@@ -228,6 +225,9 @@ class ExplicitComponent(Component):
         distributed : bool
             If True, this variable is a distributed variable, so it can have different sizes/values
             across MPI processes.
+        primal_name : str or None
+            Valid python name to represent the variable in compute_primal if 'name' is not a valid
+            python name.
 
         Returns
         -------
@@ -243,7 +243,7 @@ class ExplicitComponent(Component):
                                   ref=ref, ref0=ref0, res_ref=res_ref,
                                   tags=tags, shape_by_conn=shape_by_conn,
                                   copy_shape=copy_shape, compute_shape=compute_shape,
-                                  distributed=distributed)
+                                  distributed=distributed, primal_name=primal_name)
 
     def _approx_subjac_keys_iter(self):
         is_output = self._outputs._contains_abs
@@ -342,7 +342,7 @@ class ExplicitComponent(Component):
                 else:  # rev
                     d_inputs.set_val(new_vals)
         else:
-            dochk = mode == 'rev' and self._problem_meta['checking'] and self.comm.size > 1
+            dochk = self._problem_meta['checking'] and mode == 'rev' and self.comm.size > 1
 
             if dochk:
                 nzdresids = self._get_dist_nz_dresids()
@@ -619,85 +619,8 @@ class ExplicitComponent(Component):
         list
             List of argnames expected by the compute_primal method.
         """
-        argnames = []
-        argnames.extend(self._var_rel_names['input'])
-        if self._discrete_inputs:
-            argnames.extend(self._discrete_inputs)
-        return argnames
-
-    def _setup_jax(self, from_group=False):
-        """
-        Set up the jax interface for this component.
-
-        Parameters
-        ----------
-        from_group : bool
-            If True, this is being called from a Group setup.
-        """
-        if self.matrix_free is True:
-            self.compute_jacvec_product = MethodType(_jax_compute_jacvec_product, self)
+        if self._valid_name_map:
+            return [self._valid_name_map.get(n, n) for n in chain(self._var_rel_names['input'],
+                                                                  self._discrete_inputs)]
         else:
-            self.compute_partials = MethodType(_jax_compute_partials, self)
-            self._has_compute_partials = True
-
-        if self.compute_primal is None:
-            # convert the compute method to a compute_primal method
-            jaxifier = ExplicitCompJaxify(self, verbose=True)
-
-            if jaxifier.get_self_statics:
-                self.get_self_statics = MethodType(jaxifier.get_self_statics, self)
-            # replace existing compute method with base class method, so that compute_primal
-            # will be called.
-            self.compute = MethodType(ExplicitComponent.compute, self)
-
-            self.compute_primal = MethodType(jaxifier.compute_primal, self)
-            self._compute_primal_returns_tuple = True
-        else:
-            # check that compute_primal args are in the correct order
-            args = list(inspect.signature(self.compute_primal).parameters)
-            if args and args[0] == 'self':
-                args = args[1:]
-            compargs = self._get_compute_primal_argnames()
-            if args != compargs:
-                raise RuntimeError(f"{self.msginfo}: compute_primal method args {args} don't match "
-                                   f"the expected args {compargs}.")
-
-            # determine if the compute_primal method returns a tuple
-            self._compute_primal_returns_tuple = ReturnChecker(self.compute_primal).returns_tuple()
-
-        if not from_group and self.options['use_jit']:
-            static_argnums = []
-            idx = len(self._var_rel_names['input']) + 1
-            static_argnums.extend(range(idx, idx + len(self._discrete_inputs)))
-            self.compute_primal = MethodType(jit(self.compute_primal.__func__,
-                                                 static_argnums=static_argnums), self)
-
-        _jax_register_pytree_class(self.__class__)
-
-    def _get_jac_func(self):
-        """
-        Return the jacobian function for this component.
-
-        In forward mode, jax.jacfwd is used, and in reverse mode, jax.jacrev is used.  The direction
-        is chosen automatically based on the sizes of the inputs and outputs.
-
-        Returns
-        -------
-        function
-            The jacobian function.
-        """
-        # TODO: modify this to use relevance and possibly compile multiple jac functions depending
-        # on DV/response so that we don't compute any derivatives that are always zero.
-        if self._jac_func_ is None:
-            fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
-            nstatic = len(self._discrete_inputs)
-            wrt_idxs = list(range(1, len(self._var_abs2meta['input']) + 1))
-            self._jac_func_ = MethodType(fjax(self.compute_primal.__func__, argnums=wrt_idxs), self)
-
-            if self.options['use_jit']:
-                static_argnums = tuple(range(1 + len(wrt_idxs), 1 + len(wrt_idxs) + nstatic))
-                self._jac_func_ = MethodType(jit(self._jac_func_.__func__,
-                                                 static_argnums=static_argnums),
-                                             self)
-
-        return self._jac_func_
+            return list(chain(self._var_rel_names['input'], self._discrete_inputs))
