@@ -2,7 +2,6 @@
 
 from collections import defaultdict
 import sqlite3
-import time  # TODO remove
 
 from bokeh.models import (
     ColumnDataSource,
@@ -32,9 +31,14 @@ from bokeh.server.server import Server
 from bokeh.application.application import Application
 from bokeh.application.handlers import FunctionHandler
 
+# from bokeh.core.property.validation import validate
+
+# validate(False)
+
 import numpy as np
 
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
+import openmdao.utils.hooks as hooks
 
 try:
     from openmdao.utils.gui_testing_utils import get_free_port
@@ -45,20 +49,35 @@ except:
 
 _time_between_callbacks_in_ms = 2000
 _unused_session_lifetime_milliseconds = 1000 * 60 * 10  # TODO try different values here
-_obj_color = "black"
+_obj_color = "black"  # color of the plot line for the objective function
 _non_active_plot_color = "black"
 _varea_alpha = 0.3 # how transparent is the area part of the plot for desvars that are vectors
-
+# the CSS for the toggle buttons to let user choose what variables to plot
 toggle_styles = """
-            font-size: 22px !important; 
+            font-size: 22px; 
             box-shadow: 
                 0 4px 6px rgba(0, 0, 0, 0.1),    /* Distant shadow */
                 0 1px 3px rgba(0, 0, 0, 0.08),   /* Close shadow */
                 inset 0 2px 2px rgba(255, 255, 255, 0.2);  /* Top inner highlight */
 """
+from bokeh.palettes import Category20, Category20b, Category20c
+colorPalette = (
+    Category20[20] + Category20b[20] + Category20c[20]
+)  # gives us 60 colors
 
+from bokeh.colors.color import RGB
+colorPalette = (
+    RGB.from_hex_string('#1f77b4'),
+    RGB.from_hex_string('#98df8a'),
+)
+
+
+# This is the JavaScript code that gets run when a user clicks on 
+#   one of the toggle buttons that change what is being plotted
 callback_code=f"""
-// Create the ColorManager class first
+// The ColorManager provides color from a palette for plotting lines. When the 
+//   user turns off the plotting of a line, the color is returned to the manager
+//   for use with a different variable plot
 if (typeof window.ColorManager === 'undefined') {{
     window.ColorManager = class {{
         constructor(palette = 'Category10') {{
@@ -79,7 +98,16 @@ if (typeof window.ColorManager === 'undefined') {{
                 ]
             }};
             
-            this.palette = this.palettes[palette] || this.palettes.Colorblind;
+
+            //this.palette = new Set(palette) ;
+            //this.palette = colorPalette ;
+            this.palette = this.palettes['Colorblind'] ;
+
+            console.log("in Constructor: this.palette = " + this.palette);
+
+
+
+
             this.usedColors = new Set();
             this.variableColorMap = new Map();
             
@@ -91,6 +119,7 @@ if (typeof window.ColorManager === 'undefined') {{
                 return this.variableColorMap.get(variableName);
             }}
     
+            console.log("in getColor: this.palette = " + this.palette);
             const availableColor = this.palette.find(color => !this.usedColors.has(color));
             const newColor = availableColor || this.palette[this.usedColors.size % this.palette.length];
             
@@ -125,11 +154,15 @@ if (typeof window.ColorManager === 'undefined') {{
     }}; // end of class definition
 
     window.colorManager = new window.ColorManager("Colorblind");
-}}  // end of if
+}}
 
 // Get the toggle that triggered the callback
 const toggle = cb_obj;
 const index = toggles.indexOf(toggle);
+// index value of 0 is for the objective variable whose axis
+//    is on the left. The index variable really refers to the list of toggles.
+// The axes list variable only is for desvars and cons, whose axes are on the right
+// The lines list variables includes all vars
 
 // Set line visibility
 lines[index].visible = toggle.active;
@@ -140,26 +173,46 @@ if (index > 0 && index-1 < axes.length) {{
 }}
 
 let variable_name = cb_obj.label;
-// if turning on, get a color and set the line and toggle button to that color
-
+// if turning on, get a color and set the line, axis label, and toggle button to that color
 if (toggle.active) {{
     let color = window.colorManager.getColor(variable_name);
-    axes[index-1].axis_label_text_color = color
+
+
+    console.log("typeof color = ", typeof color);
+    console.log("typeof lines[index].glyph.line_color = " + typeof lines[index].glyph.line_color);
+
+    if (index > 0) {{
+        axes[index-1].axis_label_text_color = color
+    }}
+
+    console.log("color = " + color);
+
 
     if (lines[index].glyph.type == "VArea"){{
         lines[index].glyph.fill_color = color;
     }}
     if (lines[index].glyph.type == "Line"){{
-        lines[index].glyph.line_color = color;
-    }}
+        try {{
+            // lines[index].glyph.line_color = '#138231';
 
+            //lines[index].glyph.line_color.setv({{'value': '#ff0000'}});
+
+            const glyph = lines[index].glyph;
+            glyph.line_color = color;
+            lines[index].change.emit();
+
+        }} catch(err) {{
+            console.log("err " + err);
+        }}
+    }}
+    // make the button background color the same as the line, just slightly transparent
     toggle.stylesheets = [`
         .bk-btn.bk-active {{
             background-color: rgb(from ${{color}} R G B / 0.3);
             {toggle_styles}
         }}
     `];
-// if turning off, return the color to the pool and set the color of the button to black
+// if turning off, return the color to the pool
 }} else {{
     window.colorManager.releaseColor(variable_name);
     toggle.stylesheets = [`
@@ -170,8 +223,6 @@ if (toggle.active) {{
 
 }}
 """
-
-start_time = time.time()  # remove TODO
 
 def _realtime_opt_plot_setup_parser(parser):
     """
@@ -200,6 +251,16 @@ def _realtime_opt_plot_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
+
+    def _view_realtime_opt_plot(prob):
+        print('in _setup_recording hook')
+        # realtime_opt_plot(options.case_recorder_filename, _time_between_callbacks_in_ms)
+
+    # driver._setup_recording()
+
+    
+    hooks._register_hook('_setup_recording', 'Driver', post=_view_realtime_opt_plot)
+
     realtime_opt_plot(options.case_recorder_filename, _time_between_callbacks_in_ms)
 
 def _update_y_min_max(name, y, y_min, y_max):
@@ -381,8 +442,13 @@ class RealTimeOptPlot(object):
         self.y_max = defaultdict(lambda: float("-inf"))
 
         def update():
+            try:
+                real_update()
+            except:
+                pass
 
-            print(f"start update at {time.time()-start_time}")
+        def real_update():
+            print("updating")
             new_data = self._case_tracker.get_new_case()
             if new_data is None:
                 return
@@ -392,7 +458,6 @@ class RealTimeOptPlot(object):
             #   source object and add the lines to the figure
             # if source not setup yet, need to do that to setup streaming
             if self._source is None:
-                print(f"if new_data at {time.time()-start_time}")
                 self.setup_data_source()
                 # index of lines across all variables: obj, desvars, cons
                 i_line = 0
@@ -406,7 +471,7 @@ class RealTimeOptPlot(object):
                 
                 # Create CustomJS callback for toggle buttons
                 legend_item_callback = CustomJS(
-                    args=dict(lines=self._lines, axes=self._axes, toggles=self._toggles),
+                    args=dict(lines=self._lines, axes=self._axes, toggles=self._toggles, colorPalette=colorPalette),
                     code=callback_code,
                 )
 
@@ -416,13 +481,12 @@ class RealTimeOptPlot(object):
 
                 for i, obj_name in enumerate(obj_names):
                     units = self._case_tracker.get_units(obj_name)
+                    self.p.yaxis.axis_label = f"{obj_name} ({units})"
                     self._make_legend_item(f"{obj_name} ({units})", _obj_color, True, legend_item_callback)
                     self._make_line_and_hover_tool("objs", obj_name, False, _obj_color,"solid", True)
                     value = new_data["objs"][obj_name]
                     float_value = _get_value_for_plotting(value, "objs")
                     self.p.y_range = Range1d(float_value - 1, float_value + 1)
-
-                # TODO do we need to increment i_line ?
 
                 # desvars
                 desvars_label = _make_header_text_for_variable_chooser("DESIGN VARS")
@@ -452,11 +516,9 @@ class RealTimeOptPlot(object):
                     self._make_axis("cons", cons_name, float_value, units)
                     i_line += 1
 
-                print(f"after making all the lines and axes at {time.time()-start_time}")
-
                 # Add callback to all toggles
-                for toggle in self._toggles:
-                    toggle.js_on_change("active", legend_item_callback)
+                # for toggle in self._toggles:
+                #     toggle.js_on_change("active", legend_item_callback)
 
                 # Create a column of toggles with scrolling
                 toggle_column = Column(
@@ -496,7 +558,6 @@ class RealTimeOptPlot(object):
 
                 graph = Row(self.p, scroll_box, sizing_mode="stretch_both")
                 doc.add_root(graph)
-                print(f"after initial setup at {time.time()-start_time}")
                 # end of self._source is None - plottng is setup
 
             counter = new_data["counter"]
@@ -513,14 +574,13 @@ class RealTimeOptPlot(object):
                 iline += 1
 
             for desvar_name, desvar_value in new_data["desvars"].items():
-                float_desvar_value = _get_value_for_plotting(desvar_value, "desvars")  # TODO is this used?
                 if not self._labels_updated_with_units and desvar_value.size > 1:
                     units = self._case_tracker.get_units(desvar_name)
                     self._toggles[iline].label = f"{desvar_name} ({units}) {desvar_value.shape}"
                 min_max_changed = False
                 min_max_changed = min_max_changed or _update_y_min_max(desvar_name, np.min(desvar_value), self.y_min, self.y_max)
                 min_max_changed = min_max_changed or _update_y_min_max(desvar_name, np.max(desvar_value), self.y_min, self.y_max)
-                if min_max_changed: # TODO fix
+                if min_max_changed:
                     range = Range1d(
                         self.y_min[desvar_name], self.y_max[desvar_name]
                     )
@@ -574,10 +634,6 @@ class RealTimeOptPlot(object):
         self._source = ColumnDataSource(_source_dict)
 
     def _make_legend_item(self, varname, color, active, callback):
-        # TODO what should we do with colors?
-        color = 'black'
-        color = 'blue'
-
         toggle = Toggle(
             label=varname,
             active=active,
@@ -626,6 +682,10 @@ class RealTimeOptPlot(object):
                 color=color,
                 visible=visible,
             )
+
+
+
+
         if var_type == "desvars":
             line.y_range_name=f"extra_y_{varname}_min"
         elif var_type == "cons":
@@ -685,10 +745,10 @@ class RealTimeOptPlot(object):
             output_backend="webgl",
         )
         self.p.x_range.follow = "start"
-        self.p.title.text_font_size = "25px"
+        # self.p.title.text_font_size = "25px"
         self.p.title.text_color = "black"
         self.p.title.text_font = "arial"
-        self.p.title.align = "center"
+        self.p.title.align = "left"
         self.p.title.standoff = 40  # Adds 40 pixels of space below the title
 
         self.p.xaxis.axis_label = "Driver iterations"
