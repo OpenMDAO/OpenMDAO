@@ -17,7 +17,7 @@ import numpy as np
 
 from openmdao.core.constants import _DEFAULT_COLORING_DIR, _DEFAULT_OUT_STREAM, \
     _UNDEFINED, INT_DTYPE, INF_BOUND, _SetupStatus
-from openmdao.jacobians.jacobian import Jacobian
+from openmdao.jacobians.dictionary_jacobian import Jacobian, DictionaryJacobian
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import _full_slice
@@ -26,14 +26,15 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path, has_match
 from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
 from openmdao.utils.variable_table import write_var_table, NA
-from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len, get_errors
+from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len, get_errors, \
+    sparsity_diff_viz, get_sparsity_diff_array
 from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
-    _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
+    STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, \
-    DerivativesWarning, PromotionWarning, UnusedOptionWarning, UnitsWarning, warn_deprecation
+    PromotionWarning, UnusedOptionWarning, UnitsWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, is_undefined, \
     format_as_float_or_array, all_ancestors, match_prom_or_abs, \
     ensure_compatible, env_truthy, make_traceback, _is_slicer_op, _wrap_comm, _unwrap_comm, \
@@ -392,7 +393,7 @@ class System(object, metaclass=SystemMetaclass):
     _promotion_tree : dict
         Mapping of system path to promotion info indicating all subsystems where variables
         were promoted.
-    _during_sparsity : bool
+    _during_coloring : bool
         If True, we're doing a sparsity computation and uncolored approxs need to be restricted
         to only colored columns.
     compute_primal : function or None
@@ -543,7 +544,7 @@ class System(object, metaclass=SystemMetaclass):
         self._output_solver_options = {}
         self._promotion_tree = None
 
-        self._during_sparsity = False
+        self._during_coloring = False
 
         if not hasattr(self, 'compute_primal'):
             self.compute_primal = None
@@ -783,6 +784,14 @@ class System(object, metaclass=SystemMetaclass):
                 dist_sizes = sizes_in[:, toidx[wrt]] if tometa_in[wrt]['distributed'] else None
                 yield wrt, start, end, vec, _full_slice, dist_sizes
                 start = end
+
+    def _init_jacobian(self):
+        """
+        Initialize the jacobian.
+
+        Override this in a subclass to use a different jacobian type than DictionaryJacobian.
+        """
+        self._jacobian = DictionaryJacobian(system=self)
 
     def _declare_options(self):
         """
@@ -1427,14 +1436,17 @@ class System(object, metaclass=SystemMetaclass):
         ApproximationScheme
             The ApproximationScheme associated with the given method.
         """
-        if method == 'exact':
-            return None
         if method not in _supported_methods:
             msg = '{}: Method "{}" is not supported, method must be one of {}'
             raise ValueError(msg.format(self.msginfo, method,
-                                        [m for m in _supported_methods if m != 'exact']))
+                                        [m for m, v in _supported_methods.items()
+                                         if v is not None]))
+        if _supported_methods[method] is None:
+            return None
+
         if method not in self._approx_schemes:
             self._approx_schemes[method] = _supported_methods[method]()
+
         return self._approx_schemes[method]
 
     def get_source(self, name):
@@ -1517,7 +1529,7 @@ class System(object, metaclass=SystemMetaclass):
 
         return self._approx_subjac_keys
 
-    def use_fixed_coloring(self, coloring=_STD_COLORING_FNAME, recurse=True):
+    def use_fixed_coloring(self, coloring=STD_COLORING_FNAME(), recurse=True):
         """
         Use a precomputed coloring for this System.
 
@@ -1530,14 +1542,14 @@ class System(object, metaclass=SystemMetaclass):
             If True, set fixed coloring in all subsystems that declare a coloring. Ignored
             if a specific coloring is passed in.
         """
-        if coloring_mod._force_dyn_coloring and coloring is _STD_COLORING_FNAME:
+        if coloring_mod._force_dyn_coloring and isinstance(coloring, STD_COLORING_FNAME):
             self._coloring_info.dynamic = True
             return  # don't use static this time
 
         self._coloring_info.static = coloring
         self._coloring_info.dynamic = False
 
-        if coloring is not _STD_COLORING_FNAME:
+        if not isinstance(coloring, STD_COLORING_FNAME):
             if recurse:
                 issue_warning('recurse was passed to use_fixed_coloring but a specific coloring '
                               'was set, so recurse was ignored.',
@@ -1689,84 +1701,93 @@ class System(object, metaclass=SystemMetaclass):
 
         return True
 
-    def _perturbation_iter(self, num_full_jacs, perturb_size):
+    def uses_approx(self):
         """
-        Iterate over random perturbations of the inputs array.
+        Return True if the system uses approximations to compute derivatives.
 
-        For implicit components, we also randomize the outputs.  The perturbation is relative
-        to the starting value of the input or output, unless that value is 0.0, in which case
-        the perturbation is absolute.  The final value of the input or output is the perturbation
-        multiplied by a random number between 0 and 1 added to the starting value.
+        Returns
+        -------
+        bool
+            True if the system uses approximations to compute derivatives, False otherwise.
+        """
+        for approx in self._approx_schemes.values():
+            if approx:
+                return True
+        method = self.options['derivs_method']
+        return method in ('fd', 'cs')
 
-        Inputs, outputs, and residuals are all restored to their starting values at the end of
-        the iterations.
+    def _perturbation_iter(self, num_iters, perturb_size, perturb_vecs=(), save_vecs=()):
+        """
+        Iterate over random perturbations of the given Vectors.
+
+        The perturbation is relative to the starting value, unless that value is 0.0,
+        in which case the perturbation is absolute.  Otherwise, the perturbed value is the
+        perturb_size multiplied by a random number between 0 and 1 added to the starting value.
+
+        All vectors in perturb_vecs and save_vecs are restored to their starting values at the end
+        of the iterations.  The same vector should NOT be added to both perturb_vecs and save_vecs.
 
         Parameters
         ----------
-        num_full_jacs : int
-            Number of full jacobians to compute.
+        num_iters : int
+            Number of iterations to perform.
         perturb_size : float
             Size of relative perturbation.  If base value is 0.0, perturbation is absolute.
+        perturb_vecs : list of Vector
+            List of Vectors to perturb.
+        save_vecs : list of Vector
+            List of Vectors to save. This should not include any vectors in perturb_vecs.
 
         Yields
         ------
         int
             The current iteration number.
         """
-        from openmdao.core.group import Group
-        is_total = isinstance(self, Group)
-        use_jax = self.options['derivs_method'] == 'jax'
-        is_explicit = self.is_explicit()
+        use_approx = self.uses_approx()
 
-        starting_inputs = self._inputs.asarray(copy=True)
-        starting_outputs = self._outputs.asarray(copy=True)
-        starting_resids = self._residuals.asarray(copy=True)
+        save_perturb_arrays = [vec.asarray(copy=True) for vec in perturb_vecs]
+        save_arrays = [vec.asarray(copy=True) for vec in save_vecs]
 
         # compute perturbations
-        in_offsets = starting_inputs.copy()
-        in_offsets[in_offsets == 0.0] = 1.0
-        in_offsets *= perturb_size
+        perturbs = []
+        for arr in save_perturb_arrays:
+            perturb = arr.copy()
+            perturb[perturb == 0.0] = 1.0
+            perturb *= perturb_size
+            perturbs.append(perturb)
 
-        if not is_explicit:
-            out_offsets = starting_outputs.copy()
-            out_offsets[out_offsets == 0.0] = 1.0
-            out_offsets *= perturb_size
-
-        for i in range(num_full_jacs):
-            # randomize inputs (and outputs if implicit)
-            if i > 0:
-                self._inputs.set_val(starting_inputs +
-                                     in_offsets * np.random.random(in_offsets.size))
-                if not is_explicit:
-                    self._outputs.set_val(starting_outputs +
-                                          out_offsets * np.random.random(out_offsets.size))
-                if is_total:
-                    with self._relevance.nonlinear_active('iter'):
-                        self._solve_nonlinear()
-                else:
-                    self._apply_nonlinear()
-
-                if not use_jax:
-                    for scheme in self._approx_schemes.values():
-                        scheme._reset()  # force a re-initialization of approx
-            elif is_explicit and not is_total:
-                self._apply_nonlinear()  # need this to get the output values into the resids
+        for i in range(num_iters):
+            # add random noise to the perturbed vectors
+            for pvec, starting, perturb in zip(perturb_vecs, save_perturb_arrays, perturbs):
+                pvec.set_val(starting + perturb * np.random.random(perturb.size))
 
             yield i
 
-        if not use_jax:
+        if use_approx:
             # revert uncolored approx back to normal
             for scheme in self._approx_schemes.values():
                 scheme._reset()
 
-        # restore original inputs/outputs/resids
-        self._inputs.set_val(starting_inputs)
-        self._outputs.set_val(starting_outputs)
-        self._residuals.set_val(starting_resids)
+        # restore original Vectors
+        for vec, save_array in zip(perturb_vecs, save_perturb_arrays):
+            vec.set_val(save_array)
+        for vec, save_array in zip(save_vecs, save_arrays):
+            vec.set_val(save_array)
 
-    def compute_sparsity(self):
+    def compute_sparsity(self, direction=None, num_iters=2, perturb_size=1e-9):
         """
         Compute the sparsity of the partial jacobian.
+
+        Parameters
+        ----------
+        direction : str
+            Compute derivatives in fwd or rev mode, or whichever is based based on input and
+            output sizes if value is None.  Note that only fwd is possible when using finite
+            difference.
+        num_iters : int
+            Number of times to compute the full jacobian.
+        perturb_size : float
+            Size of relative perturbation.  If base value is 0.0, perturbation is absolute.
 
         Returns
         -------
@@ -1775,9 +1796,18 @@ class System(object, metaclass=SystemMetaclass):
         dict
             Metadata about the sparsity computation.
         """
-        use_jax = self.options['derivs_method'] == 'jax'
-        if not use_jax:
-            approx_scheme = self._get_approx_scheme(self._coloring_info['method'])
+        if self._coloring_info.coloring is not None:
+            method = self._coloring_info['method']
+            num_iters = self._coloring_info['num_full_jacs']
+            perturb_size = self._coloring_info['perturb_size']
+        else:
+            method = self.options['derivs_method']
+            if method is None:
+                method = 'fd'
+
+        uses_approx = self.uses_approx()
+        if uses_approx:
+            approx_scheme = self._get_approx_scheme(method)
 
         save_first_call = self._first_call_to_linearize
         self._first_call_to_linearize = False
@@ -1786,9 +1816,9 @@ class System(object, metaclass=SystemMetaclass):
         self._setup_approx_coloring()
 
         # tell approx scheme to limit itself to only colored columns
-        if not use_jax:
+        if uses_approx:
             approx_scheme._reset()
-            self._during_sparsity = True
+            self._during_coloring = True
 
         self._coloring_info._update_wrt_matches(self)
 
@@ -1797,30 +1827,139 @@ class System(object, metaclass=SystemMetaclass):
         # use special sparse jacobian to collect sparsity info
         self._jacobian = _ColSparsityJac(self)
 
-        from openmdao.core.group import Group
-        is_total = isinstance(self, Group)
+        if self.is_explicit():
+            pvecs = (self._inputs,)
+            save_vecs = (self._outputs, self._residuals)
+        else:
+            pvecs = (self._inputs, self._outputs)
+            save_vecs = (self._residuals,)
 
-        for i in self._perturbation_iter(self._coloring_info['num_full_jacs'],
-                                         self._coloring_info['perturb_size']):
-            if use_jax:
-                self._jax_linearize()
-                sparsity, sp_info = self._jacobian.get_sparsity()
-            elif is_total:
+        from openmdao.core.group import Group
+
+        if isinstance(self, Group):
+            for _ in self._perturbation_iter(num_iters, perturb_size, pvecs, save_vecs):
+                with self._relevance.nonlinear_active('iter'):
+                    self._solve_nonlinear()
                 self.run_linearize(sub_do_ln=False)
-                sparsity, sp_info = self._jacobian.get_sparsity()
-            else:  # for components
-                # this avoids calling any compute_partials/linearize methods which will fail
-                # because _ColSparsityJac only supports set_col and not dict access.
-                sparsity, sp_info = self.compute_fd_sparsity()
+            sparsity, sp_info = self._jacobian.get_sparsity()
+        else:
+            # this avoids calling any compute_partials/linearize methods which will fail
+            # because _ColSparsityJac only supports set_col and not dict access.
+            sparsity, sp_info = \
+                self.compute_fd_sparsity(method=method, num_full_jacs=num_iters,
+                                         perturb_size=perturb_size)
 
         self._jacobian = save_jac
-
-        if not use_jax:
-            self._during_sparsity = False
-
+        self._during_coloring = False
         self._first_call_to_linearize = save_first_call
 
+        self._update_subjac_sparsity(self.subjac_sparsity_iter(sparsity=sparsity))
+
         return sparsity, sp_info
+
+    def _update_subjac_sparsity(self, sparsity_iter):
+        """
+        Update subjac sparsity info based on the given sparsity iterator.
+
+        The sparsity of the partial derivatives in this component will be used when computing
+        the sparsity of the total jacobian for the entire model.  Without this, all of this
+        component's partials would be treated as dense, resulting in an overly conservative
+        coloring of the total jacobian.
+
+        Parameters
+        ----------
+        sparsity_iter : iter of tuple
+            Tuple of the form (of, wrt, rows, cols, shape).
+        """
+        # sparsity uses relative names, so we need to convert to absolute
+        prefix = self.pathname + '.'
+        for of, wrt, rows, cols, shape in sparsity_iter:
+            if rows is None:
+                continue
+            abs_key = (prefix + of, prefix + wrt)
+            if abs_key in self._subjacs_info:
+                self._subjacs_info[abs_key]['sparsity'] = (rows, cols, shape)
+
+    def subjac_sparsity_iter(self, sparsity=None, wrt_matches=None):
+        """
+        Iterate over sparsity for each subjac in the jacobian.
+
+        Parameters
+        ----------
+        sparsity : coo_matrix or None
+            Sparsity matrix to use. If None, compute_sparsity will be called to compute it.
+        wrt_matches : set or None
+            Only include row vars that are contained in this set.
+
+        Yields
+        ------
+        str
+            Name of 'of' variable.
+        str
+            Name of 'wrt' variable.
+        ndarray
+            Row indices of the non-zero elements local to the subjac.
+        ndarray
+            Column indices of the non-zero elements local to the subjac.
+        tuple
+            Shape of the subjac.
+        """
+        if sparsity is None:
+            sparsity, _ = self.compute_sparsity()
+        rows = sparsity.row
+        cols = sparsity.col
+        plen = len(self.pathname) + 1 if self.pathname else 0
+        for of, ofstart, ofend, _, _ in self._jac_of_iter():
+            subrows = np.logical_and(sparsity.row >= ofstart, sparsity.row < ofend)
+            for wrt, wrtstart, wrtend, _, _, _ in self._jac_wrt_iter(wrt_matches):
+                matching = np.logical_and(sparsity.col >= wrtstart, sparsity.col < wrtend)
+                matching &= subrows
+                nzrows = rows[matching] - ofstart
+                shape = (ofend - ofstart, wrtend - wrtstart)
+                nzcols = cols[matching] - wrtstart
+                yield of[plen:], wrt[plen:], nzrows, nzcols, shape
+
+    def sparsity_matches_fd(self, direction=None, outstream=sys.stdout):
+        """
+        Compare the sparsity computed by this system vs. the sparsity computed using fd.
+
+        Note that some systems use fd to compute their sparsity, so no difference will ever be
+        found even if the sparsity is somehow incorrect.
+
+        Parameters
+        ----------
+        direction : str or None
+            Compute derivatives in fwd or rev mode, or whichever is based based on input and
+            output sizes if value is None.  Note that only fwd is possible when using finite
+            difference.
+        outstream : file-like
+            Stream where output will be written.  If None, no output will be written. The output
+            is a text visualization of the sparsity difference.
+
+        Returns
+        -------
+        bool
+            True if they match, False otherwise.
+        """
+        if self.pathname == '' or not ('derivs_method' in self.options and
+                                       self.options['derivs_method'] == 'jax'):
+            if outstream is not None:
+                print(f"{self.msginfo} already uses fd to compute sparsity so no comparison was "
+                      "performed.")
+            return True
+
+        Jsys, _ = self.compute_sparsity(direction)
+        Jfd, _ = self.compute_fd_sparsity()
+
+        if outstream is not None:
+            print(f"{self.msginfo} sparsity comparison with fd (direction={direction})")
+            print("0 or x = both agree, 1 = sys nonzero and fd zero, 2 = fd nonzero and sys zero")
+            ret = sparsity_diff_viz(Jsys, Jfd, stream=outstream)
+        else:
+            spdiff = get_sparsity_diff_array(Jsys, Jfd)
+            ret = 1 not in spdiff.data and 3 not in spdiff.data
+
+        return ret
 
     def _compute_coloring(self, recurse=False, **overrides):
         """
@@ -1859,44 +1998,10 @@ class System(object, metaclass=SystemMetaclass):
             return [c for c in colorings if c is not None] or [None]
 
         info = self._coloring_info
-
-        use_jax = self.options['derivs_method'] == 'jax'
-
         info.update(overrides)
 
         if info['method'] is None and self._approx_schemes:
             info['method'] = list(self._approx_schemes)[0]
-
-        if info.coloring is None:
-            # check to see if any approx or jax derivs have been declared
-            for meta in self._subjacs_info.values():
-                if 'method' in meta and meta['method']:
-                    break
-            else:  # no approx or jax partials found
-                method = info['method']
-                if self._subjacs_info:
-                    for meta in self._subjacs_info.values():
-                        meta['method'] = method
-
-                else:  # declare all derivs as approx
-                    if not (self._owns_approx_of or self._owns_approx_wrt):
-                        issue_warning("No approx or jax partials found but coloring was requested. "
-                                      "Declaring ALL partials as dense "
-                                      "(method='{}')".format(info['method']),
-                                      prefix=self.msginfo, category=DerivativesWarning)
-                        try:
-                            self.declare_partials('*', '*', method=info['method'])
-                        except AttributeError:  # assume system is a group
-                            from openmdao.core.component import Component
-                            from openmdao.core.indepvarcomp import IndepVarComp
-                            from openmdao.components.exec_comp import ExecComp
-                            for s in self.system_iter(recurse=True, typ=Component):
-                                if not isinstance(s, ExecComp) and not isinstance(s, IndepVarComp):
-                                    s.declare_partials('*', '*', method=info['method'])
-                        self._setup_partials()
-
-        if not use_jax:
-            approx_scheme = self._get_approx_scheme(info['method'])
 
         if info.coloring is None and info.static is None:
             info.dynamic = True
@@ -1915,19 +2020,16 @@ class System(object, metaclass=SystemMetaclass):
                 print("\n{} using class coloring for class '{}'".format(self.pathname,
                                                                         type(self).__name__))
                 info.update(coloring._meta)
-                # force regen of approx groups during next compute_approximations
-                if not use_jax:
-                    approx_scheme._reset()
             return [coloring]
 
         sparsity_start_time = time.perf_counter()
         sparsity, sp_info = self.compute_sparsity()
         sparsity_time = time.perf_counter() - sparsity_start_time
 
-        if use_jax:
-            direction = self._mode
-        else:
+        if self.uses_approx():
             direction = 'fwd'
+        else:
+            direction = self.best_partial_deriv_direction()
 
         coloring = _compute_coloring(sparsity, direction)
 
@@ -2007,12 +2109,12 @@ class System(object, metaclass=SystemMetaclass):
             return coloring
 
         static = info.static
-        if static is _STD_COLORING_FNAME or isinstance(static, str):
+        if isinstance(static, (str, STD_COLORING_FNAME)):
             std_fname = self.get_coloring_fname(mode='input')
-            if static is _STD_COLORING_FNAME:
-                fname = std_fname
-            else:
+            if isinstance(static, str):
                 fname = static
+            else:
+                fname = std_fname
             print(f"{self.msginfo}: loading coloring from file {fname}")
             info.coloring = coloring = Coloring.load(fname)
 
@@ -2029,7 +2131,7 @@ class System(object, metaclass=SystemMetaclass):
             approx = self._get_approx_scheme(info['method'])
             # force regen of approx groups during next compute_approximations
             approx._reset()
-        elif isinstance(static, coloring_mod.Coloring):
+        elif isinstance(static, Coloring):
             info.coloring = coloring = static
 
         if coloring is not None:
@@ -2059,6 +2161,7 @@ class System(object, metaclass=SystemMetaclass):
         else:
             if not self._coloring_info.dynamic:
                 coloring._check_config_partial(self)
+            self._update_subjac_sparsity(coloring._subjac_sparsity_iter())
 
         return coloring
 
@@ -2932,14 +3035,6 @@ class System(object, metaclass=SystemMetaclass):
     @property
     def _relevance(self):
         return self._problem_meta['relevance']
-
-    @property
-    def _jax_group(self):
-        return self._problem_meta['jax_group']
-
-    @_jax_group.setter
-    def _jax_group(self, val):
-        self._problem_meta['jax_group'] = val
 
     @property
     def _static_mode(self):
@@ -6457,7 +6552,9 @@ class System(object, metaclass=SystemMetaclass):
         str
             The best direction for derivative calculations, 'fwd' or 'rev'.
         """
-        return 'fwd' if len(self._outputs) > len(self._inputs) else 'rev'
+        nouts = np.sum(self._var_sizes['output'][self.comm.rank, :])
+        nins = np.sum(self._var_sizes['input'][self.comm.rank, :])
+        return 'fwd' if nouts >= nins else 'rev'
 
     def _get_sys_promotion_tree(self, tree=None):
         """
@@ -6999,7 +7096,7 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
                      rel_errs.forward, rel_vals.forward, didx) = get_errors(Jforward, Jfd)
                 denom_idxs['fwd'] = didx
 
-            if Jreverse is not None:
+            if Jreverse is not None and 'directional_fd_rev' in derivative_info:
                 mhatdotm, dhatdotd = derivative_info['directional_fd_rev'][i]
                 (abs_errs.reverse, abs_vals.reverse, rel_errs.reverse, rel_vals.reverse, didx) = \
                     get_errors(mhatdotm, dhatdotd)

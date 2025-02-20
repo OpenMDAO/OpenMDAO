@@ -282,11 +282,18 @@ def sparsity_diff_viz(arr1, arr2, val_map=None, stream=sys.stdout):
         Mapping of array values to characters.
     stream : file-like
         Stream where output will be written.
+
+    Returns
+    -------
+    bool
+        True if they agree, False otherwise.
     """
     if val_map is None:
         val_map = {0: '.', 1: '1', 3: '2', 4: 'x'}
     spdiff = get_sparsity_diff_array(arr1, arr2)
     csr_array_viz(spdiff, val_map=val_map, stream=stream)
+
+    return 1 not in spdiff.data and 3 not in spdiff.data
 
 
 def array_viz(arr, prob=None, of=None, wrt=None, stream=sys.stdout):
@@ -622,7 +629,7 @@ def dv_abs_complex(x, x_deriv):
     return x, x_deriv
 
 
-def rand_sparsity(shape, density_ratio, dtype=bool):
+def rand_sparsity(shape, density_ratio, dtype=bool, rng=None):
     """
     Return a random COO matrix of the given shape with given percent density.
 
@@ -637,6 +644,8 @@ def rand_sparsity(shape, density_ratio, dtype=bool):
         Approximate ratio of nonzero to zero entries in the desired matrix.
     dtype : type
         Specifies type of the values in the returned matrix.
+    rng : np.random.Generator or None
+        Random number generator.
 
     Returns
     -------
@@ -645,13 +654,16 @@ def rand_sparsity(shape, density_ratio, dtype=bool):
     """
     assert len(shape) == 2, f"shape must be a size 2 tuple but {shape} was given"
 
+    if rng is None:
+        rng = np.random.default_rng()
+
     nrows, ncols = shape
 
     nnz = int(nrows * ncols * density_ratio)
 
     data = np.ones(nnz, dtype=dtype)
-    rows = np.random.randint(0, nrows, nnz)
-    cols = np.random.randint(0, ncols, nnz)
+    rows = rng.integers(0, nrows, nnz)
+    cols = rng.integers(0, ncols, nnz)
 
     coo = coo_matrix((data, (rows, cols)), shape=shape)
 

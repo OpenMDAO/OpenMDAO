@@ -64,6 +64,17 @@ class ApproximationScheme(object):
         self._totals_directions = {}
         self._totals_directional_mode = None
 
+    def __bool__(self):
+        """
+        Return True if the approximation scheme contains any approximations.
+
+        Returns
+        -------
+        bool
+            True if the approximation scheme contains any approximations, False otherwise.
+        """
+        return bool(self._wrt_meta)
+
     def __repr__(self):
         """
         Return a simple string representation.
@@ -132,16 +143,16 @@ class ApproximationScheme(object):
         raise NotImplementedError("add_approximation has not been implemented")
 
     def _init_colored_approximations(self, system):
+        # don't do anything if the coloring doesn't exist yet, or if there is no
+        # forward coloring
+        coloring = system._coloring_info.coloring
+        if coloring is None or coloring._fwd is None:
+            return
+
         is_total = system.pathname == ''
         is_semi = _is_group(system) and not is_total
         self._colored_approx_groups = []
         wrt_ranges = []
-
-        # don't do anything if the coloring doesn't exist yet, or if there is no
-        # forward coloring
-        coloring = system._coloring_info.coloring
-        if not isinstance(coloring, coloring_mod.Coloring) or coloring._fwd is None:
-            return
 
         wrt_matches = system._coloring_info._update_wrt_matches(system)
         out_slices = system._outputs.get_slice_dict()
@@ -234,7 +245,7 @@ class ApproximationScheme(object):
         self._approx_groups = []
         self._nruns_uncolored = 0
 
-        if system._during_sparsity:
+        if system._during_coloring:
             wrt_matches = system._coloring_info.wrt_matches
         else:
             wrt_matches = None
