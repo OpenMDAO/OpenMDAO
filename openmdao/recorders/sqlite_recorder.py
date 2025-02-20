@@ -240,9 +240,6 @@ class SqliteRecorder(CaseRecorder):
                 # used to keep track of the order of the case records across all case tables
                 c.execute("CREATE TABLE global_iterations(id INTEGER PRIMARY KEY, "
                           "record_type TEXT, rowid INT, source TEXT)")
-
-
-                print("DEBUG: creating driver_iterations table")
                 
                 c.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
@@ -494,23 +491,17 @@ class SqliteRecorder(CaseRecorder):
                            metadata['timestamp'], metadata['success'], metadata['msg'],
                            inputs_text, outputs_text, residuals_text))
 
-
                 c.execute("INSERT INTO global_iterations(record_type, rowid, source) VALUES(?,?,?)",
                           ('driver', c.lastrowid, driver._get_name()))
-                
-                print(f"DEBUG: inserting global driver, {c.lastrowid}, {driver._get_name()}")
                 
                 # Query to count the number of rows in the table
                 query = f"SELECT COUNT(*) FROM driver_iterations"
                 c.execute(query)
                 row_count = c.fetchone()[0]
-                print(f"DEBUG: The number of rows in the table driver_iterations is: {row_count}")
 
                 query = f"SELECT COUNT(*) FROM global_iterations"
                 c.execute(query)
                 row_count = c.fetchone()[0]
-                print(f"DEBUG: The number of rows in the table global_iterations is: {row_count}")
-                
 
     def record_iteration_problem(self, problem, data, metadata):
         """
@@ -574,34 +565,26 @@ class SqliteRecorder(CaseRecorder):
                 query = f"SELECT COUNT(*) FROM global_iterations"
                 c.execute(query)
                 row_count = c.fetchone()[0]
-                print(f"DEBUG: The number of rows in the table global_iterations before problem insert is: {row_count}")
-
 
                 query = f"SELECT COUNT(*) FROM driver_iterations"
                 c.execute(query)
                 row_count = c.fetchone()[0]
-                print(f"DEBUG: The number of rows in the table driver_iterations before adding problem is: {row_count}")
-
 
                 c.execute("INSERT INTO global_iterations(record_type, rowid, source) VALUES(?,?,?)",
                           ('problem', c.lastrowid, metadata['name']))
-                print(f"DEBUG: inserting global problem {c.lastrowid}")
 
                 # Query to count the number of rows in the table
                 query = f"SELECT COUNT(*) FROM problem_cases"
                 c.execute(query)
                 row_count = c.fetchone()[0]
-                print(f"DEBUG: The number of rows in the table problem_cases is: {row_count}")
 
                 query = f"SELECT COUNT(*) FROM global_iterations"
                 c.execute(query)
                 row_count = c.fetchone()[0]
-                print(f"DEBUG: The number of rows in the table global_iterations is: {row_count}")
 
                 query = f"SELECT COUNT(*) FROM driver_iterations"
                 c.execute(query)
                 row_count = c.fetchone()[0]
-                print(f"DEBUG: The number of rows in the table driver_iterations after adding problem is: {row_count}")
 
     def record_iteration_system(self, system, data, metadata):
         """
@@ -653,7 +636,6 @@ class SqliteRecorder(CaseRecorder):
 
                 c.execute("INSERT INTO global_iterations(record_type, rowid, source) VALUES(?,?,?)",
                           ('system', c.lastrowid, source_system))
-                print(f"DEBUG: inserting system driver {c.lastrowid}")
 
     def record_iteration_solver(self, solver, data, metadata):
         """
@@ -720,7 +702,6 @@ class SqliteRecorder(CaseRecorder):
 
                 c.execute("INSERT INTO global_iterations(record_type, rowid, source) VALUES(?,?,?)",
                           ('solver', c.lastrowid, source_solver))
-                print(f"DEBUG: inserting global solver {c.lastrowid}")
 
     def record_viewer_data(self, model_viewer_data, key='Driver'):
         """
@@ -880,7 +861,6 @@ class SqliteRecorder(CaseRecorder):
         if self.connection:
             self.connection.execute("DELETE FROM global_iterations")
             self.connection.execute("DELETE FROM driver_iterations")
-            print("DEBUG: deleting driver_iterations table")
             self.connection.execute("DELETE FROM driver_derivatives")
             self.connection.execute("DELETE FROM problem_cases")
             self.connection.execute("DELETE FROM system_iterations")
