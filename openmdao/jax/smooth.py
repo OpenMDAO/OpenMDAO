@@ -132,3 +132,30 @@ def smooth_abs(x, mu=1.0E-2):
     """
     act = act_tanh(x, mu, 0.0, -1.0, 1.0)
     return x * act
+
+
+@jit
+def smooth_round(x, mu=0.01):
+    """
+    Computes a smooth and differentiable approximation to the round function.
+
+    Parameters
+    ----------
+    x : float or array
+        The argument to round.
+    mu : float
+        A shaping parameter which impacts the tradeoff between the
+        smoothness and accuracy of the function. As this value
+        approaches zero the response approaches that of the true
+        absolute value.
+
+    Returns
+    -------
+    float or array
+        An approximation of the round function rounded to the nearest decimal specified
+        by the user. The values returned will not be exact integers. However, they
+        will be smooth and the derivatives will be continuous. 
+    """
+
+    # Apply smooth rounding
+    return jnp.floor(x) + 0.5 * (1 + jnp.tanh(1/mu * (x - jnp.floor(x) - 0.5)))
