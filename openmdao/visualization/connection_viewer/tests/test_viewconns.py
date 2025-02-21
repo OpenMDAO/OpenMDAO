@@ -3,7 +3,6 @@ import unittest
 import openmdao.api as om
 from openmdao.test_suite.components.sellar import SellarNoDerivatives
 from openmdao.utils.testing_utils import use_tempdirs
-from openmdao.utils.assert_utils import assert_warning
 
 
 @use_tempdirs
