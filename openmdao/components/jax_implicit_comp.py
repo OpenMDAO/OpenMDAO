@@ -78,7 +78,8 @@ class JaxImplicitComponent(ImplicitComponent):
         else:
             if self._coloring_info.use_coloring():
                 # ensure coloring (and sparsity) is computed before partials
-                self._get_coloring()
+                raise RuntimeError("Coloring not currently supported for JAX implicit components.")
+                # self._get_coloring()
                 # if self.best_partial_deriv_direction() == 'fwd':
                 #     self.linearize = self._jacfwd_colored
                 # else:
