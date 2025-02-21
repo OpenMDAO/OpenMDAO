@@ -211,6 +211,39 @@ class TestJaxComp(unittest.TestCase):
 
         assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
         assert_near_equal(p.get_val('comp.zz'), y * 2.5)
+        assert_check_totals(p.check_totals(of=['comp.z','comp.zz'], wrt=['ivc.x', 'ivc.y'],
+                                           method=method, show_only_incorrect=True))
+        assert_check_partials(p.check_partials(method=method, show_only_incorrect=True))
+        assert_sparsity_matches_fd(comp, outstream=None)
+
+    @parameterized.expand(itertools.product(['fwd', 'rev'], ['jax','fd', 'cs'],
+                                            ['coloring', 'nocoloring']), name_func=parameterized_name)
+    def test_jax_explicit_comp2primal_nodecl_shape_by_conn(self, mode, derivs_method, slvtype):
+        # this component defines its own compute_primal method
+        p = om.Problem()
+        comp = p.model.add_subsystem('comp', DotProdMultPrimalNoDeclPartials(derivs_method=derivs_method))
+
+        if slvtype == 'coloring':
+            comp.declare_coloring()
+            p.model.add_constraint('comp.zz', lower=0.)
+            p.model.add_constraint('comp.z', lower=0.)
+            p.model.add_design_var('comp.x', lower=0.)
+            p.model.add_design_var('comp.y', lower=0.)
+            p.driver.declare_coloring()
+
+        p.setup(mode=mode, force_alloc_complex=True)
+
+        x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
+        y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
+        p.set_val('comp.x', x)
+        p.set_val('comp.y', y)
+        p.final_setup()
+        p.run_model()
+
+        method = method_dict[derivs_method]
+
+        assert_near_equal(p.get_val('comp.z'), np.dot(x, y))
+        assert_near_equal(p.get_val('comp.zz'), y * 2.5)
         assert_check_totals(p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'],
                                            method=method, show_only_incorrect=True))
         assert_check_partials(p.check_partials(method=method, show_only_incorrect=True))
