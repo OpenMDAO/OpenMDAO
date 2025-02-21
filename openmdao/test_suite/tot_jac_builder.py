@@ -8,7 +8,7 @@ from scipy.sparse import coo_matrix
 import openmdao.api as om
 from openmdao.utils.coloring import _compute_coloring
 from openmdao.utils.assert_utils import assert_near_equal
-from openmdao.devtools.debug import compare_jacs
+from openmdao.test_suite.components.sparsity_comp import SparsityComp
 
 
 class TotJacBuilder(object):
@@ -180,49 +180,6 @@ def rand_jac(minrows=(1, 10), mincols=(1, 10)):
                                    min_shape=(minr,minc),
                                    max_shape=(minr+rnd(10),minc+rnd(10)),
                                    n_random_pts=rnd(15))
-
-
-class SparsityComp(om.ExplicitComponent):
-    """
-    A simple component that multiplies a sparse matrix by an input vector.
-
-    The sparsity structure is defined by the 'sparsity' argument, and the data values are
-    just the (index + 1) of the nonzeros in the sparsity structure.
-
-    This component is used to test the coloring of the total jacobian.  A Problem is set up
-    with a model containing only this component, and the total jacobian is computed with and
-    without coloring.  The two jacobians are compared to ensure they are the same.
-
-    Parameters
-    ----------
-    sparsity : ndarray or coo_matrix
-        Sparsity structure to be tested.
-
-    Attributes
-    ----------
-    sparsity : coo_matrix or ndarray
-        Dense or sparse version of the sparsity structure.
-    """
-    def __init__(self, sparsity, **kwargs):
-        super(SparsityComp, self).__init__(**kwargs)
-        if isinstance(sparsity, np.ndarray):
-            self.sparsity = coo_matrix(sparsity)
-        else:
-            self.sparsity = sparsity.tocoo()
-
-        self.sparsity.data = np.arange(1, self.sparsity.data.size + 1)
-
-    def setup(self):
-        self.add_input('x', shape=self.sparsity.shape[1])
-        self.add_output('y', shape=self.sparsity.shape[0])
-
-        self.declare_partials('y', 'x', rows=self.sparsity.row, cols=self.sparsity.col)
-
-    def compute(self, inputs, outputs):
-        outputs['y'] = self.sparsity.dot(inputs['x'])
-
-    def compute_partials(self, inputs, partials):
-        partials['y', 'x'] = self.sparsity.data
 
 
 def check_sparsity_tot_coloring(sparsity, direct=True, tolerance=1e-15, tol_type='rel', mode='auto'):

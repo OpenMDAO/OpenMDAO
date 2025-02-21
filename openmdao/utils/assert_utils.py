@@ -2,6 +2,7 @@
 Functions for making assertions about OpenMDAO Systems.
 """
 
+import sys
 from fnmatch import fnmatch
 import warnings
 import unittest
@@ -242,6 +243,11 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6, verbose=False, max_display
         Default is (20, 20).  Only active if verbose is True.
     """
     error_strings = []
+
+    if isinstance(data, tuple):
+        if len(data) != 2:
+            raise RuntimeError(f"partials data format error (tuple of size {len(data)})")
+        data = data[0]
 
     for comp in data:
         bad_derivs = []
@@ -736,6 +742,23 @@ def assert_near_equal(actual, desired, tolerance=1e-15, tol_type='rel'):
             'actual and desired have unexpected types: %s, %s' % (type(actual), type(desired)))
 
     return error
+
+
+def assert_sparsity_matches_fd(system, direction='fwd', outstream=sys.stdout):
+    """
+    Assert that the sparsity of the system matches the finite difference sparsity.
+
+    Parameters
+    ----------
+    system : System
+        The system to check.
+    direction : str
+        The direction to check. 'fwd' or 'rev'.
+    outstream : file
+        The stream to write the output to.  If None, no output is written.
+    """
+    assert system.sparsity_matches_fd(direction=direction, outstream=outstream), \
+        f"{system.msginfo}: Sparsity does not match finite difference sparsity"
 
 
 def assert_equal_arrays(a1, a2):
