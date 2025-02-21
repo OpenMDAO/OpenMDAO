@@ -1878,6 +1878,49 @@ class TestProblem(unittest.TestCase):
         # make sure the deprecated function still returns tha data
         self.assertEqual(set(prob_vars.keys()), {'constraints', 'design_vars', 'objectives'})
 
+    def test_list_driver_vars_bounds_bug(self):
+
+        model = SellarDerivatives()
+        model.nonlinear_solver = om.NonlinearBlockGS()
+
+        prob = om.Problem(model)
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]), scaler=2.0)
+        model.add_objective('obj', scaler=0.1)
+        model.add_constraint('con1', upper=1.0, scaler=7.0)
+
+        prob.setup()
+        prob.run_driver()
+
+        info =  prob.list_driver_vars(
+            driver_scaling=False,
+            desvar_opts=['lower', 'upper', 'scaler', 'adder'],
+            cons_opts=['lower', 'upper', 'scaler', 'adder'],
+            objs_opts=['scaler', 'adder'],
+        )
+
+        upper = info['design_vars'][0][1]['upper']
+        assert_near_equal(upper, np.array([10., 10.]))
+
+        upper = info['constraints'][0][1]['upper']
+        assert_near_equal(upper, 1.0)
+
+        info =  prob.list_driver_vars(
+            driver_scaling=False,
+            desvar_opts=['lower', 'upper', 'scaler', 'adder'],
+            cons_opts=['lower', 'upper', 'scaler', 'adder'],
+            objs_opts=['scaler', 'adder'],
+        )
+
+        upper = info['design_vars'][0][1]['upper']
+        assert_near_equal(upper, np.array([10., 10.]))
+
+        upper = info['constraints'][0][1]['upper']
+        assert_near_equal(upper, 1.0)
+
     def test_list_driver_vars_before_final_setup(self):
         prob = om.Problem()
         prob.model.add_subsystem('parab', Paraboloid(), promotes_inputs=['x', 'y'])
