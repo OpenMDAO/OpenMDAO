@@ -992,6 +992,40 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
     return sparsity, info
 
 
+def _compute_output_shapes(func, input_shapes):
+    """
+    Compute the shapes of the outputs of the function.
+
+    Parameters
+    ----------
+    func : function
+        The function to compute the output shapes for.
+    input_shapes : list
+        The shapes of the input variables, or None if the input isn't a scalar or array.
+    """
+    argnames = list(inspect.signature(func).parameters)
+    traceargs = []
+    for argname in argnames:
+        inshape = input_shapes.get(argname)
+        if inshape is not None:
+            traceargs.append(jax.ShapeDtypeStruct(inshape, jnp.float64))
+        else:
+            traceargs.append(None)
+
+    retvals = jax.eval_shape(func, *traceargs)
+    if not isinstance(retvals, tuple):
+        retvals = (retvals,)
+
+    retshapes = []
+    for val in retvals:
+        try:
+            retshapes.append(val.shape)
+        except AttributeError:
+            retshapes.append(None)
+
+    return retshapes
+
+
 def _ensure_returns_tuple(func):
     """
     Ensure that the function returns a tuple.
@@ -1029,6 +1063,19 @@ def _ensure_returns_tuple(func):
 
 
 def _jax2np(J):
+    """
+    Take the return of vmapped jvp/vjp and convert to a numpy array.
+
+    Parameters
+    ----------
+    J : tuple or jax array
+        The return of vmapped jvp/vjp.
+
+    Returns
+    -------
+    ndarray
+        The numpy array.
+    """
     if isinstance(J, tuple):
         if len(J) == 1:
             J = np.asarray(J[0])
@@ -1252,6 +1299,30 @@ def to_compute_primal(inst, outfile='stdout', verbose=False):
     else:
         with open(outfile, 'w') as f:
             print(jaxer.get_class_src(), file=f)
+
+
+def _update_add_input_kwargs(self, name, **kwargs):
+    # override Component.add_input for jax components to use shape_by_conn by default
+    if self.options['derivs_method'] == 'jax':
+        # for jax components, make shape_by_conn the default behavior if the shape isn't defined
+        if 'val' not in kwargs or np.isscalar(kwargs['val']):
+            if (kwargs.get('shape') is None and kwargs.get('copy_shape') is None and
+                    kwargs.get('compute_shape') is None):
+                kwargs['shape_by_conn'] = True
+
+    return kwargs
+
+
+def _update_add_output_kwargs(self, name, **kwargs):
+    # override Component.add_output for jax components to use dynamic shaping by default
+    if self.options['derivs_method'] == 'jax':
+        if 'val' not in kwargs or np.isscalar(kwargs['val']):
+            if (kwargs.get('shape') is None and kwargs.get('copy_shape') is None and
+                    kwargs.get('compute_shape') is None):
+                # add our own compute_shape function
+                kwargs['compute_shape'] = self._get_compute_shape_func(name)
+
+    return kwargs
 
 
 if __name__ == '__main__':

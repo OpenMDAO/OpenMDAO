@@ -44,10 +44,18 @@ class DotProdMult(om.ExplicitComponent):
 
 class DotProdMultPrimalNoDeclPartials(om.JaxExplicitComponent):
     def setup(self):
-        self.add_input('x', shape_by_conn=True)
-        self.add_input('y', shape_by_conn=True)
-        self.add_output('z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
-        self.add_output('zz', copy_shape='y')
+        # If we're using jax, dynamic shaping is the default behavior and output shapes are computed
+        # from the input shapes automatically.
+        if self.options['derivs_method'] == 'jax':
+            self.add_input('x')
+            self.add_input('y')
+            self.add_output('z')
+            self.add_output('zz')
+        else:
+            self.add_input('x', shape_by_conn=True)
+            self.add_input('y', shape_by_conn=True)
+            self.add_output('z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
+            self.add_output('zz', copy_shape='y')
 
     def compute_primal(self, x, y):
         z = jnp.dot(x, y)
@@ -248,6 +256,31 @@ class TestJaxComp(unittest.TestCase):
                                            method=method, show_only_incorrect=True))
         assert_check_partials(p.check_partials(method=method, show_only_incorrect=True))
         assert_sparsity_matches_fd(comp, outstream=None)
+
+    def test_auto_shape_by_conn(self):
+        class Transpose(om.JaxExplicitComponent):
+            def setup(self):
+                self.add_input('x')
+                self.add_output('y')
+
+            def compute_primal(self, x):
+                return x.T
+
+        p = om.Problem()
+        p.model.add_subsystem('C1', DotProdMultPrimalNoDeclPartials())
+        p.model.add_subsystem('T', Transpose())
+        p.model.add_subsystem('C2', DotProdMultPrimalNoDeclPartials())
+
+        p.model.connect('C1.z', 'C2.x')
+        p.model.connect('C1.zz', 'T.x')
+        p.model.connect('T.y', 'C2.y')
+        p.model.connect('C2.z', 'C1.x')
+
+        p.setup()
+        p.set_val('C1.x', np.ones((2, 3)))
+        p.set_val('C1.y', np.ones((3, 4)) * 3.)
+
+        p.run_model()
 
     @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False], ['jax','fd']), name_func=parameterized_name)
     def test_jax_explicit_comp2primal_w_option(self, mode, matrix_free, derivs_method):
@@ -492,10 +525,8 @@ if sys.version_info >= (3, 9):
             if self.use_coloring:
                 comp.declare_coloring()
 
-            for io in range(self.nouts):
-                for ii in range(self.nins):
-                    if ii == io:
-                        self.connect(f'ivc.x{io}', f'comp.x{ii}')
+            for i in range(self.nins):
+                self.connect(f'ivc.x{i}', f'comp.x{i}')
 
 
 

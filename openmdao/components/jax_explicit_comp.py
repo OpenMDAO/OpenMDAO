@@ -4,13 +4,15 @@ An ExplicitComponent that uses JAX for derivatives.
 
 import sys
 from types import MethodType
+from functools import partial
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.jax_utils import jax, jit, \
     _jax_register_pytree_class, _compute_sparsity, get_vmap_tangents, \
     _update_subjac_sparsity, _jax_derivs2partials, _uncompress_jac, _jax2np, \
-    _ensure_returns_tuple
+    _ensure_returns_tuple, _compute_output_shapes, _update_add_input_kwargs, \
+    _update_add_output_kwargs
 
 
 class JaxExplicitComponent(ExplicitComponent):
@@ -45,6 +47,7 @@ class JaxExplicitComponent(ExplicitComponent):
     def __init__(self, fallback_derivs_method='fd', **kwargs):  # noqa
         if sys.version_info < (3, 9):
             raise RuntimeError("JaxExplicitComponent requires Python 3.9 or newer.")
+
         super().__init__(**kwargs)
 
         self._re_init()
@@ -77,6 +80,41 @@ class JaxExplicitComponent(ExplicitComponent):
         self._jac_func_ = None
         self._static_hash = None
         self._jac_colored_ = None
+        self._output_shapes = None
+
+    def add_input(self, name, **kwargs):
+        """
+        Add an input to the component.
+
+        This overrides the base class method to update the kwargs to use dynamic shaping by
+        default.
+
+        Parameters
+        ----------
+        name : str
+            The name of the input.
+        **kwargs : dict
+            The kwargs to pass to the base class method.
+        """
+        kwargs = _update_add_input_kwargs(self, name, **kwargs)
+        super().add_input(name, **kwargs)
+
+    def add_output(self, name, **kwargs):
+        """
+        Add an output to the component.
+
+        This overrides the base class method to update the kwargs to use dynamic shaping by
+        default.
+
+        Parameters
+        ----------
+        name : str
+            The name of the output.
+        **kwargs : dict
+            The kwargs to pass to the base class method.
+        """
+        kwargs = _update_add_output_kwargs(self, name, **kwargs)
+        super().add_output(name, **kwargs)
 
     def _setup_jax(self):
         """
@@ -493,3 +531,14 @@ class JaxExplicitComponent(ExplicitComponent):
                                        tuple(self._discrete_outputs.values()))
 
             d_inputs.set_vals(deriv_vals)
+
+    def _get_compute_shape_func(self, name):
+        return partial(self._compute_output_shape, name)
+
+    def _compute_output_shape(self, name, input_shapes):
+        if self._output_shapes is None:
+            out_shapes = _compute_output_shapes(self._orig_compute_primal.__func__,
+                                                input_shapes)
+            self._output_shapes = {n: shp for n, shp in zip(self._var_rel_names['output'],
+                                                            out_shapes)}
+        return self._output_shapes[name]

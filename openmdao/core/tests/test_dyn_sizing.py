@@ -548,7 +548,7 @@ class TestDynShapes(unittest.TestCase):
         # now put the DynShapeGroupSeries in a cycle (sink.y2 feeds back into Gdyn.C1.x2). Sizes are known
         # at both ends of the model (the IVC and at the sink)
         p = om.Problem()
-        p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
+        # p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
         p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3,2, DynShapeComp))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
                                                   x1=np.ones((2,3)),
@@ -558,8 +558,9 @@ class TestDynShapes(unittest.TestCase):
         p.model.connect('Gdyn.C3.y1', 'sink.x1')
         p.model.connect('Gdyn.C3.y2', 'sink.x2')
         p.model.connect('sink.y2', 'Gdyn.C1.x2')
-        p.model.connect('indep.x1', 'Gdyn.C1.x1')
+        # p.model.connect('indep.x1', 'Gdyn.C1.x1')
         p.setup()
+        p.set_val('Gdyn.C1.x1', np.ones((2,3)))
         p.run_model()
         np.testing.assert_allclose(p['sink.y1'], np.ones((2,3))*16)
         np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*16)
