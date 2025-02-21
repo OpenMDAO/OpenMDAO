@@ -742,33 +742,7 @@ def benchmark_component(comp_class, methods=(None, 'cs', 'jax'), initial_vals=No
     return results
 
 
-def jax_deriv_shape(derivs):
-    """
-    Get the shape of the derivatives from a jax derivative calculation.
-
-    Parameters
-    ----------
-    derivs : tuple
-        The tuple of derivatives.
-
-    Returns
-    -------
-    list
-        The shape of the derivatives.
-    """
-    dims = []
-    if isinstance(derivs, jnp.ndarray):
-        dims.append(derivs.shape)
-    else:   # tuple
-        for d in derivs:
-            if isinstance(d, jnp.ndarray):
-                dims.append(d.shape)
-            else:
-                dims.append(jax_deriv_shape(d))
-    return dims
-
-
-if jax is None or bool(os.environ.get('JAX_DISABLE_JIT', '')):
+if jax is None:
     def _jax_register_pytree_class(cls):
         pass
 
