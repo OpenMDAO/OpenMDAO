@@ -99,7 +99,7 @@ _force_dyn_coloring = False
 # path or system pathname. U
 
 
-class STD_COLORING_FNAME(object):
+class STD_COLORING_FNAME():
     """
     Used to indicate that coloring file should have a standard name.
 
