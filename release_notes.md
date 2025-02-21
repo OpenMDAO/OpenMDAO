@@ -1,7 +1,7 @@
 ***********************************
 # Release Notes for OpenMDAO 3.37.0
 
-Feb 21, 2024
+Feb 21, 2025
 
 OpenMDAO 3.37.0 introduces a new AnalysisDriver, which is intended to eventually replace DOEDriver, but allow for users to more easily specify what variables they wish to change when evaluating a model.
 See the documentation for more explanation of how to use it.
