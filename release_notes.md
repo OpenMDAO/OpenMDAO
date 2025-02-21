@@ -21,7 +21,8 @@ From a performance perspective, an unnecessary nonlinear solve was removed when 
 - Added `is_undefined` function for MPI-safe and array-compatible checks. [#3423](https://github.com/OpenMDAO/OpenMDAO/pull/3423)
 - Updated check_partials and check_totals to measure absolute and relative err in the same way that np.assert_allclose does [#3442](https://github.com/OpenMDAO/OpenMDAO/pull/3442)
 - Make printout of sparsity summary subject to the 'show_summary' flag. [#3427](https://github.com/OpenMDAO/OpenMDAO/pull/3427)
-
+- Implemented automatic sparsity detection and coloring for Jax explicit components [#3451](https://github.com/OpenMDAO/OpenMDAO/pull/3451)
+- Added a smooth_round function to om.jax [#3457](https://github.com/OpenMDAO/OpenMDAO/pull/3457)
 
 ## Bug Fixes
 
@@ -32,13 +33,15 @@ From a performance perspective, an unnecessary nonlinear solve was removed when 
 - Fix for computed sparsity when some subjacs are zero. [#3430](https://github.com/OpenMDAO/OpenMDAO/pull/3430)
 - Removed unnecessary NL solve when performing a hot start. [#3432](https://github.com/OpenMDAO/OpenMDAO/pull/3432)
 - Added name mapping from component names to valid python names for use in compute_primal method [#3444](https://github.com/OpenMDAO/OpenMDAO/pull/3444)
+- _CheckingJacobian no longer raises if the sparsity pattern is bad [#3450](https://github.com/OpenMDAO/OpenMDAO/pull/3450)
+- Updated the list of disallowed variable names for ExecComp [#3456](https://github.com/OpenMDAO/OpenMDAO/pull/3456)
+- Fix bug in list_driver_vars where the bounds are wrong if it is called twice with driver_scaling=False. [#3461](https://github.com/OpenMDAO/OpenMDAO/pull/3461)
 
 ## Miscellaneous
 
-
-- Updated latest workflow to use a known working version of PETSc [#3446](https://github.com/OpenMDAO/OpenMDAO/pull/3446)
-- Updated Ubuntu images used by test workflows [#3425](https://github.com/OpenMDAO/OpenMDAO/pull/3425)
-
+- Updated Ubuntu images used by GitHub test workflows [#3425](https://github.com/OpenMDAO/OpenMDAO/pull/3425)
+- Updated latest GitHub workflow to use a known working version of PETSc [#3446](https://github.com/OpenMDAO/OpenMDAO/pull/3446)
+- Added an image definition and GitHub workflow to publish an image [#3454](https://github.com/OpenMDAO/OpenMDAO/pull/3454)
 
 
 ***********************************
@@ -58,7 +61,7 @@ OpenMDAO now provides a dashboard utility for examining the contents of recordin
 In another significant change, AutoIVC outputs can now be recorded more easily. Recording items by the promoted name
 will always record the _output_, while specifying an input by absolute name will result in it being recorded as an input.
 Since OpenMDAO no longer has "dangling" inputs, recording by absolute name is only really necessary when debugging the
-input values as seen by a component. 
+input values as seen by a component.
 
 ## New Features
 
