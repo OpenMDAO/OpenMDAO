@@ -91,6 +91,18 @@ class ExplicitFuncComp(ExplicitComponent):
                 issue_warning(f"{self.msginfo}: failed jit compile of compute function: {err}. "
                               "Falling back to using non-jitted function.")
 
+    @property
+    def _mode(self):
+        """
+        Return the current system mode.
+
+        Returns
+        -------
+        str
+            The current system mode, 'fwd' or 'rev'.
+        """
+        return self.best_partial_deriv_direction()
+
     def setup(self):
         """
         Define out inputs and outputs.
