@@ -1076,7 +1076,7 @@ class Group(System):
 
         return sarr, tarr, tsize, has_dist_data
 
-    def _setup_part2(self):
+    def setup_part2(self):
         """
         Complete setup of connections, sizes, and residuals.
 

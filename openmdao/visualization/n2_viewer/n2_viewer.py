@@ -339,13 +339,10 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
         A dictionary containing information about the model for use by the viewer.
     """
     if isinstance(data_source, Problem):
-        root_group = data_source.model
+        # make sure at least setup_part2 has been run
+        data_source.set_setup_status(_SetupStatus.POST_SETUP2)
 
-        if not isinstance(root_group, Group):
-            # this function only makes sense when the model is a Group
-            msg = f"The model is of type {root_group.__class__.__name__}, " \
-                  "viewer data is only available if the model is a Group."
-            raise TypeError(msg)
+        root_group = data_source.model
 
         driver = data_source.driver
         driver_name = driver.__class__.__name__
@@ -375,6 +372,12 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
             # this function only makes sense when it is at the root
             msg = f"Viewer data is not available for sub-Group '{data_source.pathname}'."
             raise TypeError(msg)
+
+        if data_source._problem_meta is not None:
+            if data_source._problem_meta['setup_status'] >= _SetupStatus.POST_SETUP:
+                if data_source._problem_meta['setup_status'] < _SetupStatus.POST_SETUP2:
+                    # run setup_part2 on the model
+                    data_source._problem_meta['model_ref']().setup_part2()
 
         # set default behavio r for values flag
         if is_undefined(values):

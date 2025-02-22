@@ -287,7 +287,6 @@ class TestViewerData(unittest.TestCase):
         p = om.Problem(model=SellarStateConnection(), allow_post_setup_reorder=False)
         p.driver.add_recorder(SqliteRecorder(filename))
         p.setup()
-        p.model._setup_part2()
 
         # Uncomment to update regression data
         # save_viewer_data(_get_viewer_data(p), 'sellar_no_values.json')
@@ -392,7 +391,7 @@ class TestViewerData(unittest.TestCase):
         prob = om.Problem()
         prob.model.add_subsystem('comp', SystemWithNdArrayOption(arr=np.ones(2)))
         prob.setup()
-        prob.model._setup_part2()
+        prob.final_setup()
 
         viewer_data = _get_viewer_data(prob)
         np.testing.assert_equal(viewer_data['tree']['children'][1]['options']['arr'],
@@ -415,7 +414,7 @@ class TestViewerData(unittest.TestCase):
         comp = prob.model.add_subsystem('comp', SystemWithLargeOption())
         comp.options['large_option'] = np.zeros(int(1e4))
         prob.setup()
-        prob.model._setup_part2()
+        prob.final_setup()
 
         viewer_data = _get_viewer_data(prob)
         self.assertEqual(viewer_data['tree']['children'][1]['options']['large_option'],

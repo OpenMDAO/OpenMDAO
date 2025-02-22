@@ -1062,6 +1062,16 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         return self
 
+    def setup_part2(self):
+        """
+        Complete setup of connections, sizes, and residuals.
+
+        This part of setup is called automatically from final_setup.
+        This method is called only on the top level Group.
+        """
+        self.model.setup_part2()
+        self._metadata['setup_status'] = _SetupStatus.POST_SETUP2
+
     def final_setup(self):
         """
         Perform final setup phase on problem in preparation for run.
@@ -1079,7 +1089,7 @@ class Problem(object, metaclass=ProblemMetaclass):
             first = True
             self._metadata['static_mode'] = False
             try:
-                model._setup_part2()
+                self.set_setup_status(_SetupStatus.POST_SETUP2)
                 self._check_collected_errors()
 
                 responses = model.get_responses(recurse=True, use_prom_ivc=True)
@@ -1159,6 +1169,39 @@ class Problem(object, metaclass=ProblemMetaclass):
             else:
                 logger = TestLogger()
             self.check_config(logger, checks=checks)
+
+    def set_setup_status(self, status, **setup_kwargs):
+        """
+        Set the setup status of the problem, running any setup steps that haven't been run yet.
+
+        If the status is already at or beyond the requested status, this method does nothing,
+        i.e., it won't reset the status to an earlier step.
+
+        Parameters
+        ----------
+        status : _SetupStatus
+            The status to set the problem to.
+        **setup_kwargs : dict
+            Keyword arguments to pass to the setup method if it hasn't already been called.
+        """
+        current_status = self._metadata['setup_status']
+        if current_status >= status:
+            return
+
+        if status >= _SetupStatus.POST_SETUP:
+            if current_status < _SetupStatus.POST_SETUP:
+                self.setup(**setup_kwargs)
+                current_status = _SetupStatus.POST_SETUP
+
+        if status >= _SetupStatus.POST_SETUP2:
+            if current_status < _SetupStatus.POST_SETUP2:
+                self.setup_part2()
+                current_status = _SetupStatus.POST_SETUP2
+
+        if status >= _SetupStatus.POST_FINAL_SETUP:
+            if current_status < _SetupStatus.POST_FINAL_SETUP:
+                self.final_setup()
+                current_status = _SetupStatus.POST_FINAL_SETUP
 
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, includes=None, excludes=None,
                        compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
@@ -2155,6 +2198,8 @@ class Problem(object, metaclass=ProblemMetaclass):
         """
         if checks is None:
             return
+
+        self.ensure_setup_status(_SetupStatus.POST_SETUP2, 'check_config')
 
         reports_dir_exists = os.path.isdir(self.get_reports_dir())
         check_file_path = None
