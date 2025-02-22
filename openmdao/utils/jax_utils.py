@@ -957,13 +957,13 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
             J = J[0]
             if len(J.shape) > 2:
                 # flatten 'variable' dimensions.  Last dimension is the batching dimension.
-                J = J.reshape(np.prod(J.shape[:-1]), J.shape[-1])
+                J = J.reshape(np.prod(J.shape[:-1], dtype=int), J.shape[-1])
             elif len(J.shape) == 1:
                 J = np.atleast_2d(J)
         else:
             # flatten 'variable' dimensions for each variable.  Last dimension is the batching
             # dimension.  Then vertically stack all the flattened 'variable' arrays.
-            J = np.vstack([j.reshape(np.prod(j.shape[:-1]), j.shape[-1]) for j in J])
+            J = np.vstack([j.reshape(np.prod(j.shape[:-1], dtype=int), j.shape[-1]) for j in J])
 
         if direction != 'fwd':
             J = J.T

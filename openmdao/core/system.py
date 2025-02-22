@@ -5752,9 +5752,11 @@ class System(object, metaclass=SystemMetaclass):
 
             for n, dyn in zip(abs_names, has_dyn_shape):
                 if dyn:
-                    all_meta['input'][n]['shape'] = ic_cache[abs_name][0].shape
+                    val = ic_cache[abs_name][0]
+                    shape = () if np.isscalar(val) else val.shape
+                    all_meta['input'][n]['shape'] = shape
                     if n in loc_meta['input']:
-                        loc_meta['input'][n]['shape'] = ic_cache[abs_name][0].shape
+                        loc_meta['input'][n]['shape'] = shape
         else:
             myrank = model.comm.rank
 

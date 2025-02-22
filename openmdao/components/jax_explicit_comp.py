@@ -3,6 +3,7 @@ An ExplicitComponent that uses JAX for derivatives.
 """
 
 import sys
+import inspect
 from types import MethodType
 from functools import partial
 
@@ -13,6 +14,7 @@ from openmdao.utils.jax_utils import jax, jit, \
     _update_subjac_sparsity, _jax_derivs2partials, _uncompress_jac, _jax2np, \
     _ensure_returns_tuple, _compute_output_shapes, _update_add_input_kwargs, \
     _update_add_output_kwargs
+from openmdao.utils.code_utils import get_return_names
 
 
 class JaxExplicitComponent(ExplicitComponent):
@@ -81,6 +83,23 @@ class JaxExplicitComponent(ExplicitComponent):
         self._static_hash = None
         self._jac_colored_ = None
         self._output_shapes = None
+
+    def _setup_check(self):
+        """
+        Check if inputs and outputs have been added, and if not, determine them from compute_primal.
+
+        Variables will have default metadata for a jax component, so inputs will be shape_by_conn
+        and outputs will use compute_shape.
+        """
+        if not self._var_rel_names['input']:
+            for argname in inspect.signature(self._orig_compute_primal).parameters:
+                self.add_input(argname)
+
+        if not self._var_rel_names['output']:
+            for i, name in enumerate(get_return_names(self._orig_compute_primal)):
+                if name is None:
+                    name = f'out_{i}'
+                self.add_output(name)
 
     def add_input(self, name, **kwargs):
         """

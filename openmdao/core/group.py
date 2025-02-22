@@ -2692,8 +2692,8 @@ class Group(System):
                                 graph.add_edge(inp, name, multi=False)
                         elif not meta['compute_shape'] and not meta['copy_shape']:
                             # check to see if we can get shape from _group_inputs
-                            fail = not meta['shape']
-                            if io == 'input':
+                            fail = meta['shape'] is None
+                            if fail and io == 'input':
                                 prom = all_abs2prom_in[name]
                                 grp_shape = get_group_input_shape(prom, grp_shapes)
                                 if grp_shape is not None:

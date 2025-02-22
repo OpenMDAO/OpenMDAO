@@ -282,6 +282,29 @@ class TestJaxComp(unittest.TestCase):
 
         p.run_model()
 
+    @parameterized.expand(itertools.product(['fwd', 'rev'],[(), (3,), (2, 3)]), name_func=parameterized_name)
+    def test_super_simple_decl(self, mode, shape):
+        class SuperSimpleJaxComp(om.JaxExplicitComponent):
+            def compute_primal(self, a, b, c):
+                x = a * b
+                y = x + c
+                z = y * 2.0
+                return x, y, z
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', SuperSimpleJaxComp())
+        p.setup(mode=mode)
+        if shape == ():
+            p.set_val('comp.a', 2.0)
+            p.set_val('comp.b', 3.0)
+            p.set_val('comp.c', 4.0)
+        else:
+            p.set_val('comp.a', np.ones(shape) * 2.0)
+            p.set_val('comp.b', np.ones(shape) * 3.0)
+            p.set_val('comp.c', np.ones(shape) * 4.0)
+
+        p.run_model()
+
     @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False], ['jax','fd']), name_func=parameterized_name)
     def test_jax_explicit_comp2primal_w_option(self, mode, matrix_free, derivs_method):
         # this component defines its own compute_primal method

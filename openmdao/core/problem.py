@@ -2199,8 +2199,6 @@ class Problem(object, metaclass=ProblemMetaclass):
         if checks is None:
             return
 
-        self.ensure_setup_status(_SetupStatus.POST_SETUP2, 'check_config')
-
         reports_dir_exists = os.path.isdir(self.get_reports_dir())
         check_file_path = None
         if logger is None:
