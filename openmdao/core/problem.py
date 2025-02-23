@@ -530,7 +530,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         object
             The value of the requested output/input variable.
         """
-        if self._metadata['setup_status'] == _SetupStatus.POST_SETUP:
+        if self._metadata['setup_status'] <= _SetupStatus.POST_SETUP2:
             abs_names = name2abs_names(self.model, name)
             if abs_names:
                 val = self.model._get_cached_val(name, abs_names, get_remote=get_remote)

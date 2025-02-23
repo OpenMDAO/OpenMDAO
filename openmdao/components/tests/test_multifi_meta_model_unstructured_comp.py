@@ -390,7 +390,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('indep', om.IndepVarComp('x', arr))
         prob.model.connect('indep.x', 'mm.x', src_indices=om.slicer[:, 1])
         prob.setup()
-        prob.final_setup()
+        prob.model._setup_part2()
 
         assert_near_equal(prob['mm.x'], np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]]))
 
