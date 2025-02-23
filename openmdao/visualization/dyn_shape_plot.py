@@ -89,8 +89,8 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
         raise RuntimeError("view_dyn_shapes cannot be called on a subsystem of the model.  "
                            "Call it with the Problem or the model.")
 
-    if system._metadata['setup_status'] < _SetupStatus.POST_SETUP2:
-        if system._metadata['setup_status'] == _SetupStatus.POST_SETUP:
+    if system._problem_meta['setup_status'] < _SetupStatus.POST_SETUP2:
+        if system._problem_meta['setup_status'] == _SetupStatus.POST_SETUP:
             system._setup_part2()
         else:
             raise RuntimeError("Can't plot dynamic shape dependency graph because it hasn't been "
