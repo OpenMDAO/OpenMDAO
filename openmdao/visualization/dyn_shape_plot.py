@@ -7,7 +7,6 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.file_utils import _load_and_exec
 import openmdao.utils.hooks as hooks
 from openmdao.utils.general_utils import common_subpath
-from openmdao.core.problem import _SetupStatus
 
 
 def _view_dyn_shapes_setup_parser(parser):
@@ -88,14 +87,6 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
     if root.pathname != '':
         raise RuntimeError("view_dyn_shapes cannot be called on a subsystem of the model.  "
                            "Call it with the Problem or the model.")
-
-    if system._problem_meta['setup_status'] < _SetupStatus.POST_SETUP2:
-        if system._problem_meta['setup_status'] == _SetupStatus.POST_SETUP:
-            system._setup_part2()
-        else:
-            raise RuntimeError("Can't plot dynamic shape dependency graph because it hasn't been "
-                               "computed yet.  view_dyn_shapes must be called after problem "
-                               "setup().")
 
     try:
         import matplotlib.pyplot as plt
