@@ -377,7 +377,7 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
             if data_source._problem_meta['setup_status'] >= _SetupStatus.POST_SETUP:
                 if data_source._problem_meta['setup_status'] < _SetupStatus.POST_SETUP2:
                     # run setup_part2 on the model
-                    data_source._problem_meta['model_ref']().setup_part2()
+                    data_source._problem_meta['model_ref']()._setup_part2()
 
         # set default behavio r for values flag
         if is_undefined(values):

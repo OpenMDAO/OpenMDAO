@@ -1062,16 +1062,6 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         return self
 
-    def setup_part2(self):
-        """
-        Complete setup of connections, sizes, and residuals.
-
-        This part of setup is called automatically from final_setup.
-        This method is called only on the top level Group.
-        """
-        self.model.setup_part2()
-        self._metadata['setup_status'] = _SetupStatus.POST_SETUP2
-
     def final_setup(self):
         """
         Perform final setup phase on problem in preparation for run.
@@ -1089,7 +1079,7 @@ class Problem(object, metaclass=ProblemMetaclass):
             first = True
             self._metadata['static_mode'] = False
             try:
-                self.set_setup_status(_SetupStatus.POST_SETUP2)
+                model._setup_part2()
                 self._check_collected_errors()
 
                 responses = model.get_responses(recurse=True, use_prom_ivc=True)
@@ -1195,7 +1185,7 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         if status >= _SetupStatus.POST_SETUP2:
             if current_status < _SetupStatus.POST_SETUP2:
-                self.setup_part2()
+                self.model._setup_part2()
                 current_status = _SetupStatus.POST_SETUP2
 
         if status >= _SetupStatus.POST_FINAL_SETUP:

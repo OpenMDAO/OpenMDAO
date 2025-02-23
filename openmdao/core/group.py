@@ -1076,7 +1076,7 @@ class Group(System):
 
         return sarr, tarr, tsize, has_dist_data
 
-    def setup_part2(self):
+    def _setup_part2(self):
         """
         Complete setup of connections, sizes, and residuals.
 
@@ -1108,6 +1108,8 @@ class Group(System):
         for recorder in self._auto_ivc_recorders:
             self._auto_ivc.add_recorder(recorder)
         self._auto_ivc_recorders = []
+
+        self._problem_meta['setup_status'] = _SetupStatus.POST_SETUP2
 
     def _final_setup(self):
         """
