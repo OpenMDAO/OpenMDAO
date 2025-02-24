@@ -11,7 +11,7 @@ import sys
 
 import openmdao.api as om
 from openmdao.utils.testing_utils import use_tempdirs
-from openmdao.utils.file_utils import get_work_dir
+from openmdao.utils.file_utils import _get_work_dir
 from openmdao.core.problem import _clear_problem_names
 from openmdao.utils.reports_system import clear_reports
 
@@ -62,14 +62,14 @@ class TestCleanOutputs(unittest.TestCase):
         with redirect_stdout(ss):
             om.clean_outputs(p1)
 
-        self.assertEqual(len(os.listdir(get_work_dir())), 1)
+        self.assertEqual(len(os.listdir(_get_work_dir())), 1)
 
         # Now specify p2 with the output directory.
         ss = io.StringIO()
         with redirect_stdout(ss):
             om.clean_outputs(p2)
 
-        self.assertEqual(len(os.listdir(get_work_dir())), 0)
+        self.assertEqual(len(os.listdir(_get_work_dir())), 0)
 
     def test_specify_non_output_dir_no_prompt(self):
 
@@ -86,7 +86,7 @@ class TestCleanOutputs(unittest.TestCase):
         # First Test that a dryrun on '.' works as expected.
         ss = io.StringIO()
         cwd = os.getcwd()
-        os.chdir(get_work_dir())
+        os.chdir(_get_work_dir())
         try:
             with redirect_stdout(ss):
                 om.clean_outputs('.', dryrun=True)
