@@ -240,7 +240,7 @@ class SqliteRecorder(CaseRecorder):
                 # used to keep track of the order of the case records across all case tables
                 c.execute("CREATE TABLE global_iterations(id INTEGER PRIMARY KEY, "
                           "record_type TEXT, rowid INT, source TEXT)")
-                
+
                 c.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                           "success INT, msg TEXT, inputs TEXT, outputs TEXT, residuals TEXT)")
@@ -493,15 +493,6 @@ class SqliteRecorder(CaseRecorder):
 
                 c.execute("INSERT INTO global_iterations(record_type, rowid, source) VALUES(?,?,?)",
                           ('driver', c.lastrowid, driver._get_name()))
-                
-                # Query to count the number of rows in the table
-                query = f"SELECT COUNT(*) FROM driver_iterations"
-                c.execute(query)
-                row_count = c.fetchone()[0]
-
-                query = f"SELECT COUNT(*) FROM global_iterations"
-                c.execute(query)
-                row_count = c.fetchone()[0]
 
     def record_iteration_problem(self, problem, data, metadata):
         """
@@ -562,29 +553,8 @@ class SqliteRecorder(CaseRecorder):
                            inputs_text, outputs_text, residuals_text, totals_blob,
                            abs_err, rel_err))
 
-                query = f"SELECT COUNT(*) FROM global_iterations"
-                c.execute(query)
-                row_count = c.fetchone()[0]
-
-                query = f"SELECT COUNT(*) FROM driver_iterations"
-                c.execute(query)
-                row_count = c.fetchone()[0]
-
                 c.execute("INSERT INTO global_iterations(record_type, rowid, source) VALUES(?,?,?)",
                           ('problem', c.lastrowid, metadata['name']))
-
-                # Query to count the number of rows in the table
-                query = f"SELECT COUNT(*) FROM problem_cases"
-                c.execute(query)
-                row_count = c.fetchone()[0]
-
-                query = f"SELECT COUNT(*) FROM global_iterations"
-                c.execute(query)
-                row_count = c.fetchone()[0]
-
-                query = f"SELECT COUNT(*) FROM driver_iterations"
-                c.execute(query)
-                row_count = c.fetchone()[0]
 
     def record_iteration_system(self, system, data, metadata):
         """

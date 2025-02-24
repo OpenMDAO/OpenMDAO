@@ -184,14 +184,16 @@ class SqliteCaseReader(BaseCaseReader):
         self._abs2meta = None
         self._conns = None
         self._global_iterations = None
-       
+
+        filename = str(filename)
+
         with sqlite3.connect(filename) as con:
             con.row_factory = sqlite3.Row
             cur = con.cursor()
 
             # get the global iterations table, and save it as an attribute
             self._global_iterations = self._get_global_iterations(cur)
-            
+
             # If separate metadata not specified, check the current db
             # to make sure it's there
             if metadata_filename is None:
@@ -239,7 +241,7 @@ class SqliteCaseReader(BaseCaseReader):
         var_info = self.problem_metadata['variables']
         self._driver_cases = DriverCases(filename, self._format_version, self._global_iterations,
                                          self._prom2abs, self._abs2prom, self._abs2meta,
-                                         self._conns, self._auto_ivc_map, var_info)
+                                         self._conns, var_info)
         self._system_cases = SystemCases(filename, self._format_version, self._global_iterations,
                                          self._prom2abs, self._abs2prom, self._abs2meta,
                                          self._conns, var_info)
@@ -799,7 +801,7 @@ class SqliteCaseReader(BaseCaseReader):
         if self._format_version >= 2:
             problem_cases = self._problem_cases.list_cases()
         global_iters = self._global_iterations
-        
+
         if not coord:
             # will return all cases
             coord = ''
