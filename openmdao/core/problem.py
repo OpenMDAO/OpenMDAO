@@ -6,6 +6,7 @@ import shutil
 import sys
 import pprint
 import os
+from copy import deepcopy
 import weakref
 import pathlib
 import textwrap
@@ -1791,7 +1792,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         desvars = self.driver._designvars
         vals = self.driver.get_design_var_values(get_remote=True, driver_scaling=driver_scaling)
         if not driver_scaling:
-            desvars = desvars.copy()
+            desvars = deepcopy(desvars)
             for meta in desvars.values():
                 scaler = meta['scaler'] if meta.get('scaler') is not None else 1.
                 adder = meta['adder'] if meta.get('adder') is not None else 0.
@@ -1819,7 +1820,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         cons = self.driver._cons
         vals = self.driver.get_constraint_values(driver_scaling=driver_scaling)
         if not driver_scaling:
-            cons = cons.copy()
+            cons = deepcopy(cons)
             for meta in cons.values():
                 scaler = meta['scaler'] if meta.get('scaler') is not None else 1.
                 adder = meta['adder'] if meta.get('adder') is not None else 0.

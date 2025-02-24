@@ -15,6 +15,7 @@ from openmdao.utils.general_utils import format_as_float_or_array, _subjac_meta2
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.utils.om_warnings import issue_warning
+from openmdao.utils.coloring import _ColSparsityJac
 
 
 _tuplist = (tuple, list)
@@ -499,6 +500,8 @@ class ImplicitComponent(Component):
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         """
         super()._setup_vectors(root_vectors)
+        if self._jacobian is None:
+            self._init_jacobian()
 
         if self._declared_residuals:
             name2slcshape = _get_slice_shape_dict(self._resid_name_shape_iter())
@@ -912,7 +915,7 @@ class ImplicitComponent(Component):
         """
         return self._list_states()
 
-    def _get_compute_primal_invals(self, inputs, outputs, discrete_inputs):
+    def _get_compute_primal_invals(self, inputs=None, outputs=None, discrete_inputs=None):
         """
         Yield inputs and outputs in the order expected by the compute_primal method.
 
@@ -930,6 +933,13 @@ class ImplicitComponent(Component):
         any
             Inputs and outputs in the order expected by the compute_primal method.
         """
+        if inputs is None:
+            inputs = self._inputs
+        if outputs is None:
+            outputs = self._outputs
+        if discrete_inputs is None:
+            discrete_inputs = self._discrete_inputs
+
         yield from inputs.values()
         yield from outputs.values()
         if discrete_inputs:
@@ -945,6 +955,32 @@ class ImplicitComponent(Component):
         else:
             return list(chain(self._var_rel_names['input'], self._var_rel_names['output'],
                               self._discrete_inputs))
+
+    def compute_fd_sparsity(self, method='fd', num_full_jacs=2, perturb_size=1e-9):
+        """
+        Use finite difference to compute a sparsity matrix.
+
+        Parameters
+        ----------
+        method : str
+            The type of finite difference to perform. Valid options are 'fd' for forward difference,
+            or 'cs' for complex step.
+        num_full_jacs : int
+            Number of times to repeat jacobian computation using random perturbations.
+        perturb_size : float
+            Size of the random perturbation.
+
+        Returns
+        -------
+        coo_matrix
+            The sparsity matrix.
+        """
+        jac = _ColSparsityJac(self)
+        for _ in self._perturbation_iter(num_full_jacs, perturb_size,
+                                         (self._inputs, self._outputs), (self._residuals,)):
+            self._apply_nonlinear()
+            self.compute_fd_jac(jac=jac, method=method)
+        return jac.get_sparsity()
 
 
 def meta2range_iter(meta_dict, names=None, shp_name='shape'):
