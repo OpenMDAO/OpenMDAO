@@ -2831,6 +2831,34 @@ class TestSqliteCaseReader(unittest.TestCase):
         for i, line in enumerate(expected_cases):
             self.assertEqual(text[i], line)
 
+    def test_alias_units(self):
+        prob = SellarProblem()
+
+        if prob.model._static_mode and prob.model._static_responses:
+            responses = prob.model._static_responses
+        else:
+            responses = prob.model._responses
+        
+        responses.clear()
+
+        prob.model.add_objective('obj', alias='objective_alias')
+        prob.setup()
+
+        prob.add_recorder(self.recorder)
+        prob.driver.add_recorder(self.recorder)
+
+        prob.run_driver()
+
+        prob.cleanup()   
+
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)     
+        cr.list_cases()
+        c = cr.get_case(0)
+        
+        units = c._get_units('obj')
+        units_alias = c._get_units('objective_alias')
+        self.assertEqual(units, units_alias)
+
     def test_list_sources_format(self):
         prob = SellarProblem()
         prob.setup()
