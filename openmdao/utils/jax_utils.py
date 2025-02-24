@@ -742,33 +742,7 @@ def benchmark_component(comp_class, methods=(None, 'cs', 'jax'), initial_vals=No
     return results
 
 
-def jax_deriv_shape(derivs):
-    """
-    Get the shape of the derivatives from a jax derivative calculation.
-
-    Parameters
-    ----------
-    derivs : tuple
-        The tuple of derivatives.
-
-    Returns
-    -------
-    list
-        The shape of the derivatives.
-    """
-    dims = []
-    if isinstance(derivs, jnp.ndarray):
-        dims.append(derivs.shape)
-    else:   # tuple
-        for d in derivs:
-            if isinstance(d, jnp.ndarray):
-                dims.append(d.shape)
-            else:
-                dims.append(jax_deriv_shape(d))
-    return dims
-
-
-if jax is None or bool(os.environ.get('JAX_DISABLE_JIT', '')):
+if jax is None:
     def _jax_register_pytree_class(cls):
         pass
 
@@ -949,8 +923,9 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
 
         Jfunc = jax.vmap(jvp_at_point, in_axes=[-1, None], out_axes=-1)
     else:
-        cotangents = get_vmap_tangents(tuple(self._outputs.values()), 'rev',
-                                       fill=np.nan if use_nan else 1.)
+        # these are really cotangents
+        tangents = get_vmap_tangents(tuple(self._outputs.values()), 'rev',
+                                     fill=np.nan if use_nan else 1.)
 
         def vjp_at_point(cotangent, contvals):
             return jax.vjp(differentiable_part, *contvals)[1](cotangent)
@@ -966,15 +941,8 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
         self._apply_nonlinear()
 
         full_invals = tuple(self._get_compute_primal_invals())
-        icontvals = full_invals[:ncontins]  # continuous inputs
 
-        if direction == 'fwd':
-            # vectorize over the last axis of the tangents
-            J = Jfunc(tangents, icontvals)
-
-        else:  # rev
-            # vectorize over last axis of cotangents
-            J = Jfunc(cotangents, icontvals)
+        J = Jfunc(tangents, full_invals[:ncontins])  # :ncontins are the continuous inputs
 
         if not isinstance(J, tuple):
             J = (J,)
@@ -983,13 +951,13 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
             J = J[0]
             if len(J.shape) > 2:
                 # flatten 'variable' dimensions.  Last dimension is the batching dimension.
-                J = J.reshape(np.prod(J.shape[:-1]), J.shape[-1])
+                J = J.reshape(np.prod(J.shape[:-1], dtype=int), J.shape[-1])
             elif len(J.shape) == 1:
                 J = np.atleast_2d(J)
         else:
             # flatten 'variable' dimensions for each variable.  Last dimension is the batching
             # dimension.  Then vertically stack all the flattened 'variable' arrays.
-            J = np.vstack([j.reshape(np.prod(j.shape[:-1]), j.shape[-1]) for j in J])
+            J = np.vstack([j.reshape(np.prod(j.shape[:-1], dtype=int), j.shape[-1]) for j in J])
 
         if direction != 'fwd':
             J = J.T
@@ -1016,6 +984,40 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
     self._update_subjac_sparsity(self.subjac_sparsity_iter(sparsity=sparsity))
 
     return sparsity, info
+
+
+def _compute_output_shapes(func, input_shapes):
+    """
+    Compute the shapes of the outputs of the function.
+
+    Parameters
+    ----------
+    func : function
+        The function to compute the output shapes for.
+    input_shapes : list
+        The shapes of the input variables, or None if the input isn't a scalar or array.
+    """
+    argnames = list(inspect.signature(func).parameters)
+    traceargs = []
+    for argname in argnames:
+        inshape = input_shapes.get(argname)
+        if inshape is not None:
+            traceargs.append(jax.ShapeDtypeStruct(inshape, jnp.float64))
+        else:
+            traceargs.append(None)
+
+    retvals = jax.eval_shape(func, *traceargs)
+    if not isinstance(retvals, tuple):
+        retvals = (retvals,)
+
+    retshapes = []
+    for val in retvals:
+        try:
+            retshapes.append(val.shape)
+        except AttributeError:
+            retshapes.append(None)
+
+    return retshapes
 
 
 def _ensure_returns_tuple(func):
@@ -1055,6 +1057,19 @@ def _ensure_returns_tuple(func):
 
 
 def _jax2np(J):
+    """
+    Take the return of vmapped jvp/vjp and convert to a numpy array.
+
+    Parameters
+    ----------
+    J : tuple or jax array
+        The return of vmapped jvp/vjp.
+
+    Returns
+    -------
+    ndarray
+        The numpy array.
+    """
     if isinstance(J, tuple):
         if len(J) == 1:
             J = np.asarray(J[0])
@@ -1278,6 +1293,30 @@ def to_compute_primal(inst, outfile='stdout', verbose=False):
     else:
         with open(outfile, 'w') as f:
             print(jaxer.get_class_src(), file=f)
+
+
+def _update_add_input_kwargs(self, name, **kwargs):
+    # override Component.add_input for jax components to use shape_by_conn by default
+    if self.options['derivs_method'] == 'jax':
+        # for jax components, make shape_by_conn the default behavior if the shape isn't defined
+        if 'val' not in kwargs:
+            if (kwargs.get('shape') is None and kwargs.get('copy_shape') is None and
+                    kwargs.get('compute_shape') is None):
+                kwargs['shape_by_conn'] = True
+
+    return kwargs
+
+
+def _update_add_output_kwargs(self, name, **kwargs):
+    # override Component.add_output for jax components to use dynamic shaping by default
+    if self.options['derivs_method'] == 'jax':
+        if 'val' not in kwargs:
+            if (kwargs.get('shape') is None and kwargs.get('copy_shape') is None and
+                    kwargs.get('compute_shape') is None):
+                # add our own compute_shape function
+                kwargs['compute_shape'] = self._get_compute_shape_func(name)
+
+    return kwargs
 
 
 if __name__ == '__main__':

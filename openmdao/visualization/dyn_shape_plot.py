@@ -123,8 +123,11 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
     node_colors = []
     node_labels = {}
     for n in graph:
-        meta = abs2meta['input'][n] if n in abs2meta['input'] else abs2meta['output'][n]
-        shape = meta['shape']
+        try:
+            meta = abs2meta['input'][n] if n in abs2meta['input'] else abs2meta['output'][n]
+            shape = meta['shape']
+        except KeyError:
+            shape = None
         if shape is None:
             shape = '?'
             node_colors.append('red')

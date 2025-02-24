@@ -316,6 +316,7 @@ class SrcIndicesTestCase(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(cm.exception.args[0],
            "\nCollected errors for problem 'src_shape_mismatch':"
@@ -347,6 +348,7 @@ class SrcIndicesTestCase(unittest.TestCase):
         p.model.set_input_defaults('x', src_shape=src_shape)
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(cm.exception.args[0],
             "\nCollected errors for problem 'src_indices_on_promotes':"

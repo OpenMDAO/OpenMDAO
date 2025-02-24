@@ -11,7 +11,8 @@ from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.jax_utils import jax, jit, _jax_register_pytree_class, \
     _compute_sparsity, get_vmap_tangents, _update_subjac_sparsity, \
-    _jax_derivs2partials, _ensure_returns_tuple
+    _jax_derivs2partials, _ensure_returns_tuple, _update_add_input_kwargs, \
+    _update_add_output_kwargs
 
 
 class JaxImplicitComponent(ImplicitComponent):
@@ -42,6 +43,7 @@ class JaxImplicitComponent(ImplicitComponent):
     def __init__(self, fallback_derivs_method='fd', **kwargs):  # noqa
         if sys.version_info < (3, 9):
             raise RuntimeError("JaxImplicitComponent requires Python 3.9 or newer.")
+
         super().__init__(**kwargs)
 
         self._tangents = {'fwd': None, 'rev': None}
@@ -62,6 +64,40 @@ class JaxImplicitComponent(ImplicitComponent):
             issue_warning(f"{self.msginfo}: JAX is not available, so "
                           f"'{fallback_derivs_method}' will be used for derivatives.")
             self.options['derivs_method'] = fallback_derivs_method
+
+    def add_input(self, name, **kwargs):
+        """
+        Add an input to the component.
+
+        This overrides the base class method to update the kwargs to use dynamic shaping by
+        default.
+
+        Parameters
+        ----------
+        name : str
+            The name of the input.
+        **kwargs : dict
+            The kwargs to pass to the base class method.
+        """
+        kwargs = _update_add_input_kwargs(self, name, **kwargs)
+        super().add_input(name, **kwargs)
+
+    def add_output(self, name, **kwargs):
+        """
+        Add an output to the component.
+
+        This overrides the base class method to update the kwargs to use dynamic shaping by
+        default.
+
+        Parameters
+        ----------
+        name : str
+            The name of the output.
+        **kwargs : dict
+            The kwargs to pass to the base class method.
+        """
+        kwargs = _update_add_output_kwargs(self, name, **kwargs)
+        super().add_output(name, **kwargs)
 
     def _setup_jax(self):
         self._sparsity = None

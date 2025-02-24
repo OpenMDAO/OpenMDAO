@@ -339,13 +339,10 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
         A dictionary containing information about the model for use by the viewer.
     """
     if isinstance(data_source, Problem):
-        root_group = data_source.model
+        # make sure at least setup_part2 has been run
+        data_source.set_setup_status(_SetupStatus.POST_SETUP2)
 
-        if not isinstance(root_group, Group):
-            # this function only makes sense when the model is a Group
-            msg = f"The model is of type {root_group.__class__.__name__}, " \
-                  "viewer data is only available if the model is a Group."
-            raise TypeError(msg)
+        root_group = data_source.model
 
         driver = data_source.driver
         driver_name = driver.__class__.__name__
@@ -375,6 +372,12 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
             # this function only makes sense when it is at the root
             msg = f"Viewer data is not available for sub-Group '{data_source.pathname}'."
             raise TypeError(msg)
+
+        if data_source._problem_meta is not None:
+            if data_source._problem_meta['setup_status'] >= _SetupStatus.POST_SETUP:
+                if data_source._problem_meta['setup_status'] < _SetupStatus.POST_SETUP2:
+                    # run setup_part2 on the model
+                    data_source._problem_meta['model_ref']()._setup_part2()
 
         # set default behavio r for values flag
         if is_undefined(values):
@@ -723,8 +726,8 @@ def _n2_cmd(options, user_args):
 
         def _view_model_w_errors(prob):
             # if problem name is not specified, use top-level problem (no delimiter in pathname)
-            pathname = prob._metadata['pathname']
-            if (probname is None and '/' not in pathname) or (probname == prob._name):
+            prob_id = prob._get_inst_id()
+            if probname is None or probname == prob_id:
                 errs = prob._metadata['saved_errors']
                 if errs:
                     # only run the n2 here if we've had setup errors. Normally we'd wait until
@@ -733,17 +736,19 @@ def _n2_cmd(options, user_args):
                        values=not options.no_values, title=options.title, path=options.path,
                        embeddable=options.embeddable)
                     # errors will result in exit at the end of the _check_collected_errors method
-                else:
-                    # no errors, generate n2 after final_setup
-                    def _view_model_no_errors(prob):
-                        n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
-                           values=not options.no_values, title=options.title, path=options.path,
-                           embeddable=options.embeddable)
-                    hooks._register_hook('final_setup', 'Problem',
-                                         post=_view_model_no_errors, exit=True)
-                    hooks._setup_hooks(prob)
 
-        hooks._register_hook('_check_collected_errors', 'Problem', pre=_view_model_w_errors)
+        # no errors, generate n2 after final_setup
+        def _view_model_no_errors(prob):
+            prob_id = prob._get_inst_id()
+            if (probname is None and '/' not in prob_id) or (probname == prob_id):
+                n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
+                   values=not options.no_values, title=options.title, path=options.path,
+                   embeddable=options.embeddable)
+
+        hooks._register_hook('_check_collected_errors', 'Problem', pre=_view_model_w_errors,
+                             inst_id=probname)
+        hooks._register_hook('final_setup', class_name='Problem', post=_view_model_no_errors,
+                             inst_id=probname, exit=True)
 
         _load_and_exec(options.file[0], user_args)
     else:

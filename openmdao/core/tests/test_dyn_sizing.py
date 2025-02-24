@@ -183,6 +183,7 @@ class TestPassSize(unittest.TestCase):
 
         with self.assertRaises(Exception) as raises_cm:
             prob.setup()
+            prob.final_setup()
 
         exception = raises_cm.exception
 
@@ -221,6 +222,7 @@ class TestPassSizeDistributed(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             prob.setup()
+            prob.final_setup()
 
         self.assertEqual(str(cm.exception),
             "\nCollected errors for problem 'serial_start':"
@@ -257,6 +259,7 @@ class TestPassSizeDistributed(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as cm:
             prob.setup()
+            prob.final_setup()
 
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'distributed_start':"
@@ -473,6 +476,7 @@ class TestDynShapes(unittest.TestCase):
         p.model.connect('comp.y2', 'sink.x2')
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
+            p.final_setup()
 
         msg = "\nCollected errors for problem 'copy_shape_in_in_unresolvable':\n   <model> <class Group>: Failed to resolve shapes for ['comp.x1', 'comp.x2']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x1' to 'comp.x1'. The source shape is (2, 3) but the target shape is None.\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x2' to 'comp.x2'. The source shape is (2, 3) but the target shape is None."
         self.assertEqual(cm.exception.args[0], msg)
@@ -494,6 +498,7 @@ class TestDynShapes(unittest.TestCase):
         p.model.connect('indep.x2', 'Gdyn.C1.x2')
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'mismatched_dyn_shapes':"
@@ -543,7 +548,7 @@ class TestDynShapes(unittest.TestCase):
         # now put the DynShapeGroupSeries in a cycle (sink.y2 feeds back into Gdyn.C1.x2). Sizes are known
         # at both ends of the model (the IVC and at the sink)
         p = om.Problem()
-        p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
+        # p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
         p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3,2, DynShapeComp))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
                                                   x1=np.ones((2,3)),
@@ -553,8 +558,9 @@ class TestDynShapes(unittest.TestCase):
         p.model.connect('Gdyn.C3.y1', 'sink.x1')
         p.model.connect('Gdyn.C3.y2', 'sink.x2')
         p.model.connect('sink.y2', 'Gdyn.C1.x2')
-        p.model.connect('indep.x1', 'Gdyn.C1.x1')
+        # p.model.connect('indep.x1', 'Gdyn.C1.x1')
         p.setup()
+        p.set_val('Gdyn.C1.x1', np.ones((2,3)))
         p.run_model()
         np.testing.assert_allclose(p['sink.y1'], np.ones((2,3))*16)
         np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*16)
@@ -604,6 +610,7 @@ class TestDynShapes(unittest.TestCase):
         p.model.connect('indep.x1', 'Gdyn.C1.x1')
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'cycle_unresolved':"
@@ -621,6 +628,7 @@ class TestDynShapes(unittest.TestCase):
         p.model.connect('indep.x1', 'sink.x1')
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'bad_copy_shape_name':"
@@ -636,6 +644,7 @@ class TestDynShapes(unittest.TestCase):
         p.model.connect('indep.x1', 'sink.x1')
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'unconnected_var_dyn_shape':"
@@ -665,6 +674,7 @@ class TestDistribDynShapes(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertTrue(
             "Collected errors for problem 'remote_distrib':\n"
@@ -817,6 +827,7 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         p.model.connect('indeps.x', 'comp.x')
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
         self.assertEqual(cm.exception.args[0],
            "\nCollected errors for problem 'ser_unknown_dist_known_err':"
            "\n   <model> <class Group>: dynamic sizing of non-distributed output 'indeps.x' from distributed input 'comp.x' is not supported because not all comp.x ranks are the same size (sizes=[3 6 9])."
@@ -833,6 +844,7 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         p.model.connect('indeps.x', 'comp.x')
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
         self.assertEqual(cm.exception.args[0],
             "\nCollected errors for problem 'dist_known_ser_unknown':"
             "\n   <model> <class Group>: dynamic sizing of non-distributed input 'comp.x' from distributed output 'indeps.x' is not supported."
@@ -847,6 +859,7 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         p.model.connect('indeps.x', 'comp.x')
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
         self.assertTrue(
             "\nCollected errors for problem 'dist_unknown_ser_known':"
             "\n   <model> <class Group>: Can't connect distributed output 'indeps.x' to "
@@ -945,7 +958,7 @@ class DynShpComp(om.ExplicitComponent):
 
     def setup(self):
         self.add_input('x', units='ft', shape_by_conn=True)
-        self.add_output('y', copy_shape='x', units='ft')
+        self.add_output('y', compute_shape=lambda shapes: shapes['x'], units='ft')
 
     def compute(self, inputs, outputs):
         outputs['y'] = 3. * inputs['x']
@@ -959,6 +972,28 @@ class PGroup(om.Group):
 
     def configure(self):
         self.set_input_defaults('x', src_shape=(2, ))
+
+
+class DanglingInputGroup(om.Group):
+
+    def setup(self):
+        self.add_subsystem('comp1', DynShpComp(), promotes_inputs=['x'])
+        self.add_subsystem('comp2', DynShpComp(), promotes_inputs=['x'])
+
+
+class TestDynShapesViaSetVal(unittest.TestCase):
+    def test_group_dangling_input(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('sub', DanglingInputGroup())
+
+        prob.setup()
+
+        # setting this sets the shape of sub.x
+        prob['sub.x'] = np.ones(2) * 7.
+        prob.run_model()
+
+        assert_near_equal(prob['sub.comp1.y'], np.ones(2) * 21.)
+        assert_near_equal(prob['sub.comp2.y'], np.ones(2) * 21.)
 
 
 class TestDynShapesWithInputConns(unittest.TestCase):
@@ -1005,6 +1040,7 @@ class TestDynShapesWithInputConns(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             prob.setup()
+            prob.final_setup()
 
         # just make sure we still get a clear error msg
 
@@ -1024,6 +1060,7 @@ class TestDynShapesWithInputConns(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             prob.setup()
+            prob.final_setup()
 
         # just make sure we still get a clear error msg
 

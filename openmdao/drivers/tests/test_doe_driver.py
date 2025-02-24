@@ -371,6 +371,7 @@ class TestDOEDriver(unittest.TestCase):
         model.add_design_var('p2.y', lower=0.0, upper=1.0)
 
         prob.setup()
+        prob.final_setup()
 
         # create a list of DOE cases
         case_gen = om.FullFactorialGenerator(levels=2)

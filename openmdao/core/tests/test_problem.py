@@ -1000,8 +1000,9 @@ class TestProblem(unittest.TestCase):
                                                      y={'val': 0.0, 'units': 'inch'}),
                                  promotes=['x'])
 
+        prob.setup()
         try:
-            prob.setup()
+            prob.final_setup()
         except Exception as err:
             self.assertEqual(str(err),
                "\nCollected errors for problem 'get_set_with_units_diff_err':"
@@ -1212,6 +1213,7 @@ class TestProblem(unittest.TestCase):
         prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.setup()
+        prob.final_setup()
 
         # default value from the class definition
         assert_near_equal(prob.get_val('x'), 1.0, 1e-6)
@@ -2230,8 +2232,8 @@ class TestProblem(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.final_setup()
 
-        msg = "<model> <class Group>: Design variable 'x' is connected to 'initial_comp.x', " + \
-              "but 'initial_comp.x' is not an IndepVarComp or ImplicitComp output."
+        msg = "\nCollected errors for problem 'output_as_input_err':\n" + \
+              "   <model> <class Group>: Design variable 'x' is connected to 'initial_comp.x', but 'initial_comp.x' is not an IndepVarComp or ImplicitComp output."
         self.assertEqual(str(cm.exception), msg)
 
     def test_design_var_connected_to_output(self):
