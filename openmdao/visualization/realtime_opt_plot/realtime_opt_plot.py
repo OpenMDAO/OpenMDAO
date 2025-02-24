@@ -251,16 +251,7 @@ def _realtime_opt_plot_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-
-    def _view_realtime_opt_plot(prob):
-        print('in _setup_recording hook')
-        # realtime_opt_plot(options.case_recorder_filename, _time_between_callbacks_in_ms)
-
-    # driver._setup_recording()
-
-    
-    hooks._register_hook('_setup_recording', 'Driver', post=_view_realtime_opt_plot)
-
+    print("in _realtime_opt_plot_cmd")
     realtime_opt_plot(options.case_recorder_filename, _time_between_callbacks_in_ms)
 
 def _update_y_min_max(name, y, y_min, y_max):
@@ -316,10 +307,10 @@ class CaseTracker:
             from openmdao.recorders.case import Case
             if self._cr is None:
                 self._cr = SqliteCaseReader(self._case_recorder_filename)
-                var_info = self._cr.problem_metadata['variables']
-            case = Case('driver', row, self._cr._driver_cases._prom2abs, self._cr._driver_cases._abs2prom, self._cr._driver_cases._abs2meta,
-                        self._cr._driver_cases._conns, self._cr._driver_cases._auto_ivc_map, self._cr._driver_cases._var_info, 
-                        self._cr._driver_cases._format_version)
+            var_info = self._cr.problem_metadata['variables']
+            case = Case('driver', row, self._cr._prom2abs, self._cr._abs2prom, self._cr._abs2meta,
+                        self._cr._conns, var_info, self._cr._format_version)
+
             return case
         else:
             return None
@@ -408,9 +399,6 @@ class CaseTracker:
                 return None
         driver_case = self._initial_cr_with_one_case.get_case(0)
 
-        # meta = driver_case.get_io_metadata(includes=name)
-        # meta2 = self._initial_cr_with_one_case.problem_metadata
-        # shape = meta[name]['shape']
         try:
             units = driver_case._get_units(name)
         except RuntimeError as err:
@@ -418,6 +406,9 @@ class CaseTracker:
                 return "Ambiguous"
             raise
         except KeyError as err:
+            meta2 = self._initial_cr_with_one_case.problem_metadata
+            if name in meta2['variables']:
+                return meta2['variables'][name]['units']
             return "Unavailable"
 
         return units
@@ -442,12 +433,6 @@ class RealTimeOptPlot(object):
         self.y_max = defaultdict(lambda: float("-inf"))
 
         def update():
-            try:
-                real_update()
-            except:
-                pass
-
-        def real_update():
             print("updating")
             new_data = self._case_tracker.get_new_case()
             if new_data is None:
