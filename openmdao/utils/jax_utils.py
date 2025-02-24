@@ -923,8 +923,9 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
 
         Jfunc = jax.vmap(jvp_at_point, in_axes=[-1, None], out_axes=-1)
     else:
-        cotangents = get_vmap_tangents(tuple(self._outputs.values()), 'rev',
-                                       fill=np.nan if use_nan else 1.)
+        # these are really cotangents
+        tangents = get_vmap_tangents(tuple(self._outputs.values()), 'rev',
+                                     fill=np.nan if use_nan else 1.)
 
         def vjp_at_point(cotangent, contvals):
             return jax.vjp(differentiable_part, *contvals)[1](cotangent)
@@ -940,15 +941,8 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
         self._apply_nonlinear()
 
         full_invals = tuple(self._get_compute_primal_invals())
-        icontvals = full_invals[:ncontins]  # continuous inputs
 
-        if direction == 'fwd':
-            # vectorize over the last axis of the tangents
-            J = Jfunc(tangents, icontvals)
-
-        else:  # rev
-            # vectorize over last axis of cotangents
-            J = Jfunc(cotangents, icontvals)
+        J = Jfunc(tangents, full_invals[:ncontins])  # :ncontins are the continuous inputs
 
         if not isinstance(J, tuple):
             J = (J,)
@@ -1305,7 +1299,7 @@ def _update_add_input_kwargs(self, name, **kwargs):
     # override Component.add_input for jax components to use shape_by_conn by default
     if self.options['derivs_method'] == 'jax':
         # for jax components, make shape_by_conn the default behavior if the shape isn't defined
-        if 'val' not in kwargs or np.isscalar(kwargs['val']):
+        if 'val' not in kwargs:
             if (kwargs.get('shape') is None and kwargs.get('copy_shape') is None and
                     kwargs.get('compute_shape') is None):
                 kwargs['shape_by_conn'] = True
@@ -1316,7 +1310,7 @@ def _update_add_input_kwargs(self, name, **kwargs):
 def _update_add_output_kwargs(self, name, **kwargs):
     # override Component.add_output for jax components to use dynamic shaping by default
     if self.options['derivs_method'] == 'jax':
-        if 'val' not in kwargs or np.isscalar(kwargs['val']):
+        if 'val' not in kwargs:
             if (kwargs.get('shape') is None and kwargs.get('copy_shape') is None and
                     kwargs.get('compute_shape') is None):
                 # add our own compute_shape function
