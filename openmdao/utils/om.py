@@ -507,25 +507,21 @@ def _rtplot_cmd(options, user_args):
     """
 
     def _view_realtime_opt_plot(problem):
-        print(f"{problem=}")
-        print(f"{problem.driver=}")
-        print(f"{problem.driver._rec_mgr._recorders=}")
-        print(f"{problem.driver._rec_mgr._recorders[0]=}")
-        print(f"{str(problem.driver._rec_mgr._recorders[0]._filepath)=}")
-
         driver = problem.driver
         if not driver:
-            raise RuntimeError("Unable to run realtime optimization progress plot because no Driver a")
-        recorder_filepath = str(problem.driver._rec_mgr._recorders[0]._filepath)
-        
-        print("in _view_realtime_opt_plot  *****************************")
-        cmd = ['openmdao', 'realtime_opt_plot', recorder_filepath]
-        cp = subprocess.run(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE)  # nosec: trusted input
-        if (cp.returncode != 0):
-            raise RuntimeError(f"Failed to create HTML file with generic model ({cp.stderr}).")
+            raise RuntimeError("Unable to run realtime optimization progress plot because no Driver")
+        if len(problem.driver._rec_mgr._recorders) == 0:
+            raise RuntimeError("Unable to run realtime optimization progress plot because no case recorder attached to Driver")
 
-        # This code runs immediately
-        print("Main program continues!")
+        recorder_filepath = str(problem.driver._rec_mgr._recorders[0]._filepath) 
+
+        print(f"in _view_realtime_opt_plot {recorder_filepath=}")      
+        cmd = ['openmdao', 'realtime_opt_plot', recorder_filepath]
+        cp = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE)  # nosec: trusted input
+
+        print(f"done running run {cmd=}")
+        if (cp.returncode != 0):
+            raise RuntimeError(f"Failed to start up the realtime plot server ({cp.stderr}).")
 
     # register the hook
     hooks._register_hook('_setup_recording', 'Problem', post=_view_realtime_opt_plot, ncalls=1)
