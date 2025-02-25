@@ -7005,6 +7005,39 @@ class _MagnitudeData(object):
                 self.fd = max(self.fd, np.max(np.abs(J)))
 
 
+def _abs_from_tol_violation(tol_violations, tv_vals, atol, rtol):
+    """
+    Given tolerance violations and their corresponding values, back out the absolute errors.
+
+    Parameters
+    ----------
+    tol_violations : list of _ErrorData
+        List of tolerance violation objects.
+    tv_vals : list of _ErrorDataVal
+        List of tolerance violation values.
+    atol : float
+        Absolute tolerance.
+    rtol : float
+        Relative tolerance.
+
+    Returns
+    -------
+    abs_errs : list of _ErrorData
+        List of absolute error objects.
+    """
+    abs_errs = []
+    for tv, tv_val in zip(tol_violations, tv_vals):
+        abs_err = _ErrorData()
+        if tv.forward is not None:
+            abs_err.forward = tv.forward + atol + rtol * tv_val.forward[1]
+        if tv.reverse is not None:
+            abs_err.reverse = tv.reverse + atol + rtol * tv_val.reverse[1]
+        if tv.fwd_rev is not None:
+            abs_err.fwd_rev = tv.fwd_rev + atol + rtol * tv_val.fwd_rev[1]
+        abs_errs.append(abs_err)
+    return abs_errs
+
+
 def _compute_deriv_errors(derivative_info, matrix_free, directional, totals, atol, rtol):
     """
     Compute the errors between derivatives that were computed using different modes or methods.
@@ -7104,6 +7137,11 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals, ato
         derivative_info['magnitude'].append(abs_mags)
         derivative_info['vals_at_max_error'].append(err_vals)
         derivative_info['steps'].append(step)
+
+    # for backward compatibility, keep 'abs error' around
+    derivative_info['abs error'] = _abs_from_tol_violation(derivative_info['tol violation'],
+                                                           derivative_info['vals_at_max_error'],
+                                                           atol, rtol)
 
     return above_tol
 
